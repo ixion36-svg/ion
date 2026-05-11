@@ -4313,6 +4313,103 @@ def _create_kfp_document(session: Session, kfp, username: str) -> int | None:
         return None
 
 
+def _extract_community_and_node(
+    raw_data: Optional[dict],
+) -> tuple[Optional[str], Optional[str]]:
+    """Extract ``(network.community_id, arkime_node)`` from a raw ES doc.
+
+    ECS surface is ``network.community_id`` (nested dict). Some pipelines
+    flatten it as ``"network.community_id"`` (literal key) or strip the
+    namespace entirely. ``arkime_node`` is custom (non-ECS); it lives
+    top-level on many setups and nested under ``arkime.node`` on others.
+
+    Returns ``(None, None)`` when raw_data is unusable.
+    """
+    if not isinstance(raw_data, dict):
+        return None, None
+
+    # community_id — nested ECS first, then flattened variants.
+    net = raw_data.get("network")
+    cid: Optional[str] = None
+    if isinstance(net, dict):
+        cid = net.get("community_id")
+    if not cid:
+        cid = raw_data.get("community_id") or raw_data.get("network.community_id")
+
+    # arkime_node — top-level OR nested. The previous v0.16.0 form had an
+    # ``or`` + ternary precedence bug that dropped the top-level value
+    # when no nested ``arkime`` dict was present.
+    node: Optional[str] = raw_data.get("arkime_node")
+    if not node:
+        arkime = raw_data.get("arkime")
+        if isinstance(arkime, dict):
+            node = arkime.get("node")
+
+    return (str(cid) if cid else None, str(node) if node else None)
+
+
+async def _build_pcap_flows(
+    *,
+    alert_ids: List[str],
+    alert_contexts: Optional[List["AlertContext"]],
+) -> List[Dict[str, Optional[str]]]:
+    """Build the per-alert PCAP-analysis flow list for ``create_case``.
+
+    Walks every alert_id; reads raw_data from the matching alert_context
+    when available, falls back to ``ElasticsearchService.get_alerts_by_ids``
+    for alerts whose context was sent without raw_data (the alerts list
+    endpoint defaults to ``include_raw=False`` so multi-select case
+    creation hits this path on most alerts).
+
+    Returns a list of ``{"community_id", "node_hint", "alert_id"}`` dicts
+    suitable for ``enqueue_pcap_analysis_for_case``. Deduping by
+    community_id happens later in the service.
+    """
+    context_map: Dict[str, "AlertContext"] = {}
+    if alert_contexts:
+        for ctx in alert_contexts:
+            if ctx and getattr(ctx, "alert_id", None):
+                context_map[ctx.alert_id] = ctx
+
+    flows: List[Dict[str, Optional[str]]] = []
+    needs_es: List[str] = []
+    for aid in alert_ids:
+        ctx = context_map.get(aid)
+        rd = getattr(ctx, "raw_data", None) if ctx else None
+        if isinstance(rd, dict) and rd:
+            cid, node = _extract_community_and_node(rd)
+            if cid:
+                flows.append({"community_id": cid, "node_hint": node, "alert_id": aid})
+                continue
+            # context present but no community_id in it — no need to
+            # round-trip ES for this alert; the doc genuinely doesn't
+            # carry the flow hash.
+            continue
+        # context missing or raw_data empty — needs ES fallback.
+        needs_es.append(aid)
+
+    if needs_es:
+        try:
+            es = get_elasticsearch_service()
+            es_alerts = await es.get_alerts_by_ids(needs_es)
+        except Exception as exc:
+            logger.debug(
+                "create_case: ES fallback for PCAP raw_data failed: %s", exc,
+            )
+            es_alerts = []
+        for alert in es_alerts or []:
+            rd = getattr(alert, "raw_data", None)
+            cid, node = _extract_community_and_node(rd)
+            if cid:
+                flows.append({
+                    "community_id": cid,
+                    "node_hint": node,
+                    "alert_id": getattr(alert, "id", None),
+                })
+
+    return flows
+
+
 @router.post("/elasticsearch/alerts/cases")
 async def create_case(
     data: CaseCreate,
@@ -4552,48 +4649,46 @@ async def create_case(
             "observable_linked audit batch failed in create_case (non-fatal)"
         )
 
-    # ── v0.16.0: PCAP auto-analysis ─────────────────────────────────────
+    # ── v0.16.0 / v0.25.x: PCAP auto-analysis ────────────────────────────
     #
-    # If any of the linked alerts carry ``network.community_id`` (the
+    # For every linked alert that carries ``network.community_id`` (the
     # Zeek/Arkime flow hash), fire a background task that:
-    #   1. resolves each community_id to an Arkime session,
+    #   1. resolves the community_id to an Arkime session,
     #   2. downloads the matching PCAP,
     #   3. parses it via ``pcap_service.parse_pcap`` (dpkt),
     #   4. posts a markdown analysis as a case Note attributed to Bob.
     #
+    # v0.25.x changes:
+    #   - **Multi-alert support.** Previously the runner took a single
+    #     ``alert_node_hint`` for all flows; now each flow carries its
+    #     own node hint so cases with alerts on different capture nodes
+    #     work correctly.
+    #   - **ES fallback for missing raw_data.** The alerts list endpoint
+    #     sends ``include_raw=False`` to cut payload, so multi-select
+    #     case creation has empty ``ctx.raw_data`` per alert. We now
+    #     fetch the missing alerts via ``get_alerts_by_ids`` (one round
+    #     trip, source = the full _source doc) so community_id can be
+    #     extracted from the actual ES document.
+    #   - **Node-hint bug fix.** The previous ``or`` + ternary form
+    #     dropped the top-level ``arkime_node`` when no nested
+    #     ``arkime`` dict was present.
+    #
     # Best-effort: never blocks case creation, never raises into the
-    # response. The community_id list is extracted from raw_data when
-    # available; we also pull a node hint from the alert's
-    # ``arkime_node`` field so the Arkime lookup can prefer the right
-    # capture node.
+    # response.
     try:
-        community_ids: List[str] = []
-        node_hint: Optional[str] = None
-        for ctx in (data.alert_contexts or []):
-            rd = ctx.raw_data or {}
-            if not isinstance(rd, dict):
-                continue
-            # ECS path: network.community_id; some pipelines flatten it.
-            net = rd.get("network") if isinstance(rd.get("network"), dict) else None
-            cid = (net or {}).get("community_id") or rd.get("community_id") or rd.get("network.community_id")
-            if cid:
-                community_ids.append(str(cid))
-            if not node_hint:
-                node_hint = (
-                    rd.get("arkime_node")
-                    or rd.get("arkime", {}).get("node") if isinstance(rd.get("arkime"), dict) else None
-                )
-
-        if community_ids:
+        pcap_flows = await _build_pcap_flows(
+            alert_ids=(data.alert_ids or []),
+            alert_contexts=data.alert_contexts,
+        )
+        if pcap_flows:
             from ion.services.pcap_analysis_service import enqueue_pcap_analysis_for_case
             enqueue_pcap_analysis_for_case(
                 case_id=new_case.id,
-                community_ids=community_ids,
-                alert_node_hint=node_hint,
+                flows=pcap_flows,
             )
             logger.info(
-                "create_case: queued PCAP auto-analysis for case %s (%d community_ids)",
-                case_number, len(set(community_ids)),
+                "create_case: queued PCAP auto-analysis for case %s (%d flows)",
+                case_number, len(pcap_flows),
             )
     except Exception as exc:  # pragma: no cover — defensive
         logger.warning("create_case: PCAP auto-analysis enqueue failed: %s", exc)
