@@ -30,8 +30,32 @@ column carries the target ``case_id`` as JSON, which the evaluator
 groups by to ensure the alerts converge on a single case rather than
 being scattered across multiple.
 
-Future kinds: ``observable_created``, ``case_closed_with_reason``,
-``regex_in_analyst_notes``, ``mitre_technique_tagged``.
+``observable_created`` (v0.25.0) — config:
+``{"min_count": int = 1, "types": Optional[list[str]] = None}``.
+Awards full points the first time at least ``min_count`` audit rows
+with ``action='observable_linked'`` exist for the session user during
+the session window. If ``types`` is supplied, only rows whose
+``details["observable_type"]`` is in the list count toward the total.
+The ``observable_linked`` audit event is emitted by ION's two extract
+endpoints (``/observables/extract-from-alert/{id}`` and
+``/observables/extract-from-case/{id}``) since v0.25.0, one row per
+new ObservableLink created. Unlike ``viewed_alert`` /
+``linked_to_case``, this evaluator does NOT scope by session fixtures
+— the L1 M5 lab grades "did the learner create any observables during
+the session window", not "did they create observables tied to a
+specific alert".
+
+``case_closed_with_reason`` (v0.25.0) — config:
+``{"required_reasons": list[str], "min_count": int = 1}``.
+Awards full points the first time at least ``min_count`` audit rows
+with ``action='case_closed'`` exist for the session user during the
+session window, where the row's ``details["closure_reason"]`` is in
+``required_reasons``. The ``case_closed`` audit event is emitted by
+``ion.web.api.update_case`` since v0.25.0 on OPEN→CLOSED transitions.
+``required_reasons`` values must be lowercase ``CaseClosureReason``
+enum values (e.g. ``"true_positive"``).
+
+Future kinds: ``regex_in_analyst_notes``, ``mitre_technique_tagged``.
 """
 
 from __future__ import annotations
@@ -193,11 +217,137 @@ def _evaluate_linked_to_case(
     return False, None
 
 
+def _evaluate_observable_created(
+    session: Session,
+    *,
+    session_id: int,  # noqa: ARG001 — kept for signature parity
+    user_id: int,
+    started_at,
+    config: dict[str, Any],
+) -> tuple[bool, Optional[int]]:
+    """Return (matched, audit_log_id_of_earliest_qualifying_row).
+
+    Match when at least ``min_count`` (default 1) audit rows with
+    ``action='observable_linked'`` exist for ``user_id`` during the
+    session window. If ``types`` is configured, only rows whose
+    ``details["observable_type"]`` is in the list count.
+
+    See module docstring for full semantics.
+    """
+    min_count = int(config.get("min_count", 1))
+    types_filter = config.get("types")
+    if types_filter is not None:
+        # Coerce to a normalised string set for membership checks.
+        types_filter = {str(t) for t in types_filter}
+
+    rows = session.execute(
+        text(
+            "SELECT id, details FROM audit_logs "
+            "WHERE action = 'observable_linked' "
+            "  AND user_id = :uid "
+            "  AND timestamp >= :since "
+            "ORDER BY id ASC"
+        ),
+        {"uid": user_id, "since": started_at},
+    ).fetchall()
+    if not rows:
+        return False, None
+
+    qualifying = 0
+    earliest_audit_id: Optional[int] = None
+    for audit_id, details_raw in rows:
+        if types_filter is not None:
+            # Parse details JSON and check the observable_type field.
+            if details_raw is None:
+                continue
+            try:
+                details = (
+                    details_raw
+                    if isinstance(details_raw, dict)
+                    else json.loads(details_raw)
+                )
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if str(details.get("observable_type", "")) not in types_filter:
+                continue
+        qualifying += 1
+        if earliest_audit_id is None:
+            earliest_audit_id = int(audit_id)
+        if qualifying >= min_count:
+            return True, earliest_audit_id
+    return False, None
+
+
+def _evaluate_case_closed_with_reason(
+    session: Session,
+    *,
+    session_id: int,  # noqa: ARG001 — kept for signature parity
+    user_id: int,
+    started_at,
+    config: dict[str, Any],
+) -> tuple[bool, Optional[int]]:
+    """Return (matched, audit_log_id_of_earliest_qualifying_row).
+
+    Match when at least ``min_count`` (default 1) audit rows with
+    ``action='case_closed'`` exist for ``user_id`` during the session
+    window, where ``details["closure_reason"]`` is in
+    ``required_reasons``.
+
+    ``required_reasons`` must be specified (a rubric author who wanted
+    to match any close would set min_count and an exhaustive reasons
+    list). If absent or empty, the evaluator never matches — defensive
+    choice rather than implicitly accepting all closures.
+    """
+    required_reasons = config.get("required_reasons") or []
+    required_set = {str(r) for r in required_reasons}
+    if not required_set:
+        return False, None
+    min_count = int(config.get("min_count", 1))
+
+    rows = session.execute(
+        text(
+            "SELECT id, details FROM audit_logs "
+            "WHERE action = 'case_closed' "
+            "  AND user_id = :uid "
+            "  AND timestamp >= :since "
+            "ORDER BY id ASC"
+        ),
+        {"uid": user_id, "since": started_at},
+    ).fetchall()
+    if not rows:
+        return False, None
+
+    qualifying = 0
+    earliest_audit_id: Optional[int] = None
+    for audit_id, details_raw in rows:
+        if details_raw is None:
+            continue
+        try:
+            details = (
+                details_raw
+                if isinstance(details_raw, dict)
+                else json.loads(details_raw)
+            )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        reason = details.get("closure_reason")
+        if reason is None or str(reason) not in required_set:
+            continue
+        qualifying += 1
+        if earliest_audit_id is None:
+            earliest_audit_id = int(audit_id)
+        if qualifying >= min_count:
+            return True, earliest_audit_id
+    return False, None
+
+
 # Registry: criterion_kind → evaluator callable
 # Each evaluator returns (matched: bool, matched_audit_log_id: Optional[int]).
 _EVALUATORS = {
     "viewed_alert": _evaluate_viewed_alert,
     "linked_to_case": _evaluate_linked_to_case,
+    "observable_created": _evaluate_observable_created,
+    "case_closed_with_reason": _evaluate_case_closed_with_reason,
 }
 
 

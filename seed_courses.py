@@ -4412,6 +4412,22 @@ Answer the 4 questions below based on the workflow you just walked.
         points=2,
     )
 
+    # v0.25.0: adaptive lab grading — observable_created criterion.
+    # The lab grades that the learner extracted at least one observable
+    # during the session window. Any of the create paths fires the
+    # observable_linked audit event: case-create extraction, the explicit
+    # POST /observables/extract-from-alert/{id} endpoint, or the case
+    # extract endpoint. No fixtures required — this kind scopes by user +
+    # timestamp only.
+    _add_lab_rubric(
+        session, m5_lab,
+        criterion_kind="observable_created",
+        config={"min_count": 1},
+        points=100,
+        sort_order=0,
+        description="Extracted at least one observable during the session.",
+    )
+
     # ── Module 6 — Phishing Triage ───────────────────────────────────────
     # End-to-end phishing alert triage: taxonomy, email auth (SPF/DKIM/DMARC/
     # ARC), lure analysis, attachment+link triage, gateway+EDR telemetry,
@@ -6670,6 +6686,21 @@ Answer the 3 questions below based on your handoff.
         ],
         explanation_md="**The TLP / PAP markings explicitly + the permitted action scope.** TLP:AMBER+STRICT means *only the recipient's SOC team* can read; the detection-eng team is part of the SOC, so they can read but the markings travel with the data. Detection-eng might want to publish a Sigma rule based on the observables — the TLP markings constrain whether the rule can be shared back to the CTI community. The handoff note must surface this: *don't ship a public rule with these IOCs in it; check with the CTI source first*. Mismarking is itself an incident; the L1's reflex on every escalation is to **propagate TLP/PAP forward** with explicit values, not assume the receiver will look it up.",
         points=2,
+    )
+
+    # v0.25.0: adaptive lab grading — case_closed_with_reason criterion.
+    # The lab is "Escalate a case via the runbook" — by definition the
+    # analyst is escalating because they've confirmed a true incident, so
+    # the grade requires closing a case with closure_reason='true_positive'
+    # during the session window. Fires the case_closed audit event added
+    # in v0.25.0 at the PATCH /api/cases/{id} update_case site.
+    _add_lab_rubric(
+        session, m7_lab,
+        criterion_kind="case_closed_with_reason",
+        config={"required_reasons": ["true_positive"]},
+        points=100,
+        sort_order=0,
+        description="Closed a case as true_positive during the session (the escalation outcome).",
     )
 
     # ── Module 8 — Common ATT&CK Techniques (L1 FINALE) ──────────────────
@@ -9525,6 +9556,21 @@ Answer the 3 questions below.
         correct=["sort_asc", "limit_n", "stats_by_field", "where_count_eq_1"],
         explanation_md="The four valid characteristics: ASC sort (rare tail), bounded LIMIT, BY a high-cardinality field, optional WHERE count==1 for singletons. `SORT count DESC` is the *opposite* of a rare-tail hunt — it surfaces the most-common values, which are typically benign noise. Aggregating over all events without a BY clause produces a single count value, useless for hunting. The L2's reflex when stack-counting: cardinality-aware threshold (M7 L7.2) — singletons for high-cardinality fields, bottom-N% for moderate-cardinality, don't bother for low-cardinality.",
         points=3,
+    )
+
+    # v0.25.0: adaptive lab grading — observable_created criterion.
+    # A real hunt produces observables: the analyst lands on a suspicious
+    # host/IP/process, then captures it as an IOC. The grade is "did the
+    # learner extract at least one observable during the session"; ION
+    # fires observable_linked when alerts are extracted, cases are
+    # created from alerts, or the explicit extract endpoint is called.
+    _add_lab_rubric(
+        session, m2_lab,
+        criterion_kind="observable_created",
+        config={"min_count": 1},
+        points=100,
+        sort_order=0,
+        description="Extracted at least one observable from the hunt during the session.",
     )
 
     # ── Module 3 — Process & file events: Execution + Defense Evasion ────
@@ -12770,6 +12816,29 @@ Answer the 3 questions below.
         correct="page_ir",
         explanation_md="**Page IR.** The cluster is page-class: low-CV beacon (M7 L7.3) + DGA-shape entropy domain (M7 L7.5) + recent registration + suspicious initiating process. Each individual signal has a real base-rate of FP, but their *intersection* on the same `source.ip` within an hour is near-zero base-rate — exactly the *intersection-of-rare-signals* page-class pattern from M7's capstone. The right L2 reflex: trigger SOAR auto-isolate (or manual host quarantine if no auto-isolate), capture process artefacts for malware analysis, engage IR. Tuning the rule is wrong — the rule found the right thing. Ignoring is wrong — outdated browser is a *vulnerability indicator* not a benign explanation.",
         points=2,
+    )
+
+    # v0.25.0: adaptive lab grading — multi-criterion rubric. The L2 beacon
+    # hunt produces both observables (the C2 domain/IP) AND a closed case
+    # (the page-class evidence becomes an incident the analyst confirms as
+    # true_positive). 60pt for extracting ≥2 observables, 40pt for the
+    # true_positive close — sums to 100. Multi-criterion exemplar #2
+    # (alongside L1 M2's viewed_alert + linked_to_case).
+    _add_lab_rubric(
+        session, m5_lab,
+        criterion_kind="observable_created",
+        config={"min_count": 2},
+        points=60,
+        sort_order=0,
+        description="Extracted at least two observables (e.g. C2 domain + source host) during the session.",
+    )
+    _add_lab_rubric(
+        session, m5_lab,
+        criterion_kind="case_closed_with_reason",
+        config={"required_reasons": ["true_positive"]},
+        points=40,
+        sort_order=1,
+        description="Closed a case as true_positive after confirming the beacon was a real incident.",
     )
 
     # ── Module 6 — Email & collaboration: Initial Access ────────────────

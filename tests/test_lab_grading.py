@@ -604,3 +604,192 @@ class TestMultiCriterionRubric:
         assert result["points_earned"] == 0
         assert result["score"] == 0
         assert not any(c["matched"] for c in result["criteria"])
+
+
+# ── v0.25.0: observable_created + case_closed_with_reason criteria ───────
+
+
+def _add_obs_audit(
+    db: Session, user_id: int, *, observable_id: int = 1, obs_type: str = "ip"
+) -> int:
+    """Insert an observable_linked audit row with details JSON the evaluator parses."""
+    import json as _json
+    row = AuditLog(
+        user_id=user_id,
+        action="observable_linked",
+        resource_type="observable",
+        resource_id=observable_id,
+        details=_json.dumps({
+            "observable_id": observable_id,
+            "observable_type": obs_type,
+            "link_type": "alert",
+            "entity_id": 100,
+            "context": obs_type,
+        }),
+    )
+    db.add(row)
+    db.flush()
+    return row.id
+
+
+def _add_case_close_audit(
+    db: Session, user_id: int, *, case_id: int = 1, reason: str = "true_positive"
+) -> int:
+    """Insert a case_closed audit row with details JSON the evaluator parses."""
+    import json as _json
+    row = AuditLog(
+        user_id=user_id,
+        action="case_closed",
+        resource_type="alert_case",
+        resource_id=case_id,
+        details=_json.dumps({
+            "case_id": case_id,
+            "case_number": f"CASE-{case_id:04d}",
+            "closure_reason": reason,
+            "closure_notes": None,
+        }),
+    )
+    db.add(row)
+    db.flush()
+    return row.id
+
+
+class TestObservableCreatedEvaluator:
+    """v0.25.0: observable_created fires when audit rows accumulate to min_count."""
+
+    def test_no_match_without_audit_rows(self, db, enrolment, lab_lesson):
+        _add_rubric(db, lab_lesson.id, kind="observable_created", points=100,
+                    config={"min_count": 1})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+        assert result["score"] == 0
+
+    def test_match_with_single_audit_row(self, db, enrolment, lab_lesson, user):
+        _add_rubric(db, lab_lesson.id, kind="observable_created", points=100,
+                    config={"min_count": 1})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        _add_obs_audit(db, user.id, observable_id=1, obs_type="ip")
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is True
+        assert result["score"] == 100
+
+    def test_min_count_unmet(self, db, enrolment, lab_lesson, user):
+        _add_rubric(db, lab_lesson.id, kind="observable_created", points=100,
+                    config={"min_count": 2})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        _add_obs_audit(db, user.id, observable_id=1)
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+
+    def test_type_filter_match(self, db, enrolment, lab_lesson, user):
+        _add_rubric(db, lab_lesson.id, kind="observable_created", points=100,
+                    config={"min_count": 1, "types": ["ip"]})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        _add_obs_audit(db, user.id, observable_id=1, obs_type="ip")
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is True
+
+    def test_type_filter_miss(self, db, enrolment, lab_lesson, user):
+        _add_rubric(db, lab_lesson.id, kind="observable_created", points=100,
+                    config={"min_count": 1, "types": ["domain"]})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        # Audit row is an ip; rubric wants domain — no match.
+        _add_obs_audit(db, user.id, observable_id=1, obs_type="ip")
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+
+
+class TestCaseClosedWithReasonEvaluator:
+    """v0.25.0: case_closed_with_reason fires when closure_reason ∈ required_reasons."""
+
+    def test_no_match_without_audit_rows(self, db, enrolment, lab_lesson):
+        _add_rubric(db, lab_lesson.id, kind="case_closed_with_reason", points=100,
+                    config={"required_reasons": ["true_positive"]})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+
+    def test_match_with_correct_reason(self, db, enrolment, lab_lesson, user):
+        _add_rubric(db, lab_lesson.id, kind="case_closed_with_reason", points=100,
+                    config={"required_reasons": ["true_positive"]})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        _add_case_close_audit(db, user.id, case_id=42, reason="true_positive")
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is True
+        assert result["score"] == 100
+
+    def test_no_match_with_wrong_reason(self, db, enrolment, lab_lesson, user):
+        _add_rubric(db, lab_lesson.id, kind="case_closed_with_reason", points=100,
+                    config={"required_reasons": ["true_positive"]})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        # Case closed with false_positive — required_reasons does not include it.
+        _add_case_close_audit(db, user.id, case_id=42, reason="false_positive")
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is False
+
+    def test_match_with_multi_reason_list(self, db, enrolment, lab_lesson, user):
+        _add_rubric(db, lab_lesson.id, kind="case_closed_with_reason", points=100,
+                    config={"required_reasons": ["true_positive", "duplicate"]})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        _add_case_close_audit(db, user.id, case_id=42, reason="duplicate")
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["criteria"][0]["matched"] is True
+
+
+class TestThreeCriterionPartialCredit:
+    """v0.25.0: 3-criterion rubric (viewed_alert + observable_created + case_closed)."""
+
+    def test_two_of_three_match_partial_score(
+        self, db, enrolment, lab_lesson, user
+    ):
+        # Mirror an L1 M7 style rubric: 30 viewed_alert + 30 observable_created
+        # + 40 case_closed_with_reason. Cover the multi-kind path explicitly.
+        _add_alert_triage_fixture(db, lab_lesson.id, "es-three-001")
+        _add_rubric(db, lab_lesson.id, kind="viewed_alert",
+                    points=30, sort_order=0)
+        _add_rubric(db, lab_lesson.id, kind="observable_created",
+                    points=30, sort_order=1, config={"min_count": 1})
+        _add_rubric(db, lab_lesson.id, kind="case_closed_with_reason",
+                    points=40, sort_order=2,
+                    config={"required_reasons": ["true_positive"]})
+        sid = lab_session_service.start_or_resume(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        mat_ids = seed_lab(
+            db, enrollment_id=enrolment.id, lesson_id=lab_lesson.id
+        )
+        lab_session_service.link_fixtures(
+            db, session_id=sid, materialised_ids=mat_ids
+        )
+        # Learner only does two of three: views the alert + extracts an
+        # observable; never closes a case. Score should be 30+30 = 60.
+        _add_audit(db, user_id=user.id, action="alert_view",
+                   resource_type="alert_triage", resource_id=mat_ids[0])
+        _add_obs_audit(db, user.id, observable_id=1)
+        result = lab_grading_service.grade_session(db, session_id=sid)
+        assert result["points_earned"] == 60
+        assert result["points_max"] == 100
+        assert result["score"] == 60
+        matched_kinds = [c["kind"] for c in result["criteria"] if c["matched"]]
+        assert "viewed_alert" in matched_kinds
+        assert "observable_created" in matched_kinds
+        assert "case_closed_with_reason" not in matched_kinds

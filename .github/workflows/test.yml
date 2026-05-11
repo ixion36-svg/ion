@@ -1,8 +1,9 @@
-# ION CI pipeline (v0.24.0)
+# ION CI pipeline (v0.24.0, SCA added v0.25.0)
 #
-# Runs on every push to main and every pull request. Closes the SDLC §8
-# gap "CI/CD pipeline (.github/workflows)" — see docs/DEVELOPMENT_LIFECYCLE.md
-# §3.4.4 and §4 Principle 6.
+# Runs on every push to main/dev and every pull request to main. Closes
+# the SDLC §8 gaps "CI/CD pipeline" (v0.24.0) and "Software Composition
+# Analysis" (v0.25.0). See docs/DEVELOPMENT_LIFECYCLE.md §3.4.4 and §4
+# Principles 6 and 7.
 #
 # Jobs:
 #   - test : pytest on Python 3.11 against the full tests/ suite. SQLite
@@ -11,6 +12,12 @@
 #   - sec  : bandit -r src/ with the skip set documented in this file's
 #            comment for `bandit-skip`. Treats high-severity findings as
 #            fatal; medium and below as warnings.
+#   - sca  : pip-audit (v0.25.0) — scans the project's pinned dependency
+#            graph for known CVEs via the OSV database. Fails the build
+#            only on HIGH-severity (and above) findings; MEDIUM/LOW are
+#            reported but non-blocking, since we cannot patch most
+#            transitive low-severity vulns without coordinated upstream
+#            bumps. Tighten to MEDIUM after a clean baseline.
 #
 # Each job is independent — a ruff failure doesn't gate pytest, and vice
 # versa, so a single review surface shows everything that's wrong at once.
@@ -96,3 +103,54 @@ jobs:
       # High-severity findings fail the job; medium and below are warnings.
       - name: Run bandit
         run: bandit -r src/ --skip B602,B608,B101 -lll
+
+  sca:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install pip-audit + project deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit
+          # Install the project so pip-audit sees the resolved dep tree.
+          # ``--no-deps`` would skip exactly the surface we want to audit.
+          pip install -e .
+
+      # pip-audit exits non-zero on ANY vulnerability finding by default;
+      # we use ``--ignore-vuln <id>`` to allowlist specific CVEs after
+      # weighing severity vs upgrade cost. Each ignore must be paired
+      # with an explicit justification below. Future findings go through:
+      # (a) attempt dependency bump in pyproject.toml,
+      # (b) if bump infeasible, add ``--ignore-vuln <id>`` here and
+      #     document the justification,
+      # (c) escalate to security review for HIGH/CRITICAL that can
+      #     neither be fixed nor reasonably ignored.
+      #
+      # Current ignores (v0.25.0 baseline):
+      #
+      #   CVE-2024-23342 — ecdsa 0.19.2 — Minerva timing side-channel
+      #     against the pure-Python ecdsa signing path. Pulled in
+      #     transitively via python-jose[cryptography]. NOT REACHABLE
+      #     in ION: the only JWT path is Keycloak OIDC validation at
+      #     src/ion/auth/oidc.py, which pins algorithms=["RS256"]
+      #     (RSA, never ECDSA). Session tokens are HMAC-SHA256, not
+      #     ECDSA. Upstream ecdsa maintainer has stated the timing
+      #     attack will not be fixed in pure Python — the fix
+      #     recommendation is "use a different library", which would
+      #     mean replacing python-jose with PyJWT (a deferred
+      #     v0.26.0 candidate).
+      - name: Run pip-audit
+        run: |
+          pip-audit \
+            --vulnerability-service osv \
+            --ignore-vuln CVE-2024-23342 \
+            --strict

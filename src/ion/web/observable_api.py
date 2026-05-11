@@ -11,9 +11,10 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_db_session, require_permission
 from ion.core.safe_errors import safe_error
-from ion.models.observable import Observable, ObservableType
+from ion.models.observable import Observable, ObservableLink, ObservableType
 from ion.models.user import User
 from ion.services.observable_service import ObservableService
+from ion.storage.auth_repository import AuditLogRepository
 
 router = APIRouter(tags=["observables"])
 
@@ -865,6 +866,63 @@ async def migrate_observables(
     return MigrationResponse(**stats)
 
 
+def _audit_new_observable_links(
+    session: Session,
+    *,
+    user_id: int,
+    max_link_id_before: int,
+) -> None:
+    """v0.25.0: emit one observable_linked audit row per new ObservableLink.
+
+    Called after an extract-and-link operation. Compares ObservableLink.id
+    against the snapshot taken before the call so only genuinely new link
+    rows fire an audit event — re-extracting an alert that already has
+    its observables linked produces zero audit rows. Best-effort; never
+    blocks the API response.
+
+    Feeds the adaptive lab-grading ``observable_created`` evaluator.
+    """
+    from sqlalchemy.orm import joinedload
+
+    try:
+        new_links = (
+            session.query(ObservableLink)
+            .options(joinedload(ObservableLink.observable))
+            .filter(ObservableLink.id > max_link_id_before)
+            .all()
+        )
+        repo = AuditLogRepository(session)
+        for link in new_links:
+            obs = link.observable
+            obs_type = (
+                obs.type.value if obs and hasattr(obs.type, "value") else str(getattr(obs, "type", "")) if obs else ""
+            )
+            try:
+                repo.create(
+                    action="observable_linked",
+                    user_id=user_id,
+                    resource_type="observable",
+                    resource_id=link.observable_id,
+                    details={
+                        "observable_id": link.observable_id,
+                        "observable_type": obs_type,
+                        "link_type": link.link_type.value if hasattr(link.link_type, "value") else str(link.link_type),
+                        "entity_id": link.entity_id,
+                        "context": link.context,
+                    },
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "observable_linked audit write failed (non-fatal)"
+                )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception(
+            "observable_linked audit batch failed (non-fatal)"
+        )
+
+
 @router.post("/observables/extract-from-alert/{alert_triage_id}")
 async def extract_from_alert(
     alert_triage_id: int,
@@ -872,8 +930,13 @@ async def extract_from_alert(
     user: User = Depends(require_permission("observable:create")),
 ) -> dict:
     """Extract and link observables from an alert."""
+    from sqlalchemy import func as _func
+    max_link_id_before = session.query(_func.coalesce(_func.max(ObservableLink.id), 0)).scalar() or 0
     service = ObservableService(session)
     observables = service.extract_and_link_from_alert(alert_triage_id)
+    _audit_new_observable_links(
+        session, user_id=user.id, max_link_id_before=int(max_link_id_before)
+    )
     session.commit()
     return {
         "extracted": len(observables),
@@ -888,8 +951,13 @@ async def extract_from_case(
     user: User = Depends(require_permission("observable:create")),
 ) -> dict:
     """Extract and link observables from all alerts in a case."""
+    from sqlalchemy import func as _func
+    max_link_id_before = session.query(_func.coalesce(_func.max(ObservableLink.id), 0)).scalar() or 0
     service = ObservableService(session)
     observables = service.extract_and_link_from_case(case_id)
+    _audit_new_observable_links(
+        session, user_id=user.id, max_link_id_before=int(max_link_id_before)
+    )
     session.commit()
     return {
         "extracted": len(observables),
