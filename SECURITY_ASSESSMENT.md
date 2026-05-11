@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-11 (v0.23.0 delta + v0.22.1 delta) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.23.0 (adaptive lab grading feature ship on main)
-**Previous Assessment Version:** 0.22.1 (2026-05-11)
+**Assessment Date:** 2026-05-11 (v0.23.1 delta + v0.23.0 delta + v0.22.1 delta) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.23.1 (bug-fix patch on main)
+**Previous Assessment Version:** 0.23.0 (2026-05-11)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -13,15 +13,52 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 |
-|----------|---------|------------|------------|------------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** (unchanged) |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** (unchanged) |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 |
+|----------|---------|------------|------------|------------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** |
 
-v0.23.0 adds the adaptive lab grading feature — three new tables, one new audit-event surface, and one new evaluator service. Net new findings: 0C / 0H / 0M / 0L. v0.22.1 closes the two Lows that the v0.22.0-rc assessment recommended addressing in a patch (L5 reasoning_text serialisation, L6 confidence_threshold_override permission tier) and resolves the three open questions (OQ4/5/6) from `_spec_v0_22.md` §7. See the deltas below.
+v0.23.1 is a bug-fix patch — investigation queue control surface, Bob auto-comment removal in favour of an on-demand endpoint, multi-alert case title format. Net new findings: 0C / 0H / 0M / 0L. The auto-comment removal also closes a **minor information-flow concern**: prior behaviour wrote Bob's verdict + summary text to a Note row authored by the system user on EVERY investigation completion, including cases that may have been opened by a different user. The new model only emits Bob output when an analyst explicitly clicks "Get Bob's analysis", which is a clear consent boundary. See the v0.23.1 Delta section below.
+
+---
+
+## v0.23.1 Delta (2026-05-11)
+
+**Net change vs v0.23.0:** +0 findings. Three new endpoint surfaces, one new auth-gated table, one removed auto-write surface. The removed surface is a small information-flow + ownership improvement (not a counted closure).
+
+### New Surface 1: `system_runtime_flags` table
+
+**File:** `src/ion/storage/database.py` (migration), `src/ion/services/system_flags.py`.
+
+A key/value table with `key VARCHAR(64) PK`, `value VARCHAR(255)`, `updated_at`, `updated_by_id` (FK users). Only read/written by the new queue-control endpoints (each `alert:triage` permission-gated) and the investigation sweep loop. No untrusted input: the only key in use (`investigation_loop_paused`) is hard-coded; the only value is `"true"` (written by the pause endpoint). Even if a future caller wrote unsanitised key/value pairs, the table has no SQL injection path because every read/write uses parameterised queries. **PASS — no untrusted data flow into this surface.**
+
+### New Surface 2: queue-control endpoints
+
+**File:** `src/ion/web/investigation_api.py`.
+
+Five new routes, all permission-gated:
+- `GET /api/investigate/loop/status` — `alert:read`
+- `POST /api/investigate/loop/pause` — `alert:triage`
+- `POST /api/investigate/loop/resume` — `alert:triage`
+- `POST /api/investigate/jobs/cancel-pending` — `alert:triage`
+- `POST /api/investigate/jobs/{inv_id}/cancel` — `alert:triage`
+
+`alert:triage` is the correct gate — pausing the sweep loop and cancelling investigations are triage-tier actions, equivalent in privilege to manually triggering a sweep (which already uses `alert:triage`). The bulk-cancel endpoint writes `status='cancelled'` only on rows where `status='pending'`; running rows are left alone. The per-row endpoint 404s on missing ids and returns `{cancelled_count: 0}` on terminal rows (no error path leaks row existence). **PASS — gate is correct, no privilege escalation, no information disclosure beyond what `alert:read` already exposes via the existing `/api/investigate/jobs` listing.**
+
+### New Surface 3: `POST /api/elasticsearch/alerts/cases/{case_id}/bob-analysis`
+
+**File:** `src/ion/web/bob_analysis_api.py`.
+
+Generates an on-demand case analysis. Permission: `case:read`. The endpoint reads case + linked triages + investigations + observables + similar closed cases (via the existing pgvector helper, same permission boundary as `/api/elasticsearch/alerts/cases/{id}/similar`) and a best-effort raw ES alert fetch. The data assembled into the LLM prompt is data the calling user can already see via existing endpoints; the endpoint adds no new information-flow boundary. The response is **not persisted** — the analyst clicks "Save as note" separately, which goes through the existing `POST /api/elasticsearch/alerts/cases/{id}/notes` endpoint (gated on `case:update`) and authors the resulting Note under the analyst's own user id, not Bob's system user. **PASS — read-only generation + analyst-authored persistence; no auto-write under any user's name without explicit consent.**
+
+### Removed Surface: investigation_service._post_to_case auto-comment
+
+**File:** `src/ion/services/investigation_service.py`.
+
+Previously this method wrote a `Note` row (authored by `User.username == 'admin'` via `_get_system_user_id`) AND posted a Kibana Cases comment on every investigation completion. Removed in v0.23.1. The remaining side-effects (IOC merge, OPEN→ACKNOWLEDGED status transitions, ES workflow-status push) are kept because they do not impersonate the analyst — they update structured fields, not free-text narrative on behalf of a human author. The information-flow improvement: Bob no longer writes content attributed to the system user on cases owned by other users, which removes a small but real ambiguity in the case audit trail.
 
 ---
 
