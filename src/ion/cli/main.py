@@ -65,9 +65,9 @@ def web(
     """Start the web UI server."""
     import uvicorn
 
-    console.print(f"[bold]Starting ION Web UI[/bold]")
+    console.print("[bold]Starting ION Web UI[/bold]")
     console.print(f"  URL: http://{host}:{port}")
-    console.print(f"  Press Ctrl+C to stop\n")
+    console.print("  Press Ctrl+C to stop\n")
 
     uvicorn.run(
         "ion.web.server:app",
@@ -108,7 +108,7 @@ def status() -> None:
         documents = document_repo.list_all()
         tags = template_repo.list_tags()
 
-        console.print(f"\n[bold]Statistics[/bold]")
+        console.print("\n[bold]Statistics[/bold]")
         console.print(f"  Templates: {len(templates)}")
         console.print(f"  Documents: {len(documents)}")
         console.print(f"  Tags: {len(tags)}")
@@ -650,7 +650,7 @@ def seed_users(
         session.commit()
         console.print("\n[green]OK[/green] Auth data seeded successfully.")
         console.print("\n[bold]Default credentials:[/bold]")
-        console.print(f"  Username: admin")
+        console.print("  Username: admin")
         console.print(f"  Password: {admin_password}")
         console.print("  [yellow]Please change the password after first login![/yellow]")
 

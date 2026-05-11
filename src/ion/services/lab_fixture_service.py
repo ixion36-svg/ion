@@ -197,6 +197,7 @@ def teardown_lab(
 
 
 import re as _re
+
 _SAFE_COLUMN_RE = _re.compile(r"^[a-z_][a-z0-9_]*$")
 
 

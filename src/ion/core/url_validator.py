@@ -117,7 +117,7 @@ def validate_url(
     if not allow_private:
         # Try to parse as IP
         if is_private_ip(hostname):
-            return False, f"Private/internal IP addresses are not allowed"
+            return False, "Private/internal IP addresses are not allowed"
 
         # Check for decimal/octal/hex IP obfuscation
         # e.g., 2130706433 = 127.0.0.1, 0x7f000001 = 127.0.0.1

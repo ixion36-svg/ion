@@ -158,7 +158,7 @@ def submit_assessment(
     level_info = MATURITY_LEVELS.get(overall, MATURITY_LEVELS[1])
 
     assessment = MaturityAssessment(
-        title=title or f"SOC Maturity Assessment",
+        title=title or "SOC Maturity Assessment",
         scores=scores,
         responses=responses,
         overall_score=overall,

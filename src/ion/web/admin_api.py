@@ -184,6 +184,7 @@ def _ssrf_safe_url(url: str, integration_type: str) -> str:
     behaves identically to the test path.
     """
     from fastapi import HTTPException
+
     from ion.core.url_validator import validate_integration_url
     ok, err = validate_integration_url(url, integration_type)
     if not ok:

@@ -4571,6 +4571,7 @@ async def create_case(
     # audit pass below knows which links are genuinely new. Feeds the
     # adaptive lab-grading observable_created evaluator.
     from sqlalchemy import func as _func
+
     from ion.models.observable import ObservableLink as _ObservableLink
     _max_link_id_before = (
         session.query(_func.coalesce(_func.max(_ObservableLink.id), 0)).scalar() or 0
@@ -4946,7 +4947,7 @@ async def get_case_timeline(
     )
     if case.closed_at:
         _ev(
-            case.closed_at, "system", f"Case closed",
+            case.closed_at, "system", "Case closed",
             detail=f"Closure reason: {case.closure_reason or 'unspecified'}",
             source_type="case", source_id=case.id,
         )

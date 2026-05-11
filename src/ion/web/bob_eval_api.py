@@ -16,7 +16,7 @@ import logging
 import math
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import HTMLResponse
@@ -24,7 +24,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import get_current_user, require_permission
+from ion.auth.dependencies import require_permission
 from ion.models.user import User
 from ion.services.bob_eval_service import (
     _MAX_SAMPLE_SIZE,
@@ -148,6 +148,7 @@ def get_run_samples(
 
     # Total count for pagination.
     from sqlalchemy import func
+
     from ion.models.bob_eval import BobEvalRunSample
     total = session.query(func.count(BobEvalRunSample.id)).filter(
         BobEvalRunSample.eval_run_id == run_id

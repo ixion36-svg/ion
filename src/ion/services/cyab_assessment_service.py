@@ -513,6 +513,7 @@ def load_answers(session, system_id: int) -> Dict[str, Any]:
     are empty.
     """
     from sqlalchemy import select  # local import to keep top of file lean
+
     from ion.models.cyab import CyabSystemAssessment
 
     legacy = session.scalars(

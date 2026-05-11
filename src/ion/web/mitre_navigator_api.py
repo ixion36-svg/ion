@@ -25,7 +25,7 @@ def get_navigator_layer(
     return JSONResponse(
         content=layer,
         headers={
-            "Content-Disposition": f'attachment; filename="ion_mitre_coverage.json"',
+            "Content-Disposition": 'attachment; filename="ion_mitre_coverage.json"',
             "Content-Type": "application/json",
         },
     )

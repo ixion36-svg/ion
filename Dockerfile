@@ -32,6 +32,24 @@ COPY src/ src/
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir .
 
+# v0.26.0: Software Bill of Materials (SBOM) generation via syft.
+# Closes the SDLC §8 SBOM gap. Generated at build time against the
+# resolved venv so the SPDX-JSON output lists every Python package
+# pip actually installed (not just declared deps). Syft is installed
+# as a pinned static binary so the SBOM-tool layer is reproducible.
+# The generated artefact is copied into Stage 2 at /app/sbom.spdx.json;
+# the syft binary itself is NOT shipped to the runtime image.
+#
+# Verify post-build:
+#   docker run --rm ixion36/ion:vX.Y.Z cat /app/sbom.spdx.json | head -20
+ARG SYFT_VERSION=1.18.1
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
+    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+      | sh -s -- -b /usr/local/bin "v${SYFT_VERSION}" && \
+    syft /opt/venv -o spdx-json=/build/sbom.spdx.json && \
+    apt-get purge -y curl && apt-get autoremove -y && \
+    rm -rf /var/lib/apt/lists/* /usr/local/bin/syft
+
 # ============================================================================
 # Stage 2: Runtime stage - minimal image
 # ============================================================================
@@ -39,7 +57,7 @@ FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.25.1" \
+      org.opencontainers.image.version="0.26.0" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
 # Install runtime libraries (PostgreSQL client + WeasyPrint deps + fonts)
@@ -62,6 +80,11 @@ WORKDIR /app
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+
+# v0.26.0: copy the SBOM generated in the builder stage. Deployers can
+# extract it with `docker cp <container>:/app/sbom.spdx.json .` for
+# supplier-assurance auditing.
+COPY --from=builder /build/sbom.spdx.json /app/sbom.spdx.json
 
 # Copy application source, seed scripts, and entrypoint
 COPY src/ src/

@@ -585,8 +585,8 @@ def export_lesson_pdf(
         )
     except (ImportError, OSError):
         # WeasyPrint missing in this environment — return HTML fallback.
-        from ion.services.pdf_export_service import _content_to_html, _build_pdf_html
-        import html as _html_mod
+
+        from ion.services.pdf_export_service import _build_pdf_html, _content_to_html
         body_html = _content_to_html(lesson.content_md or "", "markdown")
         full_html = _build_pdf_html(body_html, lesson.title or "Lesson")
         return Response(

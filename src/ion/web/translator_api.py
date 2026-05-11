@@ -29,12 +29,12 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
+from ion.auth.dependencies import require_page_permission, require_permission
+
 # v0.19.17: route exception details through safe_error so HTTP responses
 # don't carry raw `str(exc)` (file paths, internal libraries, partial
 # stack frames). The full trace still goes to the app log.
 from ion.core.safe_errors import safe_error
-
-from ion.auth.dependencies import require_page_permission, require_permission
 from ion.models.user import User
 from ion.services.translation_service import (
     MAX_FILE_BYTES,

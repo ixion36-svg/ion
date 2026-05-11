@@ -83,6 +83,11 @@ async function loadLesson() {
     _courseSlug = _lesson.course_id ? await slugForCourse(_lesson.course_id) : '';
     document.getElementById('ln-back').href = _courseSlug ? `/courses/${_courseSlug}` : '/courses';
     render();
+    // v0.26.0: populate the lab attempt history subpanel after render
+    // injects the placeholder div. No-op for non-lab lessons.
+    if (_lesson && _lesson.lesson_type === 'lab') {
+      _loadLabHistory();
+    }
   } catch (e) {
     document.getElementById('ln-root').innerHTML =
       '<div class="text-ion-coral py-8 text-center text-[13px]">Failed to load lesson: ' + escHtml(e.message) + '</div>';
@@ -123,6 +128,11 @@ function render() {
            </button>
          </div>
          <div id="ln-lab-links" style="margin-top:0.5rem;font-size:0.78rem;"></div>
+         <!-- v0.26.0: lab attempt history. JS-populated by _loadLabHistory(). -->
+         <div id="ln-lab-history" style="margin-top:0.75rem;display:none;">
+           <div style="font-weight:700;margin-bottom:0.4rem;font-size:0.82rem;color:var(--text-primary);">Lab attempt history</div>
+           <div id="ln-lab-history-list"></div>
+         </div>
        </div>`
     : '';
 
@@ -321,7 +331,13 @@ async function completeLab() {
     _renderLabCriteria(d);
     const linksEl = document.getElementById('ln-lab-links');
     if (linksEl) linksEl.innerHTML = '';
-    showToast('Lab completed', 'success');
+    // v0.26.0: refresh history subpanel so the just-completed attempt appears.
+    _loadLabHistory();
+    if (d.lesson_status === 'failed') {
+      showToast(`Lab failed (score ${d.score ?? '—'}% < pass mark ${d.pass_threshold ?? 70}%)`, 'error');
+    } else {
+      showToast('Lab completed', 'success');
+    }
     setTimeout(loadLesson, 600);
   } catch (e) { showToast('Complete failed: ' + e.message, 'error'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = 'Complete lab'; } }
@@ -349,6 +365,67 @@ function _renderLabCriteria(d) {
     + '<div style="font-weight:600;color:var(--text-primary);margin-bottom:0.25rem;font-size:0.78rem;">Rubric</div>'
     + rows
     + '</div>';
+}
+
+async function _loadLabHistory() {
+  // v0.26.0: populate the "Lab attempt history" subpanel.
+  // Renders one card per past attempt with status badge + score, plus
+  // an expandable per-criterion breakdown re-using _renderLabCriteria.
+  const host = document.getElementById('ln-lab-history');
+  const listEl = document.getElementById('ln-lab-history-list');
+  if (!host || !listEl) return;
+  if (!_lesson || _lesson.lesson_type !== 'lab') return;
+  const slug = await _getCourseSlug();
+  if (!slug) return;
+  try {
+    const resp = await fetch(`/api/courses/${slug}/lessons/${_lesson.id}/lab-sessions`);
+    if (!resp.ok) { host.style.display = 'none'; return; }
+    const data = await resp.json();
+    const sessions = data.sessions || [];
+    if (!sessions.length) { host.style.display = 'none'; return; }
+    host.style.display = 'block';
+
+    const threshold = data.pass_threshold || 70;
+    listEl.innerHTML = sessions.map((s, idx) => {
+      const cardId = `ln-lab-hist-${s.session_id}`;
+      const status = s.status || 'in_progress';
+      const colour = status === 'completed' ? '#34d399'
+        : status === 'failed' ? '#f87171'
+        : '#a5b4fc';
+      const label = status === 'completed' ? 'Pass'
+        : status === 'failed' ? 'Fail'
+        : 'In progress';
+      const score = (s.score === null || s.score === undefined) ? '—' : `${s.score}%`;
+      const completedAt = s.completed_at ? new Date(s.completed_at).toLocaleString() : '(not completed)';
+      const criteriaRows = (s.criteria || []).map(c => {
+        const mark = c.matched ? '✓' : '✗';
+        const mcol = c.matched ? '#34d399' : '#f87171';
+        return `<div style="display:flex;justify-content:space-between;gap:0.5rem;padding:0.15rem 0;font-size:0.78rem;">
+                  <span style="color:${mcol};">${mark}</span>
+                  <span style="flex:1;color:var(--text-secondary);">${escHtml(c.kind)}</span>
+                  <span style="color:var(--text-secondary);">${c.points_earned}/${c.points_max}</span>
+                </div>`;
+      }).join('');
+      const criteriaBlock = criteriaRows
+        ? `<div id="${cardId}-crit" style="display:none;margin-top:0.4rem;padding:0.3rem 0.5rem;border-top:1px solid rgba(255,255,255,0.06);">${criteriaRows}</div>`
+        : '';
+      const toggle = criteriaRows
+        ? `<button onclick="(function(){const el=document.getElementById('${cardId}-crit');if(el)el.style.display=el.style.display==='none'?'block':'none';})()" style="background:none;border:none;color:#a5b4fc;cursor:pointer;font-size:0.74rem;padding:0;">Show breakdown ▾</button>`
+        : '';
+      return `<div id="${cardId}" style="padding:0.4rem 0.6rem;margin-bottom:0.3rem;border:1px solid rgba(255,255,255,0.08);border-radius:0.4rem;background:rgba(0,0,0,0.15);">
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
+                  <span style="color:${colour};font-weight:600;font-size:0.8rem;">${label}</span>
+                  <span style="color:var(--text-primary);font-size:0.78rem;">Attempt ${s.attempt_number}</span>
+                  <span style="flex:1;text-align:right;color:var(--text-secondary);font-size:0.78rem;">${score}</span>
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.2rem;">${escHtml(completedAt)} · pass mark ${threshold}%</div>
+                ${toggle}
+                ${criteriaBlock}
+              </div>`;
+    }).join('');
+  } catch (e) {
+    host.style.display = 'none';
+  }
 }
 
 function _renderLabLinks(d) {

@@ -2518,7 +2518,7 @@ class InvestigationService:
                 INVESTIGATION_LOOP_PAUSED,
                 is_flag_true,
             )
-            from ion.storage.database import get_session_factory, get_engine
+            from ion.storage.database import get_engine, get_session_factory
 
             with get_session_factory(get_engine())() as _flag_db:
                 if is_flag_true(_flag_db, INVESTIGATION_LOOP_PAUSED):

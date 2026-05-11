@@ -199,7 +199,6 @@ def _parse_ts(ts_str: str):
 
 def _annotation_response(ann, session) -> dict:
     """Build the API response shape (deleted_at never included)."""
-    from sqlalchemy.orm import Session
     username = None
     if ann.created_by:
         username = getattr(ann.created_by, "username", None)

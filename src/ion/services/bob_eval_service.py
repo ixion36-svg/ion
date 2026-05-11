@@ -28,7 +28,6 @@ from sqlalchemy.orm import Session
 
 from ion.models.bob_eval import BobEvalRun, BobEvalRunSample
 from ion.storage.database import (
-    LOCK_BOB_EVAL_BG,
     LOCK_INVESTIGATION_BG,
     get_engine,
     get_session_factory,

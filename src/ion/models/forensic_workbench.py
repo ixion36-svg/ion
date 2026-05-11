@@ -33,7 +33,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
-from ion.models.case_evidence import FindingStatus, PinSeverity, PinSourceType
+from ion.models.case_evidence import FindingStatus
 
 if TYPE_CHECKING:
     from ion.models.forensics import ForensicCase
