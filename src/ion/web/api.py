@@ -4348,6 +4348,53 @@ def _extract_community_and_node(
     return (str(cid) if cid else None, str(node) if node else None)
 
 
+def _extract_ip_and_timestamp(
+    raw_data: Optional[dict],
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """v0.29.1: extract ``(source_ip, destination_ip, timestamp)`` for the
+    PCAP auto-analysis IP-fallback path.
+
+    Mirrors what ``arkime_api.preview_arkime`` does on the manual
+    button: when ``find_sessions_by_community_id`` returns empty, the
+    service falls back to ``find_sessions_by_ip`` anchored on the alert
+    timestamp. The auto path needs the same data for parity.
+
+    Handles ECS-nested (``source.ip``), flattened (``source.ip``), and
+    plain (``source_ip``) forms. Timestamp falls through several
+    well-known keys.
+    """
+    if not isinstance(raw_data, dict):
+        return None, None, None
+
+    def _nested(top: str, leaf: str) -> Optional[str]:
+        v = raw_data.get(top)
+        if isinstance(v, dict):
+            inner = v.get(leaf)
+            return str(inner) if inner else None
+        return None
+
+    src_ip = (
+        _nested("source", "ip")
+        or raw_data.get("source.ip")
+        or raw_data.get("source_ip")
+    )
+    dst_ip = (
+        _nested("destination", "ip")
+        or raw_data.get("destination.ip")
+        or raw_data.get("destination_ip")
+    )
+    ts = (
+        raw_data.get("@timestamp")
+        or raw_data.get("timestamp")
+        or raw_data.get("kibana.alert.original_time")
+    )
+    return (
+        str(src_ip) if src_ip else None,
+        str(dst_ip) if dst_ip else None,
+        str(ts) if ts else None,
+    )
+
+
 async def _build_pcap_flows(
     *,
     alert_ids: List[str],
@@ -4379,7 +4426,14 @@ async def _build_pcap_flows(
         if isinstance(rd, dict) and rd:
             cid, node = _extract_community_and_node(rd)
             if cid:
-                flows.append({"community_id": cid, "node_hint": node, "alert_id": aid})
+                # v0.29.1: also carry IPs + timestamp for the IP-fallback
+                # path that fires when Arkime's community_id index misses.
+                src_ip, dst_ip, ts = _extract_ip_and_timestamp(rd)
+                flows.append({
+                    "community_id": cid, "node_hint": node, "alert_id": aid,
+                    "source_ip": src_ip, "destination_ip": dst_ip,
+                    "alert_timestamp": ts,
+                })
                 continue
             # context present but no community_id in it — no need to
             # round-trip ES for this alert; the doc genuinely doesn't
@@ -4401,10 +4455,14 @@ async def _build_pcap_flows(
             rd = getattr(alert, "raw_data", None)
             cid, node = _extract_community_and_node(rd)
             if cid:
+                src_ip, dst_ip, ts = _extract_ip_and_timestamp(rd)
                 flows.append({
                     "community_id": cid,
                     "node_hint": node,
                     "alert_id": getattr(alert, "id", None),
+                    "source_ip": src_ip,
+                    "destination_ip": dst_ip,
+                    "alert_timestamp": ts,
                 })
 
     return flows

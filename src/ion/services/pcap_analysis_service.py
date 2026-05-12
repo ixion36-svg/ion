@@ -95,11 +95,22 @@ def _render_pcap_markdown(
     pcap_result: Optional[Any],
     arkime_url_root: Optional[str] = None,
     pcap_error: Optional[str] = None,
+    fallback_warning: Optional[str] = None,
 ) -> str:
-    """Render the full markdown report for one community_id."""
+    """Render the full markdown report for one community_id.
+
+    v0.29.1: emits an italic warning block when the analysis used the
+    IP-fallback path (community_id index missed but IP search hit).
+    Lets analysts know the sessions below may include unrelated traffic
+    from the same host.
+    """
     parts: List[str] = []
     parts.append(f"### {_ICON} PCAP auto-analysis — `community_id` = `{community_id}`")
     parts.append("")
+
+    if fallback_warning:
+        parts.append(f"⚠️ _{fallback_warning}_")
+        parts.append("")
 
     if arkime_url_root:
         parts.append(
@@ -196,17 +207,30 @@ async def _analyze_one(
     community_id: str,
     *,
     alert_node_hint: Optional[str] = None,
+    source_ip: Optional[str] = None,
+    destination_ip: Optional[str] = None,
+    alert_timestamp: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Run the Arkime → PCAP → dpkt pipeline for one community_id.
 
     Returns ``{"sessions": [...], "pcap_result": PcapResult|None,
-    "arkime_url_root": str, "pcap_error": str|None}``. Never raises —
-    failures land in ``pcap_error`` so the renderer can fall back
-    gracefully to metadata-only output.
+    "arkime_url_root": str, "pcap_error": str|None,
+    "search_mode": "community_id"|"ip_time"}``. Never raises — failures
+    land in ``pcap_error`` so the renderer can fall back gracefully to
+    metadata-only output.
+
+    v0.29.1: when ``find_sessions_by_community_id`` returns empty, fall
+    back to ``find_sessions_by_ip`` anchored on the alert timestamp.
+    Mirrors the manual /api/arkime/.../preview path so the auto pipeline
+    surfaces sessions in the same deployments the manual button does.
+    Many Arkime installs have a sparse community_id index (older
+    captures, mismatched hash algorithms) but a complete IP index.
     """
     out: Dict[str, Any] = {
         "sessions": [], "pcap_result": None,
         "arkime_url_root": None, "pcap_error": None,
+        "search_mode": "community_id",
+        "fallback_warning": None,
     }
     try:
         from ion.services.arkime_service import get_arkime_service
@@ -220,24 +244,72 @@ async def _analyze_one(
         return out
     out["arkime_url_root"] = getattr(svc, "url", None)
 
+    # ── Step 1: community_id lookup (preferred path) ────────────────────
+    sessions = None
     try:
         sessions = await svc.find_sessions_by_community_id(
             alert_node_hint or "", community_id,
         )
-        out["sessions"] = sessions or []
     except Exception as exc:
-        out["pcap_error"] = f"Arkime session lookup failed: {exc}"
-        return out
-
-    if not sessions:
-        out["pcap_error"] = "No Arkime sessions matched"
-        return out
-
-    try:
-        download = await svc.download_pcap_by_community_id(
-            alert_node_hint or "", community_id,
+        logger.info(
+            "pcap_analysis: community_id lookup raised for %s: %s — "
+            "will try IP fallback if available", community_id, exc,
         )
-        pcap_bytes = download.get("pcap")
+
+    # ── Step 2: IP-fallback when community_id lookup returns empty ──────
+    # Matches arkime_api.preview_arkime's manual-button logic. Only fires
+    # when we have a usable IP + the community_id path produced no hits.
+    ip_to_use = source_ip or destination_ip
+    if not sessions and ip_to_use:
+        try:
+            sessions = await svc.find_sessions_by_ip(
+                alert_node_hint or "", ip_to_use,
+                alert_timestamp=alert_timestamp,
+            )
+            if sessions:
+                out["search_mode"] = "ip_time"
+                out["fallback_warning"] = (
+                    f"community_id `{community_id}` returned no matches in "
+                    f"Arkime; fell back to IP search on `{ip_to_use}` "
+                    f"anchored on the alert timestamp. Sessions below may "
+                    f"include unrelated traffic from the same host."
+                )
+        except Exception as exc:
+            logger.info(
+                "pcap_analysis: IP-fallback also failed for %s/%s: %s",
+                community_id, ip_to_use, exc,
+            )
+
+    out["sessions"] = sessions or []
+    if not sessions:
+        out["pcap_error"] = (
+            "No Arkime sessions matched (community_id lookup empty"
+            + (f"; IP fallback on {ip_to_use} also empty)" if ip_to_use else "; no IP available for fallback)")
+        )
+        return out
+
+    # ── Step 3: PCAP download ───────────────────────────────────────────
+    # If we reached here via the IP-fallback, prefer downloading by
+    # the session id we already resolved rather than re-querying by
+    # community_id (which would just miss again).
+    try:
+        if out["search_mode"] == "community_id":
+            download = await svc.download_pcap_by_community_id(
+                alert_node_hint or "", community_id,
+            )
+            pcap_bytes = download.get("pcap")
+        else:
+            # Pull the PCAP for the first matching IP session.
+            primary = sessions[0]
+            session_id = primary.get("id") or primary.get("_id")
+            resolved_node = primary.get("node") or alert_node_hint or ""
+            if not (session_id and resolved_node):
+                raise RuntimeError(
+                    "IP-fallback session missing id/node; can't download PCAP"
+                )
+            pcap_bytes = await svc.download_pcap(
+                resolved_node, str(session_id),
+            )
     except Exception as exc:
         out["pcap_error"] = f"PCAP download failed: {exc}"
         return out
@@ -301,9 +373,14 @@ async def _runner(
     """One analysis pass per flow; one Note per result.
 
     Each flow is a ``{"community_id": str, "node_hint": Optional[str],
-    "alert_id": Optional[str]}`` dict. Flows are processed sequentially
-    so the case timeline accumulates notes in a predictable order and
-    Arkime doesn't get hammered with parallel PCAP-assembly requests.
+    "alert_id": Optional[str], "source_ip": Optional[str],
+    "destination_ip": Optional[str], "alert_timestamp": Optional[str]}``
+    dict. The IP + timestamp fields (v0.29.1) feed the IP-fallback path
+    inside ``_analyze_one`` when Arkime's community_id index misses.
+
+    Flows are processed sequentially so the case timeline accumulates
+    notes in a predictable order and Arkime doesn't get hammered with
+    parallel PCAP-assembly requests.
     """
     for flow in flows:
         cid = flow.get("community_id") or ""
@@ -312,13 +389,20 @@ async def _runner(
         node_hint = flow.get("node_hint")
         alert_id = flow.get("alert_id")
         try:
-            r = await _analyze_one(cid, alert_node_hint=node_hint)
+            r = await _analyze_one(
+                cid,
+                alert_node_hint=node_hint,
+                source_ip=flow.get("source_ip"),
+                destination_ip=flow.get("destination_ip"),
+                alert_timestamp=flow.get("alert_timestamp"),
+            )
             md = _render_pcap_markdown(
                 community_id=cid,
                 sessions=r["sessions"],
                 pcap_result=r["pcap_result"],
                 arkime_url_root=r["arkime_url_root"],
                 pcap_error=r["pcap_error"],
+                fallback_warning=r.get("fallback_warning"),
             )
             footer = f"\n\n_Generated by Bob · {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_"
             if alert_id:
