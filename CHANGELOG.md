@@ -1,5 +1,80 @@
 # Changelog
 
+## v0.26.1 — 2026-05-12
+
+Bug-fix patch surfacing two release-blockers found via the brand-new SDLC
+§3.4.8 acceptance walk-through that ships in v0.26.0 itself. The walk-
+through immediately earned its keep by exposing six dormant bugs that the
+unit-test suite had been missing for releases at a time; v0.26.1 closes
+the two that were causing visible 500s / silent crashes today. The other
+four (lab-fixture system) are scoped as a v0.27.0 bundle in
+`_backlog_v0_27.md`.
+
+### remove(ticker): pull the ticker service in its current form
+
+The ticker service (v0.10.3+) auto-flagged critical alerts open without a
+case for N minutes. The background loop has been crashing every tick on
+an enum-case mismatch: `AlertTriage.status` is stored by SQLAlchemy
+`SQLEnum(native_enum=False)` as the enum NAME `'OPEN'` but legacy rows
+plus parts of the query path used the lowercase enum value `'open'`,
+producing `LookupError: 'open' is not among the defined enum values`.
+The error has been silent in the logs at `WARNING` level; analysts saw
+no tickers populate but no surfaced failure either.
+
+Beyond the enum bug, the auto-flagging design also conflicted with the
+v0.23.x investigation-queue ownership model — tickers fired on alerts
+whose queues other workers owned. Rather than patch the enum case and
+keep an awkward subsystem, the runtime is **removed**:
+
+- Deleted: `src/ion/services/ticker_service.py`, `src/ion/web/ticker_api.py`,
+  `src/ion/web/templates/tickers.html`.
+- Removed from `server.py`: ticker router import, `include_router` call,
+  and the `_start_ticker_loop` block in startup.
+- Removed from `templates/base.html`: the global ticker strip div + CSS +
+  polling-JS block (was 404-ing every 30 s on every page after the API
+  came down).
+
+Kept dormant:
+- `src/ion/models/ticker.py` + the `tickers` DB table — legacy rows still
+  readable, `wallboard_service._collect_ticker` continues to surface them
+  read-only on the wallboard panel. New rows are no longer created
+  anywhere in the codebase.
+- The v0.10.3 `ION_TICKER_*` env vars in `.env.deploy` are now no-ops;
+  removed in a separate cleanup commit if/when the file is touched.
+
+If a future analyst-attention surface is needed, the v0.27.0+ design
+should be event-driven (subscribe to specific audit events rather than
+poll for state mismatches) and avoid the enum-case footgun by comparing
+against the enum object directly. See `_backlog_v0_27.md` "Ticker
+subsystem — design rethink".
+
+### fix(bob-eval): TemplateResponse signature collision
+
+`bob_eval_api.bob_eval_page` was the sole holdout in the codebase still
+using the legacy positional `TemplateResponse("bob_eval.html", {...})`
+signature. Modern Starlette parses that as
+`TemplateResponse(request="bob_eval.html", name={...})` — the context
+dict gets interpreted as the template name and Jinja chokes downstream
+with `TypeError: cannot use 'tuple' as a dict key (unhashable type:
+'dict')`. The Bob eval harness page at `/bob-eval` has been returning
+500 since whichever Starlette bump first enforced the new signature.
+
+Rewrote to the modern kwarg form matching the convention used by every
+other route in the codebase (`course_api.py`, `cyab_api.py`,
+`investigation_api.py`, etc.):
+
+```python
+return _templates.TemplateResponse(
+    request=request,
+    name="bob_eval.html",
+    context={...},
+)
+```
+
+Files: `src/ion/web/bob_eval_api.py:202-218`.
+
+---
+
 ## v0.26.0 — 2026-05-11
 
 Mixed plate matching the v0.22/0.23.0/0.24.0/0.25.0 shape.
