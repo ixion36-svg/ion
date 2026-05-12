@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.27.0 — 2026-05-12
+
+Threat Intel page consolidation + enhancement release. Three pages
+collapse into one unified `/threat-intel`; Threat Hunting subsystem
+removed; three new enhancements layered on the unified page.
+
+### feat(threat-intel): three pages collapse into one (7 tabs)
+
+The Threat Intel nav dropdown shrinks **6 → 3 items**:
+- ~~Threat Landscape~~ → folded into `/threat-intel` Overview + IOC Feed + Reports tabs (page redirects 302 → `/threat-intel`)
+- `/threat-intel` → **unified 7-tab page**: Overview · Threat Actors · Campaigns · IOC Feed · Reports · Watchlist · Attack Stories
+- ~~Threat Hunting~~ → **removed entirely** (page + API + service + model + table DROP migration); see "Threat Hunting removal" below
+- ~~Attack Stories~~ → folded into `/threat-intel` "Attack Stories" tab (page redirects 302)
+- Knowledge Graph (unchanged)
+- Canaries (unchanged)
+
+Two existing page routes (`/threat-landscape`, `/attack-stories`) now 302-redirect to `/threat-intel` so old bookmarks still resolve.
+
+Three templates deleted: `threat_landscape.html` (1054 LOC), `attack_stories.html` (165 LOC), `threat_hunting.html` (204 LOC). The backing API routers (`threat_landscape_api.py`, `attack_story_api.py`) stay — the unified page calls them for IOC + reports + stories data.
+
+### feat(threat-intel): colour-rich Overview + AI Threat Briefing
+
+Overview tab gains: **AI Threat Briefing** panel (amber-bordered, "Generate Briefing" button hits `POST /api/threat-landscape/ai-summary`); 4 coloured KPI cards (Actors white / Campaigns cyan / Matches coral / Unread amber); **Top Threat Actors + Latest High-Score IOCs** two-column preview; **Recently Active Observables + Recently Seen MITRE Techniques** widgets (v0.27.0 new); MITRE coverage cross-link → `/cyab/attack-heatmap`; Recent Matches table. Tabs switched from monochrome underline to **cyan pill style** with glowing active state.
+
+### feat(threat-intel): three new enhancements
+
+1. **Actor deep-dive profile page.** New route `/threat-intel/actors/{entity_id}` with KPIs, description, ATT&CK chips, campaign timeline, and a "Recently Active in Your Cases" feed pulled from local AlertCase rows matching the actor's name + aliases (≥4 chars). New endpoint `GET /api/threat-intel/actors/{id}/profile`. Actors-tab rows gain "↗ Profile" button.
+2. **IOC sightings sparkline.** IOC Feed table's "Created" column replaced with a 12-month inline SVG sparkline. Each bar = one month of distinct AlertCase rows mentioning the IOC value. New endpoint `GET /api/threat-intel/ioc-sightings?value=&months=12`. Batched 6 concurrent.
+3. **MITRE technique click-to-drill.** Click a technique on Overview → 480px side panel with tactic chips, sub-technique parent link, local cases (last 90d), and actors using it. New endpoint `GET /api/threat-intel/techniques/{id}/drill` from bundled ATT&CK v15.1.
+
+### feat(threat-intel): unified search bar
+
+Global search bar above tabs hits `GET /api/threat-intel/unified-search?q=` fanning out to OpenCTI (actors + campaigns) + local Observable + AlertCase. Results grouped by kind with deep-links.
+
+### remove(threat-hunt): half-built CRUD shell removed
+
+The Threat Hunting subsystem (v0.10.3+) was a write-only CRUD form that never integrated with `/discover` or `/cases`. Removed: `templates/threat_hunting.html` (204 LOC), `web/threat_hunt_api.py` (98 LOC), `services/threat_hunt_service.py`, ThreatHunt model. Migration drops the `threat_hunts` table (idempotent). Future hunting design should be event-driven; see `_backlog_v0_27.md`.
+
+### Tests
+
+`tests/test_v027_ti_endpoints.py` — 8 cases covering `/unified-search`, `/recently-active`, OpenCTI-down fallback, malformed observable entries, etc. 8/8 pass.
+
+---
+
 ## v0.26.1 — 2026-05-12
 
 Bug-fix patch surfacing two release-blockers found via the brand-new SDLC
