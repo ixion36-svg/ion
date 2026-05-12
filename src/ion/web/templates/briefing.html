@@ -5,6 +5,13 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+{% set tabs = [
+    {"label": "Morning Briefing", "href": "/briefing"},
+    {"label": "Shift Handover", "href": "/shift-handover"},
+    {"label": "Daily Standup", "href": "/daily-standup"}
+] %}
+{% set active_label = "Morning Briefing" %}
+{% include "_nav_tabs.html" %}
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
 <div class="flex-1 min-w-0">
   <div class="flex items-center gap-3 mb-4">
