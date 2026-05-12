@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.29.0 — 2026-05-12
+
+Operations + Knowledge nav condensation, applying the same shared
+sibling-tab-strip pattern v0.28.0 introduced for Engineering.
+
+### nav(operations): 9 → 5 items
+
+Operations dropdown collapses via three new sibling-tab groups:
+
+* **Shift Operations** (default `/briefing`) — sibling-tab strip
+  over `/briefing`, `/shift-handover`, `/daily-standup`. All three
+  are part of the same daily shift cycle; grouping them puts the
+  cycle in one place.
+* **Bob Admin** (default `/alert-prompts`) — sibling-tab strip
+  over `/alert-prompts` + `/bob-eval`. Both are Bob/AI configuration
+  surfaces.
+* **Tools** (default `/translator`) — sibling-tab strip over
+  `/translator` + `/tools`. Both are analyst toolkits.
+
+Kept top-level: SOC Workspace, Job Scheduler.
+
+### nav(knowledge): 9 → 3 items
+
+Knowledge dropdown collapses to two groups + Social Hub:
+
+* **Training** (default `/guide`) — sibling-tab strip over
+  `/guide`, `/guide/sim`, `/guide/range`, `/training`, `/courses`.
+  All five are learning/training surfaces.
+* **Reference** (default `/notes`) — sibling-tab strip over
+  `/notes`, `/templates`, `/documents`. All three are reference
+  content.
+
+Kept top-level: Social Hub.
+
+### Shared partial renamed
+
+`_eng_tabs.html` → `_nav_tabs.html` since it's now used across
+multiple nav groups (Engineering's 2 groups, Operations' 3 groups,
+Knowledge's 2 groups = 7 groups total). Comment block updated. All
+existing v0.28.0 includes updated to the new name.
+
+### Nav-bar count
+
+Top-level nav items unchanged (Dashboard + 7 dropdowns). Total deep
+links across all dropdowns: **~52 → ~30** since v0.27.0 (Threat Intel
+6→3) + v0.28.0 (Engineering 9→5) + v0.29.0 (Operations 9→5 + Knowledge
+9→3). Three releases of nav-density work; the dropdown surface is now
+~40% lighter than at v0.26.0.
+
+### Files
+
+`src/ion/web/templates/base.html` (nav rewrite for both dropdowns).
+`src/ion/web/templates/_nav_tabs.html` (renamed from `_eng_tabs.html`;
+comment updated). 13 page templates updated with the `{% include %}`
+5-liner: `briefing`, `shift_handover`, `daily_standup`,
+`alert_prompt_templates`, `bob_eval`, `translator`, `tools`, `guide`,
+`guide_sim`, `cyber_range`, `training`, `courses`, `notes`,
+`templates`, `documents`. Plus the v0.28.0 includes in 5 Engineering
+templates updated from `_eng_tabs.html` to `_nav_tabs.html`.
+
+No backend changes, no schema changes, no test changes.
+
+---
+
 ## v0.28.0 — 2026-05-12
 
 Engineering nav condensation release. Reduces the Engineering dropdown
