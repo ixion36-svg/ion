@@ -3,6 +3,13 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+{% set tabs = [
+    {"label": "Topology", "href": "/topology"},
+    {"label": "Network Map", "href": "/network-map"},
+    {"label": "Data Flow", "href": "/data-flow"}
+] %}
+{% set active_label = "Data Flow" %}
+{% include "_eng_tabs.html" %}
 <style>
 .df-page { max-width: 1400px; margin: 0 auto; }
 
