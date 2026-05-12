@@ -199,10 +199,17 @@ def bob_eval_page(
     )
     recent_runs = list_eval_runs(template_id=None, limit=20, session=session)
 
+    # v0.26.1: rewrote from the legacy positional form
+    # ``TemplateResponse("bob_eval.html", {...})`` which collided with
+    # Starlette's modern signature ``TemplateResponse(request, name,
+    # context, ...)`` — the dict was being interpreted as the ``name``
+    # argument and failed downstream with "cannot use 'tuple' as a
+    # dict key". Matches the kwargs convention used everywhere else
+    # in the codebase (see course_api.py for examples).
     return _templates.TemplateResponse(
-        "bob_eval.html",
-        {
-            "request": request,
+        request=request,
+        name="bob_eval.html",
+        context={
             "current_user": current_user,
             "templates_list": templates_list,
             "recent_runs": [r.to_dict() for r in recent_runs],

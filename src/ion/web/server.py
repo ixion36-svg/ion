@@ -103,7 +103,10 @@ from ion.web.threat_hunt_api import router as threat_hunt_router
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
-from ion.web.ticker_api import router as ticker_router
+# v0.26.1: ticker service + API removed (was crashing every tick on an
+# enum-case mismatch; the auto-flagging design also conflicted with
+# investigation queue ownership). Model + table kept dormant for any
+# future redesign — see _backlog_v0_27.md.
 from ion.web.training_sim_api import router as training_sim_router
 from ion.web.translator_api import router as translator_router
 from ion.web.triage_suggestion_api import router as triage_suggestion_router
@@ -340,7 +343,7 @@ app.include_router(course_router, prefix="")
 # v0.21.0 — Lab fixture launch/complete lifecycle
 app.include_router(labs_router, prefix="")
 app.include_router(tuning_proposal_router, prefix="")
-app.include_router(ticker_router, prefix="")
+# v0.26.1: ticker_router removed alongside the service.
 app.include_router(investigation_memory_router)
 app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
@@ -683,19 +686,14 @@ async def startup_event():
                hold_until_close=True)
 
     # ---------------------------------------------------------------
-    # Ticker background producer — flags critical alerts without a case.
-    # Honours ION_TICKER_ENABLED / _INTERVAL_S / _CRITICAL_NO_CASE_MIN.
+    # Ticker background producer — REMOVED v0.26.1.
+    # The loop crashed every tick on an enum-case mismatch
+    # (AlertTriageStatus stored as the enum NAME 'OPEN', queried for
+    # 'open') AND its auto-flagging design conflicted with the
+    # investigation-queue ownership model. Model + table kept dormant
+    # for any future redesign. See _backlog_v0_27.md for the design
+    # rethink notes.
     # ---------------------------------------------------------------
-    def _start_ticker_loop():
-        from ion.services.ticker_service import start_ticker_if_enabled
-        start_ticker_if_enabled(engine=engine)
-        logger.info("Ticker background loop started")
-    # Note: start_ticker_if_enabled grabs LOCK_TICKER_BG internally, so we
-    # just call it directly (no outer run_locked wrapper).
-    try:
-        _start_ticker_loop()
-    except Exception as exc:
-        logger.warning("Failed to start ticker loop: %s", exc)
 
     # ---------------------------------------------------------------
     # Case-embedding background producer — embeds cases via Ollama for
