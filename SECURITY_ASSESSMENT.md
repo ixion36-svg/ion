@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-12 (v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.29.0 (nav-only release on main)
-**Previous Assessment Version:** 0.28.0 (2026-05-12)
+**Assessment Date:** 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.29.1 (PCAP auto-analysis IP-fallback fix)
+**Previous Assessment Version:** 0.29.0 (2026-05-12)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -13,13 +13,15 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 |
-|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 |
+|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+
+v0.29.1 is a bug-fix patch: the PCAP auto-analysis runner now falls back to `find_sessions_by_ip` when Arkime's `community_id` index misses, matching the behaviour of the manual `/api/arkime/.../preview` button. Same Arkime credentials, same auth, same `ION_ARKIME_PCAP_TIMEOUT_S` budget — only the search-path waterfall changed (community_id → IP+timestamp). The new `_extract_ip_and_timestamp` helper reads from already-trusted alert raw_data; no new attack surface, no new permission gate. **Net new findings: 0C / 0H / 0M / 0L.**
 
 v0.29.0 continues the nav-only consolidation work from v0.28.0: Operations dropdown 9→5 and Knowledge dropdown 9→3, all via the same shared sibling-tab-strip pattern (`_nav_tabs.html`, renamed from `_eng_tabs.html`). **No backend changes, no API changes, no permission shifts, no schema migrations.** Every page involved keeps its existing route, permission gate, and template logic. The shared Jinja partial renders cyan pill-style tabs from a `tabs` array passed in by the parent template; all label and href values are author-controlled. **Net new findings: 0C / 0H / 0M / 0L.**
 

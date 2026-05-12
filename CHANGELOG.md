@@ -1,5 +1,60 @@
 # Changelog
 
+## v0.29.1 — 2026-05-12
+
+Bug-fix patch: PCAP auto-analysis IP-fallback when Arkime's community_id
+index misses.
+
+### fix(pcap-auto): IP-fallback parity with the manual /api/arkime preview
+
+**Bug.** When the case-create auto PCAP analysis fired,
+`find_sessions_by_community_id` would return empty for some alerts and
+the runner gave up with "No Arkime sessions matched" in the case Note.
+The analyst would then click the manual "Preview PCAP" button on the
+same alert and Arkime *did* find a session for it — proving the
+network traffic was there to analyse, just not via the community_id
+index path the auto runner used.
+
+**Root cause.** Two paths to Arkime were already in the codebase:
+* `pcap_analysis_service._analyze_one` (auto, fires on case-create)
+  used ONLY `find_sessions_by_community_id`.
+* `arkime_api.preview_arkime` (manual button) tries community_id first,
+  then falls back to `find_sessions_by_ip` anchored on the alert
+  timestamp when community_id returns empty.
+
+Many Arkime installs have a sparse community_id index — older
+captures, hash-algorithm version mismatches, capture nodes that don't
+populate the field — but a complete IP index. The manual button's
+IP-fallback compensated for that; the auto runner didn't.
+
+**Fix.**
+* New `_extract_ip_and_timestamp` helper in `src/ion/web/api.py`
+  pulls `source.ip` + `destination.ip` + `@timestamp` (ECS nested,
+  flattened, and plain forms) from each alert's raw_data.
+* `_build_pcap_flows` now adds those three fields to each flow dict
+  alongside `community_id` + `node_hint` + `alert_id`.
+* `pcap_analysis_service._analyze_one` now:
+  1. tries `find_sessions_by_community_id` (preferred path),
+  2. if that returns empty AND a source/destination IP is available,
+     falls back to `find_sessions_by_ip(alert_timestamp=...)`,
+  3. records `search_mode = "ip_time"` and a `fallback_warning`
+     string when the fallback fires,
+  4. downloads the PCAP via `download_pcap(node, session_id)` (using
+     the resolved session from the IP search) rather than re-querying
+     by community_id which would just miss again.
+* `_render_pcap_markdown` accepts the optional `fallback_warning` and
+  emits an italic ⚠️ block above the session table so analysts know
+  the session list may include unrelated traffic from the same host.
+* The `_runner` passes the three new flow fields through to
+  `_analyze_one`.
+
+Same Arkime credentials, same auth, same PCAP-download timeout — only
+the search-path waterfall changed. Net new findings: 0C / 0H / 0M / 0L.
+
+Files: `src/ion/web/api.py`, `src/ion/services/pcap_analysis_service.py`.
+
+---
+
 ## v0.29.0 — 2026-05-12
 
 Operations + Knowledge nav condensation, applying the same shared
