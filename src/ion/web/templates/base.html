@@ -210,61 +210,10 @@
       </div>
     </header>
 
-    <!-- Ticker strip — shown to all authenticated users. Polls every 30s.
-         Critical entries pinned non-dismissable; warning/info dismissable. -->
-    <div id="ion-ticker-strip" class="ion-ticker-strip" style="display:none;"></div>
-    <style>
-    .ion-ticker-strip { position: sticky; top: 0; z-index: 35; width: 100%; }
-    .ion-ticker-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.4rem 1rem; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 13px; }
-    .ion-ticker-item.severity-critical { background: rgba(220,38,38,0.18); color: #fecaca; }
-    .ion-ticker-item.severity-warning { background: rgba(234,179,8,0.14); color: #fde68a; }
-    .ion-ticker-item.severity-info { background: rgba(59,130,246,0.12); color: #bfdbfe; }
-    .ion-ticker-item .ion-ticker-title { font-weight: 600; }
-    .ion-ticker-item .ion-ticker-body { opacity: 0.85; }
-    .ion-ticker-item a { color: inherit; text-decoration: underline; }
-    .ion-ticker-item .ion-ticker-dismiss { margin-left: auto; background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 4px; padding: 2px 8px; cursor: pointer; font-size: 11px; opacity: 0.75; }
-    .ion-ticker-item .ion-ticker-dismiss:hover { opacity: 1; }
-    </style>
-    <script>
-    (function() {
-        const strip = document.getElementById('ion-ticker-strip');
-        if (!strip) return;
-        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        async function load() {
-            try {
-                const resp = await fetch('/api/ticker/active', { credentials: 'same-origin' });
-                if (!resp.ok) { strip.style.display = 'none'; return; }
-                const data = await resp.json();
-                const items = data.tickers || [];
-                if (!items.length) { strip.innerHTML = ''; strip.style.display = 'none'; return; }
-                strip.innerHTML = items.map(t => {
-                    const link = t.link_url ? `<a href="${esc(t.link_url)}">open</a>` : '';
-                    // v0.19.13: critical tickers are now per-user dismissable
-                    // too. Auto-resolve still kicks in once the underlying
-                    // alert is cased, so the operational visibility stays.
-                    const dismiss = `<button class="ion-ticker-dismiss" data-id="${t.id}" onclick="ionDismissTicker(${t.id})">Dismiss</button>`;
-                    const body = t.body ? `<span class="ion-ticker-body">${esc(t.body)}</span>` : '';
-                    return `<div class="ion-ticker-item severity-${esc(t.severity)}">
-                        <span class="ion-ticker-title">${esc(t.title)}</span>
-                        ${body} ${link} ${dismiss}
-                    </div>`;
-                }).join('');
-                strip.style.display = 'block';
-            } catch (e) {
-                // silent — ticker endpoint unavailable
-                strip.style.display = 'none';
-            }
-        }
-        window.ionDismissTicker = async function(id) {
-            try {
-                await fetch(`/api/ticker/${id}/dismiss`, { method: 'POST', credentials: 'same-origin' });
-            } catch (e) {}
-            load();
-        };
-        load();
-        setInterval(load, 30000);
-    })();
-    </script>
+    <!-- v0.26.1: ticker strip removed alongside the broken ticker service.
+         The /api/ticker/* endpoints are gone, so the previous polling
+         block 404'd on every page load. See _backlog_v0_27.md for the
+         design rethink on the replacement surface. -->
 
     <!-- Icon library — all SVG <symbol> defs shared across every page -->
     {% include "_icons.html" %}
