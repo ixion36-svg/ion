@@ -5,6 +5,12 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+{% set tabs = [
+    {"label": "Translator", "href": "/translator"},
+    {"label": "SOC Tools", "href": "/tools"}
+] %}
+{% set active_label = "Translator" %}
+{% include "_nav_tabs.html" %}
 
   <!-- Header -->
   <section class="mb-8 rise d-1">

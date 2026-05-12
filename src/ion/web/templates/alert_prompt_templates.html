@@ -5,6 +5,12 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+{% set tabs = [
+    {"label": "Alert Prompts", "href": "/alert-prompts"},
+    {"label": "Bob Eval Harness", "href": "/bob-eval"}
+] %}
+{% set active_label = "Alert Prompts" %}
+{% include "_nav_tabs.html" %}
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
   <div class="flex-1 min-w-0">
