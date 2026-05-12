@@ -1,0 +1,26 @@
+{# v0.28.0: shared sibling-tab strip for the Engineering pages.
+
+   Pass two args via Jinja `include`:
+     - tabs: list of {label, href, active_path_prefix}
+     - active_label: which tab to mark as active
+
+   Example:
+     {% include "_eng_tabs.html" with context %}
+     (after defining `tabs` and `active_label` in the parent page) #}
+
+<nav class="ion-tw mb-6 -mt-2">
+  <div class="flex items-center gap-1 p-1 rounded-lg bg-white/5 border border-white/10 overflow-x-auto">
+    {% for tab in tabs %}
+      {% set is_active = (tab.label == active_label) %}
+      <a href="{{ tab.href }}"
+         class="px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition
+                {% if is_active %}
+                  bg-ion-cyan text-ink-950 shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]
+                {% else %}
+                  text-slate-400 hover:text-white
+                {% endif %}">
+        {{ tab.label }}
+      </a>
+    {% endfor %}
+  </div>
+</nav>
