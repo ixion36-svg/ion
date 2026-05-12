@@ -171,7 +171,7 @@ from ion.models.sla import (
     ScheduledReport,
     SLABreachLog,
     SLAPolicy,
-    ThreatHunt,
+    # ThreatHunt removed v0.27.0; see ion/models/sla.py for the removal note.
 )
 from ion.models.social import (
     SocialComment,

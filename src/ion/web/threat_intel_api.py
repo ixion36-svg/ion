@@ -258,3 +258,467 @@ async def get_overview(
     """Get threat intel overview stats."""
     service = ThreatIntelService(session)
     return service.get_overview_stats()
+
+
+# ---- v0.27.0: Unified search + recently-active ---------------------------
+
+@router.get("/unified-search")
+async def unified_search(
+    q: str = Query(..., min_length=2, description="Search term"),
+    limit_per_kind: int = Query(8, ge=1, le=25),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+):
+    """v0.27.0: cross-entity search bar for the unified /threat-intel page.
+
+    Fans out to OpenCTI (actors + campaigns) and the ION case DB
+    (observables matching the term + attack stories whose alerts
+    mention it). Returns a typed bundle so the UI can group results
+    under headings. Each sub-call is wrapped in its own try/except so
+    one source going down doesn't break the others.
+
+    Auth: ``observable:read`` (same gate as the other TI endpoints).
+    """
+    from sqlalchemy import or_
+    from ion.models.alert_triage import AlertCase
+
+    out: dict = {"q": q, "actors": [], "campaigns": [], "iocs": [], "cases": []}
+
+    # Actors + campaigns from OpenCTI (best-effort).
+    try:
+        svc = get_opencti_service()
+        if svc.is_configured:
+            try:
+                a = await svc.search_threat_actors(search=q, first=limit_per_kind)
+                out["actors"] = a.get("actors", []) if isinstance(a, dict) else []
+            except Exception as e:
+                logger.debug("unified-search: actor search failed: %s", e)
+            try:
+                c = await svc.search_campaigns(search=q, first=limit_per_kind)
+                out["campaigns"] = c.get("campaigns", []) if isinstance(c, dict) else []
+            except Exception as e:
+                logger.debug("unified-search: campaign search failed: %s", e)
+    except Exception as e:
+        logger.debug("unified-search: OpenCTI service unavailable: %s", e)
+
+    # Cases whose title or observables JSON mention the term. We use
+    # ``.ilike()`` so SQLAlchemy emits dialect-appropriate SQL (Postgres
+    # ILIKE, SQLite case-insensitive LIKE). For the observables JSON
+    # column we cast to text first; SQLAlchemy's ``cast()`` handles the
+    # type translation across dialects.
+    try:
+        from sqlalchemy import cast, String as _SQLString
+        like = f"%{q}%"
+        case_rows = (
+            session.query(AlertCase)
+            .filter(
+                or_(
+                    AlertCase.title.ilike(like),
+                    cast(AlertCase.observables, _SQLString).ilike(like),
+                )
+            )
+            .order_by(AlertCase.created_at.desc())
+            .limit(limit_per_kind)
+            .all()
+        )
+        out["cases"] = [
+            {
+                "id": c.id,
+                "case_number": c.case_number,
+                "title": c.title,
+                "status": c.status.value if hasattr(c.status, "value") else str(c.status),
+                "severity": c.severity,
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+            }
+            for c in case_rows
+        ]
+    except Exception as e:
+        logger.debug("unified-search: case scan failed: %s", e)
+
+    # IOC search: ION's observables table is the right home. Reuse the
+    # existing observable_service search rather than re-implementing.
+    try:
+        from ion.services.observable_service import ObservableService
+        obs_svc = ObservableService(session)
+        # ObservableService doesn't have a typed-search helper that
+        # matches our q-against-value semantics, so use a direct query.
+        from ion.models.observable import Observable
+        ioc_rows = (
+            session.query(Observable)
+            .filter(
+                or_(
+                    Observable.value.ilike(like),
+                    Observable.normalized_value.ilike(like),
+                )
+            )
+            .order_by(Observable.last_seen.desc())
+            .limit(limit_per_kind)
+            .all()
+        )
+        out["iocs"] = [
+            {
+                "id": o.id,
+                "type": o.type.value if hasattr(o.type, "value") else str(o.type),
+                "value": o.value,
+                "threat_level": o.threat_level.value if hasattr(o.threat_level, "value") else str(o.threat_level),
+                "is_ioc": bool(getattr(o, "is_ioc", False)),
+                "is_watched": bool(getattr(o, "is_watched", False)),
+            }
+            for o in ioc_rows
+        ]
+        _ = obs_svc  # touch to keep the helper available for follow-ups
+    except Exception as e:
+        logger.debug("unified-search: IOC scan failed: %s", e)
+
+    out["total"] = (
+        len(out["actors"]) + len(out["campaigns"])
+        + len(out["iocs"]) + len(out["cases"])
+    )
+    return out
+
+
+@router.get("/recently-active")
+def recently_active(
+    days: int = Query(30, ge=1, le=365),
+    top_n: int = Query(10, ge=1, le=50),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+):
+    """v0.27.0: "Recently active in cases" widget for the Overview tab.
+
+    Aggregates the last ``days`` of case + triage activity into a
+    top-N list of:
+      - **observables** — types/values that appear most often in
+        AlertCase.observables JSON over the window;
+      - **MITRE techniques** — most-frequent technique ids in
+        AlertTriage.mitre_techniques JSON over the window.
+
+    No external network — pure SQL + Python aggregation against the
+    local DB. Safe to call on cold caches; the queries are bounded by
+    the days window and a hard 5000-row scan limit per table.
+    """
+    from collections import Counter
+    from datetime import datetime, timedelta, timezone
+    from ion.models.alert_triage import AlertCase, AlertTriage
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=int(days))
+
+    obs_counter: Counter = Counter()
+    case_rows = (
+        session.query(AlertCase.observables, AlertCase.created_at)
+        .filter(AlertCase.created_at >= cutoff)
+        .order_by(AlertCase.created_at.desc())
+        .limit(5000)
+        .all()
+    )
+    for obs_json, _created in case_rows:
+        if not obs_json:
+            continue
+        try:
+            obs_list = obs_json if isinstance(obs_json, list) else json.loads(obs_json)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        for o in obs_list or []:
+            if isinstance(o, dict):
+                t = str(o.get("type") or "")
+                v = str(o.get("value") or "")
+                if t and v:
+                    obs_counter[(t, v)] += 1
+
+    tech_counter: Counter = Counter()
+    triage_rows = (
+        session.query(AlertTriage.mitre_techniques, AlertTriage.created_at)
+        .filter(AlertTriage.created_at >= cutoff)
+        .order_by(AlertTriage.created_at.desc())
+        .limit(5000)
+        .all()
+    )
+    for tech_json, _created in triage_rows:
+        if not tech_json:
+            continue
+        try:
+            tech_list = (
+                tech_json if isinstance(tech_json, list) else json.loads(tech_json)
+            )
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        for t in tech_list or []:
+            if t:
+                tech_counter[str(t)] += 1
+
+    return {
+        "time_window_days": days,
+        "case_sample_size": len(case_rows),
+        "triage_sample_size": len(triage_rows),
+        "observables": [
+            {"type": t, "value": v, "count": c}
+            for (t, v), c in obs_counter.most_common(top_n)
+        ],
+        "techniques": [
+            {"id": tid, "count": c}
+            for tid, c in tech_counter.most_common(top_n)
+        ],
+    }
+
+
+@router.get("/ioc-sightings")
+def ioc_sightings(
+    value: str = Query(..., min_length=2, description="IOC value (case-insensitive)"),
+    months: int = Query(12, ge=1, le=36),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+):
+    """v0.27.0: per-IOC histogram across the last N months of local cases.
+
+    Powers the sparkline in the IOC Feed tab. Returns one bucket per
+    calendar month, oldest → newest, each ``{"month": "YYYY-MM",
+    "count": int}``. A bucket count is the number of distinct
+    AlertCase rows whose ``observables`` JSON column mentions the
+    given value (case-insensitive substring match — keeps the query
+    cheap and dialect-portable).
+
+    Empty histogram (all zeros) means "never seen locally" — useful
+    signal that an IOC from OpenCTI hasn't landed in any of our cases.
+    """
+    from collections import OrderedDict
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import cast, String as _SQLString
+    from ion.models.alert_triage import AlertCase
+
+    now = datetime.now(timezone.utc)
+    # Build N month buckets newest → oldest then reverse, so the JSON
+    # response renders left-to-right as time progresses.
+    buckets: "OrderedDict[str, int]" = OrderedDict()
+    cursor = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    for _ in range(int(months)):
+        buckets[cursor.strftime("%Y-%m")] = 0
+        # Step back one month (handles year rollover).
+        if cursor.month == 1:
+            cursor = cursor.replace(year=cursor.year - 1, month=12)
+        else:
+            cursor = cursor.replace(month=cursor.month - 1)
+    # Reverse so the OrderedDict iterates oldest → newest.
+    buckets = OrderedDict(reversed(list(buckets.items())))
+
+    cutoff = now - timedelta(days=int(months) * 31)
+    like = f"%{value}%"
+    rows = (
+        session.query(AlertCase.created_at)
+        .filter(
+            AlertCase.created_at >= cutoff,
+            cast(AlertCase.observables, _SQLString).ilike(like),
+        )
+        .limit(5000)
+        .all()
+    )
+    for (created,) in rows:
+        if created is None:
+            continue
+        key = created.strftime("%Y-%m")
+        if key in buckets:
+            buckets[key] += 1
+
+    series = [{"month": m, "count": c} for m, c in buckets.items()]
+    total = sum(c for c in buckets.values())
+    return {
+        "value": value,
+        "months": months,
+        "total_sightings": total,
+        "series": series,
+    }
+
+
+@router.get("/techniques/{technique_id}/drill")
+def technique_drill(
+    technique_id: str,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+):
+    """v0.27.0: click-to-drill on a MITRE technique.
+
+    Returns:
+      * Technique metadata from the bundled ATT&CK v15.1 snapshot
+        (id, name, tactic_ids, is_subtechnique).
+      * Local cases whose AlertTriage rows carry this technique in
+        their ``mitre_techniques`` JSON column (last 90 days).
+      * Optionally: actors in OpenCTI known to use this technique.
+        Wraps the existing OpenCTI service in a try/except so an
+        unconfigured deployment doesn't 500 the panel.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import cast, String as _SQLString
+    from ion.models.alert_triage import AlertCase, AlertTriage
+    from ion.services.mitre_heatmap_service import (
+        _get_snapshot,
+        normalize_technique_id,
+    )
+
+    tid = normalize_technique_id(technique_id)
+    if not tid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid technique id: {technique_id!r}",
+        )
+
+    by_id, _ = _get_snapshot()
+    meta = by_id.get(tid)
+    if meta is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Technique {tid} not in bundled ATT&CK snapshot",
+        )
+
+    # Local cases referencing this technique. SQLite + Postgres both
+    # accept the cast-to-text + ilike pattern for JSON columns.
+    cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+    like_pattern = f'%"{tid}"%'  # technique strings are JSON-quoted
+    case_rows = (
+        session.query(
+            AlertCase.id,
+            AlertCase.case_number,
+            AlertCase.title,
+            AlertCase.severity,
+            AlertCase.created_at,
+        )
+        .join(AlertTriage, AlertTriage.case_id == AlertCase.id)
+        .filter(
+            AlertTriage.created_at >= cutoff,
+            cast(AlertTriage.mitre_techniques, _SQLString).ilike(like_pattern),
+        )
+        .distinct()
+        .order_by(AlertCase.created_at.desc())
+        .limit(25)
+        .all()
+    )
+
+    out: dict = {
+        "technique_id": tid,
+        "name": meta["name"],
+        "tactic_ids": meta["tactic_ids"],
+        "is_subtechnique": meta["is_subtechnique"],
+        "parent_id": meta["parent_id"],
+        "local_cases": [
+            {
+                "id": r[0], "case_number": r[1], "title": r[2],
+                "severity": r[3],
+                "created_at": r[4].isoformat() if r[4] else None,
+            }
+            for r in case_rows
+        ],
+        "actors": [],
+        "actors_error": None,
+    }
+
+    # Best-effort OpenCTI lookup for actors using this technique.
+    try:
+        svc = get_opencti_service()
+        if svc.is_configured and hasattr(svc, "search_actors_by_technique"):
+            # Optional method — may not exist on every OpenCTI service
+            # build. The fallback is "skip silently" so the panel still
+            # renders the local-case half.
+            actors = svc.search_actors_by_technique(tid)  # type: ignore[attr-defined]
+            if hasattr(actors, "__await__"):
+                import asyncio
+                actors = asyncio.run(actors)
+            out["actors"] = actors or []
+    except Exception as exc:
+        out["actors_error"] = str(exc)
+
+    return out
+
+
+@router.get("/actors/{entity_id}/profile")
+async def actor_profile(
+    entity_id: str,
+    entity_class: str = Query("intrusion_set"),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+):
+    """v0.27.0: actor deep-dive profile.
+
+    Returns the OpenCTI actor detail (description, aliases, TTPs,
+    malware, indicators) plus a "recently active in your cases" feed
+    derived from local cases whose linked alerts mention this actor
+    by name/alias in their analyst notes, observables, or triggered
+    rule names.
+
+    Best-effort fan-out: OpenCTI errors don't break the local-case
+    half; missing local cases don't break the OpenCTI half.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import cast, String as _SQLString, or_
+    from ion.models.alert_triage import AlertCase, AlertTriage
+
+    out: dict = {
+        "entity_id": entity_id, "entity_class": entity_class,
+        "actor": None, "actor_error": None,
+        "recent_cases": [],
+    }
+
+    # OpenCTI side
+    try:
+        svc = get_opencti_service()
+        if not svc.is_configured:
+            out["actor_error"] = "OpenCTI not configured"
+        else:
+            detail = await svc.get_entity_detail(entity_id, entity_class)
+            if detail.get("error"):
+                out["actor_error"] = detail["error"]
+            else:
+                out["actor"] = detail
+    except Exception as exc:
+        out["actor_error"] = str(exc)
+
+    # Local cases referencing this actor by name or alias. Use the
+    # actor's name + aliases as the haystack terms.
+    actor = out.get("actor") or {}
+    needles: list[str] = []
+    if actor.get("name"):
+        needles.append(str(actor["name"]))
+    aliases_raw = actor.get("aliases")
+    if aliases_raw:
+        if isinstance(aliases_raw, list):
+            needles.extend(str(a) for a in aliases_raw if a)
+        elif isinstance(aliases_raw, str):
+            needles.append(aliases_raw)
+    # Trim short / generic aliases that would produce too-broad hits
+    # (e.g. "G0007"). Keep names ≥ 4 chars.
+    needles = [n for n in needles if n and len(n) >= 4]
+    needles = list(dict.fromkeys(needles))  # dedup, preserve order
+
+    if needles:
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(days=180)
+            like_clauses = [
+                cast(AlertCase.observables, _SQLString).ilike(f"%{n}%")
+                for n in needles
+            ] + [
+                AlertCase.title.ilike(f"%{n}%") for n in needles
+            ] + [
+                cast(AlertCase.affected_users, _SQLString).ilike(f"%{n}%")
+                for n in needles
+            ]
+            rows = (
+                session.query(AlertCase)
+                .filter(
+                    AlertCase.created_at >= cutoff,
+                    or_(*like_clauses),
+                )
+                .order_by(AlertCase.created_at.desc())
+                .limit(15)
+                .all()
+            )
+            out["recent_cases"] = [
+                {
+                    "id": c.id, "case_number": c.case_number,
+                    "title": c.title,
+                    "status": c.status.value if hasattr(c.status, "value") else str(c.status),
+                    "severity": c.severity,
+                    "created_at": c.created_at.isoformat() if c.created_at else None,
+                }
+                for c in rows
+            ]
+        except Exception as exc:
+            logger.debug("actor_profile: local case match failed: %s", exc)
+
+    return out

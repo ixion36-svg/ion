@@ -65,14 +65,16 @@
 
             <!-- Threat Intel — intelligence & hunting -->
             <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/threat-intel') or p.startswith('/threat-landscape') or p.startswith('/attack-stories') or p.startswith('/threat-hunting') or p.startswith('/canaries') or p.startswith('/knowledge-graph') %}is-active{% endif %}">Threat Intel
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/threat-intel') or p.startswith('/threat-landscape') or p.startswith('/attack-stories') or p.startswith('/canaries') or p.startswith('/knowledge-graph') %}is-active{% endif %}">Threat Intel
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
-                <a href="/threat-landscape" class="tw-drop-item {% if p.startswith('/threat-landscape') %}is-active{% endif %}">Threat Landscape</a>
-                <a href="/threat-intel" class="tw-drop-item {% if p == '/threat-intel' %}is-active{% endif %}">Threat Intel</a>
-                <a href="/threat-hunting" class="tw-drop-item {% if p.startswith('/threat-hunting') %}is-active{% endif %}">Threat Hunting</a>
-                <a href="/attack-stories" class="tw-drop-item {% if p.startswith('/attack-stories') %}is-active{% endif %}">Attack Stories</a>
+                <!-- v0.27.0: dropdown shrunk 6 → 3. /threat-landscape +
+                     /attack-stories folded into /threat-intel as new
+                     tabs (now 7 tabs total); /threat-hunting deleted
+                     as a half-built CRUD shell (workflow now lives in
+                     /discover for queries + /cases for findings). -->
+                <a href="/threat-intel" class="tw-drop-item {% if p == '/threat-intel' or p.startswith('/threat-intel') or p.startswith('/threat-landscape') or p.startswith('/attack-stories') %}is-active{% endif %}">Threat Intel</a>
                 <a href="/knowledge-graph" class="tw-drop-item {% if p.startswith('/knowledge-graph') %}is-active{% endif %}">Knowledge Graph</a>
                 <a href="/canaries" class="tw-drop-item {% if p.startswith('/canaries') %}is-active{% endif %}">Canaries</a>
               </div>
