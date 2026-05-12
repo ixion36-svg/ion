@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.28.0 — 2026-05-12
+
+Engineering nav condensation release. Reduces the Engineering dropdown
+from 9 items to 5 by grouping related pages under shared sibling-tab
+strips, with one rename. No page deletions, no API changes, no
+permission shifts.
+
+### nav(engineering): 9 → 5 items via shared sibling-tab strips
+
+Engineering dropdown was the densest nav group (9 items with 3
+admin-gated). v0.28.0 collapses it via in-page sibling-tab strips
+rather than literal template merges — each grouped page keeps its
+existing route, CSS, JS, and permissions, but they all render a
+shared cyan pill-tab strip at the top so users can swap between
+them without going back to the nav.
+
+* **Infrastructure** (new dropdown entry; defaults to `/network-map`)
+  — sibling-tab strip over `/topology` + `/network-map` + `/data-flow`.
+  Default route points at `/network-map` (publicly accessible);
+  Topology stays admin-gated (`security:read`), so non-admins see
+  the Topology tab but click-through 403s if they don't have the
+  permission. Acceptable: the tab strip is discoverable; the
+  permission gate stays load-bearing at the route layer.
+* **Platform Health** (new dropdown entry; defaults to `/log-sources`)
+  — sibling-tab strip over `/log-sources` + `/engineering-analytics`.
+* **Architecture → Workflow Orchestrator** rename. The page is a
+  workflow-orchestrator dashboard, not system architecture; the old
+  name was misleading. Route stays `/architecture` (unchanged
+  internal id; just the visible label changes).
+* Detection Engineering + CyAB + Security (admin) kept as top-level
+  dropdown items.
+
+Removed from the dropdown (now reachable via Infrastructure tab strip):
+Network Map, Data Flow, Topology.
+Removed from the dropdown (now reachable via Platform Health tab strip):
+Log Source Health (now "Sources"), System Analytics (now "Analytics").
+
+### Shared partial: `_eng_tabs.html`
+
+New Jinja partial at `src/ion/web/templates/_eng_tabs.html` renders a
+cyan pill-style sibling-tab strip from a `tabs` array + an
+`active_label`. Reusable for future nav consolidations — any group of
+sibling pages can drop this in.
+
+```jinja
+{% set tabs = [
+    {"label": "X", "href": "/x"},
+    {"label": "Y", "href": "/y"},
+] %}
+{% set active_label = "X" %}
+{% include "_eng_tabs.html" %}
+```
+
+### Files
+
+`src/ion/web/templates/base.html` (nav rewrite), `_eng_tabs.html` (new),
+`topology.html`, `network_map.html`, `data_flow.html`, `log_sources.html`,
+`engineering_analytics.html` (each gets the `{% include %}` 5-liner at
+the top of `{% block content %}`).
+
+No backend changes, no schema changes, no test changes.
+
+---
+
 ## v0.27.0 — 2026-05-12
 
 Threat Intel page consolidation + enhancement release. Three pages

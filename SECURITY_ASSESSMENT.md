@@ -1,8 +1,8 @@
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-12 (v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.27.0 (feature ship on main)
-**Previous Assessment Version:** 0.26.1 (2026-05-12)
+**Assessment Date:** 2026-05-12 (v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.28.0 (nav-only release on main)
+**Previous Assessment Version:** 0.27.0 (2026-05-12)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -13,13 +13,15 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 |
-|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 |
+|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+
+v0.28.0 is a nav-only release: the Engineering dropdown collapses 9 items → 5 via in-page sibling-tab strips. **No backend changes, no API changes, no schema migrations, no permission shifts.** Every page involved keeps its existing route, permission gate (`require_page_permission("security:read")` for Topology, `require_page_auth` for Network Map + Data Flow, `require_page_permission("alert:read")` for Log Sources + System Analytics), and template logic. The new shared Jinja partial `_eng_tabs.html` renders a cyan pill-style tab strip from a passed-in `tabs` array; no untrusted input flows into the template, all `tabs[].label` and `tabs[].href` values are author-controlled. **Net new findings: 0C / 0H / 0M / 0L.**
 
 v0.27.0 is the Threat Intel page consolidation + enhancement release. Three pages collapse into one (`/threat-landscape` + `/attack-stories` deleted, both 302-redirect to `/threat-intel`); the Threat Hunting subsystem is removed entirely (page + API + service + model + `threat_hunts` table dropped via idempotent migration); three new enhancement features layered on the unified page (actor deep-dive profile, IOC sightings sparkline, MITRE technique click-to-drill). **Net new findings: 0C / 0H / 0M / 0L.** All new endpoints are gated by the existing `observable:read` permission (matches the read-only nature of the surface). Three new database-touching endpoints (`/unified-search`, `/recently-active`, `/ioc-sightings`) use parameterised SQLAlchemy queries with bounded row scans (5000-row cap on aggregations, 25-row cap on case scans); no SQL injection surface. The new actor profile page deep-link (`/threat-intel/actors/{id}`) takes the OpenCTI entity id verbatim and passes it as a path parameter to OpenCTI's GraphQL query — same pattern the existing `/api/threat-intel/actors/{id}` endpoint has used since v0.10.x, no new escape concern. The MITRE technique drill-down endpoint validates the technique id with the existing `normalize_technique_id` regex before querying. Defence-in-depth improvement: the Threat Hunting subsystem removal eliminates 332 LOC of API surface + 1 DB table from the production image; the half-built CRUD form was an unused write-path risk.
 
