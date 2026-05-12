@@ -292,6 +292,15 @@ def _run_migrations(engine: Engine) -> None:
             conn.execute(text("DROP TABLE notifications"))
             logger.info("Migrated: dropped notifications table (v0.9.76)")
 
+    # v0.27.0: drop the threat_hunts table — feature removed. The
+    # half-built /threat-hunting page never integrated with /discover
+    # (where hunt queries actually run) or /cases (where findings get
+    # recorded). Workflow now lives in those existing surfaces.
+    if insp.has_table("threat_hunts"):
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE threat_hunts"))
+            logger.info("Migrated: dropped threat_hunts table (v0.27.0)")
+
     # Migrations for alert_cases table
     if insp.has_table("alert_cases"):
         existing = {col["name"] for col in insp.get_columns("alert_cases")}

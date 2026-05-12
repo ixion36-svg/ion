@@ -99,7 +99,7 @@ from ion.web.smtp_api import router as smtp_router
 from ion.web.soc_health_api import router as soc_health_router
 from ion.web.social_api import router as social_router
 from ion.web.story_api import router as story_router
-from ion.web.threat_hunt_api import router as threat_hunt_router
+# v0.27.0: threat_hunt_api removed; see /threat-hunting handler note below.
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
@@ -327,7 +327,7 @@ app.include_router(change_log_router, prefix="/api")
 app.include_router(sla_router, prefix="/api")
 app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
-app.include_router(threat_hunt_router, prefix="/api")
+# v0.27.0: threat_hunt_router removed alongside the half-built page.
 app.include_router(dashboard_layout_router, prefix="/api")
 app.include_router(report_scheduler_router, prefix="/api")
 app.include_router(playbook_action_router, prefix="/api")
@@ -893,10 +893,32 @@ async def threat_intel_page(request: Request, user: User = Depends(require_page_
     return templates.TemplateResponse(request=request, name="threat_intel.html")
 
 
-@app.get("/threat-landscape", response_class=HTMLResponse)
-async def threat_landscape_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
-    """Render the threat landscape analytics page."""
-    return templates.TemplateResponse(request=request, name="threat_landscape.html")
+@app.get("/threat-intel/actors/{entity_id}", response_class=HTMLResponse)
+async def threat_intel_actor_profile_page(
+    entity_id: str,
+    request: Request,
+    user: User = Depends(require_page_permission("observable:read")),
+):
+    """v0.27.0: actor deep-dive page. Data loaded client-side from
+    /api/threat-intel/actors/{id}/profile so the page renders fast
+    while OpenCTI roundtrips."""
+    return templates.TemplateResponse(
+        request=request,
+        name="threat_intel_actor.html",
+        context={"entity_id": entity_id},
+    )
+
+
+# v0.27.0: /threat-landscape page removed; content folded into /threat-intel
+# as new IOC Feed + Reports + Analytics tabs. The /api/threat-landscape/*
+# router still exists — the unified page calls it for IOC + reports data.
+# Redirect old bookmarks rather than 404'ing them.
+
+
+@app.get("/threat-landscape")
+async def threat_landscape_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/threat-intel", status_code=302)
 
 
 @app.get("/tools", response_class=HTMLResponse)
@@ -2138,10 +2160,15 @@ async def cyber_range_page(request: Request, user: User = Depends(require_page_a
     return templates.TemplateResponse(request=request, name="cyber_range.html")
 
 
-@app.get("/attack-stories", response_class=HTMLResponse)
-async def attack_stories_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Attack Stories page."""
-    return templates.TemplateResponse(request=request, name="attack_stories.html")
+# v0.27.0: /attack-stories page removed; content folded into the
+# /threat-intel "Attack Stories" tab. The /api/attack-stories endpoint
+# still exists — the unified page calls it.
+
+
+@app.get("/attack-stories")
+async def attack_stories_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/threat-intel", status_code=302)
 
 
 @app.get("/executive-report", response_class=HTMLResponse)
@@ -2150,10 +2177,12 @@ async def executive_report_page(request: Request, user: User = Depends(require_p
     return templates.TemplateResponse(request=request, name="executive_report.html")
 
 
-@app.get("/threat-hunting", response_class=HTMLResponse)
-async def threat_hunting_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Threat Hunting Workbench page."""
-    return templates.TemplateResponse(request=request, name="threat_hunting.html")
+# v0.27.0: /threat-hunting page + threat_hunt_api router + ThreatHunt
+# model + threat_hunts table removed. The half-built CRUD shell never
+# integrated with /discover (where hunt queries actually run) or /cases
+# (where findings get recorded), so it was deleted rather than fleshed
+# out. Real hunting workflow: write the query in /discover, record the
+# verdict in the case the query produced.
 
 
 

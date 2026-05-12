@@ -45,29 +45,11 @@ class SLABreachLog(Base, TimestampMixin):
     exceeded_by_minutes: Mapped[float] = mapped_column(Float, nullable=False)
 
 
-class ThreatHunt(Base, TimestampMixin):
-    """Threat hunting hypothesis and investigation."""
-
-    __tablename__ = "threat_hunts"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
-    hypothesis: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="active")  # active, confirmed, refuted, inconclusive
-    priority: Mapped[str] = mapped_column(String(20), nullable=False, default="medium")  # critical, high, medium, low
-    created_by_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    assigned_to_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
-    threat_actor: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
-    mitre_techniques: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list
-    data_sources: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list: which ES indices / log sources
-    queries: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list of {query, description, result_count}
-    findings: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # markdown
-    conclusion: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    iocs_found: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list
-    closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-
-    created_by = relationship("User", foreign_keys=[created_by_id])
-    assigned_to = relationship("User", foreign_keys=[assigned_to_id])
+# v0.27.0: ThreatHunt model removed alongside the half-built
+# /threat-hunting page + threat_hunt_api. The threat_hunts table is
+# dropped via the migration in storage/database.py. Hunt workflow
+# now lives in /discover (queries) + /cases (findings); the parallel
+# CRUD surface never integrated with either.
 
 
 class DashboardLayout(Base, TimestampMixin):

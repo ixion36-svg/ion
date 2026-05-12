@@ -9,15 +9,20 @@
 .ti-header h1 { font-size: 1.5rem; margin: 0 0 4px; }
 .ti-header p { color: var(--text-secondary); font-size: .85rem; margin: 0; }
 
-/* Tabs */
-.ti-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+/* v0.27.0: pill-style tabs with cyan active state — ported from
+   the old /threat-landscape colour palette. The cards / cells inside
+   tabs keep using the existing ti-* CSS, but the strip itself is
+   Tailwind-driven so it picks up the brand colours. */
 .ti-tab {
-    padding: 10px 20px; background: transparent; border: none; border-bottom: 2px solid transparent;
-    color: var(--text-secondary); cursor: pointer; font-size: .85rem; font-weight: 600;
-    transition: color .15s, border-color .15s;
+    background: transparent; border: none; cursor: pointer;
+    color: rgb(148 163 184); /* slate-400 */
 }
-.ti-tab:hover { color: var(--text-primary); }
-.ti-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.ti-tab:hover { color: #fff; }
+.ti-tab.active {
+    background: var(--ion-cyan, #6de4ff);
+    color: #0a0c12; /* ink-950 */
+    box-shadow: 0 0 18px -4px rgba(109,228,255,0.8);
+}
 .ti-panel { display: none; }
 .ti-panel.active { display: block; }
 
@@ -117,27 +122,132 @@
       <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Search OpenCTI for threat actors and campaigns, manage your watchlist, and monitor enrichment matches.</p>
     </section>
 
-    <!-- Tabs -->
-    <div class="ti-tabs" id="ti-tabs">
-        <button class="ti-tab active" data-panel="overview">Overview</button>
-        <button class="ti-tab" data-panel="actors">Threat Actors</button>
-        <button class="ti-tab" data-panel="campaigns">Campaigns</button>
-        <button class="ti-tab" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge" style="display:none">0</span></button>
+    <!-- v0.27.0: global search bar — hits /api/threat-intel/unified-search.
+         Fans out to actors + campaigns (OpenCTI) + IOCs + cases. Results
+         grouped by kind under the bar. Press Enter or click Search. -->
+    <div class="ti-search-bar" style="margin-bottom:24px;">
+        <input type="text" class="ti-search-input" id="ti-global-search"
+               placeholder="Search across actors, campaigns, IOCs, cases (e.g. APT28, evil.com, 10.0.0.1)…">
+        <button class="ti-btn" onclick="tiUnifiedSearch()">Search</button>
+        <button class="ti-btn-outline" onclick="tiClearSearch()" id="ti-global-search-clear" style="display:none;">Clear</button>
+    </div>
+    <div id="ti-global-search-results" style="display:none;margin-bottom:24px;"></div>
+
+    <!-- Tabs (v0.27.0: 4 → 7 tabs after merging /threat-landscape +
+         /attack-stories. Pill style with cyan active state ported from
+         the old /threat-landscape design.) -->
+    <div class="flex items-center gap-1 p-1 rounded-lg bg-white/5 border border-white/10 mb-6 overflow-x-auto" id="ti-tabs">
+        <button class="ti-tab active px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="overview">Overview</button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="actors">Threat Actors</button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="campaigns">Campaigns</button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="ioc">IOC Feed</button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="reports">Reports</button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge" style="display:none;">0</span></button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="stories">Attack Stories</button>
     </div>
 
     <!-- Overview Panel -->
     <div class="ti-panel active" id="panel-overview">
-        <div class="ti-stats" id="ti-stats">
-            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-actors">-</div><div class="ti-stat-label">Watched Actors</div></div>
-            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-campaigns">-</div><div class="ti-stat-label">Watched Campaigns</div></div>
-            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-matches">-</div><div class="ti-stat-label">Matches (7d)</div></div>
-            <div class="ti-stat-card"><div class="ti-stat-value" id="stat-unread">-</div><div class="ti-stat-label">Unread Alerts</div></div>
-        </div>
-        <h3 style="font-size:.95rem;margin:0 0 12px;">Recent Matches</h3>
-        <table class="ti-table" id="overview-matches-table">
-            <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Type</th><th>Actions</th></tr></thead>
-            <tbody id="overview-matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
-        </table>
+
+        <!-- v0.27.0: AI Threat Briefing — ported from /threat-landscape.
+             Hits POST /api/threat-landscape/ai-summary; sources the
+             OpenCTI overview snapshot, returns a Bob-authored prose
+             summary. Manual trigger so we don't burn Ollama on every
+             page load. -->
+        <section class="mb-6">
+          <div class="rounded-xl border border-ion-amber/20 bg-gradient-to-br from-ion-amber/[0.04] to-transparent p-5">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-ion-amber text-base">★</span>
+                <span class="text-[11px] uppercase tracking-wider text-ion-amber font-semibold">AI Threat Briefing</span>
+              </div>
+              <button id="ai-brief-btn" onclick="tiLoadAISummary()"
+                      class="px-3 py-1.5 rounded-md text-xs font-medium bg-ion-amber/10 text-ion-amber border border-ion-amber/30 hover:bg-ion-amber/20 transition">
+                Generate Briefing
+              </button>
+            </div>
+            <div id="ai-brief-content" class="text-sm text-slate-300 leading-relaxed">
+              Click <strong class="text-ion-amber">Generate Briefing</strong> for an AI-powered executive summary of the current threat landscape — recent actors, hot IOCs, kill-chain coverage.
+            </div>
+            <div id="ai-brief-model" class="hidden mt-2 text-[10px] text-slate-600 font-mono"></div>
+          </div>
+        </section>
+
+        <!-- v0.27.0: KPI cards — coloured. Stat values keep the
+             existing ids so the original ``loadOverview`` JS keeps
+             working unchanged. -->
+        <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Watched Actors</div>
+                <div id="stat-actors" class="text-[28px] font-semibold text-white font-mono">—</div>
+                <div class="text-[11px] text-slate-500 mt-1">on the watchlist</div>
+            </div>
+            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Watched Campaigns</div>
+                <div id="stat-campaigns" class="text-[28px] font-semibold text-ion-cyan font-mono">—</div>
+                <div class="text-[11px] text-slate-500 mt-1">on the watchlist</div>
+            </div>
+            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Matches (7d)</div>
+                <div id="stat-matches" class="text-[28px] font-semibold text-ion-coral font-mono">—</div>
+                <div class="text-[11px] text-slate-500 mt-1">across alerts</div>
+            </div>
+            <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
+                <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Unread Alerts</div>
+                <div id="stat-unread" class="text-[28px] font-semibold text-ion-amber font-mono">—</div>
+                <div class="text-[11px] text-slate-500 mt-1">match alerts pending</div>
+            </div>
+        </section>
+
+        <!-- v0.27.0: Top 5 Threat Actors + Top 5 High-Score IOCs —
+             ported from /threat-landscape Overview. JS-populated. -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-sans font-semibold text-base text-white">Top Threat Actors</h3>
+              <button onclick="tiSwitchTab('actors')" class="text-[11px] text-ion-cyan hover:text-white transition">View all →</button>
+            </div>
+            <div id="ti-overview-actors" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
+              <div class="text-slate-500 text-sm animate-pulse">Loading actors…</div>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-sans font-semibold text-base text-white">Latest High-Score IOCs</h3>
+              <button onclick="tiSwitchTab('ioc')" class="text-[11px] text-ion-cyan hover:text-white transition">View feed →</button>
+            </div>
+            <div id="ti-overview-iocs" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
+              <div class="text-slate-500 text-sm animate-pulse">Loading IOCs…</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- v0.27.0: Recently Active in Cases — coloured, last 30d of
+             case + triage data. Fed by /api/threat-intel/recently-active. -->
+        <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
+            <h3 class="font-sans font-semibold text-base text-white mb-3">Recently Active Observables <span class="text-[11px] text-slate-500 font-normal">— last 30d in cases</span></h3>
+            <div id="ti-recent-obs" class="text-sm text-slate-400">Loading…</div>
+          </div>
+          <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
+            <h3 class="font-sans font-semibold text-base text-white mb-3">Recently Seen MITRE Techniques <span class="text-[11px] text-slate-500 font-normal">— last 30d in triage</span></h3>
+            <div id="ti-recent-tech" class="text-sm text-slate-400">Loading…</div>
+            <div class="mt-3 pt-3 border-t border-white/5">
+              <a href="/cyab/attack-heatmap" class="text-[11px] text-ion-cyan hover:text-white transition">
+                → View full coverage in MITRE ATT&amp;CK heatmap
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <!-- Recent matches table -->
+        <section>
+            <h3 class="font-sans font-semibold text-base text-white mb-3">Recent Matches</h3>
+            <table class="ti-table" id="overview-matches-table">
+                <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Type</th><th>Actions</th></tr></thead>
+                <tbody id="overview-matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
+            </table>
+        </section>
     </div>
 
     <!-- Threat Actors Panel -->
@@ -179,6 +289,71 @@
             <tbody id="matches-body"><tr><td colspan="5" class="ti-empty">Loading...</td></tr></tbody>
         </table>
     </div>
+
+    <!-- v0.27.0: IOC Feed Panel — ported from /threat-landscape. -->
+    <div class="ti-panel" id="panel-ioc">
+        <div class="ti-search-bar">
+            <select id="ti-ioc-min-score" class="ti-search-input" style="flex:0 0 auto;width:auto;" onchange="tiLoadIOCFeed()">
+                <option value="0">All scores</option>
+                <option value="50">Score ≥ 50</option>
+                <option value="75" selected>Score ≥ 75</option>
+                <option value="90">Score ≥ 90</option>
+            </select>
+            <button class="ti-btn" onclick="tiLoadIOCFeed()">Refresh</button>
+        </div>
+        <table class="ti-table" id="ioc-table">
+            <thead><tr><th>Score</th><th>Type</th><th>Value</th><th>Labels</th><th>Source</th><th title="Local sightings over the last 12 months">Sightings</th><th>Actions</th></tr></thead>
+            <tbody id="ioc-body"><tr><td colspan="7" class="ti-empty">Click Refresh to load OpenCTI indicators.</td></tr></tbody>
+        </table>
+    </div>
+
+    <!-- v0.27.0: Reports Panel — ported from /threat-landscape. -->
+    <div class="ti-panel" id="panel-reports">
+        <div class="ti-search-bar">
+            <input type="text" class="ti-search-input" id="ti-report-filter" placeholder="Filter reports by title…">
+            <button class="ti-btn" onclick="tiLoadReports()">Refresh</button>
+        </div>
+        <div id="ti-reports-list">
+            <div class="ti-empty">Click Refresh to load latest threat reports from OpenCTI.</div>
+        </div>
+    </div>
+
+    <!-- v0.27.0: ATT&CK technique drill-down side panel.
+         Opened by clicking a technique on the Overview's Recently Seen
+         MITRE list. Closed by the X button or clicking the backdrop. -->
+    <div id="ti-drill-panel"
+         style="display:none;position:fixed;top:0;right:0;bottom:0;width:480px;max-width:90vw;
+                background:var(--bg-primary);border-left:1px solid var(--border);
+                box-shadow:-8px 0 24px rgba(0,0,0,0.5);z-index:200;overflow-y:auto;padding:20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+            <h3 id="ti-drill-title" style="font-size:1rem;margin:0;color:var(--ion-cyan,#6de4ff);font-family:'JetBrains Mono',monospace;">—</h3>
+            <button onclick="tiCloseDrill()"
+                    style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.2rem;">&times;</button>
+        </div>
+        <div id="ti-drill-body">
+            <div class="ti-loading"><span class="ti-spinner"></span>Loading…</div>
+        </div>
+    </div>
+    <div id="ti-drill-backdrop"
+         style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:199;"
+         onclick="tiCloseDrill()"></div>
+
+    <!-- v0.27.0: Attack Stories Panel — ported from /attack-stories. -->
+    <div class="ti-panel" id="panel-stories">
+        <div class="ti-search-bar">
+            <select id="ti-stories-hours" class="ti-search-input" style="flex:0 0 auto;width:auto;" onchange="tiLoadStories()">
+                <option value="4">Last 4h</option>
+                <option value="12">Last 12h</option>
+                <option value="24" selected>Last 24h</option>
+                <option value="72">Last 3 days</option>
+                <option value="168">Last 7 days</option>
+            </select>
+            <button class="ti-btn" onclick="tiLoadStories()">Refresh</button>
+        </div>
+        <div id="ti-stories-list">
+            <div class="ti-empty">Click Refresh to correlate recent alerts into attack stories.</div>
+        </div>
+    </div>
 </div>
 
 
@@ -205,6 +380,10 @@
 
         if (tab.dataset.panel === 'overview') loadOverview();
         if (tab.dataset.panel === 'watchlist') { loadWatches(); loadMatches(); }
+        // v0.27.0: lazy-load the merged tabs.
+        if (tab.dataset.panel === 'ioc' && !window._tiIOCLoaded) { tiLoadIOCFeed(); window._tiIOCLoaded = true; }
+        if (tab.dataset.panel === 'reports' && !window._tiReportsLoaded) { tiLoadReports(); window._tiReportsLoaded = true; }
+        if (tab.dataset.panel === 'stories' && !window._tiStoriesLoaded) { tiLoadStories(); window._tiStoriesLoaded = true; }
     });
 
     // ── Enter key on search ──────────────────
@@ -232,10 +411,468 @@
             }
 
             renderMatchRows('overview-matches-body', matches.matches || [], true);
+
+            // v0.27.0: populate the additional Overview surfaces.
+            loadRecentlyActive();
+            loadOverviewActors();
+            loadOverviewIOCs();
         } catch(e) {
             console.error('Failed to load overview', e);
         }
     }
+
+    // ── v0.27.0: Top 5 Threat Actors preview (Overview tab) ──
+    async function loadOverviewActors() {
+        const el = document.getElementById('ti-overview-actors');
+        try {
+            const r = await fetch('/api/threat-landscape/overview');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            const actors = (d.actors || []).slice(0, 5);
+            if (!actors.length) {
+                el.innerHTML = '<div class="text-slate-500 text-sm">No actors tracked yet.</div>';
+                return;
+            }
+            el.innerHTML = '<div class="space-y-2">' + actors.map(a => {
+                const flag = a.country_flag || '';
+                return `<div class="flex items-center gap-3 py-1.5">
+                    <span class="text-ion-cyan font-semibold text-sm flex-shrink-0">${flag ? flag + ' ' : ''}${escapeHtml(a.name)}</span>
+                    <span class="text-slate-500 text-xs">${a.ttp_count || 0} TTPs</span>
+                    <span class="text-slate-500 text-xs">${a.malware_count || 0} malware</span>
+                    <span class="flex-1"></span>
+                    <span class="text-slate-600 text-[10px] font-mono">${(a.modified || '').substring(0, 10)}</span>
+                </div>`;
+            }).join('') + '</div>';
+        } catch(e) {
+            el.innerHTML = '<div class="text-slate-500 text-sm">Actors unavailable — OpenCTI not configured?</div>';
+        }
+    }
+
+    // ── v0.27.0: Top 5 High-Score IOCs preview (Overview tab) ──
+    async function loadOverviewIOCs() {
+        const el = document.getElementById('ti-overview-iocs');
+        try {
+            const r = await fetch('/api/threat-landscape/ioc-feed?limit=5&min_score=75');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            const iocs = (d.indicators || []).slice(0, 5);
+            if (!iocs.length) {
+                el.innerHTML = '<div class="text-slate-500 text-sm">No high-score IOCs at this threshold.</div>';
+                return;
+            }
+            el.innerHTML = '<div class="space-y-1.5">' + iocs.map(i => {
+                const score = i.score || 0;
+                const cls = score >= 90 ? 'text-red-400' : score >= 70 ? 'text-amber-400' : 'text-slate-400';
+                return `<div class="flex items-center gap-3 py-1">
+                    <span class="font-mono text-[11px] font-bold w-7 text-right ${cls}">${score}</span>
+                    <span class="text-[10px] text-slate-500 font-mono w-20">${escapeHtml(i.ioc_type)}</span>
+                    <span class="text-xs text-slate-200 font-mono truncate flex-1">${escapeHtml(i.ioc_value)}</span>
+                    <span class="text-[10px] text-slate-500">${escapeHtml(i.source || '')}</span>
+                </div>`;
+            }).join('') + '</div>';
+        } catch(e) {
+            el.innerHTML = '<div class="text-slate-500 text-sm">IOCs unavailable — OpenCTI not configured?</div>';
+        }
+    }
+
+    // ── v0.27.0: AI Threat Briefing (Overview tab) ──
+    window.tiLoadAISummary = async function() {
+        const btn = document.getElementById('ai-brief-btn');
+        const content = document.getElementById('ai-brief-content');
+        const modelEl = document.getElementById('ai-brief-model');
+        btn.disabled = true;
+        btn.textContent = 'Generating…';
+        content.innerHTML = '<span class="text-slate-500 animate-pulse">Analyzing the current threat landscape with AI… this typically takes 15–30 seconds.</span>';
+        try {
+            const r = await fetch('/api/threat-landscape/ai-summary', { method: 'POST' });
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                throw new Error(err.detail || 'HTTP ' + r.status);
+            }
+            const d = await r.json();
+            // Strip light markdown so the prose renders cleanly.
+            let text = (d.summary || 'No summary generated.')
+                .replace(/^#{1,4}\s+/gm, '')
+                .replace(/\*\*(.+?)\*\*/g, '$1')
+                .replace(/\*(.+?)\*/g, '$1')
+                .replace(/^[-*]\s+/gm, '')
+                .replace(/^\d+\.\s+/gm, '')
+                .replace(/```[\s\S]*?```/g, '');
+            content.innerHTML = text.split(/\n\n+/).filter(p => p.trim()).map(p =>
+                '<p class="mt-3 first:mt-0">' + escapeHtml(p.trim()).replace(/\n/g, ' ') + '</p>'
+            ).join('');
+            if (d.model) {
+                modelEl.textContent = 'Model: ' + d.model;
+                modelEl.classList.remove('hidden');
+            }
+            btn.textContent = 'Regenerate';
+        } catch(e) {
+            content.innerHTML = '<span class="text-ion-coral text-xs">Failed: ' + escapeHtml(String(e.message || e)) + '</span>';
+            btn.textContent = 'Retry';
+        }
+        btn.disabled = false;
+    };
+
+    // ── v0.27.0: Tab-switch helper (used by "View all →" links) ──
+    window.tiSwitchTab = function(panelKey) {
+        const btn = document.querySelector('.ti-tab[data-panel="' + panelKey + '"]');
+        if (btn) btn.click();
+    };
+
+    // ── v0.27.0: ATT&CK technique drill-down ──
+    window.tiDrillTechnique = async function(techId) {
+        const panel = document.getElementById('ti-drill-panel');
+        const backdrop = document.getElementById('ti-drill-backdrop');
+        const title = document.getElementById('ti-drill-title');
+        const body = document.getElementById('ti-drill-body');
+        title.textContent = techId;
+        body.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading technique details…</div>';
+        panel.style.display = 'block';
+        backdrop.style.display = 'block';
+        try {
+            const r = await fetch(API + '/techniques/' + encodeURIComponent(techId) + '/drill');
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                throw new Error(err.detail || 'HTTP ' + r.status);
+            }
+            const d = await r.json();
+            title.textContent = `${d.technique_id} — ${d.name}`;
+            const sections = [];
+
+            // Tactic chips
+            if (d.tactic_ids && d.tactic_ids.length) {
+                sections.push(`<div style="margin-bottom:14px;">
+                    <div style="font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Tactics</div>
+                    ${d.tactic_ids.map(t =>
+                        `<span style="display:inline-block;padding:2px 8px;background:rgba(109,228,255,0.1);border:1px solid rgba(109,228,255,0.3);border-radius:4px;font-size:.72rem;color:var(--ion-cyan,#6de4ff);margin-right:4px;font-family:'JetBrains Mono',monospace;">${escapeHtml(t)}</span>`
+                    ).join('')}
+                </div>`);
+            }
+            if (d.is_subtechnique && d.parent_id) {
+                sections.push(`<div style="font-size:.78rem;color:var(--text-secondary);margin-bottom:14px;">
+                    Sub-technique of <a href="javascript:void(0)" onclick="tiCloseDrill();tiDrillTechnique('${escapeHtml(d.parent_id)}');" style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;">${escapeHtml(d.parent_id)}</a>
+                </div>`);
+            }
+
+            // Local cases
+            sections.push(`<div style="margin-bottom:14px;">
+                <h4 style="font-size:.85rem;margin:0 0 8px;color:var(--text-primary);">Local Cases <span style="color:var(--text-secondary);font-weight:400;font-size:.75rem;">(last 90 days)</span></h4>
+                ${!d.local_cases.length
+                    ? '<em style="font-size:.78rem;color:var(--text-secondary);">No cases triggered this technique in the last 90 days.</em>'
+                    : '<ul style="list-style:none;padding:0;margin:0;">' + d.local_cases.map(c => `
+                        <li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:.8rem;">
+                            <a href="/cases?selected=${c.id}" style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;">${escapeHtml(c.case_number)}</a>
+                            <span style="margin-left:6px;color:var(--text-primary);">${escapeHtml(c.title)}</span>
+                            <span class="sev-badge sev-${escapeHtml(c.severity)}" style="margin-left:6px;font-size:.7rem;">${escapeHtml(c.severity)}</span>
+                        </li>`).join('') + '</ul>'
+                }
+            </div>`);
+
+            // Actors
+            sections.push(`<div style="margin-bottom:14px;">
+                <h4 style="font-size:.85rem;margin:0 0 8px;color:var(--text-primary);">Actors Using This Technique <span style="color:var(--text-secondary);font-weight:400;font-size:.75rem;">(OpenCTI)</span></h4>
+                ${d.actors_error
+                    ? `<em style="font-size:.78rem;color:var(--text-secondary);">OpenCTI lookup unavailable: ${escapeHtml(d.actors_error)}</em>`
+                    : !d.actors.length
+                        ? '<em style="font-size:.78rem;color:var(--text-secondary);">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>'
+                        : '<ul style="list-style:none;padding:0;margin:0;">' + d.actors.map(a => `
+                            <li style="padding:4px 0;font-size:.8rem;">
+                                <span style="color:var(--ion-cyan,#6de4ff);">${escapeHtml(a.name || a.id || '')}</span>
+                            </li>`).join('') + '</ul>'
+                }
+            </div>`);
+
+            body.innerHTML = sections.join('');
+        } catch(e) {
+            body.innerHTML = '<div class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
+        }
+    };
+
+    window.tiCloseDrill = function() {
+        document.getElementById('ti-drill-panel').style.display = 'none';
+        document.getElementById('ti-drill-backdrop').style.display = 'none';
+    };
+
+    async function loadRecentlyActive() {
+        try {
+            const r = await fetch(API + '/recently-active?days=30&top_n=8');
+            if (!r.ok) return;
+            const d = await r.json();
+            const obsEl = document.getElementById('ti-recent-obs');
+            const techEl = document.getElementById('ti-recent-tech');
+            if (!d.observables.length) {
+                obsEl.innerHTML = '<em>No observable activity in the last 30 days.</em>';
+            } else {
+                obsEl.innerHTML = '<ul style="list-style:none;padding:0;margin:0;">' +
+                    d.observables.map(o =>
+                        `<li style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;">
+                            <span><code style="font-size:.75rem;color:var(--text-muted);">${o.type}</code>
+                            <code style="margin-left:6px;color:var(--text-primary);">${escapeHtml(o.value)}</code></span>
+                            <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:.75rem;">${o.count}×</span>
+                        </li>`
+                    ).join('') + '</ul>';
+            }
+            if (!d.techniques.length) {
+                techEl.innerHTML = '<em>No MITRE techniques tagged in the last 30 days.</em>';
+            } else {
+                // v0.27.0: each technique chip is now click-to-drill.
+                techEl.innerHTML = '<ul style="list-style:none;padding:0;margin:0;">' +
+                    d.techniques.map(t =>
+                        `<li style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;">
+                            <a href="javascript:void(0)" onclick="tiDrillTechnique('${escapeHtml(t.id)}')"
+                               style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;"
+                               title="Drill into this technique">${escapeHtml(t.id)}</a>
+                            <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:.75rem;">${t.count}×</span>
+                        </li>`
+                    ).join('') + '</ul>';
+            }
+        } catch(e) {
+            console.warn('Recently-active widget failed', e);
+        }
+    }
+
+    // ── v0.27.0: helper for safe HTML escaping in inline-rendered cells ──
+    function escapeHtml(s) {
+        if (s == null) return '';
+        return String(s).replace(/[&<>"']/g, c =>
+            ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])
+        );
+    }
+
+    // ── v0.27.0: Global search bar (fans out to actors, campaigns, IOCs, cases) ──
+    window.tiUnifiedSearch = async function() {
+        const q = document.getElementById('ti-global-search').value.trim();
+        if (q.length < 2) return;
+        const out = document.getElementById('ti-global-search-results');
+        const clear = document.getElementById('ti-global-search-clear');
+        out.style.display = 'block';
+        clear.style.display = 'inline-block';
+        out.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Searching…</div>';
+        try {
+            const r = await fetch(API + '/unified-search?q=' + encodeURIComponent(q) + '&limit_per_kind=8');
+            if (!r.ok) { out.innerHTML = '<div class="ti-empty">Search failed: HTTP ' + r.status + '</div>'; return; }
+            const d = await r.json();
+            const sections = [];
+            if (d.actors.length) {
+                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">Threat Actors (${d.actors.length})</h4>` +
+                    '<ul style="list-style:none;padding:0;margin:0;">' + d.actors.map(a =>
+                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;">
+                            ${escapeHtml(a.name || a.id || '')}
+                        </li>`
+                    ).join('') + '</ul>');
+            }
+            if (d.campaigns.length) {
+                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">Campaigns (${d.campaigns.length})</h4>` +
+                    '<ul style="list-style:none;padding:0;margin:0;">' + d.campaigns.map(c =>
+                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;">
+                            ${escapeHtml(c.name || c.id || '')}
+                        </li>`
+                    ).join('') + '</ul>');
+            }
+            if (d.iocs.length) {
+                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">IOCs (${d.iocs.length})</h4>` +
+                    '<ul style="list-style:none;padding:0;margin:0;">' + d.iocs.map(i =>
+                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;display:flex;justify-content:space-between;gap:8px;">
+                            <span><code style="font-size:.75rem;color:var(--text-muted);">${escapeHtml(i.type)}</code>
+                            <code style="margin-left:6px;color:var(--text-primary);">${escapeHtml(i.value)}</code></span>
+                            <a href="/observables/${i.id}" style="color:var(--accent);font-size:.75rem;text-decoration:none;">→ open</a>
+                        </li>`
+                    ).join('') + '</ul>');
+            }
+            if (d.cases.length) {
+                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">Cases (${d.cases.length})</h4>` +
+                    '<ul style="list-style:none;padding:0;margin:0;">' + d.cases.map(c =>
+                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;display:flex;justify-content:space-between;gap:8px;">
+                            <span><code style="font-size:.75rem;color:var(--text-muted);">${escapeHtml(c.case_number)}</code>
+                            <span style="margin-left:6px;color:var(--text-primary);">${escapeHtml(c.title)}</span></span>
+                            <a href="/cases?selected=${c.id}" style="color:var(--accent);font-size:.75rem;text-decoration:none;">→ open</a>
+                        </li>`
+                    ).join('') + '</ul>');
+            }
+            if (!sections.length) {
+                out.innerHTML = `<div class="ti-empty">No matches for "${escapeHtml(q)}".</div>`;
+            } else {
+                out.innerHTML = `<div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;">
+                    <div style="font-size:.78rem;color:var(--text-secondary);margin-bottom:8px;">${d.total} result${d.total === 1 ? '' : 's'} for "${escapeHtml(q)}"</div>
+                    ${sections.join('')}
+                </div>`;
+            }
+        } catch(e) {
+            out.innerHTML = '<div class="ti-empty">Search failed: ' + escapeHtml(String(e)) + '</div>';
+        }
+    };
+
+    window.tiClearSearch = function() {
+        document.getElementById('ti-global-search').value = '';
+        document.getElementById('ti-global-search-results').style.display = 'none';
+        document.getElementById('ti-global-search-clear').style.display = 'none';
+    };
+
+    document.getElementById('ti-global-search').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') window.tiUnifiedSearch();
+    });
+
+    // ── v0.27.0: IOC Feed tab (ported from /threat-landscape) ──
+    window.tiLoadIOCFeed = async function() {
+        const tbody = document.getElementById('ioc-body');
+        const minScore = document.getElementById('ti-ioc-min-score').value || '0';
+        tbody.innerHTML = '<tr><td colspan="7" class="ti-empty"><span class="ti-spinner"></span>Loading IOC feed…</td></tr>';
+        try {
+            const r = await fetch('/api/threat-landscape/ioc-feed?limit=50&min_score=' + minScore);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            const iocs = d.indicators || [];
+            if (!iocs.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="ti-empty">No indicators at this score threshold.</td></tr>';
+                return;
+            }
+            tbody.innerHTML = iocs.map((i, idx) => {
+                const score = i.score || 0;
+                const labels = (i.labels || []).slice(0, 3).map(l =>
+                    `<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:.7rem;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-right:2px;">${escapeHtml(l.value || l)}</span>`
+                ).join('');
+                const sparkId = 'ti-spark-' + idx;
+                return `<tr>
+                    <td><strong style="color:${score >= 90 ? 'var(--danger)' : score >= 70 ? 'var(--neon-orange)' : 'var(--text-secondary)'};">${score}</strong></td>
+                    <td><code style="font-size:.75rem;color:var(--text-muted);">${escapeHtml(i.ioc_type)}</code></td>
+                    <td><code style="color:var(--text-primary);">${escapeHtml(i.ioc_value)}</code></td>
+                    <td>${labels || '<span style="color:var(--text-muted);">—</span>'}</td>
+                    <td>${escapeHtml(i.source || '—')}</td>
+                    <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span style="font-size:.7rem;color:var(--text-muted);">…</span></span></td>
+                    <td>
+                        <button class="ti-btn-outline ti-btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(i.ioc_value)}');this.textContent='Copied';setTimeout(()=>{this.textContent='Copy';},1500);">Copy</button>
+                    </td>
+                </tr>`;
+            }).join('');
+            // v0.27.0: lazy-load sparklines AFTER the table renders so the
+            // initial paint isn't blocked by N parallel requests. Batched
+            // to 6 at a time to keep the OpenCTI backend honest.
+            tiLoadSparklines();
+        } catch(e) {
+            tbody.innerHTML = '<tr><td colspan="7" class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e)) + '</td></tr>';
+        }
+    };
+
+    // ── v0.27.0: per-IOC sightings sparkline ──
+    async function tiLoadSparklines() {
+        const sparks = Array.from(document.querySelectorAll('.ti-spark'));
+        // Throttle: 6 concurrent fetches. The endpoint is local-DB-only
+        // and cheap, but batching avoids paint-thrash on slow databases.
+        const batchSize = 6;
+        for (let i = 0; i < sparks.length; i += batchSize) {
+            const batch = sparks.slice(i, i + batchSize);
+            await Promise.all(batch.map(spark => tiRenderSpark(spark)));
+        }
+    }
+    async function tiRenderSpark(spark) {
+        const value = spark.getAttribute('data-ioc');
+        if (!value) return;
+        try {
+            const r = await fetch(API + '/ioc-sightings?value=' + encodeURIComponent(value) + '&months=12');
+            if (!r.ok) { spark.innerHTML = '<span style="font-size:.7rem;color:var(--text-muted);">—</span>'; return; }
+            const d = await r.json();
+            const series = d.series || [];
+            const total = d.total_sightings || 0;
+            if (!series.length || total === 0) {
+                spark.innerHTML = '<span style="font-size:.7rem;color:var(--text-muted);" title="No local sightings in the last 12 months">—</span>';
+                return;
+            }
+            // Inline SVG sparkline: 12 bars, max bar = 14px tall.
+            const max = Math.max(...series.map(b => b.count));
+            const barW = 6, gap = 1, h = 14;
+            const w = series.length * (barW + gap);
+            const bars = series.map((b, idx) => {
+                if (b.count === 0) return '';
+                const bh = Math.max(1, Math.round((b.count / max) * h));
+                const x = idx * (barW + gap);
+                const y = h - bh;
+                const col = b.count === max ? 'var(--ion-cyan, #6de4ff)' : 'var(--text-secondary)';
+                return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${col}"><title>${b.month}: ${b.count}</title></rect>`;
+            }).join('');
+            spark.innerHTML = `<svg width="${w}" height="${h}" style="vertical-align:middle;" title="${total} local sightings in last 12 months">${bars}</svg> <span style="font-size:.7rem;color:var(--text-muted);margin-left:4px;">${total}</span>`;
+        } catch(e) {
+            spark.innerHTML = '<span style="font-size:.7rem;color:var(--text-muted);">—</span>';
+        }
+    }
+
+    // ── v0.27.0: Reports tab (ported from /threat-landscape) ──
+    window.tiLoadReports = async function() {
+        const host = document.getElementById('ti-reports-list');
+        const filterTerm = (document.getElementById('ti-report-filter').value || '').toLowerCase().trim();
+        host.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading reports…</div>';
+        try {
+            const r = await fetch('/api/threat-landscape/reports?limit=25');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            let reports = d.reports || [];
+            if (filterTerm) {
+                reports = reports.filter(rep =>
+                    (rep.name || '').toLowerCase().includes(filterTerm)
+                );
+            }
+            if (!reports.length) {
+                host.innerHTML = '<div class="ti-empty">No reports' + (filterTerm ? ' match the filter' : ' available') + '.</div>';
+                return;
+            }
+            host.innerHTML = reports.map(rep => {
+                const published = rep.published ? new Date(rep.published).toLocaleDateString() : '-';
+                return `<div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;background:var(--bg-secondary);">
+                    <div style="font-size:.9rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">${escapeHtml(rep.name || 'Untitled')}</div>
+                    <div style="font-size:.75rem;color:var(--text-secondary);">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
+                    <div style="font-size:.72rem;color:var(--text-muted);margin-top:6px;font-family:'JetBrains Mono',monospace;">${escapeHtml(rep.report_type || 'report')} · ${published}</div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            host.innerHTML = '<div class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e)) + '</div>';
+        }
+    };
+
+    // ── v0.27.0: Attack Stories tab (ported from /attack-stories) ──
+    window.tiLoadStories = async function() {
+        const host = document.getElementById('ti-stories-list');
+        const hours = document.getElementById('ti-stories-hours').value;
+        host.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Correlating alerts into attack stories…</div>';
+        try {
+            const r = await fetch('/api/attack-stories?hours=' + hours);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const d = await r.json();
+            const stories = d.stories || [];
+            const chainOrder = d.kill_chain_order || [];
+            if (!stories.length) {
+                host.innerHTML = '<div class="ti-empty">No attack stories — alerts did not correlate into multi-step patterns over the selected window.</div>';
+                return;
+            }
+            host.innerHTML = stories.map(s => {
+                const tacticsSet = new Set(s.tactics_progression || []);
+                const chainHtml = chainOrder.length
+                    ? `<div style="display:flex;gap:0;align-items:center;overflow-x:auto;margin:8px 0;">
+                        ${chainOrder.map((stage, i) => {
+                            const active = tacticsSet.has(stage);
+                            return (i > 0 ? '<span style="padding:0 4px;color:var(--text-muted);font-size:.8rem;">→</span>' : '') +
+                                `<span style="padding:3px 8px;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase;white-space:nowrap;${
+                                    active
+                                        ? 'background:rgba(220,38,38,0.18);color:#fecaca;border:1px solid rgba(220,38,38,0.4);'
+                                        : 'background:var(--bg-primary);color:var(--text-muted);border:1px dashed var(--border);'
+                                }">${escapeHtml(stage)}</span>`;
+                        }).join('')}
+                       </div>`
+                    : '';
+                return `<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
+                        <div style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'JetBrains Mono',monospace;font-size:.85rem;background:rgba(220,38,38,0.15);color:#fecaca;border:2px solid rgba(220,38,38,0.4);flex-shrink:0;">${s.score}</div>
+                        <div style="flex:1;">
+                            <div style="font-size:.95rem;font-weight:700;color:var(--text-primary);">${escapeHtml(s.entity)} <small style="font-size:.72rem;color:var(--text-secondary);font-weight:400;">(${escapeHtml(s.entity_type)})</small></div>
+                            <div style="font-size:.75rem;color:var(--text-secondary);margin-top:2px;">${s.alert_count} alerts · ${(s.unique_techniques||[]).length} techniques · ${s.time_span_hours}h span · <span class="sev-badge sev-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span></div>
+                        </div>
+                    </div>
+                    <div style="padding:10px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:.82rem;line-height:1.55;color:var(--text-primary);">${escapeHtml(s.narrative)}</div>
+                    ${chainHtml}
+                </div>`;
+            }).join('');
+        } catch(e) {
+            host.innerHTML = '<div class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e)) + '</div>';
+        }
+    };
 
     function renderMatchRows(tbodyId, matches, showType) {
         const tbody = document.getElementById(tbodyId);
@@ -297,6 +934,11 @@
                 const watchBtn = isWatched
                     ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
                     : `<button class="ti-btn ti-btn-sm ti-btn-watch" onclick="watchActor(${idx})">Watch</button>`;
+                // v0.27.0: open the deep-dive profile page for this actor.
+                // entity_class param tells the profile endpoint which
+                // OpenCTI lookup path to use (most APTs are intrusion sets).
+                const klass = (a.threat_actor_types || []).includes('intrusion-set') ? 'intrusion_set' : 'threat_actor';
+                const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm" style="margin-left:6px;" title="Open deep-dive profile">↗ Profile</a>`;
                 html += `<tr>
                     <td class="ti-name-cell" onclick="toggleActorDetail(${idx})">${esc(a.name)}</td>
                     <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span style="color:var(--text-muted)">-</span>'}</td>
@@ -306,7 +948,7 @@
                     <td>${formatDate(a.first_seen)}</td>
                     <td>${formatDate(a.last_seen)}</td>
                     <td>${labels || '-'}</td>
-                    <td>${watchBtn}</td>
+                    <td>${watchBtn}${profileLink}</td>
                 </tr>`;
                 html += `<tr class="ti-detail-row" id="actor-detail-${idx}"><td colspan="9"><div class="ti-loading"><span class="ti-spinner"></span> Loading detail...</div></td></tr>`;
             });

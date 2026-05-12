@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Threat Actor — ION{% endblock %}
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+<section class="mb-6 rise d-1">
+  <div class="flex items-center gap-3 mb-3">
+    <a href="/threat-intel" class="text-[11px] text-ion-cyan hover:text-white transition">← Back to Threat Intel</a>
+  </div>
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-coral"><use href="#i-target"/></svg>
+    <span class="label-tiny text-ion-coral">Threat actor profile</span>
+  </div>
+  <h1 id="actor-name" class="font-sans font-semibold text-[32px] md:text-[40px] xl:text-[48px] leading-[1.05] text-white tracking-[-0.02em]">Loading…</h1>
+  <div id="actor-aliases" class="mt-3 text-[14px] text-slate-400 font-mono"></div>
+</section>
+
+<div id="actor-error" class="hidden mb-6 rounded-xl border border-ion-coral/20 bg-ion-coral/5 p-4 text-sm text-ion-coral"></div>
+
+<!-- ── KPI strip ── -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
+    <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Confidence</div>
+    <div id="kpi-confidence" class="text-[22px] font-semibold text-white font-mono">—</div>
+  </div>
+  <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
+    <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">First Seen</div>
+    <div id="kpi-first-seen" class="text-[14px] font-semibold text-ion-cyan font-mono">—</div>
+  </div>
+  <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
+    <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Last Seen</div>
+    <div id="kpi-last-seen" class="text-[14px] font-semibold text-ion-amber font-mono">—</div>
+  </div>
+  <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
+    <div class="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Local Case Matches</div>
+    <div id="kpi-cases" class="text-[22px] font-semibold text-ion-coral font-mono">—</div>
+    <div class="text-[10px] text-slate-500 mt-0.5">last 180 days</div>
+  </div>
+</section>
+
+<!-- ── Description ── -->
+<section class="mb-6">
+  <h2 class="font-sans font-semibold text-base text-white mb-3">Description</h2>
+  <div class="rounded-xl border border-white/5 bg-ink-900/40 p-4">
+    <div id="actor-description" class="text-sm text-slate-300 leading-relaxed">Loading…</div>
+  </div>
+</section>
+
+<!-- ── Recently active in your cases ── -->
+<section class="mb-6">
+  <h2 class="font-sans font-semibold text-base text-white mb-3">Recently Active in Your Cases <span class="text-[11px] text-slate-500 font-normal">— last 180 days</span></h2>
+  <div id="local-cases" class="rounded-xl border border-white/5 bg-ink-900/40 p-4">
+    <div class="text-slate-500 text-sm animate-pulse">Loading…</div>
+  </div>
+</section>
+
+<!-- ── TTPs (if available) ── -->
+<section class="mb-6">
+  <h2 class="font-sans font-semibold text-base text-white mb-3">Associated TTPs <span class="text-[11px] text-slate-500 font-normal">— from OpenCTI</span></h2>
+  <div id="actor-ttps" class="rounded-xl border border-white/5 bg-ink-900/40 p-4">
+    <div class="text-slate-500 text-sm">Loading…</div>
+  </div>
+</section>
+
+<!-- ── Campaigns ── -->
+<section class="mb-6">
+  <h2 class="font-sans font-semibold text-base text-white mb-3">Campaigns</h2>
+  <div id="actor-campaigns" class="rounded-xl border border-white/5 bg-ink-900/40 p-4">
+    <div class="text-slate-500 text-sm">Loading…</div>
+  </div>
+</section>
+
+</div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+  const ENTITY_ID = "{{ entity_id }}";
+  const ENTITY_CLASS = new URLSearchParams(window.location.search).get('entity_class') || 'intrusion_set';
+  function esc(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function fmtDate(iso) { if (!iso) return '—'; try { return new Date(iso).toLocaleDateString(undefined, {year:'numeric',month:'short',day:'numeric'}); } catch { return iso; } }
+
+  async function load() {
+    try {
+      const r = await fetch('/api/threat-intel/actors/' + encodeURIComponent(ENTITY_ID) + '/profile?entity_class=' + ENTITY_CLASS);
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.detail || 'HTTP ' + r.status);
+      }
+      const d = await r.json();
+      render(d);
+    } catch(e) {
+      document.getElementById('actor-error').classList.remove('hidden');
+      document.getElementById('actor-error').textContent = 'Failed to load actor: ' + (e.message || e);
+    }
+  }
+
+  function render(d) {
+    const a = d.actor || {};
+    document.title = (a.name || 'Threat Actor') + ' — ION';
+    document.getElementById('actor-name').textContent = a.name || 'Unknown actor';
+
+    // Aliases
+    const aliases = Array.isArray(a.aliases) ? a.aliases : (a.aliases ? [a.aliases] : []);
+    document.getElementById('actor-aliases').innerHTML = aliases.length
+      ? '<span class="text-slate-500">Also known as:</span> ' + aliases.map(al => `<span class="text-ion-cyan">${esc(al)}</span>`).join(', ')
+      : '';
+
+    // KPIs
+    document.getElementById('kpi-confidence').textContent = a.confidence != null ? a.confidence + '%' : '—';
+    document.getElementById('kpi-first-seen').textContent = fmtDate(a.first_seen);
+    document.getElementById('kpi-last-seen').textContent = fmtDate(a.last_seen);
+    document.getElementById('kpi-cases').textContent = (d.recent_cases || []).length;
+
+    // Description
+    if (d.actor_error) {
+      document.getElementById('actor-description').innerHTML = `<em class="text-slate-500">OpenCTI lookup failed: ${esc(d.actor_error)}.</em>`;
+    } else if (a.description) {
+      document.getElementById('actor-description').innerHTML = esc(a.description).replace(/\n/g, '<br>');
+    } else {
+      document.getElementById('actor-description').innerHTML = '<em class="text-slate-500">No description available.</em>';
+    }
+
+    // Local cases
+    const cases = d.recent_cases || [];
+    const casesEl = document.getElementById('local-cases');
+    if (!cases.length) {
+      casesEl.innerHTML = '<div class="text-slate-500 text-sm">No matching cases in the last 180 days. <a href="/threat-intel" class="text-ion-cyan hover:text-white">← back to overview</a></div>';
+    } else {
+      casesEl.innerHTML = '<ul class="space-y-2">' + cases.map(c => `
+        <li class="flex items-center gap-3 py-1">
+          <a href="/cases?selected=${c.id}" class="text-ion-cyan font-mono text-xs hover:text-white transition">${esc(c.case_number)}</a>
+          <span class="sev-badge sev-${esc(c.severity)} text-[10px]">${esc(c.severity)}</span>
+          <span class="text-sm text-slate-200 flex-1">${esc(c.title)}</span>
+          <span class="text-[10px] text-slate-500 font-mono">${fmtDate(c.created_at)}</span>
+        </li>`).join('') + '</ul>';
+    }
+
+    // TTPs
+    const ttps = a.ttps || [];
+    const ttpsEl = document.getElementById('actor-ttps');
+    if (!ttps.length) {
+      ttpsEl.innerHTML = '<div class="text-slate-500 text-sm">No TTPs surfaced by OpenCTI for this actor.</div>';
+    } else {
+      ttpsEl.innerHTML = '<div class="flex flex-wrap gap-2">' + ttps.slice(0, 30).map(t => `
+        <a href="javascript:void(0)" onclick="(function(){ window.location.href='/threat-intel?drill=' + encodeURIComponent('${esc(t.mitre_id || t.id || '')}'); })()"
+           class="px-2 py-1 rounded bg-ion-amber/10 text-ion-amber border border-ion-amber/30 text-[11px] font-mono hover:bg-ion-amber/20 transition"
+           title="${esc(t.name || '')}">${esc(t.mitre_id || t.id || '?')}</a>`).join('') + '</div>';
+    }
+
+    // Campaigns
+    const campaigns = a.campaigns || [];
+    const campEl = document.getElementById('actor-campaigns');
+    if (!campaigns.length) {
+      campEl.innerHTML = '<div class="text-slate-500 text-sm">No campaigns linked to this actor in OpenCTI.</div>';
+    } else {
+      campEl.innerHTML = '<ul class="space-y-2">' + campaigns.map(c => `
+        <li class="flex items-center gap-3 py-1.5 border-b border-white/5 last:border-b-0">
+          <span class="text-ion-cyan font-semibold text-sm flex-1">${esc(c.name)}</span>
+          <span class="text-[11px] text-slate-500 font-mono">${fmtDate(c.first_seen)} → ${fmtDate(c.last_seen)}</span>
+        </li>`).join('') + '</ul>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', load);
+})();
+</script>
+{% endblock %}
