@@ -127,7 +127,7 @@ def pick_lab_lesson_status(score: Optional[int], pass_threshold: int) -> str:
 # ── Routes ────────────────────────────────────────────────────────────────
 
 
-@router.post("/courses/{slug}/lessons/{lesson_id}/lab/launch")
+@router.post("/api/courses/{slug}/lessons/{lesson_id}/lab/launch")
 def launch_lab(
     slug: str,
     lesson_id: int,
@@ -177,7 +177,7 @@ def launch_lab(
     }
 
 
-@router.post("/courses/{slug}/lessons/{lesson_id}/lab/complete")
+@router.post("/api/courses/{slug}/lessons/{lesson_id}/lab/complete")
 def complete_lab(
     slug: str,
     lesson_id: int,
@@ -306,7 +306,7 @@ def complete_lab(
     }
 
 
-@router.get("/courses/{slug}/lessons/{lesson_id}/lab-sessions")
+@router.get("/api/courses/{slug}/lessons/{lesson_id}/lab-sessions")
 def get_lab_sessions(
     slug: str,
     lesson_id: int,

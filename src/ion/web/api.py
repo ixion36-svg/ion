@@ -2273,14 +2273,23 @@ async def revert_document_to_version(
 
 
 # Health check endpoint (no auth required)
-@router.get("/health")
-async def health_check():
-    """Health check for Docker/load balancers. Returns basic status."""
+def _health_core() -> dict:
+    """Shared version + database-type block used by /health and /health/deep.
+
+    Both endpoints used to re-import __version__ and re-build the dialect
+    lookup independently (audit Amend C). Centralising here so a future
+    field change lands once.
+    """
     from ion import __version__
     from ion.storage.database import get_engine
     engine = get_engine()
-    db_type = engine.dialect.name
-    return {"status": "ok", "database": db_type, "version": __version__}
+    return {"database": engine.dialect.name, "version": __version__}
+
+
+@router.get("/health")
+async def health_check():
+    """Health check for Docker/load balancers. Returns basic status."""
+    return {"status": "ok", **_health_core()}
 
 
 @router.get("/health/deep")
@@ -2296,13 +2305,10 @@ async def deep_health_check(
     for an attacker mapping the deployment topology. /health (the
     shallow check used by load balancers) stays public.
     """
-    from ion import __version__
     from ion.core.config import get_config
-    from ion.storage.database import get_engine
 
     config = get_config()
-    engine = get_engine()
-    checks = {"database": engine.dialect.name, "version": __version__}
+    checks = dict(_health_core())
 
     # Elasticsearch
     try:
@@ -3542,6 +3548,50 @@ async def get_es_alerts(
                 d["tide_system_id"] = res.get("tide_system_id")
                 d["tide_system_name"] = res.get("tide_system_name")
             out_alerts.append(d)
+
+        # v0.30.0: surface lab-fixture AlertTriage rows that have no
+        # backing ES document, so graded labs can drive the standard
+        # `alert_view` / `alert_linked` audit chain. Fixture rows are
+        # marked by `es_alert_id LIKE 'lab-fixture-%'` per
+        # seed_lab_fixtures.py. We override their timestamp to "now" so
+        # they always appear in the modern time window — the hardcoded
+        # 2026-01-01 in the seed payload is intentional (air-gap
+        # determinism) and would otherwise fight client-side filters.
+        from datetime import datetime as _datetime
+        from datetime import timezone as _tz
+
+        from ion.models.alert_triage import AlertTriage as _AlertTriage
+        fixture_q = session.query(_AlertTriage).filter(
+            _AlertTriage.es_alert_id.like("lab-fixture-%")
+        )
+        # Respect status filter when the caller asked for a specific status;
+        # without an explicit filter we include open fixtures plus (unless
+        # include_closed=False) closed ones. Matches the ES-side behaviour.
+        if status:
+            fixture_q = fixture_q.filter(_AlertTriage.status == status)
+        elif not include_closed:
+            fixture_q = fixture_q.filter(_AlertTriage.status != "closed")
+        # Severity filter maps to AlertTriage.priority (the seed payload's
+        # severity-equivalent field; AlertTriage has no `severity` column).
+        if severity:
+            fixture_q = fixture_q.filter(_AlertTriage.priority == severity)
+        _now_iso = _datetime.now(_tz.utc).isoformat()
+        for t in fixture_q.all():
+            out_alerts.append({
+                "id": t.es_alert_id,
+                "severity": t.priority or "medium",
+                "title": t.rule_name or t.es_alert_id,
+                "rule_name": t.rule_name,
+                "host": None,
+                "user": None,
+                "source_system": t.source_system or "elastic",
+                "status": t.status,
+                "timestamp": _now_iso,
+                "mitre_techniques": t.mitre_techniques or [],
+                "mitre_technique_id": (t.mitre_techniques or [None])[0] if t.mitre_techniques else None,
+                "is_lab_fixture": True,
+            })
+
         return {
             "alerts": out_alerts,
             "total": len(out_alerts),

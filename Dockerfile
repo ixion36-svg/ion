@@ -57,7 +57,7 @@ FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.29.1" \
+      org.opencontainers.image.version="0.30.0" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
 # Install runtime libraries (PostgreSQL client + WeasyPrint deps + fonts)
@@ -93,7 +93,8 @@ COPY src/ src/
 COPY seed_all.py seed_ion_data.py seed_knowledge_base.py \
      seed_knowledge_base_blueteam.py seed_knowledge_base_foundations.py \
      seed_knowledge_base_security_fundamentals.py \
-     seed_playbooks.py seed_soc_templates.py seed_courses.py /app/
+     seed_playbooks.py seed_soc_templates.py seed_courses.py \
+     seed_lab_fixtures.py /app/
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 

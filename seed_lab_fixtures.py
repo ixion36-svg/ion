@@ -29,7 +29,7 @@ if str(_SRC) not in sys.path:
 
 from sqlalchemy import text
 
-from ion.storage.database import get_engine, get_session
+from ion.storage.database import get_engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -106,7 +106,11 @@ def seed_lab_fixtures() -> None:
             JOIN course_modules m ON m.id = l.module_id
             JOIN courses c ON c.id = m.course_id
             WHERE c.level = 'L1'
-              AND l.lesson_type = 'lab'
+              -- v0.30.0: SQLEnum(native_enum=False) stores the enum NAME
+              -- ('LAB', uppercase), not the value. Same dialect-binding
+              -- pattern that bit v0.23.2's case-close test. Pre-fix this
+              -- silently filtered to zero matches and inserted no fixtures.
+              AND UPPER(l.lesson_type) = 'LAB'
               AND l.title LIKE '%Read your first alert%'
             LIMIT 1
         """)).fetchone()

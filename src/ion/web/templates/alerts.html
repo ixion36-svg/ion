@@ -680,6 +680,24 @@
     opacity: 1;
 }
 
+/* v0.30.0: lab-fixture badge — tags AlertTriage rows seeded by
+   seed_lab_fixtures.py so analysts don't confuse training fixtures with
+   real alerts. Amber pill is consistent with the Training nav group. */
+.lab-fixture-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #ffb74d;
+    background: rgba(255, 183, 77, 0.12);
+    border: 1px solid rgba(255, 183, 77, 0.4);
+    border-radius: 3px;
+    vertical-align: middle;
+}
+
 /* Notification Toasts */
 .notification-toast {
     position: fixed;
@@ -6953,6 +6971,9 @@ function renderAlerts() {
         const mitreBadge = a.mitre_technique_id
             ? `<span class="mitre-inline-badge" title="${escapeHtml(a.mitre_technique_name || '')} (${escapeHtml(a.mitre_tactic_name || '')})">${escapeHtml(a.mitre_technique_id)}</span>`
             : '';
+        const labFixtureBadge = a.is_lab_fixture
+            ? `<span class="lab-fixture-badge" title="Training lab fixture — not a real alert">Lab fixture</span>`
+            : '';
         const isSelected = selectedAlertIds.has(a.id);
         return `
         <tr class="alert-row ${isSelected ? 'selected' : ''}"
@@ -6965,7 +6986,7 @@ function renderAlerts() {
             </td>
             <td style="width:32px;text-align:center;"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
             <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
-            <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}${mitreBadge}</td>
+            <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}${mitreBadge}${labFixtureBadge}</td>
             <td title="${escapeHtml(a.host || '-')}">${escapeHtml(a.host || '-')}</td>
             <td title="${escapeHtml(a.user || '-')}">${escapeHtml(a.user || '-')}</td>
             <td title="${escapeHtml(a.rule_name || '-')}">${escapeHtml(a.rule_name || '-')}</td>
