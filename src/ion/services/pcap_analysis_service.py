@@ -327,6 +327,90 @@ async def _analyze_one(
     return out
 
 
+def _link_pcap_observables(case_id: int, pcap_result: Optional[Any]) -> None:
+    """Extract observables from a PCAP analysis result and link to the case.
+
+    v0.30.1: pre-fix the auto-PCAP service only wrote a markdown Note,
+    so IPs / DNS queries / TLS SNIs / HTTP hosts surfaced in the note
+    text but never got rolled up into the case's observable list. The
+    standard observable enrichment + watchlist + correlation pipelines
+    therefore couldn't see PCAP findings. We now also create Observable
+    rows (via ObservableService.get_or_create) and link them to the
+    case (via link_to_case) with context strings that preserve the
+    PCAP role (auto_pcap_source / _destination / _dns / _tls / _http).
+    Best-effort: any per-observable failure is logged and the chain
+    continues so one bad value can't poison the whole batch.
+    """
+    if pcap_result is None:
+        return
+    try:
+        from ion.core.config import get_config
+        from ion.models.observable import ObservableType
+        from ion.services.observable_service import ObservableService
+        from ion.storage.database import get_engine, get_session_factory
+    except Exception as exc:
+        logger.warning("pcap_analysis: cannot import deps for observable link: %s", exc)
+        return
+
+    # Collect (type, value, context) triples from each pcap_result field.
+    # Field shapes mirror the dict keys used by _render_pcap_markdown above.
+    items: list[tuple[ObservableType, str, str]] = []
+    for entry in (getattr(pcap_result, "top_src_ips", None) or []):
+        ip = entry.get("ip") if isinstance(entry, dict) else None
+        if ip:
+            items.append((ObservableType.IPV4, ip, "auto_pcap_source"))
+    for entry in (getattr(pcap_result, "top_dst_ips", None) or []):
+        ip = entry.get("ip") if isinstance(entry, dict) else None
+        if ip:
+            items.append((ObservableType.IPV4, ip, "auto_pcap_destination"))
+    for entry in (getattr(pcap_result, "dns_queries", None) or []):
+        q = entry.get("query") if isinstance(entry, dict) else None
+        if q:
+            items.append((ObservableType.DOMAIN, q, "auto_pcap_dns"))
+    for entry in (getattr(pcap_result, "tls_handshakes", None) or []):
+        sni = entry.get("sni") if isinstance(entry, dict) else None
+        if sni:
+            items.append((ObservableType.DOMAIN, sni, "auto_pcap_tls_sni"))
+    for entry in (getattr(pcap_result, "http_requests", None) or []):
+        host = entry.get("host") if isinstance(entry, dict) else None
+        if host:
+            items.append((ObservableType.DOMAIN, host, "auto_pcap_http_host"))
+
+    if not items:
+        return
+
+    config = get_config()
+    engine = get_engine(config.db_path)
+    factory = get_session_factory(engine)
+    session: Session = factory()
+    try:
+        service = ObservableService(session)
+        created_count = 0
+        linked_count = 0
+        for obs_type, value, context in items:
+            try:
+                obs, created = service.get_or_create(obs_type, value)
+                if created:
+                    created_count += 1
+                link = service.link_to_case(obs.id, case_id, context=context)
+                if link is not None:
+                    linked_count += 1
+            except Exception as exc:
+                logger.debug(
+                    "pcap_analysis: linking %s=%s failed: %s", obs_type, value, exc
+                )
+        session.commit()
+        logger.info(
+            "pcap_analysis: linked %d observable(s) to case %s (%d newly created)",
+            linked_count, case_id, created_count,
+        )
+    except Exception as exc:
+        session.rollback()
+        logger.warning("pcap_analysis: observable linking failed: %s", exc)
+    finally:
+        session.close()
+
+
 def _post_case_note(case_id: int, content: str) -> None:
     """Open a fresh DB session, attribute the note to Bob, commit.
 
@@ -412,6 +496,10 @@ async def _runner(
                 )
             md += footer
             _post_case_note(case_id, md)
+            # v0.30.1: also surface PCAP findings as Observable rows linked
+            # to the case so they participate in enrichment / watchlist /
+            # correlation. Best-effort — never blocks the Note write.
+            _link_pcap_observables(case_id, r["pcap_result"])
         except Exception as exc:
             logger.warning("pcap_analysis: %s failed: %s", cid, exc)
 

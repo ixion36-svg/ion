@@ -175,6 +175,21 @@ class KibanaSyncService:
 
             current_status = case.status.value if hasattr(case.status, "value") else case.status
 
+            # v0.30.1: "closed" is terminal in ION. The bidirectional sync
+            # used to flip ION back to "acknowledged" when the 60s loop fired
+            # before the ION→Kibana close had propagated (Kibana still showed
+            # "in-progress"), causing the Kanban-close flap the user
+            # surfaced. ION-closed sticks; the analyst must re-open
+            # explicitly. Kibana-closed propagates eagerly (handled at the
+            # caller level — see sync_all_case_statuses).
+            if current_status == "closed" and ion_status != "closed":
+                logger.debug(
+                    "Kibana sync: refusing to flip case %s from CLOSED to %s "
+                    "(closed is terminal in ION; re-open manually if intended)",
+                    case.case_number, ion_status,
+                )
+                return False
+
             if current_status != ion_status:
                 case.status = ion_status
                 case.kibana_case_version = kibana_case.get("version")
@@ -288,6 +303,36 @@ class KibanaSyncService:
                     # Parse timestamps
                     kibana_updated = kibana_case.get("updated_at") or kibana_case.get("created_at")
                     ion_updated = case.updated_at or case.created_at
+
+                    # v0.30.1: "closed" is a terminal state and gets eager
+                    # bidirectional propagation regardless of the timestamp
+                    # gate, so close events can't be defeated by clock skew
+                    # or async-push latency. Pre-fix:
+                    #
+                    # * Close-in-ION flap — the 60s loop could fire after
+                    #   ION committed close but before the ION→Kibana
+                    #   background sync push completed. Kibana still showed
+                    #   "in-progress" → reverse-sync flipped ION back to
+                    #   "acknowledged". (sync_case_status_from_kibana now
+                    #   also refuses to demote ION's CLOSED back to a
+                    #   non-closed state — closed is terminal.)
+                    #
+                    # * Close-in-Kibana never reaching ION — happened when
+                    #   ION's updated_at was newer than Kibana's (clock
+                    #   skew, or ION had any other recent write); the
+                    #   timestamp gate routed to to_kibana and Kibana's
+                    #   closed never propagated.
+                    kibana_status = kibana_case.get("status")
+                    ion_status = case.status.value if hasattr(case.status, "value") else case.status
+
+                    if kibana_status == "closed" and ion_status != "closed":
+                        if await self.sync_case_status_from_kibana(session, case):
+                            from_kibana += 1
+                        continue
+                    if ion_status == "closed" and kibana_status != "closed":
+                        if await self.sync_case_status_to_kibana(session, case):
+                            to_kibana += 1
+                        continue
 
                     # Convert Kibana timestamp to datetime for comparison
                     if kibana_updated:
