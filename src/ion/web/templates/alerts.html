@@ -3538,8 +3538,13 @@ async function loadAlerts() {
 
         const data = await response.json();
 
-        // Handle graceful error responses (ES not enabled, not configured, or unreachable)
-        if (data.message) {
+        // Handle graceful error responses (ES not enabled, not configured, or unreachable).
+        // v0.30.0: when the API still returns alerts despite a degraded-ES
+        // message (lab-fixture rows always surface regardless of ES state),
+        // render them instead of wiping the table. Only short-circuit to the
+        // error banner if there is genuinely nothing to show.
+        const incomingAlerts = data.alerts || [];
+        if (data.message && incomingAlerts.length === 0) {
             const friendlyMsg = data.connection_error
                 ? 'Unable to connect to Elasticsearch. Verify the service is running and the connection settings are correct.'
                 : data.message;
@@ -3550,7 +3555,7 @@ async function loadAlerts() {
             return;
         }
 
-        allAlerts = data.alerts || [];
+        allAlerts = incomingAlerts;
         arkimeEnabled = !!data.arkime_enabled;
         applyFilters();
         renderThreatBanner();
