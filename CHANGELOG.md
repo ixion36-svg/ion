@@ -1,13 +1,102 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.30.0 -->
+<!-- ion-doc:version=0.30.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.30.1 — 2026-05-13
+
+Bug-fix patch — 4 issues surfaced during the v0.30.0 §3.4.8
+acceptance walk.
+
+### fix(cyab): MITRE heatmap 500 — Postgres `json` has no `<>` operator
+
+`/cyab/attack-heatmap` (plus the "View full coverage in MITRE ATT&CK
+heatmap" deep-link from the Threat Intel page's "Recently Seen MITRE
+Techniques" widget) crashed with `psycopg2.errors.UndefinedFunction:
+operator does not exist: json <> json` whenever the route was hit.
+The queries in `mitre_heatmap_service` defensively filtered out rows
+whose JSON value is the literal `null` via `!= 'null'::json`, but
+Postgres `json` (unlike `jsonb`) has no equality/inequality operators
+— that filter never compiled. Cast `mitre_techniques::text` and
+compare against the plain string `'null'`. Three call-sites patched
+(`_alert_observations_postgres` + `_pin_observations_postgres` x2).
+
+### fix(cases): Kanban-close flap + Kibana→ION close stuck
+
+Two related sync-loop bugs from `KibanaSyncService`:
+
+* **Close-in-ION flap.** Closing a case from the Kanban (or anywhere
+  else in ION) committed `status=closed`, then the 60s bidirectional
+  sync loop fired before the async ION→Kibana background push had
+  completed. Kibana still showed `in-progress`, the reverse-sync
+  mapped that to `acknowledged`, and ION flipped back to in-progress.
+  The user perceived this as "AI summary appears, case bounces back"
+  — the AI Note write is innocent; it's the 60s loop racing the
+  background Kibana push.
+* **Close-in-Kibana not reaching ION.** When ION's `updated_at` was
+  newer than Kibana's (clock skew or any unrelated ION write that
+  touched the case row), the "last update wins" timestamp gate
+  routed the case to sync-to-kibana instead of sync-from-kibana, so
+  Kibana's close never propagated.
+
+Fix: `closed` is now a terminal state in the sync logic.
+`sync_case_status_from_kibana` refuses to demote ION's CLOSED back
+to a non-closed state. `sync_all_case_statuses` eager-propagates
+`closed` in either direction regardless of the timestamp gate — if
+one side is closed and the other isn't, the close wins. Normal
+non-closed transitions keep the existing last-update-wins logic.
+
+### fix(pcap): auto-PCAP observables now linked to the case
+
+`pcap_analysis_service` used to only write a markdown Note to the
+case. The IPs / DNS queries / TLS SNIs / HTTP hosts discovered in
+the PCAP surfaced in the Note text but never got rolled up into the
+case's Observable list — so the standard enrichment / watchlist /
+correlation pipelines couldn't see PCAP findings.
+
+New `_link_pcap_observables(case_id, pcap_result)` helper extracts
+five fields from the PcapResult dataclass and creates/links
+Observable rows via `ObservableService.get_or_create` +
+`link_to_case`:
+
+| Source field | Observable type | Link context |
+|---|---|---|
+| `top_src_ips` | IPV4 | `auto_pcap_source` |
+| `top_dst_ips` | IPV4 | `auto_pcap_destination` |
+| `dns_queries` | DOMAIN | `auto_pcap_dns` |
+| `tls_handshakes` | DOMAIN | `auto_pcap_tls_sni` |
+| `http_requests` | DOMAIN | `auto_pcap_http_host` |
+
+Best-effort: per-observable failures are logged but don't break the
+batch, and the helper never blocks the Note write (called after
+`_post_case_note` in `_runner`).
+
+### fix(nav): Notes moved from first to last in the Reference tab strip
+
+The Reference sibling-tab strip on `/notes`, `/templates`,
+`/documents` displayed `[Notes, Templates, Documents]`. Reordered
+to `[Templates, Documents, Notes]` across all three page templates.
+The Knowledge dropdown's `Reference` link updated from `/notes` to
+`/templates` so clicking the dropdown entry lands on the new first
+tab. The `is-active` matcher still covers all three paths.
+
+### Files
+
+`src/ion/services/mitre_heatmap_service.py`,
+`src/ion/services/pcap_analysis_service.py`,
+`src/ion/services/kibana_sync_service.py`,
+`src/ion/web/templates/notes.html`,
+`src/ion/web/templates/templates.html`,
+`src/ion/web/templates/documents.html`,
+`src/ion/web/templates/base.html`.
+
+---
 
 ## v0.30.0 — 2026-05-13
 
