@@ -101,37 +101,55 @@
       <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 2b · KPIs</div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-        <!-- Open Alerts (Last 30d) -->
+        <!-- v0.31.1: Alerts in the last 24h — replaces the v0.17.1 30d
+             backlog card. Severity row (Critical / High / Medium / Low)
+             + status row (Open / Ack / Closed). Source = ES via
+             _check_alerts_24h; falls back to ION-local AlertTriage
+             counts when ES is down (severity drops to "unknown" in
+             that mode — banner shown below if so). -->
         <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
           <div class="flex items-baseline justify-between mb-3">
-            <span class="text-[11px] uppercase tracking-wider text-slate-500">Alert backlog · 30d</span>
-            <span id="ds-a30-pct" class="text-[11px] text-slate-500 tabular-nums">— %</span>
+            <span class="text-[11px] uppercase tracking-wider text-slate-500">Alerts · 24h</span>
+            <span id="ds-a24-source" class="text-[11px] text-slate-500 tabular-nums">—</span>
           </div>
           <div class="flex items-end gap-3 mb-3">
-            <div id="ds-a30-total" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-white">—</div>
-            <div class="text-[11px] text-slate-500 leading-tight pb-1">total alerts<br><span class="text-slate-600">last 30 days</span></div>
+            <div id="ds-a24-total" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-white">—</div>
+            <div class="text-[11px] text-slate-500 leading-tight pb-1">total alerts<br><span class="text-slate-600">last 24h</span></div>
           </div>
-          <div class="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
-            <div><div id="ds-a30-open" class="text-[18px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
-            <div><div id="ds-a30-ack"  class="text-[18px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">ack</div></div>
-            <div><div id="ds-a30-closed" class="text-[18px] font-semibold tabular-nums text-ion-lime  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
+          <div class="grid grid-cols-4 gap-2 pt-3 border-t border-white/5 text-center">
+            <div><div id="ds-a24-critical" class="text-[16px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">critical</div></div>
+            <div><div id="ds-a24-high"     class="text-[16px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">high</div></div>
+            <div><div id="ds-a24-medium"   class="text-[16px] font-semibold tabular-nums text-slate-300  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
+            <div><div id="ds-a24-low"      class="text-[16px] font-semibold tabular-nums text-slate-400  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 pt-2 mt-2 border-t border-white/5 text-center">
+            <div><div id="ds-a24-open"     class="text-[14px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
+            <div><div id="ds-a24-ack"      class="text-[14px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">ack</div></div>
+            <div><div id="ds-a24-closed"   class="text-[14px] font-semibold tabular-nums text-ion-lime  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
           </div>
         </div>
 
-        <!-- Case status counts -->
+        <!-- v0.31.1: Cases card — expanded with a severity breakdown row.
+             Top row remains status (Open / In Progress / Closed). -->
         <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
           <div class="flex items-baseline justify-between mb-3">
-            <span class="text-[11px] uppercase tracking-wider text-slate-500">Cases</span>
-            <span id="ds-cs-flow" class="text-[11px] text-slate-500 tabular-nums">7d: — open / — closed</span>
+            <span class="text-[11px] uppercase tracking-wider text-slate-500">Cases · 24h</span>
+            <span id="ds-cs-flow" class="text-[11px] text-slate-500 tabular-nums">— closed/24h</span>
           </div>
           <div class="flex items-end gap-3 mb-3">
             <div id="ds-cs-total" class="font-sans font-semibold tabular-nums tracking-tight text-[36px] leading-none text-white">—</div>
-            <div class="text-[11px] text-slate-500 leading-tight pb-1">cases total</div>
+            <div class="text-[11px] text-slate-500 leading-tight pb-1">intake<br><span class="text-slate-600">last 24h</span></div>
           </div>
           <div class="grid grid-cols-3 gap-2 pt-3 border-t border-white/5 text-center">
-            <div><div id="ds-cs-open" class="text-[18px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
-            <div><div id="ds-cs-ack"  class="text-[18px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">in&nbsp;progress</div></div>
-            <div><div id="ds-cs-closed" class="text-[18px] font-semibold tabular-nums text-ion-lime leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
+            <div><div id="ds-cs-open" class="text-[16px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
+            <div><div id="ds-cs-ack"  class="text-[16px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">in&nbsp;progress</div></div>
+            <div><div id="ds-cs-closed" class="text-[16px] font-semibold tabular-nums text-ion-lime leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
+          </div>
+          <div class="grid grid-cols-4 gap-2 pt-2 mt-2 border-t border-white/5 text-center">
+            <div><div id="ds-cs-sev-critical" class="text-[14px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">critical</div></div>
+            <div><div id="ds-cs-sev-high"     class="text-[14px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">high</div></div>
+            <div><div id="ds-cs-sev-medium"   class="text-[14px] font-semibold tabular-nums text-slate-300  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
+            <div><div id="ds-cs-sev-low"      class="text-[14px] font-semibold tabular-nums text-slate-400  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
           </div>
         </div>
 
@@ -493,7 +511,13 @@ function renderAlerts(data) {
   // never blank — analysts complained the panel was hard to decipher
   // when ES alerts had no rule.name (older Sigma exports, custom feeds).
   tbody.innerHTML = rows.map(a => {
-    const ruleLabel = a.rule_name || a.title || a.id || '(unnamed)';
+    // v0.31.1: rule-name column. Drop the previous `a.id` fallback —
+    // the raw ES document id (a UUID like `abcd-1234…`) was leaking
+    // into the column whenever rule_name/title were missing, which
+    // analysts read as "ID instead of rule name". Prefer rule_name,
+    // fall back to title, terminate at "(rule unknown)" — never to
+    // the document id.
+    const ruleLabel = a.rule_name || a.title || '(rule unknown)';
     return `<tr class="border-b border-white/5 hover:bg-white/[.02]">
     <td class="px-3 py-2 text-slate-400 font-mono">${fmtShort(a.timestamp)}</td>
     <td class="px-3 py-2">${sevPill(a.severity)}</td>
@@ -727,30 +751,48 @@ function fmtN(n) {
   if (n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   return Number(n).toLocaleString();
 }
-function renderOpenAlerts30d(d) {
+// v0.31.1: 24h alerts breakdown (replaces renderOpenAlerts30d on the
+// page — the 30d data is still computed server-side for pptx export
+// but no longer rendered as a KPI card).
+function renderAlerts24h(d) {
   d = d || {};
-  document.getElementById('ds-a30-total').textContent  = fmtN(d.total);
-  document.getElementById('ds-a30-open').textContent   = fmtN(d.open);
-  document.getElementById('ds-a30-ack').textContent    = fmtN(d.acknowledged);
-  document.getElementById('ds-a30-closed').textContent = fmtN(d.closed);
-  document.getElementById('ds-a30-pct').textContent =
-    (d.still_open_pct != null ? d.still_open_pct + '% open' : '— %');
+  const sev = d.by_severity || {};
+  const st  = d.by_status || {};
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = fmtN(v); };
+  set('ds-a24-total',    d.total);
+  set('ds-a24-critical', sev.critical);
+  set('ds-a24-high',     sev.high);
+  set('ds-a24-medium',   sev.medium);
+  set('ds-a24-low',      sev.low);
+  set('ds-a24-open',     st.open);
+  set('ds-a24-ack',      st.acknowledged);
+  set('ds-a24-closed',   st.closed);
+  const srcEl = document.getElementById('ds-a24-source');
+  if (srcEl) {
+    if (d.source === 'ion_fallback') {
+      srcEl.textContent = 'ION fallback (ES down) — severity n/a';
+    } else {
+      srcEl.textContent = 'ES';
+    }
+  }
 }
 function renderCaseStatusCounts(d) {
-  // v0.19.14: API switched to a 24h-scoped view. Field rename:
-  //   total            -> intake_24h
-  //   open             -> open    (now: created in 24h, currently open)
-  //   acknowledged     -> in_progress
-  //   closed           -> closed_24h
-  //   opened_last_7d / closed_last_7d -> dropped
+  // v0.19.14: API switched to a 24h-scoped view (intake_24h /
+  // closed_24h / open / in_progress).
+  // v0.31.1: added by_severity_24h breakdown on the same window.
   d = d || {};
   const setIf = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmtN(val); };
   setIf('ds-cs-total',  d.intake_24h);
   setIf('ds-cs-open',   d.open);
   setIf('ds-cs-ack',    d.in_progress);
   setIf('ds-cs-closed', d.closed_24h);
+  const sev = d.by_severity_24h || {};
+  setIf('ds-cs-sev-critical', sev.critical);
+  setIf('ds-cs-sev-high',     sev.high);
+  setIf('ds-cs-sev-medium',   sev.medium);
+  setIf('ds-cs-sev-low',      sev.low);
   const flow = document.getElementById('ds-cs-flow');
-  if (flow) flow.textContent = `Last 24h · ${fmtN(d.intake_24h)} new / ${fmtN(d.closed_24h)} closed`;
+  if (flow) flow.textContent = `${fmtN(d.intake_24h)} new · ${fmtN(d.closed_24h)} closed`;
 }
 function renderTriageThroughput(d) {
   d = d || {};
@@ -770,7 +812,11 @@ async function loadChecks() {
     if (el) el.innerHTML = spinner(id === 'rules-tbody' ? 3 : 5);
   });
   try {
-    const r = await fetch('/api/daily-standup/checks');
+    // v0.31.1: bypass browser cache. Backend also sends
+    // Cache-Control: no-store; this is belt-and-braces so analysts
+    // don't see "critical alerts from days ago" when ES has nothing
+    // fresh and the previous response is sitting in disk cache.
+    const r = await fetch('/api/daily-standup/checks', { cache: 'no-store' });
     if (!r.ok) throw new Error('Failed to load checks');
     const data = await r.json();
     DS.checksData = data;
@@ -780,8 +826,8 @@ async function loadChecks() {
     if (data.dc_log_health) renderLogHealth('dc', data.dc_log_health);
     if (data.wef_log_health) renderLogHealth('wef', data.wef_log_health);
     renderRuleFailures(data.rule_failures);
-    // v0.17.1 additions
-    renderOpenAlerts30d(data.open_alerts_30d);
+    // v0.17.1 / v0.31.1 KPI cards
+    renderAlerts24h(data.alerts_24h);
     renderCaseStatusCounts(data.case_status_counts);
     renderTriageThroughput(data.triage_throughput);
   } catch (e) {

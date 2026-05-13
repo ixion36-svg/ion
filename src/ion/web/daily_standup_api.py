@@ -316,6 +316,90 @@ async def _check_open_alerts_30d() -> Dict[str, Any]:
         session.close()
 
 
+async def _check_alerts_24h() -> Dict[str, Any]:
+    """v0.31.1: alerts in the last 24h with severity + status breakdown.
+
+    Replaces the v0.17.1 30-day backlog card on the standup page. The
+    30d backend check is kept (pptx export still uses it) — this one
+    drives the new Section 2b KPI card.
+
+    Source of truth: try ES first for the severity dimension (which
+    AlertTriage doesn't store natively). If ES is down or
+    unconfigured, fall back to AlertTriage counts (no severity
+    breakdown, all severities lumped as `unknown`).
+    """
+    from ion.services.elasticsearch_service import ElasticsearchService
+
+    by_severity = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0, "unknown": 0}
+    by_status = {"open": 0, "acknowledged": 0, "closed": 0}
+    total = 0
+    source = "elasticsearch"
+    error: str = ""
+
+    es = ElasticsearchService()
+    if es.is_configured:
+        try:
+            es_alerts = await es.get_alerts(hours=24, include_closed=True, limit=5000)
+            total = len(es_alerts)
+            for a in es_alerts:
+                sev = (a.severity or "unknown").lower()
+                if sev in by_severity:
+                    by_severity[sev] += 1
+                else:
+                    by_severity["unknown"] += 1
+                st = (a.status or "open").lower()
+                if st in by_status:
+                    by_status[st] += 1
+                else:
+                    by_status["open"] += 1
+        except Exception as e:
+            error = str(e)[:120]
+            es_alerts = []
+    else:
+        es_alerts = []
+
+    if not total and (not es.is_configured or error):
+        # Fallback — count AlertTriage rows in the last 24h. Severity
+        # breakdown is unavailable on this path because AlertTriage
+        # doesn't carry severity (see _check_critical_alerts fallback
+        # comments). Status breakdown IS available.
+        from ion.core.config import get_config
+        from ion.models.alert_triage import AlertTriage
+        from ion.storage.database import get_engine, get_session_factory
+
+        config = get_config()
+        engine = get_engine(config.db_path)
+        factory = get_session_factory(engine)
+        session = factory()
+        try:
+            cutoff = datetime.utcnow() - timedelta(hours=24)
+            rows = (
+                session.query(AlertTriage.status, func.count(AlertTriage.id))
+                .filter(AlertTriage.created_at >= cutoff)
+                .group_by(AlertTriage.status)
+                .all()
+            )
+            for st_enum, n in rows:
+                st = (st_enum.value if hasattr(st_enum, "value") else str(st_enum)).lower()
+                if st in by_status:
+                    by_status[st] += int(n)
+                else:
+                    by_status["open"] += int(n)
+            total = sum(by_status.values())
+            by_severity["unknown"] = total
+            source = "ion_fallback"
+        finally:
+            session.close()
+
+    return {
+        "total": total,
+        "by_severity": by_severity,
+        "by_status": by_status,
+        "source": source,
+        "fallback_reason": error or None,
+    }
+
+
 async def _check_case_status_counts() -> Dict[str, Any]:
     """Case status snapshot — last 24 hours.
 
@@ -361,11 +445,29 @@ async def _check_case_status_counts() -> Dict[str, Any]:
             .filter(AlertCase.closed_at >= cutoff)
             .count()
         )
+        # v0.31.1: severity breakdown for cases created in the last
+        # 24h. Drives the Section 2b "Cases" KPI card's bottom row.
+        severity_rows = (
+            session.query(AlertCase.severity, func.count(AlertCase.id))
+            .filter(AlertCase.created_at >= cutoff)
+            .group_by(AlertCase.severity)
+            .all()
+        )
+        by_severity_24h: Dict[str, int] = {
+            "critical": 0, "high": 0, "medium": 0, "low": 0, "unknown": 0,
+        }
+        for s, n in severity_rows:
+            key = (s or "unknown").lower()
+            if key in by_severity_24h:
+                by_severity_24h[key] += int(n)
+            else:
+                by_severity_24h["unknown"] += int(n)
         return {
             "open":         int(by_status_24h.get("open", 0)),
             "in_progress":  int(by_status_24h.get("acknowledged", 0)),
             "closed_24h":   int(closed_24h),
             "intake_24h":   int(sum(by_status_24h.values())),
+            "by_severity_24h": by_severity_24h,
         }
     except Exception as e:
         return {"error": str(e)[:120]}
@@ -702,7 +804,7 @@ async def get_daily_checks(
     (
         cluster, alerts, cases,
         dc_health, wef_health, rule_failures,
-        alerts_30d, case_status, triage_throughput,
+        alerts_30d, alerts_24h, case_status, triage_throughput,
     ) = await asyncio.gather(
         _check_cluster_health(),
         _check_critical_alerts(),
@@ -711,6 +813,7 @@ async def get_daily_checks(
         _check_log_source_health(_standup_wef_patterns(), "Windows Event Forwarding"),
         _check_rule_failures(),
         _check_open_alerts_30d(),
+        _check_alerts_24h(),
         _check_case_status_counts(),
         _check_triage_throughput_24h(),
         return_exceptions=True,
@@ -721,7 +824,7 @@ async def get_daily_checks(
             return {"error": str(val)[:100]}
         return val
 
-    return {
+    payload = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "cluster_health":     _safe(cluster),
         "critical_alerts":    _safe(alerts),
@@ -733,7 +836,21 @@ async def get_daily_checks(
         "open_alerts_30d":    _safe(alerts_30d),
         "case_status_counts": _safe(case_status),
         "triage_throughput":  _safe(triage_throughput),
+        # v0.31.1: 24h alerts breakdown — replaces the 30d KPI on the
+        # standup page. 30d data above stays in the response because
+        # the pptx export still references it.
+        "alerts_24h":         _safe(alerts_24h),
     }
+    # v0.31.1: standup is a real-time operator panel — never let a
+    # browser or proxy show stale numbers. The "critical alerts from
+    # days ago" symptom the user reported was at least partly a cache
+    # artefact; this header rules that out as a cause.
+    import json as _json
+    return Response(
+        content=_json.dumps(payload),
+        media_type="application/json",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+    )
 
 
 # ── Save standup ──────────────────────────────────────────────────────────
