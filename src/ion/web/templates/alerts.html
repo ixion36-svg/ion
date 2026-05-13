@@ -262,8 +262,11 @@
         <option value="info">Info</option>
     </select>
     <select id="alert-status-filter" onchange="handleStatusFilterChange()">
+        <!-- v0.31.0: "Open Only" is the page-load default per user
+             direction. The Active (Open + Ack) option remains
+             selectable, but new analyst eyes land on Open. -->
+        <option value="open" selected>Open Only</option>
         <option value="">Active (Open + Ack)</option>
-        <option value="open">Open Only</option>
         <option value="acknowledged">Acknowledged Only</option>
         <option value="closed">Closed</option>
         <option value="all">All Statuses</option>
