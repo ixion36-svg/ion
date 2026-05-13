@@ -1,13 +1,94 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.0 -->
+<!-- ion-doc:version=0.31.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.1 — 2026-05-13
+
+Daily standup polish — three operator-reported issues closed. No
+backend schema / API contract changes. **Net new findings: 0C / 0H /
+0M / 0L.**
+
+### fix(standup): no-store cache headers prevent stale snapshots
+
+`/api/daily-standup/checks` used to be served without cache headers,
+so a browser (or any HTTP proxy between the analyst and ION) could
+hold a previous response and surface day-old `critical_alerts` even
+after a hard reload of the page. Operator reported "critical alerts
+still almost caching from days ago".
+
+Fix:
+
+  - Backend wraps the JSON payload in a `Response` with
+    `Cache-Control: no-store, no-cache, must-revalidate`.
+  - Frontend `fetch('/api/daily-standup/checks', { cache: 'no-store' })`
+    as a belt-and-braces hint.
+
+If the panel still surfaces stale data after this, the cause is the
+ES `hours=24` filter not matching the source data shape — a data
+issue, not a cache one.
+
+### fix(standup): rule column never falls back to the ES doc id
+
+Section 2's critical-alerts table used a fallback chain
+`rule_name → title → id → '(unnamed)'`. The `id` step let the raw
+ES document id (a UUID-style string) leak into the cell whenever
+both rule_name and title were missing — analysts read that as "ID
+instead of rule name". Fallback now terminates at
+`'(rule unknown)'`; the document id can never appear in the rule
+column.
+
+If a row renders `(rule unknown)`, it means ES did not return any
+of `kibana.alert.rule.name`, `signal.rule.name`, or `rule.name` for
+that alert — a Kibana data shape issue, not an ION display bug.
+
+### feat(standup): Section 2b rebuilt — drop 30d, add 24h breakdowns
+
+Operator direction: drop the 30-day backlog card; the standup is
+"what is happening right now". Show more breakdowns of recent
+alerts and cases on the same window.
+
+Three KPI cards in Section 2b:
+
+| Card | Total | Breakdown 1 | Breakdown 2 |
+|---|---|---|---|
+| **Alerts · 24h** *(new — replaces 30d card)* | last-24h count | Critical / High / Medium / Low | Open / Ack / Closed |
+| **Cases · 24h** *(expanded)* | intake_24h | Open / In Progress / Closed | Critical / High / Medium / Low |
+| **Triage · 24h** *(unchanged)* | triaged_24h | avg / p50 / p90 MTTA | — |
+
+Backend:
+
+  - New `_check_alerts_24h()` — queries ES (hours=24,
+    include_closed=True, limit=5000) and aggregates by severity and
+    by status. ES-down fallback uses AlertTriage counts; severity
+    drops to "unknown" (AlertTriage has no severity column) and the
+    card surfaces a "ION fallback" banner in that mode.
+  - `_check_case_status_counts()` gains `by_severity_24h` —
+    Critical / High / Medium / Low counts for cases created in the
+    last 24h.
+  - The 30d backend check stays in the orchestrator response
+    (`open_alerts_30d`) because the pptx slide export still uses it.
+
+Frontend:
+
+  - HTML — Section 2b cards rewritten. Card IDs renamed
+    `ds-a30-*` → `ds-a24-*`, `ds-cs-sev-*` added.
+  - JS — new `renderAlerts24h(d)`. `renderCaseStatusCounts(d)`
+    extended for `by_severity_24h`. `renderOpenAlerts30d` removed
+    from the load path.
+
+### Files
+
+`src/ion/web/daily_standup_api.py`,
+`src/ion/web/templates/daily_standup.html`.
+
+---
 
 ## v0.31.0 — 2026-05-13
 
