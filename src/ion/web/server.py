@@ -875,10 +875,73 @@ async def alert_arkime_page(
     )
 
 
+@app.get("/alerts/{row_id:int}")
+async def alert_deeplink(
+    row_id: int,
+    user: User = Depends(require_page_permission("alert:read")),
+):
+    """Deep-link to a single alert by AlertTriage row PK.
+
+    v0.30.0: lab_fixture_service._observable_link returns
+    `/alerts/<row_id>` for materialised AlertTriage rows. Pre-fix this
+    404'd because the alerts page is keyed on `es_alert_id` (a string),
+    not the triage row PK. We look up the row, resolve its es_alert_id,
+    and redirect to `/alerts?selected=<es_alert_id>` so the list page
+    can pre-open the detail panel.
+
+    If the row doesn't exist we redirect to `/alerts` without a
+    `selected` param so the user lands on a sensible page instead of a
+    404 error.
+    """
+    from sqlalchemy.orm import Session
+
+    from ion.models.alert_triage import AlertTriage
+    from ion.storage.database import get_session
+
+    s: Session = next(get_session())
+    try:
+        triage = s.query(AlertTriage).filter(AlertTriage.id == row_id).one_or_none()
+        if triage is None:
+            return RedirectResponse(url="/alerts", status_code=303)
+        return RedirectResponse(
+            url=f"/alerts?selected={triage.es_alert_id}", status_code=303
+        )
+    finally:
+        s.close()
+
+
 @app.get("/cases", response_class=HTMLResponse)
 async def cases_page(request: Request, user: User = Depends(require_page_permission("case:read"))):
     """Render the cases management page."""
     return templates.TemplateResponse(request=request, name="cases.html")
+
+
+@app.get("/cases/{row_id:int}")
+async def case_deeplink(
+    row_id: int,
+    user: User = Depends(require_page_permission("case:read")),
+):
+    """Deep-link to a single case by AlertCase row PK.
+
+    v0.30.0 companion to `alert_deeplink` — see that function's
+    docstring for the rationale. We look up the case, resolve its
+    `case_number`, and redirect to `/cases?selected=<case_number>`.
+    """
+    from sqlalchemy.orm import Session
+
+    from ion.models.alert_triage import AlertCase
+    from ion.storage.database import get_session
+
+    s: Session = next(get_session())
+    try:
+        case = s.query(AlertCase).filter(AlertCase.id == row_id).one_or_none()
+        if case is None:
+            return RedirectResponse(url="/cases", status_code=303)
+        return RedirectResponse(
+            url=f"/cases?selected={case.case_number}", status_code=303
+        )
+    finally:
+        s.close()
 
 
 @app.get("/observables", response_class=HTMLResponse)
