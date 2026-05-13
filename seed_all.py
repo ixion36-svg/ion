@@ -17,8 +17,8 @@ import os
 import subprocess
 import sys
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 SEED_URL = os.environ.get("ION_SEED_URL", "http://127.0.0.1:8000")
@@ -38,6 +38,9 @@ SEEDS = [
     ("Playbooks", "seed_playbooks.py"),
     ("SOC Templates", "seed_soc_templates.py"),
     ("Courses (L1/L2/L3)", "seed_courses.py"),
+    # v0.30.0: lab fixtures depend on the `lessons` rows seed_courses creates,
+    # so they MUST run after seed_courses. Joined against lessons.lesson_type.
+    ("Lab Fixtures", "seed_lab_fixtures.py"),
 ]
 
 HEALTH_URL = f"{SEED_URL}/api/health"
@@ -91,7 +94,7 @@ def run_seed(label, script_name):
         print(f"  FAILED (exit code {result.returncode})")
         return False
 
-    print(f"  OK")
+    print("  OK")
     return True
 
 

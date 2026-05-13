@@ -1,4 +1,107 @@
+<!-- ion-doc:type=CHANGELOG -->
+<!-- ion-doc:title=ION Changelog -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
+<!-- ion-doc:version=0.30.0 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # Changelog
+
+## v0.30.0 — 2026-05-13
+
+Mixed-plate ship: lab fixture system end-to-end repair (the v0.27.0
+priority that got skipped twice), `SECURITY.md` vulnerability disclosure
+policy (closes SDLC §8 public-disclosure gap + NCSC Principle 5),
+`/health` + `/health/deep` consolidation (closes audit Amend C).
+
+### fix(labs): graded lab system works end-to-end via the deployed UI
+
+Four compounding bugs kept graded labs broken end-to-end since v0.21.0
+through v0.29.1 — 9 minor releases. Unit tests passed throughout
+because they bypassed the FastAPI router and the seeding pipeline;
+nothing exercised the deployed-image path until the v0.26.0 §3.4.8
+acceptance walk surfaced the failures. All four are now fixed and
+guarded by `tests/test_v030_lab_fixture_repair.py` (6 cases).
+
+* **Bug 1 — `labs_api` route prefixes.** `@router.post("/courses/.../lab/launch")`
+  served `/courses/...` while the frontend hit `/api/courses/...` →
+  404 since v0.21.0. The router is mounted with `prefix=""` (see
+  `server.py:344`), so decorators must carry the `/api/` prefix
+  themselves (matching `course_api.py` convention). Rewrote the three
+  decorators in `src/ion/web/labs_api.py` (lines 130, 180, 309).
+* **Bug 2 — `seed_lab_fixtures.py` not shipped + not orchestrated.**
+  The Dockerfile Stage-2 COPY block omitted `seed_lab_fixtures.py`,
+  AND `seed_all.py` (the master seeder Docker uses) never called it
+  even when the file was present. Both fixed: COPY block now includes
+  the file; `seed_all.py` invokes it after `seed_courses.py` (the
+  JOIN target the lab fixtures depend on).
+* **Bug 3 — enum-case SELECT silently inserted zero fixtures.**
+  `seed_lab_fixtures.py:109` filtered `l.lesson_type = 'lab'`
+  (lowercase) but SQLEnum(native_enum=False) stores the enum NAME
+  (`'LAB'`, uppercase) — same dialect-binding pattern that bit
+  v0.23.2's case-close test. Rewrote as `UPPER(l.lesson_type) = 'LAB'`.
+* **Bug 4 — fixture rows invisible in `/alerts` list.** The list
+  endpoint `/api/elasticsearch/alerts` returned ES alerts only;
+  `alert_triage` rows seeded by `seed_lab_fixtures.py` (no matching
+  ES doc) didn't appear, so the analyst couldn't open them, so the
+  `alert_view` audit row never fired, so the `viewed_alert` grader
+  never matched. `get_es_alerts` now merges `AlertTriage` rows with
+  `es_alert_id LIKE 'lab-fixture-%'` into the response, tagged with
+  `is_lab_fixture=True`. The seed payload's hardcoded `2026-01-01`
+  timestamp (intentional for air-gap determinism) is overridden to
+  "now" at serialise-time so fixtures survive client-side time
+  filters. `alerts.html` renders a "Lab fixture" amber pill badge
+  next to the title for these rows.
+
+Net effect: §3.4.8 acceptance walk for L1 M2 ("Read your first alert
+in /alerts") is now unblocked end-to-end — Launch → fixture rows
+appear in /alerts → click fires `alert_view` audit → link both to
+LAB-CASE-0001 → Complete lab → score 100 / Pass.
+
+### feat(security): `SECURITY.md` vulnerability disclosure policy
+
+Adds `SECURITY.md` at repo root documenting the private disclosure
+contract: GitHub Security Advisory (preferred, end-to-end encrypted)
+and maintainer email (`[contact-via-github-security-advisory]`, subject `[ION SECURITY]`)
+fallback; supported-versions guidance ("latest minor on `main`
+receives security patches"); disclosure timeline with severity-aligned
+SLAs mirroring `docs/DEVELOPMENT_LIFECYCLE.md` §3.5.4 (Critical 72h,
+High 14d, Medium next MINOR, Low opportunistic); air-gap operator
+escalation path; out-of-scope clarifications. GPG fingerprint deferred
+— the GitHub Security Advisory channel provides E2E encryption for
+the preferred path.
+
+Cross-references updated:
+* `README.md` Documentation table — new `SECURITY.md` entry.
+* `docs/DEVELOPMENT_LIFECYCLE.md` §3.5.4 — paragraph rewritten to
+  describe the published policy.
+* `docs/DEVELOPMENT_LIFECYCLE.md` §4 NCSC Principle 5 — status
+  upgraded **Partial → Met**.
+* `docs/DEVELOPMENT_LIFECYCLE.md` §8 — gap row marked
+  ~~Closed v0.30.0~~ with policy detail.
+
+### chore(health): consolidate `/health` and `/health/deep`
+
+Both endpoints used to re-import `__version__` and re-build the
+SQLAlchemy dialect lookup independently (audit Amend C). Extracted
+into `_health_core()` helper called by both. Future field additions
+to the shallow block now land in one place.
+
+### chore(closeout): silent ruff fixes
+
+* `seed_all.py` — sorted `import urllib.*` imports (I001), removed
+  extraneous f-string prefix (F541).
+* `seed_lab_fixtures.py` — removed unused `get_session` import (F401).
+
+Files: `src/ion/web/labs_api.py`, `src/ion/web/api.py`,
+`src/ion/web/templates/alerts.html`, `seed_lab_fixtures.py`,
+`seed_all.py`, `Dockerfile`, `SECURITY.md` (new),
+`README.md`, `docs/DEVELOPMENT_LIFECYCLE.md`,
+`tests/test_v030_lab_fixture_repair.py` (new).
+
+---
 
 ## v0.29.1 — 2026-05-12
 

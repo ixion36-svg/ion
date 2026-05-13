@@ -1,7 +1,16 @@
+<!-- ion-doc:type=DEVELOPMENT LIFECYCLE -->
+<!-- ion-doc:title=ION Development Lifecycle -->
+<!-- ion-doc:subtitle=Secure-by-Design SDLC; 5-phase reference aligned with NCSC SD&D and SSDF -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=Architects, security reviewers, compliance reviewers, customer DA -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # ION Development Lifecycle
 
 **Document owner:** Repository maintainer (`ixion36`)
-**Status:** Current as of v0.24.0 (2026-05-11)
+**Status:** Current as of v0.29.1 (2026-05-12)
 **Review cadence:** Every minor-version bump (v0.X.0) or on material process change, whichever is sooner.
 **Primary framework:** Secure by Design (SbD)
 **Secondary references:** NCSC *Secure Development and Deployment Guidance* (8 principles); NIST SP 800-218 (SSDF) for international interoperability.
@@ -363,7 +372,7 @@ When a CVE is reported against an ION dependency, or a `SECURITY_ASSESSMENT.md` 
 - **Medium** — Address within the next MINOR release.
 - **Low** — Address opportunistically; track in `_backlog_v<next>.md`.
 
-There is currently **no public security advisory channel** (e.g. `SECURITY.md` with a GPG-keyed contact). **Gap (§8).**
+ION publishes a vulnerability disclosure policy at `SECURITY.md` (repository root, v0.30.0). The policy documents two private reporting channels (GitHub Security Advisory preferred; maintainer email fallback), acknowledgement and triage timelines, severity-aligned fix SLAs (mirroring §3.5.4), supported-versions guidance for air-gapped operators, and a public-acknowledgements section for credited reporters. A GPG fingerprint for encrypted reports is not yet published; the policy notes that a key will be issued on request before reproducer details are shared. Publishing the fingerprint is tracked separately and is not a gap-blocker since GitHub Security Advisory provides end-to-end encryption for the preferred channel.
 
 #### 3.5.5 Retirement
 
@@ -383,7 +392,7 @@ The NCSC's 8 principles map to ION's existing practice as follows. Where a princ
 | **2. Protect your code repository** | GitHub private repository, SSH-keyed access, branch `main` is the only release-eligible branch. | **Partial** — branch protection not enabled; signed commits not enforced (§3.4.1). |
 | **3. Secure-by-default configuration** | `.env.deploy` template ships secure defaults. Cookie Secure flag warned at startup. Debug mode default-off. Admin password forced to be non-default in production. | **Met** — see `docs/DEPLOYMENT.md`. |
 | **4. Manage third-party risk** | Dependencies declared in `pyproject.toml` with version-floor constraints. Licence policy stated (§3.2.3). `pip-audit` runs in CI against the OSV database on every push and PR (v0.25.0). `syft` generates a SPDX-JSON SBOM at Docker build, shipped at `/app/sbom.spdx.json` in the image (v0.26.0). | **Met** — SCA + SBOM in place. Exact-pinned versions remain a §8 candidate for reproducible builds but are not load-bearing for third-party risk management. |
-| **5. Plan for vulnerabilities** | `SECURITY_ASSESSMENT.md` reviewed every release. Per-finding fix-by-version target stated. SLA documented in §3.5.4. | **Met** for internal findings; gap for public disclosure channel (§8). |
+| **5. Plan for vulnerabilities** | `SECURITY_ASSESSMENT.md` reviewed every release. Per-finding fix-by-version target stated. SLA documented in §3.5.4. `SECURITY.md` (v0.30.0) documents the private reporting channels, severity-aligned fix SLAs, supported versions, and the disclosure timeline. | **Met**. |
 | **6. Continuous security testing** | Per-release `SECURITY_ASSESSMENT.md` is a manual audit pass. Regression tests are pinned to every fix. CI runs `pytest` + `ruff` + `bandit -r src/` + `pip-audit` on every push and PR via GitHub Actions (`.github/workflows/test.yml`, v0.24.0 / SCA v0.25.0). | **Met** — automated CI security scanning incl. SCA. Higher-tier static analysis (Semgrep / CodeQL) remains an aspirational §8 candidate. |
 | **7. Auditable build** | Two-commit release pattern; `chore(release)` commit is mechanical and auditable. Docker images content-addressed by digest. | **Partial** — no signed images; no SBOM; no reproducible-build guarantee at the Python wheel layer (§8). |
 | **8. Operational telemetry** | ECS-compliant structured logs; audit_log table; status banners on degraded integrations. | **Partial** — no metrics endpoint; no formal log-shipping spec (§8). |
@@ -504,7 +513,7 @@ The following items are **not currently in place** and represent the delta betwe
 
 | Gap | Status | Indicative target |
 |-----|--------|-------------------|
-| Public vulnerability disclosure channel (`SECURITY.md` + GPG contact) | Not in place | v0.24.x |
+| ~~Public vulnerability disclosure channel (`SECURITY.md` + GPG contact)~~ | **Closed v0.30.0** — `SECURITY.md` at repo root documents private reporting via GitHub Security Advisory (preferred) and maintainer email (fallback), with disclosure timeline and severity-aligned SLAs cross-referencing §3.5.4. GPG fingerprint deferred; the GitHub Security Advisory channel provides end-to-end encryption for the preferred path. |
 | Branch protection on `main` (force-push, required reviews) | Not in place | Configurable at the GitHub level — administrative, not code |
 | Signed commits enforced | Not in place | Configurable at the GitHub level |
 | Independent design review for solo-maintainer changes | Partially mitigated by AI pair (§6.3) | Requires customer-side DSO — deployment-specific |

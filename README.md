@@ -1,6 +1,15 @@
+<!-- ion-doc:type=PROJECT OVERVIEW -->
+<!-- ion-doc:title=ION — Intelligent Operating Network -->
+<!-- ion-doc:subtitle=SOC analyst workbench: features, integrations, deployment, documentation index -->
+<!-- ion-doc:version=0.30.0 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=Any reader; first-touch overview -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # ION - Intelligent Operating Network
 
-![Version](https://img.shields.io/badge/version-0.29.1-blue)
+![Version](https://img.shields.io/badge/version-0.30.0-blue)
 ![Python](https://img.shields.io/badge/python-3.14-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ixion36%2Fion-blue)
@@ -21,7 +30,6 @@ A full-stack Security Operations Centre platform for threat detection, investiga
 - **AI Chat** -- Ollama-powered analysis, document generation, triage assistance, NL-to-Elasticsearch queries
 - **Case Similarity & Triage Suggestions** -- Historical closure data suggests FP/TP; find similar past cases by rules, hosts, observables, and MITRE techniques
 - **Discover** -- Raw Elasticsearch query builder and saved searches
-- **Threat Hunting** -- Hypothesis-driven hunting workbench with query attachments and IOC tracking
 
 ### Response
 - **Playbooks** -- 25+ SOC playbooks with step-by-step execution tracking and effectiveness analytics
@@ -32,8 +40,7 @@ A full-stack Security Operations Centre platform for threat detection, investiga
 - **Case Grouper** -- Automated alert correlation into case clusters
 
 ### Threat Intelligence
-- **OpenCTI Integration** -- Threat landscape, actor deep-dive, live IOC feed, reports, watchlist with country attribution
-- **Threat Hunting Workbench** -- Create hunts, attach queries, track IOCs found
+- **Unified Threat Intel** -- Single consolidated page (v0.27.0): threat landscape, actor deep-dive with IOC sparkline + ATT&CK click-through, live IOC feed, reports, watchlist with country attribution
 - **Attack Stories** -- Multi-step attack narrative reconstruction with kill chain visualisation
 - **Knowledge Graph** -- Visual relationship mapping across threat data
 - **Canaries** -- Honeypot token deployment and monitoring
@@ -317,7 +324,7 @@ docker compose --profile ai up -d
 ```bash
 docker pull ixion36/ion:latest
 # or a specific version
-docker pull ixion36/ion:0.22.0
+docker pull ixion36/ion:0.29.1
 ```
 
 ---
@@ -346,14 +353,30 @@ ion/
 
 | Document | Purpose |
 |----------|---------|
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture, components, data flow, schema |
+| [`docs/HLD.md`](docs/HLD.md) | High-Level Design — C4 L1-L3, architectural decisions, NFRs, deployment views |
+| [`docs/LLD.md`](docs/LLD.md) | Low-Level Design — modules, data model, API surface, sequence diagrams, per-feature deep dives |
+| [`docs/USER_REQUIREMENTS.md`](docs/USER_REQUIREMENTS.md) | User Requirements Document — 51 numbered URs per persona with source, priority, acceptance criterion |
+| [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md) | Requirements Traceability Matrix — UR → SR → HLD/LLD → Use Case → Gap → Test → Status |
+| [`docs/USE_CASES.md`](docs/USE_CASES.md) | Use cases by persona (L1/L2/L3 analyst, detection engineer, SOC manager, admin, learner, compliance) |
+| [`docs/GAPS_FILLED.md`](docs/GAPS_FILLED.md) | The SOC pain points ION addresses, with concrete feature evidence per gap |
+| [`docs/ION_STACK_BRIEF.md`](docs/ION_STACK_BRIEF.md) | GG stack adoption brief — pre-GG state (Elastic + YouTrack + unconfigured n8n) vs operational GG stack (ION + TIDE + Elastic + GitLab + DFIR-IRIS + Arkime + OpenCTI + Keycloak + n8n); ION's specific gap-fill + tool-by-tool integration map; "if we bought everything else but not ION" analysis; adoption history + remaining acceptance gates |
+| [`docs/API.md`](docs/API.md) | API reference — auth, RBAC, 73-router catalogue, webhook contract, OpenAPI pointer |
+| [`docs/CRYPTOGRAPHY.md`](docs/CRYPTOGRAPHY.md) | Cryptographic inventory — every algorithm + key size + library used + NCSC alignment |
+| [`docs/BACKUP_RESTORE.md`](docs/BACKUP_RESTORE.md) | Standalone backup + restore runbook with RTO/RPO targets and drill cadence |
+| [`docs/VULN_MGMT.md`](docs/VULN_MGMT.md) | Vulnerability management process — CVE intake, triage, fix-cadence SLAs, disclosure |
+| [`docs/CONFIG_MGMT.md`](docs/CONFIG_MGMT.md) | Configuration management plan — source control, branching, release ritual, CI catalogue |
+| [`docs/CAPACITY.md`](docs/CAPACITY.md) | Performance + capacity plan — targets, sizing envelope, scaling levers, monitoring thresholds, load-test plan |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Original technical architecture reference (componentry, data flow, schema) |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Deployment topology, container orchestration, `.env.deploy` reference |
 | [`docs/RUNBOOK.md`](docs/RUNBOOK.md) | Operational duties (SOC lead daily activities, integration config, troubleshooting, release ritual) |
 | [`docs/DEVELOPMENT_LIFECYCLE.md`](docs/DEVELOPMENT_LIFECYCLE.md) | Development lifecycle aligned to Secure by Design (5 phases); cross-references NCSC Secure Development and Deployment |
 | [`CHANGELOG.md`](CHANGELOG.md) | Per-release change record |
 | [`SECURITY_ASSESSMENT.md`](SECURITY_ASSESSMENT.md) | Per-release security audit with severity-trend table |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability disclosure policy — how to report, supported versions, disclosure timeline |
 | [`SETUP.md`](SETUP.md) | Local dev setup |
 | [`STACK.md`](STACK.md) | Tech-stack reference |
+| `tools/pdf_build/build_docs.py` | Builder script — produces ION-branded PDFs from any of the above markdown docs |
+| `tools/pdf_build/build_csv.py` | Builder script — emits editable CSV companions for table-shaped docs (URD, RTM, SR catalogue, Use Cases, MOD compliance pack) for reviewers to mark up in Excel |
 
 ---
 
