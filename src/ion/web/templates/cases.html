@@ -801,6 +801,33 @@
 
 .case-panel-close:hover { color: var(--text-primary); }
 
+/* v0.31.0: panel tab nav */
+.cpanel-tab-nav {
+    display: flex; gap: 0;
+    border-bottom: 1px solid var(--border);
+    margin: -0.5rem -1.25rem 1rem;
+    padding: 0 0.75rem;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+.cpanel-tab-btn {
+    background: none; border: none;
+    padding: 0.625rem 0.875rem;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+}
+.cpanel-tab-btn:hover { color: var(--text-primary); }
+.cpanel-tab-btn.active {
+    color: var(--accent-color);
+    border-bottom-color: var(--accent-color);
+}
+.cpanel-section.tab-hidden { display: none; }
+
 .case-panel-body {
     flex: 1;
     overflow-y: auto;
@@ -2430,6 +2457,10 @@ async function openCaseDetail(caseId) {
         panel.dataset.caseId = String(c.id);
 
         body.innerHTML = renderPanelContent(c);
+        // v0.31.0: apply the active tab after each render so panel
+        // re-renders (status change, severity change, note add)
+        // don't bump the analyst back to Overview.
+        switchPanelTab(_currentPanelTab);
 
         // Load Kibana comments async if case is synced
         if (c.kibana_case_id) {
@@ -2467,7 +2498,7 @@ const statusColors = {
 function renderPanelContent(c) {
     let html = '';
 
-    // Severity strip
+    // Severity strip (always visible, above tabs)
     const sev = c.severity || 'medium';
     const sevIcons = { critical: 'icon-alert-octagon', high: 'icon-alert-triangle', medium: 'icon-info', low: 'icon-minus-circle' };
     const alertCount = (c.alerts || []).length;
@@ -2478,8 +2509,21 @@ function renderPanelContent(c) {
         + '<span class="cpanel-sev-detail">' + alertCount + ' alert' + (alertCount !== 1 ? 's' : '') + ' &middot; ' + obsCount + ' observable' + (obsCount !== 1 ? 's' : '') + ' &middot; ' + ageLabel(c.created_at) + ' old</span>'
         + '</div>';
 
+    // v0.31.0: tab nav. Sections below carry data-tab="…" attributes
+    // so switchPanelTab(tabName) can show/hide them. Default tab is
+    // overview. Counts on Alerts and Observables reflect the data at
+    // panel-open time. Action buttons + severity strip stay outside
+    // any tab so they're always reachable.
+    html += '<div class="cpanel-tab-nav">'
+        + '<button type="button" class="cpanel-tab-btn active" data-tab="overview" onclick="switchPanelTab(\'overview\')">Overview</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="alerts" onclick="switchPanelTab(\'alerts\')">Alerts (' + alertCount + ')</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="observables" onclick="switchPanelTab(\'observables\')">Observables (' + obsCount + ')</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="timeline" onclick="switchPanelTab(\'timeline\')">Timeline</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="notes" onclick="switchPanelTab(\'notes\')">Notes</button>'
+        + '</div>';
+
     // Metadata
-    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section" data-tab="overview">';
     html += '<div class="cpanel-section-title">Metadata</div>';
     html += '<div class="cpanel-meta-grid">';
     html += '<div class="cpanel-meta-item"><label>Status</label>'
@@ -2538,7 +2582,7 @@ function renderPanelContent(c) {
     const users = c.affected_users || [];
     const rules = c.triggered_rules || [];
     if (hosts.length || users.length || rules.length) {
-        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section" data-tab="overview">';
         html += '<div class="cpanel-section-title">Context</div>';
         html += '<div class="cpanel-tags">';
         hosts.forEach(h => { html += '<span class="cpanel-tag cpanel-tag-host" title="Host"><span class="cpanel-tag-label">H</span>' + esc(h) + '</span>'; });
@@ -2549,7 +2593,7 @@ function renderPanelContent(c) {
 
     // Description
     if (c.description || c.evidence_summary) {
-        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section" data-tab="overview">';
         html += '<div class="cpanel-section-title">Description</div>';
         const desc = c.description || c.evidence_summary || '';
         if (typeof marked !== 'undefined') {
@@ -2578,7 +2622,7 @@ function renderPanelContent(c) {
         }
     });
 
-    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section" data-tab="observables">';
     html += '<div class="cpanel-section-title">Observables (' + allObs.length + ')</div>';
     if (allObs.length) {
         html += '<div class="cpanel-obs-list">';
@@ -2613,7 +2657,7 @@ function renderPanelContent(c) {
         });
     });
     if (allMitre.length) {
-        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section" data-tab="overview">';
         html += '<div class="cpanel-section-title">MITRE ATT&CK (' + allMitre.length + ')</div>';
         html += '<div class="cpanel-tags">';
         allMitre.forEach(t => {
@@ -2628,13 +2672,13 @@ function renderPanelContent(c) {
     // notes, observable extraction, playbook runs. Latest Bob verdict
     // surfaces as a narrative header so analysts get the "what happened"
     // before scanning the rail of events.
-    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section" data-tab="timeline">';
     html += '<div class="cpanel-section-title">Attack Story Timeline</div>';
     html += '<div id="case-timeline-container" style="font-size:0.8rem;color:var(--text-secondary);">Loading…</div>';
     html += '</div>';
 
     // ── Similar Cases (pgvector-backed, loaded async) ──────
-    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section" data-tab="overview">';
     html += '<div class="cpanel-section-title">Similar Closed Cases</div>';
     html += '<div id="similar-cases-container" style="font-size:0.8rem;color:var(--text-secondary);">Loading…</div>';
     html += '</div>';
@@ -2645,14 +2689,14 @@ function renderPanelContent(c) {
     // observable value with this case. Driven by ObservableLink rows;
     // observables marked ignore_similarity / is_whitelisted are skipped
     // server-side.
-    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section" data-tab="observables">';
     html += '<div class="cpanel-section-title">Cross-Case Observable Sightings</div>';
     html += '<div id="similar-observables-container" style="font-size:0.8rem;color:var(--text-secondary);">Loading…</div>';
     html += '</div>';
 
     // ── Linked Alerts (enriched) ───────────────────────────
     const alerts = c.alerts || [];
-    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section" data-tab="alerts">';
     html += '<div class="cpanel-section-title">Linked Alerts (' + alerts.length + ')</div>';
     if (alerts.length) {
         alerts.forEach(a => {
@@ -2707,7 +2751,7 @@ function renderPanelContent(c) {
 
     // ── Kibana Comments (loaded async) ─────────────────────
     if (c.kibana_case_id) {
-        html += '<div class="cpanel-section">';
+        html += '<div class="cpanel-section" data-tab="notes">';
         html += '<div class="cpanel-section-title">Kibana Comments <span class="cpanel-section-badge" id="kibana-comment-count">...</span></div>';
         html += '<div id="kibana-comments-container"><p style="font-size:0.8rem;color:var(--text-secondary);">Loading comments...</p></div>';
         html += '</div>';
@@ -2715,7 +2759,7 @@ function renderPanelContent(c) {
 
     // ── Investigation Notes ────────────────────────────────
     const notes = c.notes || [];
-    html += '<div class="cpanel-section">';
+    html += '<div class="cpanel-section" data-tab="notes">';
     html += '<div class="cpanel-section-title">Investigation Notes (' + notes.length + ')</div>';
     if (notes.length) {
         notes.forEach(n => {
@@ -2760,7 +2804,7 @@ function renderPanelContent(c) {
     // ── v0.20.0 Workbench (pinned evidence + tamper-evident ledger) ──
     // Renders an empty container that loadWorkbench() fills async after the
     // panel paint. Avoids blocking the rest of the panel on the verify call.
-    html += '<div class="cpanel-section" id="workbench-section-' + c.id + '">'
+    html += '<div class="cpanel-section" data-tab="timeline" id="workbench-section-' + c.id + '">'
         +   '<div class="cpanel-section-title" style="display:flex;align-items:center;gap:0.5rem;">'
         +     '<i class="icon-bookmark"></i> Workbench'
         +     '<span class="cpanel-section-badge" id="workbench-pin-count-' + c.id + '">…</span>'
@@ -2786,7 +2830,7 @@ function renderPanelContent(c) {
     // -- v0.22.0 Timeline Annotations --
     // Indigo left-border accent distinguishes narrative from evidence pins.
     // Loaded async via loadAnnotations() after panel paint.
-    html += '<div class="cpanel-section" id="annotations-section-' + c.id + '">'
+    html += '<div class="cpanel-section" data-tab="timeline" id="annotations-section-' + c.id + '">'
         + '<div class="cpanel-section-title" style="display:flex;align-items:center;gap:0.5rem;">'
         + '<i class="icon-clock"></i> Timeline Annotations'
         + '<span class="cpanel-section-badge" id="annotations-count-' + c.id + '">'
@@ -2799,7 +2843,7 @@ function renderPanelContent(c) {
 
     // v0.23.1 — On-demand Bob analysis panel (rendered into when analyst clicks
     // "Get Bob's Analysis"). Empty until then.
-    html += '<div id="bob-analysis-panel-' + c.id + '" class="cpanel-section" style="display:none;">'
+    html += '<div id="bob-analysis-panel-' + c.id + '" class="cpanel-section" data-tab="notes" style="display:none;">'
         +   '<div class="cpanel-section-title" style="display:flex;align-items:center;gap:0.5rem;">'
         +     '<i class="icon-sparkles"></i> Bob\'s analysis'
         +     '<span id="bob-analysis-meta-' + c.id + '" style="margin-left:auto;font-size:0.7rem;color:#94a3b8;font-weight:400;"></span>'
@@ -3080,6 +3124,21 @@ async function loadKibanaComments(kibanaId) {
     }
 }
 
+// v0.31.0: panel tab state. Persisted across panel re-renders (e.g.
+// panelUpdateField → openCaseDetail) so changing severity / status
+// doesn't bump the analyst back to Overview. Reset on panel close.
+let _currentPanelTab = 'overview';
+
+function switchPanelTab(tabName) {
+    _currentPanelTab = tabName;
+    document.querySelectorAll('.cpanel-tab-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === tabName);
+    });
+    document.querySelectorAll('.cpanel-section[data-tab]').forEach(s => {
+        s.classList.toggle('tab-hidden', s.dataset.tab !== tabName);
+    });
+}
+
 function closeCasePanel() {
     const panel = document.getElementById('case-panel');
     panel.classList.remove('open');
@@ -3088,6 +3147,9 @@ function closeCasePanel() {
     // for a different case doesn't mistakenly think the panel is showing
     // it (panel is closed, dataset would be stale).
     delete panel.dataset.caseId;
+    // v0.31.0: reset the panel tab so the NEXT case opened lands on
+    // Overview rather than wherever the previous case left off.
+    _currentPanelTab = 'overview';
 }
 
 // =============================================================================
