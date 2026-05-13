@@ -3887,13 +3887,20 @@ function renderCasesSummary() {
     container.innerHTML = casesData.slice(0, 10).map(c => {
         const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'acknowledged' ? '#f57c00' : '#616161';
         const closureBadge = c.closure_reason ? `<span class="closure-reason-badge reason-${c.closure_reason}" style="font-size:0.625rem;padding:0.0625rem 0.3rem;margin-left:0.25rem;">${closureLabels[c.closure_reason] || c.closure_reason}</span>` : '';
+        // v0.31.0: navigate to /cases?selected=<case_number> instead of
+        // popping the compact centred modal — gives the analyst the full
+        // /cases panel UX (status dropdown → closure modal with the full
+        // CaseClosureReason enum) for case-management work driven from
+        // the /alerts sidebar. Anchor (not onclick) so middle-click /
+        // right-click → open-in-new-tab works.
+        const caseHref = '/cases?selected=' + encodeURIComponent(c.case_number);
         return `
-            <div class="list-item" onclick="showCaseDetail(${c.id})" title="${escapeHtml(c.title)}">
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <a class="list-item" href="${caseHref}" title="${escapeHtml(c.title)}" style="text-decoration:none;color:inherit;display:flex;">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">
                     <strong>${escapeHtml(c.case_number)}</strong> ${escapeHtml(c.title)}${closureBadge}
                 </span>
                 <span class="list-item-count" style="background:${statusColor}">${c.alert_count}</span>
-            </div>
+            </a>
         `;
     }).join('');
 }
