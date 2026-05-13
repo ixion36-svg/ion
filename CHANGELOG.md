@@ -1,13 +1,133 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.30.1 -->
+<!-- ion-doc:version=0.31.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.0 — 2026-05-13
+
+UX release — analyst-driven changes to the `/alerts` cases sidebar
+flow, closure-option parity, default filter, and the `/cases`
+slide-out panel. No backend / schema / API changes. **Net new
+findings: 0C / 0H / 0M / 0L.**
+
+### feat(cases): slim case-detail slide-out panel ON /alerts
+
+The cases-sidebar (left-rail "Recent Cases" list) on `/alerts`
+used to pop a compact centred modal on click. Replaced with a
+self-contained slide-out panel (640px wide, slides from right) so
+the analyst stays on the alerts page while working the case.
+
+Panel contents:
+
+* Severity strip (alert + observable counts + age)
+* Closed-info banner when applicable
+* Metadata (Status / Severity dropdowns + Created / Updated)
+* Linked Alerts (top 25, read-only)
+* Observables (top 50, read-only)
+* Notes journal (read + add)
+* "Open full case view ↗" footer link → `/cases?selected=<case_number>`
+  for the heavyweight features (Workbench / Annotations / Similar
+  Cases / Kibana comments / Bob analysis) which stay on `/cases` to
+  avoid ~1500 LOC of duplication.
+* Closure modal triggered by Status → Closed with the full
+  `CaseClosureReason` enum.
+
+Esc closes the closure modal first, then the panel.
+
+### feat(cases): full CaseClosureReason set in /alerts quick-action strips
+
+The legacy quick-action strips in `renderCaseManagementModal` (the
+old centred modal) and `renderCaseTab` (the alert-detail Case tab)
+only offered 3 buttons — Benign / Escalated / False Positive — a
+lossy subset of the 6-value `CaseClosureReason` enum. "Benign"
+mapped to `benign_true_positive`, "Escalated" mapped to
+`true_positive` — confusing UX. Expanded both strips to 6 buttons,
+one per enum value, matching the `/cases` tab options:
+
+  True Positive · Benign True Positive · False Positive ·
+  Duplicate · Insufficient Data · Not Applicable
+
+`closeCaseWithAlerts(caseId, closureType)` updated to accept
+`CaseClosureReason` values directly. Legacy aliases (`benign`,
+`escalated`) retained for backward compatibility. Strip layout
+switched to `flex-wrap` so 6 buttons reflow cleanly inside the
+modal width. 5 new `.alert-closure-btn.*` CSS variants added.
+
+Every closure entry point on `/alerts` now offers the same options
+as `/cases`.
+
+### feat(alerts): default the status filter to "Open Only"
+
+Page-load default on `/alerts` used to be `Active (Open + Ack)` —
+analyst eyes landed on both untouched and analyst-acknowledged
+alerts. Switched the default to **Open Only** per user direction so
+new analyst attention falls on what hasn't been triaged yet. The
+Active (Open + Ack) option remains in the dropdown for the wider
+view.
+
+### feat(cases): tabbed slide-out panel on /cases
+
+With 100+ linked alerts the panel became unmanageable as a single
+long scroll. Grouped sections into 5 tabs:
+
+| Tab | Contents |
+|---|---|
+| **Overview** | Metadata · Context · Description · MITRE ATT&CK · Similar Closed Cases |
+| **Alerts (N)** | Linked Alerts (the heavy list) |
+| **Observables (M)** | Observables · Cross-Case Observable Sightings |
+| **Timeline** | Attack Story Timeline · Workbench · Timeline Annotations |
+| **Notes** | Investigation Notes · Kibana Comments · Bob analysis |
+
+Severity strip stays above the tab nav (always-visible header) and
+the action button row (Escalate / Kibana / Get Bob's analysis /
+Playbook / Export PDF) stays below the tab content (always-visible
+footer).
+
+Active tab persists across panel re-renders (status change,
+severity change, note add) via module-level `_currentPanelTab` —
+no more getting bumped back to Overview just because you changed a
+dropdown. Resets to Overview when the panel closes.
+
+Implementation: each `<div class="cpanel-section">` carries a
+`data-tab="…"` attribute. `switchPanelTab(tabName)` toggles
+`.active` on the matching `.cpanel-tab-btn` and `.tab-hidden` on
+each `.cpanel-section[data-tab]`. The `.tab-hidden` rule is a plain
+`display: none` (no `!important`) so Bob's own
+`display: none` / `display: block` toggle from
+`getBobAnalysis` still wins — Bob only appears when the analyst
+actually triggers it AND the Notes tab is active.
+
+Async loaders unchanged — they target the same container IDs,
+which now live inside their respective tabs.
+
+The /alerts slim panel from `ce457f5` is intentionally not tabbed —
+it's already short.
+
+### feat(cases): `?selected=<case_number>` deep-link handler
+
+`cases.html` init now reads `?selected=` from the URL after
+`loadAllCases` resolves and auto-opens that case's panel. The
+v0.30.0 deep-link redirects (`/alerts/{row_id}` →
+`/alerts?selected=<es_alert_id>` and `/cases/{row_id}` →
+`/cases?selected=<case_number>`) now land cleanly — the
+`_observable_link` deep-link from the lesson page works
+end-to-end. The slim `/alerts` panel's "Open full case view ↗"
+link also drives this entry point.
+
+### Files
+
+`src/ion/web/templates/alerts.html` (+509 / -10 in ce457f5,
++58 / -11 in 0f48cab, +4 / -1 in 9eb0a55, +29 / -5 in 8c5d0b9),
+`src/ion/web/templates/cases.html` (+77 / -15 in 0def263 +
+the 8c5d0b9 init hook).
+
+---
 
 ## v0.30.1 — 2026-05-13
 
