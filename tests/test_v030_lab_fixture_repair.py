@@ -266,3 +266,70 @@ def test_alerts_list_severity_filter_maps_to_priority(db: Session):
     )
     assert len(high_only) == 1
     assert high_only[0].es_alert_id == "lab-fixture-high-001"
+
+
+def test_fixture_alert_dicts_does_not_touch_elasticsearch(db: Session):
+    """The `_fixture_alert_dicts` helper must work without any
+    Elasticsearch service or configuration involvement — fixtures have
+    to surface in air-gapped dev environments where ES isn't running.
+
+    Earlier v0.30.0 implementations put the fixture merge inside the
+    ES-success path, so fixtures disappeared when ES was disabled,
+    unconfigured, or unreachable. This test guards the regression by
+    importing the helper directly and confirming it produces the
+    correct dict shape from AlertTriage rows alone.
+    """
+    from ion.web.api import _fixture_alert_dicts
+
+    db.add_all([
+        AlertTriage(
+            es_alert_id="lab-fixture-no-es-001",
+            status="open",
+            priority="high",
+            rule_name="Air-Gapped Lab Fixture",
+            source_system="elastic",
+            mitre_techniques=["T1059.001"],
+        ),
+        AlertTriage(
+            es_alert_id="lab-fixture-no-es-002",
+            status="closed",
+            priority="low",
+            rule_name="Already-Closed Fixture",
+        ),
+        AlertTriage(
+            es_alert_id="real-elastic-alert-999",
+            status="open",
+            priority="high",
+            rule_name="Real Alert (Not A Fixture)",
+        ),
+    ])
+    db.commit()
+
+    # Default: open + acknowledged fixtures surface; closed is filtered
+    # out unless include_closed=True. Real ES-backed AlertTriage rows
+    # never appear (they have a backing ES doc).
+    dicts = _fixture_alert_dicts(db)
+    ids = {d["id"] for d in dicts}
+    assert "lab-fixture-no-es-001" in ids
+    assert "lab-fixture-no-es-002" not in ids  # closed → filtered
+    assert "real-elastic-alert-999" not in ids  # not a fixture
+
+    # is_lab_fixture flag is set on every returned dict — drives the UI
+    # badge.
+    assert all(d["is_lab_fixture"] is True for d in dicts)
+
+    # Dict shape mirrors the ES alert dict the frontend expects.
+    open_fixture = next(d for d in dicts if d["id"] == "lab-fixture-no-es-001")
+    assert open_fixture["severity"] == "high"
+    assert open_fixture["title"] == "Air-Gapped Lab Fixture"
+    assert open_fixture["mitre_technique_id"] == "T1059.001"
+    assert open_fixture["timestamp"] is not None  # overridden to "now"
+
+    # include_closed=True surfaces both.
+    dicts_with_closed = _fixture_alert_dicts(db, include_closed=True)
+    ids_with_closed = {d["id"] for d in dicts_with_closed}
+    assert "lab-fixture-no-es-002" in ids_with_closed
+
+    # Explicit status=closed filters to closed fixtures only.
+    closed_only = _fixture_alert_dicts(db, status="closed")
+    assert {d["id"] for d in closed_only} == {"lab-fixture-no-es-002"}

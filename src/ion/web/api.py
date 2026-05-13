@@ -3488,6 +3488,68 @@ async def test_es_connection(
     return result
 
 
+def _fixture_alert_dicts(
+    session: Session,
+    *,
+    severity: Optional[str] = None,
+    status: Optional[str] = None,
+    include_closed: bool = False,
+) -> list[dict]:
+    """Return lab-fixture alert dicts shaped like the ES alert list payload.
+
+    v0.30.0: lab fixtures have no backing ES document by design — the
+    seeder writes them straight to `alert_triage` so the lab system stays
+    functional in air-gapped dev environments where ES isn't available.
+    This helper is called from every return path of `get_es_alerts` so
+    fixtures surface whether ES is disabled, unconfigured, unreachable,
+    or fully up.
+
+    The `system` filter is intentionally NOT honoured here — lab fixtures
+    have no CyAB-system attribution and should always be visible to a
+    learner running the lab regardless of system selection.
+    """
+    from datetime import datetime as _datetime
+    from datetime import timezone as _tz
+
+    from ion.models.alert_triage import AlertTriage as _AlertTriage
+
+    fixture_q = session.query(_AlertTriage).filter(
+        _AlertTriage.es_alert_id.like("lab-fixture-%")
+    )
+    if status:
+        fixture_q = fixture_q.filter(_AlertTriage.status == status)
+    elif not include_closed:
+        fixture_q = fixture_q.filter(_AlertTriage.status != "closed")
+    # `severity` query param maps to AlertTriage.priority (the seed-payload
+    # field that semantically aligns with ES alert severity; AlertTriage
+    # has no `severity` column).
+    if severity:
+        fixture_q = fixture_q.filter(_AlertTriage.priority == severity)
+
+    # Override the hardcoded 2026-01-01 seed timestamp with "now" so
+    # fixtures survive the client-side time-window filter on /alerts. The
+    # underlying DB row keeps its deterministic timestamp (air-gap
+    # reproducibility).
+    now_iso = _datetime.now(_tz.utc).isoformat()
+    return [
+        {
+            "id": t.es_alert_id,
+            "severity": t.priority or "medium",
+            "title": t.rule_name or t.es_alert_id,
+            "rule_name": t.rule_name,
+            "host": None,
+            "user": None,
+            "source_system": t.source_system or "elastic",
+            "status": t.status,
+            "timestamp": now_iso,
+            "mitre_techniques": t.mitre_techniques or [],
+            "mitre_technique_id": (t.mitre_techniques or [None])[0] if t.mitre_techniques else None,
+            "is_lab_fixture": True,
+        }
+        for t in fixture_q.all()
+    ]
+
+
 @router.get("/elasticsearch/alerts")
 async def get_es_alerts(
     hours: int = 24,
@@ -3503,6 +3565,10 @@ async def get_es_alerts(
 ):
     """Fetch alerts from Elasticsearch.
 
+    v0.30.0: lab-fixture AlertTriage rows are always merged into the
+    response (regardless of ES state) so graded labs work in dev
+    environments where ES isn't running. See `_fixture_alert_dicts`.
+
     Args:
         hours: Number of hours to look back (default 24, ignored if time_from set)
         severity: Filter by severity (critical, high, medium, low, info)
@@ -3512,13 +3578,28 @@ async def get_es_alerts(
         time_from: Absolute start time (ISO 8601). Overrides hours.
         time_to: Absolute end time (ISO 8601). Defaults to now.
     """
+    fixture_dicts = _fixture_alert_dicts(
+        session, severity=severity, status=status, include_closed=include_closed
+    )
+
     config = get_elasticsearch_config()
     if not config.get("enabled"):
-        return {"alerts": [], "enabled": False, "message": "Elasticsearch integration is not enabled"}
+        return {
+            "alerts": fixture_dicts,
+            "total": len(fixture_dicts),
+            "enabled": False,
+            "message": "Elasticsearch integration is not enabled",
+        }
 
     service = get_elasticsearch_service()
     if not service.is_configured:
-        return {"alerts": [], "enabled": True, "configured": False, "message": "Elasticsearch is not configured"}
+        return {
+            "alerts": fixture_dicts,
+            "total": len(fixture_dicts),
+            "enabled": True,
+            "configured": False,
+            "message": "Elasticsearch is not configured",
+        }
 
     try:
         alerts = await service.get_alerts(
@@ -3549,48 +3630,7 @@ async def get_es_alerts(
                 d["tide_system_name"] = res.get("tide_system_name")
             out_alerts.append(d)
 
-        # v0.30.0: surface lab-fixture AlertTriage rows that have no
-        # backing ES document, so graded labs can drive the standard
-        # `alert_view` / `alert_linked` audit chain. Fixture rows are
-        # marked by `es_alert_id LIKE 'lab-fixture-%'` per
-        # seed_lab_fixtures.py. We override their timestamp to "now" so
-        # they always appear in the modern time window — the hardcoded
-        # 2026-01-01 in the seed payload is intentional (air-gap
-        # determinism) and would otherwise fight client-side filters.
-        from datetime import datetime as _datetime
-        from datetime import timezone as _tz
-
-        from ion.models.alert_triage import AlertTriage as _AlertTriage
-        fixture_q = session.query(_AlertTriage).filter(
-            _AlertTriage.es_alert_id.like("lab-fixture-%")
-        )
-        # Respect status filter when the caller asked for a specific status;
-        # without an explicit filter we include open fixtures plus (unless
-        # include_closed=False) closed ones. Matches the ES-side behaviour.
-        if status:
-            fixture_q = fixture_q.filter(_AlertTriage.status == status)
-        elif not include_closed:
-            fixture_q = fixture_q.filter(_AlertTriage.status != "closed")
-        # Severity filter maps to AlertTriage.priority (the seed payload's
-        # severity-equivalent field; AlertTriage has no `severity` column).
-        if severity:
-            fixture_q = fixture_q.filter(_AlertTriage.priority == severity)
-        _now_iso = _datetime.now(_tz.utc).isoformat()
-        for t in fixture_q.all():
-            out_alerts.append({
-                "id": t.es_alert_id,
-                "severity": t.priority or "medium",
-                "title": t.rule_name or t.es_alert_id,
-                "rule_name": t.rule_name,
-                "host": None,
-                "user": None,
-                "source_system": t.source_system or "elastic",
-                "status": t.status,
-                "timestamp": _now_iso,
-                "mitre_techniques": t.mitre_techniques or [],
-                "mitre_technique_id": (t.mitre_techniques or [None])[0] if t.mitre_techniques else None,
-                "is_lab_fixture": True,
-            })
+        out_alerts.extend(fixture_dicts)
 
         return {
             "alerts": out_alerts,
@@ -3603,8 +3643,8 @@ async def get_es_alerts(
     except ElasticsearchError as e:
         logger.warning("Elasticsearch connection error fetching alerts: %s", e)
         return {
-            "alerts": [],
-            "total": 0,
+            "alerts": fixture_dicts,
+            "total": len(fixture_dicts),
             "hours": hours,
             "enabled": True,
             "configured": True,
