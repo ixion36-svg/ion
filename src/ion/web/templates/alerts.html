@@ -484,6 +484,57 @@
 </div>
 </div><!-- /ion-tw inner wrapper -->
 </div><!-- /ion-tw -->
+
+<!-- =========================================================================
+  v0.31.0: Case Detail Slide-out Panel
+  ====================================================================== -->
+<div class="acp-overlay" id="acp-overlay" onclick="closeCasePanel()"></div>
+<div class="acp-panel" id="acp-panel" data-case-id="">
+  <div class="acp-header">
+    <div style="min-width:0;flex:1;">
+      <span class="acp-number" id="acp-number"></span>
+      <span class="acp-title" id="acp-title"></span>
+    </div>
+    <button class="acp-close" onclick="closeCasePanel()" title="Close (Esc)">&times;</button>
+  </div>
+  <div class="acp-body" id="acp-body">
+    <p style="color:var(--text-secondary);text-align:center;padding:2rem;">Loading...</p>
+  </div>
+</div>
+
+<!-- Closure modal — full CaseClosureReason enum -->
+<div class="acp-closure-overlay" id="acp-closure-overlay" onclick="if(event.target===this)cancelCasePanelClosure()">
+  <div class="acp-closure-modal">
+    <div class="acp-closure-header">
+      <h3>Close Case</h3>
+      <button class="acp-closure-close" onclick="cancelCasePanelClosure()">&times;</button>
+    </div>
+    <div class="acp-closure-body">
+      <div class="form-group" style="margin-bottom:0.75rem;">
+        <label style="display:block;margin-bottom:0.25rem;color:var(--text-muted);font-size:0.8rem;">Closure Reason *</label>
+        <select id="acp-closure-reason" class="form-control" style="width:100%;padding:0.5rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;">
+          <option value="">Select reason...</option>
+          <option value="true_positive">True Positive</option>
+          <option value="false_positive">False Positive</option>
+          <option value="benign_true_positive">Benign True Positive</option>
+          <option value="duplicate">Duplicate</option>
+          <option value="insufficient_data">Insufficient Data</option>
+          <option value="not_applicable">Not Applicable</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label style="display:block;margin-bottom:0.25rem;color:var(--text-muted);font-size:0.8rem;">Closure Notes</label>
+        <textarea id="acp-closure-notes" rows="3" placeholder="Closure details..."
+          style="width:100%;padding:0.5rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;"></textarea>
+      </div>
+    </div>
+    <div class="acp-closure-footer">
+      <button class="btn btn-secondary" onclick="cancelCasePanelClosure()">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmCasePanelClosure()">Confirm</button>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -3307,6 +3358,180 @@ kbd {
     line-height: 1; flex-shrink: 0;
 }
 .alert-attn-dismiss:hover { color: var(--text-primary); }
+
+/* =========================================================================
+   v0.31.0: Case Detail Slide-out Panel (alerts page)
+   Slim panel — full CaseClosureReason closure UX. "View full case view"
+   link inside the panel for heavier features (Workbench, Annotations,
+   Similar Cases) which live on /cases.
+   ====================================================================== */
+.acp-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 1049;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.25s;
+}
+.acp-overlay.open { opacity: 1; pointer-events: auto; }
+
+.acp-panel {
+    position: fixed; top: 0; right: 0;
+    width: 640px; max-width: 95vw; height: 100vh;
+    background: var(--bg-primary);
+    border-left: 1px solid var(--border);
+    z-index: 1050;
+    display: flex; flex-direction: column;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    box-shadow: -8px 0 28px -8px rgba(0,0,0,0.4);
+}
+.acp-panel.open { transform: translateX(0); }
+
+.acp-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.acp-number {
+    font-size: 0.8rem; font-weight: 600;
+    color: var(--accent-color);
+    display: block; margin-bottom: 0.15rem;
+}
+.acp-title {
+    font-size: 1.1rem; font-weight: 600;
+    color: var(--text-primary);
+    display: block;
+}
+.acp-close {
+    background: none; border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem; cursor: pointer;
+    padding: 0; line-height: 1; flex-shrink: 0;
+}
+.acp-close:hover { color: var(--text-primary); }
+
+.acp-body { padding: 1rem 1.25rem; overflow-y: auto; flex: 1; }
+
+.acp-section {
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.acp-section:last-child { border-bottom: none; }
+.acp-section-title {
+    font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+}
+
+.acp-sev-strip {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.625rem 0.75rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+}
+.acp-sev-strip.sev-critical { background: rgba(239,68,68,0.12); color: var(--danger); }
+.acp-sev-strip.sev-high { background: rgba(245,158,11,0.12); color: var(--warning); }
+.acp-sev-strip.sev-medium { background: rgba(59,130,246,0.12); color: var(--info); }
+.acp-sev-strip.sev-low { background: rgba(107,114,128,0.12); color: #9ca3af; }
+.acp-sev-detail { color: var(--text-muted); margin-left: auto; font-size: 0.75rem; }
+
+.acp-meta-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0.625rem;
+}
+.acp-meta-item { display: flex; flex-direction: column; gap: 0.2rem; }
+.acp-meta-item label {
+    font-size: 0.7rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.acp-meta-item select,
+.acp-meta-item .acp-meta-value {
+    padding: 0.375rem 0.5rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+.acp-meta-item select:focus { outline: none; border-color: var(--accent-color); }
+
+.acp-alerts-list, .acp-obs-list, .acp-notes-list {
+    display: flex; flex-direction: column; gap: 0.375rem;
+}
+.acp-item {
+    padding: 0.5rem 0.625rem;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8rem;
+}
+.acp-item-title { font-weight: 600; color: var(--text-primary); }
+.acp-item-meta { color: var(--text-muted); font-size: 0.7rem; margin-top: 0.15rem; }
+
+.acp-closure-info {
+    padding: 0.625rem 0.75rem;
+    background: rgba(34,211,238,0.06);
+    border: 1px solid rgba(34,211,238,0.18);
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.8rem;
+}
+
+.acp-footer-link {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 0.5rem; flex-wrap: wrap;
+}
+.acp-footer-link a {
+    font-size: 0.75rem; color: var(--accent-color);
+    text-decoration: none;
+    padding: 0.375rem 0.625rem;
+    border: 1px solid rgba(34,211,238,0.3);
+    border-radius: 4px;
+}
+.acp-footer-link a:hover {
+    background: rgba(34,211,238,0.08);
+    color: var(--text-primary);
+}
+
+/* Closure modal */
+.acp-closure-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 1100;
+    justify-content: center; align-items: center;
+}
+.acp-closure-overlay.open { display: flex; }
+.acp-closure-modal {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 480px; max-width: 95vw;
+    display: flex; flex-direction: column;
+    box-shadow: 0 18px 40px -10px rgba(0,0,0,0.5);
+}
+.acp-closure-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+}
+.acp-closure-header h3 { margin: 0; font-size: 1rem; color: var(--text-primary); }
+.acp-closure-close {
+    background: none; border: none; color: var(--text-muted);
+    font-size: 1.25rem; cursor: pointer; line-height: 1;
+}
+.acp-closure-body { padding: 1rem 1.25rem; }
+.acp-closure-footer {
+    display: flex; justify-content: flex-end; gap: 0.5rem;
+    padding: 0.875rem 1.25rem;
+    border-top: 1px solid var(--border);
+}
 </style>
 
 {% raw %}
@@ -3887,20 +4112,15 @@ function renderCasesSummary() {
     container.innerHTML = casesData.slice(0, 10).map(c => {
         const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'acknowledged' ? '#f57c00' : '#616161';
         const closureBadge = c.closure_reason ? `<span class="closure-reason-badge reason-${c.closure_reason}" style="font-size:0.625rem;padding:0.0625rem 0.3rem;margin-left:0.25rem;">${closureLabels[c.closure_reason] || c.closure_reason}</span>` : '';
-        // v0.31.0: navigate to /cases?selected=<case_number> instead of
-        // popping the compact centred modal — gives the analyst the full
-        // /cases panel UX (status dropdown → closure modal with the full
-        // CaseClosureReason enum) for case-management work driven from
-        // the /alerts sidebar. Anchor (not onclick) so middle-click /
-        // right-click → open-in-new-tab works.
-        const caseHref = '/cases?selected=' + encodeURIComponent(c.case_number);
+        // v0.31.0: open the slide-out case panel on /alerts so the
+        // analyst can work the case without leaving the alerts page.
         return `
-            <a class="list-item" href="${caseHref}" title="${escapeHtml(c.title)}" style="text-decoration:none;color:inherit;display:flex;">
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;">
+            <div class="list-item" onclick="openCasePanel(${c.id})" title="${escapeHtml(c.title)}" style="cursor:pointer;">
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                     <strong>${escapeHtml(c.case_number)}</strong> ${escapeHtml(c.title)}${closureBadge}
                 </span>
                 <span class="list-item-count" style="background:${statusColor}">${c.alert_count}</span>
-            </a>
+            </div>
         `;
     }).join('');
 }
@@ -10041,6 +10261,285 @@ function showKeyboardShortcutsHelp() {
 
 // Initialize keyboard shortcuts
 document.addEventListener('DOMContentLoaded', initKeyboardShortcuts);
+
+// =============================================================================
+// v0.31.0: Case Detail Slide-out Panel (alerts page)
+// =============================================================================
+// Slim version of the /cases panel. Wired from the cases-sidebar items in
+// renderSideList. Status dropdown → closure modal with the full
+// CaseClosureReason enum. Heavy features (Workbench, Annotations,
+// Similar Cases) stay on /cases and are reachable via the "Open full case
+// view" link inside the panel.
+// =============================================================================
+
+let _acpAssigneesCache = null;          // {id, display_name, username}[]; lazy-loaded
+let _acpClosurePending = null;          // { caseId } while the closure modal is open
+
+const _ACP_CLOSURE_LABELS = {
+    true_positive: 'True Positive',
+    false_positive: 'False Positive',
+    benign_true_positive: 'Benign True Positive',
+    duplicate: 'Duplicate',
+    insufficient_data: 'Insufficient Data',
+    not_applicable: 'Not Applicable',
+};
+
+async function openCasePanel(caseId) {
+    const panel = document.getElementById('acp-panel');
+    const overlay = document.getElementById('acp-overlay');
+    const body = document.getElementById('acp-body');
+    if (!panel) return;
+
+    panel.classList.add('open');
+    overlay.classList.add('open');
+    panel.dataset.caseId = String(caseId);
+    body.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:2rem;">Loading...</p>';
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId);
+        if (!resp.ok) throw new Error('Failed to load case');
+        const c = await resp.json();
+        document.getElementById('acp-number').textContent = c.case_number || '';
+        document.getElementById('acp-title').textContent = c.title || '';
+        body.innerHTML = _renderAcpContent(c);
+    } catch (e) {
+        body.innerHTML = '<p style="color:#ef4444;text-align:center;padding:2rem;">Failed to load case details</p>';
+    }
+}
+
+function closeCasePanel() {
+    document.getElementById('acp-panel')?.classList.remove('open');
+    document.getElementById('acp-overlay')?.classList.remove('open');
+}
+
+async function _acpLoadAssignees() {
+    if (_acpAssigneesCache) return _acpAssigneesCache;
+    try {
+        const resp = await fetch('/api/users/assignable');
+        if (!resp.ok) throw new Error('users fetch failed');
+        const data = await resp.json();
+        _acpAssigneesCache = data.users || data || [];
+    } catch (e) {
+        _acpAssigneesCache = [];
+    }
+    return _acpAssigneesCache;
+}
+
+function _renderAcpContent(c) {
+    const sev = c.severity || 'medium';
+    const alertCount = (c.alerts || []).length;
+    const obsCount = (c.observables || []).length;
+    const ageMs = c.created_at ? (Date.now() - new Date(c.created_at).getTime()) : 0;
+    const ageLabel = ageMs > 86400000
+        ? Math.floor(ageMs / 86400000) + 'd'
+        : (ageMs > 3600000 ? Math.floor(ageMs / 3600000) + 'h' : Math.floor(ageMs / 60000) + 'm');
+
+    let html = `<div class="acp-sev-strip sev-${escapeHtml(sev)}">
+        <strong>${escapeHtml(sev)}</strong>
+        <span class="acp-sev-detail">${alertCount} alert${alertCount !== 1 ? 's' : ''}
+          &middot; ${obsCount} observable${obsCount !== 1 ? 's' : ''}
+          &middot; ${ageLabel} old</span>
+    </div>`;
+
+    // Closed-info banner
+    if (c.status === 'closed' && c.closure_reason) {
+        html += `<div class="acp-closure-info">
+            <div><strong>Closed:</strong> ${escapeHtml(_ACP_CLOSURE_LABELS[c.closure_reason] || c.closure_reason)}</div>
+            ${c.closure_notes ? `<div style="margin-top:0.25rem;color:var(--text-secondary);">${escapeHtml(c.closure_notes)}</div>` : ''}
+            <div style="margin-top:0.25rem;color:var(--text-muted);font-size:0.7rem;">
+                Closed by ${escapeHtml(c.closed_by || 'unknown')}${c.closed_at ? ' on ' + new Date(c.closed_at).toLocaleString() : ''}
+            </div>
+        </div>`;
+    }
+
+    // Metadata
+    html += `<div class="acp-section"><div class="acp-section-title">Metadata</div>
+        <div class="acp-meta-grid">
+            <div class="acp-meta-item"><label>Status</label>
+                <select onchange="acpUpdateField(${c.id},'status',this.value,'${escapeHtml(c.status || 'open')}')">
+                    ${['open','acknowledged','closed'].map(s =>
+                        `<option value="${s}"${c.status === s ? ' selected' : ''}>${s}</option>`).join('')}
+                </select>
+            </div>
+            <div class="acp-meta-item"><label>Severity</label>
+                <select onchange="acpUpdateField(${c.id},'severity',this.value)">
+                    ${['critical','high','medium','low'].map(s =>
+                        `<option value="${s}"${c.severity === s ? ' selected' : ''}>${s}</option>`).join('')}
+                </select>
+            </div>
+            <div class="acp-meta-item"><label>Created</label>
+                <div class="acp-meta-value">${c.created_at ? new Date(c.created_at).toLocaleString() : '-'}</div>
+            </div>
+            <div class="acp-meta-item"><label>Updated</label>
+                <div class="acp-meta-value">${c.updated_at ? new Date(c.updated_at).toLocaleString() : '-'}</div>
+            </div>
+        </div>
+    </div>`;
+
+    // Alerts linked
+    const alerts = c.alerts || [];
+    html += `<div class="acp-section"><div class="acp-section-title">Linked alerts (${alerts.length})</div>
+        <div class="acp-alerts-list">`;
+    if (alerts.length === 0) {
+        html += '<div style="color:var(--text-muted);font-size:0.8rem;">No alerts linked.</div>';
+    } else {
+        alerts.slice(0, 25).forEach(a => {
+            html += `<div class="acp-item">
+                <div class="acp-item-title">${escapeHtml(a.rule_name || a.es_alert_id || 'unknown')}</div>
+                <div class="acp-item-meta">${escapeHtml(a.status || '')} &middot; ${escapeHtml(a.es_alert_id || '')}</div>
+            </div>`;
+        });
+    }
+    html += '</div></div>';
+
+    // Observables
+    const obs = c.observables || [];
+    html += `<div class="acp-section"><div class="acp-section-title">Observables (${obs.length})</div>
+        <div class="acp-obs-list">`;
+    if (obs.length === 0) {
+        html += '<div style="color:var(--text-muted);font-size:0.8rem;">No observables.</div>';
+    } else {
+        obs.slice(0, 50).forEach(o => {
+            const v = o.value || o.normalized_value || JSON.stringify(o);
+            const t = o.type || '';
+            html += `<div class="acp-item"><div class="acp-item-title">${escapeHtml(v)}</div>
+                <div class="acp-item-meta">${escapeHtml(t)}${o.context ? ' &middot; ' + escapeHtml(o.context) : ''}</div></div>`;
+        });
+    }
+    html += '</div></div>';
+
+    // Notes
+    const notes = c.notes || [];
+    html += `<div class="acp-section"><div class="acp-section-title">Notes (${notes.length})</div>
+        <div class="acp-notes-list">`;
+    if (notes.length === 0) {
+        html += '<div style="color:var(--text-muted);font-size:0.8rem;">No notes yet.</div>';
+    } else {
+        notes.forEach(n => {
+            html += `<div class="acp-item">
+                <div class="acp-item-meta">${escapeHtml(n.user || 'unknown')}
+                  &middot; ${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</div>
+                <div style="margin-top:0.25rem;white-space:pre-wrap;">${escapeHtml(n.content || '')}</div>
+            </div>`;
+        });
+    }
+    html += `<div style="margin-top:0.5rem;display:flex;gap:0.375rem;">
+        <textarea id="acp-note-input" rows="2" placeholder="Add note..."
+          style="flex:1;padding:0.375rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;font-size:0.8rem;"></textarea>
+        <button class="btn btn-primary" onclick="acpAddNote(${c.id})" style="font-size:0.75rem;align-self:flex-start;">Add</button>
+    </div>`;
+    html += '</div></div>';
+
+    // Footer — link to /cases panel for heavy features
+    html += `<div class="acp-footer-link">
+        <a href="/cases?selected=${encodeURIComponent(c.case_number)}" target="_blank">
+            Open full case view (Workbench / Annotations / Similar) ↗
+        </a>
+        ${c.kibana_url ? `<a href="${escapeHtml(c.kibana_url)}" target="_blank">View in Kibana ↗</a>` : ''}
+    </div>`;
+
+    return html;
+}
+
+async function acpUpdateField(caseId, field, value, oldStatus) {
+    // Status → closed: open the closure modal (full CaseClosureReason picker).
+    if (field === 'status' && value === 'closed' && oldStatus !== 'closed') {
+        _acpClosurePending = { caseId };
+        document.getElementById('acp-closure-reason').value = '';
+        document.getElementById('acp-closure-notes').value = '';
+        document.getElementById('acp-closure-overlay').classList.add('open');
+        return;
+    }
+
+    // Reopen: clear the closure fields server-side via status PATCH.
+    const body = {};
+    body[field] = value;
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Update failed');
+        }
+        if (typeof showToast === 'function') showToast('Case updated', 'success');
+        openCasePanel(caseId);  // refresh
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Failed: ' + e.message, 'error');
+        else alert('Failed: ' + e.message);
+        // Reset the dropdown to actual state
+        openCasePanel(caseId);
+    }
+}
+
+async function confirmCasePanelClosure() {
+    if (!_acpClosurePending) return;
+    const reason = document.getElementById('acp-closure-reason').value;
+    if (!reason) {
+        alert('Closure reason is required');
+        return;
+    }
+    const notes = document.getElementById('acp-closure-notes').value.trim();
+    const caseId = _acpClosurePending.caseId;
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'closed', closure_reason: reason, closure_notes: notes }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            throw new Error(err.detail || 'Close failed');
+        }
+        document.getElementById('acp-closure-overlay').classList.remove('open');
+        _acpClosurePending = null;
+        if (typeof showToast === 'function') showToast('Case closed', 'success');
+        openCasePanel(caseId);
+    } catch (e) {
+        alert('Failed to close: ' + e.message);
+    }
+}
+
+function cancelCasePanelClosure() {
+    document.getElementById('acp-closure-overlay').classList.remove('open');
+    const pending = _acpClosurePending;
+    _acpClosurePending = null;
+    // Reset the dropdown to actual state by re-rendering the panel.
+    if (pending) openCasePanel(pending.caseId);
+}
+
+async function acpAddNote(caseId) {
+    const ta = document.getElementById('acp-note-input');
+    if (!ta) return;
+    const content = ta.value.trim();
+    if (!content) return;
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+        });
+        if (!resp.ok) throw new Error('Failed to add note');
+        ta.value = '';
+        openCasePanel(caseId);
+    } catch (e) {
+        alert('Failed to add note: ' + e.message);
+    }
+}
+
+// Close panel on Esc
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const closurelay = document.getElementById('acp-closure-overlay');
+    if (closurelay && closurelay.classList.contains('open')) {
+        cancelCasePanelClosure();
+        return;
+    }
+    const panel = document.getElementById('acp-panel');
+    if (panel && panel.classList.contains('open')) closeCasePanel();
+});
 </script>
 {% endraw %}
 {% endblock %}
