@@ -4147,9 +4147,9 @@ async function deleteAnnotation(caseId, annId) {
 // =============================================================================
 // Init
 // =============================================================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     loadUsers();
-    loadAllCases();
+    await loadAllCases();
     loadTeamMetrics();
 
     // Restore analytics panel collapse state
@@ -4158,6 +4158,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const chevron = document.getElementById('analytics-chevron');
         if (panel) panel.classList.add('collapsed');
         if (chevron) chevron.classList.add('collapsed');
+    }
+
+    // v0.31.0: deep-link support — `?selected=<case_number>` (or numeric
+    // id) auto-opens that case's detail panel. Drives the
+    // /cases/{row_id} redirect from `_observable_link` AND the alerts
+    // page's cases-sidebar "open in /cases" links so the analyst lands
+    // on the standard /cases panel UX (status dropdown → closure
+    // modal with full CaseClosureReason enum) instead of the compact
+    // centered modal that used to live on /alerts.
+    const params = new URLSearchParams(window.location.search);
+    const selected = params.get('selected');
+    if (selected) {
+        const match = allCases.find(c => c.case_number === selected)
+            || allCases.find(c => String(c.id) === selected);
+        if (match) {
+            openCaseDetail(match.id);
+        }
     }
 });
 </script>
