@@ -42,7 +42,12 @@ _FIXTURES = [
         "target_table": "alert_triage",
         "payload": {
             "es_alert_id": "lab-fixture-mimikatz-001",
-            "status": "open",
+            # v0.30.0: SQLEnum(native_enum=False) stores the enum NAME
+            # ('OPEN', uppercase) — same dialect-binding pattern that
+            # bit v0.23.2's case-close test and Bug 3's SELECT. Materialisation
+            # via raw SQL in lab_fixture_service._insert_row passes the
+            # payload through unchanged, so the value MUST be the NAME.
+            "status": "OPEN",
             "priority": "high",
             "source_system": "elastic",
             "rule_name": "Credential Dumping via LSASS Memory (Lab fixture)",
@@ -57,7 +62,7 @@ _FIXTURES = [
         "target_table": "alert_triage",
         "payload": {
             "es_alert_id": "lab-fixture-powershell-encoded-001",
-            "status": "open",
+            "status": "OPEN",
             "priority": "medium",
             "source_system": "elastic",
             "rule_name": "Suspicious Base64-Encoded PowerShell (Lab fixture)",
@@ -86,7 +91,7 @@ _FIXTURES = [
                 "Auto-seeded for L1 Module 2 lab exercise. "
                 "Link the two open alerts to this case as part of the lab task."
             ),
-            "status": "open",
+            "status": "OPEN",
             "severity": "high",
             "created_by_id": 1,
             "created_at": "2026-01-01 00:00:00",
