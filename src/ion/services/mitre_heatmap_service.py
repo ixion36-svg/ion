@@ -155,7 +155,11 @@ def _alert_observations_postgres(session: Session) -> Dict[str, int]:
             AS unnested(technique_id)
         WHERE at2.case_id IS NOT NULL
           AND at2.mitre_techniques IS NOT NULL
-          AND at2.mitre_techniques != 'null'::json
+          -- v0.30.1: Postgres `json` type has no `!=` operator; cast to
+          -- text so we can compare against the JSON null literal as a
+          -- plain string. Without this the heatmap 500s with
+          -- "operator does not exist: json <> json".
+          AND at2.mitre_techniques::text != 'null'
         GROUP BY upper(unnested.technique_id)
         """
     )
@@ -209,10 +213,12 @@ def _pin_observations_postgres(session: Session) -> Dict[str, int]:
         """
         SELECT upper(u.technique_id) AS tid, COUNT(*) AS cnt
         FROM (
+            -- v0.30.1: cast to text for the != 'null' check; see the
+            -- alert_triage query above for the rationale.
             SELECT json_array_elements_text(cep.mitre_techniques) AS technique_id
             FROM case_evidence_pins AS cep
             WHERE cep.mitre_techniques IS NOT NULL
-              AND cep.mitre_techniques != 'null'::json
+              AND cep.mitre_techniques::text != 'null'
               AND cep.finding_status != 'dismissed'
 
             UNION ALL
@@ -220,7 +226,7 @@ def _pin_observations_postgres(session: Session) -> Dict[str, int]:
             SELECT json_array_elements_text(fcp.mitre_techniques) AS technique_id
             FROM forensic_case_pins AS fcp
             WHERE fcp.mitre_techniques IS NOT NULL
-              AND fcp.mitre_techniques != 'null'::json
+              AND fcp.mitre_techniques::text != 'null'
               AND fcp.finding_status != 'dismissed'
         ) AS u
         GROUP BY upper(u.technique_id)
