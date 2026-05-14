@@ -376,7 +376,7 @@ ion/
 | [`SETUP.md`](SETUP.md) | Local dev setup |
 | [`STACK.md`](STACK.md) | Tech-stack reference |
 | `tools/pdf_build/build_docs.py` | Builder script — produces ION-branded PDFs from any of the above markdown docs |
-| `tools/pdf_build/build_csv.py` | Builder script — emits editable CSV companions for table-shaped docs (URD, RTM, SR catalogue, Use Cases, MOD compliance pack) for reviewers to mark up in Excel |
+| `tools/pdf_build/build_csv.py` | Builder script — emits editable CSV companions for table-shaped docs (URD, RTM, SR catalogue, Use Cases, regulated-environment compliance pack) for reviewers to mark up in Excel |
 
 ---
 
