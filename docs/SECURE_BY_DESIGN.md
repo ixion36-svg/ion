@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.4 -->
+<!-- ion-doc:version=0.31.5 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
@@ -298,15 +298,18 @@ descend from this principle.
   handlers (`onclick=`) and inline `style=""` attributes are still
   permitted via `script-src-attr` / `style-src-attr` `'unsafe-inline'`
   — these remain a future-tightening target.
-* **Delegated event listener** (v0.31.4) — `static/js/event-delegation.js`
+* **Delegated event listener** (v0.31.4+) — `static/js/event-delegation.js`
   registers a single document-level listener per event type and
   dispatches based on `data-*-action` attributes. Templates being
-  migrated swap `onclick="foo()"` → `data-click-action="foo"`. As of
-  v0.31.4, **base.html** is fully migrated (7 handlers); the other
-  72 templates still carry inline handlers (1,001 `onclick=` +
-  1,659 inline `style=""`) and are queued for per-template
-  migration. Once all are migrated, `script-src-attr 'none'` and
-  `style-src-attr 'none'` can be enforced and P11 moves to Met.
+  migrated swap `onclick="foo()"` → `data-click-action="foo"`.
+  Per-element `data-args='[…]'` JSON or per-event `data-${event}-args`
+  carry positional arguments; sentinel tokens `$event` / `$value` /
+  `$checked` / `$target` substitute at dispatch time. As of v0.31.5,
+  **base.html + cases.html** are fully migrated (7 + 48 = 55
+  handlers). The remaining 71 templates still carry inline handlers
+  (~960 `onclick=` + ~1,650 inline `style=""`) and are queued for
+  per-template migration. Once all are migrated, `script-src-attr 'none'`
+  and `style-src-attr 'none'` can be enforced and P11 moves to Met.
 
 **Status:** Mostly Met — inline event handlers + inline `style=""`
 attributes still permitted; full strict-CSP requires refactoring those
@@ -566,3 +569,4 @@ is the phase guide. If the two ever disagree, this doc wins for
 | 1.0     | 2026-05-14 | Maintainer | Initial publication. 20 principles synthesised from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder. Audit at v0.31.2: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.1     | 2026-05-14 | Maintainer | v0.31.3: P11 application — per-request CSP nonce on every inline `<script>` and `<style>` block via `SecurityHeadersMiddleware` + Jinja global. Inline event handlers + inline `style=""` attributes still permitted via CSP3 split-directive `script-src-attr` / `style-src-attr`. P11 audit body updated; gap narrowed from "CSP nonce" to "strict CSP (refactor inline handlers)". Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.2     | 2026-05-14 | Maintainer | v0.31.4: P11 follow-up — event-delegation foundation. New `static/js/event-delegation.js` + base.html migrated as proof-of-pattern. CSP unchanged this release (72 child templates still carry inline handlers). P11 audit body updated with the migration mechanism + remaining work. Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
+| 1.3     | 2026-05-14 | Maintainer | v0.31.5: P11 follow-up #2 — cases.html migrated (48 handlers incl. kanban drag-and-drop). Helper extended with drag events, `$event` sentinel, per-event positional args. CSP unchanged. P11 audit body updated with current count (55 handlers migrated; 71 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
