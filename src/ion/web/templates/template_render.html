@@ -96,7 +96,7 @@
         </div>
     </div>
 </div>
-<style>
+<style nonce="{{ csp_nonce }}">
 .se-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:0.75rem;overflow:hidden;transition:border-color .2s}
 .se-card.se-editing{border-color:var(--primary)}
 .se-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 1rem;cursor:pointer;user-select:none;gap:0.5rem}
@@ -132,7 +132,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 {% raw %}
 const templateId = {% endraw %}{{ template_id }}{% raw %};
 let templateVariables = [];

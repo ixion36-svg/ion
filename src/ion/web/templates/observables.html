@@ -358,7 +358,7 @@ sha256,abc123...,c2,</pre>
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* Stats Banner */
 .stats-banner {
     display: flex;
@@ -1179,8 +1179,8 @@ sha256,abc123...,c2,</pre>
 .context-badge.ctx-generic { background: rgba(156, 163, 175, 0.12); color: #9ca3af; }
 </style>
 
+<script nonce="{{ csp_nonce }}">
 {% raw %}
-<script>
 // State
 let observables = [];
 let currentPage = 1;
@@ -2539,6 +2539,6 @@ function renderHeatmap(container, data) {
         `<div class="heatmap-day level-${d.level}" title="${d.date}: ${d.count} sightings"></div>`
     ).join('');
 }
-</script>
 {% endraw %}
+</script>
 {% endblock %}

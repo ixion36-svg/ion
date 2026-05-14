@@ -344,7 +344,7 @@ d41d8cd98f00b204e9800998ecf8427e"></textarea>
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // ==================== TAB SWITCHING ====================
 function switchToolTab(tabName) {
     // Hide all tabs

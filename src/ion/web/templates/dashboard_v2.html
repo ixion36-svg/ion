@@ -291,7 +291,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
   // ── Helpers ──────────────────────────────────────────────────
   const $ = (id) => document.getElementById(id);
   const pad = (n) => String(n).padStart(2, '0');

@@ -44,7 +44,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .brf-loading{text-align:center;padding:60px;color:var(--text-secondary)}
 .brf-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:brf-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes brf-spin{to{transform:rotate(360deg)}}
@@ -102,7 +102,7 @@
     .brf-headlines { gap: 8px; }
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const BRF_API = '/api/briefing';
 function brfEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function brfFmt(iso){if(!iso)return'-';try{return new Date(iso).toLocaleString()}catch(e){return iso}}

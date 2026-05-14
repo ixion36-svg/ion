@@ -14,7 +14,7 @@
 </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 .ce-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.45rem;padding:1rem 1.2rem;margin-bottom:0.85rem}
 .ce-card-header{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem}
 .ce-row{display:flex;align-items:center;gap:0.55rem;flex-wrap:wrap}
@@ -48,7 +48,7 @@
 .ce-mdpreview .mermaid{background:var(--bg-deep);padding:0.6rem;border-radius:0.3rem;border:1px solid var(--border);margin:0.5rem 0}
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 const COURSE_ID = {{ course_id | tojson }};
 let _course = null;
 let _editing = {};  // { lesson_id: 'preview' | 'edit' }

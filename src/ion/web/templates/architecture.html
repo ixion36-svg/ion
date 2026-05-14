@@ -5,7 +5,7 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 w-full py-10 md:py-12">
-<style>
+<style nonce="{{ csp_nonce }}">
 /* ═══════════════════════════════════════════════════════════════
    ION System Architecture — Workflow Orchestrator
    ═══════════════════════════════════════════════════════════════ */
@@ -349,7 +349,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
     // ── Icon mapping: Lucide icon names → ION icon-* CSS classes ──
     const ICON_MAP = {

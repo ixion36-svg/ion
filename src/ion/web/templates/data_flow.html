@@ -10,7 +10,7 @@
 ] %}
 {% set active_label = "Data Flow" %}
 {% include "_nav_tabs.html" %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .df-page { max-width: 1400px; margin: 0 auto; }
 
 /* Header */
@@ -288,7 +288,7 @@
     </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function(){
     // ── State ──
     let activeFlow = 'legacy';

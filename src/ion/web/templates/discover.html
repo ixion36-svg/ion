@@ -353,7 +353,7 @@
     </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 /* Discover page specific styles */
 .page-subtitle {
     color: var(--text-secondary);
@@ -687,7 +687,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // Tab switching
 function switchDiscoverTab(tabName) {
     document.querySelectorAll('.tool-tab').forEach(t => t.classList.remove('active'));

@@ -57,7 +57,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* ── Detection Engineering ─────────────────────────── */
 .de-tide-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);border-radius:20px;font-size:.75rem;font-weight:700;color:var(--neon-cyan,#00d4ff);letter-spacing:.5px;font-family:'JetBrains Mono',monospace}
 .de-tide-dot{width:8px;height:8px;border-radius:50%;background:var(--sev-critical);animation:de-pulse 2s infinite}
@@ -282,7 +282,7 @@
 .de-prog-arrow{display:flex;align-items:center;justify-content:center;width:24px;flex-shrink:0;color:var(--text-secondary);font-size:1rem}
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function(){
 'use strict';
 

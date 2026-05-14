@@ -52,7 +52,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 {% raw %}
 const templateId = {% endraw %}{{ template_id }}{% raw %};
 let currentVersionNum = null;

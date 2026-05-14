@@ -697,7 +697,7 @@
     </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 .settings-layout {
     display: grid;
     grid-template-columns: 220px 1fr;
@@ -1877,8 +1877,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/integration-wizard.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}" src="/static/js/integration-wizard.js"></script>
+<script nonce="{{ csp_nonce }}">
 let currentConfig = {};
 
 document.addEventListener('DOMContentLoaded', () => {

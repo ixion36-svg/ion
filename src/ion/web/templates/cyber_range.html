@@ -34,7 +34,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .cr-loading{text-align:center;padding:60px;color:var(--text-secondary)}
 .cr-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:cr-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes cr-spin{to{transform:rotate(360deg)}}
@@ -165,7 +165,7 @@
 .cr-legend-item{display:flex;align-items:center;gap:3px}
 .cr-legend-dot{width:6px;height:6px;border-radius:50%}
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const API = '/api/cyber-range';
 function $(id){return document.getElementById(id)}
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}

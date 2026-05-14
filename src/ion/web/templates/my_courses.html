@@ -49,7 +49,7 @@
 </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
   .mc-row{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.55rem;padding:1.1rem 1.25rem;display:flex;flex-wrap:wrap;align-items:center;gap:1rem;transition:border-color 0.12s}
   .mc-row:hover{border-color:var(--primary)}
   .mc-row-main{flex:1;min-width:240px}
@@ -71,7 +71,7 @@
   .mc-progress-fill{display:block;height:100%;background:var(--primary)}
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 async function loadMyCourses(){
   try{
     const r = await fetch('/api/my-courses');

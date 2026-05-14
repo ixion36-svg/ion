@@ -92,7 +92,7 @@
   </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 .ac-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px}
 .ac-L1{background:rgba(34,197,94,0.14);color:#86efac}
 .ac-L2{background:rgba(109,228,255,0.14);color:#6de4ff}
@@ -102,7 +102,7 @@
 .ac-status-draft{background:rgba(148,163,184,0.14);color:#94a3b8}
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 function escHtml(s){if(s==null)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
 
 async function loadCourses(){

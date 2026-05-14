@@ -26,7 +26,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .cmp-loading{text-align:center;padding:60px;color:var(--text-secondary)}
 .cmp-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:cmp-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes cmp-spin{to{transform:rotate(360deg)}}
@@ -94,7 +94,7 @@ table.cmp-table{width:100%;border-collapse:collapse}
     .cmp-fw-score { font-size: 1.4rem; }
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const CMP_API = '/api/compliance';
 let _cmpAll = null;
 let _cmpSelected = null;

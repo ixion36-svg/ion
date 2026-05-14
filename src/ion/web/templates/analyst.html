@@ -157,7 +157,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // ── Helpers ─────────────────────────────────────────
 function esc(s) {
   if (s == null) return '';

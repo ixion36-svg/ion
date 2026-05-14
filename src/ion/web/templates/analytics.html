@@ -173,7 +173,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* =========================================================================
    Analytics Stats Bar — matches stat-card pattern from style.css
    ========================================================================= */
@@ -849,7 +849,7 @@
 .sys-unmapped-badge a { color: var(--primary); text-decoration: none; }
 .sys-unmapped-badge a:hover { text-decoration: underline; }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 let dashboardData = null;
 let jobsList = [];
 

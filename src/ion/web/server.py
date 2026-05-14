@@ -167,11 +167,49 @@ app = FastAPI(
 # Security Headers Middleware
 # =============================================================================
 
+# v0.31.3: per-request CSP nonce. The middleware seeds this contextvar at
+# request start; templates read it via the `csp_nonce` Jinja global below.
+# ContextVar is per-async-task safe — different concurrent requests get
+# different nonces without leaking across tasks.
+import contextvars as _contextvars
+import secrets as _secrets
+
+_csp_nonce_var: _contextvars.ContextVar[str] = _contextvars.ContextVar(
+    "csp_nonce", default=""
+)
+
+
+class _CSPNonceProxy:
+    """Renders the current request's CSP nonce when interpolated in a template.
+
+    Used as `{{ csp_nonce }}` (no parens) inside `<script nonce="...">` and
+    `<style nonce="...">` opening tags. The nonce is base64-url and contains
+    no HTML-special characters, so `__html__()` returns it verbatim to avoid
+    Jinja's autoescape mangling it.
+    """
+
+    def __str__(self) -> str:
+        return _csp_nonce_var.get()
+
+    def __html__(self) -> str:
+        return _csp_nonce_var.get()
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add security headers to all responses."""
+    """Add security headers to all responses + seed the per-request CSP nonce."""
 
     async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
+        # 16 bytes of CSPRNG → base64-url-encoded (≈22 chars). Stored on
+        # request.state for direct access and on a ContextVar so the Jinja
+        # `{{ csp_nonce }}` global resolves to the right value without each
+        # route handler having to thread it through.
+        nonce = _secrets.token_urlsafe(16)
+        request.state.csp_nonce = nonce
+        _token = _csp_nonce_var.set(nonce)
+        try:
+            response = await call_next(request)
+        finally:
+            _csp_nonce_var.reset(_token)
 
         # Prevent MIME type sniffing
         response.headers["X-Content-Type-Options"] = "nosniff"
@@ -190,15 +228,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if request.url.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
-        # Content Security Policy
-        # NOTE: 'unsafe-inline' in script-src is required because the app uses
-        # onclick handlers extensively.  DOMPurify sanitises all dynamic HTML so
-        # the practical XSS risk is mitigated.  object-src and base-uri are
-        # locked down to block plugin-based and base-tag attacks.
+        # Content Security Policy — CSP3 split-directive policy.
+        # Strict-nonce on `<script>` and `<style>` element bodies (the main
+        # XSS injection surface). Inline event handlers (`onclick=`) and
+        # inline `style=` attributes remain permitted via `script-src-attr` /
+        # `style-src-attr` so the 1,185 onclicks + 1,659 inline styles in
+        # current templates don't need to be refactored in one go. See
+        # docs/SECURE_BY_DESIGN.md P11. Removing `script-src-attr`/`style-src-attr`
+        # `'unsafe-inline'` is a future tightening once those handlers are
+        # migrated to addEventListener + CSS classes.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
+            f"script-src 'self' 'nonce-{nonce}'; "
+            "script-src-attr 'unsafe-inline'; "
+            f"style-src 'self' 'nonce-{nonce}'; "
+            "style-src-attr 'unsafe-inline'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
             "connect-src 'self'; "
@@ -266,6 +310,12 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 templates.env.bytecode_cache = _J2Cache(str(_bytecode_cache_dir))
 templates.env.auto_reload = _debug_mode  # Only reload in debug
 templates.env.globals["ion_version"] = ion.__version__
+# v0.31.3: CSP nonce as a global proxy. Templates read it as `{{ csp_nonce }}`
+# (no parens) inside `<script nonce="...">` and `<style nonce="...">` tags.
+# The proxy reads the per-request value from `_csp_nonce_var`; outside a
+# request (e.g. CLI template rendering, if any) it resolves to "" which
+# produces a benign empty attribute.
+templates.env.globals["csp_nonce"] = _CSPNonceProxy()
 
 # Include API routes
 app.include_router(api_router, prefix="/api")

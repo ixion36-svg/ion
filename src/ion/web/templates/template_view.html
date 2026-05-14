@@ -94,7 +94,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .doc-type-badge {
     padding: 2px 8px;
     border-radius: 3px;
@@ -249,7 +249,7 @@
     font-family: monospace;
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 {% raw %}
 const templateId = {% endraw %}{{ template_id }}{% raw %};
 let currentTemplate = null;

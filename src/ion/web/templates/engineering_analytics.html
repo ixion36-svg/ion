@@ -100,7 +100,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* =========================================================================
    Engineering Analytics — ION dark cyber/neon theme
    ========================================================================= */
@@ -481,7 +481,7 @@
 }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 let systemData = null;
 
 async function loadSystemAnalytics() {

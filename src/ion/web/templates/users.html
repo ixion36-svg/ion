@@ -177,7 +177,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .role-widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .role-widget { display: block; cursor: pointer; }
 .role-widget-input { display: none; }
@@ -223,7 +223,7 @@
 }
 .role-widget-perms { font-size: 10px; color: #475569; font-family: 'JetBrains Mono', monospace; }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 let availableRoles = [];
 
 async function loadRoles() {

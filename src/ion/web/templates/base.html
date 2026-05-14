@@ -11,8 +11,13 @@
     <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.28">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <link rel="stylesheet" href="/static/css/tailwind.css?v=0.19.2">
-    <script src="/static/js/theme-init.js"></script>
-    <script src="/static/js/htmx.min.js"></script>
+    <!-- v0.31.3: tell HTMX not to inject its indicator <style> block at runtime.
+         Inline-injected styles can't carry our per-request CSP nonce, so they'd
+         be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
+         .htmx-indicator class anywhere, so disabling it has no UI impact. -->
+    <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
+    <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
 </head>
 <body>
     <!-- ═══════════════════ TAILWIND TOP NAV ═══════════════════ -->
@@ -226,7 +231,7 @@
     <!-- Icon library — all SVG <symbol> defs shared across every page -->
     {% include "_icons.html" %}
 
-    <style>
+    <style nonce="{{ csp_nonce }}">
     /* ── Tailwind nav: atoms that need arbitrary rules ── */
     .tw-nav-link { display: flex; align-items: center; padding: 6px 12px; border-radius: 6px; color: rgb(148 163 184); transition: background .18s, color .18s; white-space: nowrap; }
     .tw-nav-link:hover { color: #fff; background: rgba(255,255,255,0.05); }
@@ -272,7 +277,7 @@
     [data-theme="light"] .ion-tw-page .grain { background-image: none !important; }
     </style>
 
-    <script>
+    <script nonce="{{ csp_nonce }}">
     // Self-contained dropdown toggle for the Tailwind nav.
     (function() {
       document.addEventListener('click', (e) => {
@@ -346,7 +351,7 @@
     </div>
 
     <!-- Notepad styles — refreshed to align with the Tailwind design language (v0.9.72 Path A) -->
-    <style>
+    <style nonce="{{ csp_nonce }}">
     /* ── Overlay ─────────────────────────────────── */
     .np-overlay{position:fixed;inset:0;background:rgba(7,8,12,.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:1049;opacity:0;pointer-events:none;transition:opacity .25s}
     .np-overlay.open{opacity:1;pointer-events:auto}
@@ -434,15 +439,15 @@
     <div id="toast-container"></div>
 
     <!-- Markdown parser + sanitizer -->
-    <script src="/static/js/marked.min.js"></script>
-    <script src="/static/js/purify.min.js"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/marked.min.js"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/purify.min.js"></script>
     <!-- v0.11.2 / v0.11.3: Mermaid diagrams for course lessons (and any
          markdown content that wants attack-chain / flowchart visuals).
          Vendored at ~3.3 MB so air-gap deployments work out of the box.
          Consumers guard on `typeof mermaid !== 'undefined'` so a missing
          file would gracefully degrade. -->
-    <script src="/static/js/mermaid.min.js" onerror="window.__mermaidMissing=true"></script>
-    <script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/mermaid.min.js" onerror="window.__mermaidMissing=true"></script>
+    <script nonce="{{ csp_nonce }}">
       if (typeof mermaid !== 'undefined' && mermaid.initialize) {
         mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
       }
@@ -481,10 +486,10 @@
         } catch (e) { console.warn('marked custom renderer failed:', e); }
       }
     </script>
-    <script src="/static/js/app.js?v=0.9.28"></script>
-    <script src="/static/js/ai-chat.js?v=0.9.28"></script>
-    <script src="/static/js/quill.js"></script>
-    <script src="/static/js/notepad.js?v=0.9.28"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/app.js?v=0.9.28"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/ai-chat.js?v=0.9.28"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/quill.js"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/notepad.js?v=0.9.28"></script>
     {% block scripts %}{% endblock %}
 
 <!-- Keyboard shortcuts overlay -->
@@ -511,7 +516,7 @@
     </div>
   </div>
 </div>
-<script>
+<script nonce="{{ csp_nonce }}">
 // Keyboard shortcuts -- "g" prefix for navigation
 (function() {
   var gPressed = false;

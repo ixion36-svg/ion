@@ -99,7 +99,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .ls-loading{text-align:center;padding:60px;color:var(--text-secondary)}
 .ls-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:ls-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes ls-spin{to{transform:rotate(360deg)}}
@@ -167,7 +167,7 @@
     .ls-stat-val { font-size: 1.2rem; }
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const LS_API = '/api/log-sources';
 let lsCache = [];
 let lsCats = [];
