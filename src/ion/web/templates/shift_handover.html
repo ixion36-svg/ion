@@ -42,7 +42,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* ── Shift Handover ─────────────────────────── */
 .sh-select{padding:7px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
 .sh-loading{text-align:center;padding:60px;color:var(--text-secondary)}
@@ -106,7 +106,7 @@
     .sh-stat-val,.sh-section-title i{color:#333!important}
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const API = '/api/shift-handover';
 function $(id){return document.getElementById(id)}
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}

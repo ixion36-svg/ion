@@ -6,7 +6,7 @@
 <title>Sign in · ION</title>
 <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
 <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.72">
-<script>
+<script nonce="{{ csp_nonce }}">
   // Load theme and mode immediately to prevent flash
   (function() {
     const theme = localStorage.getItem('ion-theme') || 'cyan';
@@ -15,7 +15,7 @@
     document.documentElement.setAttribute('data-mode', mode);
   })();
 </script>
-<style>
+<style nonce="{{ csp_nonce }}">
   /* Pre-auth page-level atmosphere. Mirrors `.ion-tw-page` but we don't load
      base.html here, so duplicate the body styling inline. */
   html, body { margin: 0; height: 100%; }
@@ -239,7 +239,7 @@
     <p class="mt-8 text-center label-tiny text-slate-600">Guarded Glass · Security Toolkit</p>
   </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
   const form = document.getElementById('login-form');
   const errorBox = document.getElementById('error-message');
   const errorText = errorBox.querySelector('span');

@@ -3,7 +3,7 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<style>
+<style nonce="{{ csp_nonce }}">
     .social-hub { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
     .social-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .social-header h1 { font-size: 1.5rem; color: var(--text-primary); margin: 0; }
@@ -185,9 +185,9 @@
     </div>
 </div>
 
-<script src="/static/js/marked.min.js"></script>
-<script src="/static/js/purify.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}" src="/static/js/marked.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/purify.min.js"></script>
+<script nonce="{{ csp_nonce }}">
 const EMOJI_MAP = {
     thumbsup: String.fromCodePoint(0x1F44D),
     clap: String.fromCodePoint(0x1F44F),

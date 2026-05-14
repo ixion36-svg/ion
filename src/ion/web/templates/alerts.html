@@ -542,8 +542,8 @@
 
 {% block scripts %}
 <!-- v0.16.1: topojson decoder for the rotating globe's country outlines -->
-<script src="/static/js/topojson-client.min.js"></script>
-<style>
+<script nonce="{{ csp_nonce }}" src="/static/js/topojson-client.min.js"></script>
+<style nonce="{{ csp_nonce }}">
 /* Full-width override for alerts page */
 .container:has(.alerts-grid) {
     max-width: 100%;
@@ -3548,8 +3548,8 @@ kbd {
 }
 </style>
 
+<script nonce="{{ csp_nonce }}">
 {% raw %}
-<script>
 // =========================================================================
 // State
 // =========================================================================
@@ -10590,6 +10590,6 @@ document.addEventListener('keydown', (e) => {
     const panel = document.getElementById('acp-panel');
     if (panel && panel.classList.contains('open')) closeCasePanel();
 });
-</script>
 {% endraw %}
+</script>
 {% endblock %}

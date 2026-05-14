@@ -117,7 +117,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* Section Editor styles */
 .se-builder { margin: 1rem 0; }
 .se-header {
@@ -421,7 +421,7 @@
 .se-legacy-notice p { margin: 0 0 0.5rem; font-size: 0.85rem; }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 {% raw %}
 const templateId = {% endraw %}{{ template_id|default('null') }}{% raw %};
 

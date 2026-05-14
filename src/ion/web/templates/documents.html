@@ -272,7 +272,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .documents-layout {
     display: flex;
     gap: 1.5rem;
@@ -518,7 +518,7 @@
 .doc-quill-wrap .ql-editor a { color: var(--accent, #00e5ff); }
 .doc-quill-wrap .ql-editor code { background: var(--bg-secondary); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 {% raw %}
 let currentDocId = null;
 let currentDocContent = '';

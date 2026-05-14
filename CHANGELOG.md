@@ -1,13 +1,120 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.2 -->
+<!-- ion-doc:version=0.31.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.3 — 2026-05-14
+
+Secure-by-Design **P11 application** — per-request CSP nonce on every
+inline `<script>` and `<style>` block. The CSP3 split-directive policy
+keeps `script-src-attr` / `style-src-attr` permissive so the 1,185
+inline `onclick=` handlers and 1,659 inline `style=""` attributes in
+current templates don't need to be refactored in the same change.
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): per-request CSP nonce via FastAPI middleware
+
+`SecurityHeadersMiddleware` in `src/ion/web/server.py` now:
+
+* generates a 16-byte CSPRNG nonce on every request (`secrets.token_urlsafe(16)`),
+* stashes it on `request.state.csp_nonce` AND a `ContextVar` so it's
+  reachable from Jinja without threading it through every route handler,
+* sets the `Content-Security-Policy` header with that nonce on
+  `script-src` and `style-src`,
+* keeps `script-src-attr 'unsafe-inline'` and
+  `style-src-attr 'unsafe-inline'` so inline event handlers and inline
+  style attributes still work — those are tightened in a future pass
+  once they're refactored to `addEventListener` + CSS classes.
+
+A `_CSPNonceProxy` instance is registered as the Jinja global
+`csp_nonce`; templates use `<script nonce="{{ csp_nonce }}">` / 
+`<style nonce="{{ csp_nonce }}">`. The proxy implements `__str__` and
+`__html__` so Jinja's autoescape doesn't mangle the base64-url value.
+
+### feat(security): nonce attribute on every inline script + style tag
+
+A one-shot Python regex pass added `nonce="{{ csp_nonce }}"` to **155
+tags across 73 templates** (93 `<script>` opening tags + 62 `<style>`
+opening tags). Both bare (`<script>`) and attribute-bearing
+(`<script src="...">`, `<script type="module">`) forms were handled in
+the same pass via the regex `<script(\s|>)` / `<style(\s|>)`.
+
+External `<script src="...">` tags also get the nonce; CSP3 ignores the
+nonce on external scripts (the src whitelist still applies), so this is
+a harmless paint-job that keeps the template style uniform.
+
+### fix(templates): hoist `<script>`/`</script>` outside `{% raw %}`
+
+`alerts.html` (lines 3551 / 10594) and `observables.html` (lines 1182 /
+2543) wrapped their entire client-side JS in `{% raw %}` … `{% endraw %}`
+so Jinja wouldn't trip over template literals + JSX-ish curly-brace
+syntax. With the nonce added inside the raw block, the literal string
+`{{ csp_nonce }}` was sent to the browser and the inline script was
+blocked. The `<script nonce="{{ csp_nonce }}">` opening tag now lives
+*outside* the raw block; the JS body remains inside it. Same for the
+closing `</script>` tag.
+
+### fix(htmx): disable HTMX's runtime-injected indicator <style> block
+
+HTMX injects a `<style>` block at startup for the `.htmx-indicator`
+class. The injected block has no nonce attribute, so under the new
+nonce-strict `style-src`, the browser blocks it. ION does not use the
+`.htmx-indicator` class anywhere (verified via `grep -rl htmx-indicator
+src/ion/web/templates/` → 0 hits). `base.html` now carries
+`<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>`
+which tells HTMX to skip the injection at startup. No UI impact.
+
+### chore(nginx): remove static CSP header (app is authoritative)
+
+`deploy/nginx/nginx.conf` previously set its own static
+`Content-Security-Policy` line via `add_header`. The app's middleware
+now sets a per-request nonce-bearing header; if nginx kept setting its
+own, the two headers would race (with `add_header` only adding to the
+upstream header, downstream behaviour depends on nginx config). The
+static line was removed and replaced with a comment pointing at the
+new authoritative location in `SecurityHeadersMiddleware`.
+
+### Verification
+
+Browser walkthrough via Playwright on a local SQLite dev server: `/`,
+`/alerts`, `/cases`, `/daily-standup`, `/observables`, `/settings` —
+**0 CSP violations across all 6 pages**. The CSP header rotates per
+request (verified via two consecutive curl HEADs producing two
+distinct nonces). External integrations not exercised in this round
+(Kibana / TIDE / Arkime) are unaffected — CSP is a browser-side
+control on ION's own HTML.
+
+### What's *not* in this release
+
+* Inline event handlers (`onclick=` and family) — 1,185 occurrences,
+  still permitted via `script-src-attr 'unsafe-inline'`. Eliminating
+  these would require migrating each one to `addEventListener` against
+  a delegated event target.
+* Inline `style=""` attributes — 1,659 occurrences, still permitted
+  via `style-src-attr 'unsafe-inline'`. Eliminating these would
+  require migrating each to a named CSS class.
+
+Both are tracked in `docs/SECURE_BY_DESIGN.md` P11 audit status (was
+"Mostly Met", now narrower).
+
+### Files
+
+* `src/ion/web/server.py` — `SecurityHeadersMiddleware` rewrite, new
+  `_CSPNonceProxy`, new `csp_nonce` Jinja global.
+* `src/ion/web/templates/*.html` — 73 templates, 155 tag rewrites.
+* `src/ion/web/templates/base.html` — `htmx-config` meta tag.
+* `src/ion/web/templates/alerts.html` + `observables.html` — `<script>`
+  hoisted outside `{% raw %}`.
+* `deploy/nginx/nginx.conf` — `Content-Security-Policy` `add_header`
+  removed.
+
+---
 
 ## v0.31.2 — 2026-05-14
 

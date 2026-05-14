@@ -16,7 +16,7 @@
      Home/End  → first / last slide
 #}
 
-<style>
+<style nonce="{{ csp_nonce }}">
   :root {
     --deck-bg-1: #0a0e14;
     --deck-bg-2: #0d121b;
@@ -307,7 +307,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function () {
   const host = document.getElementById('deck-host');
   const loading = document.getElementById('deck-loading');

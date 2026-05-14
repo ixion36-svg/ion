@@ -14,7 +14,7 @@
 ] %}
 {% set active_label = "Skills & Training" %}
 {% include "_nav_tabs.html" %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* =========================================================================
    Training Pathways v2.5 - Dynamic Career Navigation
    ========================================================================= */
@@ -2998,7 +2998,7 @@
     <div id="rm-content"><div class="rm-loading">Loading...</div></div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 .rm-header{margin-bottom:1rem}
 .rm-header h2{margin:0 0 .25rem 0}
 .rm-sub{color:var(--text-secondary);font-size:.85rem;margin:0 0 .75rem 0}
@@ -3057,7 +3057,7 @@
 .rm-history-table tr:hover{background:rgba(88,166,255,.04);cursor:pointer}
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 const RM_API = '/api/skills/role-match';
 let rmDefinitions = null;
 let rmCurrentRole = null;
@@ -3527,7 +3527,7 @@ async function rmShowHistory() {
 
 
 
-<script>
+<script nonce="{{ csp_nonce }}">
 // =========================================================================
 // Role Data (15 roles — expanded with experience, prerequisites,
 // sub-specializations, and 3-4 pathways each with lateral moves)

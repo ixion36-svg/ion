@@ -75,7 +75,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function(){
   const ENTITY_ID = "{{ entity_id }}";
   const ENTITY_CLASS = new URLSearchParams(window.location.search).get('entity_class') || 'intrusion_set';

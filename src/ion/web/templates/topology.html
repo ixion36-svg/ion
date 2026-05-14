@@ -12,7 +12,7 @@
 ] %}
 {% set active_label = "Topology" %}
 {% include "_nav_tabs.html" %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* ═══════════════════════════════════════════════════════════════
    ION Platform Topology — SOC Infrastructure Dashboard
    ═══════════════════════════════════════════════════════════════ */
@@ -730,7 +730,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // ═══════════════════════════════════════════════════════════════
 // ION Platform Topology
 // ═══════════════════════════════════════════════════════════════

@@ -225,7 +225,7 @@
   </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
   .im-tab {
     padding: 0.6rem 1.1rem;
     font-size: 12px;
@@ -263,7 +263,7 @@
   .pill-sev-critical { background: rgba(239,68,68,0.2); color: #f87171; }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   // ---- Tab state --------------------------------------------------------
   function imSwitchTab(name) {

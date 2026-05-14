@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.2 -->
+<!-- ion-doc:version=0.31.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
@@ -291,11 +291,18 @@ descend from this principle.
   escalates low-confidence LLM verdicts (v0.21.0).
 * PDF: WeasyPrint's external-URL fetcher is blocked
   (`_block_external_url_fetcher`, v0.20.1).
-* CSP currently uses `'unsafe-inline'` for inline `<script>` blocks
-  in templates; nonce-based CSP is tracked in
-  `docs/DEVELOPMENT_LIFECYCLE.md` §8.
+* CSP `script-src` / `style-src` now use **per-request nonces** —
+  every inline `<script>` and `<style>` block carries a 16-byte
+  CSPRNG nonce minted at request time by `SecurityHeadersMiddleware`
+  and exposed to Jinja as `{{ csp_nonce }}` (v0.31.3). Inline event
+  handlers (`onclick=`) and inline `style=""` attributes are still
+  permitted via `script-src-attr` / `style-src-attr` `'unsafe-inline'`
+  — these remain a future-tightening target (1,185 + 1,659
+  occurrences across templates).
 
-**Status:** Mostly Met — CSP nonce is the named gap.
+**Status:** Mostly Met — inline event handlers + inline `style=""`
+attributes still permitted; full strict-CSP requires refactoring those
+to `addEventListener` + CSS classes.
 
 #### P12. Make compromise detection easier
 
@@ -507,9 +514,11 @@ Aggregating §3 across 20 principles:
 
 Open named gaps (also in `docs/DEVELOPMENT_LIFECYCLE.md` §8):
 
-* **CSP nonce** — eliminate `'unsafe-inline'` from `script-src` /
-  `style-src` by injecting per-request nonces into every Jinja
-  template (P11).
+* **Strict CSP** — eliminate `'unsafe-inline'` from `script-src-attr` /
+  `style-src-attr` by migrating 1,185 inline event handlers to
+  `addEventListener` and 1,659 inline `style=""` attributes to CSS
+  classes (P11). The `<script>`/`<style>` block nonce work itself is
+  done as of v0.31.3.
 * **Data-minimisation audit** — formal pass on what is stored vs what
   is needed (P13).
 * **`python-jose → PyJWT`** — removes the transitive
@@ -547,3 +556,4 @@ is the phase guide. If the two ever disagree, this doc wins for
 | Version | Date       | Author     | Notes |
 |---------|------------|------------|-------|
 | 1.0     | 2026-05-14 | Maintainer | Initial publication. 20 principles synthesised from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder. Audit at v0.31.2: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
+| 1.1     | 2026-05-14 | Maintainer | v0.31.3: P11 application — per-request CSP nonce on every inline `<script>` and `<style>` block via `SecurityHeadersMiddleware` + Jinja global. Inline event handlers + inline `style=""` attributes still permitted via CSP3 split-directive `script-src-attr` / `style-src-attr`. P11 audit body updated; gap narrowed from "CSP nonce" to "strict CSP (refactor inline handlers)". Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |

@@ -38,7 +38,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .kg-loading{text-align:center;padding:60px;color:var(--text-secondary)}
 .kg-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:kg-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes kg-spin{to{transform:rotate(360deg)}}
@@ -73,8 +73,8 @@
     .kg-canvas { height: 380px; }
 }
 </style>
-<script src="/static/js/vis-network.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
+<script nonce="{{ csp_nonce }}">
 const KG_API = '/api/knowledge-graph';
 let kgNetwork = null;
 let kgData = null;

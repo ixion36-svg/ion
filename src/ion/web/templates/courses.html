@@ -48,7 +48,7 @@
 </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 .cl-filter{padding:0.5rem 0.95rem;border-radius:0.4rem;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);color:var(--text-secondary);font-size:0.78rem;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s}
 .cl-filter:hover{background:rgba(255,255,255,0.07)}
 .cl-filter-active{background:var(--primary-dim);border-color:var(--primary);color:var(--text-primary)}
@@ -64,7 +64,7 @@
 .cl-desc{font-size:0.82rem;color:var(--text-secondary);line-height:1.45}
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 let _courses = [];
 let _currentLevel = '';
 

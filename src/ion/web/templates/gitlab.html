@@ -199,7 +199,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .connection-status {
     padding: 1rem;
     margin-bottom: 1rem;
@@ -466,7 +466,7 @@
 }
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 let currentIssue = null;
 let isAdmin = false;
 let gitlabConfigured = false;

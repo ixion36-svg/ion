@@ -14,7 +14,7 @@
 </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 .ln-content{font-size:0.95rem;line-height:1.65;color:var(--text-primary)}
 .ln-content h2{font-size:1.4rem;font-weight:700;margin-top:1.6rem;margin-bottom:0.6rem;color:var(--text-primary)}
 .ln-content h3{font-size:1.15rem;font-weight:700;margin-top:1.3rem;margin-bottom:0.5rem;color:var(--text-primary)}
@@ -60,7 +60,7 @@
 .ln-btn-secondary:hover{background:var(--bg-secondary)}
 </style>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 const LESSON_ID = {{ lesson_id | tojson }};
 const COURSE_SLUG = {{ course_slug | default('') | tojson }};
 let _lesson = null;

@@ -88,7 +88,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .can-loading{text-align:center;padding:60px;color:var(--text-secondary)}
 .can-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:can-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes can-spin{to{transform:rotate(360deg)}}
@@ -165,7 +165,7 @@ table.can-table{width:100%;border-collapse:collapse}
     .can-table th, .can-table td { font-size: .72rem; padding: 6px 8px; }
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const CAN_API = '/api/canaries';
 let canCache = [];
 let canTypes = [];

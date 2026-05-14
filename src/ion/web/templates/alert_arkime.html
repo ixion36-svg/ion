@@ -214,7 +214,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
   const ALERT_ID = {{ alert_id | tojson }};
   let previewPayload = null;
 

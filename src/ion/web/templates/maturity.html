@@ -27,7 +27,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 /* Maturity page CSS — refreshed in v0.9.72 with the data_flow visual
    language. Class names + IDs unchanged so the JS in this file (and any
    external tools that reference them) keeps working. Only the values
@@ -355,7 +355,7 @@
     .mat-intro { padding: 22px; }
 }
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const MAT_API = '/api/maturity';
 let matQuestionnaire = null;
 let matResponses = {};

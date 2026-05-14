@@ -159,8 +159,8 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="/static/js/vis-network.min.js"></script>
-<script>
+<script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
+<script nonce="{{ csp_nonce }}">
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 

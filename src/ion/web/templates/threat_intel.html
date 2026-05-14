@@ -3,7 +3,7 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<style>
+<style nonce="{{ csp_nonce }}">
 .ti-page { max-width: 1400px; margin: 0 auto; }
 .ti-header { margin-bottom: 24px; }
 .ti-header h1 { font-size: 1.5rem; margin: 0 0 4px; }
@@ -362,7 +362,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function(){
     const API = '/api/threat-intel';
     let watchedIds = new Set();

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/static/css/style.css?v=0.9.80-lightmode">
   <link rel="stylesheet" href="/static/css/design-system.css?v=0.9.72">
   <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.80-lightmode">
-  <style>
+  <style nonce="{{ csp_nonce }}">
     html, body { height: 100%; margin: 0; padding: 0; background: #0a0e17; overflow: hidden; }
     /* v0.19.21: marquee CSS removed with the ticker strip. */
     .wb-pulse-down { animation: wb-pulse 2s infinite; }
@@ -255,7 +255,7 @@
     <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
   </svg>
 
-<script>
+<script nonce="{{ csp_nonce }}">
 const REFRESH_MS = 5 * 60 * 1000;  // matches the server-side TTL
 
 const $ = (id) => document.getElementById(id);

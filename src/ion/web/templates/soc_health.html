@@ -26,7 +26,7 @@
 {% endblock %}
 
 {% block scripts %}
-<style>
+<style nonce="{{ csp_nonce }}">
 .sh-loading{text-align:center;padding:60px;color:var(--text-secondary)}
 .sh-spinner2{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sh2-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
 @keyframes sh2-spin{to{transform:rotate(360deg)}}
@@ -64,7 +64,7 @@
 .sh-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .sh-section-title i{color:var(--primary)}
 </style>
-<script>
+<script nonce="{{ csp_nonce }}">
 const API = '/api/soc-health';
 function $(id){return document.getElementById(id)}
 function esc(s){if(!s)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}

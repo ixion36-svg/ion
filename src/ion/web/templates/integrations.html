@@ -264,7 +264,7 @@
     </div>
 </div>
 
-<style>
+<style nonce="{{ csp_nonce }}">
 /* Dashboard Layout */
 .dashboard-layout {
     display: grid;
@@ -727,7 +727,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 // Load data on page load
 document.addEventListener('DOMContentLoaded', () => {
     loadIntegrationStatus();

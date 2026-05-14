@@ -154,7 +154,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script>
+<script nonce="{{ csp_nonce }}">
 let currentUser = null;
 
 async function loadProfile() {
