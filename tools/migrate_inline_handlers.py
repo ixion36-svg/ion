@@ -167,6 +167,17 @@ def _translate_handler(value: str) -> Optional[dict[str, Optional[str]]]:
     Returns a dict of { attribute_name: value } to emit, or None if the
     pattern is unmigratable (caller should leave it alone and flag).
     """
+    # JS-source-escape pattern: when an onclick attribute lives INSIDE a
+    # JS single-quoted string (e.g. `html += '<button onclick="fn(\'x\')">'`),
+    # the captured value contains `\'` escape sequences. The regex matched
+    # across an actual quote boundary in the JS source. Naively converting
+    # would produce a broken JS literal. Flag for manual handling — these
+    # spots need the data-args attribute to be JS-string-aware (escape the
+    # `'` that delimits the HTML attribute as `\'` so the outer JS string
+    # parser doesn't terminate early).
+    if "\\'" in value or '\\"' in value:
+        return None
+
     s = value.strip().rstrip(';').strip()
     flags: dict[str, Optional[str]] = {}
 

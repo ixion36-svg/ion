@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.6 -->
+<!-- ion-doc:version=0.31.7 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
@@ -309,13 +309,15 @@ descend from this principle.
   modal-backdrop (`data-close-on-self-click` /
   `data-remove-self-on-self-click`), ancestor removal
   (`data-remove-parent` / `data-remove-closest`), and optional-script
-  error flags (`data-script-onerror-flag`). As of v0.31.6,
-  **base.html + cases.html + alerts.html** are fully migrated
-  (7 + 48 + 194 = 249 handlers). A new `tools/migrate_inline_handlers.py`
-  mechanically translates the common patterns so each subsequent
-  template is mostly script-driven. The remaining 70 templates carry
-  ~770 `onclick=` + ~1,650 inline `style=""` and are queued for
-  per-template migration. Once all are migrated, `script-src-attr 'none'`
+  error flags (`data-script-onerror-flag`). As of v0.31.7,
+  **base.html + cases.html + alerts.html + training.html** are fully
+  migrated (7 + 48 + 194 + 119 = 368 handlers).
+  `tools/migrate_inline_handlers.py` mechanically translates the
+  common patterns; v0.31.7 added detection for the `\'` / `\"`
+  JS-source-escape pattern (handler inside a JS string-concat) so the
+  script reports those for hand-fixing instead of emitting broken
+  output. The remaining 69 templates carry ~650 `onclick=` + ~1,650
+  inline `style=""` and are queued for per-template migration. Once all are migrated, `script-src-attr 'none'`
   and `style-src-attr 'none'` can be enforced and P11 moves to Met.
 
 **Status:** Mostly Met — inline event handlers + inline `style=""`
@@ -578,3 +580,4 @@ is the phase guide. If the two ever disagree, this doc wins for
 | 1.2     | 2026-05-14 | Maintainer | v0.31.4: P11 follow-up — event-delegation foundation. New `static/js/event-delegation.js` + base.html migrated as proof-of-pattern. CSP unchanged this release (72 child templates still carry inline handlers). P11 audit body updated with the migration mechanism + remaining work. Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.3     | 2026-05-14 | Maintainer | v0.31.5: P11 follow-up #2 — cases.html migrated (48 handlers incl. kanban drag-and-drop). Helper extended with drag events, `$event` sentinel, per-event positional args. CSP unchanged. P11 audit body updated with current count (55 handlers migrated; 71 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.4     | 2026-05-14 | Maintainer | v0.31.6: P11 follow-up #3 — alerts.html migrated (194 handlers). New `tools/migrate_inline_handlers.py` mechanical migration script; 4 new helper built-ins (`data-stop-propagation` alone, `data-remove-target`, `data-remove-parent`, `data-remove-closest`). CSP unchanged. P11 audit body updated (249 handlers migrated; 70 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
+| 1.5     | 2026-05-14 | Maintainer | v0.31.7: P11 follow-up #4 — training.html migrated (119 handlers). 2 hand-fixed JS-source-escape spots; migration script patched to detect `\\'` / `\\"` escape sequences and skip them. P11 audit body updated (368 handlers migrated; 69 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |

@@ -2465,14 +2465,14 @@
 
 <!-- Tab Navigation -->
 <div class="training-tabs" id="training-tabs">
-    <button class="training-tab active" data-tab="tab-pathways" onclick="switchTab('tab-pathways')">Career Pathways</button>
-    <button class="training-tab" data-tab="tab-assessment" onclick="switchTab('tab-assessment')">Skills Assessment</button>
-    <button class="training-tab" data-tab="tab-rolematch" onclick="switchTab('tab-rolematch')">Role Match</button>
-    <button class="training-tab" data-tab="tab-team" id="tab-team-btn" onclick="switchTab('tab-team')" style="display:none;">Team Skills</button>
-    <button class="training-tab" data-tab="tab-schedule" id="tab-schedule-btn" onclick="switchTab('tab-schedule')" style="display:none;">Team Schedule</button>
-    <button class="training-tab" data-tab="tab-myplan" onclick="switchTab('tab-myplan')">My Training Plan</button>
-    <button class="training-tab" data-tab="tab-calendar" onclick="switchTab('tab-calendar')">Training Calendar</button>
-    <button class="training-tab" data-tab="tab-certroadmap" onclick="switchTab('tab-certroadmap')">Cert Roadmap</button>
+    <button class="training-tab active" data-tab="tab-pathways" data-click-action="switchTab" data-args='["tab-pathways"]'>Career Pathways</button>
+    <button class="training-tab" data-tab="tab-assessment" data-click-action="switchTab" data-args='["tab-assessment"]'>Skills Assessment</button>
+    <button class="training-tab" data-tab="tab-rolematch" data-click-action="switchTab" data-args='["tab-rolematch"]'>Role Match</button>
+    <button class="training-tab" data-tab="tab-team" id="tab-team-btn" data-click-action="switchTab" data-args='["tab-team"]' style="display:none;">Team Skills</button>
+    <button class="training-tab" data-tab="tab-schedule" id="tab-schedule-btn" data-click-action="switchTab" data-args='["tab-schedule"]' style="display:none;">Team Schedule</button>
+    <button class="training-tab" data-tab="tab-myplan" data-click-action="switchTab" data-args='["tab-myplan"]'>My Training Plan</button>
+    <button class="training-tab" data-tab="tab-calendar" data-click-action="switchTab" data-args='["tab-calendar"]'>Training Calendar</button>
+    <button class="training-tab" data-tab="tab-certroadmap" data-click-action="switchTab" data-args='["tab-certroadmap"]'>Cert Roadmap</button>
 </div>
 
 <!-- Tab 1: Career Pathways -->
@@ -2496,7 +2496,7 @@
     <div class="tier">
         <span class="tier-label t1">Foundation <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Associate &middot; SFIA 3 &middot; EO</span></span>
         <div class="tier-cards">
-            <div class="role-card t1" data-role="l1-analyst" onclick="showRoleDetail('l1-analyst')">
+            <div class="role-card t1" data-role="l1-analyst" data-click-action="showRoleDetail" data-args='["l1-analyst"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">L1 SOC Analyst</div>
                     <div class="tt-meta">Tier 1 &middot; Entry Point &middot; 0-1 yr</div>
@@ -2521,7 +2521,7 @@
     <div class="tier">
         <span class="tier-label t2">Core <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Practitioner &middot; SFIA 4-5 &middot; HEO/SEO</span></span>
         <div class="tier-cards">
-            <div class="role-card t2" data-role="l2-analyst" onclick="showRoleDetail('l2-analyst')">
+            <div class="role-card t2" data-role="l2-analyst" data-click-action="showRoleDetail" data-args='["l2-analyst"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">L2 SOC Analyst</div>
                     <div class="tt-meta">Tier 2 &middot; 1-3 yrs experience</div>
@@ -2537,7 +2537,7 @@
                 <div class="card-exp">1-3 yrs</div>
                 <div class="card-fw">Practitioner &middot; SFIA 4</div>
             </div>
-            <div class="role-card t2" data-role="l3-analyst" onclick="showRoleDetail('l3-analyst')">
+            <div class="role-card t2" data-role="l3-analyst" data-click-action="showRoleDetail" data-args='["l3-analyst"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">L3 / Senior SOC Analyst</div>
                     <div class="tt-meta">Tier 2 &middot; 3-5 yrs experience</div>
@@ -2552,7 +2552,7 @@
                 <div class="card-exp">3-5 yrs</div>
                 <div class="card-fw">Practitioner &middot; SFIA 5</div>
             </div>
-            <div class="role-card t2" data-role="soc-engineer" onclick="showRoleDetail('soc-engineer')">
+            <div class="role-card t2" data-role="soc-engineer" data-click-action="showRoleDetail" data-args='["soc-engineer"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">SOC Engineer (L1)</div>
                     <div class="tt-meta">Tier 2 &middot; 1-3 yrs experience</div>
@@ -2577,7 +2577,7 @@
     <div class="tier">
         <span class="tier-label t3">Specialist &amp; Leadership <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Principal &middot; SFIA 5-6 &middot; SEO/G7</span></span>
         <div class="tier-cards">
-            <div class="role-card t3" data-role="soc-lead" onclick="showRoleDetail('soc-lead')">
+            <div class="role-card t3" data-role="soc-lead" data-click-action="showRoleDetail" data-args='["soc-lead"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">SOC Lead</div>
                     <div class="tt-meta">Tier 3 &middot; 5-8 yrs experience</div>
@@ -2593,7 +2593,7 @@
                 <div class="card-exp">5-8 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 6</div>
             </div>
-            <div class="role-card t3" data-role="incident-responder" onclick="showRoleDetail('incident-responder')">
+            <div class="role-card t3" data-role="incident-responder" data-click-action="showRoleDetail" data-args='["incident-responder"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Incident Responder</div>
                     <div class="tt-meta">Tier 3 &middot; 2-5 yrs experience</div>
@@ -2609,7 +2609,7 @@
                 <div class="card-exp">2-5 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
-            <div class="role-card t3" data-role="threat-hunter" onclick="showRoleDetail('threat-hunter')">
+            <div class="role-card t3" data-role="threat-hunter" data-click-action="showRoleDetail" data-args='["threat-hunter"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Threat Hunter</div>
                     <div class="tt-meta">Tier 3 &middot; 3-6 yrs experience</div>
@@ -2625,7 +2625,7 @@
                 <div class="card-exp">3-6 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
-            <div class="role-card t3" data-role="threat-intel" onclick="showRoleDetail('threat-intel')">
+            <div class="role-card t3" data-role="threat-intel" data-click-action="showRoleDetail" data-args='["threat-intel"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Threat Intel Analyst</div>
                     <div class="tt-meta">Tier 3 &middot; 2-5 yrs experience</div>
@@ -2641,7 +2641,7 @@
                 <div class="card-exp">2-5 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
-            <div class="role-card t3" data-role="detection-engineer" onclick="showRoleDetail('detection-engineer')">
+            <div class="role-card t3" data-role="detection-engineer" data-click-action="showRoleDetail" data-args='["detection-engineer"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Detection Engineer</div>
                     <div class="tt-meta">Tier 3 &middot; 2-5 yrs experience</div>
@@ -2657,7 +2657,7 @@
                 <div class="card-exp">2-5 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
-            <div class="role-card t3" data-role="security-engineer" onclick="showRoleDetail('security-engineer')">
+            <div class="role-card t3" data-role="security-engineer" data-click-action="showRoleDetail" data-args='["security-engineer"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Security Engineer / DevSecOps</div>
                     <div class="tt-meta">Tier 3 &middot; 3-6 yrs experience</div>
@@ -2673,7 +2673,7 @@
                 <div class="card-exp">3-6 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
-            <div class="role-card t3" data-role="senior-engineer" onclick="showRoleDetail('senior-engineer')">
+            <div class="role-card t3" data-role="senior-engineer" data-click-action="showRoleDetail" data-args='["senior-engineer"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Senior SOC Engineer (L2)</div>
                     <div class="tt-meta">Tier 3 &middot; 3-5 yrs experience</div>
@@ -2688,7 +2688,7 @@
                 <div class="card-exp">3-5 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
-            <div class="role-card t3" data-role="elastic-engineer" onclick="showRoleDetail('elastic-engineer')">
+            <div class="role-card t3" data-role="elastic-engineer" data-click-action="showRoleDetail" data-args='["elastic-engineer"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Elastic / SIEM Engineer</div>
                     <div class="tt-meta">Tier 3 &middot; 3-6 yrs experience</div>
@@ -2704,7 +2704,7 @@
                 <div class="card-exp">3-6 yrs</div>
                 <div class="card-fw">Principal &middot; SFIA 5</div>
             </div>
-            <div class="role-card t3" data-role="platform-engineer" onclick="showRoleDetail('platform-engineer')">
+            <div class="role-card t3" data-role="platform-engineer" data-click-action="showRoleDetail" data-args='["platform-engineer"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Platform Engineer (L3)</div>
                     <div class="tt-meta">Tier 3 &middot; 4-7 yrs experience</div>
@@ -2729,7 +2729,7 @@
     <div class="tier">
         <span class="tier-label t4">Expert <span style="opacity:0.6;font-size:0.55rem;font-weight:400;">/ UKCSC Chartered &middot; SFIA 6-7 &middot; G7/G6</span></span>
         <div class="tier-cards">
-            <div class="role-card t4" data-role="malware-analyst" onclick="showRoleDetail('malware-analyst')">
+            <div class="role-card t4" data-role="malware-analyst" data-click-action="showRoleDetail" data-args='["malware-analyst"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Malware Analyst</div>
                     <div class="tt-meta">Tier 4 &middot; 5-8 yrs experience</div>
@@ -2745,7 +2745,7 @@
                 <div class="card-exp">5-8 yrs</div>
                 <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
-            <div class="role-card t4" data-role="digital-forensics" onclick="showRoleDetail('digital-forensics')">
+            <div class="role-card t4" data-role="digital-forensics" data-click-action="showRoleDetail" data-args='["digital-forensics"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Digital Forensics</div>
                     <div class="tt-meta">Tier 4 &middot; 4-7 yrs experience</div>
@@ -2761,7 +2761,7 @@
                 <div class="card-exp">4-7 yrs</div>
                 <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
-            <div class="role-card t4" data-role="pen-tester" onclick="showRoleDetail('pen-tester')">
+            <div class="role-card t4" data-role="pen-tester" data-click-action="showRoleDetail" data-args='["pen-tester"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Penetration Tester</div>
                     <div class="tt-meta">Tier 4 &middot; 4-7 yrs experience</div>
@@ -2777,7 +2777,7 @@
                 <div class="card-exp">4-7 yrs</div>
                 <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
-            <div class="role-card t4" data-role="cloud-security" onclick="showRoleDetail('cloud-security')">
+            <div class="role-card t4" data-role="cloud-security" data-click-action="showRoleDetail" data-args='["cloud-security"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Cloud Security Engineer</div>
                     <div class="tt-meta">Tier 4 &middot; 4-7 yrs experience</div>
@@ -2793,7 +2793,7 @@
                 <div class="card-exp">4-7 yrs</div>
                 <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
-            <div class="role-card t4" data-role="security-architect" onclick="showRoleDetail('security-architect')">
+            <div class="role-card t4" data-role="security-architect" data-click-action="showRoleDetail" data-args='["security-architect"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">Security Architect</div>
                     <div class="tt-meta">Tier 4 &middot; 8-12 yrs experience</div>
@@ -2809,7 +2809,7 @@
                 <div class="card-exp">8-12 yrs</div>
                 <div class="card-fw">Chartered &middot; SFIA 7</div>
             </div>
-            <div class="role-card t4" data-role="grc" onclick="showRoleDetail('grc')">
+            <div class="role-card t4" data-role="grc" data-click-action="showRoleDetail" data-args='["grc"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">GRC / Compliance</div>
                     <div class="tt-meta">Tier 4 &middot; 5-8 yrs experience</div>
@@ -2825,7 +2825,7 @@
                 <div class="card-exp">5-8 yrs</div>
                 <div class="card-fw">Chartered &middot; SFIA 6</div>
             </div>
-            <div class="role-card t4" data-role="siem-architect" onclick="showRoleDetail('siem-architect')">
+            <div class="role-card t4" data-role="siem-architect" data-click-action="showRoleDetail" data-args='["siem-architect"]'>
                 <div class="card-tooltip">
                     <div class="tt-title">SIEM / Data Architect</div>
                     <div class="tt-meta">Tier 4 &middot; 6-10 yrs experience</div>
@@ -2849,9 +2849,9 @@
 
 <!-- Detail Slide-in Panel (outside tabs for overlay behavior) -->
 <div class="detail-overlay" id="detail-overlay">
-    <div class="detail-backdrop" onclick="closeDetail()"></div>
+    <div class="detail-backdrop" data-click-action="closeDetail"></div>
     <div class="detail-panel" id="detail-panel">
-        <button class="detail-close" onclick="closeDetail()">&times;</button>
+        <button class="detail-close" data-click-action="closeDetail">&times;</button>
         <div id="detail-content"></div>
     </div>
 </div>
@@ -2872,18 +2872,18 @@
     <div id="sa-form"></div>
     <div id="sa-forecast"></div>
     <div class="sa-save-bar">
-        <button class="sa-save-btn sa-delete-btn" id="sa-delete-btn" onclick="deleteAssessment()" title="Delete your entire self-assessment"><i class="icon-trash-2"></i> Reset Assessment</button>
+        <button class="sa-save-btn sa-delete-btn" id="sa-delete-btn" data-click-action="deleteAssessment" title="Delete your entire self-assessment"><i class="icon-trash-2"></i> Reset Assessment</button>
         <span class="sa-save-status" id="sa-save-status">Saved successfully</span>
-        <button class="sa-save-btn" id="sa-save-btn" onclick="saveAssessment()">Save Assessment</button>
-        <button class="sa-save-btn sa-submit-btn" id="sa-submit-btn" onclick="submitAssessment()">Submit Assessment</button>
+        <button class="sa-save-btn" id="sa-save-btn" data-click-action="saveAssessment">Save Assessment</button>
+        <button class="sa-save-btn sa-submit-btn" id="sa-submit-btn" data-click-action="submitAssessment">Submit Assessment</button>
     </div>
 </div>
 
 <!-- Tab 3: Team Skills (lead+ only) -->
 <div class="tab-content" id="tab-team">
     <div class="team-subtabs">
-        <button class="team-subtab active" onclick="switchTeamSubTab('overview')">Overview</button>
-        <button class="team-subtab" onclick="switchTeamSubTab('knowledge')">Document Registry</button>
+        <button class="team-subtab active" data-click-action="switchTeamSubTab" data-args='["overview"]'>Overview</button>
+        <button class="team-subtab" data-click-action="switchTeamSubTab" data-args='["knowledge"]'>Document Registry</button>
     </div>
 
     <div class="team-sub-content active" id="sub-overview">
@@ -2909,7 +2909,7 @@
         </div>
         <div class="departure-sim">
             <label>Simulate Departure</label>
-            <select id="departure-user" onchange="simulateDeparture()">
+            <select id="departure-user" data-change-action="simulateDeparture">
                 <option value="">-- Select team member --</option>
             </select>
             <div class="departure-results" id="departure-results"></div>
@@ -2938,9 +2938,9 @@
 
     <!-- Month navigation + legend -->
     <div class="sched-controls">
-        <button class="sched-nav-btn" onclick="schedNavMonth(-1)">&larr; Prev</button>
+        <button class="sched-nav-btn" data-click-action="schedNavMonth" data-args='[-1]'>&larr; Prev</button>
         <span class="sched-month-label" id="sched-month-label"></span>
-        <button class="sched-nav-btn" onclick="schedNavMonth(1)">Next &rarr;</button>
+        <button class="sched-nav-btn" data-click-action="schedNavMonth" data-args='[1]'>Next &rarr;</button>
         <div class="sched-legend">
             <span class="sched-legend-item"><span class="sched-legend-swatch sg-working"><i class="icon-check"></i></span> Working</span>
             <span class="sched-legend-item"><span class="sched-legend-swatch sg-leave">&#x2708;</span> Leave</span>
@@ -2966,8 +2966,8 @@
         <div class="soc-cov-header">
             <h3 class="sched-section-title" style="margin-bottom:0;">SOC Capability Coverage</h3>
             <div class="soc-cov-toggle">
-                <button class="sched-nav-btn soc-cov-view-btn active" data-view="day" onclick="switchCovView('day')">Daily</button>
-                <button class="sched-nav-btn soc-cov-view-btn" data-view="week" onclick="switchCovView('week')">Weekly</button>
+                <button class="sched-nav-btn soc-cov-view-btn active" data-view="day" data-click-action="switchCovView" data-args='["day"]'>Daily</button>
+                <button class="sched-nav-btn soc-cov-view-btn" data-view="week" data-click-action="switchCovView" data-args='["week"]'>Weekly</button>
             </div>
         </div>
         <div class="soc-cov-legend">
@@ -2991,8 +2991,8 @@
         <h2>Role Match</h2>
         <p class="rm-sub">Pick a SOC role, answer a short Elastic-focused questionnaire, and see how your current knowledge maps to the role's expectations.</p>
         <div class="rm-actions">
-            <button class="btn btn-secondary" onclick="rmShowHistory()">My History</button>
-            <button class="btn btn-primary" onclick="rmShowRolePicker()">Start Assessment</button>
+            <button class="btn btn-secondary" data-click-action="rmShowHistory">My History</button>
+            <button class="btn btn-primary" data-click-action="rmShowRolePicker">Start Assessment</button>
         </div>
     </div>
     <div id="rm-content"><div class="rm-loading">Loading...</div></div>
@@ -3058,6 +3058,25 @@
 </style>
 
 <script nonce="{{ csp_nonce }}">
+// v0.31.7: small delegated-action helpers for patterns the generic
+// event-delegation.js can't express directly. Exposed as window.* so
+// the dispatcher finds them by name.
+window.__toggleParentClassOpen = function(event) {
+    // Replaces `onclick="this.parentElement.classList.toggle('open')"` on
+    // collapsible-section headers. `event.currentTarget` is the element
+    // carrying the data-click-action attribute.
+    if (event.currentTarget && event.currentTarget.parentElement) {
+        event.currentTarget.parentElement.classList.toggle('open');
+    }
+};
+window.__switchToPathwaysAndShowRole = function(event, dataset) {
+    // Replaces inline `switchTab('tab-pathways');setTimeout(()=>showRoleDetail(id),100);`
+    if (window.switchTab) window.switchTab('tab-pathways');
+    setTimeout(function() {
+        if (window.showRoleDetail) window.showRoleDetail(dataset.roleId);
+    }, 100);
+};
+
 const RM_API = '/api/skills/role-match';
 let rmDefinitions = null;
 let rmCurrentRole = null;
@@ -3097,7 +3116,7 @@ async function rmShowRolePicker() {
         rmDefinitions = await r.json();
         let html = '<div class="rm-role-grid">';
         for (const role of rmDefinitions.roles) {
-            html += '<div class="rm-role-card" onclick="rmStartAssessment(\'' + rmEsc(role.id) + '\')">'
+            html += '<div class="rm-role-card" data-click-action="rmStartAssessment" data-args=\'["' + rmEsc(role.id) + '"]\'>'
                 + '<div class="rm-role-name"><span class="rm-role-tier">' + rmEsc(role.tier) + '</span>' + rmEsc(role.name) + '</div>'
                 + '<div class="rm-role-desc">' + rmEsc(role.description) + '</div>'
                 + '<div class="rm-role-meta">' + role.area_count + ' sections · ' + role.question_count + ' questions</div>'
@@ -3136,7 +3155,7 @@ function rmRenderQuestionnaire() {
                 + '<div class="rm-q-guidance">' + rmEsc(q.guidance) + '</div>'
                 + '<div class="rm-q-rate" data-area="' + rmEsc(area.id) + '" data-q="' + rmEsc(q.id) + '">';
             for (const v of [1,2,3,4,5]) {
-                html += '<button onclick="rmRate(\'' + rmEsc(area.id) + '\',\'' + rmEsc(q.id) + '\',' + v + ',this)">' + v + '</button>';
+                html += '<button data-click-action="rmRate" data-args=\'["' + rmEsc(area.id) + '","' + rmEsc(q.id) + '",' + v + ',"$target"]\'>' + v + '</button>';
             }
             html += '</div></div>';
         }
@@ -3144,8 +3163,8 @@ function rmRenderQuestionnaire() {
     }
 
     html += '<div class="rm-submit">'
-        + '<button class="btn btn-secondary" onclick="rmShowRolePicker()">Cancel</button>'
-        + '<button class="btn btn-primary" id="rm-submit-btn" onclick="rmSubmit()">Submit</button>'
+        + '<button class="btn btn-secondary" data-click-action="rmShowRolePicker">Cancel</button>'
+        + '<button class="btn btn-primary" id="rm-submit-btn" data-click-action="rmSubmit">Submit</button>'
         + '</div>';
     c.innerHTML = html;
 }
@@ -3249,8 +3268,8 @@ function rmRenderResult(a) {
     }
 
     html += '<div class="rm-submit">'
-        + '<button class="btn btn-secondary" onclick="rmShowHistory()">View History</button>'
-        + '<button class="btn btn-primary" onclick="rmShowRolePicker()">New Assessment</button>'
+        + '<button class="btn btn-secondary" data-click-action="rmShowHistory">View History</button>'
+        + '<button class="btn btn-primary" data-click-action="rmShowRolePicker">New Assessment</button>'
         + '</div>';
     c.innerHTML = html;
 }
@@ -3270,12 +3289,12 @@ async function rmShowHistory() {
         for (const a of list) {
             const pct = a.overall_match_pct;
             const color = rmPctColor(pct);
-            html += '<tr onclick="rmRenderResult(' + JSON.stringify(a).replace(/"/g,'&quot;') + ')">'
+            html += '<tr data-click-action="rmRenderResult" data-args="[' + JSON.stringify(a).replace(/"/g,'&quot;') + ']">'
                 + '<td>' + (a.taken_at ? new Date(a.taken_at).toLocaleDateString() : '-') + '</td>'
                 + '<td>' + rmEsc(a.role_name) + '</td>'
                 + '<td><strong style="color:' + color + '">' + pct + '%</strong></td>'
                 + '<td>' + rmEsc(a.overall_level) + '</td>'
-                + '<td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();rmRenderResult(' + JSON.stringify(a).replace(/"/g,'&quot;') + ')">View</button></td>'
+                + '<td><button class="btn btn-secondary btn-sm" data-click-action="rmRenderResult" data-stop-propagation data-args="[' + JSON.stringify(a).replace(/"/g,'&quot;') + ']">View</button></td>'
                 + '</tr>';
         }
         html += '</tbody></table>';
@@ -3291,19 +3310,19 @@ async function rmShowHistory() {
     <!-- Plan selector / create -->
     <div class="tp-header">
         <div class="tp-header-left">
-            <select id="tp-plan-select" class="tp-select" onchange="tpSelectPlan(this.value)">
+            <select id="tp-plan-select" class="tp-select" data-change-action="tpSelectPlan" data-args='["$value"]'>
                 <option value="">-- Select a plan --</option>
             </select>
-            <button class="tp-btn tp-btn-primary" onclick="tpShowCreateModal()">+ New Plan</button>
+            <button class="tp-btn tp-btn-primary" data-click-action="tpShowCreateModal">+ New Plan</button>
         </div>
         <div class="tp-header-right" id="tp-plan-actions" style="display:none;">
-            <select id="tp-status-select" class="tp-select tp-select-sm" onchange="tpChangeStatus(this.value)">
+            <select id="tp-status-select" class="tp-select tp-select-sm" data-change-action="tpChangeStatus" data-args='["$value"]'>
                 <option value="draft">Draft</option>
                 <option value="active">Active</option>
                 <option value="completed">Completed</option>
                 <option value="archived">Archived</option>
             </select>
-            <button class="tp-btn tp-btn-danger-sm" onclick="tpDeletePlan()" title="Delete plan"><i class="icon-trash-2"></i></button>
+            <button class="tp-btn tp-btn-danger-sm" data-click-action="tpDeletePlan" title="Delete plan"><i class="icon-trash-2"></i></button>
         </div>
     </div>
 
@@ -3356,7 +3375,7 @@ async function rmShowHistory() {
                     <h3 style="margin:0;color:var(--text-bright);font-size:1.15rem;">Training Budget Dashboard</h3>
                     <p style="margin:0.25rem 0 0;font-size:0.75rem;color:var(--text-muted);">Aligned with UKCSC Career Framework, SFIA, Defence Cyber Academy &amp; Gov Security Profession</p>
                 </div>
-                <button class="tp-btn" onclick="tpLoadForecast()" style="font-size:0.75rem;"><i class="icon-refresh-cw"></i> Refresh</button>
+                <button class="tp-btn" data-click-action="tpLoadForecast" style="font-size:0.75rem;"><i class="icon-refresh-cw"></i> Refresh</button>
             </div>
 
             <!-- Budget overview totals -->
@@ -3381,7 +3400,7 @@ async function rmShowHistory() {
         <i class="icon-book-open" style="font-size:3rem;color:var(--text-secondary);"></i>
         <h3>My Training Plan</h3>
         <p>Create a training plan to track certifications, costs, and progress towards your career goals.</p>
-        <button class="tp-btn tp-btn-primary" onclick="tpShowCreateModal()">Create Your First Plan</button>
+        <button class="tp-btn tp-btn-primary" data-click-action="tpShowCreateModal">Create Your First Plan</button>
     </div>
 </div>
 
@@ -3410,8 +3429,8 @@ async function rmShowHistory() {
             <textarea id="tp-new-notes" class="tp-input" rows="2" placeholder="Plan description..."></textarea>
         </div>
         <div class="tp-modal-actions">
-            <button class="tp-btn" onclick="tpHideCreateModal()">Cancel</button>
-            <button class="tp-btn tp-btn-primary" onclick="tpCreatePlan()">Create Plan</button>
+            <button class="tp-btn" data-click-action="tpHideCreateModal">Cancel</button>
+            <button class="tp-btn tp-btn-primary" data-click-action="tpCreatePlan">Create Plan</button>
         </div>
     </div>
 </div>
@@ -3421,8 +3440,8 @@ async function rmShowHistory() {
     <!-- Source toggle -->
     <div class="cal-source-toggle" style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
         <span style="font-size:0.8rem;color:var(--text-secondary);font-weight:600;">Source:</span>
-        <button class="cal-src-btn active" data-src="plan" onclick="switchCalSource('plan')">My Training Plan</button>
-        <button class="cal-src-btn" data-src="auto" onclick="switchCalSource('auto')">Auto-Generated</button>
+        <button class="cal-src-btn active" data-src="plan" data-click-action="switchCalSource" data-args='["plan"]'>My Training Plan</button>
+        <button class="cal-src-btn" data-src="auto" data-click-action="switchCalSource" data-args='["auto"]'>Auto-Generated</button>
         <span id="cal-plan-name" style="font-size:0.75rem;color:var(--text-muted);margin-left:auto;"></span>
     </div>
 
@@ -3440,12 +3459,12 @@ async function rmShowHistory() {
 
     <!-- Controls -->
     <div class="cal-controls">
-        <button class="cal-nav-btn" onclick="calNavMonth(-1)">&larr; Prev</button>
+        <button class="cal-nav-btn" data-click-action="calNavMonth" data-args='[-1]'>&larr; Prev</button>
         <span class="cal-month-label" id="cal-month-label"></span>
-        <button class="cal-nav-btn" onclick="calNavMonth(1)">Next &rarr;</button>
+        <button class="cal-nav-btn" data-click-action="calNavMonth" data-args='[1]'>Next &rarr;</button>
         <div class="cal-view-toggle">
-            <button class="cal-view-btn active" data-view="month" onclick="switchCalView('month')">Month</button>
-            <button class="cal-view-btn" data-view="gantt" onclick="switchCalView('gantt')">Timeline</button>
+            <button class="cal-view-btn active" data-view="month" data-click-action="switchCalView" data-args='["month"]'>Month</button>
+            <button class="cal-view-btn" data-view="gantt" data-click-action="switchCalView" data-args='["gantt"]'>Timeline</button>
         </div>
     </div>
 
@@ -3476,19 +3495,19 @@ async function rmShowHistory() {
         <div class="cr-controls">
             <div class="cr-filter-group">
                 <label>Domain:</label>
-                <select id="cr-domain-filter" onchange="crFilterDomain(this.value)">
+                <select id="cr-domain-filter" data-change-action="crFilterDomain" data-args='["$value"]'>
                     <option value="all">All Domains</option>
                 </select>
             </div>
             <div class="cr-filter-group">
                 <label>Provider:</label>
-                <select id="cr-provider-filter" onchange="crFilterProvider(this.value)">
+                <select id="cr-provider-filter" data-change-action="crFilterProvider" data-args='["$value"]'>
                     <option value="all">All Providers</option>
                 </select>
             </div>
             <div class="cr-filter-group">
                 <label>Max Cost:</label>
-                <select id="cr-cost-filter" onchange="crFilterCost(this.value)">
+                <select id="cr-cost-filter" data-change-action="crFilterCost" data-args='["$value"]'>
                     <option value="all">Any</option>
                     <option value="250">Under £250</option>
                     <option value="500">Under £500</option>
@@ -3497,7 +3516,7 @@ async function rmShowHistory() {
                     <option value="5000">Under £5,000</option>
                 </select>
             </div>
-            <button class="cr-reset-btn" onclick="crResetFilters()">Reset</button>
+            <button class="cr-reset-btn" data-click-action="crResetFilters">Reset</button>
         </div>
     </div>
 
@@ -3520,7 +3539,7 @@ async function rmShowHistory() {
 
     <!-- Detail Panel (slide-up) -->
     <div class="cr-detail-overlay" id="cr-detail-overlay">
-        <div class="cr-detail-backdrop" onclick="crCloseDetail()"></div>
+        <div class="cr-detail-backdrop" data-click-action="crCloseDetail"></div>
         <div class="cr-detail-panel" id="cr-detail-panel"></div>
     </div>
 </div>
@@ -5308,8 +5327,8 @@ function renderDetailPanel() {
     // Mode toggle
     const modeToggleHtml = `
         <div class="mode-toggle">
-            <button class="mode-btn ${viewMode === 'to' ? 'active' : ''}" onclick="switchMode('to')">Paths TO This Role</button>
-            <button class="mode-btn ${viewMode === 'from' ? 'active' : ''}" onclick="switchMode('from')">Explore FROM Here</button>
+            <button class="mode-btn ${viewMode === 'to' ? 'active' : ''}" data-click-action="switchMode" data-args='["to"]'>Paths TO This Role</button>
+            <button class="mode-btn ${viewMode === 'from' ? 'active' : ''}" data-click-action="switchMode" data-args='["from"]'>Explore FROM Here</button>
         </div>
     `;
 
@@ -5327,7 +5346,7 @@ function renderDetailPanel() {
             `;
         } else {
             const btns = role.pathways.map((p, i) =>
-                `<button class="pathway-btn ${i === activePathwayIndex ? 'active' : ''}" onclick="switchPathway(${i})">${esc(p.name)}</button>`
+                `<button class="pathway-btn ${i === activePathwayIndex ? 'active' : ''}" data-click-action="switchPathway" data-args='[${i}]'>${esc(p.name)}</button>`
             ).join('');
 
             const pathway = role.pathways[activePathwayIndex];
@@ -5337,7 +5356,7 @@ function renderDetailPanel() {
                 const arrow = i < pathway.steps.length - 1 ? '<span class="pathway-arrow">\u2192</span>' : '';
                 const stepRole = ROLES[s];
                 const fwLabel = stepRole ? `${stepRole.ukcsc} \u00b7 SFIA ${stepRole.sfia}` : '';
-                return `<span class="${stepClass}" onclick="showRoleDetail('${s}')">${esc(SHORT_NAMES[s] || s)}<span class="step-fw">${fwLabel}</span></span>${arrow}`;
+                return `<span class="${stepClass}" data-click-action="showRoleDetail" data-args='["${s}"]'>${esc(SHORT_NAMES[s] || s)}<span class="step-fw">${fwLabel}</span></span>${arrow}`;
             }).join('');
 
             pathwaySectionHtml = `
@@ -5364,7 +5383,7 @@ function renderDetailPanel() {
             const chips = sorted.map(([id, pathNames]) => {
                 const r = ROLES[id];
                 const fwTag = r ? `${r.ukcsc} \u00b7 S${r.sfia}` : `T${r?.tier || '?'}`;
-                return `<span class="reachable-chip" onclick="showRoleDetail('${id}')">
+                return `<span class="reachable-chip" data-click-action="showRoleDetail" data-args='["${id}"]'>
                     <span class="chip-arrow">\u2192</span>
                     ${esc(r?.title || id)}
                     <span class="chip-tier">${fwTag}</span>
@@ -5419,7 +5438,7 @@ function renderDetailPanel() {
         const certDataAttr = btoa(JSON.stringify({name:c.name,provider:c.provider,price:c.price,difficulty:c.difficulty}));
         return `
             <div class="cert-card">
-                <button class="${addBtnCls}" data-cert="${certDataAttr}" onclick="event.stopPropagation();tpAddCertFromCardBtn(this)">${addBtnText}</button>
+                <button class="${addBtnCls}" data-cert="${certDataAttr}" data-click-action="tpAddCertFromCardBtn" data-stop-propagation data-args='["$target"]'>${addBtnText}</button>
                 <div class="cert-header">
                     <span class="cert-name">${esc(c.name)}</span>
                     <span class="cert-price">~\u00a3${c.price.toLocaleString()}</span>
@@ -5435,10 +5454,10 @@ function renderDetailPanel() {
     // Filter + note
     const certFilterHtml = `
         <div class="cert-filter">
-            <button class="cert-filter-btn ${certFilter === 'all' ? 'active' : ''}" onclick="switchCertFilter('all')">All</button>
-            <button class="cert-filter-btn ${certFilter === 'cs' ? 'active' : ''}" onclick="switchCertFilter('cs')">Civil Servant</button>
-            <button class="cert-filter-btn ${certFilter === 'contractor' ? 'active' : ''}" onclick="switchCertFilter('contractor')">Contractor</button>
-            <button class="cert-filter-btn ${certFilter === 'mod' ? 'active' : ''}" onclick="switchCertFilter('mod')" style="${certFilter === 'mod' ? '' : 'border-color:rgba(251,191,36,0.3);'}color:${certFilter === 'mod' ? '' : '#fbbf24'};">MOD</button>
+            <button class="cert-filter-btn ${certFilter === 'all' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["all"]'>All</button>
+            <button class="cert-filter-btn ${certFilter === 'cs' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["cs"]'>Civil Servant</button>
+            <button class="cert-filter-btn ${certFilter === 'contractor' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["contractor"]'>Contractor</button>
+            <button class="cert-filter-btn ${certFilter === 'mod' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["mod"]' style="${certFilter === 'mod' ? '' : 'border-color:rgba(251,191,36,0.3);'}color:${certFilter === 'mod' ? '' : '#fbbf24'};">MOD</button>
         </div>
         <div class="cert-note">${
             certFilter === 'cs'
@@ -5499,8 +5518,8 @@ function renderDetailPanel() {
         ${(() => {
             const modEq = getModEquivalents(activeRole);
             if (!modEq) return '';
-            const soldierHtml = modEq.soldier.map(s => `<span class="mod-detail-pill" style="cursor:pointer;" onclick="modShowDetail('${s.id}')" title="${s.sub}">${esc(s.label)}</span>`).join('');
-            const officerHtml = modEq.officer.map(o => `<span class="mod-detail-pill" style="cursor:pointer;" onclick="modShowDetail('${o.id}')" title="${o.sub}">${esc(o.label)}</span>`).join('');
+            const soldierHtml = modEq.soldier.map(s => `<span class="mod-detail-pill" style="cursor:pointer;" data-click-action="modShowDetail" data-args='["${s.id}"]' title="${s.sub}">${esc(s.label)}</span>`).join('');
+            const officerHtml = modEq.officer.map(o => `<span class="mod-detail-pill" style="cursor:pointer;" data-click-action="modShowDetail" data-args='["${o.id}"]' title="${o.sub}">${esc(o.label)}</span>`).join('');
             if (!soldierHtml && !officerHtml) return '';
             return `<div class="detail-fw-equiv" style="margin-top:0;">
                 <span style="font-size:0.58rem;color:var(--text-muted);margin-right:0.2rem;" title="Military equivalent at SFIA ${modEq.sfia}">MOD:</span>
@@ -5547,7 +5566,7 @@ function renderDetailPanel() {
         </div>
 
         <div class="detail-section" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
-            <button class="tp-btn tp-btn-primary" style="width:100%;padding:0.75rem;font-size:0.9rem;" onclick="tpCreateFromPathway()">
+            <button class="tp-btn tp-btn-primary" style="width:100%;padding:0.75rem;font-size:0.9rem;" data-click-action="tpCreateFromPathway">
                 Create "${esc(role.title)}" Training Plan (${filteredKpiCerts.length} certs, ~\u00a3${filteredKpiCost.toLocaleString()})
             </button>
             <p style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">Auto-creates a plan named after this role with all ${certFilter !== 'all' ? (certFilter === 'cs' ? 'CS-funded' : certFilter === 'mod' ? 'MOD-funded' : 'contractor') + ' ' : ''}certs</p>
@@ -5635,7 +5654,7 @@ function modShowDetail(roleId) {
             const arrow = i < steps.length - 1 ? '<span class="pathway-arrow">\u2192</span>' : '';
             const sr = MOD_ROLES[s];
             const fw = sr ? `SFIA ${sr.sfia}` : '';
-            return `<span class="${cls}" onclick="modShowDetail('${s}')" style="cursor:pointer;">${esc(MOD_SHORT_NAMES[s] || s)}<span class="step-fw" style="display:block;font-size:0.5rem;opacity:0.6;">${fw}</span></span>${arrow}`;
+            return `<span class="${cls}" data-click-action="modShowDetail" data-args='["${s}"]' style="cursor:pointer;">${esc(MOD_SHORT_NAMES[s] || s)}<span class="step-fw" style="display:block;font-size:0.5rem;opacity:0.6;">${fw}</span></span>${arrow}`;
         }).join('');
         pathwayHtml = `
             <div class="detail-section">
@@ -5659,7 +5678,7 @@ function modShowDetail(roleId) {
             const addTxt = inPlan ? 'In Plan' : '+ Plan';
             const certData = btoa(JSON.stringify({name:c.name,provider:c.provider,price:c.price,difficulty:c.difficulty}));
             return `<div class="cert-card">
-                <button class="${addCls}" data-cert="${certData}" onclick="event.stopPropagation();tpAddCertFromCardBtn(this)">${addTxt}</button>
+                <button class="${addCls}" data-cert="${certData}" data-click-action="tpAddCertFromCardBtn" data-stop-propagation data-args='["$target"]'>${addTxt}</button>
                 <div class="cert-header">
                     <span class="cert-name">${esc(c.name)}</span>
                     <span class="cert-price">~\u00a3${c.price.toLocaleString()}</span>
@@ -5690,7 +5709,7 @@ function modShowDetail(roleId) {
             const civRoles = getCivilianEquivalents(roleId);
             if (!civRoles || civRoles.length === 0) return '<div class="detail-fw-equiv" style="margin-top:0;"><span style="font-size:0.58rem;color:var(--text-muted);">Equivalent Roles:</span> <span style="font-size:0.58rem;color:var(--text-muted);font-style:italic;">No direct civilian SOC role at this level</span></div>';
             return '<div class="detail-fw-equiv" style="margin-top:0;"><span style="font-size:0.58rem;color:var(--text-muted);margin-right:0.2rem;">Equivalent Roles:</span>' +
-                civRoles.map(r => `<span class="mod-detail-pill" style="cursor:pointer;" onclick="switchTab('tab-pathways');setTimeout(()=>showRoleDetail('${r.id}'),100);">${esc(r.label)}</span>`).join('') +
+                civRoles.map(r => `<span class="mod-detail-pill" style="cursor:pointer;" data-click-action="__switchToPathwaysAndShowRole" data-role-id="${r.id}">${esc(r.label)}</span>`).join('') +
                 '</div>';
         })()}
 
@@ -5766,7 +5785,7 @@ function modShowDetail(roleId) {
 
         ${role.certs && role.certs.length > 0 ? `
         <div class="detail-section" style="border-top:1px solid var(--border);padding-top:1rem;margin-top:1rem;">
-            <button class="tp-btn tp-btn-primary" style="width:100%;padding:0.75rem;font-size:0.9rem;" onclick="tpCreateFromModRole('${roleId}')">
+            <button class="tp-btn tp-btn-primary" style="width:100%;padding:0.75rem;font-size:0.9rem;" data-click-action="tpCreateFromModRole" data-args='["${roleId}"]'>
                 Create "${esc(role.title)}" Training Plan (${role.certs.length} certs, ~\u00a3${role.certs.reduce((s,c)=>s+c.price,0).toLocaleString()})
             </button>
             <p style="text-align:center;font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">Auto-creates a plan with all MOD-funded certifications for this role</p>
@@ -5946,7 +5965,7 @@ function renderAssessmentForm() {
             if (rating > 0) catRatedCount++;
 
             const ratingBtns = [1,2,3,4,5].map(v =>
-                `<button class="sa-rating-btn r${v} ${rating === v ? 'selected' : ''}" onclick="setRating('${key}',${v})">${v}</button>`
+                `<button class="sa-rating-btn r${v} ${rating === v ? 'selected' : ''}" data-click-action="setRating" data-args='["${key}", ${v}]'>${v}</button>`
             ).join('');
 
             const targetBadge = target > 0
@@ -5968,7 +5987,7 @@ function renderAssessmentForm() {
 
         html += `
             <div class="sa-category${assessmentFormRendered ? '' : ' open'}">
-                <div class="sa-category-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="sa-category-header" data-click-action="__toggleParentClassOpen">
                     <span class="sa-cat-title">${esc(catName)}</span>
                     <span class="sa-cat-badge">${catRatedCount}/${catSkillCount} rated</span>
                     <span class="sa-cat-chevron"><i class="icon-chevron-down"></i></span>
@@ -6200,7 +6219,7 @@ function renderReviewBanner() {
                 <strong>Review Overdue</strong>
                 <span>Your last assessment was submitted on ${submittedStr}. A review was due on ${nextStr}. Please review and re-submit your skills.</span>
             </div>
-            <button class="sa-review-btn primary" onclick="startReview()">Start Review</button>
+            <button class="sa-review-btn primary" data-click-action="startReview">Start Review</button>
         `;
         toggleSubmitButton(true);
     } else if (reviewCycle.is_locked) {
@@ -6212,7 +6231,7 @@ function renderReviewBanner() {
                 <strong>${dueSoon ? 'Review Due Soon' : 'Assessment Submitted'}</strong>
                 <span>Submitted on ${submittedStr}. Next review due ${nextStr} (${reviewCycle.days_until_review} days).</span>
             </div>
-            <button class="sa-review-btn" onclick="unlockAssessment()">Edit Assessment</button>
+            <button class="sa-review-btn" data-click-action="unlockAssessment">Edit Assessment</button>
         `;
         toggleSubmitButton(false);
     } else {
@@ -6815,15 +6834,15 @@ function renderKnowledge() {
                 : `<span style="color:var(--text-muted);font-size:0.65rem;">--</span>`;
             html += `<tr data-doc="${esc(d.key)}">
                 <td><div class="km-doc-name">${esc(d.name)}</div><div class="km-doc-desc">${esc(d.desc)}</div></td>
-                <td><select class="km-select" data-doc="${esc(d.key)}" data-field="doc_status" onchange="saveKnowledgeDebounced()">
+                <td><select class="km-select" data-doc="${esc(d.key)}" data-field="doc_status" data-change-action="saveKnowledgeDebounced">
                     <option value="undocumented" ${status==='undocumented'?'selected':''}>Missing</option>
                     <option value="basic" ${status==='basic'?'selected':''}>Draft</option>
                     <option value="comprehensive" ${status==='comprehensive'?'selected':''}>Approved</option>
                 </select></td>
-                <td><select class="km-select" data-doc="${esc(d.key)}" data-field="owner_user_id" onchange="saveKnowledgeDebounced()">
+                <td><select class="km-select" data-doc="${esc(d.key)}" data-field="owner_user_id" data-change-action="saveKnowledgeDebounced">
                     <option value="">--</option>${memberOpts}
                 </select></td>
-                <td><textarea class="km-notes-edit" data-doc="${esc(d.key)}" data-field="notes" placeholder="..." onchange="saveKnowledgeDebounced()" oninput="saveKnowledgeDebounced()" rows="1">${esc(s.notes || '')}</textarea></td>
+                <td><textarea class="km-notes-edit" data-doc="${esc(d.key)}" data-field="notes" placeholder="..." data-change-action="saveKnowledgeDebounced" data-input-action="saveKnowledgeDebounced" rows="1">${esc(s.notes || '')}</textarea></td>
                 <td style="text-align:center;">${tplLink}</td>
             </tr>`;
         });
@@ -7456,12 +7475,12 @@ function renderScheduleGrid() {
         const dayName = dt.toLocaleDateString('en-GB', { weekday: 'short' }).substring(0, 2);
         const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const isToday = dateStr === todayStr;
-        html += `<div class="sg-cell sg-header ${isWeekend ? 'sg-header-weekend' : ''} ${isToday ? 'sg-today-marker' : ''}" title="Click to view daily roster: ${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'})}" style="cursor:pointer;" onclick="openDayRoster('${dateStr}')"><span class="sg-hdr-day">${dayName}</span><span class="sg-hdr-num">${d}</span></div>`;
+        html += `<div class="sg-cell sg-header ${isWeekend ? 'sg-header-weekend' : ''} ${isToday ? 'sg-today-marker' : ''}" title="Click to view daily roster: ${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'})}" style="cursor:pointer;" data-click-action="openDayRoster" data-args='["${dateStr}"]'><span class="sg-hdr-day">${dayName}</span><span class="sg-hdr-num">${d}</span></div>`;
     }
 
     // One row per team member
     schedMembers.forEach(member => {
-        html += `<div class="sg-cell sg-name" title="Click to view ${esc(member.display_name)}'s skill profile" style="cursor:pointer;" onclick="openMemberProfile(${member.user_id})">${esc(member.display_name)}</div>`;
+        html += `<div class="sg-cell sg-name" title="Click to view ${esc(member.display_name)}'s skill profile" style="cursor:pointer;" data-click-action="openMemberProfile" data-args='[${member.user_id}]'>${esc(member.display_name)}</div>`;
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const key = `${member.user_id}-${dateStr}`;
@@ -7478,7 +7497,7 @@ function renderScheduleGrid() {
             const tooltip = `${member.display_name}\n${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'})}\nStatus: ${info.label}${shift}${entry && entry.notes ? '\nNote: ' + entry.notes : ''}`;
 
             const shiftMark = entry && entry.shift ? `<span style="font-size:0.45rem;display:block;line-height:1;opacity:0.7;">${entry.shift.charAt(0).toUpperCase()}</span>` : '';
-            html += `<div class="${cellCls}" title="${esc(tooltip)}" data-uid="${member.user_id}" data-date="${dateStr}" onclick="openSchedulePicker(this)"><span class="sg-status-icon">${info.icon}</span>${shiftMark}</div>`;
+            html += `<div class="${cellCls}" title="${esc(tooltip)}" data-uid="${member.user_id}" data-date="${dateStr}" data-click-action="openSchedulePicker" data-args='["$target"]'><span class="sg-status-icon">${info.icon}</span>${shiftMark}</div>`;
         }
     });
 
@@ -7538,8 +7557,8 @@ function openSchedulePicker(cell) {
     const currentNotes = entry ? (entry.notes || '') : '';
 
     const root = document.getElementById('sched-modal-root');
-    let html = `<div class="sched-modal-backdrop" onclick="closeSchedModal(event)">
-        <div class="sched-modal" onclick="event.stopPropagation()">
+    let html = `<div class="sched-modal-backdrop" data-click-action="closeSchedModal" data-args='["$event"]'>
+        <div class="sched-modal" data-stop-propagation>
             <div class="sched-modal-title">${esc(member ? member.display_name : 'User ' + uid)}</div>
             <div class="sched-modal-sub">${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long', year:'numeric'})}</div>
 
@@ -7548,7 +7567,7 @@ function openSchedulePicker(cell) {
                 <div class="sched-modal-statuses">`;
     SCHED_STATUSES.forEach(s => {
         const sel = s.key === currentStatus ? ' selected' : '';
-        html += `<button class="sched-modal-status-btn ${s.cls}${sel}" data-status="${s.key}" onclick="selectModalStatus(this)">${s.icon} ${s.label}</button>`;
+        html += `<button class="sched-modal-status-btn ${s.cls}${sel}" data-status="${s.key}" data-click-action="selectModalStatus" data-args='["$target"]'>${s.icon} ${s.label}</button>`;
     });
     html += `</div></div>
 
@@ -7557,7 +7576,7 @@ function openSchedulePicker(cell) {
                 <div class="sched-modal-shifts">`;
     SCHED_SHIFTS.forEach(sh => {
         const sel = sh.key === currentShift ? ' selected' : '';
-        html += `<button class="sched-modal-shift-btn${sel}" data-shift="${sh.key || ''}" onclick="selectModalShift(this)">${sh.label}</button>`;
+        html += `<button class="sched-modal-shift-btn${sel}" data-shift="${sh.key || ''}" data-click-action="selectModalShift" data-args='["$target"]'>${sh.label}</button>`;
     });
     html += `</div></div>
 
@@ -7567,9 +7586,9 @@ function openSchedulePicker(cell) {
             </div>
 
             <div class="sched-modal-actions">
-                <button class="sched-modal-clear" onclick="clearSchedEntry(${uid}, '${dateStr}')">Reset to Default</button>
-                <button class="sched-modal-cancel" onclick="closeSchedModal()">Cancel</button>
-                <button class="sched-modal-save" onclick="saveSchedModal(${uid}, '${dateStr}')">Save</button>
+                <button class="sched-modal-clear" data-click-action="clearSchedEntry" data-args='[${uid}, "${dateStr}"]'>Reset to Default</button>
+                <button class="sched-modal-cancel" data-click-action="closeSchedModal">Cancel</button>
+                <button class="sched-modal-save" data-click-action="saveSchedModal" data-args='[${uid}, "${dateStr}"]'>Save</button>
             </div>
         </div>
     </div>`;
@@ -7681,9 +7700,9 @@ function openDayRoster(dateStr) {
         .filter(([, s]) => s.level <= 1)
         .map(([name, s]) => ({ name, level: s.level, label: ['None', 'Weak'][s.level] }));
 
-    let html = `<div class="day-roster-backdrop" onclick="closeDayRoster(event)">
-        <div class="day-roster" onclick="event.stopPropagation()">
-            <button class="day-roster-close" onclick="closeDayRoster()">&times;</button>
+    let html = `<div class="day-roster-backdrop" data-click-action="closeDayRoster" data-args='["$event"]'>
+        <div class="day-roster" data-stop-propagation>
+            <button class="day-roster-close" data-click-action="closeDayRoster">&times;</button>
             <div class="day-roster-title">Daily Roster &mdash; Who Can Do What</div>
             <div class="day-roster-sub">${esc(dayLabel)} &mdash; ${workingMembers.length} on duty, ${absentMembers.length} off</div>`;
 
@@ -7753,14 +7772,14 @@ function openMemberProfile(userId) {
     const levelClasses = ['', 'awareness', 'basic', 'intermediate', 'advanced', 'expert'];
     const levelColors = ['transparent', 'rgba(100,100,100,0.3)', 'rgba(249,115,22,0.3)', 'rgba(234,179,8,0.3)', 'rgba(34,197,94,0.3)', 'rgba(6,182,212,0.3)'];
 
-    let html = `<div class="member-popover-backdrop" onclick="closeMemberPopover(event)">
-        <div class="member-popover" onclick="event.stopPropagation()">
+    let html = `<div class="member-popover-backdrop" data-click-action="closeMemberPopover" data-args='["$event"]'>
+        <div class="member-popover" data-stop-propagation>
             <div class="mp-header">
                 <div>
                     <div class="mp-name">${esc(member.display_name)}</div>
                     <div class="mp-role">${td.current_role ? td.current_role.replace(/-/g, ' ') : ''} ${td.target_role ? '\u2192 ' + td.target_role.replace(/-/g, ' ') : ''}</div>
                 </div>
-                <button class="mp-close" onclick="closeMemberPopover()">&times;</button>
+                <button class="mp-close" data-click-action="closeMemberPopover">&times;</button>
             </div>`;
 
     // Capability breakdown
@@ -8134,17 +8153,17 @@ function tpRenderPlan(plan) {
         const diffCls = item.difficulty ? `tp-item-difficulty ${item.difficulty}` : 'tp-item-difficulty';
         return `
         <div class="${cls}" data-item-id="${item.id}">
-            <div class="${checkCls}" onclick="tpToggleComplete(${plan.id},${item.id},'${item.status}')" title="Toggle complete"></div>
+            <div class="${checkCls}" data-click-action="tpToggleComplete" data-args='[${plan.id}, ${item.id}, "${item.status}"]' title="Toggle complete"></div>
             <div class="tp-item-info">
                 <div class="tp-item-name">${esc(item.cert_name)}</div>
                 <div class="tp-item-provider">${esc(item.provider || '')}</div>
             </div>
             <span class="tp-item-price">~\u00a3${item.price.toLocaleString()}</span>
             <span class="${diffCls}">${esc(item.difficulty || '-')}</span>
-            <span class="tp-item-funding ${item.funding_type}" onclick="tpCycleFunding(event,${plan.id},${item.id},'${item.funding_type}')" title="Click to change">${tpFundingLabel(item.funding_type)}</span>
-            <span class="tp-item-status ${item.status}" onclick="tpCycleStatus(event,${plan.id},${item.id},'${item.status}')" title="Click to change">${tpStatusLabel(item.status)}</span>
+            <span class="tp-item-funding ${item.funding_type}" data-click-action="tpCycleFunding" data-args='["$event", ${plan.id}, ${item.id}, "${item.funding_type}"]' title="Click to change">${tpFundingLabel(item.funding_type)}</span>
+            <span class="tp-item-status ${item.status}" data-click-action="tpCycleStatus" data-args='["$event", ${plan.id}, ${item.id}, "${item.status}"]' title="Click to change">${tpStatusLabel(item.status)}</span>
             <div class="tp-item-actions">
-                <button onclick="tpRemoveItem(${plan.id},${item.id})" title="Remove"><i class="icon-x"></i></button>
+                <button data-click-action="tpRemoveItem" data-args='[${plan.id}, ${item.id}]' title="Remove"><i class="icon-x"></i></button>
             </div>
         </div>`;
     }).join('');
@@ -8611,11 +8630,11 @@ function renderCalPlanSchedule() {
             </div>
             <span class="${statusCls}">${statusLabel}</span>
             <label>Start:</label>
-            <input type="date" value="${startVal}" onchange="calUpdateItemDate(${item.id},'start',this.value)">
+            <input type="date" value="${startVal}" data-change-action="calUpdateItemDate" data-args='[${item.id}, "start", "$value"]'>
             <label>Exam:</label>
-            <input type="date" value="${endVal}" onchange="calUpdateItemDate(${item.id},'end',this.value)">
+            <input type="date" value="${endVal}" data-change-action="calUpdateItemDate" data-args='[${item.id}, "end", "$value"]'>
             <label>Weeks:</label>
-            <input type="number" min="1" max="52" value="${weeks}" onchange="calUpdateItemWeeks(${item.id},this.value,this)">
+            <input type="number" min="1" max="52" value="${weeks}" data-change-action="calUpdateItemWeeks" data-args='[${item.id}, "$value", "$target"]'>
         </div>`;
     }).join('');
 }
@@ -9072,7 +9091,7 @@ function crShowDetail(certId) {
         prereqsHtml = `<div class="cr-d-section"><h4>Prerequisites / Recommended</h4><div>` +
             cert.prereqs.map(pid => {
                 const pc = CR_CERTS.find(c => c.id === pid);
-                return pc ? `<span class="cr-d-prereq-chip" onclick="crShowDetail('${pid}')">${esc(pc.abbr)}</span>` : '';
+                return pc ? `<span class="cr-d-prereq-chip" data-click-action="crShowDetail" data-args='["${pid}"]'>${esc(pc.abbr)}</span>` : '';
             }).join('') + '</div></div>';
     }
 
@@ -9082,7 +9101,7 @@ function crShowDetail(certId) {
                 <div class="cr-d-title">${esc(cert.name)}</div>
                 <div class="cr-d-provider" style="color:${CR_PROVIDER_COLORS[cert.provider]||'#888'}">${esc(cert.provider)}</div>
             </div>
-            <button class="cr-d-close" onclick="crCloseDetail()">&times;</button>
+            <button class="cr-d-close" data-click-action="crCloseDetail">&times;</button>
         </div>
         <div class="cr-d-stats">
             <div class="cr-d-stat">
