@@ -63,6 +63,13 @@
     keyup: 'data-keyup-action',
     blur: 'data-blur-action',
     focus: 'data-focus-action',
+    // v0.31.5: drag and drop for the Kanban + Workbench surfaces.
+    dragstart: 'data-dragstart-action',
+    dragend: 'data-dragend-action',
+    dragover: 'data-dragover-action',
+    dragenter: 'data-dragenter-action',
+    dragleave: 'data-dragleave-action',
+    drop: 'data-drop-action',
   };
 
   function pickAction(target, attr) {
@@ -78,8 +85,8 @@
     var skip = new Set([
       'clickAction', 'changeAction', 'inputAction', 'submitAction',
       'keydownAction', 'keyupAction', 'blurAction', 'focusAction',
-      'preventDefault', 'stopPropagation',
-      'closeTarget', 'closeOnSelfClick',
+      'preventDefault', 'stopPropagation', 'onlySelfClick',
+      'closeTarget', 'closeOnSelfClick', 'args',
     ]);
     var out = {};
     for (var key in el.dataset) {
@@ -89,9 +96,30 @@
     return out;
   }
 
+  function substituteRuntimeArgs(args, event) {
+    // Sentinel tokens for values only known at click time. The original
+    // `onclick="foo(this.value)"` form encoded these implicitly; we
+    // need an explicit marker now.
+    //   "$event"   → the Event object itself (DragEvent, MouseEvent, ...)
+    //   "$value"   → event.target.value (form fields)
+    //   "$checked" → event.target.checked (checkboxes / radios)
+    //   "$target"  → event.target (raw element reference)
+    return args.map(function (a) {
+      if (a === '$event') return event;
+      if (a === '$value') return event.target.value;
+      if (a === '$checked') return event.target.checked;
+      if (a === '$target') return event.target;
+      return a;
+    });
+  }
+
   function dispatch(event, attr) {
     var hit = pickAction(event.target, attr);
     if (!hit) return;
+    // `data-only-self-click` gates the action on the click being a direct
+    // hit on this element (not bubbled from a child). Mirrors the inline
+    // `if(event.target===this) ...` modal-backdrop pattern.
+    if (hit.el.hasAttribute('data-only-self-click') && event.target !== hit.el) return;
     if (hit.el.hasAttribute('data-prevent-default')) event.preventDefault();
     if (hit.el.hasAttribute('data-stop-propagation')) event.stopPropagation();
     var fn = window[hit.name];
@@ -104,7 +132,40 @@
       return;
     }
     try {
-      fn.call(hit.el, event, buildDataset(hit.el));
+      // Two calling conventions, selected by which data-args attribute is set:
+      //   (a) `data-${event}-args="[…]"` (e.g. data-click-args, data-drop-args)
+      //       or fallback `data-args="[…]"` → fn.apply(el, args)
+      //       — preserves existing positional-arg function signatures so
+      //       templates can migrate inline `onclick="foo(a,b,c)"` calls
+      //       without refactoring `foo`. Per-event variants exist for
+      //       elements with multiple handlers needing different args
+      //       (e.g. a kanban card with onclick={openCaseDetail(id)} AND
+      //       ondragstart={onDragStart(event, id)}).
+      //   (b) no args attribute → fn.call(el, event, dataset)
+      //       — the cleaner contract used by base.html in v0.31.4. New
+      //       handler functions should prefer this shape.
+      var argsAttr = hit.el.getAttribute('data-' + event.type + '-args');
+      if (argsAttr === null) argsAttr = hit.el.dataset.args !== undefined ? hit.el.dataset.args : null;
+      if (argsAttr !== null) {
+        var parsed;
+        try {
+          parsed = JSON.parse(argsAttr);
+        } catch (jsonErr) {
+          if (window.console && console.error) {
+            console.error('[delegation] invalid data-args on action', hit.name, ':', hit.el.dataset.args, jsonErr);
+          }
+          return;
+        }
+        if (!Array.isArray(parsed)) {
+          if (window.console && console.error) {
+            console.error('[delegation] data-args must be a JSON array, got:', typeof parsed);
+          }
+          return;
+        }
+        fn.apply(hit.el, substituteRuntimeArgs(parsed, event));
+      } else {
+        fn.call(hit.el, event, buildDataset(hit.el));
+      }
     } catch (err) {
       if (window.console && console.error) {
         console.error('[delegation] action', hit.name, 'threw:', err);

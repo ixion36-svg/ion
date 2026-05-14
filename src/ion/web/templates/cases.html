@@ -16,7 +16,7 @@
       <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Cases</h1>
       <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Visual workflow tracking for security investigations.</p>
     </div>
-    <button onclick="showCreateCaseModal()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+    <button data-click-action="showCreateCaseModal" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
       <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
       New Case
     </button>
@@ -29,7 +29,7 @@
         <svg class="w-4 h-4"><use href="#i-alert-triangle"/></svg>
         <span id="attn-count">0</span> cases need attention
       </span>
-      <button onclick="dismissAttentionBanner()" class="text-slate-400 hover:text-white transition" title="Dismiss">
+      <button data-click-action="dismissAttentionBanner" class="text-slate-400 hover:text-white transition" title="Dismiss">
         <svg class="w-4 h-4"><use href="#i-x"/></svg>
       </button>
     </div>
@@ -74,15 +74,15 @@
 
 <!-- Filters Bar -->
 <div class="cases-filters-bar">
-    <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." oninput="debouncedFilter()">
-    <select id="filter-severity" class="cases-filter-select" onchange="filterCases()">
+    <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." data-input-action="debouncedFilter">
+    <select id="filter-severity" class="cases-filter-select" data-change-action="filterCases">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
         <option value="medium">Medium</option>
         <option value="low">Low</option>
     </select>
-    <select id="filter-assignee" class="cases-filter-select" onchange="filterCases()">
+    <select id="filter-assignee" class="cases-filter-select" data-change-action="filterCases">
         <option value="">All Assignees</option>
     </select>
 </div>
@@ -90,7 +90,9 @@
 <!-- Kanban Board -->
 <div class="kanban-board" id="kanban-board">
     <div class="kanban-column" data-status="open"
-         ondragover="onDragOver(event)" ondrop="onDrop(event, 'open')">
+         data-dragover-action="onDragOver"
+         data-drop-action="onDrop"
+         data-args='["$event","open"]'>
         <div class="kanban-col-header col-open">
             <span class="kanban-col-title">Open</span>
             <span class="kanban-col-count" id="col-count-open">0</span>
@@ -98,7 +100,9 @@
         <div class="kanban-cards" id="col-open"></div>
     </div>
     <div class="kanban-column" data-status="acknowledged"
-         ondragover="onDragOver(event)" ondrop="onDrop(event, 'acknowledged')">
+         data-dragover-action="onDragOver"
+         data-drop-action="onDrop"
+         data-args='["$event","acknowledged"]'>
         <div class="kanban-col-header col-acknowledged">
             <span class="kanban-col-title">Acknowledged</span>
             <span class="kanban-col-count" id="col-count-acknowledged">0</span>
@@ -106,7 +110,9 @@
         <div class="kanban-cards" id="col-acknowledged"></div>
     </div>
     <div class="kanban-column" data-status="closed"
-         ondragover="onDragOver(event)" ondrop="onDrop(event, 'closed')">
+         data-dragover-action="onDragOver"
+         data-drop-action="onDrop"
+         data-args='["$event","closed"]'>
         <div class="kanban-col-header col-closed">
             <span class="kanban-col-title">Closed</span>
             <span class="kanban-col-count" id="col-count-closed">0</span>
@@ -116,7 +122,7 @@
 </div>
 
 <!-- Management Analytics Panel -->
-<div class="analytics-toggle" onclick="toggleAnalyticsPanel()">
+<div class="analytics-toggle" data-click-action="toggleAnalyticsPanel">
     <h3>Management Analytics</h3>
     <span class="chevron" id="analytics-chevron"><i class="icon-chevron-down"></i></span>
 </div>
@@ -154,14 +160,14 @@
 </div>
 
 <!-- Case Detail Slide-out Panel -->
-<div class="case-panel-overlay" id="case-panel-overlay" onclick="closeCasePanel()"></div>
+<div class="case-panel-overlay" id="case-panel-overlay" data-click-action="closeCasePanel"></div>
 <div class="case-panel" id="case-panel">
     <div class="case-panel-header">
         <div>
             <span class="case-panel-number" id="panel-case-number"></span>
             <span class="case-panel-title" id="panel-case-title"></span>
         </div>
-        <button class="case-panel-close" onclick="closeCasePanel()">&times;</button>
+        <button class="case-panel-close" data-click-action="closeCasePanel">&times;</button>
     </div>
     <div class="case-panel-body" id="case-panel-body">
         <!-- Populated dynamically -->
@@ -169,11 +175,11 @@
 </div>
 
 <!-- Create Case Modal -->
-<div class="cases-modal-overlay" id="create-case-overlay" style="display:none;" onclick="if(event.target===this)closeCreateCaseModal()">
+<div class="cases-modal-overlay" id="create-case-overlay" style="display:none;" data-click-action="closeCreateCaseModal" data-only-self-click>
     <div class="cases-modal">
         <div class="cases-modal-header">
             <h3>Create New Case</h3>
-            <button class="cases-modal-close" onclick="closeCreateCaseModal()">&times;</button>
+            <button class="cases-modal-close" data-click-action="closeCreateCaseModal">&times;</button>
         </div>
         <div class="cases-modal-body">
             <div class="form-group">
@@ -203,18 +209,18 @@
             </div>
         </div>
         <div class="cases-modal-footer">
-            <button class="btn" onclick="closeCreateCaseModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="submitCreateCase()">Create Case</button>
+            <button class="btn" data-click-action="closeCreateCaseModal">Cancel</button>
+            <button class="btn btn-primary" data-click-action="submitCreateCase">Create Case</button>
         </div>
     </div>
 </div>
 
 <!-- Closure Modal -->
-<div class="cases-modal-overlay" id="closure-modal-overlay" style="display:none;" onclick="if(event.target===this)cancelClosure()">
+<div class="cases-modal-overlay" id="closure-modal-overlay" style="display:none;" data-click-action="cancelClosure" data-only-self-click>
     <div class="cases-modal">
         <div class="cases-modal-header">
             <h3 id="closure-modal-title">Close Case</h3>
-            <button class="cases-modal-close" onclick="cancelClosure()">&times;</button>
+            <button class="cases-modal-close" data-click-action="cancelClosure">&times;</button>
         </div>
         <div class="cases-modal-body">
             <div class="form-group">
@@ -235,8 +241,8 @@
             </div>
         </div>
         <div class="cases-modal-footer">
-            <button class="btn" onclick="cancelClosure()">Cancel</button>
-            <button class="btn btn-primary" onclick="confirmClosure()">Confirm</button>
+            <button class="btn" data-click-action="cancelClosure">Cancel</button>
+            <button class="btn btn-primary" data-click-action="confirmClosure">Confirm</button>
         </div>
     </div>
 </div>
@@ -2245,9 +2251,11 @@ function renderCard(c) {
     const ageClass = getAgeClass(c.created_at);
 
     return '<div class="kanban-card sev-' + esc(sev) + '" draggable="true"'
-        + ' ondragstart="onDragStart(event,' + c.id + ')"'
-        + ' ondragend="onDragEnd(event)"'
-        + ' onclick="openCaseDetail(' + c.id + ')"'
+        + ' data-dragstart-action="onDragStart"'
+        + ' data-dragstart-args=\'["$event",' + c.id + ']\''
+        + ' data-dragend-action="onDragEnd"'
+        + ' data-click-action="openCaseDetail"'
+        + ' data-click-args=\'[' + c.id + ']\''
         + ' data-case-id="' + c.id + '">'
         + '<div class="kcard-header">'
         +   '<span class="kcard-number">' + esc(c.case_number) + '</span>'
@@ -2410,17 +2418,18 @@ function cancelClosure() {
     // (same-value transitions don't dispatch). That bug presented as
     // "closing via dropdown sometimes does nothing" — the user thought
     // they were starting a new close, but the browser ignored the click.
+    //
+    // v0.31.5: the panel's selects no longer carry an inline onchange=
+    // attribute (CSP migration); they carry data-args='[caseId,"field","$value"]'
+    // instead. Match the status select by parsing that.
     if (pendingClosure) {
         const caseObj = allCases.find(c => c.id === pendingClosure.caseId);
         if (caseObj) {
-            // The panel has multiple selects (status, severity, assigned_to_id).
-            // Pick the one whose onchange attribute references the 'status'
-            // field for this case_id — that's the dropdown the user just
-            // changed and now wants to roll back.
-            const needle = "panelUpdateField(" + pendingClosure.caseId + ",'status'";
             document.querySelectorAll('.cpanel-meta-grid select').forEach(sel => {
-                const handler = sel.getAttribute('onchange') || '';
-                if (handler.indexOf(needle) !== -1) {
+                let parsed = null;
+                try { parsed = JSON.parse(sel.getAttribute('data-args') || ''); }
+                catch (e) { /* not our select */ }
+                if (Array.isArray(parsed) && parsed[0] === pendingClosure.caseId && parsed[1] === 'status') {
                     sel.value = caseObj.status;
                 }
             });
@@ -2515,11 +2524,11 @@ function renderPanelContent(c) {
     // panel-open time. Action buttons + severity strip stay outside
     // any tab so they're always reachable.
     html += '<div class="cpanel-tab-nav">'
-        + '<button type="button" class="cpanel-tab-btn active" data-tab="overview" onclick="switchPanelTab(\'overview\')">Overview</button>'
-        + '<button type="button" class="cpanel-tab-btn" data-tab="alerts" onclick="switchPanelTab(\'alerts\')">Alerts (' + alertCount + ')</button>'
-        + '<button type="button" class="cpanel-tab-btn" data-tab="observables" onclick="switchPanelTab(\'observables\')">Observables (' + obsCount + ')</button>'
-        + '<button type="button" class="cpanel-tab-btn" data-tab="timeline" onclick="switchPanelTab(\'timeline\')">Timeline</button>'
-        + '<button type="button" class="cpanel-tab-btn" data-tab="notes" onclick="switchPanelTab(\'notes\')">Notes</button>'
+        + '<button type="button" class="cpanel-tab-btn active" data-tab="overview" data-click-action="switchPanelTab" data-args=\'["overview"]\'>Overview</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="alerts" data-click-action="switchPanelTab" data-args=\'["alerts"]\'>Alerts (' + alertCount + ')</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="observables" data-click-action="switchPanelTab" data-args=\'["observables"]\'>Observables (' + obsCount + ')</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="timeline" data-click-action="switchPanelTab" data-args=\'["timeline"]\'>Timeline</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="notes" data-click-action="switchPanelTab" data-args=\'["notes"]\'>Notes</button>'
         + '</div>';
 
     // Metadata
@@ -2527,13 +2536,13 @@ function renderPanelContent(c) {
     html += '<div class="cpanel-section-title">Metadata</div>';
     html += '<div class="cpanel-meta-grid">';
     html += '<div class="cpanel-meta-item"><label>Status</label>'
-        + '<select onchange="panelUpdateField(' + c.id + ',\'status\',this.value)">'
+        + '<select data-change-action="panelUpdateField" data-args=\'[' + c.id + ',"status","$value"]\'>'
         + ['open','acknowledged','closed'].map(s =>
             '<option value="' + s + '"' + (c.status === s ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>'
         ).join('')
         + '</select></div>';
     html += '<div class="cpanel-meta-item"><label>Severity</label>'
-        + '<select onchange="panelUpdateField(' + c.id + ',\'severity\',this.value)">'
+        + '<select data-change-action="panelUpdateField" data-args=\'[' + c.id + ',"severity","$value"]\'>'
         + ['critical','high','medium','low'].map(s =>
             '<option value="' + s + '"' + (c.severity === s ? ' selected' : '') + '>' + s + '</option>'
         ).join('')
@@ -2552,7 +2561,7 @@ function renderPanelContent(c) {
     const mismatch = kbAssignees.length > 0
         && (c.assigned_to_id == null || !kbIonIds.includes(c.assigned_to_id));
     html += '<div class="cpanel-meta-item"><label>Assigned To</label>'
-        + '<select onchange="panelUpdateField(' + c.id + ',\'assigned_to_id\',this.value)">'
+        + '<select data-change-action="panelUpdateField" data-args=\'[' + c.id + ',"assigned_to_id","$value"]\'>'
         + '<option value=""' + (!c.assigned_to_id ? ' selected' : '') + '>Unassigned</option>'
         + usersCache.map(u =>
             '<option value="' + u.id + '"' + (c.assigned_to_id === u.id ? ' selected' : '') + '>'
@@ -2738,7 +2747,7 @@ function renderPanelContent(c) {
             const pinSev = a.priority || c.severity || '';
             html += '<div class="cpanel-alert-card-meta" style="margin-top:0.3rem;">'
                 +     '<button class="cpanel-pin-btn" type="button" '
-                +       'onclick="pinAlertToCase(' + c.id + ', \'' + esc(alertId) + '\', \'' + esc(pinTitle) + '\', \'' + esc(pinSev) + '\')">'
+                +       'data-click-action="pinAlertToCase" data-args=\'[' + c.id + ',"' + esc(alertId) + '","' + esc(pinTitle) + '","' + esc(pinSev) + '"]\'>'
                 +       '<i class="icon-bookmark" style="font-size:0.6rem;margin-right:0.2rem;"></i>Pin as evidence'
                 +     '</button>'
                 + '</div>';
@@ -2785,7 +2794,7 @@ function renderPanelContent(c) {
                 + '<div class="cpanel-note-header" style="display:flex;align-items:center;gap:0.5rem;">'
                 +   '<span class="cpanel-note-user"><i class="icon-user" style="font-size:0.65rem;margin-right:0.2rem;"></i>' + esc(n.user || 'Unknown') + '</span>'
                 +   '<span>' + fmtDate(n.created_at) + '</span>'
-                +   '<button class="cpanel-note-translate" type="button" onclick="translateCaseNote(\'' + noteId + '\')" '
+                +   '<button class="cpanel-note-translate" type="button" data-click-action="translateCaseNote" data-args=\'["' + noteId + '"]\' '
                 +     'style="margin-left:auto;font-size:0.65rem;background:none;border:1px solid rgba(255,255,255,0.1);color:#94a3b8;padding:0.1rem 0.45rem;border-radius:3px;cursor:pointer;">Translate</button>'
                 + '</div>'
                 + '<div class="cpanel-note-content cpanel-note-markdown" id="' + noteId + '" '
@@ -2797,7 +2806,7 @@ function renderPanelContent(c) {
     }
     html += '<div class="cpanel-add-note">'
         + '<textarea id="panel-note-input" placeholder="Add a note..." rows="2"></textarea>'
-        + '<button class="btn btn-primary" style="align-self:flex-end;font-size:0.8rem;padding:0.4rem 0.75rem;" onclick="addPanelNote(' + c.id + ')">Add</button>'
+        + '<button class="btn btn-primary" style="align-self:flex-end;font-size:0.8rem;padding:0.4rem 0.75rem;" data-click-action="addPanelNote" data-args=\'[' + c.id + ']\'>Add</button>'
         + '</div>';
     html += '</div>';
 
@@ -2820,7 +2829,7 @@ function renderPanelContent(c) {
         +       '<option value="low">low</option>'
         +       '<option value="info">info</option>'
         +     '</select>'
-        +     '<button type="button" class="btn btn-primary" style="font-size:0.75rem;padding:0.35rem 0.75rem;" onclick="addObservationPin(' + c.id + ')">Pin</button>'
+        +     '<button type="button" class="btn btn-primary" style="font-size:0.75rem;padding:0.35rem 0.75rem;" data-click-action="addObservationPin" data-args=\'[' + c.id + ']\'>Pin</button>'
         +   '</div>'
         +   '<div id="workbench-kanban-' + c.id + '" class="workbench-kanban">'
         +     '<div class="cpanel-empty-hint" style="grid-column:1/-1;">Loading workbench…</div>'
@@ -2853,11 +2862,11 @@ function renderPanelContent(c) {
         +        'padding:0.75rem;background:rgba(0,0,0,0.2);border-left:3px solid #6de4ff;border-radius:4px;">'
         +   '</div>'
         +   '<div style="display:flex;gap:0.5rem;margin-top:0.5rem;flex-wrap:wrap;">'
-        +     '<button class="btn" onclick="saveBobAnalysisAsNote(' + c.id + ')" '
+        +     '<button class="btn" data-click-action="saveBobAnalysisAsNote" data-args=\'[' + c.id + ']\' '
         +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;">Save as note</button>'
-        +     '<button class="btn" onclick="getBobAnalysis(' + c.id + ')" '
+        +     '<button class="btn" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\' '
         +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;">Re-run</button>'
-        +     '<button class="btn" onclick="hideBobAnalysis(' + c.id + ')" '
+        +     '<button class="btn" data-click-action="hideBobAnalysis" data-args=\'[' + c.id + ']\' '
         +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;background:none;">Dismiss</button>'
         +   '</div>'
         + '</div>';
@@ -2867,15 +2876,15 @@ function renderPanelContent(c) {
     if (c.dfir_iris_case_id) {
         html += '<button class="btn" disabled title="Already escalated">Escalated to DFIR-IRIS</button>';
     } else {
-        html += '<button class="btn" onclick="escalateCase(' + c.id + ')">Escalate to DFIR-IRIS</button>';
+        html += '<button class="btn" data-click-action="escalateCase" data-args=\'[' + c.id + ']\'>Escalate to DFIR-IRIS</button>';
     }
     if (c.kibana_url) {
         html += '<a class="btn" href="' + esc(c.kibana_url) + '" target="_blank" rel="noopener">View in Kibana</a>';
     }
-    html += '<button class="btn btn-primary" onclick="getBobAnalysis(' + c.id + ')" '
+    html += '<button class="btn btn-primary" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\' '
         +       'title="Generate Bob\'s analysis based on investigations, observables, raw alert, and similar cases">'
         +       'Get Bob\'s analysis</button>';
-    html += '<button class="btn" onclick="toggleCasePlaybookBrowser(' + c.id + ')">Start Playbook</button>';
+    html += '<button class="btn" data-click-action="toggleCasePlaybookBrowser" data-args=\'[' + c.id + ']\'>Start Playbook</button>';
     html += '<a class="btn" href="/api/elasticsearch/alerts/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
     html += '</div>';
     html += '<div id="case-playbook-browser-' + c.id + '" style="display:none;"></div>';
@@ -2914,7 +2923,7 @@ async function loadSimilarCases(caseId) {
         container.innerHTML = items.map(s => {
             const c = closureColors[s.closure_reason] || closureColors.not_applicable;
             const pct = Math.round((s.similarity || 0) * 100) + '%';
-            return '<div class="cpanel-alert-card" onclick="openCaseDetail(' + s.case_id + ')" style="cursor:pointer;">'
+            return '<div class="cpanel-alert-card" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\' style="cursor:pointer;">'
                 +   '<div class="cpanel-alert-card-header">'
                 +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
                 +     '<div class="cpanel-alert-badges">'
@@ -3062,7 +3071,7 @@ async function loadSimilarObservables(caseId) {
                 ? '<span class="cpanel-alert-badge" title="Marked as IOC" style="background:rgba(239,68,68,.14);color:#fca5a5;">IOC</span>'
                 : '';
             const sightingsList = (row.sightings || []).slice(0, 6).map(s => {
-                return '<div class="cpanel-alert-card" onclick="openCaseDetail(' + s.case_id + ')" style="cursor:pointer;margin-top:0.3rem;">'
+                return '<div class="cpanel-alert-card" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\' style="cursor:pointer;margin-top:0.3rem;">'
                     +   '<div class="cpanel-alert-card-header">'
                     +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
                     +     '<span class="cpanel-alert-badge" style="background:rgba(148,163,184,.14);color:#cbd5e1;">' + esc(s.status || '?') + '</span>'
@@ -3395,13 +3404,13 @@ function renderCasePlaybookBrowser(caseId, playbooks, filter) {
 
     if (!filtered.length) {
         panel.innerHTML = '<div class="cpanel-playbook-browser">'
-            + '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." oninput="filterCasePlaybooks(' + caseId + ', this.value)" value="' + (filter || '') + '"></div>'
+            + '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." data-input-action="filterCasePlaybooks" data-args=\'[' + caseId + ',"$value"]\' value="' + (filter || '') + '"></div>'
             + '<div style="padding:0.5rem;font-size:0.8125rem;color:var(--text-muted);">No matching playbooks</div></div>';
         return;
     }
 
     let html = '<div class="cpanel-playbook-browser">';
-    html += '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." oninput="filterCasePlaybooks(' + caseId + ', this.value)" value="' + (filter || '') + '"></div>';
+    html += '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." data-input-action="filterCasePlaybooks" data-args=\'[' + caseId + ',"$value"]\' value="' + (filter || '') + '"></div>';
 
     if (active.length > 0) {
         html += '<div class="cpanel-pb-group-header">Active Playbooks</div>';
@@ -3424,7 +3433,7 @@ function renderCasePlaybookItem(caseId, p, isActive) {
         + '<div class="cpanel-pb-item-desc">' + desc + ' &middot; ' + p.step_count + ' steps</div>'
         + '</div>'
         + '<span class="cpanel-pb-badge ' + (isActive ? 'active' : 'inactive') + '">' + (isActive ? 'Active' : 'Library') + '</span>'
-        + '<button class="btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;" onclick="startPlaybookForCase(' + caseId + ',' + p.id + ',\'' + esc(p.name) + '\')">Start</button>'
+        + '<button class="btn" style="font-size:0.75rem;padding:0.25rem 0.5rem;" data-click-action="startPlaybookForCase" data-args=\'[' + caseId + ',' + p.id + ',"' + esc(p.name) + '"]\'>Start</button>'
         + '</div>';
 }
 
@@ -3585,7 +3594,7 @@ function computeAttentionAlerts() {
 
     const list = document.getElementById('attn-list');
     list.innerHTML = unique.map(a =>
-        '<div class="attn-item" onclick="openCaseDetail(' + a.case.id + ')">'
+        '<div class="attn-item" data-click-action="openCaseDetail" data-args=\'[' + a.case.id + ']\'>'
         + '<span class="attn-reason attn-reason-' + a.type + '">' + esc(a.label) + '</span>'
         + '<span class="attn-case-num">' + esc(a.case.case_number) + '</span>'
         + '<span class="attn-case-title">' + esc(a.case.title) + '</span>'
@@ -3822,7 +3831,7 @@ function renderSLAIndicators() {
         const ageMs = now - new Date(c.created_at).getTime();
         const colorClass = getSLAColor(ageMs);
         const sevBadge = '<span class="kcard-severity sev-' + esc(c.severity || 'medium') + '" style="margin-right:0.25rem;">' + esc(c.severity || 'med') + '</span>';
-        return '<div class="sla-row" onclick="openCaseDetail(' + c.id + ')">'
+        return '<div class="sla-row" data-click-action="openCaseDetail" data-args=\'[' + c.id + ']\'>'
             + '<span class="sla-dot ' + colorClass + '"></span>'
             + sevBadge
             + '<span class="sla-case-num">' + esc(c.case_number) + '</span>'
@@ -3925,8 +3934,8 @@ function renderWorkbenchKanban(caseId, pins) {
     WB_COLUMNS.forEach(col => {
         const colPins = visible.filter(p => p.finding_status === col.key);
         html += '<div class="workbench-col" data-col="' + col.key + '" data-case="' + caseId + '"'
-            +   ' ondragover="wbDragOver(event)" ondragleave="wbDragLeave(event)"'
-            +   ' ondrop="wbDrop(event, ' + caseId + ', \'' + col.key + '\')">'
+            +   ' data-dragover-action="wbDragOver" data-dragleave-action="wbDragLeave"'
+            +   ' data-drop-action="wbDrop" data-args=\'["$event",' + caseId + ',"' + col.key + '"]\'>'
             +   '<div class="workbench-col-header">'
             +     '<span>' + esc(col.label) + '</span>'
             +     '<span class="workbench-col-count">' + colPins.length + '</span>'
@@ -3954,12 +3963,12 @@ function renderWorkbenchPinCard(caseId, p) {
         : '';
     return '<div class="workbench-pin ' + sevClass + '" draggable="true"'
         +   ' data-pin="' + p.id + '" data-case="' + caseId + '"'
-        +   ' ondragstart="wbDragStart(event, ' + p.id + ')">'
+        +   ' data-dragstart-action="wbDragStart" data-args=\'["$event",' + p.id + ']\'>'
         +   '<div class="workbench-pin-head">'
         +     '<span class="workbench-pin-src">' + esc(srcLabel) + '</span>'
         +     (sev ? '<span class="workbench-pin-sev">' + esc(sev) + '</span>' : '')
         +     '<button type="button" class="workbench-pin-x" title="Dismiss"'
-        +       ' onclick="dismissWorkbenchPin(' + caseId + ', ' + p.id + ')">&times;</button>'
+        +       ' data-click-action="dismissWorkbenchPin" data-args=\'[' + caseId + ',' + p.id + ']\'>&times;</button>'
         +   '</div>'
         +   '<div class="workbench-pin-title">' + esc(p.title || '(untitled)') + '</div>'
         +   summarySnippet
@@ -4114,7 +4123,7 @@ function renderAnnotations(caseId, annotations) {
     var body = document.getElementById('annotations-body-' + caseId);
     if (!body) return;
     var html = annotations.map(function(a) { return renderAnnotationCard(caseId, a); }).join('');
-    html += '<div style="margin-top:0.5rem;"><button type="button" class="btn btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.65rem;" onclick="toggleAnnotationForm(' + caseId + ')">+ Add annotation</button></div>';
+    html += '<div style="margin-top:0.5rem;"><button type="button" class="btn btn-secondary" style="font-size:0.75rem;padding:0.3rem 0.65rem;" data-click-action="toggleAnnotationForm" data-args=\'[' + caseId + ']\'>+ Add annotation</button></div>';
     html += renderAnnotationFormHtml(caseId);
     body.innerHTML = html;
 }
@@ -4124,8 +4133,8 @@ function renderAnnotationFormHtml(caseId) {
         + '<input type="datetime-local" id="ann-ts-' + caseId + '" style="width:100%;margin-bottom:0.4rem;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.3rem 0.5rem;color:var(--text-primary);font-size:0.8rem;">'
         + '<textarea id="ann-body-' + caseId + '" rows="3" placeholder="Add a timeline annotation..." style="width:100%;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:0.4rem 0.6rem;color:var(--text-primary);font-size:0.8rem;resize:vertical;box-sizing:border-box;"></textarea>'
         + '<div style="display:flex;gap:0.4rem;margin-top:0.35rem;">'
-        + '<button type="button" class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="submitAnnotation(' + caseId + ')">Save</button>'
-        + '<button type="button" class="btn" style="font-size:0.75rem;padding:0.3rem 0.7rem;" onclick="toggleAnnotationForm(' + caseId + ')">Cancel</button>'
+        + '<button type="button" class="btn btn-primary" style="font-size:0.75rem;padding:0.3rem 0.7rem;" data-click-action="submitAnnotation" data-args=\'[' + caseId + ']\'>Save</button>'
+        + '<button type="button" class="btn" style="font-size:0.75rem;padding:0.3rem 0.7rem;" data-click-action="toggleAnnotationForm" data-args=\'[' + caseId + ']\'>Cancel</button>'
         + '</div></div>';
 }
 
@@ -4137,8 +4146,8 @@ function renderAnnotationCard(caseId, a) {
         + '<span style="color:#818cf8;font-weight:600;">' + esc(ts) + '</span>'
         + '<span>&middot;</span><span>' + esc(author) + '</span>'
         + '<span style="margin-left:auto;display:flex;gap:0.35rem;">'
-        + '<button type="button" title="Edit" onclick="editAnnotation(' + caseId + ',' + a.id + ')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 0.2rem;font-size:0.8rem;">&#9998;</button>'
-        + '<button type="button" title="Delete" onclick="deleteAnnotation(' + caseId + ',' + a.id + ')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 0.2rem;font-size:0.8rem;">&times;</button>'
+        + '<button type="button" title="Edit" data-click-action="editAnnotation" data-args=\'[' + caseId + ',' + a.id + ']\' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 0.2rem;font-size:0.8rem;">&#9998;</button>'
+        + '<button type="button" title="Delete" data-click-action="deleteAnnotation" data-args=\'[' + caseId + ',' + a.id + ']\' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 0.2rem;font-size:0.8rem;">&times;</button>'
         + '</span></div>'
         + '<div style="font-size:0.8rem;color:var(--text-primary);white-space:pre-wrap;">' + esc(a.body) + '</div>'
         + '</div>';

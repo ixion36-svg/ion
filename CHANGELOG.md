@@ -1,13 +1,97 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.4 -->
+<!-- ion-doc:version=0.31.5 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.5 — 2026-05-14
+
+Secure-by-Design **P11 follow-up #2** — cases.html migrated off inline
+event handlers. Largest single template migration so far (48 handlers).
+Event-delegation helper extended to handle drag-and-drop, runtime
+event substitution, and per-event positional args.
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): event-delegation helper — drag events + `$event` sentinel
+
+`static/js/event-delegation.js` (v0.31.5):
+
+* **Drag/drop events** added to the dispatch table — `dragstart`,
+  `dragend`, `dragover`, `dragenter`, `dragleave`, `drop`. Each is
+  driven by a `data-${event}-action` attribute alongside the existing
+  click/change/input/submit/keydown/keyup/blur/focus set.
+* **`$event` runtime sentinel** in `data-args` — substitutes to the
+  Event object at dispatch time. Joins `$value`, `$checked`, and
+  `$target` for the cases where the original `onclick="foo(event, ...)"`
+  needs the live event passed positionally.
+* **Per-event positional args** — `data-${event}-args` overrides the
+  shared `data-args` for that specific event. Necessary on elements
+  with multiple handlers that need different args (e.g. a kanban card
+  whose `click` opens the case detail with just `caseId`, but whose
+  `dragstart` needs `(event, caseId)`).
+
+### feat(templates): migrate cases.html — 48 inline handlers gone
+
+All 48 inline handlers in `cases.html` replaced with the data-attribute
+shape:
+
+* **15 static** (in the rendered HTML directly) — New Case button,
+  banner dismiss, filter inputs, kanban-column dragover/drop, analytics
+  toggle, modal opens/closes, closure modal confirm/cancel.
+* **18 dynamic** (built inside JS template literals) — kanban card
+  click + drag, slide-out tab buttons, status / severity / assignee
+  selects, pin actions, note actions, Bob analysis actions, escalate,
+  playbook browser, attention banner items, SLA rows, workbench
+  drag/drop, annotation form actions.
+* **9 drag/drop** across kanban columns + cards + workbench columns +
+  workbench pins.
+
+The closure modal's `cancelClosure` previously matched the status
+`<select>` via `sel.getAttribute('onchange')` regex. That attribute no
+longer exists — `cancelClosure` now parses each select's `data-args`
+JSON to find the one whose second element is `"status"` for the right
+case id. Same v0.23.2 contract preserved (status drops back to the
+case's actual status when the user cancels closure mid-confirm), just
+read via the new attribute.
+
+### Scope clarification
+
+After this release, 71 child templates (~960 inline `onclick=` + ~1,650
+inline `style=""` remaining) still rely on `script-src-attr 'unsafe-inline'`
+/ `style-src-attr 'unsafe-inline'`. CSP unchanged this release.
+
+### Verification
+
+Browser-test on local SQLite dev server:
+
+* Page loads with 0 CSP violations.
+* Page-presence checks: all 5 static delegated attributes present, all
+  3 kanban columns wired, all relevant window-global functions resolved
+  (`showCreateCaseModal`, `onDragOver`, `onDrop`, `openCaseDetail`,
+  `panelUpdateField`, ...).
+* Programmatic interactions:
+  * "New Case" button → modal opens; Cancel button → closes.
+  * Analytics toggle → panel expands.
+  * Kanban card click → case-detail panel opens with correct title.
+  * Tab switch (Alerts) → switches visible section.
+* Pre-existing 503 on `/api/kibana/cases/...` (Kibana not configured
+  locally) — unrelated.
+
+### Files
+
+* `src/ion/web/static/js/event-delegation.js` — drag events, `$event`,
+  per-event-args lookup.
+* `src/ion/web/templates/cases.html` — 48 handlers migrated;
+  `cancelClosure` updated.
+* `src/ion/web/templates/base.html` — helper version bumped to
+  `?v=0.31.5`.
+
+---
 
 ## v0.31.4 — 2026-05-14
 
