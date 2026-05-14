@@ -1,4 +1,9 @@
-"""OIDC/Keycloak token validation and user synchronization."""
+"""OIDC/Keycloak token validation and user synchronization.
+
+v0.31.8: migrated from python-jose to PyJWT. Same JWT semantics for our
+RS256-only Keycloak path; PyJWT drops the transitive `ecdsa` dep that
+carried CVE-2024-23342. See docs/SECURE_BY_DESIGN.md P17.
+"""
 
 import logging
 import time
@@ -6,7 +11,8 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import httpx
-from jose import ExpiredSignatureError, JWTError, jwt
+import jwt
+from jwt import ExpiredSignatureError, InvalidTokenError, PyJWK
 from sqlalchemy.orm import Session
 
 from ion.auth.oidc_config import OIDCConfig
@@ -179,10 +185,19 @@ class OIDCValidator:
             if not rsa_key:
                 raise OIDCValidationError(f"Key {kid} not found in JWKS")
 
+            # Wrap the JWK dict into PyJWK so jwt.decode gets the
+            # signing key in the form it expects. PyJWT 2.x accepts a
+            # PyJWK directly (its `.key` attribute is the cryptography
+            # public-key object).
+            try:
+                signing_key = PyJWK.from_dict(rsa_key).key
+            except Exception as e:  # pragma: no cover - shape errors only
+                raise OIDCValidationError(f"Invalid JWKS key shape for kid {kid}: {e}")
+
             # Verify and decode the token
             claims = jwt.decode(
                 token,
-                rsa_key,
+                signing_key,
                 algorithms=["RS256"],
                 audience=self.config.client_id,
                 issuer=self.config.issuer_url,
@@ -218,7 +233,7 @@ class OIDCValidator:
 
         except ExpiredSignatureError:
             raise OIDCValidationError("Token has expired")
-        except JWTError as e:
+        except InvalidTokenError as e:
             raise OIDCValidationError(f"Token validation failed: {e}")
 
     async def validate_token_async(self, token: str) -> OIDCTokenData:
@@ -244,9 +259,14 @@ class OIDCValidator:
             if not rsa_key:
                 raise OIDCValidationError(f"Key {kid} not found in JWKS")
 
+            try:
+                signing_key = PyJWK.from_dict(rsa_key).key
+            except Exception as e:  # pragma: no cover - shape errors only
+                raise OIDCValidationError(f"Invalid JWKS key shape for kid {kid}: {e}")
+
             claims = jwt.decode(
                 token,
-                rsa_key,
+                signing_key,
                 algorithms=["RS256"],
                 audience=self.config.client_id,
                 issuer=self.config.issuer_url,
@@ -273,7 +293,7 @@ class OIDCValidator:
 
         except ExpiredSignatureError:
             raise OIDCValidationError("Token has expired")
-        except JWTError as e:
+        except InvalidTokenError as e:
             raise OIDCValidationError(f"Token validation failed: {e}")
 
 

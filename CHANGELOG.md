@@ -1,13 +1,108 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.7 -->
+<!-- ion-doc:version=0.31.8 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.8 — 2026-05-14
+
+Secure-by-Design **P17 closure** — `python-jose` retired in favour of
+PyJWT. Drops the transitive `ecdsa` dependency that carried
+CVE-2024-23342 (Minerva timing attack on P-256). The vulnerability was
+never reachable in ION (JWT validation pinned to RS256, no ECDSA path)
+but the dep kept appearing in scanner output and `pip-audit` required
+an `--ignore-vuln` allowlist entry to stay green. Both are gone now.
+**Net new findings: 0C / 0H / 0M / 0L. Closes one HIGH from the
+external Docker Scout scan of v0.31.6.**
+
+### feat(auth): replace python-jose with PyJWT[crypto]
+
+`src/ion/auth/oidc.py:OIDCValidator` migrated:
+
+* **Imports** — `from jose import ...` → `import jwt` + 
+  `from jwt import ExpiredSignatureError, InvalidTokenError, PyJWK`.
+* **JWKS handling** — previously passed the JWKS dict directly to
+  `jose.jwt.decode`. PyJWT requires a `PyJWK` instance (which holds
+  the underlying `cryptography` public key). Wrapped via
+  `PyJWK.from_dict(rsa_key).key` — the wrap is cheap and the resulting
+  key is what `jwt.decode` natively wants.
+* **Exception classes** — `JWTError` → `InvalidTokenError` (PyJWT's
+  broad catch-all). `ExpiredSignatureError` is named the same in both
+  libraries, no change.
+* **Decode semantics preserved** — same `algorithms=["RS256"]`, same
+  `audience` / `issuer` arguments, same `options` dict
+  (`verify_aud` / `verify_iss` / `verify_exp` / `verify_iat`). PyJWT
+  accepts the identical option keys.
+
+### chore(deps): pyproject.toml dependency swap
+
+* `python-jose[cryptography]>=3.3.0` removed.
+* `PyJWT[crypto]>=2.8.0` added with an inline justification comment
+  pointing at this release.
+* `cryptography` continues as a transitive — PyJWT[crypto] pulls it in
+  for RSA signing/verification, same as `python-jose[cryptography]`
+  did. No change to that dep's surface.
+
+### chore(ci): drop pip-audit --ignore-vuln CVE-2024-23342
+
+`.github/workflows/test.yml` `pip-audit` step no longer carries any
+`--ignore-vuln` flags. The historical block explaining the v0.25.0–
+v0.31.7 ignore is preserved in the file's comments for audit trail.
+
+### test: tests/test_v031_8_oidc_pyjwt.py (8 cases)
+
+New regression test that signs a token with a self-generated RSA
+keypair, exposes the public key to the validator via its in-memory
+JWKS cache, and asserts:
+
+* Happy path returns sub / email / preferred_username / roles / name.
+* Tampered signature → `OIDCValidationError`.
+* Expired token → `OIDCValidationError` with "expired" in message.
+* Wrong audience → `OIDCValidationError`.
+* Wrong issuer → `OIDCValidationError`.
+* Missing `kid` header → rejected.
+* Unknown `kid` (not in JWKS) → rejected with "not found in jwks".
+* Missing `sub` claim → rejected.
+
+No network, no Keycloak. Future library swaps will either preserve
+these semantics (test passes) or fail loudly.
+
+### docs(security): SECURE_BY_DESIGN P17 → Met
+
+* `docs/SECURE_BY_DESIGN.md` P17 ("Eliminate vulnerability classes")
+  status moves from **Mostly Met** to **Met**. Revision 1.6.
+* §4 audit summary recount: **16 Met / 2 Mostly Met / 2 Partial / 0 Gap**
+  (was 15 / 3 / 2 / 0).
+* Open gap list now lists only CSP-strict (P11) and data-min audit
+  (P13) under Mostly Met, plus single-maintainer (P1) and branch
+  protection (P15) under Partial.
+
+### Verification
+
+* `pytest tests/test_v031_8_oidc_pyjwt.py` — 8/8 passing.
+* `ruff check src/ion/auth/oidc.py tests/test_v031_8_oidc_pyjwt.py` —
+  clean.
+* Local dev server starts and `/api/health` returns 200 — confirms the
+  new import path works at runtime.
+* Browser-test deferred — Keycloak isn't configured in local dev so
+  the full OIDC login dance can't be walked here. The 8 unit tests
+  exercise every branch of `OIDCValidator.validate_token` end-to-end
+  with real RSA signing.
+
+### Files
+
+* `pyproject.toml` — dep swap.
+* `src/ion/auth/oidc.py` — imports + 2 `validate_token` paths.
+* `tests/test_v031_8_oidc_pyjwt.py` — new, 8 cases.
+* `.github/workflows/test.yml` — drop `--ignore-vuln CVE-2024-23342`.
+* `docs/SECURE_BY_DESIGN.md` — P17 status + audit summary.
+
+---
 
 ## v0.31.7 — 2026-05-14
 

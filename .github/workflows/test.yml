@@ -135,22 +135,17 @@ jobs:
       # (c) escalate to security review for HIGH/CRITICAL that can
       #     neither be fixed nor reasonably ignored.
       #
-      # Current ignores (v0.25.0 baseline):
+      # Current ignores: NONE.
       #
-      #   CVE-2024-23342 — ecdsa 0.19.2 — Minerva timing side-channel
-      #     against the pure-Python ecdsa signing path. Pulled in
-      #     transitively via python-jose[cryptography]. NOT REACHABLE
-      #     in ION: the only JWT path is Keycloak OIDC validation at
-      #     src/ion/auth/oidc.py, which pins algorithms=["RS256"]
-      #     (RSA, never ECDSA). Session tokens are HMAC-SHA256, not
-      #     ECDSA. Upstream ecdsa maintainer has stated the timing
-      #     attack will not be fixed in pure Python — the fix
-      #     recommendation is "use a different library", which would
-      #     mean replacing python-jose with PyJWT (a deferred
-      #     v0.26.0 candidate).
+      # Historical: CVE-2024-23342 (ecdsa 0.19.2 Minerva timing side-channel)
+      # was ignored from v0.25.0 through v0.31.7 because the ecdsa package
+      # was pulled in transitively via python-jose[cryptography] but never
+      # actually reachable — the only JWT path was Keycloak OIDC validation
+      # pinned to algorithms=["RS256"] (RSA, never ECDSA). v0.31.8 retired
+      # python-jose entirely in favour of PyJWT, removing the ecdsa dep
+      # from the resolved tree. The --ignore-vuln flag is dropped here.
       - name: Run pip-audit
         run: |
           pip-audit \
             --vulnerability-service osv \
-            --ignore-vuln CVE-2024-23342 \
             --strict
