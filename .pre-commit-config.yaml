@@ -1,0 +1,106 @@
+# Pre-commit hooks for ION (v0.31.9+).
+#
+# Mirrors the checks `.github/workflows/test.yml` runs in CI, but at
+# the workstation BEFORE the commit lands. Catches mechanical issues
+# (ruff, bandit, SCA) before they hit a remote pipeline. The pre-commit
+# framework picks each hook's pinned version up-front so a local
+# install doesn't drift from CI.
+#
+# Install once per workstation:
+#
+#   pip install pre-commit
+#   pre-commit install
+#
+# Then every `git commit` runs the configured hooks. To run on the
+# full tree without committing:
+#
+#   pre-commit run --all-files
+#
+# When a hook fails: fix the underlying issue and re-commit. Do NOT
+# `--no-verify` past a failure (see CONTRIBUTING.md §2.1).
+#
+# Secure-by-Design context: this file is the workstation half of P14
+# ("Clean code") and P16 ("Secure the build pipeline") — the same
+# gates apply locally and in CI, so a developer can't accidentally
+# ship code that would have been red in CI.
+
+default_install_hook_types: [pre-commit]
+default_language_version:
+  python: python3.11   # matches CI
+
+repos:
+  # ---------------------------------------------------------------------
+  # Generic hygiene — catch the obvious foot-guns.
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'  # Markdown trailing whitespace is meaningful (line break)
+      - id: end-of-file-fixer
+        exclude: '\.md$'
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-yaml
+        exclude: '^deploy/'  # nginx.conf-style YAML not strictly conforming
+      - id: check-toml
+      - id: check-json
+        exclude: '^src/ion/data/'  # bundled KB data may contain example fragments
+      - id: detect-private-key
+
+  # ---------------------------------------------------------------------
+  # Ruff — style, import sort, safety lint. Same config as CI
+  # (`pyproject.toml` [tool.ruff]).
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: [--fix]
+        types_or: [python, pyi]
+
+  # ---------------------------------------------------------------------
+  # Bandit — high-severity SAST. Skip list matches CI exactly.
+  # B602 — shell=True in subprocess (KB seed scripts only)
+  # B608 — SQL string construction (allow-listed columns only)
+  # B101 — assert statements (test code only)
+  # ---------------------------------------------------------------------
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.8.0
+    hooks:
+      - id: bandit
+        args:
+          - -r
+          - src/
+          - --skip
+          - B602,B608,B101
+          - -lll
+        # bandit hits only Python source; restrict to changed py files
+        # to keep the commit feedback loop snappy.
+        files: '^src/.*\.py$'
+
+  # ---------------------------------------------------------------------
+  # pip-audit — SCA against the OSV database. Runs against the resolved
+  # dep tree, so it's a slower hook (network fetch). Use the manual
+  # stage so it doesn't fire on every commit; run explicitly via
+  # `pre-commit run --hook-stage manual pip-audit-manual --all-files`
+  # before release.
+  # ---------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: pip-audit-manual
+        name: pip-audit (manual; pre-release)
+        entry: bash -c 'pip-audit --vulnerability-service osv --strict'
+        language: system
+        pass_filenames: false
+        stages: [manual]
+        always_run: true
+
+# To run the manual hook ahead of a release:
+#
+#   pre-commit run --hook-stage manual pip-audit-manual --all-files
+#
+# CI already runs the full pip-audit on every push; the manual local
+# hook is for catching new CVEs at the workstation when a release is
+# imminent.

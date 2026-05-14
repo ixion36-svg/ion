@@ -1,13 +1,123 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.8 -->
+<!-- ion-doc:version=0.31.9 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.9 — 2026-05-14
+
+Secure-by-Design **P1 Partial → Mostly Met.** Four artifacts ship to
+systematise the single-maintainer review pattern that's previously
+been encoded only in CLAUDE.md instructions. P1 ("security is
+everyone's concern") cannot reach Met without onboarding a second
+human reviewer — the principle literally requires multiple humans —
+but the v0.31.9 artifacts bring it as close as a single-maintainer
+project structurally can.
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(governance): CONTRIBUTING.md
+
+New top-level `CONTRIBUTING.md` codifies the security-review
+expectations any future contributor follows:
+
+* Pre-commit hooks install + run instructions (`pre-commit install`).
+* Per-change Secure-by-Design walk (`docs/SECURE_BY_DESIGN.md`
+  reference + the focused 8 principles every substantive change
+  touches).
+* When `SECURITY_ASSESSMENT.md` needs a delta block (new endpoint,
+  new file upload, new external integration, new permission, new
+  crypto primitive, removed attack surface).
+* Conventional-commit prefixes used in ION.
+* Release ritual pointer + the load-bearing `--pull --no-cache`
+  rationale (without it, base-image system-package patches don't
+  land in the rebuilt image — see v0.31.8 postgresql-17 episode).
+* §5 explains the single-maintainer pattern + the six mitigations
+  that bring P1 to Mostly Met.
+
+### feat(governance): CODEOWNERS
+
+New top-level `CODEOWNERS` routes review responsibility per path.
+Today every entry is `@ixion36` so the file is a no-op for
+single-maintainer review, but it:
+
+* Encodes intent — security-sensitive paths are listed explicitly
+  (auth, storage migrations, Workbench ledger, CI / Dockerfile,
+  the release docs).
+* Unlocks branch-protection (P15 — currently Partial). When that
+  ships, code-owner approval becomes a required gate.
+* Stops a future second contributor from silently bypassing review
+  on critical surfaces.
+
+### feat(claude): security-reviewer agent
+
+New `.claude/agents/security-reviewer.md`. Focused SbD-walk agent
+invoked via `/agents security-reviewer` before a commit. Complements
+the existing `release-checker` (version-drift only) and
+`workbench-ledger-reviewer` (sha256-chain integrity) agents:
+
+* Reads the staged diff (fallback to unstaged).
+* Walks the principles the diff might touch; explicitly skips ones
+  it clearly doesn't.
+* Reports per-principle PASS/FLAG with file:line evidence.
+* Names which `SECURITY_ASSESSMENT.md` section to update if the
+  diff introduces new attack surface.
+* Does NOT modify files, run tests, or block — the human author
+  decides what to address.
+
+This materialises "AI pair-programmer reviews every change" from
+implicit practice (encoded in CLAUDE.md guidance) into a callable
+workflow step.
+
+### feat(devtools): .pre-commit-config.yaml
+
+New `.pre-commit-config.yaml` mirrors CI's checks at the workstation:
+
+* **Generic hygiene** (pre-commit-hooks v5.0.0) — trailing
+  whitespace, EOF newline, merge conflicts, large files, YAML/TOML/
+  JSON validity, private-key detection.
+* **ruff v0.8.6** — same config as CI (`pyproject.toml [tool.ruff]`),
+  with `--fix` to auto-correct.
+* **bandit 1.8.0** — `-r src/ --skip B602,B608,B101 -lll`, identical
+  to CI.
+* **pip-audit (manual stage)** — `--vulnerability-service osv --strict`
+  for pre-release runs; CI already runs full pip-audit on every push.
+
+Install once per workstation:
+
+```
+pip install pre-commit
+pre-commit install
+```
+
+Then every `git commit` runs the configured hooks at the workstation.
+Closes a real gap: previously, ION's CI caught issues AFTER push.
+
+### docs(security): P1 audit body + SDLC §6.4 updated
+
+* `docs/SECURE_BY_DESIGN.md` P1 status: **Partial → Mostly Met**.
+  Audit body rewritten with all six mitigations enumerated. Audit
+  summary recount: **16 Met / 3 Mostly Met / 1 Partial / 0 Gap**
+  (was 16 / 2 / 2 / 0). Revision 1.7.
+* `docs/DEVELOPMENT_LIFECYCLE.md` §6.4 (Separation of duty)
+  extended with the four new mitigations and a note that DSO is
+  still the canonical path for closing residual risk in
+  higher-assurance deployments.
+
+### Files
+
+* `CONTRIBUTING.md` (new) — security-review expectations + PR template.
+* `CODEOWNERS` (new) — review responsibility per path.
+* `.claude/agents/security-reviewer.md` (new) — focused SbD agent.
+* `.pre-commit-config.yaml` (new) — workstation gates mirroring CI.
+* `docs/SECURE_BY_DESIGN.md` — P1 audit body + summary.
+* `docs/DEVELOPMENT_LIFECYCLE.md` — §6.4 extended.
+
+---
 
 ## v0.31.8 — 2026-05-14
 

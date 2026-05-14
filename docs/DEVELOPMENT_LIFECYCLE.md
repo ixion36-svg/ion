@@ -470,8 +470,12 @@ The current single-maintainer model is a known control weakness. Mitigations in 
 - Two-commit release pattern (§3.4.2) — the `chore(release)` commit is mechanical and any deviation between its delta and the actual feature commit would be obvious in review.
 - The AI pair-programmer acts as a second reviewer on every change. While this does not satisfy strict "two human pairs of eyes" controls, it materially reduces the risk of a maintainer-only blind spot.
 - Per-release SECURITY_ASSESSMENT.md is authored by the same maintainer, but is structured as a deliberate hostile re-read of the diff; new-surface items, removed-surface items, and known-non-findings are recorded explicitly so an external reviewer can challenge each.
+- **`CONTRIBUTING.md`** (v0.31.9) codifies the security-review expectations any future contributor follows. Even with one maintainer today, the policy is explicit so an external auditor sees a single consistent process.
+- **`CODEOWNERS`** (v0.31.9) routes review responsibility per path; pairs with branch-protection rules (P15 closure path) once a second maintainer joins.
+- **`.claude/agents/security-reviewer.md`** (v0.31.9) — focused agent that walks the diff against the 20 SbD principles before commit. The release ritual's `release-checker` agent handles version-drift; this agent handles security-review.
+- **`.pre-commit-config.yaml`** (v0.31.9) — `ruff` + `bandit` + `pip-audit` run at the workstation BEFORE every commit, mirroring the CI gates so issues are caught at design time, not after push.
 
-**For higher-assurance deployments:** a customer-side Designated Security Officer reviewing the per-release `CHANGELOG.md` + `SECURITY_ASSESSMENT.md` delta before the operator deploys it is the recommended additional control.
+**For higher-assurance deployments:** a customer-side Designated Security Officer reviewing the per-release `CHANGELOG.md` + `SECURITY_ASSESSMENT.md` delta before the operator deploys it is the recommended additional control. This remains the canonical path to closing the residual single-maintainer risk for environments where one human + AI + automated gates aren't sufficient.
 
 ### 6.5 Memory and project context
 

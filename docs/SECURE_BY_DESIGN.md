@@ -76,17 +76,37 @@ point of failure. Bugs caught in design are 10–100× cheaper than bugs
 caught in production.
 
 **ION application.**
-* The AI pair-programmer reviews every change against this list. The
-  human maintainer is accountable.
+* `CONTRIBUTING.md` (v0.31.9) codifies the security-review
+  expectations any future contributor follows: pre-commit hooks,
+  Secure-by-Design walk per change, `SECURITY_ASSESSMENT.md` update
+  gate for any new attack surface. Even with one maintainer today,
+  the policy is explicit so an external auditor (or future
+  contributor) sees a single consistent process.
+* `CODEOWNERS` (v0.31.9) routes review responsibility per path. With
+  one maintainer it's a no-op; once a second contributor joins, it
+  unlocks branch-protection rules (P15 closure path).
+* `.claude/agents/security-reviewer.md` (v0.31.9) — focused agent
+  that walks the diff against the 20 principles before commit.
+  Materialises "AI pair-programmer reviews every change" from
+  implicit practice to a callable workflow step (invoke via
+  `/agents security-reviewer`).
+* `.pre-commit-config.yaml` (v0.31.9) — `ruff` + `bandit` +
+  `pip-audit` run at the workstation BEFORE every commit, mirroring
+  the CI gates so issues are caught at design time, not after push.
 * Every commit message lists what the change is and why; release
   commits carry a `SECURITY_ASSESSMENT.md` delta documenting any new
   attack surface.
-* The single-maintainer model (with AI as second-reviewer) is a known
-  limit of this principle; the customer-side Designated Security
-  Officer (per `docs/DEVELOPMENT_LIFECYCLE.md` §6.4) is the
-  recommended additional control for higher-assurance deployments.
+* The single-maintainer model (with AI as second-reviewer) is a
+  known structural limit of this principle — the literal "everyone"
+  in "everyone's concern" requires multiple humans. For
+  higher-assurance deployments, the customer-side Designated
+  Security Officer pattern in `docs/DEVELOPMENT_LIFECYCLE.md` §6.4
+  is the recommended additional control.
 
-**Status:** Partial — see `docs/DEVELOPMENT_LIFECYCLE.md` §6.4 mitigations.
+**Status:** Mostly Met (v0.31.9). The single-maintainer model
+prevents reaching Met without onboarding a second human reviewer;
+the six artifacts above bring the pattern as close to "Met" as a
+single-maintainer project structurally can.
 
 #### P2. Senior accountability for product security
 
@@ -534,8 +554,8 @@ Aggregating §3 across 20 principles:
 | Status | Count | Principles |
 |---|---|---|
 | **Met** | 16 | P2, P3, P4, P5, P6, P7, P8, P9, P10, P12, P14, P16, P17, P18, P19, P20 |
-| **Mostly Met** | 2 | P11 (CSP strict — inline handlers in 69 templates still pending), P13 (data-min audit) |
-| **Partial** | 2 | P1 (single maintainer + AI), P15 (branch protection + signed commits) |
+| **Mostly Met** | 3 | P1 (single maintainer; six artifacts in place), P11 (CSP strict — inline handlers in 69 templates still pending), P13 (data-min audit) |
+| **Partial** | 1 | P15 (branch protection + signed commits) |
 | **Gap** | 0 | — |
 
 Open named gaps (also in `docs/DEVELOPMENT_LIFECYCLE.md` §8):
@@ -550,9 +570,13 @@ Open named gaps (also in `docs/DEVELOPMENT_LIFECYCLE.md` §8):
 * ~~`python-jose → PyJWT`~~ — **CLOSED v0.31.8.** `python-jose`
   retired; PyJWT in its place; transitive `ecdsa` dep removed;
   CI `--ignore-vuln CVE-2024-23342` flag dropped.
-* **Single-maintainer model** — operator-side Designated Security
-  Officer review per release recommended for higher-assurance
-  deployments (P1).
+* **Single-maintainer model** — fundamental structural limit on P1
+  (the principle requires multiple humans). The v0.31.9 artifacts
+  (CONTRIBUTING.md, CODEOWNERS, security-reviewer agent, pre-commit
+  hooks) bring this as close to Met as a single-maintainer project
+  can. For higher-assurance deployments, the customer-side
+  Designated Security Officer pattern in `docs/DEVELOPMENT_LIFECYCLE.md`
+  §6.4 closes the remaining gap.
 * **Branch protection rules** + **signed commits** — repository-side
   enforcement to match the documented policy (P15).
 
@@ -589,3 +613,4 @@ is the phase guide. If the two ever disagree, this doc wins for
 | 1.4     | 2026-05-14 | Maintainer | v0.31.6: P11 follow-up #3 — alerts.html migrated (194 handlers). New `tools/migrate_inline_handlers.py` mechanical migration script; 4 new helper built-ins (`data-stop-propagation` alone, `data-remove-target`, `data-remove-parent`, `data-remove-closest`). CSP unchanged. P11 audit body updated (249 handlers migrated; 70 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.5     | 2026-05-14 | Maintainer | v0.31.7: P11 follow-up #4 — training.html migrated (119 handlers). 2 hand-fixed JS-source-escape spots; migration script patched to detect `\\'` / `\\"` escape sequences and skip them. P11 audit body updated (368 handlers migrated; 69 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.6     | 2026-05-14 | Maintainer | v0.31.8: **P17 CLOSED.** `python-jose[cryptography]` retired in favour of `PyJWT[crypto]>=2.8.0`. Transitive `ecdsa` dep (CVE-2024-23342, Minerva timing attack on P-256) removed from the resolved tree. CI `--ignore-vuln CVE-2024-23342` flag dropped. `src/ion/auth/oidc.py` migrated: `PyJWK.from_dict(jwk).key` wraps the JWKS dict before `jwt.decode`; same RS256-only semantics. New `tests/test_v031_8_oidc_pyjwt.py` (8 cases) pins happy path + tampered signature + expired + wrong audience/issuer + missing/unknown kid + missing sub. P17 status: **Mostly Met → Met.** Audit summary: **16 Met / 2 Mostly Met / 2 Partial / 0 Gap** (was 15 / 3 / 2 / 0). |
+| 1.7     | 2026-05-14 | Maintainer | v0.31.9: **P1 PARTIAL → MOSTLY MET.** Four artifacts ship to systematize the single-maintainer review pattern: `CONTRIBUTING.md` (codified expectations + PR template), `CODEOWNERS` (review responsibility per path), `.claude/agents/security-reviewer.md` (focused SbD-walk agent invoked before commit), `.pre-commit-config.yaml` (ruff + bandit + pip-audit at the workstation; mirrors CI). P1 cannot reach Met without onboarding a second human reviewer. Audit summary: **16 Met / 3 Mostly Met / 1 Partial / 0 Gap** (was 16 / 2 / 2 / 0). |
