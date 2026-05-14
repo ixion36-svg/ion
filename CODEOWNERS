@@ -1,0 +1,56 @@
+# CODEOWNERS — review responsibility for ION (v0.31.9+)
+#
+# GitHub uses this file to auto-request review on PRs. With branch
+# protection enabled (a future Secure-by-Design P15 closure), code-owner
+# review becomes a required gate. Today the single-maintainer model means
+# every entry routes to @ixion36; once a second maintainer joins, split
+# by area below.
+#
+# Syntax: <glob>  <owner-list>
+# Patterns later in the file override earlier ones for the same path.
+
+# ---------------------------------------------------------------------------
+# Default: everything is owned by the maintainer.
+# ---------------------------------------------------------------------------
+*                                       @ixion36
+
+# ---------------------------------------------------------------------------
+# Security-sensitive surfaces — explicit so that any future contributor
+# definitely cannot bypass review on these paths. Even with @ixion36 alone
+# today, keeping these listed makes intent clear.
+# ---------------------------------------------------------------------------
+
+# Authentication & authorisation
+/src/ion/auth/                          @ixion36
+/src/ion/web/security_middleware.py     @ixion36
+/src/ion/web/server.py                  @ixion36
+
+# Security headers + CSP (server-side authoritative source)
+# The Content-Security-Policy nonce is generated in server.py; any change
+# here changes the live CSP for every request. v0.31.3+.
+
+# Storage / migrations — schema changes need careful review
+/src/ion/storage/database.py            @ixion36
+/src/ion/storage/                       @ixion36
+
+# Workbench + tamper-evident ledger (sha256 chain)
+/src/ion/services/case_pin_service.py             @ixion36
+/src/ion/services/case_evidence_service.py        @ixion36
+/src/ion/services/forensic_pin_service.py         @ixion36
+/src/ion/services/case_evidence_ledger_service.py @ixion36
+
+# CI / release plumbing
+/.github/                               @ixion36
+/Dockerfile                             @ixion36
+/docker-compose.yml                     @ixion36
+/.env.deploy                            @ixion36
+
+# Documentation — release docs are part of the audit trail
+/SECURITY.md                            @ixion36
+/SECURITY_ASSESSMENT.md                 @ixion36
+/CHANGELOG.md                           @ixion36
+/docs/SECURE_BY_DESIGN.md               @ixion36
+/docs/DEVELOPMENT_LIFECYCLE.md          @ixion36
+
+# Claude Code tooling (slash commands, agents, hooks)
+/.claude/                               @ixion36
