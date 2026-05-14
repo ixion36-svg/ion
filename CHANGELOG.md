@@ -1,13 +1,112 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.3 -->
+<!-- ion-doc:version=0.31.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.4 — 2026-05-14
+
+Secure-by-Design **P11 follow-up** — foundation for migrating inline
+`onclick=` handlers off the CSP `script-src-attr 'unsafe-inline'`
+escape hatch. New delegated-event helper, base.html migrated as the
+proof of pattern, 72 child templates still using inline handlers
+remain (tracked).
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): event-delegation helper
+
+`src/ion/web/static/js/event-delegation.js` registers a single
+document-level listener per event type (`click`, `change`, `input`,
+`submit`, `keydown`, `keyup`, `blur`, `focus`) and dispatches based on
+`data-*-action` attributes:
+
+```html
+<!-- before -->
+<button onclick="toggleUserDropdown()">User</button>
+
+<!-- after -->
+<button data-click-action="toggleUserDropdown">User</button>
+```
+
+Three control attributes round out the helper:
+
+* `data-prevent-default` — equivalent to `event.preventDefault()` or
+  the legacy `return false;` at the tail of an `onclick=`.
+* `data-stop-propagation` — equivalent to `event.stopPropagation()`.
+* Per-element parameters via additional `data-*` attributes are
+  forwarded to the handler as its second argument (the receiving
+  function reads `event` and `dataset` separately).
+
+Two built-in patterns handle common modal-close shapes:
+
+* `data-close-target="someId"` — clicking the element hides
+  `document.getElementById("someId")`. Replaces the inline
+  `document.getElementById('...').style.display='none'` idiom.
+* `data-close-on-self-click` — when a click hits *this* element
+  directly (not bubbled from a child), hide it. Replaces the
+  `if(event.target===this)this.style.display='none'` modal-backdrop
+  pattern.
+
+One more replaces the inline `onerror=` on optional `<script src>`
+tags:
+
+* `data-script-onerror-flag="windowFlag"` on a `<script>` element —
+  the helper attaches an `error` listener that sets
+  `window[windowFlag] = true` when the script fails to load. Mermaid
+  (the only script using this pattern in base.html) uses it.
+
+### feat(templates): migrate base.html off inline handlers
+
+Seven inline handlers in base.html (notepad toggle, user-menu
+dropdown, appearance toggle with `return false`, sign-out link with
+`return false`, mermaid `onerror`, shortcuts-overlay backdrop click,
+shortcuts-overlay close button) are now data-attribute driven. After
+this release base.html has **zero inline event handlers** and would
+survive `script-src-attr 'none'` on its own.
+
+### Scope clarification
+
+* CSP **unchanged** in this release — `script-src-attr 'unsafe-inline'`
+  / `style-src-attr 'unsafe-inline'` still permitted because 72 child
+  templates still carry inline `onclick=` / `style=` handlers
+  (analytics: 1,001 onclicks + 1,659 inline style attributes remain).
+* Each child template will be migrated to data-attributes in a
+  follow-up release, then `script-src-attr` and `style-src-attr` can
+  be tightened. P11 stays **Mostly Met**.
+
+### Verification
+
+Browser test on local SQLite dev server:
+
+* DOM presence — all 7 migrated attributes present, helper loaded,
+  no inline `onclick=` remains in base.html.
+* User-menu toggle — programmatic click cycle opens then closes the
+  `#user-dropdown` via `data-click-action="toggleUserDropdown"`.
+* Shortcuts-overlay close button — `data-close-target` hides the
+  overlay.
+* Shortcuts-overlay backdrop — `data-close-on-self-click` hides on
+  direct click on the overlay element, does **not** hide on click on
+  a child (modal content).
+* All four global functions resolved on `window` —
+  `toggleNotepad`, `toggleUserDropdown`, `toggleIonMode`, `logout`.
+* Walked /dashboard, /cases, /alerts — 0 new CSP violations; one
+  pre-existing 404 (`/api/chat/users`, residue from the v0.9.64 chat
+  removal — unrelated).
+
+### Files
+
+* `src/ion/web/static/js/event-delegation.js` (new).
+* `src/ion/web/templates/base.html` — 7 handler migrations + helper
+  script tag.
+* `docs/SECURE_BY_DESIGN.md` — revision 1.2; P11 audit body updated
+  with the new sub-status.
+
+---
 
 ## v0.31.3 — 2026-05-14
 

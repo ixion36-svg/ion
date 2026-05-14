@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.31.3 -->
+<!-- ion-doc:version=0.31.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,9 +9,9 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-14 (v0.31.3 + v0.31.2 deltas) / 2026-05-13 (v0.31.1 + v0.31.0 + v0.30.1 + v0.30.0 deltas) / 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.31.3 (CSP nonce — per-request nonce on every `<script>` and `<style>` block via `SecurityHeadersMiddleware` + Jinja global; CSP3 split-directive policy; browser-verified on 6 pages)
-**Previous Assessment Version:** 0.31.2 (2026-05-14)
+**Assessment Date:** 2026-05-14 (v0.31.4 + v0.31.3 + v0.31.2 deltas) / 2026-05-13 (v0.31.1 + v0.31.0 + v0.30.1 + v0.30.0 deltas) / 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.31.4 (event-delegation foundation — new `static/js/event-delegation.js` + base.html migrated; P11 sub-progress)
+**Previous Assessment Version:** 0.31.3 (2026-05-14)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -22,13 +22,15 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 | v0.31.2 | v0.31.3 |
-|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 | v0.31.2 | v0.31.3 | v0.31.4 |
+|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+
+v0.31.4 is a P11 follow-up release: foundation for retiring inline `onclick=` handlers via a new delegated-event helper at `src/ion/web/static/js/event-delegation.js` plus base.html migration as proof-of-pattern. base.html's seven inline handlers (notepad toggle, user-menu dropdown, appearance toggle, sign-out, mermaid `onerror`, shortcuts-overlay backdrop, shortcuts-overlay close) are now `data-click-action="..."` / `data-prevent-default` / `data-close-target="..."` / `data-close-on-self-click` / `data-script-onerror-flag="..."` driven; the helper registers single document-level listeners and dispatches by attribute. **Net new findings: 0C / 0H / 0M / 0L.** CSP is unchanged this release — `script-src-attr 'unsafe-inline'` / `style-src-attr 'unsafe-inline'` still permitted because the other 72 templates still use inline handlers (1,001 remaining `onclick=` plus 1,659 inline `style=""` attributes). Each child template will be migrated in subsequent releases, then `script-src-attr 'none'` and `style-src-attr 'none'` can be enforced. P11 stays Mostly Met. Browser-verified on a local SQLite server: DOM presence, programmatic clicks on user-menu / shortcuts-overlay close / shortcuts-overlay backdrop all behave correctly; 0 new CSP violations across /, /cases, /alerts.
 
 v0.31.3 is a hardening release: **per-request CSP nonce on every inline `<script>` and `<style>` block**. The CSP `script-src` and `style-src` no longer contain `'unsafe-inline'` — only `'self' 'nonce-XXX'` where `XXX` is a 16-byte CSPRNG value rotated per HTTP response. CSP3's `script-src-attr` / `style-src-attr` are kept at `'unsafe-inline'` so the 1,185 inline event handlers and 1,659 inline `style=` attributes still work. CSP authority moved from `deploy/nginx/nginx.conf` to `SecurityHeadersMiddleware` in `src/ion/web/server.py` (necessary — nginx can't generate per-request nonces without lua). `_CSPNonceProxy` exposes the nonce as the Jinja global `{{ csp_nonce }}`. 73 templates rewritten with `nonce="{{ csp_nonce }}"` on all 155 inline script/style opening tags via a single Python regex pass. Two templates (`alerts.html`, `observables.html`) had their entire JS wrapped in `{% raw %}` — the opening `<script>` tag was hoisted outside that block so Jinja can interpolate the nonce. `base.html` got `<meta name="htmx-config" content='{"includeIndicatorStyles":false}'>` to stop HTMX runtime-injecting an un-nonceable `<style>` block (verified zero usage of the `.htmx-indicator` class in templates). Browser-verified on 6 pages (`/`, `/alerts`, `/cases`, `/daily-standup`, `/observables`, `/settings`) — **0 CSP violations**. Net new findings: 0C / 0H / 0M / 0L. Reduces (does not eliminate) the XSS attack surface — inline event handlers + inline style attributes remain a future-tightening target tracked in `docs/SECURE_BY_DESIGN.md` P11.
 
