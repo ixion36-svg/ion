@@ -1,13 +1,82 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.6 -->
+<!-- ion-doc:version=0.31.7 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.7 — 2026-05-14
+
+Secure-by-Design **P11 follow-up #4** — training.html migrated off
+inline event handlers (119 total). Migration-script hardening for the
+edge case it tripped on first time around.
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(templates): migrate training.html — 119 inline handlers gone
+
+119 inline handlers (106 `onclick` + 12 `onchange` + 1 `oninput`)
+replaced with data-attribute delegation. 115 translated mechanically
+via `tools/migrate_inline_handlers.py`; 4 hand-fixed:
+
+* **Collapsible category header** —
+  `onclick="this.parentElement.classList.toggle('open')"` wrapped by
+  `__toggleParentClassOpen` window helper.
+* **MOD-pathway role link** with chained `switchTab(...);setTimeout(...)` —
+  wrapped by `__switchToPathwaysAndShowRole`.
+* **Two `rmRenderResult(JSON.stringify(a))` calls** — these embed an
+  entire assessment object as the click handler argument. Migrated
+  to `data-args="[' + JSON.stringify(a).replace(/"/g,'&quot;') + ']"`
+  so the helper's `JSON.parse(el.dataset.args)` reconstructs the
+  object at click time.
+
+### fix(migration-script): detect JS-source-escape patterns
+
+`tools/migrate_inline_handlers.py` now bails out when the captured
+handler value contains `\\'` or `\\"` (JS-source escape sequences).
+These appear when an inline handler lives inside a JS string built by
+concatenation, e.g.
+`html += '<button onclick="fn(\\'' + x + '\\')">'`. Naively translating
+produces broken JS because the surrounding string boundaries get
+re-emitted as unescaped quotes. Two such spots in training.html were
+detected post-mortem (`rmStartAssessment` + `rmRate` role-card
+constructions), hand-fixed to use `data-args=\\'["' + esc + '"]\\'`
+with the outer-string escapes preserved. With the script patched,
+future templates with the same pattern will be reported as skipped
+for hand-fixing.
+
+### Verification
+
+Browser-test on local SQLite dev server:
+
+* `/training` loads with **0 CSP violations** and **0 JS errors**.
+* All 6 window helpers present (`__toggleParentClassOpen`,
+  `__switchToPathwaysAndShowRole`, plus the v0.31.6 alerts.html
+  helpers carried forward).
+* 59 delegated click attributes + 6 change attributes in the static
+  DOM; more added as tabs render content.
+* Playwright spy on `switchTab` confirmed
+  `switchTab(["tab-assessment"])` dispatched correctly when clicking
+  the Skills Assessment tab.
+
+### Scope clarification
+
+After this release base.html + cases.html + alerts.html + training.html
+are fully migrated (7 + 48 + 194 + 119 = **368 handlers**). 69
+templates remain (~650 inline `onclick=` + ~1,650 inline `style=""`).
+CSP unchanged this release.
+
+### Files
+
+* `src/ion/web/templates/training.html` — 119 handlers migrated;
+  2 hand-fixed window globals added.
+* `src/ion/web/templates/base.html` — helper version `?v=0.31.7`.
+* `tools/migrate_inline_handlers.py` — skip on JS-source-escape patterns.
+
+---
 
 ## v0.31.6 — 2026-05-14
 
