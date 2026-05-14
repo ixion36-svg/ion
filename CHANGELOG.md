@@ -1,13 +1,83 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.1 -->
+<!-- ion-doc:version=0.31.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.2 — 2026-05-14
+
+Code-quality release. 15 ORM filters across 9 service modules switched
+from `Column == EnumX.value` (or bare lowercase strings) to the
+enum-instance form `Column == EnumX`. Plus a new regression test that
+pins SQLAlchemy's actual storage and bind behaviour for
+`SQLEnum(native_enum=False)`. **Net new findings: 0C / 0H / 0M / 0L.**
+
+### What we thought we were fixing
+
+A v0.31.2 audit (driven by repeat appearances of "enum case mismatch" in
+the v0.23.2 / v0.26.1 / v0.30.0 CHANGELOG entries) initially flagged 15
+SQL filters as silently broken — patterns like
+`AlertCase.status != AlertCaseStatus.CLOSED.value` were assumed to be
+matching nothing because the column stores the enum NAME (`'CLOSED'`,
+uppercase) while the bind value would be `'closed'` (lowercase).
+
+### What was actually happening
+
+The new test (`tests/test_v032_sqlenum_name_storage.py`) demonstrates the
+ORM filters were never broken. SQLAlchemy's `Enum.bind_processor` builds
+`_object_lookup` keyed on BOTH `.name` and `.value`, looks up the
+bind-side string, resolves it to the enum member, and binds the
+member's `.name`. With the default `validate_strings=False`, both
+lowercase strings AND `.value` references coerce correctly. **Raw
+`text()` SQL is the only path that actually bypasses the bind processor
+— that's what bit `seed_lab_fixtures.py:109` in v0.30.0.**
+
+### What still landed
+
+The 15 edits stay. They are not bug fixes, but they are better code:
+
+* More idiomatic — `M.status == EnumX.OPEN` says exactly what is meant.
+* Immune to a future SQLAlchemy version tightening `validate_strings` to
+  True by default (that change is on the long-running deprecation list).
+* Easier to grep — `.value` against an enum class in a filter context is
+  now a code smell instead of an accepted idiom.
+
+`src/ion/web/api.py:_fixture_alert_dicts` now also converts the
+URL-query `status` parameter to an enum instance via
+`AlertTriageStatus(status)` before filtering, with a `ValueError` guard
+that short-circuits to "no fixture rows" on bogus input. Previously
+relied on SQLAlchemy's implicit coercion.
+
+### Files
+
+* `src/ion/services/analytics_engine.py`,
+  `src/ion/services/briefing_service.py`,
+  `src/ion/services/case_similarity_service.py`,
+  `src/ion/services/executive_report_service.py`,
+  `src/ion/services/incident_cost_service.py`,
+  `src/ion/services/ioc_staleness_service.py`,
+  `src/ion/services/knowledge_graph_service.py`,
+  `src/ion/services/shift_handover_service.py`,
+  `src/ion/web/api.py` (15 ORM filter sites + 1 user-input coercion site).
+* `tests/test_v032_sqlenum_name_storage.py` — new, 10 cases (storage
+  format, four ORM filter shapes, two raw-SQL shapes, three mirror
+  cases on `AlertTriage` + `ObservableLink`, one user-input coercion).
+* `CLAUDE.md` "Known gotchas" — entry rewritten with the accurate rule
+  (ORM coerces, raw `text()` SQL does not).
+
+### Why it took this long to notice
+
+The audit chain went: imprecise CHANGELOG paraphrase ("SQLEnum has bitten
+3 releases") → over-broad fix scope → test that was supposed to prove the
+bug instead proved the lack of one. Net good: we now have a regression
+test, the doc says what's actually true, and the code style is uniform.
+
+---
 
 ## v0.31.1 — 2026-05-13
 

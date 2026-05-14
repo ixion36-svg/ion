@@ -11,7 +11,7 @@ from typing import Any, Optional
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from ion.models.alert_triage import AlertCase, AlertTriage
+from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage
 from ion.models.user import AuditLog, User
 
 logger = logging.getLogger(__name__)
@@ -173,7 +173,7 @@ def _case_metrics(session: Session, cutoff: datetime) -> dict:
         by_severity[sev] = by_severity.get(sev, 0) + 1
 
     open_backlog = session.execute(
-        select(func.count(AlertCase.id)).where(AlertCase.status != "closed")
+        select(func.count(AlertCase.id)).where(AlertCase.status != AlertCaseStatus.CLOSED)
     ).scalar() or 0
 
     return {

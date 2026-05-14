@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ion.models.alert_triage import AlertCase
+from ion.models.alert_triage import AlertCase, AlertCaseStatus
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ def find_similar_cases(session: Session, case_id: int, limit: int = 10) -> dict:
 
     closed_cases = session.execute(
         select(AlertCase).where(
-            AlertCase.status == "closed",
+            AlertCase.status == AlertCaseStatus.CLOSED,
             AlertCase.id != case_id,
         )
     ).scalars().all()

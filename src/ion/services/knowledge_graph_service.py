@@ -87,7 +87,7 @@ def build_graph(
     # 1. Cases
     case_stmt = select(AlertCase).order_by(AlertCase.created_at.desc())
     if not include_closed:
-        case_stmt = case_stmt.where(AlertCase.status != AlertCaseStatus.CLOSED.value)
+        case_stmt = case_stmt.where(AlertCase.status != AlertCaseStatus.CLOSED)
     case_stmt = case_stmt.limit(case_limit)
     cases = session.execute(case_stmt).scalars().all()
 
@@ -148,7 +148,7 @@ def build_graph(
     if case_ids:
         link_rows = session.execute(
             select(ObservableLink).where(
-                ObservableLink.link_type == ObservableLinkType.CASE.value,
+                ObservableLink.link_type == ObservableLinkType.CASE,
                 ObservableLink.entity_id.in_(case_ids),
             )
         ).scalars().all()

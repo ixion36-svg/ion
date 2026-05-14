@@ -507,7 +507,7 @@ class AnalyticsEngine:
 
         # Open cases with no notes in X days
         open_cases = session.query(AlertCase).filter(
-            AlertCase.status != AlertCaseStatus.CLOSED.value
+            AlertCase.status != AlertCaseStatus.CLOSED
         ).all()
 
         stale_cases = []
@@ -532,7 +532,7 @@ class AnalyticsEngine:
 
         # Open triages with no notes in X days
         open_triages = session.query(AlertTriage).filter(
-            AlertTriage.status != AlertTriageStatus.CLOSED.value,
+            AlertTriage.status != AlertTriageStatus.CLOSED,
             AlertTriage.case_id == None,  # noqa: E711 — only uncased alerts
         ).all()
 
