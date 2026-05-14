@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.7 -->
+<!-- ion-doc:version=0.31.8 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
@@ -450,12 +450,18 @@ potential bugs.
   the client.
 * **Password storage** — bcrypt; cost factor configurable, sensible
   default.
-* **JWT** — RS256 (asymmetric); the `python-jose → PyJWT` migration
-  to remove a transitive `--ignore-vuln` is tracked.
+* **JWT** — RS256 (asymmetric) via `PyJWT[crypto]` since v0.31.8.
+  Previously used `python-jose[cryptography]`, which pulled a
+  transitive `ecdsa` dep with CVE-2024-23342 (Minerva timing attack
+  on P-256). The vulnerable code was never reachable (ION's only JWT
+  path pins `algorithms=["RS256"]`), but the dep kept appearing in
+  scanner output and required a `pip-audit --ignore-vuln` allowlist
+  entry. v0.31.8 retired `python-jose` entirely — `ecdsa` is no
+  longer in the resolved tree and the `--ignore-vuln` flag is gone.
 * **PDF SSRF** — WeasyPrint external URL fetcher blocked
   (v0.20.1).
 
-**Status:** Mostly Met. `python-jose → PyJWT` is the one open thread.
+**Status:** Met (v0.31.8).
 
 #### P18. Continually test security
 
@@ -527,8 +533,8 @@ Aggregating §3 across 20 principles:
 
 | Status | Count | Principles |
 |---|---|---|
-| **Met** | 15 | P2, P3, P4, P5, P6, P7, P8, P9, P10, P12, P14, P16, P18, P19, P20 |
-| **Mostly Met** | 3 | P11 (CSP nonce), P13 (data-min audit), P17 (`python-jose → PyJWT`) |
+| **Met** | 16 | P2, P3, P4, P5, P6, P7, P8, P9, P10, P12, P14, P16, P17, P18, P19, P20 |
+| **Mostly Met** | 2 | P11 (CSP strict — inline handlers in 69 templates still pending), P13 (data-min audit) |
 | **Partial** | 2 | P1 (single maintainer + AI), P15 (branch protection + signed commits) |
 | **Gap** | 0 | — |
 
@@ -541,8 +547,9 @@ Open named gaps (also in `docs/DEVELOPMENT_LIFECYCLE.md` §8):
   done as of v0.31.3.
 * **Data-minimisation audit** — formal pass on what is stored vs what
   is needed (P13).
-* **`python-jose → PyJWT`** — removes the transitive
-  `CVE-2024-23342` `--ignore-vuln` in CI (P17).
+* ~~`python-jose → PyJWT`~~ — **CLOSED v0.31.8.** `python-jose`
+  retired; PyJWT in its place; transitive `ecdsa` dep removed;
+  CI `--ignore-vuln CVE-2024-23342` flag dropped.
 * **Single-maintainer model** — operator-side Designated Security
   Officer review per release recommended for higher-assurance
   deployments (P1).
@@ -581,3 +588,4 @@ is the phase guide. If the two ever disagree, this doc wins for
 | 1.3     | 2026-05-14 | Maintainer | v0.31.5: P11 follow-up #2 — cases.html migrated (48 handlers incl. kanban drag-and-drop). Helper extended with drag events, `$event` sentinel, per-event positional args. CSP unchanged. P11 audit body updated with current count (55 handlers migrated; 71 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.4     | 2026-05-14 | Maintainer | v0.31.6: P11 follow-up #3 — alerts.html migrated (194 handlers). New `tools/migrate_inline_handlers.py` mechanical migration script; 4 new helper built-ins (`data-stop-propagation` alone, `data-remove-target`, `data-remove-parent`, `data-remove-closest`). CSP unchanged. P11 audit body updated (249 handlers migrated; 70 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.5     | 2026-05-14 | Maintainer | v0.31.7: P11 follow-up #4 — training.html migrated (119 handlers). 2 hand-fixed JS-source-escape spots; migration script patched to detect `\\'` / `\\"` escape sequences and skip them. P11 audit body updated (368 handlers migrated; 69 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
+| 1.6     | 2026-05-14 | Maintainer | v0.31.8: **P17 CLOSED.** `python-jose[cryptography]` retired in favour of `PyJWT[crypto]>=2.8.0`. Transitive `ecdsa` dep (CVE-2024-23342, Minerva timing attack on P-256) removed from the resolved tree. CI `--ignore-vuln CVE-2024-23342` flag dropped. `src/ion/auth/oidc.py` migrated: `PyJWK.from_dict(jwk).key` wraps the JWKS dict before `jwt.decode`; same RS256-only semantics. New `tests/test_v031_8_oidc_pyjwt.py` (8 cases) pins happy path + tampered signature + expired + wrong audience/issuer + missing/unknown kid + missing sub. P17 status: **Mostly Met → Met.** Audit summary: **16 Met / 2 Mostly Met / 2 Partial / 0 Gap** (was 15 / 3 / 2 / 0). |

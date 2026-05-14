@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.31.7"
+version = "0.31.8"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -25,7 +25,14 @@ dependencies = [
     "python-multipart>=0.0.6",
     "passlib[bcrypt]>=1.7.4",
     "bcrypt>=4.0.0,<4.1",
-    "python-jose[cryptography]>=3.3.0",
+    # v0.31.8: migrated from python-jose[cryptography] to PyJWT[crypto].
+    # python-jose pulled a transitive `ecdsa` dep with CVE-2024-23342
+    # (Minerva timing attack on P-256). ION only validates RS256 tokens
+    # via Keycloak so the vulnerable code was not reachable, but the
+    # transitive dep kept appearing in scanner output. PyJWT has the
+    # same JWT semantics for our usage (decode + verify exp/iat/aud/iss)
+    # and pulls only `cryptography` (no ecdsa).
+    "PyJWT[crypto]>=2.8.0",
     "httpx>=0.25.0",
     "aiosmtplib>=3.0.0",
     "email-validator>=2.0.0",
