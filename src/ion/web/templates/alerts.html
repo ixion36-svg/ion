@@ -17,11 +17,11 @@
     </div>
     <div class="flex items-center gap-2">
       <label id="auto-refresh-toggle" class="flex items-center gap-2 h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[12px] text-slate-300 cursor-pointer">
-        <input type="checkbox" id="auto-refresh-cb" checked onchange="toggleAutoRefresh()" class="accent-ion-cyan">
+        <input type="checkbox" id="auto-refresh-cb" checked data-change-action="toggleAutoRefresh" class="accent-ion-cyan">
         Auto-refresh
         <span id="auto-refresh-indicator" class="h-1.5 w-1.5 rounded-full bg-ion-lime"></span>
       </label>
-      <button onclick="loadAlerts()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="loadAlerts" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>
         Refresh
       </button>
@@ -46,7 +46,7 @@
     <svg class="w-4 h-4 text-ion-amber shrink-0"><use href="#i-alert-triangle"/></svg>
     <span class="label-tiny text-ion-amber">Needs attention:</span>
     <div id="alert-attn-chips" class="flex items-center gap-2 flex-wrap flex-1"></div>
-    <button onclick="dismissAlertAttention()" class="text-slate-400 hover:text-white transition" aria-label="Dismiss">
+    <button data-click-action="dismissAlertAttention" class="text-slate-400 hover:text-white transition" aria-label="Dismiss">
       <svg class="w-4 h-4"><use href="#i-x"/></svg>
     </button>
   </div>
@@ -57,32 +57,32 @@
       <span class="label-tiny text-slate-500">Total</span>
       <span id="stat-total" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-white">–</span>
     </div>
-    <button onclick="quickFilterByTriage('open')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+    <button data-click-action="quickFilterByTriage" data-args='["open"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
       <span class="label-tiny text-slate-500">Open</span>
       <span id="stat-open" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-cyan">–</span>
     </button>
-    <button onclick="quickFilterByTriage('acknowledged')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+    <button data-click-action="quickFilterByTriage" data-args='["acknowledged"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
       <span class="label-tiny text-slate-500">Ack</span>
       <span id="stat-acknowledged" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-iris">–</span>
     </button>
-    <button onclick="quickFilterByTriage('closed')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+    <button data-click-action="quickFilterByTriage" data-args='["closed"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
       <span class="label-tiny text-slate-500">Closed</span>
       <span id="stat-closed" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-slate-400">–</span>
     </button>
     <div class="w-px bg-white/10"></div>
-    <button onclick="quickFilterBySeverity('critical')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+    <button data-click-action="quickFilterBySeverity" data-args='["critical"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
       <span class="label-tiny text-slate-500">Critical</span>
       <span id="stat-critical" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-coral">–</span>
     </button>
-    <button onclick="quickFilterBySeverity('high')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+    <button data-click-action="quickFilterBySeverity" data-args='["high"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
       <span class="label-tiny text-slate-500">High</span>
       <span id="stat-high" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-amber">–</span>
     </button>
-    <button onclick="quickFilterBySeverity('medium')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+    <button data-click-action="quickFilterBySeverity" data-args='["medium"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
       <span class="label-tiny text-slate-500">Medium</span>
       <span id="stat-medium" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-ion-iris">–</span>
     </button>
-    <button onclick="quickFilterBySeverity('low')" class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
+    <button data-click-action="quickFilterBySeverity" data-args='["low"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
       <span class="label-tiny text-slate-500">Low</span>
       <span id="stat-low" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-slate-400">–</span>
     </button>
@@ -99,7 +99,7 @@
 
 <!-- Analytics Dashboard (collapsible) -->
 <div class="analytics-toggle">
-    <button class="btn btn-secondary btn-sm" id="analytics-toggle-btn" onclick="toggleAnalytics()">
+    <button class="btn btn-secondary btn-sm" id="analytics-toggle-btn" data-click-action="toggleAnalytics">
         <span id="analytics-toggle-icon"><i class="icon-chevron-right"></i></span> Analytics Dashboard
     </button>
 </div>
@@ -134,10 +134,10 @@
 
     <!-- Tab navigation -->
     <div class="ad-tabs">
-        <button class="ad-tab active" data-ad-tab="overview" onclick="switchAdTab('overview')">Overview</button>
-        <button class="ad-tab" data-ad-tab="mitre" onclick="switchAdTab('mitre')">MITRE ATT&CK</button>
-        <button class="ad-tab" data-ad-tab="geo" onclick="switchAdTab('geo')">Threat Map</button>
-        <button class="ad-tab" data-ad-tab="systems" onclick="switchAdTab('systems')">Systems</button>
+        <button class="ad-tab active" data-ad-tab="overview" data-click-action="switchAdTab" data-args='["overview"]'>Overview</button>
+        <button class="ad-tab" data-ad-tab="mitre" data-click-action="switchAdTab" data-args='["mitre"]'>MITRE ATT&CK</button>
+        <button class="ad-tab" data-ad-tab="geo" data-click-action="switchAdTab" data-args='["geo"]'>Threat Map</button>
+        <button class="ad-tab" data-ad-tab="systems" data-click-action="switchAdTab" data-args='["systems"]'>Systems</button>
     </div>
 
     <!-- Tab: Overview -->
@@ -202,7 +202,7 @@
                 <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-mapped">-</span><span class="ad-sys-stat-lbl">TIDE Mapped</span></div>
                 <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-coverage">-</span><span class="ad-sys-stat-lbl">Avg Coverage</span></div>
             </div>
-            <select class="ad-sys-range" id="ad-sys-range" onchange="loadAdSystems()">
+            <select class="ad-sys-range" id="ad-sys-range" data-change-action="loadAdSystems">
                 <option value="24">24 hours</option>
                 <option value="168" selected>7 days</option>
                 <option value="720">30 days</option>
@@ -216,13 +216,13 @@
 
 <!-- Pattern Detections Panel -->
 <div class="pattern-detections-panel" id="pattern-detections-panel" style="display:none;">
-    <div class="pattern-panel-header" onclick="togglePatternPanel()">
+    <div class="pattern-panel-header" data-click-action="togglePatternPanel">
         <div class="pattern-panel-title">
             <span class="pattern-panel-icon" id="pattern-panel-icon"><i class="icon-chevron-right"></i></span>
             <span>Pattern Detections</span>
             <span class="pattern-count-badge" id="pattern-count-badge">0</span>
         </div>
-        <button class="btn btn-sm btn-link pattern-dismiss-btn" onclick="event.stopPropagation();dismissPatternPanel()" title="Dismiss for this session">&#10005;</button>
+        <button class="btn btn-sm btn-link pattern-dismiss-btn" data-click-action="dismissPatternPanel" data-stop-propagation title="Dismiss for this session">&#10005;</button>
     </div>
     <div class="pattern-panel-body" id="pattern-panel-body" style="display:none;">
         <div id="pattern-cards-container"></div>
@@ -232,12 +232,12 @@
 <!-- Active Filter Banner -->
 <div class="active-filter-banner" id="active-filter-banner" style="display: none;">
     <span id="active-filter-text"></span>
-    <button class="btn btn-sm" onclick="clearEntityFilter()">&#10005; Clear Filter</button>
+    <button class="btn btn-sm" data-click-action="clearEntityFilter">&#10005; Clear Filter</button>
 </div>
 
 <!-- Filters -->
 <div class="alerts-filters">
-    <select id="alert-time-range" onchange="handleTimeRangeChange()">
+    <select id="alert-time-range" data-change-action="handleTimeRangeChange">
         <option value="1">Last Hour</option>
         <option value="4">Last 4 Hours</option>
         <option value="12">Last 12 Hours</option>
@@ -251,9 +251,9 @@
         <input type="datetime-local" id="custom-time-from" class="custom-time-input" title="From">
         <span class="custom-time-sep">&rarr;</span>
         <input type="datetime-local" id="custom-time-to" class="custom-time-input" title="To">
-        <button class="btn btn-sm btn-primary" onclick="applyCustomTimeRange()">Apply</button>
+        <button class="btn btn-sm btn-primary" data-click-action="applyCustomTimeRange">Apply</button>
     </div>
-    <select id="alert-severity-filter" onchange="applyFilters()">
+    <select id="alert-severity-filter" data-change-action="applyFilters">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -261,7 +261,7 @@
         <option value="low">Low</option>
         <option value="info">Info</option>
     </select>
-    <select id="alert-status-filter" onchange="handleStatusFilterChange()">
+    <select id="alert-status-filter" data-change-action="handleStatusFilterChange">
         <!-- v0.31.0: "Open Only" is the page-load default per user
              direction. The Active (Open + Ack) option remains
              selectable, but new analyst eyes land on Open. -->
@@ -271,25 +271,25 @@
         <option value="closed">Closed</option>
         <option value="all">All Statuses</option>
     </select>
-    <select id="alert-system-filter" onchange="loadAlerts()" title="Filter by source system (CyAB-registered systems only)">
+    <select id="alert-system-filter" data-change-action="loadAlerts" title="Filter by source system (CyAB-registered systems only)">
         <option value="">All Systems</option>
     </select>
-    <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." oninput="debouncedSearch()">
-    <button class="btn btn-secondary" onclick="clearAllFilters()">Clear</button>
+    <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." data-input-action="debouncedSearch">
+    <button class="btn btn-secondary" data-click-action="clearAllFilters">Clear</button>
     <span class="filter-separator">|</span>
-    <select id="saved-filters-select" class="saved-filters-select" onchange="loadSavedFilter()">
+    <select id="saved-filters-select" class="saved-filters-select" data-change-action="loadSavedFilter">
         <option value="">Saved Views...</option>
     </select>
-    <button class="btn btn-secondary btn-icon" onclick="saveCurrentFilter()" title="Save current filters">&#128190;</button>
-    <button class="btn btn-secondary btn-icon" onclick="manageSavedFilters()" title="Manage saved views">&#9881;</button>
+    <button class="btn btn-secondary btn-icon" data-click-action="saveCurrentFilter" title="Save current filters">&#128190;</button>
+    <button class="btn btn-secondary btn-icon" data-click-action="manageSavedFilters" title="Manage saved views">&#9881;</button>
 </div>
 
 <!-- Bulk Actions Toolbar -->
 <div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display: none;">
     <div class="bulk-actions-info">
-        <input type="checkbox" id="select-all-cb" onchange="toggleSelectAll()" title="Select all visible alerts">
+        <input type="checkbox" id="select-all-cb" data-change-action="toggleSelectAll" title="Select all visible alerts">
         <span id="selected-count">0</span> alerts selected
-        <button class="btn btn-sm btn-link" onclick="clearSelection()">Clear selection</button>
+        <button class="btn btn-sm btn-link" data-click-action="clearSelection">Clear selection</button>
     </div>
     <div class="bulk-actions-buttons">
         <select id="bulk-status" class="bulk-select">
@@ -309,20 +309,20 @@
             <option value="medium">Medium</option>
             <option value="low">Low</option>
         </select>
-        <button class="btn btn-primary btn-sm" onclick="applyBulkAction()">Apply</button>
+        <button class="btn btn-primary btn-sm" data-click-action="applyBulkAction">Apply</button>
         <span class="bulk-separator">|</span>
-        <button class="btn btn-secondary btn-sm" onclick="showCreateCaseFromSelected()">Create Case</button>
-        <button class="btn btn-secondary btn-sm" onclick="addToExistingCase()">Add to Case</button>
+        <button class="btn btn-secondary btn-sm" data-click-action="showCreateCaseFromSelected">Create Case</button>
+        <button class="btn btn-secondary btn-sm" data-click-action="addToExistingCase">Add to Case</button>
     </div>
 </div>
 
 <!-- Alert Context Menu -->
 <div id="alert-context-menu" class="context-menu" style="display: none;">
-    <div class="context-menu-item" onclick="contextMenuAction('open')">
+    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["open"]'>
         <span class="context-icon"><i class="icon-eye"></i></span> View Details
     </div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="contextMenuAction('assign-me')">
+    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["assign-me"]'>
         <span class="context-icon"><i class="icon-user-check"></i></span> Assign to Me
     </div>
     <div class="context-menu-submenu">
@@ -331,9 +331,9 @@
             <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
-            <div class="context-menu-item" onclick="contextMenuAction('status', 'open')">Open</div>
-            <div class="context-menu-item" onclick="contextMenuAction('status', 'acknowledged')">Acknowledged</div>
-            <div class="context-menu-item" onclick="contextMenuAction('status', 'closed')">Closed</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["status", "open"]'>Open</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["status", "acknowledged"]'>Acknowledged</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["status", "closed"]'>Closed</div>
         </div>
     </div>
     <div class="context-menu-submenu">
@@ -342,9 +342,9 @@
             <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
-            <div class="context-menu-item" onclick="contextMenuAction('close-as', 'benign')" style="color:#10b981;">&#10003; Benign</div>
-            <div class="context-menu-item" onclick="contextMenuAction('close-as', 'escalated')" style="color:#fbbf24;">&#9650; Escalated</div>
-            <div class="context-menu-item" onclick="contextMenuAction('close-as', 'false_positive')" style="color:#ef4444;">&#10007; False Positive</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["close-as", "benign"]' style="color:#10b981;">&#10003; Benign</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["close-as", "escalated"]' style="color:#fbbf24;">&#9650; Escalated</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["close-as", "false_positive"]' style="color:#ef4444;">&#10007; False Positive</div>
         </div>
     </div>
     <div class="context-menu-submenu">
@@ -353,24 +353,24 @@
             <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
-            <div class="context-menu-item" onclick="contextMenuAction('priority', 'critical')">Critical</div>
-            <div class="context-menu-item" onclick="contextMenuAction('priority', 'high')">High</div>
-            <div class="context-menu-item" onclick="contextMenuAction('priority', 'medium')">Medium</div>
-            <div class="context-menu-item" onclick="contextMenuAction('priority', 'low')">Low</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "critical"]'>Critical</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "high"]'>High</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "medium"]'>Medium</div>
+            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "low"]'>Low</div>
         </div>
     </div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="contextMenuAction('create-case')">
+    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["create-case"]'>
         <span class="context-icon"><i class="icon-folder-plus"></i></span> Create Case
     </div>
-    <div class="context-menu-item" onclick="contextMenuAction('add-to-case')">
+    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["add-to-case"]'>
         <span class="context-icon"><i class="icon-folder"></i></span> Add to Case...
     </div>
     <div class="context-menu-divider"></div>
-    <div class="context-menu-item" onclick="contextMenuAction('copy-id')">
+    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["copy-id"]'>
         <span class="context-icon"><i class="icon-clipboard"></i></span> Copy Alert ID
     </div>
-    <div class="context-menu-item" onclick="contextMenuAction('kibana')">
+    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["kibana"]'>
         <span class="context-icon"><i class="icon-external-link"></i></span> Open in Kibana
     </div>
 </div>
@@ -383,27 +383,27 @@
             <table class="data-table" id="alerts-table">
                 <thead>
                     <tr>
-                        <th style="width:40px;" class="checkbox-col"><input type="checkbox" id="header-select-all" onchange="toggleSelectAll()" title="Select all visible alerts"></th>
+                        <th style="width:40px;" class="checkbox-col"><input type="checkbox" id="header-select-all" data-change-action="toggleSelectAll" title="Select all visible alerts"></th>
                         <th style="width:32px;"></th>
-                        <th class="sortable" onclick="sortBy('severity')">
+                        <th class="sortable" data-click-action="sortBy" data-args='["severity"]'>
                             Severity <span class="sort-arrow" id="sort-severity"></span>
                         </th>
-                        <th class="sortable" onclick="sortBy('title')">
+                        <th class="sortable" data-click-action="sortBy" data-args='["title"]'>
                             Title <span class="sort-arrow" id="sort-title"></span>
                         </th>
-                        <th class="sortable" onclick="sortBy('host')">
+                        <th class="sortable" data-click-action="sortBy" data-args='["host"]'>
                             Host <span class="sort-arrow" id="sort-host"></span>
                         </th>
-                        <th class="sortable" onclick="sortBy('user')">
+                        <th class="sortable" data-click-action="sortBy" data-args='["user"]'>
                             User <span class="sort-arrow" id="sort-user"></span>
                         </th>
                         <th>Rule</th>
-                        <th class="sortable" onclick="sortBy('source_system')">
+                        <th class="sortable" data-click-action="sortBy" data-args='["source_system"]'>
                             System <span class="sort-arrow" id="sort-source_system"></span>
                         </th>
                         <th>Case</th>
                         <th>Status</th>
-                        <th class="sortable" onclick="sortBy('timestamp')">
+                        <th class="sortable" data-click-action="sortBy" data-args='["timestamp"]'>
                             Time <span class="sort-arrow" id="sort-timestamp"></span>
                         </th>
                         <th style="width:80px;">Actions</th>
@@ -473,15 +473,15 @@
             <div class="investigation-timer" id="investigation-timer">
                 <span class="timer-icon">&#9201;</span>
                 <span class="timer-display" id="timer-display">00:00</span>
-                <button class="timer-btn" id="timer-toggle-btn" onclick="toggleInvestigationTimer()" title="Pause/Resume timer">&#10074;&#10074;</button>
+                <button class="timer-btn" id="timer-toggle-btn" data-click-action="toggleInvestigationTimer" title="Pause/Resume timer">&#10074;&#10074;</button>
             </div>
-            <button class="modal-close" onclick="closeAlertModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeAlertModal">&times;</button>
         </div>
         <div class="modal-body" id="alert-detail-body">
             <!-- Populated by JS -->
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeAlertModal()">Close</button>
+            <button class="btn btn-secondary" data-click-action="closeAlertModal">Close</button>
         </div>
     </div>
 </div>
@@ -491,14 +491,14 @@
 <!-- =========================================================================
   v0.31.0: Case Detail Slide-out Panel
   ====================================================================== -->
-<div class="acp-overlay" id="acp-overlay" onclick="closeCasePanel()"></div>
+<div class="acp-overlay" id="acp-overlay" data-click-action="closeCasePanel"></div>
 <div class="acp-panel" id="acp-panel" data-case-id="">
   <div class="acp-header">
     <div style="min-width:0;flex:1;">
       <span class="acp-number" id="acp-number"></span>
       <span class="acp-title" id="acp-title"></span>
     </div>
-    <button class="acp-close" onclick="closeCasePanel()" title="Close (Esc)">&times;</button>
+    <button class="acp-close" data-click-action="closeCasePanel" title="Close (Esc)">&times;</button>
   </div>
   <div class="acp-body" id="acp-body">
     <p style="color:var(--text-secondary);text-align:center;padding:2rem;">Loading...</p>
@@ -506,11 +506,11 @@
 </div>
 
 <!-- Closure modal — full CaseClosureReason enum -->
-<div class="acp-closure-overlay" id="acp-closure-overlay" onclick="if(event.target===this)cancelCasePanelClosure()">
+<div class="acp-closure-overlay" id="acp-closure-overlay" data-click-action="cancelCasePanelClosure" data-only-self-click>
   <div class="acp-closure-modal">
     <div class="acp-closure-header">
       <h3>Close Case</h3>
-      <button class="acp-closure-close" onclick="cancelCasePanelClosure()">&times;</button>
+      <button class="acp-closure-close" data-click-action="cancelCasePanelClosure">&times;</button>
     </div>
     <div class="acp-closure-body">
       <div class="form-group" style="margin-bottom:0.75rem;">
@@ -532,8 +532,8 @@
       </div>
     </div>
     <div class="acp-closure-footer">
-      <button class="btn btn-secondary" onclick="cancelCasePanelClosure()">Cancel</button>
-      <button class="btn btn-primary" onclick="confirmCasePanelClosure()">Confirm</button>
+      <button class="btn btn-secondary" data-click-action="cancelCasePanelClosure">Cancel</button>
+      <button class="btn btn-primary" data-click-action="confirmCasePanelClosure">Confirm</button>
     </div>
   </div>
 </div>
@@ -3553,6 +3553,40 @@ kbd {
 // =========================================================================
 // State
 // =========================================================================
+
+// v0.31.6: small delegated-action helpers for patterns the generic
+// event-delegation.js can't express directly. Exposed as window.* so
+// the delegation dispatcher (which looks functions up by name) finds them.
+window.__tagChipRemove = function(event, dataset) {
+    // Clicked button → walk up to the tag-input container (which carries
+    // _tags / _removeTag attached by _initTagInput).
+    let el = event.target.parentElement;
+    while (el && !el._removeTag) el = el.parentElement;
+    if (el) el._removeTag(parseInt(dataset.idx, 10));
+};
+window.__tagInputEnter = function(event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const container = event.target.parentElement;
+    if (container && container._addTag) {
+        container._addTag(event.target.value);
+        event.target.value = '';
+    }
+};
+window.__observableInputEnter = function(event, dataset) {
+    if (event.key !== 'Enter') return;
+    if (window.addObservable) window.addObservable(dataset.alertId);
+};
+window.__filterMitreAndClose = function(event, dataset) {
+    if (window.filterByMitreTechnique) window.filterByMitreTechnique(dataset.techId);
+    if (window.closeAlertModal) window.closeAlertModal();
+};
+window.__switchDetailTabBySelector = function(event, dataset) {
+    // Original `switchDetailTab('case', document.querySelector(<sel>))`
+    const trigger = document.querySelector(dataset.selector);
+    if (window.switchDetailTab) window.switchDetailTab(dataset.tab, trigger);
+};
+
 let allAlerts = [];
 let filteredAlerts = [];
 let currentSort = { field: 'timestamp', dir: 'desc' };
@@ -3697,7 +3731,7 @@ function showNotification(message, type = 'info') {
     toast.className = `notification-toast notification-${type}`;
     toast.innerHTML = `
         <span>${escapeHtml(message)}</span>
-        <button onclick="this.parentElement.remove()" style="background:none;border:none;color:inherit;cursor:pointer;font-size:1.2rem;">&times;</button>
+        <button data-remove-parent style="background:none;border:none;color:inherit;cursor:pointer;font-size:1.2rem;">&times;</button>
     `;
     document.body.appendChild(toast);
 
@@ -3857,9 +3891,9 @@ function renderPatternCards() {
 
         let actionBtn = '';
         if (hasExec) {
-            actionBtn = `<button class="btn btn-secondary" onclick="viewPatternExecution(${p.execution.id})">View Execution</button>`;
+            actionBtn = `<button class="btn btn-secondary" data-click-action="viewPatternExecution" data-args='[${p.execution.id}]'>View Execution</button>`;
         } else if (p.playbook) {
-            actionBtn = `<button class="btn btn-primary" onclick="startPatternPlaybook('${p.pattern_id}', ${p.playbook.id}, '${p.alert_ids[0]}')">Start Playbook</button>`;
+            actionBtn = `<button class="btn btn-primary" data-click-action="startPatternPlaybook" data-args='["${p.pattern_id}", ${p.playbook.id}, "${p.alert_ids[0]}"]'>Start Playbook</button>`;
         }
 
         return `
@@ -3877,7 +3911,7 @@ function renderPatternCards() {
                 <div class="pattern-card-desc">${escapeHtml(p.description || '')}</div>
                 <div class="pattern-card-actions">
                     ${actionBtn}
-                    <button class="btn btn-secondary" onclick="filterByPatternGroup('${p.group_by}', '${escapeHtml(p.group_key)}')">Show Alerts</button>
+                    <button class="btn btn-secondary" data-click-action="filterByPatternGroup" data-args='["${p.group_by}", "${escapeHtml(p.group_key)}"]'>Show Alerts</button>
                     ${p.auto_started ? '<span style="font-size:0.6875rem;color:#22c55e;align-self:center;">Auto-started</span>' : ''}
                 </div>
             </div>
@@ -4019,11 +4053,11 @@ function computeAlertAttention() {
 
     let html = '';
     if (critStale > 0)
-        html += `<button class="alert-attn-chip alert-attn-chip-critical" onclick="filterToAttention('critical',2)" title="Critical alerts open >2h"><span class="chip-count">${critStale}</span> Critical Stale</button>`;
+        html += `<button class="alert-attn-chip alert-attn-chip-critical" data-click-action="filterToAttention" data-args='["critical", 2]' title="Critical alerts open >2h"><span class="chip-count">${critStale}</span> Critical Stale</button>`;
     if (highStale > 0)
-        html += `<button class="alert-attn-chip alert-attn-chip-high" onclick="filterToAttention('high',4)" title="High alerts open >4h"><span class="chip-count">${highStale}</span> High Stale</button>`;
+        html += `<button class="alert-attn-chip alert-attn-chip-high" data-click-action="filterToAttention" data-args='["high", 4]' title="High alerts open >4h"><span class="chip-count">${highStale}</span> High Stale</button>`;
     if (unassigned > 0)
-        html += `<button class="alert-attn-chip alert-attn-chip-unassigned" onclick="filterToAttentionUnassigned()" title="Critical/High with no assignee"><span class="chip-count">${unassigned}</span> Unassigned</button>`;
+        html += `<button class="alert-attn-chip alert-attn-chip-unassigned" data-click-action="filterToAttentionUnassigned" title="Critical/High with no assignee"><span class="chip-count">${unassigned}</span> Unassigned</button>`;
 
     chips.innerHTML = html;
     banner.style.display = 'flex';
@@ -4129,7 +4163,7 @@ function renderCasesSummary() {
         // v0.31.0: open the slide-out case panel on /alerts so the
         // analyst can work the case without leaving the alerts page.
         return `
-            <div class="list-item" onclick="openCasePanel(${c.id})" title="${escapeHtml(c.title)}" style="cursor:pointer;">
+            <div class="list-item" data-click-action="openCasePanel" data-args='[${c.id}]' title="${escapeHtml(c.title)}" style="cursor:pointer;">
                 <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
                     <strong>${escapeHtml(c.case_number)}</strong> ${escapeHtml(c.title)}${closureBadge}
                 </span>
@@ -4219,12 +4253,12 @@ function renderCaseManagementModal(caseData) {
             ${alerts.length > 0 ? alerts.map(a => `
                 <div class="related-alert-item" style="flex-wrap:wrap;">
                     <span class="triage-dot triage-${a.status}"></span>
-                    <span style="font-size:0.8125rem;flex:1;cursor:pointer;" onclick="showAlertDetail('${escapeHtml(a.es_alert_id)}')">${escapeHtml(a.es_alert_id)}</span>
+                    <span style="font-size:0.8125rem;flex:1;cursor:pointer;" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
                     <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
                     <div style="display:flex;gap:0.25rem;margin-left:auto;">
-                        <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','benign')">&#10003;</button>
-                        <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','escalated')">&#9650;</button>
-                        <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','false_positive')">&#10007;</button>
+                        <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
+                        <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
+                        <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
                     </div>
                 </div>
             `).join('') : '<div class="empty-state">No linked alerts</div>'}
@@ -4239,7 +4273,7 @@ function renderCaseManagementModal(caseData) {
                 <span style="font-size:0.8125rem;color:var(--text-muted);">Loading...</span>
             </div>
             <div style="margin-top:0.5rem;">
-                <button class="btn btn-sm btn-primary" onclick="showCasePlaybookPicker(${caseData.id})">Start Playbook</button>
+                <button class="btn btn-sm btn-primary" data-click-action="showCasePlaybookPicker" data-args='[${caseData.id}]'>Start Playbook</button>
             </div>
         </div>
     `;
@@ -4265,7 +4299,7 @@ function renderCaseManagementModal(caseData) {
     notesHtml += `
         <div class="comment-form" style="margin-top:0.75rem;">
             <textarea id="case-mgmt-note-input" placeholder="Add investigation note..."></textarea>
-            <button class="btn btn-primary" onclick="addCaseNoteFromModal(${caseData.id})">Add Note</button>
+            <button class="btn btn-primary" data-click-action="addCaseNoteFromModal" data-args='[${caseData.id}]'>Add Note</button>
         </div>
     </div>`;
 
@@ -4274,20 +4308,20 @@ function renderCaseManagementModal(caseData) {
             <h3>
                 <span>${escapeHtml(caseData.case_number)}: ${escapeHtml(caseData.title)}</span>
                 <div style="display:flex;align-items:center;gap:0.5rem;">
-                    ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiSummarizeCase(${caseData.id})" title="AI case summary">AI Summary</button>` : ''}
-                    <button class="close-btn" onclick="document.getElementById('case-mgmt-overlay').remove()" title="Close">&times;</button>
+                    ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSummarizeCase" data-args='[${caseData.id}]' title="AI case summary">AI Summary</button>` : ''}
+                    <button class="close-btn" data-remove-target="case-mgmt-overlay" title="Close">&times;</button>
                 </div>
             </h3>
             <div class="ai-case-summary" id="ai-case-summary-${caseData.id}"></div>
             ${caseData.status !== 'closed' ? `
             <div class="alert-closure-actions" style="margin:0.75rem 0;padding:0.75rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;display:flex;flex-wrap:wrap;gap:0.375rem;align-items:center;">
                 <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
-                <button class="alert-closure-btn true-positive" onclick="closeCaseWithAlerts(${caseData.id}, 'true_positive')">&#9650; True Positive</button>
-                <button class="alert-closure-btn benign-true-positive" onclick="closeCaseWithAlerts(${caseData.id}, 'benign_true_positive')">&#10003; Benign True Positive</button>
-                <button class="alert-closure-btn false-positive" onclick="closeCaseWithAlerts(${caseData.id}, 'false_positive')">&#10007; False Positive</button>
-                <button class="alert-closure-btn duplicate" onclick="closeCaseWithAlerts(${caseData.id}, 'duplicate')">&#9866; Duplicate</button>
-                <button class="alert-closure-btn insufficient-data" onclick="closeCaseWithAlerts(${caseData.id}, 'insufficient_data')">? Insufficient Data</button>
-                <button class="alert-closure-btn not-applicable" onclick="closeCaseWithAlerts(${caseData.id}, 'not_applicable')">&#8709; Not Applicable</button>
+                <button class="alert-closure-btn true-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "true_positive"]'>&#9650; True Positive</button>
+                <button class="alert-closure-btn benign-true-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "benign_true_positive"]'>&#10003; Benign True Positive</button>
+                <button class="alert-closure-btn false-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "false_positive"]'>&#10007; False Positive</button>
+                <button class="alert-closure-btn duplicate" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "duplicate"]'>&#9866; Duplicate</button>
+                <button class="alert-closure-btn insufficient-data" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "insufficient_data"]'>? Insufficient Data</button>
+                <button class="alert-closure-btn not-applicable" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "not_applicable"]'>&#8709; Not Applicable</button>
             </div>
             ` : ''}
             ${closureInfoHtml}
@@ -4295,11 +4329,11 @@ function renderCaseManagementModal(caseData) {
             <div class="case-meta-editable">
                 <div class="meta-field">
                     <label>Status</label>
-                    <select onchange="handleCaseStatusChange(${caseData.id}, this, '${caseData.status}')" id="case-status-select-${caseData.id}">${statusOptions}</select>
+                    <select data-change-action="handleCaseStatusChange" data-args='[${caseData.id}, "$target", "${caseData.status}"]' id="case-status-select-${caseData.id}">${statusOptions}</select>
                 </div>
                 <div class="meta-field">
                     <label>Severity</label>
-                    <select onchange="updateCaseField(${caseData.id}, 'severity', this.value)">${severityOptions}</select>
+                    <select data-change-action="updateCaseField" data-args='[${caseData.id}, "severity", "$value"]'>${severityOptions}</select>
                 </div>
                 <div class="meta-field">
                     <label>Created By</label>
@@ -4328,11 +4362,11 @@ function renderCaseManagementModal(caseData) {
                 <div style="display:flex;gap:0.5rem;align-items:center;">
                     ${caseData.dfir_iris_case_id
                         ? `<a href="${escapeHtml(caseData.dfir_iris_url)}" target="_blank" class="btn btn-success" style="font-size:0.75rem;">View in DFIR-IRIS #${caseData.dfir_iris_case_id}</a>`
-                        : `<button class="btn btn-warning" style="font-size:0.75rem;" onclick="escalateToDFIRIRIS(${caseData.id})" id="escalate-iris-btn-${caseData.id}">Escalate to DFIR-IRIS</button>`
+                        : `<button class="btn btn-warning" style="font-size:0.75rem;" data-click-action="escalateToDFIRIRIS" data-args='[${caseData.id}]' id="escalate-iris-btn-${caseData.id}">Escalate to DFIR-IRIS</button>`
                     }
                     ${caseData.kibana_url ? `<a href="${escapeHtml(caseData.kibana_url)}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem;">View in Kibana</a>` : ''}
                 </div>
-                <button class="btn btn-secondary" onclick="document.getElementById('case-mgmt-overlay').remove()">Close</button>
+                <button class="btn btn-secondary" data-remove-target="case-mgmt-overlay">Close</button>
             </div>
         </div>
     `;
@@ -4384,8 +4418,8 @@ function closeCaseWithAlerts(caseId, closureType) {
                 <textarea id="case-closure-quick-notes" rows="3" style="width:100%;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:0.5rem;font-size:0.8125rem;" placeholder="Enter closure reason..."></textarea>
             </div>
             <div class="closure-actions">
-                <button class="btn btn-secondary" onclick="document.getElementById('case-closure-quick-overlay').remove()">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmCloseCaseWithAlerts(${caseId}, '${closureType}')">Close Case</button>
+                <button class="btn btn-secondary" data-remove-target="case-closure-quick-overlay">Cancel</button>
+                <button class="btn btn-primary" data-click-action="confirmCloseCaseWithAlerts" data-args='[${caseId}, "${closureType}"]'>Close Case</button>
             </div>
         </div>
     `;
@@ -4508,7 +4542,7 @@ function showAlertClosureModal(alertId, closureType) {
             ${isFP ? `
             <div class="kfp-section" style="margin-top:0.75rem;">
                 <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-top:0;">
-                    <input type="checkbox" id="alert-kfp-checkbox" checked onchange="toggleAlertKFPFields()">
+                    <input type="checkbox" id="alert-kfp-checkbox" checked data-change-action="toggleAlertKFPFields">
                     <span>Add to Known False Positives Registry</span>
                 </label>
                 <div id="alert-kfp-fields">
@@ -4534,8 +4568,8 @@ function showAlertClosureModal(alertId, closureType) {
             ` : ''}
 
             <div class="closure-actions">
-                <button class="btn btn-secondary" onclick="document.getElementById('alert-closure-modal-overlay').remove()">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmAlertClosure('${escapeHtml(alertId)}', '${closureType}')">Confirm Close</button>
+                <button class="btn btn-secondary" data-remove-target="alert-closure-modal-overlay">Cancel</button>
+                <button class="btn btn-primary" data-click-action="confirmAlertClosure" data-args='["${escapeHtml(alertId)}", "${closureType}"]'>Confirm Close</button>
             </div>
         </div>
     `;
@@ -4685,7 +4719,7 @@ function showClosureReasonModal(caseId, newStatus, selectEl) {
         <div class="closure-modal">
             <h4>Close Case — Select Reason</h4>
             <label>Closure Reason <span style="color:#ef4444;">*</span></label>
-            <select id="closure-reason-select" onchange="toggleKFPSection()">${reasonOptions}</select>
+            <select id="closure-reason-select" data-change-action="toggleKFPSection">${reasonOptions}</select>
 
             <label>Closure Notes</label>
             <textarea id="closure-notes-input" placeholder="Optional notes about why this case is being closed..."></textarea>
@@ -4693,7 +4727,7 @@ function showClosureReasonModal(caseId, newStatus, selectEl) {
             <div id="kfp-add-section" style="display:none;">
                 <div class="kfp-section">
                     <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
-                        <input type="checkbox" id="kfp-add-checkbox" onchange="toggleKFPFields()">
+                        <input type="checkbox" id="kfp-add-checkbox" data-change-action="toggleKFPFields">
                         <span>Add to Known False Positives Registry</span>
                     </label>
                     <div id="kfp-fields" style="display:none;">
@@ -4719,8 +4753,8 @@ function showClosureReasonModal(caseId, newStatus, selectEl) {
             </div>
 
             <div class="closure-actions">
-                <button class="btn btn-secondary" onclick="cancelClosureModal(${caseId})">Cancel</button>
-                <button class="btn btn-primary" onclick="confirmCaseClosure(${caseId}, '${newStatus}')">Confirm Close</button>
+                <button class="btn btn-secondary" data-click-action="cancelClosureModal" data-args='[${caseId}]'>Cancel</button>
+                <button class="btn btn-primary" data-click-action="confirmCaseClosure" data-args='[${caseId}, "${newStatus}"]'>Confirm Close</button>
             </div>
         </div>
     `;
@@ -4757,8 +4791,8 @@ function _initTagInput(containerId, initialValues) {
 
     function render() {
         container.innerHTML = container._tags.map((t, i) =>
-            `<span class="tag-chip">${escapeHtml(t)}<button onclick="this.parentElement.parentElement._removeTag(${i})">&times;</button></span>`
-        ).join('') + `<input type="text" placeholder="Type and press Enter..." onkeydown="if(event.key==='Enter'){event.preventDefault();this.parentElement._addTag(this.value);this.value='';}" />`;
+            `<span class="tag-chip">${escapeHtml(t)}<button data-click-action="__tagChipRemove" data-idx="${i}">&times;</button></span>`
+        ).join('') + `<input type="text" placeholder="Type and press Enter..." data-keydown-action="__tagInputEnter" />`;
     }
     container._addTag = function(val) {
         val = val.trim();
@@ -4959,8 +4993,8 @@ async function checkKFPMatches(caseData) {
                     Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
                     <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.25rem;">(matched: ${match.matched_fields.join(', ')})</span>
                 </span>
-                <button class="btn btn-sm btn-warning" onclick="closeAsKnownFP(${caseData.id}, ${match.id})">Close as Known FP</button>
-                <button class="fp-dismiss" onclick="this.closest('.fp-suggestion-banner').remove()" title="Dismiss">&times;</button>
+                <button class="btn btn-sm btn-warning" data-click-action="closeAsKnownFP" data-args='[${caseData.id}, ${match.id}]'>Close as Known FP</button>
+                <button class="fp-dismiss" data-remove-closest=".fp-suggestion-banner" title="Dismiss">&times;</button>
             </div>
         `;
     } catch (e) {
@@ -5035,8 +5069,8 @@ async function checkKFPMatchesForTab(caseData) {
                     Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
                     <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.25rem;">(matched: ${match.matched_fields.join(', ')})</span>
                 </span>
-                <button class="btn btn-sm btn-warning" onclick="closeAsKnownFP(${caseData.id}, ${match.id})">Close as Known FP</button>
-                <button class="fp-dismiss" onclick="this.closest('.fp-suggestion-banner').remove()" title="Dismiss">&times;</button>
+                <button class="btn btn-sm btn-warning" data-click-action="closeAsKnownFP" data-args='[${caseData.id}, ${match.id}]'>Close as Known FP</button>
+                <button class="fp-dismiss" data-remove-closest=".fp-suggestion-banner" title="Dismiss">&times;</button>
             </div>
         `;
     } catch (e) {
@@ -5186,7 +5220,7 @@ async function showCasePlaybookPicker(caseId) {
             <div class="case-mgmt-modal" style="max-width:500px;">
                 <h3>
                     <span>Start Playbook for Case</span>
-                    <button class="close-btn" onclick="document.getElementById('case-playbook-picker').remove()">&times;</button>
+                    <button class="close-btn" data-remove-target="case-playbook-picker">&times;</button>
                 </h3>
                 <div style="padding:1rem;">
                     ${activePlaybooks.map(p => `
@@ -5195,7 +5229,7 @@ async function showCasePlaybookPicker(caseId) {
                                 <div style="font-weight:600;font-size:0.875rem;">${escapeHtml(p.name)}</div>
                                 <div style="font-size:0.75rem;color:var(--text-muted);">${p.step_count} steps | Priority: ${p.priority}</div>
                             </div>
-                            <button class="btn btn-sm btn-primary" onclick="startCasePlaybook(${caseId}, ${p.id})">Start</button>
+                            <button class="btn btn-sm btn-primary" data-click-action="startCasePlaybook" data-args='[${caseId}, ${p.id}]'>Start</button>
                         </div>
                     `).join('')}
                 </div>
@@ -5289,8 +5323,8 @@ function showCreateCaseForm(alertId) {
                 <textarea id="case-evidence-summary" placeholder="Auto-generated evidence narrative (editable)..." rows="4">${escapeHtml(prefillEvidence)}</textarea>
             </div>
             <div class="form-actions">
-                <button class="btn btn-secondary" onclick="document.getElementById('case-create-overlay').remove()">Cancel</button>
-                <button class="btn btn-primary" onclick="submitCreateCase('${escapeHtml(alertId)}')">Create Case</button>
+                <button class="btn btn-secondary" data-remove-target="case-create-overlay">Cancel</button>
+                <button class="btn btn-primary" data-click-action="submitCreateCase" data-args='["${escapeHtml(alertId)}"]'>Create Case</button>
             </div>
         </div>
     `;
@@ -5469,11 +5503,11 @@ function renderTriageBar(alertId, triage) {
 
     let caseHtml = '';
     if (caseNumber) {
-        caseHtml = `<span class="triage-case-link" onclick="switchDetailTab('case', document.querySelector('[data-tab=case]'))">${escapeHtml(caseNumber)}</span>`;
+        caseHtml = `<span class="triage-case-link" data-click-action="__switchDetailTabBySelector" data-tab="case" data-selector="[data-tab=case]">${escapeHtml(caseNumber)}</span>`;
     } else {
         caseHtml = `
-            <button class="btn btn-sm btn-primary" onclick="showCreateCaseForm('${escapeHtml(alertId)}')">Create Case</button>
-            <button class="btn btn-sm btn-secondary" onclick="linkAlertToCase('${escapeHtml(alertId)}')">Link to Case</button>
+            <button class="btn btn-sm btn-primary" data-click-action="showCreateCaseForm" data-args='["${escapeHtml(alertId)}"]'>Create Case</button>
+            <button class="btn btn-sm btn-secondary" data-click-action="linkAlertToCase" data-args='["${escapeHtml(alertId)}"]'>Link to Case</button>
         `;
     }
 
@@ -5483,9 +5517,9 @@ function renderTriageBar(alertId, triage) {
         observablesListHtml = observables.map((obs, idx) =>
             `<div class="observable-row" data-value="${escapeHtml(obs.value)}" data-type="${escapeHtml(obs.type)}">
                 <span class="observable-badge ${escapeHtml(obs.type)}">${escapeHtml(obs.type.replace('_', ' '))}</span>
-                <span class="observable-value observable-link" onclick="openObservableDetail('${escapeHtml(obs.type)}', '${escapeHtml(obs.value)}')" title="View in Observables">${escapeHtml(obs.value)}</span>
+                <span class="observable-value observable-link" data-click-action="openObservableDetail" data-args='["${escapeHtml(obs.type)}", "${escapeHtml(obs.value)}"]' title="View in Observables">${escapeHtml(obs.value)}</span>
                 <span class="threat-indicator" id="threat-${idx}" style="display:none;"></span>
-                <button class="btn-icon" onclick="removeObservable('${escapeHtml(alertId)}', ${idx})" title="Remove">&times;</button>
+                <button class="btn-icon" data-click-action="removeObservable" data-args='["${escapeHtml(alertId)}", ${idx}]' title="Remove">&times;</button>
             </div>`
         ).join('');
     } else {
@@ -5500,11 +5534,11 @@ function renderTriageBar(alertId, triage) {
         <div class="triage-row" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
             <div class="triage-group">
                 <label>Status</label>
-                <select onchange="updateTriage('${escapeHtml(alertId)}', 'status', this.value)">${statusOptions}</select>
+                <select data-change-action="updateTriage" data-args='["${escapeHtml(alertId)}", "status", "$value"]'>${statusOptions}</select>
             </div>
             <div class="triage-group">
                 <label>Priority</label>
-                <select onchange="updateTriage('${escapeHtml(alertId)}', 'priority', this.value)">${priorityOptions}</select>
+                <select data-change-action="updateTriage" data-args='["${escapeHtml(alertId)}", "priority", "$value"]'>${priorityOptions}</select>
             </div>
             <div class="triage-group" style="margin-left:auto;">
                 ${caseHtml}
@@ -5512,9 +5546,9 @@ function renderTriageBar(alertId, triage) {
         </div>
         <div class="alert-closure-actions">
             <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);align-self:center;">Close as:</span>
-            <button class="alert-closure-btn benign" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'benign')">&#10003; Benign</button>
-            <button class="alert-closure-btn escalated" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'escalated')">&#9650; Escalated</button>
-            <button class="alert-closure-btn false-positive" onclick="showAlertClosureModal('${escapeHtml(alertId)}', 'false_positive')">&#10007; False Positive</button>
+            <button class="alert-closure-btn benign" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "benign"]'>&#10003; Benign</button>
+            <button class="alert-closure-btn escalated" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "escalated"]'>&#9650; Escalated</button>
+            <button class="alert-closure-btn false-positive" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "false_positive"]'>&#10007; False Positive</button>
         </div>
         ${(() => {
             if (bobConfidenceInt === null && bobConfidenceInt === undefined && !bobEscalationBadge) return '';
@@ -5540,24 +5574,24 @@ function renderTriageBar(alertId, triage) {
             <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.25rem;">Analyst Notes</label>
             <div style="display:flex;gap:0.5rem;">
                 <textarea id="analyst-notes-input" placeholder="Add analyst assessment..." style="flex:1;min-height:2.5rem;resize:vertical;font-size:0.8125rem;padding:0.375rem;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">${escapeHtml(analystNotes)}</textarea>
-                <button class="btn btn-sm btn-primary" onclick="saveAnalystNotes('${escapeHtml(alertId)}')" style="align-self:flex-end;">Save</button>
+                <button class="btn btn-sm btn-primary" data-click-action="saveAnalystNotes" data-args='["${escapeHtml(alertId)}"]' style="align-self:flex-end;">Save</button>
             </div>
         </div>
         <div class="observables-section">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.375rem;">
                 <div style="display:flex;align-items:center;gap:0.5rem;">
                     <label style="margin-bottom:0;">Observables</label>
-                    ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiExtractObservables('${escapeHtml(alertId)}')" title="AI extract observables">AI Extract</button>` : ''}
+                    ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiExtractObservables" data-args='["${escapeHtml(alertId)}"]' title="AI extract observables">AI Extract</button>` : ''}
                 </div>
-                <button class="enrich-btn" id="enrich-btn" onclick="enrichObservables('${escapeHtml(alertId)}')" ${observables.length === 0 ? 'disabled' : ''}>
+                <button class="enrich-btn" id="enrich-btn" data-click-action="enrichObservables" data-args='["${escapeHtml(alertId)}"]' ${observables.length === 0 ? 'disabled' : ''}>
                     <span class="enrich-icon">&#9733;</span> Enrich via OpenCTI
                 </button>
             </div>
             <div id="observables-list">${observablesListHtml}</div>
             <div class="observable-add-row">
                 <select id="observable-type-select">${typeOptions}</select>
-                <input type="text" id="observable-value-input" placeholder="Value..." onkeydown="if(event.key==='Enter'){addObservable('${escapeHtml(alertId)}');}">
-                <button class="btn btn-sm btn-primary" onclick="addObservable('${escapeHtml(alertId)}')">Add</button>
+                <input type="text" id="observable-value-input" placeholder="Value..." data-keydown-action="__observableInputEnter" data-alert-id="${escapeHtml(alertId)}">
+                <button class="btn btn-sm btn-primary" data-click-action="addObservable" data-args='["${escapeHtml(alertId)}"]'>Add</button>
             </div>
             <div id="enrich-results"></div>
         </div>
@@ -5581,9 +5615,9 @@ function renderMitreSection(alertId, techniques) {
         techniquesListHtml = techniques.map((tech, idx) => {
             const isAuto = tech.source === 'auto';
             const removeBtn = !isAuto
-                ? `<span class="remove-btn" onclick="event.stopPropagation();removeMitreTechnique('${escapeHtml(alertId)}', ${idx})">&times;</span>`
+                ? `<span class="remove-btn" data-click-action="removeMitreTechnique" data-stop-propagation data-args='["${escapeHtml(alertId)}", ${idx}]'>&times;</span>`
                 : '';
-            return `<span class="mitre-badge ${isAuto ? 'auto' : 'manual'}" onclick="filterByMitreTechnique('${escapeHtml(tech.technique_id)}'); closeAlertModal();" title="${isAuto ? 'Auto-detected' : 'Manually added'} - Click to filter">
+            return `<span class="mitre-badge ${isAuto ? 'auto' : 'manual'}" data-click-action="__filterMitreAndClose" data-tech-id="${escapeHtml(tech.technique_id)}" title="${isAuto ? 'Auto-detected' : 'Manually added'} - Click to filter">
                 <strong>${escapeHtml(tech.technique_id)}</strong>
                 ${tech.technique_name ? ` - ${escapeHtml(tech.technique_name)}` : ''}
                 ${removeBtn}
@@ -5600,14 +5634,14 @@ function renderMitreSection(alertId, techniques) {
         <div class="mitre-section">
             <div style="display:flex;align-items:center;gap:0.5rem;">
                 <label>MITRE ATT&CK Techniques</label>
-                ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiSuggestMitre('${escapeHtml(alertId)}')" title="AI suggest MITRE techniques">AI Suggest</button>` : ''}
+                ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSuggestMitre" data-args='["${escapeHtml(alertId)}"]' title="AI suggest MITRE techniques">AI Suggest</button>` : ''}
             </div>
             <div class="mitre-techniques-list" id="mitre-techniques-list">${techniquesListHtml}</div>
             <div class="mitre-add-row">
                 <input type="text" id="mitre-id-input" placeholder="T1234" maxlength="9">
                 <input type="text" id="mitre-name-input" class="mitre-name-input" placeholder="Technique name">
                 <select id="mitre-tactic-select">${tacticOptions}</select>
-                <button class="btn btn-sm btn-primary" onclick="addMitreTechnique('${escapeHtml(alertId)}')">Add</button>
+                <button class="btn btn-sm btn-primary" data-click-action="addMitreTechnique" data-args='["${escapeHtml(alertId)}"]'>Add</button>
             </div>
         </div>
     `;
@@ -6207,7 +6241,7 @@ function renderPlaybooksSection(alertId) {
                     <div class="playbook-item-name">${escapeHtml(p.name)}</div>
                     <div class="playbook-item-meta">${p.step_count} steps | Priority: ${p.priority}</div>
                 </div>
-                <button class="btn btn-sm btn-primary" onclick="startPlaybook('${escapeHtml(alertId)}', ${p.id})">Start</button>
+                <button class="btn btn-sm btn-primary" data-click-action="startPlaybook" data-args='["${escapeHtml(alertId)}", ${p.id}]'>Start</button>
             </div>
         `).join('');
         html += '</div>';
@@ -6216,7 +6250,7 @@ function renderPlaybooksSection(alertId) {
     }
 
     // Browse Playbook Library link
-    html += `<span class="playbook-library-toggle" onclick="togglePlaybookLibrary('${escapeHtml(alertId)}')">Browse Playbook Library <i class="icon-chevron-down"></i></span>`;
+    html += `<span class="playbook-library-toggle" data-click-action="togglePlaybookLibrary" data-args='["${escapeHtml(alertId)}"]'>Browse Playbook Library <i class="icon-chevron-down"></i></span>`;
     html += `<div id="playbook-library-panel-${CSS.escape(alertId)}" style="display:none;"></div>`;
 
     // Show completed executions count
@@ -6290,7 +6324,7 @@ function renderLibraryItem(alertId, p, type) {
                 <div class="playbook-library-item-desc">${desc} &middot; ${p.step_count} steps</div>
             </div>
             <span class="playbook-type-badge ${badgeClass}">${badgeLabel}</span>
-            <button class="btn btn-sm btn-primary" ${disabled} onclick="startPlaybook('${escapeHtml(alertId)}', ${p.id})">${btnLabel}</button>
+            <button class="btn btn-sm btn-primary" ${disabled} data-click-action="startPlaybook" data-args='["${escapeHtml(alertId)}", ${p.id}]'>${btnLabel}</button>
         </div>`;
 }
 
@@ -6311,7 +6345,7 @@ function renderActiveExecution(alertId, execution) {
             <div class="playbook-step ${isDone ? 'completed' : ''}">
                 <input type="checkbox" class="playbook-step-checkbox"
                        ${isDone ? 'checked' : ''}
-                       onchange="updateStepStatus('${escapeHtml(alertId)}', ${execution.id}, ${step.id}, this.checked ? 'completed' : 'pending')">
+                       data-change-action="updateStepStatus" data-args='["${escapeHtml(alertId)}", ${execution.id}, ${step.id}, this.checked ? 'completed' : 'pending']'>
                 <span class="playbook-step-title">${escapeHtml(step.title)}</span>
                 ${step.is_required ? '<span class="playbook-step-required">Required</span>' : ''}
                 ${isSkipped ? '<span style="font-size:0.625rem;color:var(--text-muted);">(skipped)</span>' : ''}
@@ -6335,8 +6369,8 @@ function renderActiveExecution(alertId, execution) {
                 ${stepsHtml}
             </div>
             <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
-                <button class="btn btn-sm" onclick="completePlaybookExecution('${escapeHtml(alertId)}', ${execution.id})">Complete</button>
-                <button class="btn btn-sm" onclick="skipRemainingSteps('${escapeHtml(alertId)}', ${execution.id})">Skip Remaining</button>
+                <button class="btn btn-sm" data-click-action="completePlaybookExecution" data-args='["${escapeHtml(alertId)}", ${execution.id}]'>Complete</button>
+                <button class="btn btn-sm" data-click-action="skipRemainingSteps" data-args='["${escapeHtml(alertId)}", ${execution.id}]'>Skip Remaining</button>
             </div>
         </div>
     `;
@@ -6506,7 +6540,7 @@ async function enrichObservables(alertId) {
         if (aiAvailable) {
             const discussDiv = document.createElement('div');
             discussDiv.style.marginTop = '0.5rem';
-            discussDiv.innerHTML = `<button class="ai-micro-btn" onclick="openAIChatWithContext('${alertId}')" title="Discuss enrichment results with AI">Discuss with AI</button>`;
+            discussDiv.innerHTML = `<button class="ai-micro-btn" data-click-action="openAIChatWithContext" data-args='["${alertId}"]' title="Discuss enrichment results with AI">Discuss with AI</button>`;
             resultsContainer.appendChild(discussDiv);
         }
 
@@ -6770,7 +6804,7 @@ function renderCommentsTab(alertId, comments) {
                     <div class="comment-header">
                         <span class="comment-user">${escapeHtml(c.user)}</span>
                         <span class="comment-time">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</span>
-                        <button class="cmt-translate-btn" type="button" onclick="translateComment('${cmtId}')" style="margin-left:auto; font-size:10px; background:none; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; padding:2px 8px; border-radius:3px; cursor:pointer;">Translate</button>
+                        <button class="cmt-translate-btn" type="button" data-click-action="translateComment" data-args='["${cmtId}"]' style="margin-left:auto; font-size:10px; background:none; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; padding:2px 8px; border-radius:3px; cursor:pointer;">Translate</button>
                     </div>
                     <div class="comment-body cpanel-note-markdown" id="${cmtId}" data-original-raw="${safeOriginalRaw}" data-rendered-html="${escapeHtml(rendered)}">${rendered}</div>
                 </div>
@@ -6782,7 +6816,7 @@ function renderCommentsTab(alertId, comments) {
     html += `
         <div class="comment-form">
             <textarea id="comment-input" placeholder="Add a comment..."></textarea>
-            <button class="btn btn-primary" onclick="addComment('${escapeHtml(alertId)}')">Submit</button>
+            <button class="btn btn-primary" data-click-action="addComment" data-args='["${escapeHtml(alertId)}"]'>Submit</button>
         </div>
     `;
 
@@ -6841,7 +6875,7 @@ function renderCaseObservables(observables) {
 
         return `<div class="${rowClass}">
             <span class="observable-badge ${escapeHtml(obs.type)}">${escapeHtml(obs.type.replace(/_/g, ' '))}</span>
-            <span class="observable-value observable-link" onclick="openObservableDetail('${escapeHtml(obs.type)}', '${escapeHtml(obs.value)}')" title="View in Observables">${escapeHtml(obs.value)}</span>
+            <span class="observable-value observable-link" data-click-action="openObservableDetail" data-args='["${escapeHtml(obs.type)}", "${escapeHtml(obs.value)}"]' title="View in Observables">${escapeHtml(obs.value)}</span>
             ${threatDot}${enrichBadge}
         </div>`;
     }).join('');
@@ -6904,7 +6938,7 @@ async function renderCaseTab(caseId) {
         notesHtml += `
             <div class="comment-form" style="margin-top:0.75rem;">
                 <textarea id="case-note-input" placeholder="Add investigation note..."></textarea>
-                <button class="btn btn-primary" onclick="addCaseNote(${c.id})">Add Note</button>
+                <button class="btn btn-primary" data-click-action="addCaseNote" data-args='[${c.id}]'>Add Note</button>
             </div>
         </div>`;
 
@@ -6933,20 +6967,20 @@ async function renderCaseTab(caseId) {
                 <h4 style="display:flex;align-items:center;justify-content:space-between;">
                     <span>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</span>
                     <div style="display:flex;align-items:center;gap:0.5rem;">
-                        ${aiAvailable ? `<button class="ai-micro-btn" onclick="aiSummarizeCase(${c.id})" title="AI case summary">AI Summary</button>` : ''}
-                        <button class="btn btn-sm" onclick="showCaseDetail(${c.id})" title="Open case management modal" style="font-size:0.75rem;">Manage Case</button>
+                        ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSummarizeCase" data-args='[${c.id}]' title="AI case summary">AI Summary</button>` : ''}
+                        <button class="btn btn-sm" data-click-action="showCaseDetail" data-args='[${c.id}]' title="Open case management modal" style="font-size:0.75rem;">Manage Case</button>
                     </div>
                 </h4>
                 <div class="ai-case-summary" id="ai-case-summary-${c.id}"></div>
                 ${c.status !== 'closed' ? `
                 <div class="alert-closure-actions" style="margin:0.5rem 0;padding:0.5rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;display:flex;flex-wrap:wrap;gap:0.375rem;align-items:center;">
                     <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
-                    <button class="alert-closure-btn true-positive" onclick="closeCaseWithAlerts(${c.id}, 'true_positive')">&#9650; True Positive</button>
-                    <button class="alert-closure-btn benign-true-positive" onclick="closeCaseWithAlerts(${c.id}, 'benign_true_positive')">&#10003; Benign True Positive</button>
-                    <button class="alert-closure-btn false-positive" onclick="closeCaseWithAlerts(${c.id}, 'false_positive')">&#10007; False Positive</button>
-                    <button class="alert-closure-btn duplicate" onclick="closeCaseWithAlerts(${c.id}, 'duplicate')">&#9866; Duplicate</button>
-                    <button class="alert-closure-btn insufficient-data" onclick="closeCaseWithAlerts(${c.id}, 'insufficient_data')">? Insufficient Data</button>
-                    <button class="alert-closure-btn not-applicable" onclick="closeCaseWithAlerts(${c.id}, 'not_applicable')">&#8709; Not Applicable</button>
+                    <button class="alert-closure-btn true-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "true_positive"]'>&#9650; True Positive</button>
+                    <button class="alert-closure-btn benign-true-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "benign_true_positive"]'>&#10003; Benign True Positive</button>
+                    <button class="alert-closure-btn false-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "false_positive"]'>&#10007; False Positive</button>
+                    <button class="alert-closure-btn duplicate" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "duplicate"]'>&#9866; Duplicate</button>
+                    <button class="alert-closure-btn insufficient-data" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "insufficient_data"]'>? Insufficient Data</button>
+                    <button class="alert-closure-btn not-applicable" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "not_applicable"]'>&#8709; Not Applicable</button>
                 </div>
                 ` : ''}
                 ${closureInfoHtml}
@@ -6978,12 +7012,12 @@ async function renderCaseTab(caseId) {
                     ${c.alerts.length > 0 ? c.alerts.map(a => `
                         <div class="related-alert-item" style="flex-wrap:wrap;">
                             <span class="triage-dot triage-${a.status}"></span>
-                            <span style="font-size:0.8125rem;flex:1;cursor:pointer;" onclick="showAlertDetail('${escapeHtml(a.es_alert_id)}')">${escapeHtml(a.es_alert_id)}</span>
+                            <span style="font-size:0.8125rem;flex:1;cursor:pointer;" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
                             <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
                             <div style="display:flex;gap:0.25rem;margin-left:auto;">
-                                <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','benign')">&#10003;</button>
-                                <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','escalated')">&#9650;</button>
-                                <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" onclick="showAlertClosureModal('${escapeHtml(a.es_alert_id)}','false_positive')">&#10007;</button>
+                                <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
+                                <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
+                                <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
                             </div>
                         </div>
                     `).join('') : '<div class="empty-state">No other alerts linked</div>'}
@@ -7231,7 +7265,7 @@ function renderSystemBadge(a) {
     if (tideName && tideName !== cyabName) tooltipParts.push(`TIDE: ${tideName}`);
     const tooltip = escapeHtml(tooltipParts.join(' • ') || display);
     if (a.cyab_system_id) {
-        return `<a href="/cyab#${a.cyab_system_id}" class="system-badge linked" title="${tooltip}" onclick="event.stopPropagation()">${escapeHtml(display)}</a>`;
+        return `<a href="/cyab#${a.cyab_system_id}" class="system-badge linked" title="${tooltip}" data-stop-propagation>${escapeHtml(display)}</a>`;
     }
     return `<span class="system-badge" title="${tooltip}">${escapeHtml(display)}</span>`;
 }
@@ -7259,12 +7293,12 @@ function renderAlerts() {
         const isSelected = selectedAlertIds.has(a.id);
         return `
         <tr class="alert-row ${isSelected ? 'selected' : ''}"
-            onclick="showAlertDetail('${escapeHtml(a.id)}')"
+            data-click-action="showAlertDetail" data-args='["${escapeHtml(a.id)}"]'
             oncontextmenu="showContextMenu(event, '${escapeHtml(a.id)}')"
             data-alert-id="${escapeHtml(a.id)}">
-            <td class="checkbox-col" onclick="event.stopPropagation()">
+            <td class="checkbox-col" data-stop-propagation>
                 <input type="checkbox" class="alert-checkbox" data-alert-id="${escapeHtml(a.id)}"
-                       ${isSelected ? 'checked' : ''} onchange="toggleAlertSelection('${escapeHtml(a.id)}', this.checked)">
+                       ${isSelected ? 'checked' : ''} data-change-action="toggleAlertSelection" data-args='["${escapeHtml(a.id)}", "$checked"]'>
             </td>
             <td style="width:32px;text-align:center;"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
             <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
@@ -7276,12 +7310,12 @@ function renderAlerts() {
             <td>${caseName}</td>
             <td><span class="status-badge alert-status-${triageStatus !== 'none' ? triageStatus : a.status}">${triageStatus !== 'none' ? triageStatus : a.status}</span></td>
             <td>${formatDate(a.timestamp)}</td>
-            <td class="quick-actions-col" onclick="event.stopPropagation()">
+            <td class="quick-actions-col" data-stop-propagation>
                 <div class="quick-actions">
-                    <button class="quick-action-btn" onclick="quickAssignToMe('${escapeHtml(a.id)}')" title="Assign to me"><i class="icon-user-check"></i></button>
-                    <button class="quick-action-btn" onclick="quickStatusChange('${escapeHtml(a.id)}', 'acknowledged')" title="Acknowledge"><i class="icon-search"></i></button>
-                    <button class="quick-action-btn" onclick="showCreateCaseForm('${escapeHtml(a.id)}')" title="Create case"><i class="icon-folder-plus"></i></button>
-                    ${(arkimeEnabled && (a.network_community_id || a.source_ip || a.destination_ip || a.arkime_node)) ? `<a class="quick-action-btn arkime-action-btn" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis${a.network_community_id ? '' : ' (IP search — no community ID)'}" onclick="event.stopPropagation()" style="color:#6de4ff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
+                    <button class="quick-action-btn" data-click-action="quickAssignToMe" data-args='["${escapeHtml(a.id)}"]' title="Assign to me"><i class="icon-user-check"></i></button>
+                    <button class="quick-action-btn" data-click-action="quickStatusChange" data-args='["${escapeHtml(a.id)}", "acknowledged"]' title="Acknowledge"><i class="icon-search"></i></button>
+                    <button class="quick-action-btn" data-click-action="showCreateCaseForm" data-args='["${escapeHtml(a.id)}"]' title="Create case"><i class="icon-folder-plus"></i></button>
+                    ${(arkimeEnabled && (a.network_community_id || a.source_ip || a.destination_ip || a.arkime_node)) ? `<a class="quick-action-btn arkime-action-btn" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis${a.network_community_id ? '' : ' (IP search — no community ID)'}" data-stop-propagation style="color:#6de4ff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
                 </div>
             </td>
         </tr>
@@ -7381,7 +7415,7 @@ function renderSideList(containerId, countBadgeId, counts, entityType) {
     }
 
     container.innerHTML = entries.map(([name, count]) => `
-        <div class="list-item" onclick="filterByEntity('${entityType}', '${escapeHtml(name)}')" title="Filter by ${entityType}: ${escapeHtml(name)}">
+        <div class="list-item" data-click-action="filterByEntity" data-args='["${entityType}", "${escapeHtml(name)}"]' title="Filter by ${entityType}: ${escapeHtml(name)}">
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</span>
             <span class="list-item-count">${count}</span>
         </div>
@@ -7790,7 +7824,7 @@ function renderMitreHeatmap() {
                     titleParts.push('BLIND SPOT: No detection rules');
                 }
 
-                const onclick = tech.count > 0 ? `onclick="filterByMitreTechnique('${escapeHtml(tech.id)}')"` : '';
+                const onclick = tech.count > 0 ? `data-click-action="filterByMitreTechnique" data-args='["${escapeHtml(tech.id)}"]'` : '';
                 html += `<div class="mitre-heatmap-cell ${cellClass}" ${onclick} title="${escapeHtml(titleParts.join('\n'))}">
                     <span class="tech-id">${escapeHtml(tech.id)}</span>
                     <span class="tech-count">${countDisplay}</span>
@@ -8726,7 +8760,7 @@ async function showAlertDetail(alertId) {
     // Message — wrap so the v0.17.0 Translate button can replace its body in place.
     html += `<div class="alert-message-box" id="alert-message-box" data-original-message="${escapeHtml(alert.message || '')}">${escapeHtml(alert.message)}</div>`;
     html += `<div class="alert-msg-translate-row" style="margin: -4px 0 8px; display:flex; align-items:center; gap:8px; font-size:11px; color:#94a3b8;">
-        <button class="btn btn-ghost btn-sm" type="button" onclick="translateAlertMessage()" style="font-size:11px; padding:2px 8px;">
+        <button class="btn btn-ghost btn-sm" type="button" data-click-action="translateAlertMessage" style="font-size:11px; padding:2px 8px;">
             Translate
         </button>
         <select id="alert-msg-translate-target" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; font-size:11px; height:22px; padding:0 6px; border-radius:3px;">
@@ -8739,7 +8773,7 @@ async function showAlertDetail(alertId) {
             <option value="de">→ German</option>
         </select>
         <span id="alert-msg-translate-status" style="color:#64748b;"></span>
-        <button id="alert-msg-translate-revert" type="button" onclick="revertAlertMessage()" style="display:none; background:none; border:none; color:#64748b; cursor:pointer; font-size:11px; text-decoration:underline;">show original</button>
+        <button id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage" style="display:none; background:none; border:none; color:#64748b; cursor:pointer; font-size:11px; text-decoration:underline;">show original</button>
     </div>`;
 
     // Tags
@@ -8750,7 +8784,7 @@ async function showAlertDetail(alertId) {
     // MITRE ATT&CK Badges (auto-detected from alert)
     if (alert.mitre_technique_id) {
         html += `<div class="mitre-badges-row">
-            <span class="mitre-badge auto" onclick="filterByMitreTechnique('${escapeHtml(alert.mitre_technique_id)}'); closeAlertModal();" title="Click to filter by this technique">
+            <span class="mitre-badge auto" data-click-action="__filterMitreAndClose" data-tech-id="${escapeHtml(alert.mitre_technique_id)}" title="Click to filter by this technique">
                 <strong>${escapeHtml(alert.mitre_technique_id)}</strong>
                 ${alert.mitre_technique_name ? ` - ${escapeHtml(alert.mitre_technique_name)}` : ''}
                 ${alert.mitre_tactic_name ? ` <span style="opacity:0.7;">(${escapeHtml(alert.mitre_tactic_name)})</span>` : ''}
@@ -8761,8 +8795,8 @@ async function showAlertDetail(alertId) {
     // AI Analysis Bar
     if (aiAvailable) {
         html += `<div class="ai-analysis-bar">
-            <button class="ai-assist-btn" onclick="aiAnalyzeAlert('${escapeHtml(alert.id)}')">&#9733; AI Analyze</button>
-            <button class="ai-assist-btn" onclick="openAIChatWithContext('${escapeHtml(alert.id)}')" style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);color:#10b981;">&#9993; Discuss with AI</button>
+            <button class="ai-assist-btn" data-click-action="aiAnalyzeAlert" data-args='["${escapeHtml(alert.id)}"]'>&#9733; AI Analyze</button>
+            <button class="ai-assist-btn" data-click-action="openAIChatWithContext" data-args='["${escapeHtml(alert.id)}"]' style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);color:#10b981;">&#9993; Discuss with AI</button>
             <div class="ai-analysis-result" id="ai-analysis-result"></div>
         </div>`;
     }
@@ -8785,12 +8819,12 @@ async function showAlertDetail(alertId) {
     // Tabs (added Comments and Case)
     html += `
     <div class="detail-tabs">
-        <button class="detail-tab-btn active" data-tab="related" onclick="switchDetailTab('related', this)">Related Alerts</button>
-        <button class="detail-tab-btn" data-tab="timeline" onclick="switchDetailTab('timeline', this)">Timeline</button>
-        <button class="detail-tab-btn" data-tab="comments" onclick="switchDetailTab('comments', this)">Comments</button>
-        <button class="detail-tab-btn" data-tab="case" onclick="switchDetailTab('case', this)">Case</button>
-        <button class="detail-tab-btn" data-tab="sequence" onclick="switchDetailTab('sequence', this)">Sequence</button>
-        <button class="detail-tab-btn" data-tab="rawdata" onclick="switchDetailTab('rawdata', this)">Raw Data</button>
+        <button class="detail-tab-btn active" data-tab="related" data-click-action="switchDetailTab" data-args='["related", "$target"]'>Related Alerts</button>
+        <button class="detail-tab-btn" data-tab="timeline" data-click-action="switchDetailTab" data-args='["timeline", "$target"]'>Timeline</button>
+        <button class="detail-tab-btn" data-tab="comments" data-click-action="switchDetailTab" data-args='["comments", "$target"]'>Comments</button>
+        <button class="detail-tab-btn" data-tab="case" data-click-action="switchDetailTab" data-args='["case", "$target"]'>Case</button>
+        <button class="detail-tab-btn" data-tab="sequence" data-click-action="switchDetailTab" data-args='["sequence", "$target"]'>Sequence</button>
+        <button class="detail-tab-btn" data-tab="rawdata" data-click-action="switchDetailTab" data-args='["rawdata", "$target"]'>Raw Data</button>
     </div>
     <div id="detail-tab-related" class="detail-tab-content active">
         <div class="loading">Loading related alerts...</div>
@@ -8997,7 +9031,7 @@ function renderRelatedSection(title, alerts, matchType) {
         <div class="related-section">
             <div class="related-section-header">
                 <h4>${title} (${alerts.length})</h4>
-                ${currentCase ? `<button class="btn btn-sm btn-secondary" onclick="linkAllToCase('${matchType}', ${currentCase})">Link all to case</button>` : ''}
+                ${currentCase ? `<button class="btn btn-sm btn-secondary" data-click-action="linkAllToCase" data-args='["${matchType}", ${currentCase}]'>Link all to case</button>` : ''}
             </div>
             ${alerts.slice(0, 10).map(a => {
                 const triage = triageCache[a.id];
@@ -9007,7 +9041,7 @@ function renderRelatedSection(title, alerts, matchType) {
 
                 return `
                 <div class="related-alert-item ${inSameCase ? 'same-case' : ''}">
-                    <div class="related-alert-main" onclick="showAlertDetail('${escapeHtml(a.id)}')">
+                    <div class="related-alert-main" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.id)}"]'>
                         <span class="severity-badge severity-${a.severity}">${a.severity}</span>
                         <span class="similarity-badge similarity-${similarity.level}" title="${similarity.reasons.join(', ')}">${similarity.score}%</span>
                         <span class="related-alert-title" title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</span>
@@ -9017,7 +9051,7 @@ function renderRelatedSection(title, alerts, matchType) {
                         ${hasCase
                             ? `<span class="case-badge" title="In case ${triage.case_number || triage.case_id}">${triage.case_number || 'Case'}</span>`
                             : currentCase
-                                ? `<button class="btn btn-xs btn-link" onclick="linkToCurrentCase('${escapeHtml(a.id)}')">+ Link</button>`
+                                ? `<button class="btn btn-xs btn-link" data-click-action="linkToCurrentCase" data-args='["${escapeHtml(a.id)}"]'>+ Link</button>`
                                 : ''
                         }
                     </div>
@@ -9464,24 +9498,24 @@ function manageSavedFilters() {
                 <div class="saved-filter-desc">${escapeHtml(f.description)}</div>
             </div>
             <div class="saved-filter-actions">
-                <button class="btn btn-sm btn-primary" onclick="loadFilterById('${f.id}')">Load</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteFilter('${f.id}')">Delete</button>
+                <button class="btn btn-sm btn-primary" data-click-action="loadFilterById" data-args='["${f.id}"]'>Load</button>
+                <button class="btn btn-sm btn-danger" data-click-action="deleteFilter" data-args='["${f.id}"]'>Delete</button>
             </div>
         </div>
     `).join('');
 
     const modalHtml = `
-        <div id="saved-filters-modal" class="saved-filters-modal" onclick="if(event.target===this)this.remove()">
+        <div id="saved-filters-modal" class="saved-filters-modal" data-remove-self-on-self-click>
             <div class="saved-filters-content">
                 <div class="modal-header" style="margin-bottom:1rem;">
                     <h3>Manage Saved Views</h3>
-                    <button class="modal-close" onclick="document.getElementById('saved-filters-modal').remove()">&times;</button>
+                    <button class="modal-close" data-remove-target="saved-filters-modal">&times;</button>
                 </div>
                 <div class="saved-filters-list">
                     ${filterItems}
                 </div>
                 <div class="modal-footer" style="margin-top:1rem;text-align:right;">
-                    <button class="btn btn-secondary" onclick="document.getElementById('saved-filters-modal').remove()">Close</button>
+                    <button class="btn btn-secondary" data-remove-target="saved-filters-modal">Close</button>
                 </div>
             </div>
         </div>
@@ -9899,8 +9933,8 @@ function showCreateCaseFromSelected() {
             <textarea id="bulk-case-evidence" rows="3">${escapeHtml(prefillEvidence)}</textarea>
 
             <div class="case-form-actions">
-                <button class="btn btn-secondary" onclick="document.getElementById('bulk-case-create-overlay').remove()">Cancel</button>
-                <button class="btn btn-primary" onclick="submitBulkCreateCase()">Create Case</button>
+                <button class="btn btn-secondary" data-remove-target="bulk-case-create-overlay">Cancel</button>
+                <button class="btn btn-primary" data-click-action="submitBulkCreateCase">Create Case</button>
             </div>
         </div>
     `;
@@ -10018,7 +10052,7 @@ async function addToExistingCase() {
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
                     <h3>Add Alerts to Case</h3>
-                    <button class="modal-close" onclick="closeAddToCaseModal()">&times;</button>
+                    <button class="modal-close" data-click-action="closeAddToCaseModal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <p>Adding ${selectedAlertIds.size} alert(s) to case:</p>
@@ -10027,8 +10061,8 @@ async function addToExistingCase() {
                     </select>
                 </div>
                 <div class="modal-footer">
-                    <button class="btn btn-secondary" onclick="closeAddToCaseModal()">Cancel</button>
-                    <button class="btn btn-primary" onclick="confirmAddToCase()">Add to Case</button>
+                    <button class="btn btn-secondary" data-click-action="closeAddToCaseModal">Cancel</button>
+                    <button class="btn btn-primary" data-click-action="confirmAddToCase">Add to Case</button>
                 </div>
             </div>
         </div>
@@ -10276,11 +10310,11 @@ function showStatusQuickPicker() {
 
 function showKeyboardShortcutsHelp() {
     const helpHtml = `
-        <div id="keyboard-help-modal" class="saved-filters-modal" onclick="if(event.target===this)this.remove()">
+        <div id="keyboard-help-modal" class="saved-filters-modal" data-remove-self-on-self-click>
             <div class="saved-filters-content" style="max-width:400px;">
                 <div class="modal-header" style="margin-bottom:1rem;">
                     <h3>Keyboard Shortcuts</h3>
-                    <button class="modal-close" onclick="document.getElementById('keyboard-help-modal').remove()">&times;</button>
+                    <button class="modal-close" data-remove-target="keyboard-help-modal">&times;</button>
                 </div>
                 <div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem 1rem;">
                     <kbd>j</kbd><span>Next alert</span>
@@ -10297,7 +10331,7 @@ function showKeyboardShortcutsHelp() {
                     <kbd>c</kbd><span>Create case</span>
                 </div>
                 <div class="modal-footer" style="margin-top:1rem;text-align:right;">
-                    <button class="btn btn-secondary" onclick="document.getElementById('keyboard-help-modal').remove()">Close</button>
+                    <button class="btn btn-secondary" data-remove-target="keyboard-help-modal">Close</button>
                 </div>
             </div>
         </div>
@@ -10406,13 +10440,13 @@ function _renderAcpContent(c) {
     html += `<div class="acp-section"><div class="acp-section-title">Metadata</div>
         <div class="acp-meta-grid">
             <div class="acp-meta-item"><label>Status</label>
-                <select onchange="acpUpdateField(${c.id},'status',this.value,'${escapeHtml(c.status || 'open')}')">
+                <select data-change-action="acpUpdateField" data-args='[${c.id}, "status", "$value", "${escapeHtml(c.status || 'open')}"]'>
                     ${['open','acknowledged','closed'].map(s =>
                         `<option value="${s}"${c.status === s ? ' selected' : ''}>${s}</option>`).join('')}
                 </select>
             </div>
             <div class="acp-meta-item"><label>Severity</label>
-                <select onchange="acpUpdateField(${c.id},'severity',this.value)">
+                <select data-change-action="acpUpdateField" data-args='[${c.id}, "severity", "$value"]'>
                     ${['critical','high','medium','low'].map(s =>
                         `<option value="${s}"${c.severity === s ? ' selected' : ''}>${s}</option>`).join('')}
                 </select>
@@ -10476,7 +10510,7 @@ function _renderAcpContent(c) {
     html += `<div style="margin-top:0.5rem;display:flex;gap:0.375rem;">
         <textarea id="acp-note-input" rows="2" placeholder="Add note..."
           style="flex:1;padding:0.375rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;font-size:0.8rem;"></textarea>
-        <button class="btn btn-primary" onclick="acpAddNote(${c.id})" style="font-size:0.75rem;align-self:flex-start;">Add</button>
+        <button class="btn btn-primary" data-click-action="acpAddNote" data-args='[${c.id}]' style="font-size:0.75rem;align-self:flex-start;">Add</button>
     </div>`;
     html += '</div></div>';
 

@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.31.5 -->
+<!-- ion-doc:version=0.31.6 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,9 +9,9 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-14 (v0.31.5 + v0.31.4 + v0.31.3 + v0.31.2 deltas) / 2026-05-13 (v0.31.1 + v0.31.0 + v0.30.1 + v0.30.0 deltas) / 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.31.5 (cases.html migrated off inline handlers — 48 handlers including kanban drag-and-drop; helper extended with `$event` sentinel + per-event positional args)
-**Previous Assessment Version:** 0.31.4 (2026-05-14)
+**Assessment Date:** 2026-05-14 (v0.31.6 + v0.31.5 + v0.31.4 + v0.31.3 + v0.31.2 deltas) / 2026-05-13 (v0.31.1 + v0.31.0 + v0.30.1 + v0.30.0 deltas) / 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.31.6 (alerts.html migrated off inline handlers — 194 handlers via a new mechanical migration script + 4 new built-ins for the patterns alerts.html surfaced)
+**Previous Assessment Version:** 0.31.5 (2026-05-14)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -22,13 +22,15 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 | v0.31.2 | v0.31.3 | v0.31.4 | v0.31.5 |
-|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 | v0.31.2 | v0.31.3 | v0.31.4 | v0.31.5 | v0.31.6 |
+|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+
+v0.31.6 continues the P11 inline-handler retirement: alerts.html (194 inline handlers — 171 onclick + 20 onchange + 1 oninput + 2 onkeydown) migrated to data-attribute delegation. The bulk (185 handlers) translated mechanically via a new `tools/migrate_inline_handlers.py` Python script; 9 edge cases hand-fixed (closure-style tag-input component, FP-banner dismiss, toast remove, mitre+close chained call, switchDetailTab+querySelector). Event-delegation helper gains 4 new built-ins (`data-stop-propagation` / `data-prevent-default` without an action, `data-remove-target="id"`, `data-remove-parent`, `data-remove-closest=".sel"`) covering every common inline-handler shape encountered in alerts.html. **Net new findings: 0C / 0H / 0M / 0L.** Browser-verified end-to-end via Playwright spies — `sortBy` receives `["severity"]`, `quickFilterBySeverity` receives `["high"]`, `loadAlerts` fires no-arg. 0 CSP violations, 0 JS errors on /alerts (pre-existing 404 on `/api/chat/users` unrelated). CSP unchanged this release; 70 child templates still rely on `script-src-attr 'unsafe-inline'`.
 
 v0.31.5 continues the P11 inline-handler retirement: cases.html (48 inline handlers — 40 onclick + 5 onchange + 3 oninput + 9 drag/drop) migrated to data-attribute delegation. Event-delegation helper extended with drag/drop events (dragstart/dragend/dragover/dragenter/dragleave/drop), a `$event` runtime sentinel for `data-args` (preserves `onclick="foo(event, ...)"` semantics), and `data-${event}-args` per-event positional override (for elements like kanban cards where `click` and `dragstart` need different args). cases.html's `cancelClosure` rewritten to find the status select by parsing `data-args` JSON rather than matching the obsolete `onchange=` attribute string — same v0.23.2 contract preserved. Browser-verified end-to-end: modal opens/closes, kanban card click, tab switching, all 0 CSP violations. **Net new findings: 0C / 0H / 0M / 0L.** CSP unchanged this release; 71 child templates still rely on the `script-src-attr 'unsafe-inline'` escape hatch.
 

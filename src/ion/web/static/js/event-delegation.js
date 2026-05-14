@@ -85,8 +85,12 @@
     var skip = new Set([
       'clickAction', 'changeAction', 'inputAction', 'submitAction',
       'keydownAction', 'keyupAction', 'blurAction', 'focusAction',
+      'dragstartAction', 'dragendAction', 'dragoverAction',
+      'dragenterAction', 'dragleaveAction', 'dropAction',
       'preventDefault', 'stopPropagation', 'onlySelfClick',
       'closeTarget', 'closeOnSelfClick', 'args',
+      'removeTarget', 'removeSelfOnSelfClick', 'scriptOnerrorFlag',
+      'removeParent', 'removeClosest',
     ]);
     var out = {};
     for (var key in el.dataset) {
@@ -115,7 +119,17 @@
 
   function dispatch(event, attr) {
     var hit = pickAction(event.target, attr);
-    if (!hit) return;
+    if (!hit) {
+      // No action attribute on this element. Still honour bare event-control
+      // attributes — replaces the `onclick="event.stopPropagation()"` pattern
+      // where there's no function call, only event-flow control.
+      var ctrl = event.target.closest('[data-stop-propagation],[data-prevent-default]');
+      if (ctrl) {
+        if (ctrl.hasAttribute('data-stop-propagation')) event.stopPropagation();
+        if (ctrl.hasAttribute('data-prevent-default')) event.preventDefault();
+      }
+      return;
+    }
     // `data-only-self-click` gates the action on the click being a direct
     // hit on this element (not bubbled from a child). Mirrors the inline
     // `if(event.target===this) ...` modal-backdrop pattern.
@@ -187,6 +201,47 @@
     var targetId = trigger.getAttribute('data-close-target');
     var target = document.getElementById(targetId);
     if (target) target.style.display = 'none';
+  });
+
+  // Built-in: remove-target — DELETE the element whose id matches from the DOM
+  // (not just hide). Replaces the inline
+  // `onclick="document.getElementById('foo').remove()"` pattern used for
+  // dynamically-injected modals that should be destroyed on close.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-remove-target]');
+    if (!trigger) return;
+    var targetId = trigger.getAttribute('data-remove-target');
+    var target = document.getElementById(targetId);
+    if (target) target.remove();
+  });
+
+  // Built-in: remove-self-on-self-click — REMOVE this element on self-click.
+  // Replaces `onclick="if(event.target===this)this.remove()"` for modal
+  // backdrops that are destroyed (not just hidden) on outside-click.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-remove-self-on-self-click]');
+    if (!trigger) return;
+    if (event.target === trigger) trigger.remove();
+  });
+
+  // Built-in: remove-parent — remove the parent element of the clicked
+  // control. Replaces `onclick="this.parentElement.remove()"` used on
+  // dismiss-X buttons whose parent is a self-contained banner / chip.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-remove-parent]');
+    if (!trigger) return;
+    if (trigger.parentElement) trigger.parentElement.remove();
+  });
+
+  // Built-in: remove-closest — remove the closest ancestor matching the
+  // CSS selector. Replaces `onclick="this.closest('.foo').remove()"`.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-remove-closest]');
+    if (!trigger) return;
+    var selector = trigger.getAttribute('data-remove-closest');
+    if (!selector) return;
+    var ancestor = trigger.closest(selector);
+    if (ancestor) ancestor.remove();
   });
 
   // Built-in: close-on-self-click — hide self when the click was on

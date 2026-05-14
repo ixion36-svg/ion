@@ -1,13 +1,118 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.5 -->
+<!-- ion-doc:version=0.31.6 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-12 -->
 
 # Changelog
+
+## v0.31.6 — 2026-05-14
+
+Secure-by-Design **P11 follow-up #3** — alerts.html migrated off inline
+event handlers. Largest single-template migration to date (194 handlers).
+Event-delegation helper extended with built-ins for every new pattern
+alerts.html surfaced. New `tools/migrate_inline_handlers.py` carries
+the mechanical translation; will pay back across the remaining 70
+templates.
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(tools): mechanical migration script
+
+`tools/migrate_inline_handlers.py` translates the common inline-handler
+shapes to data-attribute delegation. Patterns handled mechanically:
+
+* `onclick="fn()"` → `data-click-action="fn"`
+* `onclick="fn(${id}, 'literal')"` → `data-click-action="fn" data-args='[${id}, "literal"]'`
+* `onclick="event.stopPropagation()"` → `data-stop-propagation` (no action)
+* `onclick="event.stopPropagation(); fn(...)"` → action + `data-stop-propagation`
+* `onclick="if(event.target===this)fn()"` → `data-click-action="fn" data-only-self-click`
+* `onclick="if(event.target===this)this.remove()"` → `data-remove-self-on-self-click`
+* `onclick="document.getElementById('foo').remove()"` → `data-remove-target="foo"`
+* `onclick="fn(); return false"` → `data-click-action="fn" data-prevent-default`
+* `this.value` / `this.checked` / `this` / `event` args → `$value` / `$checked` / `$target` / `$event` sentinels
+
+Edge cases the script can't translate (chained user-function calls,
+runtime DOM lookups passed as args, `this.parentElement.method()`
+chains) are listed for manual handling.
+
+### feat(security): event-delegation helper — 4 new built-ins
+
+`static/js/event-delegation.js` (v0.31.6):
+
+* **`data-stop-propagation` / `data-prevent-default` without an action**
+  — the helper now honours these on a separate pass even when no
+  `data-${event}-action` is present. Replaces the bare
+  `onclick="event.stopPropagation()"` pattern.
+* **`data-remove-target="id"`** — DELETE the element with that id from
+  the DOM (`.remove()`, not `.style.display='none'`). Replaces the
+  `onclick="document.getElementById('foo').remove()"` pattern on
+  dynamically-injected modal overlays.
+* **`data-remove-parent`** — remove the parent of the clicked element.
+  Replaces `onclick="this.parentElement.remove()"` on toast / banner
+  dismiss buttons.
+* **`data-remove-closest="<selector>"`** — remove the closest ancestor
+  matching the CSS selector. Replaces
+  `onclick="this.closest('.foo').remove()"` for nested dismiss buttons
+  inside self-removing containers.
+
+### feat(templates): migrate alerts.html — 194 inline handlers gone
+
+194 inline handlers (171 `onclick` + 20 `onchange` + 1 `oninput` +
+2 `onkeydown`) replaced with data-attribute delegation. After this
+release alerts.html has **zero inline event handlers**.
+
+Hand-fixed shapes the mechanical script couldn't reach (9 spots):
+
+* **Tag-input chips** — `this.parentElement.parentElement._removeTag(idx)`
+  shape (closure-style component with `_addTag` / `_removeTag` methods
+  attached to a container element). New `__tagChipRemove` /
+  `__tagInputEnter` window globals walk up to the container and
+  invoke its methods.
+* **Toast dismiss** — `data-remove-parent` (new built-in).
+* **FP-suggestion banner dismiss** — `data-remove-closest=".fp-suggestion-banner"`
+  (new built-in).
+* **Triage case link** — `switchDetailTab('case', document.querySelector('[data-tab=case]'))`
+  wrapped by a `__switchDetailTabBySelector` window global that does
+  the DOM lookup at click time.
+* **Observable input Enter** — `__observableInputEnter` window global,
+  reads alert id from `data-alert-id`, fires `addObservable(alertId)`.
+* **MITRE badge** — `filterByMitreTechnique(...); closeAlertModal();`
+  chained call wrapped by `__filterMitreAndClose` window global.
+
+### Scope clarification
+
+After this release, base.html + cases.html + alerts.html are fully
+migrated (7 + 48 + 194 = 249 handlers). 70 templates remain with
+~770 inline `onclick=` + ~1,650 inline `style=""`. CSP unchanged.
+
+### Verification
+
+Browser-test on local SQLite dev server:
+
+* `/alerts` loads with **0 CSP violations** and 0 JS errors (one
+  pre-existing 404 on `/api/chat/users` — unrelated).
+* 72 delegated attributes (62 click + 9 change + 1 input) present in
+  the static DOM; more added as the alert list / detail modal /
+  context menus render.
+* Playwright spies on `sortBy`, `quickFilterBySeverity`, `loadAlerts`
+  confirmed they receive the correct args via delegation:
+  * `sortBy(["severity"])` from the severity column header.
+  * `quickFilterBySeverity(["high"])` from the high quick-filter.
+  * `loadAlerts()` from the refresh button — no-arg call.
+
+### Files
+
+* `tools/migrate_inline_handlers.py` (new).
+* `src/ion/web/static/js/event-delegation.js` — 4 new built-ins +
+  control-only pass.
+* `src/ion/web/templates/alerts.html` — 194 handlers migrated;
+  6 small window-globals added for chained / closure-shaped patterns.
+* `src/ion/web/templates/base.html` — helper version `?v=0.31.6`.
+
+---
 
 ## v0.31.5 — 2026-05-14
 
