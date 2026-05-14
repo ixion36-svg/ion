@@ -73,7 +73,7 @@ def _collect_cases(session: Session, hours: int) -> dict:
         )
     ).scalars().all()
     open_backlog = session.execute(
-        select(AlertCase).where(AlertCase.status != AlertCaseStatus.CLOSED.value)
+        select(AlertCase).where(AlertCase.status != AlertCaseStatus.CLOSED)
     ).scalars().all()
 
     by_severity: dict[str, int] = {}

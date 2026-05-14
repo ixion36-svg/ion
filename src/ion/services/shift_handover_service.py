@@ -186,7 +186,7 @@ def _get_pending_items(session: Session) -> dict:
     unassigned = session.execute(
         select(func.count(AlertCase.id)).where(
             and_(
-                AlertCase.status != AlertCaseStatus.CLOSED.value,
+                AlertCase.status != AlertCaseStatus.CLOSED,
                 AlertCase.assigned_to_id.is_(None),
             )
         )
@@ -195,7 +195,7 @@ def _get_pending_items(session: Session) -> dict:
     # Open cases by severity
     open_cases_q = (
         select(AlertCase.severity, func.count(AlertCase.id))
-        .where(AlertCase.status != AlertCaseStatus.CLOSED.value)
+        .where(AlertCase.status != AlertCaseStatus.CLOSED)
         .group_by(AlertCase.severity)
     )
     open_by_severity = {}
@@ -205,21 +205,21 @@ def _get_pending_items(session: Session) -> dict:
     # Total open cases
     total_open = session.execute(
         select(func.count(AlertCase.id)).where(
-            AlertCase.status != AlertCaseStatus.CLOSED.value
+            AlertCase.status != AlertCaseStatus.CLOSED
         )
     ).scalar() or 0
 
     # Open alerts (not yet triaged / still open)
     open_alerts = session.execute(
         select(func.count(AlertTriage.id)).where(
-            AlertTriage.status == AlertTriageStatus.OPEN.value
+            AlertTriage.status == AlertTriageStatus.OPEN
         )
     ).scalar() or 0
 
     # Acknowledged but not closed (in progress)
     in_progress = session.execute(
         select(func.count(AlertTriage.id)).where(
-            AlertTriage.status == AlertTriageStatus.ACKNOWLEDGED.value
+            AlertTriage.status == AlertTriageStatus.ACKNOWLEDGED
         )
     ).scalar() or 0
 

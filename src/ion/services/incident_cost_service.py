@@ -70,7 +70,7 @@ def calculate_incident_cost(
 
     query = select(AlertCase).where(
         and_(
-            AlertCase.status == AlertCaseStatus.CLOSED.value,
+            AlertCase.status == AlertCaseStatus.CLOSED,
             AlertCase.closed_at.isnot(None),
             AlertCase.closed_at >= period_start,
         )

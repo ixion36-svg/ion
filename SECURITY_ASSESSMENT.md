@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.31.1 -->
+<!-- ion-doc:version=0.31.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,9 +9,9 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-05-13 (v0.31.1 + v0.31.0 + v0.30.1 + v0.30.0 deltas) / 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.31.1 (daily standup polish — Cache-Control no-store, rule-name not ID, Section 2b 24h breakdowns)
-**Previous Assessment Version:** 0.31.0 (2026-05-13)
+**Assessment Date:** 2026-05-14 (v0.31.2 delta) / 2026-05-13 (v0.31.1 + v0.31.0 + v0.30.1 + v0.30.0 deltas) / 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
+**Application Version:** 0.31.2 (SQLEnum filter cleanup — 15 ORM sites switched to enum-instance form + regression test pinning the actual bind behaviour)
+**Previous Assessment Version:** 0.31.1 (2026-05-13)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent
@@ -22,13 +22,15 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17–v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 |
-|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
-| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 | v0.31.2 |
+|----------|---------|------------|------------|------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
+| **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
+
+v0.31.2 is a code-quality release — 15 ORM filter sites across 9 service modules converted from `Column == EnumX.value` (or bare lowercase string) to the enum-instance form `Column == EnumX`, plus a new regression test pinning SQLAlchemy's actual `SQLEnum(native_enum=False)` storage + bind behaviour. **Net new findings: 0C / 0H / 0M / 0L.** No new endpoints, no schema migrations, no permission gate changes, no behaviour change. The audit was initially scoped as a bug-hunt for "silently-broken SQL filters" but the new test (`tests/test_v032_sqlenum_name_storage.py`, 10 cases) demonstrated SQLAlchemy's `Enum.bind_processor` coerces lowercase strings → enum instance → `.name` bind, so the ORM-side filters were never actually broken. The only path that genuinely bypasses bind coercion is raw `text()` SQL (which is what bit `seed_lab_fixtures.py:109` in v0.30.0 — already fixed). The 15 edits stay because the enum-instance form is more idiomatic, easier to grep for, and immune to a future SQLAlchemy version tightening `validate_strings` to True by default. `src/ion/web/api.py:_fixture_alert_dicts` additionally converts the URL-query `status` parameter to an enum via `AlertTriageStatus(status)` with a `ValueError` guard — defensive coding for the user-input boundary. `CLAUDE.md` "Known gotchas" rewritten with the accurate rule.
 
 v0.31.1 is a daily-standup polish release — three operator-reported usability issues closed on the `/standup` page. **Net new findings: 0C / 0H / 0M / 0L.** No backend schema or API contract changes. (1) `/api/daily-standup/checks` now sets `Cache-Control: no-store, no-cache, must-revalidate` on the response; the front-end `fetch()` also passes `cache: 'no-store'`. Prevents browsers / intermediate proxies from serving a stale `critical_alerts` snapshot to the next analyst on shift. (2) Section 2's critical-alerts rule column fallback chain shortened from `rule_name → title → id → '(unnamed)'` to `rule_name → title → '(rule unknown)'` so the raw ES document id can no longer appear where the rule name belongs. No new auth surface. (3) New `_check_alerts_24h()` aggregates `get_alerts(hours=24, include_closed=True, limit=5000)` by severity and status; uses the existing `alert:read` permission gate via the daily-standup endpoint; falls back to local AlertTriage counts when ES is down (severity collapses to "unknown" — surfaced via a source banner). `_check_case_status_counts()` adds a `by_severity_24h` aggregation on cases created in the last 24h. The previous 30-day check is kept in the orchestrator response so the pptx slide export keeps working.
 

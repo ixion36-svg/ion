@@ -3512,14 +3512,22 @@ def _fixture_alert_dicts(
     from datetime import timezone as _tz
 
     from ion.models.alert_triage import AlertTriage as _AlertTriage
+    from ion.models.alert_triage import AlertTriageStatus as _AlertTriageStatus
 
     fixture_q = session.query(_AlertTriage).filter(
         _AlertTriage.es_alert_id.like("lab-fixture-%")
     )
     if status:
-        fixture_q = fixture_q.filter(_AlertTriage.status == status)
+        # `status` comes in as the lowercase enum value (open/acknowledged/closed).
+        # AlertTriage.status is SQLEnum stored as the enum NAME, so we must hand
+        # the bind processor an enum instance, not the raw string.
+        try:
+            fixture_q = fixture_q.filter(_AlertTriage.status == _AlertTriageStatus(status))
+        except ValueError:
+            # Unknown status value — no fixture rows can match
+            fixture_q = fixture_q.filter(False)
     elif not include_closed:
-        fixture_q = fixture_q.filter(_AlertTriage.status != "closed")
+        fixture_q = fixture_q.filter(_AlertTriage.status != _AlertTriageStatus.CLOSED)
     # `severity` query param maps to AlertTriage.priority (the seed-payload
     # field that semantically aligns with ES alert severity; AlertTriage
     # has no `severity` column).

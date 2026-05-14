@@ -117,8 +117,8 @@ def get_stale_iocs(
             open_cases = (
                 session.query(AlertCase.observables)
                 .filter(AlertCase.status.in_([
-                    AlertCaseStatus.OPEN.value,
-                    AlertCaseStatus.ACKNOWLEDGED.value,
+                    AlertCaseStatus.OPEN,
+                    AlertCaseStatus.ACKNOWLEDGED,
                 ]))
                 .filter(AlertCase.observables != None)  # noqa: E711
                 .all()
