@@ -10,10 +10,10 @@
 # ION Development Lifecycle
 
 **Document owner:** Repository maintainer (`ixion36`)
-**Status:** Current as of v0.29.1 (2026-05-12)
+**Status:** Current as of v0.31.2 (2026-05-14)
 **Review cadence:** Every minor-version bump (v0.X.0) or on material process change, whichever is sooner.
-**Primary framework:** Secure by Design (SbD)
-**Secondary references:** NCSC *Secure Development and Deployment Guidance* (8 principles); NIST SP 800-218 (SSDF) for international interoperability.
+**Primary framework:** Secure by Design (SbD) — see `docs/SECURE_BY_DESIGN.md` for the canonical 20-principle list.
+**Secondary references:** NCSC *Secure Development and Deployment Guidance* (8 principles); NIST SP 800-218 (SSDF); CISA *Secure by Design*; OWASP SAMM; Saltzer & Schroeder (1975).
 
 ---
 
@@ -36,7 +36,7 @@ Those documents are inputs into this lifecycle; this one describes the process t
 This document is intended for:
 
 - ION's primary maintainer and any future contributors.
-- Defence-tier and other regulated-environment customers performing supplier due diligence.
+- Regulated-environment customers performing supplier due diligence.
 - Independent assessors auditing ION against the Secure by Design methodology.
 - The ION SOC operator team operating a deployed instance, when they need to understand the line between "operational change" (their authority) and "code change" (must go through the development lifecycle).
 
@@ -399,9 +399,9 @@ The NCSC's 8 principles map to ION's existing practice as follows. Where a princ
 
 ---
 
-## 5. Defence-Tier Supplier Alignment
+## 5. Regulated-Environment Supplier Alignment
 
-Defence-tier and other regulated-environment supplier assurance schemes commonly require the following controls. ION's current state against each:
+Regulated-environment supplier assurance schemes commonly require the following controls. ION's current state against each:
 
 - **Recognised baseline cyber hygiene** (Cyber Essentials Plus or equivalent) for the supplier's general estate — out of scope for this document; covered by the maintainer's own organisational controls.
 - **Documented secure development lifecycle** — this document satisfies that requirement.
@@ -507,7 +507,7 @@ Audit trail is **complete from `git log` alone** for the canonical artefacts. Th
 
 ## 8. Known Gaps and Roadmap
 
-The following items are **not currently in place** and represent the delta between ION's current practice and full Secure by Design alignment for defence-tier supplier requirements. Each is logged in `_backlog_v0_23.md` (or the equivalent next-version backlog) with an indicative effort.
+The following items are **not currently in place** and represent the delta between ION's current practice and full Secure by Design alignment for higher-assurance supplier requirements. Each is logged in `_backlog_v0_23.md` (or the equivalent next-version backlog) with an indicative effort.
 
 ### Process gaps
 
@@ -546,7 +546,7 @@ The following items are **not currently in place** and represent the delta betwe
 
 | Version | Date | Author | Change |
 |---------|------|--------|--------|
-| 1.0 | 2026-05-11 | Maintainer | Initial publication, aligned to Secure by Design 5 phases. Cross-referenced NCSC SD&D 8 principles. Gap analysis (§8) captures the delta to full defence-tier supplier alignment. |
+| 1.0 | 2026-05-11 | Maintainer | Initial publication, aligned to Secure by Design 5 phases. Cross-referenced NCSC SD&D 8 principles. Gap analysis (§8) captures the delta to full higher-assurance supplier alignment. |
 | 1.1 | 2026-05-11 | Maintainer | v0.24.0: CI pipeline landed at `.github/workflows/test.yml` (pytest + ruff + bandit). §3.4.4 rewritten to describe the running CI. §4 NCSC Principle 6 status moved from **Partial** to **Met**. §8 CI gap struck through with closure note. |
 | 1.2 | 2026-05-11 | Maintainer | v0.25.0: Software Composition Analysis (`pip-audit`) added as a 4th parallel CI job, scanning the resolved dep tree against OSV. §3.4.4 lists the new job and the documented `--ignore-vuln` baseline. §4 NCSC Principle 4 status moved from **Partial** to **Mostly Met**; Principle 6 prose updated to list pip-audit alongside bandit. §8 SCA gap struck through with closure note. |
 | 1.3 | 2026-05-11 | Maintainer | v0.26.0: Software Bill of Materials (`syft` 1.18.1) generated at Docker build; SPDX-JSON shipped inside the image at `/app/sbom.spdx.json`. §3.4.5 rewritten to describe the syft step. §4 NCSC Principle 4 status moved from **Mostly Met** to **Met**. §8 SBOM gap struck through with closure note. Also notes the v0.26.0 ruff cleanup: codebase-wide ignores added for deliberate-style rules (E402/E712/E741/N806/F841/N811/E711/E731/E701), per-file ignores extended to cover ORM forward-reference F821 in model files, and `ruff check src/` returns 0 errors — closing the v0.24.0/v0.25.0 ruff red CI job. **New §3.4.8 Release acceptance testing** section formalises the post-tag UI / artefact verification walk-through (health probe → SBOM extract → headline-feature walk → spot-check release files → tear down). Replaces ad-hoc per-release walk with a canonical checklist. |

@@ -12,7 +12,8 @@ Current released version: **v0.31.1** (see `pyproject.toml`). Memory above (`~/.
 | Stack inventory | `STACK.md` |
 | Setup / first run | `SETUP.md` |
 | Operations | `docs/RUNBOOK.md` |
-| SDLC / Secure-by-Design | `docs/DEVELOPMENT_LIFECYCLE.md` (customer-agnostic — keep that way) |
+| SDLC / Secure-by-Design (phases) | `docs/DEVELOPMENT_LIFECYCLE.md` (customer-agnostic — keep that way) |
+| Secure-by-Design (principles + audit) | `docs/SECURE_BY_DESIGN.md` — 20 numbered principles, ION audit per principle, gap list |
 | Recent change history | `CHANGELOG.md` |
 | Backlog / next release | latest `_backlog_v*.md` (v0.27 candidate file present but stale — through v0.31.1 has shipped) |
 | Latest handoff snapshot | latest `_handoff_v*.md` (v0.26 present; refresh on next release) |
