@@ -1,5 +1,6 @@
 """Repository for authentication and audit operations."""
 
+import hashlib
 import json
 from datetime import datetime
 from typing import List, Optional
@@ -8,6 +9,19 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session, joinedload
 
 from ion.models.user import AuditLog, Role, User, UserSession
+
+
+def _hash_session_token(token: str) -> str:
+    """Compute the SHA-256 hex digest of a session token.
+
+    G5 closure (v0.31.17): session tokens are stored as hashes at rest.
+    The plaintext token only exists in the client cookie; the DB carries
+    just the digest. SHA-256 without salt is appropriate here because
+    tokens are 32 bytes of CSPRNG output (256-bit entropy) — preimage
+    attacks are computationally infeasible, and a slow hash like bcrypt
+    buys nothing for high-entropy random inputs.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 class SessionRepository:
@@ -24,10 +38,10 @@ class SessionRepository:
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> UserSession:
-        """Create a new user session."""
+        """Create a new user session. Stores the SHA-256 hash of the token."""
         user_session = UserSession(
             user_id=user_id,
-            session_token=session_token,
+            session_token_hash=_hash_session_token(session_token),
             expires_at=expires_at,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -37,7 +51,7 @@ class SessionRepository:
         return user_session
 
     def get_by_token(self, session_token: str) -> Optional[UserSession]:
-        """Get a session by token.
+        """Get a session by token (hashes the input before lookup).
 
         v0.9.82 — matched to get_valid_session(): joinedload for the
         *-to-one relations, selectinload for the many-to-many collections.
@@ -45,6 +59,7 @@ class SessionRepository:
         (80+ rows per admin lookup) that was fixed on the hot path in
         v0.9.65 — this one was a landmine because logout is rare.
         """
+        token_hash = _hash_session_token(session_token)
         stmt = (
             select(UserSession)
             .options(
@@ -54,12 +69,12 @@ class SessionRepository:
                 joinedload(UserSession.active_role)
                     .selectinload(Role.permissions),
             )
-            .where(UserSession.session_token == session_token)
+            .where(UserSession.session_token_hash == token_hash)
         )
         return self.session.execute(stmt).scalar_one_or_none()
 
     def get_valid_session(self, session_token: str) -> Optional[UserSession]:
-        """Get a valid (non-expired) session by token.
+        """Get a valid (non-expired) session by token (hashes input first).
 
         HOT PATH — runs on every authenticated request. The previous version
         chained joinedload across two many-to-many collections (User.roles +
@@ -68,6 +83,7 @@ class SessionRepository:
         load. selectinload issues 3 fast IN-list queries instead — total
         query time drops to single-digit ms.
         """
+        token_hash = _hash_session_token(session_token)
         stmt = (
             select(UserSession)
             .options(
@@ -81,7 +97,7 @@ class SessionRepository:
                     .selectinload(Role.permissions),
             )
             .where(
-                UserSession.session_token == session_token,
+                UserSession.session_token_hash == token_hash,
                 UserSession.expires_at > datetime.utcnow(),
             )
         )
@@ -102,8 +118,9 @@ class SessionRepository:
         self.session.flush()
 
     def delete_by_token(self, session_token: str) -> bool:
-        """Delete a session by token."""
-        stmt = delete(UserSession).where(UserSession.session_token == session_token)
+        """Delete a session by token (hashes the input before lookup)."""
+        token_hash = _hash_session_token(session_token)
+        stmt = delete(UserSession).where(UserSession.session_token_hash == token_hash)
         result = self.session.execute(stmt)
         self.session.flush()
         return result.rowcount > 0
