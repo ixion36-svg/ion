@@ -224,6 +224,20 @@ def _translate_handler(value: str) -> Optional[dict[str, Optional[str]]]:
         flags["data-remove-target"] = m.group(1)
         return flags
 
+    # this.parentElement.remove() — used for tag/badge dismissal patterns
+    if s == "this.parentElement.remove()":
+        flags["data-remove-parent"] = ""
+        return flags
+
+    # this.closest('SELECTOR').remove() — used for row/card dismissal patterns
+    m = re.fullmatch(
+        r"this\.closest\(\s*['\"]([^'\"]+)['\"]\s*\)\.remove\(\)",
+        s,
+    )
+    if m:
+        flags["data-remove-closest"] = m.group(1)
+        return flags
+
     # Chained user-function calls: fn1(...); fn2(...);
     # Can't represent as a single data-action; flag for manual.
     if ";" in s and re.search(r"\)\s*;\s*\w+\s*\(", s):

@@ -35,11 +35,11 @@
 
   <!-- Level filter strip -->
   <div class="flex flex-wrap gap-2 mb-6">
-    <button onclick="filterLevel('')"      class="cl-filter cl-filter-active" data-level="">All levels</button>
-    <button onclick="filterLevel('L1')"    class="cl-filter" data-level="L1">L1 — Tier-1 SOC</button>
-    <button onclick="filterLevel('L2')"    class="cl-filter" data-level="L2">L2 — Senior analyst</button>
-    <button onclick="filterLevel('L3')"    class="cl-filter" data-level="L3">L3 — IR / hunting</button>
-    <button onclick="filterLevel('L4')"    class="cl-filter" data-level="L4">L4 — Lead / engineering</button>
+    <button data-click-action="filterLevel" data-args='[""]'      class="cl-filter cl-filter-active" data-level="">All levels</button>
+    <button data-click-action="filterLevel" data-args='["L1"]'    class="cl-filter" data-level="L1">L1 — Tier-1 SOC</button>
+    <button data-click-action="filterLevel" data-args='["L2"]'    class="cl-filter" data-level="L2">L2 — Senior analyst</button>
+    <button data-click-action="filterLevel" data-args='["L3"]'    class="cl-filter" data-level="L3">L3 — IR / hunting</button>
+    <button data-click-action="filterLevel" data-args='["L4"]'    class="cl-filter" data-level="L4">L4 — Lead / engineering</button>
   </div>
 
   <div id="courses-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

@@ -16,13 +16,13 @@
       <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Observables</h1>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button onclick="loadStats()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh</button>
-      <button onclick="showGraphView()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-network"/></svg>Graph</button>
-      <button onclick="showPatternsView()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Patterns</button>
-      <button onclick="showWatchlist()" class="relative inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-eye"/></svg>Watchlist<span id="watchlist-count" class="ml-1 px-1.5 py-0.5 rounded-full bg-ion-coral/20 text-ion-coral text-[10px]" style="display:none">0</span></button>
-      <button onclick="showImportModal()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-upload"/></svg>Import</button>
-      <button onclick="exportCSV()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-download"/></svg>Export</button>
-      <button onclick="showMigrateModal()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">Migrate</button>
+      <button data-click-action="loadStats" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh</button>
+      <button data-click-action="showGraphView" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-network"/></svg>Graph</button>
+      <button data-click-action="showPatternsView" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Patterns</button>
+      <button data-click-action="showWatchlist" class="relative inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-eye"/></svg>Watchlist<span id="watchlist-count" class="ml-1 px-1.5 py-0.5 rounded-full bg-ion-coral/20 text-ion-coral text-[10px]" style="display:none">0</span></button>
+      <button data-click-action="showImportModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-upload"/></svg>Import</button>
+      <button data-click-action="exportCSV" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-download"/></svg>Export</button>
+      <button data-click-action="showMigrateModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">Migrate</button>
     </div>
   </section>
 
@@ -30,8 +30,8 @@
   <div id="watchlist-banner" class="mb-4 rounded-[12px] border border-ion-coral/30 bg-ion-coral/5 px-5 py-4 flex items-center gap-3" style="display:none">
     <div class="h-7 w-7 rounded-full bg-ion-coral/20 grid place-items-center text-ion-coral font-bold">!</div>
     <span id="watchlist-alert-text" class="flex-1 text-[13px] text-white">You have unread watchlist alerts</span>
-    <button onclick="showWatchlistAlerts()" class="h-8 px-3 rounded-md bg-ion-coral text-ink-950 text-[11px] font-semibold hover:brightness-110 transition">View</button>
-    <button onclick="dismissWatchlistBanner()" class="text-slate-400 hover:text-white transition"><svg class="w-4 h-4"><use href="#i-x"/></svg></button>
+    <button data-click-action="showWatchlistAlerts" class="h-8 px-3 rounded-md bg-ion-coral text-ink-950 text-[11px] font-semibold hover:brightness-110 transition">View</button>
+    <button data-click-action="dismissWatchlistBanner" class="text-slate-400 hover:text-white transition"><svg class="w-4 h-4"><use href="#i-x"/></svg></button>
   </div>
 
   <!-- Stats -->
@@ -64,8 +64,8 @@
 
 <!-- Filters -->
 <div class="observables-filters">
-    <input type="text" id="search-input" class="search-input" placeholder="Search observables..." oninput="debouncedSearch()">
-    <select id="type-filter" onchange="loadObservables()">
+    <input type="text" id="search-input" class="search-input" placeholder="Search observables..." data-input-action="debouncedSearch">
+    <select id="type-filter" data-change-action="loadObservables">
         <option value="">All Types</option>
         <option value="ipv4">IPv4</option>
         <option value="ipv6">IPv6</option>
@@ -81,7 +81,7 @@
         <option value="mac">MAC Address</option>
         <option value="cve">CVE</option>
     </select>
-    <select id="threat-filter" onchange="loadObservables()">
+    <select id="threat-filter" data-change-action="loadObservables">
         <option value="">All Threat Levels</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -90,17 +90,17 @@
         <option value="benign">Benign</option>
         <option value="unknown">Unknown</option>
     </select>
-    <select id="whitelist-filter" onchange="loadObservables()">
+    <select id="whitelist-filter" data-change-action="loadObservables">
         <option value="">All</option>
         <option value="true">Whitelisted</option>
         <option value="false">Not Whitelisted</option>
     </select>
-    <select id="enriched-filter" onchange="loadObservables()">
+    <select id="enriched-filter" data-change-action="loadObservables">
         <option value="">All</option>
         <option value="true">Enriched Only</option>
         <option value="false">Not Enriched</option>
     </select>
-    <button class="btn btn-secondary" onclick="clearFilters()">Clear</button>
+    <button class="btn btn-secondary" data-click-action="clearFilters">Clear</button>
 </div>
 
 <!-- Results Table -->
@@ -132,13 +132,13 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2 id="detail-title">Observable Details</h2>
-            <button class="modal-close" onclick="closeDetailModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeDetailModal">&times;</button>
         </div>
         <div class="modal-body" id="detail-body">
             <!-- Populated by JS -->
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeDetailModal()">Close</button>
+            <button class="btn btn-secondary" data-click-action="closeDetailModal">Close</button>
         </div>
     </div>
 </div>
@@ -148,14 +148,14 @@
     <div class="modal-content modal-xlarge">
         <div class="modal-header">
             <h3>Observable Relationship Graph</h3>
-            <button class="modal-close" onclick="closeGraphModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeGraphModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="graph-controls">
-                <label>Min Co-occurrence: <input type="number" id="graph-min-cooccur" value="2" min="1" max="50" onchange="loadGraph()"></label>
-                <label>Max Nodes: <input type="number" id="graph-max-nodes" value="50" min="10" max="200" onchange="loadGraph()"></label>
-                <button class="btn btn-sm btn-secondary" onclick="loadGraph()">Refresh</button>
-                <button class="btn btn-sm btn-secondary" onclick="resetGraphView()">Reset View</button>
+                <label>Min Co-occurrence: <input type="number" id="graph-min-cooccur" value="2" min="1" max="50" data-change-action="loadGraph"></label>
+                <label>Max Nodes: <input type="number" id="graph-max-nodes" value="50" min="10" max="200" data-change-action="loadGraph"></label>
+                <button class="btn btn-sm btn-secondary" data-click-action="loadGraph">Refresh</button>
+                <button class="btn btn-sm btn-secondary" data-click-action="resetGraphView">Reset View</button>
             </div>
             <div class="graph-legend">
                 <span class="legend-item"><span class="legend-dot" style="background:#ef4444;"></span> IP</span>
@@ -177,12 +177,12 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h3>Observable Patterns</h3>
-            <button class="modal-close" onclick="closePatternsModal()">&times;</button>
+            <button class="modal-close" data-click-action="closePatternsModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="patterns-controls">
-                <label>Min Occurrences: <input type="number" id="pattern-min-occur" value="3" min="2" max="50" onchange="loadPatterns()"></label>
-                <button class="btn btn-sm btn-secondary" onclick="loadPatterns()">Refresh</button>
+                <label>Min Occurrences: <input type="number" id="pattern-min-occur" value="3" min="2" max="50" data-change-action="loadPatterns"></label>
+                <button class="btn btn-sm btn-secondary" data-click-action="loadPatterns">Refresh</button>
             </div>
             <p class="patterns-desc">Patterns are groups of observables that frequently appear together in alerts.</p>
             <div id="patterns-list" class="patterns-list">
@@ -197,7 +197,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Migrate Legacy Observables</h3>
-            <button class="modal-close" onclick="closeMigrateModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeMigrateModal">&times;</button>
         </div>
         <div class="modal-body">
             <p>This will extract observables from the legacy JSON fields in alert triage records and create normalized observable records with proper links.</p>
@@ -208,8 +208,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeMigrateModal()">Cancel</button>
-            <button class="btn btn-primary" id="migrate-btn" onclick="runMigration()">Run Migration</button>
+            <button class="btn btn-secondary" data-click-action="closeMigrateModal">Cancel</button>
+            <button class="btn btn-primary" id="migrate-btn" data-click-action="runMigration">Run Migration</button>
         </div>
     </div>
 </div>
@@ -219,12 +219,12 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h3>Import Observables</h3>
-            <button class="modal-close" onclick="closeImportModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeImportModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="import-tabs">
-                <button class="import-tab active" onclick="switchImportTab('csv')">CSV Import</button>
-                <button class="import-tab" onclick="switchImportTab('stix')">STIX Import</button>
+                <button class="import-tab active" data-click-action="switchImportTab" data-args='["csv"]'>CSV Import</button>
+                <button class="import-tab" data-click-action="switchImportTab" data-args='["stix"]'>STIX Import</button>
             </div>
 
             <div id="csv-import-tab" class="import-tab-content">
@@ -279,8 +279,8 @@ sha256,abc123...,c2,</pre>
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeImportModal()">Cancel</button>
-            <button class="btn btn-primary" id="import-btn" onclick="runImport()">Import</button>
+            <button class="btn btn-secondary" data-click-action="closeImportModal">Cancel</button>
+            <button class="btn btn-primary" id="import-btn" data-click-action="runImport">Import</button>
         </div>
     </div>
 </div>
@@ -290,7 +290,7 @@ sha256,abc123...,c2,</pre>
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h3>Watched Observables</h3>
-            <button class="modal-close" onclick="closeWatchlistModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeWatchlistModal">&times;</button>
         </div>
         <div class="modal-body">
             <p>Observables on the watchlist will trigger alerts when seen in new alerts.</p>
@@ -319,16 +319,16 @@ sha256,abc123...,c2,</pre>
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h3>Watchlist Alerts</h3>
-            <button class="modal-close" onclick="closeWatchlistAlertsModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeWatchlistAlertsModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="watchlist-alerts-filter">
-                <select id="watchlist-alerts-filter" onchange="loadWatchlistAlerts()">
+                <select id="watchlist-alerts-filter" data-change-action="loadWatchlistAlerts">
                     <option value="">All Alerts</option>
                     <option value="false">Unread Only</option>
                     <option value="true">Read Only</option>
                 </select>
-                <button class="btn btn-sm btn-secondary" onclick="markAllAlertsRead()">Mark All Read</button>
+                <button class="btn btn-sm btn-secondary" data-click-action="markAllAlertsRead">Mark All Read</button>
             </div>
             <div id="watchlist-alerts-list" class="watchlist-alerts-list">
                 <div class="loading">Loading alerts...</div>
@@ -342,7 +342,7 @@ sha256,abc123...,c2,</pre>
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h3>Observable Timeline</h3>
-            <button class="modal-close" onclick="closeTimelineModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeTimelineModal">&times;</button>
         </div>
         <div class="modal-body">
             <div id="timeline-observable-info"></div>
@@ -1378,7 +1378,7 @@ function renderObservables() {
     }
 
     tbody.innerHTML = observables.map(obs => `
-        <tr onclick="showObservableDetail(${obs.id})" style="cursor: pointer;">
+        <tr data-click-action="showObservableDetail" data-args='[${obs.id}]' style="cursor: pointer;">
             <td>
                 <span class="obs-value ${obs.is_whitelisted ? 'whitelisted' : ''} ${obs.is_watched ? 'watched' : ''}" title="${escapeHtml(obs.value)}">
                     ${obs.is_watched ? '<span class="watched-icon" title="Watched">&#128065;</span>' : ''}
@@ -1396,14 +1396,14 @@ function renderObservables() {
                     ${obs.has_enrichment ? timeAgo(obs.latest_enrichment_at) : '-'}
                 </span>
             </td>
-            <td class="actions-cell" onclick="event.stopPropagation();">
-                <button class="btn btn-sm ${obs.is_watched ? 'btn-warning' : ''}" onclick="toggleWatchlist(${obs.id}, ${obs.is_watched})" title="${obs.is_watched ? 'Remove from watchlist' : 'Add to watchlist'}">
+            <td class="actions-cell" data-stop-propagation>
+                <button class="btn btn-sm ${obs.is_watched ? 'btn-warning' : ''}" data-click-action="toggleWatchlist" data-args='[${obs.id}, ${obs.is_watched}]' title="${obs.is_watched ? 'Remove from watchlist' : 'Add to watchlist'}">
                     <i class="icon-eye"></i>
                 </button>
-                <button class="btn btn-sm" onclick="enrichObservable(${obs.id})" title="Enrich">
+                <button class="btn btn-sm" data-click-action="enrichObservable" data-args='[${obs.id}]' title="Enrich">
                     <i class="icon-search"></i>
                 </button>
-                <button class="btn btn-sm" onclick="showTimeline(${obs.id})" title="View Timeline">
+                <button class="btn btn-sm" data-click-action="showTimeline" data-args='[${obs.id}]' title="View Timeline">
                     <i class="icon-clock"></i>
                 </button>
             </td>
@@ -1421,26 +1421,26 @@ function renderPagination() {
     }
 
     let html = '';
-    html += `<button ${currentPage === 1 ? 'disabled' : ''} onclick="goToPage(${currentPage - 1})">Prev</button>`;
+    html += `<button ${currentPage === 1 ? 'disabled' : ''} data-click-action="goToPage" data-args='[${currentPage - 1}]'>Prev</button>`;
 
     // Show first page
     if (currentPage > 3) {
-        html += `<button onclick="goToPage(1)">1</button>`;
+        html += `<button data-click-action="goToPage" data-args='[1]'>1</button>`;
         if (currentPage > 4) html += `<span style="padding: 0 0.5rem;">...</span>`;
     }
 
     // Show pages around current
     for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
-        html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+        html += `<button class="${i === currentPage ? 'active' : ''}" data-click-action="goToPage" data-args='[${i}]'>${i}</button>`;
     }
 
     // Show last page
     if (currentPage < totalPages - 2) {
         if (currentPage < totalPages - 3) html += `<span style="padding: 0 0.5rem;">...</span>`;
-        html += `<button onclick="goToPage(${totalPages})">${totalPages}</button>`;
+        html += `<button data-click-action="goToPage" data-args='[${totalPages}]'>${totalPages}</button>`;
     }
 
-    html += `<button ${currentPage === totalPages ? 'disabled' : ''} onclick="goToPage(${currentPage + 1})">Next</button>`;
+    html += `<button ${currentPage === totalPages ? 'disabled' : ''} data-click-action="goToPage" data-args='[${currentPage + 1}]'>Next</button>`;
 
     container.innerHTML = html;
 }
@@ -1537,7 +1537,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
         enrichmentHtml = `
             <div style="text-align: center; padding: 1rem; color: var(--text-muted);">
                 No enrichment data available.
-                <button class="btn btn-sm btn-primary" style="margin-left: 0.5rem;" onclick="enrichObservable(${obs.id})">Enrich Now</button>
+                <button class="btn btn-sm btn-primary" style="margin-left: 0.5rem;" data-click-action="enrichObservable" data-args='[${obs.id}]'>Enrich Now</button>
             </div>
         `;
     }
@@ -1590,7 +1590,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
     let coHtml = '';
     if (coOccurring.length > 0) {
         coHtml = coOccurring.map(co => `
-            <span class="co-occur-badge" onclick="showObservableDetail(${co.id})">
+            <span class="co-occur-badge" data-click-action="showObservableDetail" data-args='[${co.id}]'>
                 <span class="obs-type-badge ${co.type}" style="min-width: auto; padding: 0.0625rem 0.25rem;">${co.type}</span>
                 ${escapeHtml(co.value.substring(0, 30))}${co.value.length > 30 ? '...' : ''}
                 <span style="color: var(--text-muted);">(${co.co_occurrence_count})</span>
@@ -1613,9 +1613,9 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                 </div>
             </div>
             <div class="detail-actions">
-                <button class="btn btn-sm" onclick="enrichObservable(${obs.id})">Enrich</button>
-                <button class="btn btn-sm" onclick="viewObservableGraph(${obs.id})">View Relationships</button>
-                <button class="btn btn-sm ${obs.is_whitelisted ? 'btn-secondary' : ''}" onclick="toggleWhitelist(${obs.id}, ${!obs.is_whitelisted})">
+                <button class="btn btn-sm" data-click-action="enrichObservable" data-args='[${obs.id}]'>Enrich</button>
+                <button class="btn btn-sm" data-click-action="viewObservableGraph" data-args='[${obs.id}]'>View Relationships</button>
+                <button class="btn btn-sm ${obs.is_whitelisted ? 'btn-secondary' : ''}" data-click-action="toggleWhitelist" data-args='[${obs.id}, ${!obs.is_whitelisted}]'>
                     ${obs.is_whitelisted ? 'Remove from Whitelist' : 'Whitelist'}
                 </button>
             </div>
@@ -1646,7 +1646,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
         <div class="detail-section">
             <h4>Notes</h4>
             <textarea class="notes-textarea" id="detail-notes" placeholder="Add analyst notes...">${escapeHtml(obs.notes || '')}</textarea>
-            <button class="btn btn-sm btn-primary" style="margin-top: 0.5rem;" onclick="saveNotes(${obs.id})">Save Notes</button>
+            <button class="btn btn-sm btn-primary" style="margin-top: 0.5rem;" data-click-action="saveNotes" data-args='[${obs.id}]'>Save Notes</button>
         </div>
 
         <div class="detail-section">
@@ -1655,7 +1655,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                 ${(obs.tags || []).map(t => `
                     <span class="tag-chip">
                         ${escapeHtml(t)}
-                        <span class="remove" onclick="removeTag(${obs.id}, '${escapeHtml(t)}')">&times;</span>
+                        <span class="remove" data-click-action="removeTag" data-args='[${obs.id}, "${escapeHtml(t)}"]'>&times;</span>
                     </span>
                 `).join('')}
                 <input type="text" id="tag-input" placeholder="Add tag..." onkeypress="handleTagInput(event, ${obs.id})">
@@ -2053,7 +2053,7 @@ function renderPatterns(patterns) {
                 `).join('')}
             </div>
             <div class="pattern-actions">
-                <button class="btn btn-sm" onclick="viewPatternInGraph(${idx})">View in Graph</button>
+                <button class="btn btn-sm" data-click-action="viewPatternInGraph" data-args='[${idx}]'>View in Graph</button>
             </div>
         </div>
     `).join('');
@@ -2285,8 +2285,8 @@ async function loadWatchlist() {
                 <td>${escapeHtml(obs.watched_by) || '-'}</td>
                 <td>${obs.watched_at ? formatDate(obs.watched_at) : '-'}</td>
                 <td>
-                    <button class="btn btn-sm btn-secondary" onclick="removeFromWatchlist(${obs.id})" title="Remove from watchlist">Remove</button>
-                    <button class="btn btn-sm btn-secondary" onclick="showTimeline(${obs.id})" title="View Timeline">Timeline</button>
+                    <button class="btn btn-sm btn-secondary" data-click-action="removeFromWatchlist" data-args='[${obs.id}]' title="Remove from watchlist">Remove</button>
+                    <button class="btn btn-sm btn-secondary" data-click-action="showTimeline" data-args='[${obs.id}]' title="View Timeline">Timeline</button>
                 </td>
             </tr>
         `).join('');
@@ -2384,7 +2384,7 @@ async function loadWatchlistAlerts() {
                 </div>
                 <p><strong>${escapeHtml(alert.observable_type)}:</strong> <code>${escapeHtml(alert.observable_value)}</code></p>
                 <p>${escapeHtml(alert.message)}</p>
-                ${!alert.is_read ? `<button class="btn btn-sm btn-secondary" onclick="markAlertRead(${alert.id})">Mark Read</button>` : ''}
+                ${!alert.is_read ? `<button class="btn btn-sm btn-secondary" data-click-action="markAlertRead" data-args='[${alert.id}]'>Mark Read</button>` : ''}
             </div>
         `).join('');
     } catch (error) {

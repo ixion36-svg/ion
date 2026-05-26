@@ -128,8 +128,8 @@
     <div class="ti-search-bar" style="margin-bottom:24px;">
         <input type="text" class="ti-search-input" id="ti-global-search"
                placeholder="Search across actors, campaigns, IOCs, cases (e.g. APT28, evil.com, 10.0.0.1)…">
-        <button class="ti-btn" onclick="tiUnifiedSearch()">Search</button>
-        <button class="ti-btn-outline" onclick="tiClearSearch()" id="ti-global-search-clear" style="display:none;">Clear</button>
+        <button class="ti-btn" data-click-action="tiUnifiedSearch">Search</button>
+        <button class="ti-btn-outline" data-click-action="tiClearSearch" id="ti-global-search-clear" style="display:none;">Clear</button>
     </div>
     <div id="ti-global-search-results" style="display:none;margin-bottom:24px;"></div>
 
@@ -161,7 +161,7 @@
                 <span class="text-ion-amber text-base">★</span>
                 <span class="text-[11px] uppercase tracking-wider text-ion-amber font-semibold">AI Threat Briefing</span>
               </div>
-              <button id="ai-brief-btn" onclick="tiLoadAISummary()"
+              <button id="ai-brief-btn" data-click-action="tiLoadAISummary"
                       class="px-3 py-1.5 rounded-md text-xs font-medium bg-ion-amber/10 text-ion-amber border border-ion-amber/30 hover:bg-ion-amber/20 transition">
                 Generate Briefing
               </button>
@@ -205,7 +205,7 @@
           <div>
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-sans font-semibold text-base text-white">Top Threat Actors</h3>
-              <button onclick="tiSwitchTab('actors')" class="text-[11px] text-ion-cyan hover:text-white transition">View all →</button>
+              <button data-click-action="tiSwitchTab" data-args='["actors"]' class="text-[11px] text-ion-cyan hover:text-white transition">View all →</button>
             </div>
             <div id="ti-overview-actors" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
               <div class="text-slate-500 text-sm animate-pulse">Loading actors…</div>
@@ -214,7 +214,7 @@
           <div>
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-sans font-semibold text-base text-white">Latest High-Score IOCs</h3>
-              <button onclick="tiSwitchTab('ioc')" class="text-[11px] text-ion-cyan hover:text-white transition">View feed →</button>
+              <button data-click-action="tiSwitchTab" data-args='["ioc"]' class="text-[11px] text-ion-cyan hover:text-white transition">View feed →</button>
             </div>
             <div id="ti-overview-iocs" class="rounded-xl border border-white/5 bg-ink-900/50 p-4 min-h-[140px]">
               <div class="text-slate-500 text-sm animate-pulse">Loading IOCs…</div>
@@ -254,7 +254,7 @@
     <div class="ti-panel" id="panel-actors">
         <div class="ti-search-bar">
             <input type="text" class="ti-search-input" id="actor-search" placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
-            <button class="ti-btn" id="actor-search-btn" onclick="searchActors()">Search</button>
+            <button class="ti-btn" id="actor-search-btn" data-click-action="searchActors">Search</button>
         </div>
         <div id="actor-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for threat actors.</div>
@@ -265,7 +265,7 @@
     <div class="ti-panel" id="panel-campaigns">
         <div class="ti-search-bar">
             <input type="text" class="ti-search-input" id="campaign-search" placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
-            <button class="ti-btn" id="campaign-search-btn" onclick="searchCampaigns()">Search</button>
+            <button class="ti-btn" id="campaign-search-btn" data-click-action="searchCampaigns">Search</button>
         </div>
         <div id="campaign-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for campaigns.</div>
@@ -282,7 +282,7 @@
 
         <h3 style="font-size:.95rem;margin:24px 0 12px;">
             Match Alerts
-            <button class="ti-btn-outline ti-btn-sm" style="margin-left:10px;" id="match-filter-btn" onclick="toggleMatchFilter()">Show Unread Only</button>
+            <button class="ti-btn-outline ti-btn-sm" style="margin-left:10px;" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
         </h3>
         <table class="ti-table" id="matches-table">
             <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
@@ -293,13 +293,13 @@
     <!-- v0.27.0: IOC Feed Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-ioc">
         <div class="ti-search-bar">
-            <select id="ti-ioc-min-score" class="ti-search-input" style="flex:0 0 auto;width:auto;" onchange="tiLoadIOCFeed()">
+            <select id="ti-ioc-min-score" class="ti-search-input" style="flex:0 0 auto;width:auto;" data-change-action="tiLoadIOCFeed">
                 <option value="0">All scores</option>
                 <option value="50">Score ≥ 50</option>
                 <option value="75" selected>Score ≥ 75</option>
                 <option value="90">Score ≥ 90</option>
             </select>
-            <button class="ti-btn" onclick="tiLoadIOCFeed()">Refresh</button>
+            <button class="ti-btn" data-click-action="tiLoadIOCFeed">Refresh</button>
         </div>
         <table class="ti-table" id="ioc-table">
             <thead><tr><th>Score</th><th>Type</th><th>Value</th><th>Labels</th><th>Source</th><th title="Local sightings over the last 12 months">Sightings</th><th>Actions</th></tr></thead>
@@ -311,7 +311,7 @@
     <div class="ti-panel" id="panel-reports">
         <div class="ti-search-bar">
             <input type="text" class="ti-search-input" id="ti-report-filter" placeholder="Filter reports by title…">
-            <button class="ti-btn" onclick="tiLoadReports()">Refresh</button>
+            <button class="ti-btn" data-click-action="tiLoadReports">Refresh</button>
         </div>
         <div id="ti-reports-list">
             <div class="ti-empty">Click Refresh to load latest threat reports from OpenCTI.</div>
@@ -327,7 +327,7 @@
                 box-shadow:-8px 0 24px rgba(0,0,0,0.5);z-index:200;overflow-y:auto;padding:20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
             <h3 id="ti-drill-title" style="font-size:1rem;margin:0;color:var(--ion-cyan,#6de4ff);font-family:'JetBrains Mono',monospace;">—</h3>
-            <button onclick="tiCloseDrill()"
+            <button data-click-action="tiCloseDrill"
                     style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.2rem;">&times;</button>
         </div>
         <div id="ti-drill-body">
@@ -336,19 +336,19 @@
     </div>
     <div id="ti-drill-backdrop"
          style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:199;"
-         onclick="tiCloseDrill()"></div>
+         data-click-action="tiCloseDrill"></div>
 
     <!-- v0.27.0: Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
         <div class="ti-search-bar">
-            <select id="ti-stories-hours" class="ti-search-input" style="flex:0 0 auto;width:auto;" onchange="tiLoadStories()">
+            <select id="ti-stories-hours" class="ti-search-input" style="flex:0 0 auto;width:auto;" data-change-action="tiLoadStories">
                 <option value="4">Last 4h</option>
                 <option value="12">Last 12h</option>
                 <option value="24" selected>Last 24h</option>
                 <option value="72">Last 3 days</option>
                 <option value="168">Last 7 days</option>
             </select>
-            <button class="ti-btn" onclick="tiLoadStories()">Refresh</button>
+            <button class="ti-btn" data-click-action="tiLoadStories">Refresh</button>
         </div>
         <div id="ti-stories-list">
             <div class="ti-empty">Click Refresh to correlate recent alerts into attack stories.</div>
@@ -619,7 +619,7 @@
                 techEl.innerHTML = '<ul style="list-style:none;padding:0;margin:0;">' +
                     d.techniques.map(t =>
                         `<li style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;">
-                            <a href="javascript:void(0)" onclick="tiDrillTechnique('${escapeHtml(t.id)}')"
+                            <a href="javascript:void(0)" data-click-action="tiDrillTechnique" data-args='["${escapeHtml(t.id)}"]'
                                style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;"
                                title="Drill into this technique">${escapeHtml(t.id)}</a>
                             <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:.75rem;">${t.count}×</span>
@@ -887,7 +887,7 @@
             const entityName = d.watch_name || '-';
             const entityType = d.entity_type ? d.entity_type.replace('_', ' ') : '-';
             const readBtn = m.is_read ? '<span style="color:var(--text-secondary);font-size:.75rem">Read</span>' :
-                `<button class="ti-btn-outline ti-btn-sm" onclick="markRead(${m.id})">Mark Read</button>`;
+                `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
             return `<tr${cls}>
                 <td>${esc(time)}</td>
                 <td><code>${esc(m.observable_value || '-')}</code> <span style="color:var(--text-secondary);font-size:.72rem">(${esc(m.observable_type || '')})</span></td>
@@ -933,14 +933,14 @@
                 const isWatched = watchedIds.has(a.id);
                 const watchBtn = isWatched
                     ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
-                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" onclick="watchActor(${idx})">Watch</button>`;
+                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchActor" data-args='[${idx}]'>Watch</button>`;
                 // v0.27.0: open the deep-dive profile page for this actor.
                 // entity_class param tells the profile endpoint which
                 // OpenCTI lookup path to use (most APTs are intrusion sets).
                 const klass = (a.threat_actor_types || []).includes('intrusion-set') ? 'intrusion_set' : 'threat_actor';
                 const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm" style="margin-left:6px;" title="Open deep-dive profile">↗ Profile</a>`;
                 html += `<tr>
-                    <td class="ti-name-cell" onclick="toggleActorDetail(${idx})">${esc(a.name)}</td>
+                    <td class="ti-name-cell" data-click-action="toggleActorDetail" data-args='[${idx}]'>${esc(a.name)}</td>
                     <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span style="color:var(--text-muted)">-</span>'}</td>
                     <td>${esc(types)}</td>
                     <td>${esc(aliases)}${moreAliases ? `<span style="color:var(--text-secondary)">${moreAliases}</span>` : ''}</td>
@@ -1059,9 +1059,9 @@
                 const isWatched = watchedIds.has(c.id);
                 const watchBtn = isWatched
                     ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
-                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" onclick="watchCampaign(${idx})">Watch</button>`;
+                    : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchCampaign" data-args='[${idx}]'>Watch</button>`;
                 html += `<tr>
-                    <td class="ti-name-cell" onclick="toggleCampaignDetail(${idx})">${esc(c.name)}</td>
+                    <td class="ti-name-cell" data-click-action="toggleCampaignDetail" data-args='[${idx}]'>${esc(c.name)}</td>
                     <td>${esc(aliases)}</td>
                     <td><span class="ti-confidence ${confCls}">${conf}</span></td>
                     <td>${formatDate(c.first_seen)}</td>
@@ -1168,7 +1168,7 @@
                     <td>${esc(lastSeen)}</td>
                     <td>${esc(w.watched_by)}</td>
                     <td>${esc(w.watch_reason || '-')}</td>
-                    <td><button class="ti-btn-outline ti-btn-sm ti-btn-danger" onclick="removeWatch(${w.id},'${esc(w.name)}')">Remove</button></td>
+                    <td><button class="ti-btn-outline ti-btn-sm ti-btn-danger" data-click-action="removeWatch" data-args='[${w.id}, "${esc(w.name)}"]'>Remove</button></td>
                 </tr>`;
             }).join('');
         } catch(e) {
@@ -1191,7 +1191,7 @@
                 const cls = m.is_read ? '' : ' class="ti-unread"';
                 const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
                 const readBtn = m.is_read ? '<span style="color:var(--text-secondary);font-size:.75rem">Read</span>' :
-                    `<button class="ti-btn-outline ti-btn-sm" onclick="markRead(${m.id})">Mark Read</button>`;
+                    `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
                 return `<tr${cls}>
                     <td>${esc(time)}</td>
                     <td><code>${esc(m.observable_value || '-')}</code></td>

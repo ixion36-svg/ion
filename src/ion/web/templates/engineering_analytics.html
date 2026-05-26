@@ -21,7 +21,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Capacity, reliability and throughput across ION and integrations.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="time-range" onchange="loadSystemAnalytics()">
+        <select id="time-range" data-change-action="loadSystemAnalytics">
             <option value="1">Last Hour</option>
             <option value="4">Last 4 Hours</option>
             <option value="12">Last 12 Hours</option>
@@ -30,7 +30,7 @@
             <option value="168">Last 7 Days</option>
             <option value="720">Last 30 Days</option>
         </select>
-        <button class="btn btn-secondary" onclick="loadSystemAnalytics()">Refresh</button>
+        <button class="btn btn-secondary" data-click-action="loadSystemAnalytics">Refresh</button>
     </div>
 </section>
 

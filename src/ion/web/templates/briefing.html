@@ -24,7 +24,7 @@
 <div class="flex items-center gap-2 flex-wrap">
         <label class="brf-window">
             Window:
-            <select id="brf-hours" onchange="brfLoad()">
+            <select id="brf-hours" data-change-action="brfLoad">
                 <option value="6">6 hours</option>
                 <option value="12" selected>12 hours (overnight)</option>
                 <option value="24">24 hours</option>
@@ -32,8 +32,8 @@
                 <option value="168">7 days</option>
             </select>
         </label>
-        <button class="btn btn-secondary" onclick="brfLoad()">Refresh</button>
-        <button class="btn btn-primary" onclick="brfLoad(true)">Generate AI Summary</button>
+        <button class="btn btn-secondary" data-click-action="brfLoad">Refresh</button>
+        <button class="btn btn-primary" data-click-action="brfLoad" data-args='[true]'>Generate AI Summary</button>
     </div>
 </section>
 

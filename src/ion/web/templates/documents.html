@@ -23,8 +23,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Rendered reports and exports.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-primary" onclick="showUploadModal()">Upload Document</button>
-        <button class="btn" onclick="showFoldersModal()">Manage Folders</button>
+        <button class="btn btn-primary" data-click-action="showUploadModal">Upload Document</button>
+        <button class="btn" data-click-action="showFoldersModal">Manage Folders</button>
     </div>
 </section>
 
@@ -35,11 +35,11 @@
             <h3>Folders</h3>
         </div>
         <div id="folder-tree" class="folder-tree">
-            <div class="folder-item active" data-id="" onclick="selectFolder(null)">
+            <div class="folder-item active" data-id="" data-click-action="selectFolder" data-args='[null]'>
                 <span class="folder-icon"><i class="icon-folder"></i></span>
                 <span class="folder-name">All Documents</span>
             </div>
-            <div class="folder-item" data-id="uncategorized" onclick="selectFolder('uncategorized')">
+            <div class="folder-item" data-id="uncategorized" data-click-action="selectFolder" data-args='["uncategorized"]'>
                 <span class="folder-icon"><i class="icon-file-text"></i></span>
                 <span class="folder-name">Uncategorized</span>
             </div>
@@ -81,7 +81,7 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2>Manage Folders</h2>
-            <button class="modal-close" onclick="closeFoldersModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeFoldersModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -92,7 +92,7 @@
                     </select>
                     <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOI, SOP, KB, WI)" class="form-control">
                     <input type="text" id="new-folder-desc" placeholder="Description" class="form-control">
-                    <button class="btn btn-primary" onclick="createFolder()">Create</button>
+                    <button class="btn btn-primary" data-click-action="createFolder">Create</button>
                 </div>
             </div>
             <h3>Existing Folders</h3>
@@ -106,15 +106,15 @@
     <div class="modal-content modal-small">
         <div class="modal-header">
             <h2>Move to Folder</h2>
-            <button class="modal-close" onclick="closeMoveModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeMoveModal">&times;</button>
         </div>
         <div class="modal-body">
             <select id="move-folder-select" class="form-control">
                 <option value="">No Folder (Root)</option>
             </select>
             <div class="modal-actions">
-                <button class="btn" onclick="closeMoveModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="moveDocument()">Move</button>
+                <button class="btn" data-click-action="closeMoveModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="moveDocument">Move</button>
             </div>
         </div>
     </div>
@@ -125,7 +125,7 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2 id="modal-doc-name">Document</h2>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeModal">&times;</button>
         </div>
         <div class="modal-body">
             <div id="modal-doc-meta" class="meta-bar"></div>
@@ -136,7 +136,7 @@
                     <span id="modal-tags-list"></span>
                     <span class="tag-add-inline">
                         <input type="text" id="modal-tag-input" placeholder="Add tag..." onkeydown="if(event.key==='Enter'){addDocTag();event.preventDefault();}">
-                        <button class="btn btn-sm" onclick="addDocTag()">+</button>
+                        <button class="btn btn-sm" data-click-action="addDocTag">+</button>
                     </span>
                 </div>
             </div>
@@ -174,7 +174,7 @@
             <button id="export-pdf-btn" class="btn btn-primary"><i class="icon-file-text"></i> Export PDF</button>
             <button id="download-btn" class="btn">Download Source</button>
             <button id="delete-doc-btn" class="btn btn-danger">Delete</button>
-            <button class="btn" onclick="closeModal()">Close</button>
+            <button class="btn" data-click-action="closeModal">Close</button>
         </div>
     </div>
 </div>
@@ -184,7 +184,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2>Confirm Amendment</h2>
-            <button class="modal-close" onclick="closeAmendmentModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeAmendmentModal">&times;</button>
         </div>
         <div class="modal-body">
             <p>You are about to create a new version of this document.</p>
@@ -199,7 +199,7 @@
         </div>
         <div class="modal-footer">
             <button id="confirm-amendment-btn" class="btn btn-success">Confirm Amendment</button>
-            <button class="btn" onclick="closeAmendmentModal()">Cancel</button>
+            <button class="btn" data-click-action="closeAmendmentModal">Cancel</button>
         </div>
     </div>
 </div>
@@ -209,7 +209,7 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2 id="version-modal-title">Version Preview</h2>
-            <button class="modal-close" onclick="closeVersionModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeVersionModal">&times;</button>
         </div>
         <div class="modal-body">
             <div id="version-meta" class="meta-bar"></div>
@@ -217,7 +217,7 @@
         </div>
         <div class="modal-footer">
             <button id="revert-version-btn" class="btn btn-warning">Revert to This Version</button>
-            <button class="btn" onclick="closeVersionModal()">Close</button>
+            <button class="btn" data-click-action="closeVersionModal">Close</button>
         </div>
     </div>
 </div>
@@ -226,7 +226,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2>Upload Document</h2>
-            <button class="modal-close" onclick="closeUploadModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeUploadModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -260,8 +260,8 @@
                 <input type="text" id="upload-tags" class="form-control" placeholder="e.g. incident-response, soc, network">
             </div>
             <div class="modal-actions">
-                <button class="btn" onclick="closeUploadModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="uploadDocument()">Upload</button>
+                <button class="btn" data-click-action="closeUploadModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="uploadDocument">Upload</button>
             </div>
         </div>
     </div>
@@ -623,7 +623,7 @@ function renderFolderItems(folders, depth) {
         const indent = depth > 0 ? 'folder-children' : '';
 
         html += '<div class="' + indent + '">';
-        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" onclick="selectFolder(' + f.id + ')">';
+        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" data-click-action="selectFolder" data-args='[" + f.id + "]'>';
         html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
         html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
         html += '<span class="folder-manage-counts">(' + (f.document_count || 0) + ')</span>';
@@ -664,13 +664,13 @@ function updateFolderPath() {
     }
 
     if (selectedFolderId === 'uncategorized') {
-        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>Uncategorized</span>';
+        pathEl.innerHTML = '<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>Uncategorized</span>';
         return;
     }
 
     const folder = allCollections.find(c => c.id === selectedFolderId);
     if (folder) {
-        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
+        pathEl.innerHTML = '<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
     }
 }
 
@@ -755,12 +755,12 @@ function renderDocuments(documents) {
         html += '</div>';
         html += '</div>';
         html += '<div class="list-item-actions">';
-        html += '<button class="btn btn-sm" onclick="viewDocument(' + d.id + ')">View</button>';
-        html += '<button class="btn btn-sm move-btn" onclick="showMoveModal(' + d.id + ', ' + (d.collection_id || 'null') + ')">Move</button>';
+        html += '<button class="btn btn-sm" data-click-action="viewDocument" data-args='[" + d.id + "]'>View</button>';
+        html += '<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[" + d.id + ", " + (d.collection_id || 'null') + "]'>Move</button>';
         if (isArchived) {
-            html += '<button class="btn btn-sm btn-success" onclick="restoreDocument(' + d.id + ')">Restore</button>';
+            html += '<button class="btn btn-sm btn-success" data-click-action="restoreDocument" data-args='[" + d.id + "]'>Restore</button>';
         } else {
-            html += '<button class="btn btn-sm btn-warning" onclick="archiveDocument(' + d.id + ')">Archive</button>';
+            html += '<button class="btn btn-sm btn-warning" data-click-action="archiveDocument" data-args='[" + d.id + "]'>Archive</button>';
         }
         html += '<button class="btn btn-sm btn-danger" onclick="deleteDocument(' + d.id + ', \'' + escapeHtml(d.name).replace(/'/g, "\\'") + '\')">Delete</button>';
         html += '</div>';
@@ -957,9 +957,9 @@ async function loadVersions() {
             html += '<td>' + escapeHtml(v.amended_by || '-') + '</td>';
             html += '<td>' + formatDate(v.created_at) + '</td>';
             html += '<td>';
-            html += '<button class="btn btn-sm" onclick="previewVersion(' + v.version_number + ')">View</button>';
+            html += '<button class="btn btn-sm" data-click-action="previewVersion" data-args='[" + v.version_number + "]'>View</button>';
             if (!isCurrent) {
-                html += ' <button class="btn btn-sm btn-warning" onclick="confirmRevert(' + v.version_number + ')">Revert</button>';
+                html += ' <button class="btn btn-sm btn-warning" data-click-action="confirmRevert" data-args='[" + v.version_number + "]'>Revert</button>';
             }
             html += '</td>';
             html += '</tr>';

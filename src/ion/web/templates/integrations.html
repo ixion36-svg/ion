@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Connected data sources, APIs and service credentials.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" onclick="refreshMetrics()">Refresh Metrics</button>
-        <button class="btn btn-primary" onclick="runHealthChecks()">Run Health Checks</button>
+        <button class="btn btn-secondary" data-click-action="refreshMetrics">Refresh Metrics</button>
+        <button class="btn btn-primary" data-click-action="runHealthChecks">Run Health Checks</button>
     </div>
 </section>
 
@@ -82,7 +82,7 @@
         <section class="section">
             <div class="section-header">
                 <h2>Webhooks</h2>
-                <button class="btn btn-sm btn-primary" onclick="showCreateWebhookModal()">+ New</button>
+                <button class="btn btn-sm btn-primary" data-click-action="showCreateWebhookModal">+ New</button>
             </div>
             <div class="webhooks-list" id="webhooks-list">
                 <div class="loading">Loading webhooks...</div>
@@ -96,13 +96,13 @@
     <div class="section-header">
         <h2>Integration Logs</h2>
         <div class="filter-controls">
-            <select id="log-type-filter" onchange="loadIntegrationLogs()">
+            <select id="log-type-filter" data-change-action="loadIntegrationLogs">
                 <option value="">All Types</option>
                 <option value="gitlab">GitLab</option>
                 <option value="opencti">OpenCTI</option>
                 <option value="elasticsearch">Elasticsearch</option>
             </select>
-            <select id="log-level-filter" onchange="loadIntegrationLogs()">
+            <select id="log-level-filter" data-change-action="loadIntegrationLogs">
                 <option value="">All Levels</option>
                 <option value="debug">Debug</option>
                 <option value="info">Info</option>
@@ -134,9 +134,9 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Create Webhook</h3>
-            <button class="modal-close" onclick="closeModal('create-webhook-modal')">&times;</button>
+            <button class="modal-close" data-click-action="closeModal" data-args='["create-webhook-modal"]'>&times;</button>
         </div>
-        <form id="create-webhook-form" onsubmit="createWebhook(event)">
+        <form id="create-webhook-form" data-submit-action="createWebhook" data-args='["$event"]'>
             <div class="form-group">
                 <label for="webhook-name">Name *</label>
                 <input type="text" id="webhook-name" name="name" required>
@@ -163,7 +163,7 @@
                 <input type="text" id="webhook-events" name="event_types" placeholder="push, issue, merge_request">
             </div>
             <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('create-webhook-modal')">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-click-action="closeModal" data-args='["create-webhook-modal"]'>Cancel</button>
                 <button type="submit" class="btn btn-primary">Create</button>
             </div>
         </form>
@@ -175,9 +175,9 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Edit Webhook</h3>
-            <button class="modal-close" onclick="closeModal('edit-webhook-modal')">&times;</button>
+            <button class="modal-close" data-click-action="closeModal" data-args='["edit-webhook-modal"]'>&times;</button>
         </div>
-        <form id="edit-webhook-form" onsubmit="updateWebhook(event)">
+        <form id="edit-webhook-form" data-submit-action="updateWebhook" data-args='["$event"]'>
             <input type="hidden" id="edit-webhook-id">
             <div class="form-group">
                 <label for="edit-webhook-name">Name *</label>
@@ -202,7 +202,7 @@
                 </label>
             </div>
             <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('edit-webhook-modal')">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-click-action="closeModal" data-args='["edit-webhook-modal"]'>Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -214,7 +214,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h3>Webhook Created</h3>
-            <button class="modal-close" onclick="closeModal('webhook-token-modal')">&times;</button>
+            <button class="modal-close" data-click-action="closeModal" data-args='["webhook-token-modal"]'>&times;</button>
         </div>
         <div class="modal-body">
             <p>Your webhook has been created. Save the token below - it will not be shown again.</p>
@@ -222,19 +222,19 @@
                 <label>Webhook URL</label>
                 <div class="copy-field">
                     <input type="text" id="webhook-url-display" readonly>
-                    <button type="button" class="btn btn-secondary" onclick="copyToClipboard('webhook-url-display')">Copy</button>
+                    <button type="button" class="btn btn-secondary" data-click-action="copyToClipboard" data-args='["webhook-url-display"]'>Copy</button>
                 </div>
             </div>
             <div class="form-group">
                 <label>Token</label>
                 <div class="copy-field">
                     <input type="text" id="webhook-token-display" readonly>
-                    <button type="button" class="btn btn-secondary" onclick="copyToClipboard('webhook-token-display')">Copy</button>
+                    <button type="button" class="btn btn-secondary" data-click-action="copyToClipboard" data-args='["webhook-token-display"]'>Copy</button>
                 </div>
             </div>
         </div>
         <div class="form-actions">
-            <button type="button" class="btn btn-primary" onclick="closeModal('webhook-token-modal')">Done</button>
+            <button type="button" class="btn btn-primary" data-click-action="closeModal" data-args='["webhook-token-modal"]'>Done</button>
         </div>
     </div>
 </div>
@@ -244,7 +244,7 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h3>Webhook Logs</h3>
-            <button class="modal-close" onclick="closeModal('webhook-logs-modal')">&times;</button>
+            <button class="modal-close" data-click-action="closeModal" data-args='["webhook-logs-modal"]'>&times;</button>
         </div>
         <div class="modal-body">
             <table class="data-table">
@@ -799,7 +799,7 @@ async function loadIntegrationStatus() {
                         ${versionWarningHtml}
                     </div>
                     <div class="integration-card-actions">
-                        <button class="btn btn-sm" onclick="testConnection('${integration.type}')">Test</button>
+                        <button class="btn btn-sm" data-click-action="testConnection" data-args='["${integration.type}"]'>Test</button>
                     </div>
                 </div>
             `;
@@ -1152,9 +1152,9 @@ async function loadWebhooks() {
                     <span>${webhook.trigger_count} triggers</span>
                 </div>
                 <div class="webhook-actions">
-                    <button class="btn btn-sm" onclick="showWebhookLogs(${webhook.id})">Logs</button>
-                    <button class="btn btn-sm" onclick="showEditWebhookModal(${webhook.id})">Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteWebhook(${webhook.id})">Delete</button>
+                    <button class="btn btn-sm" data-click-action="showWebhookLogs" data-args='[${webhook.id}]'>Logs</button>
+                    <button class="btn btn-sm" data-click-action="showEditWebhookModal" data-args='[${webhook.id}]'>Edit</button>
+                    <button class="btn btn-sm btn-danger" data-click-action="deleteWebhook" data-args='[${webhook.id}]'>Delete</button>
                 </div>
             </div>
         `).join('');

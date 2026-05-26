@@ -22,7 +22,7 @@
         <h2>Proposals</h2>
         <div class="filter-controls">
             <label>Status:
-                <select id="filter-status" class="form-control" onchange="loadProposals()">
+                <select id="filter-status" class="form-control" data-change-action="loadProposals">
                     <option value="pending" selected>Pending</option>
                     <option value="accepted">Accepted</option>
                     <option value="rejected">Rejected</option>
@@ -98,9 +98,9 @@ async function loadProposals() {
     }
     body.innerHTML = items.map(p => {
         const actions = p.status === 'pending'
-            ? `<button class="btn btn-accept" onclick="review(${p.id}, 'accept')">Accept</button>
-               <button class="btn btn-reject" onclick="review(${p.id}, 'reject')">Reject</button>
-               <button class="btn" onclick="review(${p.id}, 'duplicate')">Duplicate</button>`
+            ? `<button class="btn btn-accept" data-click-action="review" data-args='[${p.id}, "accept"]'>Accept</button>
+               <button class="btn btn-reject" data-click-action="review" data-args='[${p.id}, "reject"]'>Reject</button>
+               <button class="btn" data-click-action="review" data-args='[${p.id}, "duplicate"]'>Duplicate</button>`
             : `<span style="color:var(--text-secondary);">—</span>`;
         const reviewed = p.reviewed_at
             ? `${esc(p.reviewed_by_username || '?')}<br><small>${fmtDate(p.reviewed_at)}</small>`

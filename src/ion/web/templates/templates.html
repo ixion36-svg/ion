@@ -23,7 +23,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Document templates for playbooks and reports.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn" onclick="showFoldersModal()">Manage Folders</button>
+        <button class="btn" data-click-action="showFoldersModal">Manage Folders</button>
         <a href="/templates/new" class="btn btn-primary">New Template</a>
     </div>
 </section>
@@ -35,11 +35,11 @@
             <h3>Folders</h3>
         </div>
         <div id="folder-tree" class="folder-tree">
-            <div class="folder-item active" data-id="" onclick="selectFolder(null)">
+            <div class="folder-item active" data-id="" data-click-action="selectFolder" data-args='[null]'>
                 <span class="folder-icon"><i class="icon-folder"></i></span>
                 <span class="folder-name">All Templates</span>
             </div>
-            <div class="folder-item" data-id="uncategorized" onclick="selectFolder('uncategorized')">
+            <div class="folder-item" data-id="uncategorized" data-click-action="selectFolder" data-args='["uncategorized"]'>
                 <span class="folder-icon"><i class="icon-file-text"></i></span>
                 <span class="folder-name">Uncategorized</span>
             </div>
@@ -75,7 +75,7 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2>Manage Folders</h2>
-            <button class="modal-close" onclick="closeFoldersModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeFoldersModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -86,7 +86,7 @@
                     </select>
                     <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOP, KB, WI)" class="form-control">
                     <input type="text" id="new-folder-desc" placeholder="Description" class="form-control">
-                    <button class="btn btn-primary" onclick="createFolder()">Create</button>
+                    <button class="btn btn-primary" data-click-action="createFolder">Create</button>
                 </div>
             </div>
             <h3>Existing Folders</h3>
@@ -100,15 +100,15 @@
     <div class="modal-content modal-small">
         <div class="modal-header">
             <h2>Move to Folder</h2>
-            <button class="modal-close" onclick="closeMoveModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeMoveModal">&times;</button>
         </div>
         <div class="modal-body">
             <select id="move-folder-select" class="form-control">
                 <option value="">No Folder (Root)</option>
             </select>
             <div class="modal-actions">
-                <button class="btn" onclick="closeMoveModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="moveTemplate()">Move</button>
+                <button class="btn" data-click-action="closeMoveModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="moveTemplate">Move</button>
             </div>
         </div>
     </div>
@@ -342,7 +342,7 @@ function renderFolderItems(folders, depth) {
         const indent = depth > 0 ? 'folder-children' : '';
 
         html += '<div class="' + indent + '">';
-        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" onclick="selectFolder(' + f.id + ')">';
+        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" data-click-action="selectFolder" data-args='[" + f.id + "]'>';
         html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
         html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
         html += '<span class="folder-manage-counts">(' + f.template_count + ')</span>';
@@ -383,13 +383,13 @@ function updateFolderPath() {
     }
 
     if (selectedFolderId === 'uncategorized') {
-        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>Uncategorized</span>';
+        pathEl.innerHTML = '<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>Uncategorized</span>';
         return;
     }
 
     const folder = allCollections.find(c => c.id === selectedFolderId);
     if (folder) {
-        pathEl.innerHTML = '<span onclick="selectFolder(null)">All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
+        pathEl.innerHTML = '<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
     }
 }
 
@@ -474,7 +474,7 @@ function renderTemplates(templates) {
         html += '<div class="card-footer">';
         html += '<a href="/templates/' + t.id + '/render" class="btn btn-sm btn-primary">Render</a>';
         html += '<a href="/templates/' + t.id + '/edit" class="btn btn-sm">Edit</a>';
-        html += '<button class="btn btn-sm move-btn" onclick="showMoveModal(' + t.id + ', ' + (t.collection_id || 'null') + ')">Move</button>';
+        html += '<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[" + t.id + ", " + (t.collection_id || 'null') + "]'>Move</button>';
         html += '<button class="btn btn-sm btn-danger" onclick="deleteTemplate(' + t.id + ', \'' + escapeHtml(t.name).replace(/'/g, "\\'") + '\')">Delete</button>';
         html += '</div>';
         html += '</div>';

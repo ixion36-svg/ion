@@ -24,7 +24,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Hands-on alert triage scenarios.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" onclick="simBack()" id="sim-back-btn" style="display:none"><i class="icon-arrow-left"></i> Back to Scenarios</button>
+        <button class="btn btn-secondary" data-click-action="simBack" id="sim-back-btn" style="display:none"><i class="icon-arrow-left"></i> Back to Scenarios</button>
     </div>
 </section>
 <div id="sim-content"><div class="sim-loading"><span class="sim-spinner"></span> Loading scenarios...</div></div>
@@ -199,7 +199,7 @@ function renderScenarioList(scenarios) {
     let html = '<div style="margin-bottom:16px"><p style="font-size:.9rem;color:var(--text-secondary)">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
     html += '<div class="sim-scenarios">';
     for (const s of scenarios) {
-        html += `<div class="sim-scenario-card ${s.difficulty}" onclick="simStart('${s.id}')">
+        html += `<div class="sim-scenario-card ${s.difficulty}" data-click-action="simStart" data-args='["${s.id}"]'>
             <div class="sim-sc-title">${esc(s.title)}</div>
             <div class="sim-sc-desc">${esc(s.description)}</div>
             <div class="sim-sc-meta">
@@ -289,7 +289,7 @@ function renderSimulation() {
                     <div class="sim-ob-value">${esc(o.value)}</div>
                     <div class="sim-ob-context">${esc(o.context)}</div>
                 </div>
-                ${isEnriched ? '<span class="sim-ob-enriched-badge">ENRICHED</span>' : `<button class="sim-ob-enrich-btn" onclick="simEnrich(${i})">Enrich</button>`}
+                ${isEnriched ? '<span class="sim-ob-enriched-badge">ENRICHED</span>' : `<button class="sim-ob-enrich-btn" data-click-action="simEnrich" data-args='[${i}]'>Enrich</button>`}
             </div>
             <div class="sim-enrich-result ${isEnriched?'show':''}" id="sim-enrich-${i}">
                 ${isEnriched ? renderEnrichment(o.value, s) : ''}
@@ -331,7 +331,7 @@ function renderSimulation() {
         const step = s.steps[i];
         const state = i < currentStep ? 'completed' : i === currentStep ? 'active' : 'locked';
         html += `<div class="sim-step ${state}" id="sim-step-${i}">
-            <div class="sim-step-header" ${state !== 'locked' ? `onclick="simGoToStep(${i})"` : ''}>
+            <div class="sim-step-header" ${state !== 'locked' ? `data-click-action="simGoToStep" data-args='[${i}]'` : ''}>
                 <div class="sim-step-num">${state === 'completed' ? '&#10003;' : i+1}</div>
                 <div class="sim-step-title">${esc(step.title)}</div>
             </div>
@@ -356,7 +356,7 @@ function renderSimulation() {
         // Actions
         if (state === 'active') {
             html += `<div class="sim-step-actions">
-                <button class="sim-btn sim-btn-primary" onclick="simSubmitStep(${i})">Submit & Continue</button>
+                <button class="sim-btn sim-btn-primary" data-click-action="simSubmitStep" data-args='[${i}]'>Submit & Continue</button>
             </div>`;
         }
 
@@ -366,7 +366,7 @@ function renderSimulation() {
     // Score button (shown when all steps completed)
     if (currentStep >= s.steps.length) {
         html += `<div style="text-align:center;padding:16px">
-            <button class="sim-btn sim-btn-primary" style="padding:12px 32px;font-size:.95rem" onclick="simScore()">View Score</button>
+            <button class="sim-btn sim-btn-primary" style="padding:12px 32px;font-size:.95rem" data-click-action="simScore">View Score</button>
         </div>`;
     }
 
@@ -386,7 +386,7 @@ function renderQuestion(q, stepIdx) {
             ? (answers[q.id] || []).includes(opt.id)
             : answers[q.id] === opt.id;
         const indicator = q.type === 'multi_select' ? 'sim-option-check' : 'sim-option-radio';
-        html += `<div class="sim-option ${isSelected?'selected':''}" onclick="simSelectOption('${q.id}','${opt.id}','${q.type}')">
+        html += `<div class="sim-option ${isSelected?'selected':''}" data-click-action="simSelectOption" data-args='["${q.id}", "${opt.id}", "${q.type}"]'>
             <div class="${indicator}">${isSelected && q.type==='multi_select' ? '&#10003;' : ''}</div>
             <span>${esc(opt.text)}</span>
         </div>`;
@@ -573,8 +573,8 @@ function renderScore(d) {
     html += '</div>';
 
     html += `<div style="margin-top:24px;display:flex;gap:12px;justify-content:center">
-        <button class="sim-btn sim-btn-primary" onclick="simStart('${currentScenario.id}')">Retry Scenario</button>
-        <button class="sim-btn sim-btn-secondary" onclick="simBack()">All Scenarios</button>
+        <button class="sim-btn sim-btn-primary" data-click-action="simStart" data-args='["${currentScenario.id}"]'>Retry Scenario</button>
+        <button class="sim-btn sim-btn-secondary" data-click-action="simBack">All Scenarios</button>
     </div>`;
 
     html += '</div>';

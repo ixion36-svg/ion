@@ -16,9 +16,9 @@
 
 <!-- Tool Tabs -->
 <div class="tools-tabs">
-    <button class="tool-tab active" onclick="switchDiscoverTab('search')">Discover Search</button>
-    <button class="tool-tab" onclick="switchDiscoverTab('indices')">Index Browser</button>
-    <button class="tool-tab" onclick="switchDiscoverTab('ioc-hunt')">IOC Hunt</button>
+    <button class="tool-tab active" data-click-action="switchDiscoverTab" data-args='["search"]'>Discover Search</button>
+    <button class="tool-tab" data-click-action="switchDiscoverTab" data-args='["indices"]'>Index Browser</button>
+    <button class="tool-tab" data-click-action="switchDiscoverTab" data-args='["ioc-hunt"]'>IOC Hunt</button>
 </div>
 
 <!-- ==================== DISCOVER SEARCH TAB ==================== -->
@@ -66,19 +66,19 @@
                 <label for="search-query">Query (Lucene/KQL syntax)</label>
                 <div style="display:flex; gap:6px; align-items:center;">
                     <input type="text" id="search-query" class="form-control" style="flex:1;" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
-                    <button class="btn btn-sm" onclick="openNlQueryModal()" title="Generate query with AI" style="white-space:nowrap; display:inline-flex; align-items:center; gap:4px;">
+                    <button class="btn btn-sm" data-click-action="openNlQueryModal" title="Generate query with AI" style="white-space:nowrap; display:inline-flex; align-items:center; gap:4px;">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1v4a4 4 0 0 1-8 0v-4H7a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/></svg>
                         AI
                     </button>
                 </div>
             </div>
             <div class="form-actions">
-                <button class="btn btn-primary" onclick="executeDiscoverSearch()">Search</button>
-                <button class="btn" onclick="getHistogram()">Show Histogram</button>
-                <button class="btn" onclick="exportSearchResults()">Export CSV</button>
+                <button class="btn btn-primary" data-click-action="executeDiscoverSearch">Search</button>
+                <button class="btn" data-click-action="getHistogram">Show Histogram</button>
+                <button class="btn" data-click-action="exportSearchResults">Export CSV</button>
                 <div class="saved-searches-actions">
-                    <button class="btn" onclick="openSaveSearchModal()">Save Search</button>
-                    <button class="btn" onclick="toggleSavedSearchesPanel()">Saved Searches</button>
+                    <button class="btn" data-click-action="openSaveSearchModal">Save Search</button>
+                    <button class="btn" data-click-action="toggleSavedSearchesPanel">Saved Searches</button>
                 </div>
             </div>
         </div>
@@ -88,7 +88,7 @@
     <div class="tools-panel section-panel saved-searches-panel" id="saved-searches-panel" style="display: none;">
         <div class="panel-header">
             <h3>Saved Searches</h3>
-            <button class="btn btn-sm" onclick="loadSavedSearches()">Refresh</button>
+            <button class="btn btn-sm" data-click-action="loadSavedSearches">Refresh</button>
         </div>
         <div class="saved-searches-container">
             <div class="saved-searches-section" id="saved-searches-favorites">
@@ -111,7 +111,7 @@
         <div class="modal-dialog">
             <div class="modal-header">
                 <h3 id="save-search-modal-title">Save Search</h3>
-                <button class="modal-close" onclick="closeSaveSearchModal()">&times;</button>
+                <button class="modal-close" data-click-action="closeSaveSearchModal">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -130,8 +130,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn" onclick="closeSaveSearchModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="saveSearch()">Save</button>
+                <button class="btn" data-click-action="closeSaveSearchModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="saveSearch">Save</button>
             </div>
         </div>
     </div>
@@ -175,10 +175,10 @@
             <h3>Available Indices</h3>
             <div class="panel-actions">
                 <label class="checkbox-label">
-                    <input type="checkbox" id="include-system-indices" onchange="loadIndices()">
+                    <input type="checkbox" id="include-system-indices" data-change-action="loadIndices">
                     Include system indices
                 </label>
-                <button class="btn btn-sm" onclick="loadIndices()">Refresh</button>
+                <button class="btn btn-sm" data-click-action="loadIndices">Refresh</button>
             </div>
         </div>
         <div class="indices-container">
@@ -283,8 +283,8 @@
                 </div>
             </div>
             <div class="form-actions">
-                <button class="btn btn-primary" onclick="executeIOCHunt()">Hunt</button>
-                <button class="btn" onclick="clearIOCHunt()">Clear</button>
+                <button class="btn btn-primary" data-click-action="executeIOCHunt">Hunt</button>
+                <button class="btn" data-click-action="clearIOCHunt">Clear</button>
             </div>
         </div>
     </div>
@@ -300,7 +300,7 @@
                 <textarea id="bulk-iocs" class="form-control" rows="5" placeholder="185.220.101.32&#10;evil.com&#10;d41d8cd98f00b204e9800998ecf8427e"></textarea>
             </div>
             <div class="form-actions">
-                <button class="btn btn-primary" onclick="executeBulkIOCHunt()">Hunt All</button>
+                <button class="btn btn-primary" data-click-action="executeBulkIOCHunt">Hunt All</button>
                 <button class="btn" onclick="document.getElementById('bulk-iocs').value = ''">Clear</button>
             </div>
         </div>
@@ -856,13 +856,13 @@ function displayIndices(data) {
 
     tbody.innerHTML = data.indices.map(idx => `
         <tr>
-            <td class="clickable" onclick="loadMappings('${idx.name}')">${idx.name}</td>
+            <td class="clickable" data-click-action="loadMappings" data-args='["${idx.name}"]'>${idx.name}</td>
             <td><span class="health-${idx.health || 'unknown'}">${idx.health || '-'}</span></td>
             <td>${(idx.doc_count != null ? idx.doc_count : 0).toLocaleString()}</td>
             <td>${idx.size || '-'}</td>
             <td>
-                <button class="btn btn-sm" onclick="loadMappings('${idx.name}')">Fields</button>
-                <button class="btn btn-sm" onclick="searchIndex('${idx.name}')">Search</button>
+                <button class="btn btn-sm" data-click-action="loadMappings" data-args='["${idx.name}"]'>Fields</button>
+                <button class="btn btn-sm" data-click-action="searchIndex" data-args='["${idx.name}"]'>Search</button>
             </td>
         </tr>
     `).join('');
@@ -897,8 +897,8 @@ function displayMappings(indexName, data) {
             <td>${f.searchable ? 'Yes' : 'No'}</td>
             <td>${f.aggregatable ? 'Yes' : 'No'}</td>
             <td>
-                ${f.aggregatable ? `<button class="btn btn-sm" onclick="loadFieldStats('${indexName}', '${f.name}')">Stats</button>` : ''}
-                <button class="btn btn-sm" onclick="searchField('${indexName}', '${f.name}')">Search</button>
+                ${f.aggregatable ? `<button class="btn btn-sm" data-click-action="loadFieldStats" data-args='["${indexName}", "${f.name}"]'>Stats</button>` : ''}
+                <button class="btn btn-sm" data-click-action="searchField" data-args='["${indexName}", "${f.name}"]'>Search</button>
             </td>
         </tr>
     `).join('');
@@ -945,7 +945,7 @@ function displayFieldStats(fieldName, data) {
         <tr>
             <td>${v.value !== null ? escapeHtml(String(v.value)) : '<em>null</em>'}</td>
             <td>${v.count.toLocaleString()}</td>
-            <td><button class="btn btn-sm" onclick="huntIOC('${escapeHtml(String(v.value))}')">Hunt</button></td>
+            <td><button class="btn btn-sm" data-click-action="huntIOC" data-args='["${escapeHtml(String(v.value))}"]'>Hunt</button></td>
         </tr>
     `).join('');
 }
@@ -1098,7 +1098,7 @@ function displayBulkIOCResults(data) {
             <td><span class="${r.found ? 'found-badge' : 'not-found-badge'}">${r.found ? 'Found' : 'Not Found'}</span></td>
             <td>${r.hit_count}</td>
             <td>${r.indices.slice(0, 3).join(', ')}${r.indices.length > 3 ? '...' : ''}</td>
-            <td>${r.found ? `<button class="btn btn-sm" onclick="huntIOC('${escapeHtml(r.ioc_value)}')">Details</button>` : ''}</td>
+            <td>${r.found ? `<button class="btn btn-sm" data-click-action="huntIOC" data-args='["${escapeHtml(r.ioc_value)}"]'>Details</button>` : ''}</td>
         </tr>
     `).join('');
 }
@@ -1186,11 +1186,11 @@ function renderSavedSearchItem(search) {
     return `
         <div class="saved-search-item" data-id="${search.id}">
             <span class="saved-search-favorite ${search.is_favorite ? 'active' : ''}"
-                  onclick="event.stopPropagation(); toggleFavorite(${search.id})"
+                  data-click-action="toggleFavorite" data-stop-propagation data-args='[${search.id}]'
                   title="${search.is_favorite ? 'Remove from favorites' : 'Add to favorites'}">
                 ${search.is_favorite ? '★' : '☆'}
             </span>
-            <div class="saved-search-info" onclick="loadSavedSearch(${search.id})">
+            <div class="saved-search-info" data-click-action="loadSavedSearch" data-args='[${search.id}]'>
                 <div class="saved-search-name">${escapeHtml(search.name)}</div>
                 <div class="saved-search-meta">
                     ${search.is_shared ? '🔗 Shared' : ''}
@@ -1199,10 +1199,10 @@ function renderSavedSearchItem(search) {
                 </div>
             </div>
             <div class="saved-search-actions">
-                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); executeSavedSearch(${search.id})">Run</button>
+                <button class="btn btn-sm btn-primary" data-click-action="executeSavedSearch" data-stop-propagation data-args='[${search.id}]'>Run</button>
                 ${isOwner ? `
-                    <button class="btn btn-sm" onclick="event.stopPropagation(); editSavedSearch(${search.id})">Edit</button>
-                    <button class="btn btn-sm" onclick="event.stopPropagation(); deleteSavedSearch(${search.id})">Delete</button>
+                    <button class="btn btn-sm" data-click-action="editSavedSearch" data-stop-propagation data-args='[${search.id}]'>Edit</button>
+                    <button class="btn btn-sm" data-click-action="deleteSavedSearch" data-stop-propagation data-args='[${search.id}]'>Delete</button>
                 ` : ''}
             </div>
         </div>
@@ -1404,7 +1404,7 @@ function openNlQueryModal() {
             <div class="modal-dialog" style="max-width:560px;">
                 <div class="modal-header">
                     <h3>AI Query Builder</h3>
-                    <button class="modal-close" onclick="closeNlQueryModal()">&times;</button>
+                    <button class="modal-close" data-click-action="closeNlQueryModal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <p class="text-slate-400 mb-3" style="font-size:13px;">Describe what you're looking for in plain English and AI will generate an Elasticsearch query.</p>
@@ -1421,9 +1421,9 @@ function openNlQueryModal() {
                     </div>
                 </div>
                 <div class="modal-footer" style="display:flex; gap:8px; justify-content:flex-end;">
-                    <button class="btn" onclick="closeNlQueryModal()">Cancel</button>
-                    <button class="btn btn-primary" id="nl-query-generate-btn" onclick="generateNlQuery()">Generate</button>
-                    <button class="btn btn-primary" id="nl-query-apply-btn" onclick="applyNlQuery()" style="display:none;">Apply to Search</button>
+                    <button class="btn" data-click-action="closeNlQueryModal">Cancel</button>
+                    <button class="btn btn-primary" id="nl-query-generate-btn" data-click-action="generateNlQuery">Generate</button>
+                    <button class="btn btn-primary" id="nl-query-apply-btn" data-click-action="applyNlQuery" style="display:none;">Apply to Search</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);

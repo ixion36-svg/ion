@@ -36,7 +36,7 @@
             <p style="color:var(--text-muted); font-size:0.8125rem; margin-bottom:1rem;">
                 Map your ION account to external services. These are used to sync case assignments to Kibana and filter GitLab issues.
             </p>
-            <form id="identity-mapping-form" onsubmit="saveIdentityMapping(event)">
+            <form id="identity-mapping-form" data-submit-action="saveIdentityMapping" data-args='["$event"]'>
                 <div class="form-group">
                     <label for="id-elastic-username">Elastic / Kibana Username</label>
                     <input type="text" id="id-elastic-username" placeholder="Your Kibana username (if different from ION)">
@@ -49,7 +49,7 @@
                     <label>Elastic UID <span style="color:var(--text-muted); font-weight:normal;">(auto-resolved)</span></label>
                     <div style="display:flex; gap:0.5rem; align-items:center;">
                         <input type="text" id="id-elastic-uid" readonly style="opacity:0.7; flex:1;">
-                        <button type="button" class="btn btn-secondary" onclick="resolveElasticUid()" id="resolve-btn" style="white-space:nowrap;">Resolve</button>
+                        <button type="button" class="btn btn-secondary" data-click-action="resolveElasticUid" id="resolve-btn" style="white-space:nowrap;">Resolve</button>
                     </div>
                 </div>
                 <div class="form-group">
@@ -70,7 +70,7 @@
             <div id="password-change-required" class="alert alert-warning" style="display: none;">
                 You must change your password before continuing.
             </div>
-            <form id="change-password-form" onsubmit="changePassword(event)">
+            <form id="change-password-form" data-submit-action="changePassword" data-args='["$event"]'>
                 <div class="form-group">
                     <label for="current-password">Current Password</label>
                     <input type="password" id="current-password" required>
@@ -98,7 +98,7 @@
                 <p><strong>Browser:</strong> <span id="current-browser">-</span></p>
                 <p><strong>Session started:</strong> <span id="session-started">-</span></p>
             </div>
-            <button class="btn btn-secondary" onclick="logout()">Sign Out</button>
+            <button class="btn btn-secondary" data-click-action="logout">Sign Out</button>
         </div>
     </div>
 
@@ -110,13 +110,13 @@
             <div class="mode-toggle">
                 <h4>Mode</h4>
                 <div class="mode-switch">
-                    <button class="mode-btn" data-mode="dark" onclick="setMode('dark')">
+                    <button class="mode-btn" data-mode="dark" data-click-action="setMode" data-args='["dark"]'>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                         </svg>
                         Dark
                     </button>
-                    <button class="mode-btn" data-mode="light" onclick="setMode('light')">
+                    <button class="mode-btn" data-mode="light" data-click-action="setMode" data-args='["light"]'>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="5"/>
                             <line x1="12" y1="1" x2="12" y2="3"/>
@@ -135,14 +135,14 @@
             <div class="theme-switcher">
                 <h4>Accent Color</h4>
                 <div class="theme-options">
-                    <button class="theme-option" data-theme="cyan" title="Cyan (Default)" onclick="setTheme('cyan')"></button>
-                    <button class="theme-option" data-theme="blue" title="Blue" onclick="setTheme('blue')"></button>
-                    <button class="theme-option" data-theme="purple" title="Purple" onclick="setTheme('purple')"></button>
-                    <button class="theme-option" data-theme="pink" title="Pink" onclick="setTheme('pink')"></button>
-                    <button class="theme-option" data-theme="red" title="Red" onclick="setTheme('red')"></button>
-                    <button class="theme-option" data-theme="orange" title="Orange" onclick="setTheme('orange')"></button>
-                    <button class="theme-option" data-theme="gold" title="Gold" onclick="setTheme('gold')"></button>
-                    <button class="theme-option" data-theme="green" title="Green" onclick="setTheme('green')"></button>
+                    <button class="theme-option" data-theme="cyan" title="Cyan (Default)" data-click-action="setTheme" data-args='["cyan"]'></button>
+                    <button class="theme-option" data-theme="blue" title="Blue" data-click-action="setTheme" data-args='["blue"]'></button>
+                    <button class="theme-option" data-theme="purple" title="Purple" data-click-action="setTheme" data-args='["purple"]'></button>
+                    <button class="theme-option" data-theme="pink" title="Pink" data-click-action="setTheme" data-args='["pink"]'></button>
+                    <button class="theme-option" data-theme="red" title="Red" data-click-action="setTheme" data-args='["red"]'></button>
+                    <button class="theme-option" data-theme="orange" title="Orange" data-click-action="setTheme" data-args='["orange"]'></button>
+                    <button class="theme-option" data-theme="gold" title="Gold" data-click-action="setTheme" data-args='["gold"]'></button>
+                    <button class="theme-option" data-theme="green" title="Green" data-click-action="setTheme" data-args='["green"]'></button>
                 </div>
             </div>
         </div>

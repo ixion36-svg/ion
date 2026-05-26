@@ -19,7 +19,7 @@
     <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
     <!-- v0.31.4: delegated event listener so templates can move off
-         `onclick="foo()"` (which is blocked by strict CSP once
+         `data-click-action="foo"` (which is blocked by strict CSP once
          `script-src-attr` drops `'unsafe-inline'`). Templates declare
          `data-click-action="foo"` and the helper dispatches. See
          static/js/event-delegation.js for the supported attributes. -->

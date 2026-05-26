@@ -153,9 +153,9 @@
             <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em] mb-6">Group Membership Ingestion Flow</h1>
         </div>
         <div class="df-toggle-group">
-            <button class="df-toggle-btn active-legacy" id="df-btn-legacy" onclick="dfSetFlow('legacy')">Legacy</button>
-            <button class="df-toggle-btn" id="df-btn-modern" onclick="dfSetFlow('modern')">Modern</button>
-            <button class="df-toggle-btn" id="df-btn-compare" onclick="dfToggleCompare()">
+            <button class="df-toggle-btn active-legacy" id="df-btn-legacy" data-click-action="dfSetFlow" data-args='["legacy"]'>Legacy</button>
+            <button class="df-toggle-btn" id="df-btn-modern" data-click-action="dfSetFlow" data-args='["modern"]'>Modern</button>
+            <button class="df-toggle-btn" id="df-btn-compare" data-click-action="dfToggleCompare">
                 <i class="icon-bar-chart-3"></i> Compare
             </button>
         </div>
@@ -169,19 +169,19 @@
                 <div class="df-pipeline" style="margin-bottom: 24px;">
                     <div class="df-pipeline-track">
                         <div class="df-pipeline-line"></div>
-                        <div class="df-node" onclick="dfSelectNode(0)">
+                        <div class="df-node" data-click-action="dfSelectNode" data-args='[0]'>
                             <button class="df-node-btn selected-legacy" id="df-node-0"><i class="icon-server"></i></button>
                             <span class="df-node-label selected" id="df-node-label-0">DC (Source)</span>
                         </div>
-                        <div class="df-node" onclick="dfSelectNode(1)">
+                        <div class="df-node" data-click-action="dfSelectNode" data-args='[1]'>
                             <button class="df-node-btn" id="df-node-1"><i class="icon-shield-alert" id="df-node-icon-1"></i></button>
                             <span class="df-node-label" id="df-node-label-1">Connector</span>
                         </div>
-                        <div class="df-node" onclick="dfSelectNode(2)">
+                        <div class="df-node" data-click-action="dfSelectNode" data-args='[2]'>
                             <button class="df-node-btn" id="df-node-2"><i class="icon-settings" id="df-node-icon-2"></i></button>
                             <span class="df-node-label" id="df-node-label-2">NiFi</span>
                         </div>
-                        <div class="df-node" onclick="dfSelectNode(3)">
+                        <div class="df-node" data-click-action="dfSelectNode" data-args='[3]'>
                             <button class="df-node-btn" id="df-node-3"><i class="icon-layout" id="df-node-icon-3"></i></button>
                             <span class="df-node-label" id="df-node-label-3">Elastic Security</span>
                         </div>
@@ -441,8 +441,8 @@
             <div class="df-kibana-header">
                 <span>Elastic Security | Privilege Audit</span>
                 <div class="df-kibana-toggle">
-                    <button class="${viewMode === 'table' ? 'active' : ''}" onclick="dfSetViewMode('table', '${containerId || ''}')">Table</button>
-                    <button class="${viewMode === 'json' ? 'active' : ''}" onclick="dfSetViewMode('json', '${containerId || ''}')">JSON</button>
+                    <button class="${viewMode === 'table' ? 'active' : ''}" data-click-action="dfSetViewMode" data-args='["table", "${containerId || ''}"]'>Table</button>
+                    <button class="${viewMode === 'json' ? 'active' : ''}" data-click-action="dfSetViewMode" data-args='["json", "${containerId || ''}"]'>JSON</button>
                 </div>
             </div>
             <div class="df-kibana-body">

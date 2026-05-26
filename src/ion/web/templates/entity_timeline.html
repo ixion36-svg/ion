@@ -24,7 +24,7 @@
 </section>
 
 <div class="et-search-bar">
-    <input type="text" id="et-query" class="et-input" placeholder="Enter IP, hostname, username, domain, or hash..." onkeydown="if(event.key==='Enter')etSearch()">
+    <input type="text" id="et-query" class="et-input" placeholder="Enter IP, hostname, username, domain, or hash..." data-keydown-action="if" data-args='[event.key==='Enter')etSearch(]'>
     <select id="et-type" class="et-select">
         <option value="auto">Auto-detect</option>
         <option value="ip">IP Address</option>
@@ -34,7 +34,7 @@
         <option value="hash">Hash</option>
         <option value="email">Email</option>
     </select>
-    <button class="btn btn-primary" onclick="etSearch()">Search</button>
+    <button class="btn btn-primary" data-click-action="etSearch">Search</button>
 </div>
 
 <div id="et-content">
@@ -148,9 +148,9 @@ function renderTimeline(d) {
     for (const e of d.events) sourceCounts[e.source] = (sourceCounts[e.source]||0) + 1;
 
     html += '<div class="et-filters">';
-    html += `<button class="et-filter active" onclick="etFilterAll()" id="et-filter-all">All (${d.total_events})</button>`;
+    html += `<button class="et-filter active" data-click-action="etFilterAll" id="et-filter-all">All (${d.total_events})</button>`;
     for (const [src, count] of Object.entries(sourceCounts).sort((a,b)=>b[1]-a[1])) {
-        html += `<button class="et-filter" onclick="etToggleFilter('${src}')" id="et-filter-${src}">
+        html += `<button class="et-filter" data-click-action="etToggleFilter" data-args='["${src}"]' id="et-filter-${src}">
             <span class="et-source-badge et-source-${src}" style="margin-right:2px">${src}</span> ${count}
         </button>`;
     }

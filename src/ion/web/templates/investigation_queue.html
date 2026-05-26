@@ -17,16 +17,16 @@
       <p class="mt-3 text-[13px] text-slate-400 max-w-2xl">Live view of the autonomous investigation pipeline. Running jobs, recently completed verdicts, and on-demand controls.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button id="iq-pause-btn" onclick="iqTogglePause()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button id="iq-pause-btn" data-click-action="iqTogglePause" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         <span id="iq-pause-label">Pause loop</span>
       </button>
-      <button onclick="iqCancelAllPending()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-red-500/10 hover:border-red-500/30 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="iqCancelAllPending" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-red-500/10 hover:border-red-500/30 border border-white/10 text-[12px] font-semibold transition">
         Cancel all pending
       </button>
-      <button onclick="iqRefresh()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="iqRefresh" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
       </button>
-      <button onclick="iqRunSweep()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+      <button data-click-action="iqRunSweep" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
         <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Run sweep now
       </button>
     </div>
@@ -42,7 +42,7 @@
     <div class="flex items-center gap-3 mb-3">
       <span class="label-tiny text-slate-500">Manual trigger</span>
     </div>
-    <form id="iq-manual-form" onsubmit="iqManualSubmit(event)" class="flex flex-wrap items-end gap-3">
+    <form id="iq-manual-form" data-submit-action="iqManualSubmit" data-args='["$event"]' class="flex flex-wrap items-end gap-3">
       <label class="flex flex-col gap-1 text-[12px] text-slate-300 flex-1 min-w-[280px]">
         Alert ID (ES <code>_id</code>)
         <input name="alert_id" required class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" placeholder="e.g. 7c4fd2abc…">
@@ -241,7 +241,7 @@
   function iqRenderRow_active(inv) {
     // v0.23.1: per-row cancel for pending/running investigations.
     const cancelBtn = (inv.status === 'pending' || inv.status === 'running')
-      ? `<button onclick="iqCancelOne(${inv.id})" class="text-[11px] text-red-300 hover:text-red-200 hover:underline">Cancel</button>`
+      ? `<button data-click-action="iqCancelOne" data-args='[${inv.id}]' class="text-[11px] text-red-300 hover:text-red-200 hover:underline">Cancel</button>`
       : '';
     return `
       <tr>

@@ -15,7 +15,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Mapped controls across frameworks and evidence capture.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" onclick="cmpRefresh()">Refresh</button>
+        <button class="btn btn-secondary" data-click-action="cmpRefresh">Refresh</button>
     </div>
 </section>
 
@@ -152,7 +152,7 @@ function cmpRender() {
         const cls = cmpScoreClass(f.overall_score || 0);
         const isSel = _cmpSelected === f.framework_id ? 'selected' : '';
         const s = f.summary || {};
-        html += `<div class="cmp-fw ${isSel}" onclick="cmpSelect('${cmpEsc(f.framework_id)}')">
+        html += `<div class="cmp-fw ${isSel}" data-click-action="cmpSelect" data-args='["${cmpEsc(f.framework_id)}"]'>
             <div class="cmp-fw-name">${cmpEsc(f.framework)}</div>
             <div class="cmp-fw-version">${cmpEsc(f.version || '')}</div>
             <div class="cmp-fw-score-row">

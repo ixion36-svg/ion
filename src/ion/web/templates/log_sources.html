@@ -21,8 +21,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Index lag, source volume and configured pipelines.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" onclick="lsRefresh()">Run Health Check</button>
-        <button class="btn btn-primary" onclick="lsOpenForm()">+ New Source</button>
+        <button class="btn btn-secondary" data-click-action="lsRefresh">Run Health Check</button>
+        <button class="btn btn-primary" data-click-action="lsOpenForm">+ New Source</button>
     </div>
 </section>
 
@@ -32,7 +32,7 @@
     <div class="ls-modal">
         <div class="ls-modal-head">
             <div class="ls-modal-title" id="ls-modal-title">New Log Source</div>
-            <button class="ls-modal-close" onclick="lsCloseForm()" aria-label="Close">&times;</button>
+            <button class="ls-modal-close" data-click-action="lsCloseForm" aria-label="Close">&times;</button>
         </div>
         <form class="ls-modal-body" id="ls-form" onsubmit="return lsSubmit(event)">
             <input type="hidden" id="ls-id" value="">
@@ -87,7 +87,7 @@
             </div>
 
             <div class="ls-form-actions">
-                <button type="button" class="btn btn-secondary" onclick="lsCloseForm()">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-click-action="lsCloseForm">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -193,8 +193,8 @@ async function lsLoad() {
             c.innerHTML = `<div class="ls-empty">
                 <h3>No log sources yet</h3>
                 <p>Define the ingestion sources you expect ION to see, and we'll continuously check whether they're alive in Elasticsearch.</p>
-                <button class="btn btn-secondary" onclick="lsSeedDefaults()">Seed 8 Common Sources</button>
-                <button class="btn btn-primary" onclick="lsOpenForm()" style="margin-left:8px">+ Add Manually</button>
+                <button class="btn btn-secondary" data-click-action="lsSeedDefaults">Seed 8 Common Sources</button>
+                <button class="btn btn-primary" data-click-action="lsOpenForm" style="margin-left:8px">+ Add Manually</button>
             </div>`;
             return;
         }
@@ -262,8 +262,8 @@ function lsRender(data) {
                 <div>Owner: <strong>${lsEsc(s.owner || '-')}</strong></div>
             </div>
             <div class="ls-card-actions">
-                <button class="ls-iconbtn" onclick="lsEdit(${s.id})">Edit</button>
-                <button class="ls-iconbtn danger" onclick="lsDelete(${s.id})">Delete</button>
+                <button class="ls-iconbtn" data-click-action="lsEdit" data-args='[${s.id}]'>Edit</button>
+                <button class="ls-iconbtn danger" data-click-action="lsDelete" data-args='[${s.id}]'>Delete</button>
             </div>
         </div>`;
     }

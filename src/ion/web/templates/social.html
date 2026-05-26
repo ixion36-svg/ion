@@ -166,17 +166,17 @@
         </div>
         <textarea id="social-body" placeholder="Share an update, shoutout, or announcement... (supports markdown)"></textarea>
         <div class="social-compose-footer">
-            <button class="btn-primary" onclick="createSocialPost()">Post</button>
+            <button class="btn-primary" data-click-action="createSocialPost">Post</button>
         </div>
     </div>
 
     <!-- Filters -->
     <div class="social-filters">
-        <button class="social-filter-pill active" data-cat="" onclick="filterPosts(this, '')">All</button>
-        <button class="social-filter-pill" data-cat="announcement" onclick="filterPosts(this, 'announcement')">Announcements</button>
-        <button class="social-filter-pill" data-cat="good_work" onclick="filterPosts(this, 'good_work')">Good Work</button>
-        <button class="social-filter-pill" data-cat="certification" onclick="filterPosts(this, 'certification')">Certifications</button>
-        <button class="social-filter-pill" data-cat="general" onclick="filterPosts(this, 'general')">General</button>
+        <button class="social-filter-pill active" data-cat="" data-click-action="filterPosts" data-args='["$target", ""]'>All</button>
+        <button class="social-filter-pill" data-cat="announcement" data-click-action="filterPosts" data-args='["$target", "announcement"]'>Announcements</button>
+        <button class="social-filter-pill" data-cat="good_work" data-click-action="filterPosts" data-args='["$target", "good_work"]'>Good Work</button>
+        <button class="social-filter-pill" data-cat="certification" data-click-action="filterPosts" data-args='["$target", "certification"]'>Certifications</button>
+        <button class="social-filter-pill" data-cat="general" data-click-action="filterPosts" data-args='["$target", "general"]'>General</button>
     </div>
 
     <!-- Feed -->
@@ -253,16 +253,16 @@ function renderFeed(posts) {
             }
         }
 
-        const commentBtn = '<button class="social-comment-toggle" onclick="toggleComments(' + p.id + ')">\ud83d\udcac ' + p.comment_count + ' comments</button>';
+        const commentBtn = '<button class="social-comment-toggle" data-click-action="toggleComments" data-args='[" + p.id + "]'>\ud83d\udcac ' + p.comment_count + ' comments</button>';
 
         // Admin actions
         let adminHtml = '';
         if (isAdminOrLead) {
-            adminHtml += '<button class="social-admin-btn" onclick="togglePin(' + p.id + ')" title="' + (p.is_pinned ? 'Unpin' : 'Pin') + '">\ud83d\udccc</button>';
+            adminHtml += '<button class="social-admin-btn" data-click-action="togglePin" data-args='[" + p.id + "]' title="' + (p.is_pinned ? 'Unpin' : 'Pin') + '">\ud83d\udccc</button>';
         }
         const isMine = currentUserData && p.user_id === currentUserData.id;
         if (isMine || isAdminOrLead) {
-            adminHtml += '<button class="social-admin-btn" onclick="deletePost(' + p.id + ')" title="Delete">\ud83d\uddd1\ufe0f</button>';
+            adminHtml += '<button class="social-admin-btn" data-click-action="deletePost" data-args='[" + p.id + "]' title="Delete">\ud83d\uddd1\ufe0f</button>';
         }
 
         return '<div class="social-post' + pinnedClass + '" id="social-post-' + p.id + '">' +
@@ -363,7 +363,7 @@ async function toggleReaction(postId, emoji) {
                             reactHtml += '<button class="social-react-btn" onclick="toggleReaction(' + postId + ', \'' + key + '\')">' + icon + '</button>';
                         }
                     }
-                    const commentBtn = '<button class="social-comment-toggle" onclick="toggleComments(' + postId + ')">\ud83d\udcac ' + post.comment_count + ' comments</button>';
+                    const commentBtn = '<button class="social-comment-toggle" data-click-action="toggleComments" data-args='[" + postId + "]'>\ud83d\udcac ' + post.comment_count + ' comments</button>';
                     const adminBtns = actionsEl.querySelector('.social-post-admin-actions');
                     actionsEl.innerHTML = reactHtml + commentBtn + (adminBtns ? adminBtns.outerHTML : '');
                 }
@@ -417,7 +417,7 @@ async function loadComments(postId) {
             const av = (c.author_display || c.author || '?').charAt(0).toUpperCase();
             const isMine = currentUserData && c.user_id === currentUserData.id;
             const delBtn = (isMine || isAdminOrLead)
-                ? ' <button class="social-comment-delete" onclick="deleteComment(' + postId + ',' + c.id + ')">delete</button>'
+                ? ' <button class="social-comment-delete" data-click-action="deleteComment" data-args='[" + postId + ", " + c.id + "]'>delete</button>'
                 : '';
             return '<div class="social-comment-item">' +
                 '<div class="social-comment-avatar">' + escapeHtml(av) + '</div>' +
@@ -431,7 +431,7 @@ async function loadComments(postId) {
 
         html += '<div class="social-comment-form">' +
             '<input type="text" id="comment-input-' + postId + '" placeholder="Add a comment..." onkeydown="if(event.key===\'Enter\')addComment(' + postId + ')">' +
-            '<button onclick="addComment(' + postId + ')">Post</button>' +
+            '<button data-click-action="addComment" data-args='[" + postId + "]'>Post</button>' +
         '</div>';
 
         el.innerHTML = html;

@@ -65,7 +65,7 @@
 
     <!-- ── Customize toggle ── -->
     <div class="flex justify-end mb-4">
-      <button onclick="toggleDashConfig()" class="text-[11px] text-slate-500 hover:text-slate-300 transition flex items-center gap-1">
+      <button data-click-action="toggleDashConfig" class="text-[11px] text-slate-500 hover:text-slate-300 transition flex items-center gap-1">
         <svg class="w-3 h-3"><use href="#i-settings"/></svg> Customize
       </button>
     </div>
@@ -687,7 +687,7 @@
     container.innerHTML = DASH_SECTIONS.map(s => {
       const checked = saved[s.id] !== undefined ? saved[s.id] : s.default;
       return `<label class="flex items-center gap-2 text-[12px] text-slate-300 cursor-pointer">
-        <input type="checkbox" ${checked ? 'checked' : ''} onchange="saveDashPref('${s.id}', this.checked)">
+        <input type="checkbox" ${checked ? 'checked' : ''} data-change-action="saveDashPref" data-args='["${s.id}", "$checked"]'>
         ${s.label}
       </label>`;
     }).join('');
