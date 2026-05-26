@@ -29,17 +29,17 @@
         </div>
         <div class="discover-search-form">
             <div class="form-row">
-                <div class="form-group" style="flex: 2;">
+                <div class="form-group _ion-s-c2d2e263dc">
                     <label for="search-index">Index Pattern</label>
                     <input type="text" id="search-index" class="form-control" value="*,-.*" placeholder="e.g., logs-*, filebeat-*">
                 </div>
-                <div class="form-group" style="flex: 1;">
+                <div class="form-group _ion-s-ee3d55bf99">
                     <label for="search-time-field">Time Field</label>
                     <input type="text" id="search-time-field" class="form-control" value="@timestamp">
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group" style="flex: 1;">
+                <div class="form-group _ion-s-ee3d55bf99">
                     <label for="search-time-from">From</label>
                     <select id="search-time-from" class="form-control">
                         <option value="now-15m">Last 15 minutes</option>
@@ -51,7 +51,7 @@
                         <option value="now-90d">Last 90 days</option>
                     </select>
                 </div>
-                <div class="form-group" style="flex: 1;">
+                <div class="form-group _ion-s-ee3d55bf99">
                     <label for="search-size">Results</label>
                     <select id="search-size" class="form-control">
                         <option value="25">25</option>
@@ -64,9 +64,9 @@
             </div>
             <div class="form-group">
                 <label for="search-query">Query (Lucene/KQL syntax)</label>
-                <div style="display:flex; gap:6px; align-items:center;">
-                    <input type="text" id="search-query" class="form-control" style="flex:1;" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
-                    <button class="btn btn-sm" data-click-action="openNlQueryModal" title="Generate query with AI" style="white-space:nowrap; display:inline-flex; align-items:center; gap:4px;">
+                <div class="_ion-s-d3ecd376d1">
+                    <input type="text" id="search-query" class="form-control _ion-s-7623f05545" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
+                    <button class="btn btn-sm _ion-s-9c71bc0492" data-click-action="openNlQueryModal" title="Generate query with AI">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1v4a4 4 0 0 1-8 0v-4H7a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/></svg>
                         AI
                     </button>
@@ -85,7 +85,7 @@
     </div>
 
     <!-- Saved Searches Panel -->
-    <div class="tools-panel section-panel saved-searches-panel" id="saved-searches-panel" style="display: none;">
+    <div class="tools-panel section-panel saved-searches-panel _ion-s-f2892a2e8a" id="saved-searches-panel">
         <div class="panel-header">
             <h3>Saved Searches</h3>
             <button class="btn btn-sm" data-click-action="loadSavedSearches">Refresh</button>
@@ -107,7 +107,7 @@
     </div>
 
     <!-- Save Search Modal -->
-    <div class="modal-overlay" id="save-search-modal" style="display: none;">
+    <div class="modal-overlay _ion-s-f2892a2e8a" id="save-search-modal">
         <div class="modal-dialog">
             <div class="modal-header">
                 <h3 id="save-search-modal-title">Save Search</h3>
@@ -137,7 +137,7 @@
     </div>
 
     <!-- Histogram -->
-    <div class="tools-panel section-panel" id="histogram-panel" style="display: none;">
+    <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="histogram-panel">
         <div class="panel-header">
             <h3>Event Timeline</h3>
             <span id="histogram-total" class="badge"></span>
@@ -169,7 +169,7 @@
 </div>
 
 <!-- ==================== INDEX BROWSER TAB ==================== -->
-<div id="tab-indices" class="tool-tab-content" style="display: none;">
+<div id="tab-indices" class="tool-tab-content _ion-s-f2892a2e8a">
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Available Indices</h3>
@@ -200,7 +200,7 @@
     </div>
 
     <!-- Field Mappings Panel -->
-    <div class="tools-panel section-panel" id="mappings-panel" style="display: none;">
+    <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="mappings-panel">
         <div class="panel-header">
             <h3>Field Mappings: <span id="mappings-index-name"></span></h3>
             <span id="mappings-field-count" class="badge"></span>
@@ -222,7 +222,7 @@
     </div>
 
     <!-- Field Stats Panel -->
-    <div class="tools-panel section-panel" id="field-stats-panel" style="display: none;">
+    <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="field-stats-panel">
         <div class="panel-header">
             <h3>Field Statistics: <span id="field-stats-name"></span></h3>
         </div>
@@ -243,18 +243,18 @@
 </div>
 
 <!-- ==================== IOC HUNT TAB ==================== -->
-<div id="tab-ioc-hunt" class="tool-tab-content" style="display: none;">
+<div id="tab-ioc-hunt" class="tool-tab-content _ion-s-f2892a2e8a">
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>IOC Hunt</h3>
         </div>
         <div class="ioc-hunt-form">
             <div class="form-row">
-                <div class="form-group" style="flex: 2;">
+                <div class="form-group _ion-s-c2d2e263dc">
                     <label for="ioc-value">IOC Value</label>
                     <input type="text" id="ioc-value" class="form-control" placeholder="Enter IP, hash, domain, URL, or email...">
                 </div>
-                <div class="form-group" style="flex: 1;">
+                <div class="form-group _ion-s-ee3d55bf99">
                     <label for="ioc-type">Type (auto-detected)</label>
                     <select id="ioc-type" class="form-control">
                         <option value="">Auto-detect</option>
@@ -267,7 +267,7 @@
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group" style="flex: 1;">
+                <div class="form-group _ion-s-ee3d55bf99">
                     <label for="ioc-time-from">Time Range</label>
                     <select id="ioc-time-from" class="form-control">
                         <option value="now-24h">Last 24 hours</option>
@@ -277,7 +277,7 @@
                         <option value="">All time</option>
                     </select>
                 </div>
-                <div class="form-group" style="flex: 1;">
+                <div class="form-group _ion-s-ee3d55bf99">
                     <label for="ioc-index">Index Pattern</label>
                     <input type="text" id="ioc-index" class="form-control" value="*,-.*">
                 </div>
@@ -314,7 +314,7 @@
         </div>
 
         <!-- Single IOC Results -->
-        <div id="ioc-single-results" style="display: none;">
+        <div class="_ion-s-f2892a2e8a" id="ioc-single-results">
             <div class="ioc-hunt-summary" id="ioc-hunt-summary"></div>
             <div class="ioc-indices-found" id="ioc-indices-found"></div>
             <table class="data-table" id="ioc-hunt-table">
@@ -330,7 +330,7 @@
         </div>
 
         <!-- Bulk IOC Results -->
-        <div id="ioc-bulk-results" style="display: none;">
+        <div class="_ion-s-f2892a2e8a" id="ioc-bulk-results">
             <div class="bulk-summary" id="bulk-summary"></div>
             <table class="data-table" id="bulk-results-table">
                 <thead>
@@ -822,7 +822,7 @@ function displayHistogram(data) {
     const maxCount = Math.max(...data.buckets.map(b => b.count));
     container.innerHTML = data.buckets.map(b => {
         const height = maxCount > 0 ? (b.count / maxCount * 100) : 0;
-        return `<div class="histogram-bar" style="height: ${height}%" title="${b.timestamp}: ${b.count} events"></div>`;
+        return `<div class="histogram-bar _ion-s-78d0d72849" title="${b.timestamp}: ${b.count} events"></div>`;
     }).join('');
 }
 
@@ -1401,29 +1401,29 @@ function openNlQueryModal() {
         modal.id = 'nl-query-modal';
         modal.className = 'modal-overlay';
         modal.innerHTML = `
-            <div class="modal-dialog" style="max-width:560px;">
+            <div class="modal-dialog _ion-s-29cd8c40c8">
                 <div class="modal-header">
                     <h3>AI Query Builder</h3>
                     <button class="modal-close" data-click-action="closeNlQueryModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-slate-400 mb-3" style="font-size:13px;">Describe what you're looking for in plain English and AI will generate an Elasticsearch query.</p>
+                    <p class="text-slate-400 mb-3 _ion-s-9e6595fb01">Describe what you're looking for in plain English and AI will generate an Elasticsearch query.</p>
                     <div class="form-group">
                         <label for="nl-question">Ask in plain English</label>
                         <input type="text" id="nl-question" class="form-control" placeholder="e.g., show me lateral movement in the last 24h">
                     </div>
-                    <div id="nl-query-error" style="display:none; color:#f87171; font-size:13px; margin-bottom:8px;"></div>
-                    <div id="nl-query-result" style="display:none;" class="mt-3">
-                        <label class="text-slate-400" style="font-size:12px;">Generated Query</label>
-                        <pre id="nl-query-output" style="background:#1e293b; padding:10px; border-radius:6px; font-size:12px; max-height:240px; overflow:auto; color:#e2e8f0; white-space:pre-wrap;"></pre>
-                        <p id="nl-query-explanation" class="text-slate-400 mt-1" style="font-size:12px;"></p>
-                        <p id="nl-query-index" class="text-slate-500 mt-1" style="font-size:11px;"></p>
+                    <div class="_ion-s-17429b566c" id="nl-query-error"></div>
+                    <div id="nl-query-result" class="mt-3 _ion-s-c8be1ccba6">
+                        <label class="text-slate-400 _ion-s-e71ae94b55">Generated Query</label>
+                        <pre class="_ion-s-d0e84089b5" id="nl-query-output"></pre>
+                        <p id="nl-query-explanation" class="text-slate-400 mt-1 _ion-s-e71ae94b55"></p>
+                        <p id="nl-query-index" class="text-slate-500 mt-1 _ion-s-e48b05836a"></p>
                     </div>
                 </div>
-                <div class="modal-footer" style="display:flex; gap:8px; justify-content:flex-end;">
+                <div class="modal-footer _ion-s-b0c6f36498">
                     <button class="btn" data-click-action="closeNlQueryModal">Cancel</button>
                     <button class="btn btn-primary" id="nl-query-generate-btn" data-click-action="generateNlQuery">Generate</button>
-                    <button class="btn btn-primary" id="nl-query-apply-btn" data-click-action="applyNlQuery" style="display:none;">Apply to Search</button>
+                    <button class="btn btn-primary _ion-s-c8be1ccba6" id="nl-query-apply-btn" data-click-action="applyNlQuery">Apply to Search</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);

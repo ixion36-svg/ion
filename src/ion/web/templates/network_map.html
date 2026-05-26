@@ -89,7 +89,7 @@
   </section>
 
   <!-- Network graph visualization -->
-  <section id="graph-view" class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 mb-6" style="display:none;">
+  <section id="graph-view" class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 mb-6 _ion-s-c8be1ccba6">
     <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
       <div class="flex items-center gap-3">
         <span class="label-tiny text-slate-500">Network Diagram</span>
@@ -103,11 +103,11 @@
         <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#f8b33a]"></span> High</span>
       </div>
     </div>
-    <div id="network-graph" style="height:700px;width:100%;background:#07080c;"></div>
+    <div class="_ion-s-a0684079ae" id="network-graph"></div>
   </section>
 
   <!-- Topology view -->
-  <section id="topology-view" class="rise d-4 mb-6" style="display:none;">
+  <section id="topology-view" class="rise d-4 mb-6 _ion-s-c8be1ccba6">
     <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
       <div class="flex items-center justify-between mb-4">
         <span class="label-tiny text-slate-500">Subnet Topology</span>
@@ -142,7 +142,7 @@
   </section>
 
   <!-- Detail drawer (hidden by default) -->
-  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-[480px] bg-ink-900 border-l border-white/10 shadow-2xl z-50 translate-x-full transition-transform duration-200" style="display:none;">
+  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-[480px] bg-ink-900 border-l border-white/10 shadow-2xl z-50 translate-x-full transition-transform duration-200 _ion-s-c8be1ccba6">
     <div class="h-full overflow-y-auto p-6">
       <div class="flex items-center justify-between mb-6">
         <h2 id="drawer-hostname" class="font-sans font-semibold text-[20px] text-white"></h2>
@@ -553,7 +553,7 @@ async function renderGraph() {
   const assets = await fetchGraphAssets();
 
   if (!assets.length) {
-    $('network-graph').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#64748b;font-size:13px;">No assets to visualize. Run a sync first.</div>';
+    $('network-graph').innerHTML = '<div class="_ion-s-36838c3eb2">No assets to visualize. Run a sync first.</div>';
     return;
   }
 

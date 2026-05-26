@@ -80,7 +80,7 @@ async function aeLoad(){
         if(!r.ok) throw new Error('Failed');
         renderEfficiency(await r.json());
     } catch(e) {
-        $('ae-content').innerHTML = `<div class="ae-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+        $('ae-content').innerHTML = `<div class="ae-loading _ion-s-5dd0211252">${esc(e.message)}</div>`;
     }
 }
 
@@ -109,7 +109,7 @@ function renderEfficiency(d) {
             const val = (h.cases_closed||0) + (h.alerts_triaged||0);
             const pct = Math.max(val / maxVal * 100, 2);
             const time = new Date(h.hour).toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
-            html += `<div class="ae-activity-bar" style="height:${pct}%"><div class="tip">${time}: ${val} actions</div></div>`;
+            html += `<div class="ae-activity-bar _ion-s-9ce2eb0cde"><div class="tip">${time}: ${val} actions</div></div>`;
         }
         html += '</div></div>';
     }
@@ -122,20 +122,20 @@ function renderEfficiency(d) {
         for (const a of analysts) {
             const fpColor = a.fp_rate > 50 ? 'var(--sev-critical)' : a.fp_rate > 30 ? 'var(--sev-medium)' : 'var(--text-primary)';
             html += `<tr>
-                <td style="font-weight:600">${esc(a.username)}</td>
+                <td class="_ion-s-eed0f8fb89">${esc(a.username)}</td>
                 <td class="mono">${a.cases_closed}</td>
                 <td class="mono">${a.cases_opened}</td>
                 <td class="mono">${a.alerts_triaged}</td>
-                <td class="mono" style="color:var(--mitre-covered)">${a.true_positives}</td>
-                <td class="mono" style="color:var(--sev-critical)">${a.false_positives}</td>
-                <td class="mono" style="color:${fpColor}">${a.fp_rate}%</td>
+                <td class="mono _ion-s-b00112b508">${a.true_positives}</td>
+                <td class="mono _ion-s-5dd0211252">${a.false_positives}</td>
+                <td class="mono _ion-s-fe86cee41d">${a.fp_rate}%</td>
                 <td class="mono">${a.avg_mttr_hours != null ? a.avg_mttr_hours + 'h' : '-'}</td>
                 <td class="mono">${a.total_actions}</td>
             </tr>`;
         }
         html += '</tbody></table></div>';
     } else {
-        html += '<div class="ae-section"><div style="text-align:center;color:var(--text-secondary);padding:20px">No analyst activity in this period.</div></div>';
+        html += '<div class="ae-section"><div class="_ion-s-5a63859113">No analyst activity in this period.</div></div>';
     }
 
     $('ae-content').innerHTML = html;

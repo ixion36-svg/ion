@@ -904,19 +904,19 @@ async function loadServerMetrics() {
                 <span class="metric-label">CPU</span>
                 <span class="metric-value ${cpuClass}">${data.cpu.percent.toFixed(1)}%</span>
             </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${cpuClass}" style="width: ${data.cpu.percent}%"></div></div>
+            <div class="metric-bar"><div class="metric-bar-fill ${cpuClass} _ion-s-5a5b4f6ae2"></div></div>
 
             <div class="metric-row">
                 <span class="metric-label">Memory</span>
                 <span class="metric-value ${memClass}">${data.memory.used_percent.toFixed(1)}%</span>
             </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${memClass}" style="width: ${data.memory.used_percent}%"></div></div>
+            <div class="metric-bar"><div class="metric-bar-fill ${memClass} _ion-s-3e5bbd2767"></div></div>
 
             <div class="metric-row">
                 <span class="metric-label">Disk</span>
                 <span class="metric-value ${diskClass}">${data.disk.used_percent.toFixed(1)}%</span>
             </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${diskClass}" style="width: ${data.disk.used_percent}%"></div></div>
+            <div class="metric-bar"><div class="metric-bar-fill ${diskClass} _ion-s-4b325e9d10"></div></div>
 
             <div class="metric-row">
                 <span class="metric-label">Process</span>
@@ -1100,7 +1100,7 @@ async function loadServerLogsMetrics() {
                     <div class="server-logs-stat-label">Errors</div>
                 </div>
             </div>
-            <div style="margin-top: 1rem;">
+            <div class="_ion-s-dab43fb936">
                 <div class="metric-row">
                     <span class="metric-label">HTTP 2xx/3xx</span>
                     <span class="metric-value good">${successCount}</span>
@@ -1137,7 +1137,7 @@ async function loadWebhooks() {
         const webhooks = await response.json();
 
         if (webhooks.length === 0) {
-            container.innerHTML = '<p class="loading" style="padding: 1rem;">No webhooks configured</p>';
+            container.innerHTML = '<p class="loading _ion-s-ef7142f76c">No webhooks configured</p>';
             return;
         }
 

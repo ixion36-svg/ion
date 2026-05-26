@@ -172,7 +172,7 @@
 </div>
 
 <!-- Investigation detail modal -->
-<div class="modal" id="im-inv-modal" style="display:none">
+<div class="modal _ion-s-6b99de8b69" id="im-inv-modal">
   <div class="modal-content modal-large">
     <div class="modal-header">
       <h2 id="im-inv-modal-title">Investigation</h2>
@@ -186,7 +186,7 @@
 </div>
 
 <!-- New FP modal -->
-<div class="modal" id="im-fp-modal" style="display:none">
+<div class="modal _ion-s-6b99de8b69" id="im-fp-modal">
   <div class="modal-content">
     <div class="modal-header">
       <h2>New false-positive signature</h2>
@@ -376,7 +376,7 @@
         return;
       }
       tbody.innerHTML = rows.map(r => `
-        <tr style="cursor:pointer" data-click-action="imShowInv" data-args='[${r.id}]'>
+        <tr class="_ion-s-3b6a3a65d8" data-click-action="imShowInv" data-args='[${r.id}]'>
           <td>${imEscape(imFmtDate(r.created_at))}</td>
           <td><span class="text-white font-medium">${imEscape(r.alert_signature)}</span></td>
           <td>${imEscape(r.host || '-')}</td>

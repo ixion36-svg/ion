@@ -379,7 +379,7 @@ async function matStartNew() {
         matResponses = {};
         matRenderQuestionnaire();
     } catch (e) {
-        c.innerHTML = `<div class="mat-loading" style="color:var(--sev-critical)">${matEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="mat-loading _ion-s-5dd0211252">${matEsc(e.message)}</div>`;
     }
 }
 
@@ -418,12 +418,12 @@ function matRenderQuestionnaire() {
                 <input class="mat-q-notes" placeholder="Notes (optional)" id="mat-notes-${question.id}">
             </div>`;
         }
-        html += `<div style="font-size:.72rem;color:var(--text-secondary);margin-top:6px">Related ION pages: ${(domain.ion_pages||[]).map(p => `<a href="${p}" style="color:var(--primary);text-decoration:none">${p}</a>`).join(', ')}</div>`;
+        html += `<div class="_ion-s-361f2a66e8">Related ION pages: ${(domain.ion_pages||[]).map(p => `<a class="_ion-s-1cdc0f83d3" href="${p}">${p}</a>`).join(', ')}</div>`;
         html += '</div></div>';
     }
 
     html += `<div class="mat-submit">
-        <input id="mat-title" type="text" placeholder="Assessment title (optional)" style="flex:1;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:8px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem">
+        <input class="_ion-s-56b5cc5749" id="mat-title" type="text" placeholder="Assessment title (optional)">
         <button class="btn btn-primary" data-click-action="matSubmit">Submit Assessment</button>
     </div>`;
 
@@ -485,9 +485,9 @@ function matRenderResult(a) {
     const pct = a.overall_score * 20;
 
     let html = `<div class="mat-result-overall">
-        <div class="mat-result-ring" style="background:conic-gradient(${color} ${pct}%, rgba(99,110,123,.2) ${pct}%)">
+        <div class="mat-result-ring _ion-s-c5b24d62d0">
             <div class="mat-result-inner">
-                <div class="mat-result-score" style="color:${color}">${a.overall_score}</div>
+                <div class="mat-result-score _ion-s-2243cc4df3">${a.overall_score}</div>
                 <div class="mat-result-label">of 5</div>
             </div>
         </div>
@@ -504,15 +504,15 @@ function matRenderResult(a) {
         html += `<div class="mat-result-bar">
             <div class="mat-result-bar-head">
                 <span class="mat-result-bar-name">${matEsc(domain.name || domainId)}</span>
-                <span class="mat-result-bar-score" style="color:${col}">${score.score}/5</span>
+                <span class="mat-result-bar-score _ion-s-b099892f7b">${score.score}/5</span>
             </div>
-            <div class="mat-bar"><div class="mat-bar-fill" style="width:${score.pct}%;background:${col}"></div></div>
+            <div class="mat-bar"><div class="mat-bar-fill _ion-s-021044d3a7"></div></div>
             <div class="mat-result-bar-pct">${score.pct}%</div>
         </div>`;
     }
     html += '</div>';
 
-    html += `<div style="display:flex;gap:8px;justify-content:flex-end">
+    html += `<div class="_ion-s-309cf4771c">
         <button class="btn btn-secondary" data-click-action="matShowHistory">View History</button>
         <button class="btn btn-primary" data-click-action="matStartNew">New Assessment</button>
     </div>`;
@@ -529,10 +529,10 @@ async function matShowHistory() {
         const assessments = d.assessments || [];
 
         if (!assessments.length) {
-            c.innerHTML = `<div class="mat-intro" style="text-align:center">
-                <h3 style="color:var(--text-primary);margin-bottom:8px">No assessments yet</h3>
+            c.innerHTML = `<div class="mat-intro _ion-s-91a87015f4">
+                <h3 class="_ion-s-ba0af95016">No assessments yet</h3>
                 <p>Run your first SOC maturity assessment to establish a baseline.</p>
-                <button class="btn btn-primary" data-click-action="matStartNew" style="margin-top:14px">Start Assessment</button>
+                <button class="btn btn-primary _ion-s-d6f2af6e0a" data-click-action="matStartNew">Start Assessment</button>
             </div>`;
             return;
         }
@@ -544,20 +544,20 @@ async function matShowHistory() {
             html += `<tr>
                 <td>${a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}</td>
                 <td>${matEsc(a.title)}</td>
-                <td><strong style="color:${scoreColor(a.overall_score)}">${a.overall_score}/5</strong></td>
+                <td><strong class="_ion-s-551d72673a">${a.overall_score}/5</strong></td>
                 <td>${matEsc(a.overall_level)}</td>
                 <td>${(s.business||{}).score||'-'}</td>
                 <td>${(s.people||{}).score||'-'}</td>
                 <td>${(s.process||{}).score||'-'}</td>
                 <td>${(s.technology||{}).score||'-'}</td>
                 <td>${(s.services||{}).score||'-'}</td>
-                <td><button class="btn btn-secondary btn-sm" data-click-action="matDelete" data-args='[${a.id}]' style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                <td><button class="btn btn-secondary btn-sm _ion-s-a318f9408e" data-click-action="matDelete" data-args='[${a.id}]'>Delete</button></td>
             </tr>`;
         }
         html += '</tbody></table>';
         c.innerHTML = html;
     } catch (e) {
-        c.innerHTML = `<div class="mat-loading" style="color:var(--sev-critical)">${matEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="mat-loading _ion-s-5dd0211252">${matEsc(e.message)}</div>`;
     }
 }
 

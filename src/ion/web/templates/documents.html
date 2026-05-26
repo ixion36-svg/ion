@@ -77,7 +77,7 @@
 </div>
 
 <!-- Manage Folders Modal -->
-<div id="folders-modal" class="modal" style="display: none;">
+<div id="folders-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2>Manage Folders</h2>
@@ -102,7 +102,7 @@
 </div>
 
 <!-- Move Document Modal -->
-<div id="move-modal" class="modal" style="display: none;">
+<div id="move-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content modal-small">
         <div class="modal-header">
             <h2>Move to Folder</h2>
@@ -121,7 +121,7 @@
 </div>
 
 <!-- Document View Modal -->
-<div id="document-modal" class="modal" style="display: none;">
+<div id="document-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2 id="modal-doc-name">Document</h2>
@@ -130,7 +130,7 @@
         <div class="modal-body">
             <div id="modal-doc-meta" class="meta-bar"></div>
 
-            <div id="modal-doc-tags" class="tags-section" style="display: none;">
+            <div id="modal-doc-tags" class="tags-section _ion-s-f2892a2e8a">
                 <h4>Tags</h4>
                 <div class="tags-display">
                     <span id="modal-tags-list"></span>
@@ -149,28 +149,28 @@
             </div>
 
             <div id="rendered-view" class="document-content rendered-content"></div>
-            <div id="raw-view" class="document-content" style="display: none;">
+            <div id="raw-view" class="document-content _ion-s-f2892a2e8a">
                 <pre id="modal-doc-content" class="code-block"></pre>
             </div>
 
-            <div id="edit-view" class="document-content" style="display: none;">
+            <div id="edit-view" class="document-content _ion-s-f2892a2e8a">
                 <div id="edit-quill-wrap" class="doc-quill-wrap">
                     <div id="edit-quill-editor"></div>
                 </div>
             </div>
 
 
-            <div id="versions-view" class="document-content" style="display: none;">
+            <div id="versions-view" class="document-content _ion-s-f2892a2e8a">
                 <div id="versions-list" class="versions-list"></div>
             </div>
 
-            <div id="modal-doc-data-section" style="display: none;">
+            <div class="_ion-s-f2892a2e8a" id="modal-doc-data-section">
                 <h4>Input Data</h4>
                 <pre id="modal-doc-data" class="code-block"></pre>
             </div>
         </div>
         <div class="modal-footer">
-            <button id="save-amendment-btn" class="btn btn-success" style="display: none;">Save Amendment</button>
+            <button id="save-amendment-btn" class="btn btn-success _ion-s-f2892a2e8a">Save Amendment</button>
             <button id="export-pdf-btn" class="btn btn-primary"><i class="icon-file-text"></i> Export PDF</button>
             <button id="download-btn" class="btn">Download Source</button>
             <button id="delete-doc-btn" class="btn btn-danger">Delete</button>
@@ -180,7 +180,7 @@
 </div>
 
 <!-- Amendment Confirmation Modal -->
-<div id="amendment-modal" class="modal" style="display: none;">
+<div id="amendment-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content">
         <div class="modal-header">
             <h2>Confirm Amendment</h2>
@@ -205,7 +205,7 @@
 </div>
 
 <!-- Version Preview Modal -->
-<div id="version-modal" class="modal" style="display: none;">
+<div id="version-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2 id="version-modal-title">Version Preview</h2>
@@ -222,7 +222,7 @@
     </div>
 </div>
 <!-- Upload Document Modal -->
-<div id="upload-modal" class="modal" style="display: none;">
+<div id="upload-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content">
         <div class="modal-header">
             <h2>Upload Document</h2>
@@ -1444,7 +1444,7 @@ function renderDocumentTags() {
     tagsSection.style.display = 'block';
 
     if (currentDocTags.length === 0) {
-        tagsList.innerHTML = '<span class="muted" style="font-size:0.8rem">No tags</span> ';
+        tagsList.innerHTML = '<span class="muted _ion-s-c9565925f3">No tags</span> ';
     } else {
         let html = '';
         currentDocTags.forEach(function(tag) {

@@ -125,13 +125,13 @@
     <!-- v0.27.0: global search bar — hits /api/threat-intel/unified-search.
          Fans out to actors + campaigns (OpenCTI) + IOCs + cases. Results
          grouped by kind under the bar. Press Enter or click Search. -->
-    <div class="ti-search-bar" style="margin-bottom:24px;">
+    <div class="ti-search-bar _ion-s-8b9688e6e0">
         <input type="text" class="ti-search-input" id="ti-global-search"
                placeholder="Search across actors, campaigns, IOCs, cases (e.g. APT28, evil.com, 10.0.0.1)…">
         <button class="ti-btn" data-click-action="tiUnifiedSearch">Search</button>
-        <button class="ti-btn-outline" data-click-action="tiClearSearch" id="ti-global-search-clear" style="display:none;">Clear</button>
+        <button class="ti-btn-outline _ion-s-c8be1ccba6" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
     </div>
-    <div id="ti-global-search-results" style="display:none;margin-bottom:24px;"></div>
+    <div class="_ion-s-30ded21efa" id="ti-global-search-results"></div>
 
     <!-- Tabs (v0.27.0: 4 → 7 tabs after merging /threat-landscape +
          /attack-stories. Pill style with cyan active state ported from
@@ -142,7 +142,7 @@
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="campaigns">Campaigns</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="ioc">IOC Feed</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="reports">Reports</button>
-        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge" style="display:none;">0</span></button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge _ion-s-c8be1ccba6">0</span></button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="stories">Attack Stories</button>
     </div>
 
@@ -274,15 +274,15 @@
 
     <!-- Watchlist Panel -->
     <div class="ti-panel" id="panel-watchlist">
-        <h3 style="font-size:.95rem;margin:0 0 16px;">Active Watches</h3>
+        <h3 class="_ion-s-65ad540569">Active Watches</h3>
         <table class="ti-table" id="watchlist-table">
             <thead><tr><th>Name</th><th>Origin</th><th>Type</th><th>Matches</th><th>Last Match</th><th>Watched By</th><th>Reason</th><th>Actions</th></tr></thead>
             <tbody id="watchlist-body"><tr><td colspan="8" class="ti-empty">Loading...</td></tr></tbody>
         </table>
 
-        <h3 style="font-size:.95rem;margin:24px 0 12px;">
+        <h3 class="_ion-s-2714558e5b">
             Match Alerts
-            <button class="ti-btn-outline ti-btn-sm" style="margin-left:10px;" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
+            <button class="ti-btn-outline ti-btn-sm _ion-s-7f90823361" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
         </h3>
         <table class="ti-table" id="matches-table">
             <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
@@ -293,7 +293,7 @@
     <!-- v0.27.0: IOC Feed Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-ioc">
         <div class="ti-search-bar">
-            <select id="ti-ioc-min-score" class="ti-search-input" style="flex:0 0 auto;width:auto;" data-change-action="tiLoadIOCFeed">
+            <select id="ti-ioc-min-score" class="ti-search-input _ion-s-f9e27e828c" data-change-action="tiLoadIOCFeed">
                 <option value="0">All scores</option>
                 <option value="50">Score ≥ 50</option>
                 <option value="75" selected>Score ≥ 75</option>
@@ -321,27 +321,25 @@
     <!-- v0.27.0: ATT&CK technique drill-down side panel.
          Opened by clicking a technique on the Overview's Recently Seen
          MITRE list. Closed by the X button or clicking the backdrop. -->
-    <div id="ti-drill-panel"
-         style="display:none;position:fixed;top:0;right:0;bottom:0;width:480px;max-width:90vw;
-                background:var(--bg-primary);border-left:1px solid var(--border);
-                box-shadow:-8px 0 24px rgba(0,0,0,0.5);z-index:200;overflow-y:auto;padding:20px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-            <h3 id="ti-drill-title" style="font-size:1rem;margin:0;color:var(--ion-cyan,#6de4ff);font-family:'JetBrains Mono',monospace;">—</h3>
-            <button data-click-action="tiCloseDrill"
-                    style="background:transparent;border:none;color:var(--text-secondary);cursor:pointer;font-size:1.2rem;">&times;</button>
+    <div class="_ion-s-f054d745af" id="ti-drill-panel"
+>
+        <div class="_ion-s-4aaba5a4dd">
+            <h3 class="_ion-s-a935918594" id="ti-drill-title">—</h3>
+            <button class="_ion-s-ee7af9422a" data-click-action="tiCloseDrill"
+>&times;</button>
         </div>
         <div id="ti-drill-body">
             <div class="ti-loading"><span class="ti-spinner"></span>Loading…</div>
         </div>
     </div>
-    <div id="ti-drill-backdrop"
-         style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:199;"
-         data-click-action="tiCloseDrill"></div>
+    <div class="_ion-s-b26cdbb562" id="ti-drill-backdrop"
+ 
+ data-click-action="tiCloseDrill"></div>
 
     <!-- v0.27.0: Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
         <div class="ti-search-bar">
-            <select id="ti-stories-hours" class="ti-search-input" style="flex:0 0 auto;width:auto;" data-change-action="tiLoadStories">
+            <select id="ti-stories-hours" class="ti-search-input _ion-s-f9e27e828c" data-change-action="tiLoadStories">
                 <option value="4">Last 4h</option>
                 <option value="12">Last 12h</option>
                 <option value="24" selected>Last 24h</option>
@@ -541,50 +539,50 @@
 
             // Tactic chips
             if (d.tactic_ids && d.tactic_ids.length) {
-                sections.push(`<div style="margin-bottom:14px;">
-                    <div style="font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;">Tactics</div>
+                sections.push(`<div class="_ion-s-a82d7062cc">
+                    <div class="_ion-s-accf379c51">Tactics</div>
                     ${d.tactic_ids.map(t =>
-                        `<span style="display:inline-block;padding:2px 8px;background:rgba(109,228,255,0.1);border:1px solid rgba(109,228,255,0.3);border-radius:4px;font-size:.72rem;color:var(--ion-cyan,#6de4ff);margin-right:4px;font-family:'JetBrains Mono',monospace;">${escapeHtml(t)}</span>`
+                        `<span class="_ion-s-057eff9b07">${escapeHtml(t)}</span>`
                     ).join('')}
                 </div>`);
             }
             if (d.is_subtechnique && d.parent_id) {
-                sections.push(`<div style="font-size:.78rem;color:var(--text-secondary);margin-bottom:14px;">
-                    Sub-technique of <a href="javascript:void(0)" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(d.parent_id)}]' style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;">${escapeHtml(d.parent_id)}</a>
+                sections.push(`<div class="_ion-s-8cc2e5263b">
+                    Sub-technique of <a class="_ion-s-03d0be992c" href="javascript:void(0)" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(d.parent_id)}]'>${escapeHtml(d.parent_id)}</a>
                 </div>`);
             }
 
             // Local cases
-            sections.push(`<div style="margin-bottom:14px;">
-                <h4 style="font-size:.85rem;margin:0 0 8px;color:var(--text-primary);">Local Cases <span style="color:var(--text-secondary);font-weight:400;font-size:.75rem;">(last 90 days)</span></h4>
+            sections.push(`<div class="_ion-s-a82d7062cc">
+                <h4 class="_ion-s-0f7d025040">Local Cases <span class="_ion-s-84bbf7f5de">(last 90 days)</span></h4>
                 ${!d.local_cases.length
-                    ? '<em style="font-size:.78rem;color:var(--text-secondary);">No cases triggered this technique in the last 90 days.</em>'
-                    : '<ul style="list-style:none;padding:0;margin:0;">' + d.local_cases.map(c => `
-                        <li style="padding:6px 0;border-bottom:1px solid var(--border);font-size:.8rem;">
-                            <a href="/cases?selected=${c.id}" style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;">${escapeHtml(c.case_number)}</a>
-                            <span style="margin-left:6px;color:var(--text-primary);">${escapeHtml(c.title)}</span>
-                            <span class="sev-badge sev-${escapeHtml(c.severity)}" style="margin-left:6px;font-size:.7rem;">${escapeHtml(c.severity)}</span>
+                    ? '<em class="_ion-s-6e06904f9e">No cases triggered this technique in the last 90 days.</em>'
+                    : '<ul class="_ion-s-e7184d9d11">' + d.local_cases.map(c => `
+                        <li class="_ion-s-67b52d7eff">
+                            <a class="_ion-s-03d0be992c" href="/cases?selected=${c.id}">${escapeHtml(c.case_number)}</a>
+                            <span class="_ion-s-199aeed353">${escapeHtml(c.title)}</span>
+                            <span class="sev-badge sev-${escapeHtml(c.severity)} _ion-s-058f0f3331">${escapeHtml(c.severity)}</span>
                         </li>`).join('') + '</ul>'
                 }
             </div>`);
 
             // Actors
-            sections.push(`<div style="margin-bottom:14px;">
-                <h4 style="font-size:.85rem;margin:0 0 8px;color:var(--text-primary);">Actors Using This Technique <span style="color:var(--text-secondary);font-weight:400;font-size:.75rem;">(OpenCTI)</span></h4>
+            sections.push(`<div class="_ion-s-a82d7062cc">
+                <h4 class="_ion-s-0f7d025040">Actors Using This Technique <span class="_ion-s-84bbf7f5de">(OpenCTI)</span></h4>
                 ${d.actors_error
-                    ? `<em style="font-size:.78rem;color:var(--text-secondary);">OpenCTI lookup unavailable: ${escapeHtml(d.actors_error)}</em>`
+                    ? `<em class="_ion-s-6e06904f9e">OpenCTI lookup unavailable: ${escapeHtml(d.actors_error)}</em>`
                     : !d.actors.length
-                        ? '<em style="font-size:.78rem;color:var(--text-secondary);">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>'
-                        : '<ul style="list-style:none;padding:0;margin:0;">' + d.actors.map(a => `
-                            <li style="padding:4px 0;font-size:.8rem;">
-                                <span style="color:var(--ion-cyan,#6de4ff);">${escapeHtml(a.name || a.id || '')}</span>
+                        ? '<em class="_ion-s-6e06904f9e">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>'
+                        : '<ul class="_ion-s-e7184d9d11">' + d.actors.map(a => `
+                            <li class="_ion-s-a24e8f22c9">
+                                <span class="_ion-s-d34d5c53e4">${escapeHtml(a.name || a.id || '')}</span>
                             </li>`).join('') + '</ul>'
                 }
             </div>`);
 
             body.innerHTML = sections.join('');
         } catch(e) {
-            body.innerHTML = '<div class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
+            body.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
         }
     };
 
@@ -603,12 +601,12 @@
             if (!d.observables.length) {
                 obsEl.innerHTML = '<em>No observable activity in the last 30 days.</em>';
             } else {
-                obsEl.innerHTML = '<ul style="list-style:none;padding:0;margin:0;">' +
+                obsEl.innerHTML = '<ul class="_ion-s-e7184d9d11">' +
                     d.observables.map(o =>
-                        `<li style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;">
-                            <span><code style="font-size:.75rem;color:var(--text-muted);">${o.type}</code>
-                            <code style="margin-left:6px;color:var(--text-primary);">${escapeHtml(o.value)}</code></span>
-                            <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:.75rem;">${o.count}×</span>
+                        `<li class="_ion-s-a0850f2f6f">
+                            <span><code class="_ion-s-fcf3b313f7">${o.type}</code>
+                            <code class="_ion-s-199aeed353">${escapeHtml(o.value)}</code></span>
+                            <span class="_ion-s-7edf4c5397">${o.count}×</span>
                         </li>`
                     ).join('') + '</ul>';
             }
@@ -616,13 +614,13 @@
                 techEl.innerHTML = '<em>No MITRE techniques tagged in the last 30 days.</em>';
             } else {
                 // v0.27.0: each technique chip is now click-to-drill.
-                techEl.innerHTML = '<ul style="list-style:none;padding:0;margin:0;">' +
+                techEl.innerHTML = '<ul class="_ion-s-e7184d9d11">' +
                     d.techniques.map(t =>
-                        `<li style="padding:4px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px;">
-                            <a href="javascript:void(0)" data-click-action="tiDrillTechnique" data-args='["${escapeHtml(t.id)}"]'
-                               style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;"
-                               title="Drill into this technique">${escapeHtml(t.id)}</a>
-                            <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:.75rem;">${t.count}×</span>
+                        `<li class="_ion-s-a0850f2f6f">
+                            <a class="_ion-s-03d0be992c" href="javascript:void(0)" data-click-action="tiDrillTechnique" data-args='["${escapeHtml(t.id)}"]'
+ 
+ title="Drill into this technique">${escapeHtml(t.id)}</a>
+                            <span class="_ion-s-7edf4c5397">${t.count}×</span>
                         </li>`
                     ).join('') + '</ul>';
             }
@@ -654,46 +652,46 @@
             const d = await r.json();
             const sections = [];
             if (d.actors.length) {
-                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">Threat Actors (${d.actors.length})</h4>` +
-                    '<ul style="list-style:none;padding:0;margin:0;">' + d.actors.map(a =>
-                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;">
+                sections.push(`<h4 class="_ion-s-51ab1975aa">Threat Actors (${d.actors.length})</h4>` +
+                    '<ul class="_ion-s-e7184d9d11">' + d.actors.map(a =>
+                        `<li class="_ion-s-249f2c8531">
                             ${escapeHtml(a.name || a.id || '')}
                         </li>`
                     ).join('') + '</ul>');
             }
             if (d.campaigns.length) {
-                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">Campaigns (${d.campaigns.length})</h4>` +
-                    '<ul style="list-style:none;padding:0;margin:0;">' + d.campaigns.map(c =>
-                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;">
+                sections.push(`<h4 class="_ion-s-51ab1975aa">Campaigns (${d.campaigns.length})</h4>` +
+                    '<ul class="_ion-s-e7184d9d11">' + d.campaigns.map(c =>
+                        `<li class="_ion-s-249f2c8531">
                             ${escapeHtml(c.name || c.id || '')}
                         </li>`
                     ).join('') + '</ul>');
             }
             if (d.iocs.length) {
-                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">IOCs (${d.iocs.length})</h4>` +
-                    '<ul style="list-style:none;padding:0;margin:0;">' + d.iocs.map(i =>
-                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;display:flex;justify-content:space-between;gap:8px;">
-                            <span><code style="font-size:.75rem;color:var(--text-muted);">${escapeHtml(i.type)}</code>
-                            <code style="margin-left:6px;color:var(--text-primary);">${escapeHtml(i.value)}</code></span>
-                            <a href="/observables/${i.id}" style="color:var(--accent);font-size:.75rem;text-decoration:none;">→ open</a>
+                sections.push(`<h4 class="_ion-s-51ab1975aa">IOCs (${d.iocs.length})</h4>` +
+                    '<ul class="_ion-s-e7184d9d11">' + d.iocs.map(i =>
+                        `<li class="_ion-s-c00a097226">
+                            <span><code class="_ion-s-fcf3b313f7">${escapeHtml(i.type)}</code>
+                            <code class="_ion-s-199aeed353">${escapeHtml(i.value)}</code></span>
+                            <a class="_ion-s-d9dc6ea16c" href="/observables/${i.id}">→ open</a>
                         </li>`
                     ).join('') + '</ul>');
             }
             if (d.cases.length) {
-                sections.push(`<h4 style="font-size:.85rem;margin:8px 0 6px;color:var(--accent);">Cases (${d.cases.length})</h4>` +
-                    '<ul style="list-style:none;padding:0;margin:0;">' + d.cases.map(c =>
-                        `<li style="padding:4px 8px;background:var(--bg-secondary);margin-bottom:2px;border-radius:4px;display:flex;justify-content:space-between;gap:8px;">
-                            <span><code style="font-size:.75rem;color:var(--text-muted);">${escapeHtml(c.case_number)}</code>
-                            <span style="margin-left:6px;color:var(--text-primary);">${escapeHtml(c.title)}</span></span>
-                            <a href="/cases?selected=${c.id}" style="color:var(--accent);font-size:.75rem;text-decoration:none;">→ open</a>
+                sections.push(`<h4 class="_ion-s-51ab1975aa">Cases (${d.cases.length})</h4>` +
+                    '<ul class="_ion-s-e7184d9d11">' + d.cases.map(c =>
+                        `<li class="_ion-s-c00a097226">
+                            <span><code class="_ion-s-fcf3b313f7">${escapeHtml(c.case_number)}</code>
+                            <span class="_ion-s-199aeed353">${escapeHtml(c.title)}</span></span>
+                            <a class="_ion-s-d9dc6ea16c" href="/cases?selected=${c.id}">→ open</a>
                         </li>`
                     ).join('') + '</ul>');
             }
             if (!sections.length) {
                 out.innerHTML = `<div class="ti-empty">No matches for "${escapeHtml(q)}".</div>`;
             } else {
-                out.innerHTML = `<div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;">
-                    <div style="font-size:.78rem;color:var(--text-secondary);margin-bottom:8px;">${d.total} result${d.total === 1 ? '' : 's'} for "${escapeHtml(q)}"</div>
+                out.innerHTML = `<div class="_ion-s-4456b466c8">
+                    <div class="_ion-s-3a570f8ef8">${d.total} result${d.total === 1 ? '' : 's'} for "${escapeHtml(q)}"</div>
                     ${sections.join('')}
                 </div>`;
             }
@@ -729,16 +727,16 @@
             tbody.innerHTML = iocs.map((i, idx) => {
                 const score = i.score || 0;
                 const labels = (i.labels || []).slice(0, 3).map(l =>
-                    `<span style="display:inline-block;padding:1px 6px;border-radius:3px;font-size:.7rem;background:rgba(255,255,255,0.04);border:1px solid var(--border);margin-right:2px;">${escapeHtml(l.value || l)}</span>`
+                    `<span class="_ion-s-868f8caae5">${escapeHtml(l.value || l)}</span>`
                 ).join('');
                 const sparkId = 'ti-spark-' + idx;
                 return `<tr>
-                    <td><strong style="color:${score >= 90 ? 'var(--danger)' : score >= 70 ? 'var(--neon-orange)' : 'var(--text-secondary)'};">${score}</strong></td>
-                    <td><code style="font-size:.75rem;color:var(--text-muted);">${escapeHtml(i.ioc_type)}</code></td>
-                    <td><code style="color:var(--text-primary);">${escapeHtml(i.ioc_value)}</code></td>
-                    <td>${labels || '<span style="color:var(--text-muted);">—</span>'}</td>
+                    <td><strong class="_ion-s-2382a360e6">${score}</strong></td>
+                    <td><code class="_ion-s-fcf3b313f7">${escapeHtml(i.ioc_type)}</code></td>
+                    <td><code class="_ion-s-55289dc131">${escapeHtml(i.ioc_value)}</code></td>
+                    <td>${labels || '<span class="_ion-s-b8e0b1fa55">—</span>'}</td>
                     <td>${escapeHtml(i.source || '—')}</td>
-                    <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span style="font-size:.7rem;color:var(--text-muted);">…</span></span></td>
+                    <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span class="_ion-s-a7d8dedd23">…</span></span></td>
                     <td>
                         <button class="ti-btn-outline ti-btn-sm" data-click-action="tiCopyIOC" data-args='["$event", ${JSON.stringify(i.ioc_value)}]'>Copy</button>
                     </td>
@@ -749,7 +747,7 @@
             // to 6 at a time to keep the OpenCTI backend honest.
             tiLoadSparklines();
         } catch(e) {
-            tbody.innerHTML = '<tr><td colspan="7" class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e)) + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e)) + '</td></tr>';
         }
     };
 
@@ -769,12 +767,12 @@
         if (!value) return;
         try {
             const r = await fetch(API + '/ioc-sightings?value=' + encodeURIComponent(value) + '&months=12');
-            if (!r.ok) { spark.innerHTML = '<span style="font-size:.7rem;color:var(--text-muted);">—</span>'; return; }
+            if (!r.ok) { spark.innerHTML = '<span class="_ion-s-a7d8dedd23">—</span>'; return; }
             const d = await r.json();
             const series = d.series || [];
             const total = d.total_sightings || 0;
             if (!series.length || total === 0) {
-                spark.innerHTML = '<span style="font-size:.7rem;color:var(--text-muted);" title="No local sightings in the last 12 months">—</span>';
+                spark.innerHTML = '<span class="_ion-s-a7d8dedd23" title="No local sightings in the last 12 months">—</span>';
                 return;
             }
             // Inline SVG sparkline: 12 bars, max bar = 14px tall.
@@ -789,9 +787,9 @@
                 const col = b.count === max ? 'var(--ion-cyan, #6de4ff)' : 'var(--text-secondary)';
                 return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${col}"><title>${b.month}: ${b.count}</title></rect>`;
             }).join('');
-            spark.innerHTML = `<svg width="${w}" height="${h}" style="vertical-align:middle;" title="${total} local sightings in last 12 months">${bars}</svg> <span style="font-size:.7rem;color:var(--text-muted);margin-left:4px;">${total}</span>`;
+            spark.innerHTML = `<svg class="_ion-s-7adb5e919d" width="${w}" height="${h}" title="${total} local sightings in last 12 months">${bars}</svg> <span class="_ion-s-09790ead9c">${total}</span>`;
         } catch(e) {
-            spark.innerHTML = '<span style="font-size:.7rem;color:var(--text-muted);">—</span>';
+            spark.innerHTML = '<span class="_ion-s-a7d8dedd23">—</span>';
         }
     }
 
@@ -816,14 +814,14 @@
             }
             host.innerHTML = reports.map(rep => {
                 const published = rep.published ? new Date(rep.published).toLocaleDateString() : '-';
-                return `<div style="padding:12px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;background:var(--bg-secondary);">
-                    <div style="font-size:.9rem;font-weight:600;color:var(--text-primary);margin-bottom:4px;">${escapeHtml(rep.name || 'Untitled')}</div>
-                    <div style="font-size:.75rem;color:var(--text-secondary);">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
-                    <div style="font-size:.72rem;color:var(--text-muted);margin-top:6px;font-family:'JetBrains Mono',monospace;">${escapeHtml(rep.report_type || 'report')} · ${published}</div>
+                return `<div class="_ion-s-d2d7bfa40f">
+                    <div class="_ion-s-176f60fe66">${escapeHtml(rep.name || 'Untitled')}</div>
+                    <div class="_ion-s-6912997656">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
+                    <div class="_ion-s-adac18b9c4">${escapeHtml(rep.report_type || 'report')} · ${published}</div>
                 </div>`;
             }).join('');
         } catch(e) {
-            host.innerHTML = '<div class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e)) + '</div>';
+            host.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e)) + '</div>';
         }
     };
 
@@ -845,32 +843,28 @@
             host.innerHTML = stories.map(s => {
                 const tacticsSet = new Set(s.tactics_progression || []);
                 const chainHtml = chainOrder.length
-                    ? `<div style="display:flex;gap:0;align-items:center;overflow-x:auto;margin:8px 0;">
+                    ? `<div class="_ion-s-533efdbbfb">
                         ${chainOrder.map((stage, i) => {
                             const active = tacticsSet.has(stage);
-                            return (i > 0 ? '<span style="padding:0 4px;color:var(--text-muted);font-size:.8rem;">→</span>' : '') +
-                                `<span style="padding:3px 8px;border-radius:4px;font-size:.7rem;font-weight:600;text-transform:uppercase;white-space:nowrap;${
-                                    active
-                                        ? 'background:rgba(220,38,38,0.18);color:#fecaca;border:1px solid rgba(220,38,38,0.4);'
-                                        : 'background:var(--bg-primary);color:var(--text-muted);border:1px dashed var(--border);'
-                                }">${escapeHtml(stage)}</span>`;
+                            return (i > 0 ? '<span class="_ion-s-20db64ea41">→</span>' : '') +
+                                `<span class="_ion-s-060fd90cff">${escapeHtml(stage)}</span>`;
                         }).join('')}
                        </div>`
                     : '';
-                return `<div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:12px;">
-                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-                        <div style="width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-family:'JetBrains Mono',monospace;font-size:.85rem;background:rgba(220,38,38,0.15);color:#fecaca;border:2px solid rgba(220,38,38,0.4);flex-shrink:0;">${s.score}</div>
-                        <div style="flex:1;">
-                            <div style="font-size:.95rem;font-weight:700;color:var(--text-primary);">${escapeHtml(s.entity)} <small style="font-size:.72rem;color:var(--text-secondary);font-weight:400;">(${escapeHtml(s.entity_type)})</small></div>
-                            <div style="font-size:.75rem;color:var(--text-secondary);margin-top:2px;">${s.alert_count} alerts · ${(s.unique_techniques||[]).length} techniques · ${s.time_span_hours}h span · <span class="sev-badge sev-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span></div>
+                return `<div class="_ion-s-009e279592">
+                    <div class="_ion-s-2983292b2e">
+                        <div class="_ion-s-1e744822b5">${s.score}</div>
+                        <div class="_ion-s-7623f05545">
+                            <div class="_ion-s-0ea732aed5">${escapeHtml(s.entity)} <small class="_ion-s-4304983f97">(${escapeHtml(s.entity_type)})</small></div>
+                            <div class="_ion-s-56828649e7">${s.alert_count} alerts · ${(s.unique_techniques||[]).length} techniques · ${s.time_span_hours}h span · <span class="sev-badge sev-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span></div>
                         </div>
                     </div>
-                    <div style="padding:10px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:.82rem;line-height:1.55;color:var(--text-primary);">${escapeHtml(s.narrative)}</div>
+                    <div class="_ion-s-53033bb1a8">${escapeHtml(s.narrative)}</div>
                     ${chainHtml}
                 </div>`;
             }).join('');
         } catch(e) {
-            host.innerHTML = '<div class="ti-empty" style="color:var(--danger);">Failed: ' + escapeHtml(String(e)) + '</div>';
+            host.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e)) + '</div>';
         }
     };
 
@@ -886,11 +880,11 @@
             const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
             const entityName = d.watch_name || '-';
             const entityType = d.entity_type ? d.entity_type.replace('_', ' ') : '-';
-            const readBtn = m.is_read ? '<span style="color:var(--text-secondary);font-size:.75rem">Read</span>' :
+            const readBtn = m.is_read ? '<span class="_ion-s-362a950cb6">Read</span>' :
                 `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
             return `<tr${cls}>
                 <td>${esc(time)}</td>
-                <td><code>${esc(m.observable_value || '-')}</code> <span style="color:var(--text-secondary);font-size:.72rem">(${esc(m.observable_type || '')})</span></td>
+                <td><code>${esc(m.observable_value || '-')}</code> <span class="_ion-s-bc0077da71">(${esc(m.observable_type || '')})</span></td>
                 <td>${esc(entityName)}</td>
                 ${showType ? `<td>${esc(entityType)}</td>` : ''}
                 <td>${readBtn}</td>
@@ -924,7 +918,7 @@
             actors.forEach((a, idx) => {
                 const aliases = (a.aliases || []).slice(0, 3).join(', ');
                 const moreAliases = (a.aliases || []).length > 3 ? ` +${a.aliases.length - 3}` : '';
-                const labels = (a.labels || []).map(l => `<span class="ti-label" style="background:${l.color || '#30363d'}22;color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
+                const labels = (a.labels || []).map(l => `<span class="ti-label _ion-s-da380a1752">${esc(l.value)}</span>`).join('');
                 const types = (a.threat_actor_types || []).map(t => t === 'intrusion-set' ? 'Intrusion Set' : t).join(', ') || '-';
                 const conf = a.confidence != null ? a.confidence : '-';
                 const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
@@ -938,12 +932,12 @@
                 // entity_class param tells the profile endpoint which
                 // OpenCTI lookup path to use (most APTs are intrusion sets).
                 const klass = (a.threat_actor_types || []).includes('intrusion-set') ? 'intrusion_set' : 'threat_actor';
-                const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm" style="margin-left:6px;" title="Open deep-dive profile">↗ Profile</a>`;
+                const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm _ion-s-f89ec2babf" title="Open deep-dive profile">↗ Profile</a>`;
                 html += `<tr>
                     <td class="ti-name-cell" data-click-action="toggleActorDetail" data-args='[${idx}]'>${esc(a.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span style="color:var(--text-muted)">-</span>'}</td>
+                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="_ion-s-5872de20d5">-</span>'}</td>
                     <td>${esc(types)}</td>
-                    <td>${esc(aliases)}${moreAliases ? `<span style="color:var(--text-secondary)">${moreAliases}</span>` : ''}</td>
+                    <td>${esc(aliases)}${moreAliases ? `<span class="_ion-s-ce14cb276b">${moreAliases}</span>` : ''}</td>
                     <td><span class="ti-confidence ${confCls}">${conf}</span></td>
                     <td>${formatDate(a.first_seen)}</td>
                     <td>${formatDate(a.last_seen)}</td>
@@ -997,7 +991,7 @@
                 html += '</div></div>';
             }
             if (!detail.description && !(detail.campaigns||[]).length && !(detail.ttps||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty" style="padding:10px">No additional detail available.</div>';
+                html += '<div class="ti-empty _ion-s-59bdf7cb33">No additional detail available.</div>';
             }
             html += '</td>';
             row.innerHTML = html;
@@ -1053,7 +1047,7 @@
             let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
             campaigns.forEach((c, idx) => {
                 const aliases = (c.aliases || []).slice(0, 3).join(', ');
-                const labels = (c.labels || []).map(l => `<span class="ti-label" style="background:${l.color || '#30363d'}22;color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
+                const labels = (c.labels || []).map(l => `<span class="ti-label _ion-s-da380a1752">${esc(l.value)}</span>`).join('');
                 const conf = c.confidence != null ? c.confidence : '-';
                 const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
                 const isWatched = watchedIds.has(c.id);
@@ -1107,7 +1101,7 @@
                 html += '</div></div>';
             }
             if (!detail.description && !(detail.threat_actors||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty" style="padding:10px">No additional detail available.</div>';
+                html += '<div class="ti-empty _ion-s-59bdf7cb33">No additional detail available.</div>';
             }
             html += '</td>';
             row.innerHTML = html;
@@ -1161,8 +1155,8 @@
                 const flag = w.country_flag || '';
                 const countryName = w.country_name || '';
                 return `<tr>
-                    <td style="font-weight:600">${esc(w.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span style="color:var(--text-muted)">-</span>'}</td>
+                    <td class="_ion-s-eed0f8fb89">${esc(w.name)}</td>
+                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="_ion-s-5872de20d5">-</span>'}</td>
                     <td>${esc(type)}</td>
                     <td>${w.match_count}</td>
                     <td>${esc(lastSeen)}</td>
@@ -1190,13 +1184,13 @@
                 const d = m.details || {};
                 const cls = m.is_read ? '' : ' class="ti-unread"';
                 const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
-                const readBtn = m.is_read ? '<span style="color:var(--text-secondary);font-size:.75rem">Read</span>' :
+                const readBtn = m.is_read ? '<span class="_ion-s-362a950cb6">Read</span>' :
                     `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
                 return `<tr${cls}>
                     <td>${esc(time)}</td>
                     <td><code>${esc(m.observable_value || '-')}</code></td>
                     <td>${esc(d.watch_name || '-')}</td>
-                    <td>${m.is_read ? 'Read' : '<strong style="color:var(--accent)">Unread</strong>'}</td>
+                    <td>${m.is_read ? 'Read' : '<strong class="_ion-s-a805525bfd">Unread</strong>'}</td>
                     <td>${readBtn}</td>
                 </tr>`;
             }).join('');

@@ -195,7 +195,7 @@ async function canRefresh() {
         canCache = list.canaries || [];
         canRender(canCache, statsRes, hits.hits || []);
     } catch (e) {
-        c.innerHTML = `<div class="can-loading" style="color:var(--sev-critical,#f85149)">${canEsc(e.message || 'Failed to load')}</div>`;
+        c.innerHTML = `<div class="can-loading _ion-s-3c9b2ebd4d">${canEsc(e.message || 'Failed to load')}</div>`;
     }
 }
 
@@ -213,7 +213,7 @@ function canRender(canaries, stats, hits) {
         html += `<div class="can-section"><div class="can-empty">
             <h3>No canaries planted yet</h3>
             <p>Plant a decoy file, account, host, or token. ION will scan recent alerts for any mention and raise a high-confidence breach alert when one fires.</p>
-            <button class="btn btn-primary" data-click-action="canOpenForm" style="margin-top:16px">+ Create First Canary</button>
+            <button class="btn btn-primary _ion-s-1b0f4999d2" data-click-action="canOpenForm">+ Create First Canary</button>
         </div></div>`;
     } else {
         html += `<div class="can-section"><div class="can-section-head">

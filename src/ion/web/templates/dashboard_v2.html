@@ -16,7 +16,7 @@
   <div class="fixed inset-0 bg-grid pointer-events-none opacity-40 z-0"></div>
 
   <!-- Icon definitions for dashboard -->
-  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+  <svg class="_ion-s-6b99de8b69" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs>
       <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
       <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
@@ -69,7 +69,7 @@
         <svg class="w-3 h-3"><use href="#i-settings"/></svg> Customize
       </button>
     </div>
-    <div id="dash-config" style="display:none" class="mb-6 p-4 rounded-xl border border-white/5 bg-ink-900/50">
+    <div id="dash-config" class="mb-6 p-4 rounded-xl border border-white/5 bg-ink-900/50 _ion-s-6b99de8b69">
       <div class="text-[11px] text-slate-500 uppercase tracking-wider mb-3">Show/Hide Sections</div>
       <div class="flex flex-wrap gap-3" id="dash-config-items"></div>
     </div>
@@ -191,7 +191,7 @@
             <div class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-white"><span id="kpi-sla">—</span><span class="text-ion-cyan text-[32px] font-medium">%</span></div>
           </div>
           <div class="h-1 w-full rounded-full bg-white/5 overflow-hidden">
-            <div id="kpi-sla-bar" class="h-full rounded-full bg-gradient-to-r from-ion-cyan to-ion-lime transition-[width] duration-700" style="width:0%"></div>
+            <div id="kpi-sla-bar" class="h-full rounded-full bg-gradient-to-r from-ion-cyan to-ion-lime transition-[width] duration-700 _ion-s-d2fba0f353"></div>
           </div>
         </div>
       </aside>
@@ -576,7 +576,7 @@
       } else {
         breakdownEl.innerHTML = rows.map(([k, color, label]) => {
           const w = Math.max(8, Math.round((breakdown[k] / total) * maxW));
-          return `<div class="flex items-center gap-1"><span class="h-1 rounded-full bg-ion-${color}" style="width:${w}px"></span><span class="font-mono text-[10px] text-slate-400">${breakdown[k]} ${label}</span></div>`;
+          return `<div class="flex items-center gap-1"><span class="h-1 rounded-full bg-ion-${color} _ion-s-623e7d73d0"></span><span class="font-mono text-[10px] text-slate-400">${breakdown[k]} ${label}</span></div>`;
         }).join('');
       }
 

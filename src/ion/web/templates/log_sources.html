@@ -194,13 +194,13 @@ async function lsLoad() {
                 <h3>No log sources yet</h3>
                 <p>Define the ingestion sources you expect ION to see, and we'll continuously check whether they're alive in Elasticsearch.</p>
                 <button class="btn btn-secondary" data-click-action="lsSeedDefaults">Seed 8 Common Sources</button>
-                <button class="btn btn-primary" data-click-action="lsOpenForm" style="margin-left:8px">+ Add Manually</button>
+                <button class="btn btn-primary _ion-s-5dd2a67868" data-click-action="lsOpenForm">+ Add Manually</button>
             </div>`;
             return;
         }
         await lsRefresh();
     } catch (e) {
-        c.innerHTML = `<div class="ls-loading" style="color:var(--sev-critical,#f85149)">${lsEsc(e.message || 'Failed to load')}</div>`;
+        c.innerHTML = `<div class="ls-loading _ion-s-3c9b2ebd4d">${lsEsc(e.message || 'Failed to load')}</div>`;
     }
 }
 
@@ -211,7 +211,7 @@ async function lsRefresh() {
         const r = await fetch(LS_API + '/health').then(r => r.json());
         lsRender(r);
     } catch (e) {
-        c.innerHTML = `<div class="ls-loading" style="color:var(--sev-critical,#f85149)">${lsEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="ls-loading _ion-s-3c9b2ebd4d">${lsEsc(e.message)}</div>`;
     }
 }
 
@@ -228,7 +228,7 @@ function lsRender(data) {
 
     let banner = '';
     if (data.es_configured === false) {
-        banner = '<div class="ls-banner warn"><strong>Elasticsearch not configured.</strong> Health column shows the last cached check (if any). Configure ES in <a href="/settings#elasticsearch" style="color:inherit;text-decoration:underline">Settings</a> for live data.</div>';
+        banner = '<div class="ls-banner warn"><strong>Elasticsearch not configured.</strong> Health column shows the last cached check (if any). Configure ES in <a class="_ion-s-0510f285a6" href="/settings#elasticsearch">Settings</a> for live data.</div>';
     }
 
     let html = banner + `<div class="ls-summary">

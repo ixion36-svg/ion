@@ -42,7 +42,7 @@
     </div>
 
     <!-- Legacy template notice (shown when editing raw templates) -->
-    <div id="legacy-notice" class="se-legacy-notice" style="display:none;">
+    <div id="legacy-notice" class="se-legacy-notice _ion-s-c8be1ccba6">
         <p>This template was created with the raw editor. To use the section editor, the existing content will be placed in a single Text section.</p>
         <button type="button" class="btn btn-sm" data-click-action="convertToSections">Convert to Sections</button>
     </div>
@@ -62,8 +62,8 @@
     </div>
 
     <!-- Section Library Panel -->
-    <div id="section-library-overlay" class="se-library-overlay" style="display:none;" data-click-action="closeLibrary"></div>
-    <div id="section-library" class="se-library" style="display:none;">
+    <div id="section-library-overlay" class="se-library-overlay _ion-s-c8be1ccba6" data-click-action="closeLibrary"></div>
+    <div id="section-library" class="se-library _ion-s-c8be1ccba6">
         <div class="se-library-header">
             <h3>Section Library</h3>
             <button type="button" class="se-library-close" data-click-action="closeLibrary">&times;</button>
@@ -97,7 +97,7 @@
 </form>
 
 <!-- Preview Modal -->
-<div id="preview-modal" class="modal" style="display:none;">
+<div id="preview-modal" class="modal _ion-s-c8be1ccba6">
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2>Template Preview (Generated Jinja2)</h2>
@@ -689,7 +689,7 @@ function buildFieldsHTML(section, idx, st) {
         const varName = c.variable_name || suggestVarName(section, st);
         html += '<div class="se-variable-toggle">';
         html += '<label><input type="checkbox" data-idx="' + idx + '" data-field="variable" ' + (isVar ? 'checked' : '') + '> Make variable</label>';
-        html += '<input type="text" data-idx="' + idx + '" data-field="variable_name" value="' + escapeHtml(varName) + '" placeholder="variable_name" style="' + (isVar ? '' : 'display:none') + '">';
+        html += '<input class="_ion-s-eb85f508da" type="text" data-idx="' + idx + '" data-field="variable_name" value="' + escapeHtml(varName) + '" placeholder="variable_name">';
         html += '</div>';
     }
 
@@ -785,7 +785,7 @@ function buildColumnsField(f, columns, idx) {
 function buildMetadataFieldsField(f, fields, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="metadata">';
     fields.forEach((fld, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input class="_ion-s-8ff9961267" type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
     html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "metadata"]\'>+ Add Field</button>';
     html += '</div></div>';
@@ -795,7 +795,7 @@ function buildMetadataFieldsField(f, fields, idx) {
 function buildSignatureRolesField(f, roles, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="signatures">';
     roles.forEach((r, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input class="_ion-s-8ff9961267" type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
     html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "signatures"]\'>+ Add Role</button>';
     html += '</div></div>';

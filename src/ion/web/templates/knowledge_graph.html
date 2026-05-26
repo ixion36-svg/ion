@@ -94,7 +94,7 @@ async function kgLoad() {
         kgData = await r.json();
         kgRender(kgData);
     } catch (e) {
-        document.getElementById('kg-canvas').innerHTML = `<div class="kg-loading" style="color:var(--sev-critical,#f85149)">${kgEsc(e.message)}</div>`;
+        document.getElementById('kg-canvas').innerHTML = `<div class="kg-loading _ion-s-3c9b2ebd4d">${kgEsc(e.message)}</div>`;
     }
 }
 
@@ -108,7 +108,7 @@ function kgRenderMeta(stats) {
     let legend = '';
     for (const t of types) {
         if (!counts[t]) continue;
-        legend += `<span class="kg-legend-item"><span class="kg-legend-dot" style="background:${colors[t]}"></span>${kgEsc(t)} (${counts[t]})</span>`;
+        legend += `<span class="kg-legend-item"><span class="kg-legend-dot _ion-s-7b379fa69d"></span>${kgEsc(t)} (${counts[t]})</span>`;
     }
     document.getElementById('kg-meta').innerHTML = `
         <span><strong>${stats.total_nodes||0}</strong> nodes</span>

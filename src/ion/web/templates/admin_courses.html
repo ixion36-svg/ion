@@ -46,8 +46,8 @@
 </div>
 
 <!-- Create dialog -->
-<div id="ac-create" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);" data-click-action="closeCreateDialog" data-only-self-click>
-  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;">
+<div class="_ion-s-2f3e0c5eac" id="ac-create" data-click-action="closeCreateDialog" data-only-self-click>
+  <div class="_ion-s-d85efb1967">
     <h2 class="text-[16px] font-semibold text-white mb-4">New course</h2>
     <div class="space-y-3">
       <div><label class="label-tiny text-slate-500 block mb-1">Title <span class="text-ion-coral">*</span></label>
@@ -79,8 +79,8 @@
 </div>
 
 <!-- Import dialog -->
-<div id="ac-import" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);" data-click-action="closeImportDialog" data-only-self-click>
-  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:760px;max-height:80vh;display:flex;flex-direction:column;background:#0f172a;border:1px solid rgba(255,255,255,0.1);border-radius:12px;padding:24px;">
+<div class="_ion-s-2f3e0c5eac" id="ac-import" data-click-action="closeImportDialog" data-only-self-click>
+  <div class="_ion-s-9e454cc368">
     <h2 class="text-[16px] font-semibold text-white mb-2">Import course JSON</h2>
     <p class="text-[12px] text-slate-400 mb-3">Paste a course payload exported from another ION instance (or hand-crafted following the same shape). Whole import is one transaction — slug must not collide with an existing course.</p>
     <textarea id="im-json" rows="20" class="w-full rounded-md bg-ink-950 border border-white/10 px-3 py-2 text-[12px] text-slate-200 font-mono leading-relaxed flex-1" spellcheck="false" placeholder='{ "course": { "title": "...", "level": "L1", "modules": [...] } }'></textarea>

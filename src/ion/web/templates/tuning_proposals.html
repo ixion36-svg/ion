@@ -101,17 +101,17 @@ async function loadProposals() {
             ? `<button class="btn btn-accept" data-click-action="review" data-args='[${p.id}, "accept"]'>Accept</button>
                <button class="btn btn-reject" data-click-action="review" data-args='[${p.id}, "reject"]'>Reject</button>
                <button class="btn" data-click-action="review" data-args='[${p.id}, "duplicate"]'>Duplicate</button>`
-            : `<span style="color:var(--text-secondary);">—</span>`;
+            : `<span class="_ion-s-0e42856cf0">—</span>`;
         const reviewed = p.reviewed_at
             ? `${esc(p.reviewed_by_username || '?')}<br><small>${fmtDate(p.reviewed_at)}</small>`
-            : '<span style="color:var(--text-secondary);">—</span>';
+            : '<span class="_ion-s-0e42856cf0">—</span>';
         const ruleLine = p.rule_id
             ? `<code>${esc(p.rule_id)}</code>`
             : (p.alert_id ? `<small>alert ${esc(p.alert_id)}</small>` : '—');
         return `
             <tr>
                 <td>${p.id}</td>
-                <td>${ruleLine}<br><small style="color:var(--text-secondary);">${fmtDate(p.created_at)}</small></td>
+                <td>${ruleLine}<br><small class="_ion-s-0e42856cf0">${fmtDate(p.created_at)}</small></td>
                 <td>${esc(p.suggested_change)}</td>
                 <td>${esc(p.rationale || '')}</td>
                 <td><span class="status-${esc(p.status)}">${esc(p.status)}</span></td>

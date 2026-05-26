@@ -730,7 +730,7 @@ async function loadEvents() {
                 }
             }
             return `
-            <tr data-click-action="showEventDetail" data-args='[${event.id}]' style="cursor: pointer;">
+            <tr class="_ion-s-8410c989c9" data-click-action="showEventDetail" data-args='[${event.id}]'>
                 <td>${formatDateTime(event.created_at)}</td>
                 <td><span class="severity-badge severity-${event.severity}">${event.severity}</span></td>
                 <td>${formatEventType(event.event_type)}</td>
@@ -768,7 +768,7 @@ async function loadBlockedIPs() {
             <div class="list-item">
                 <div>
                     <span class="list-item-ip">${escapeHtml(b.ip_address)}</span>
-                    <small style="display: block; color: var(--text-muted);">
+                    <small class="_ion-s-d598ba9f79">
                         ${b.permanent ? 'Permanent' : (b.blocked_until ? 'Until ' + formatDateTime(b.blocked_until) : 'Indefinite')}
                     </small>
                 </div>
@@ -876,11 +876,11 @@ async function showEventDetail(eventId) {
                     <div class="event-detail-label">Confidence Score</div>
                     <div class="event-detail-value">${event.confidence_score}%</div>
                 </div>
-                <div class="event-detail-item" style="grid-column: span 2;">
+                <div class="event-detail-item _ion-s-1f61f29863">
                     <div class="event-detail-label">User Agent</div>
                     <div class="event-detail-value">${event.user_agent ? escapeHtml(event.user_agent) : '-'}</div>
                 </div>
-                <div class="event-detail-item" style="grid-column: span 2;">
+                <div class="event-detail-item _ion-s-1f61f29863">
                     <div class="event-detail-label">Description</div>
                     <div class="event-detail-value">${escapeHtml(event.description)}</div>
                 </div>

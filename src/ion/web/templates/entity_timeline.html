@@ -39,9 +39,9 @@
 
 <div id="et-content">
     <div class="et-empty">
-        <i class="icon-search" style="font-size:2rem;margin-bottom:8px;color:var(--primary)"></i>
+        <i class="icon-search _ion-s-d8e1e29e37"></i>
         <div>Search for any entity to see its complete history across all ION data sources.</div>
-        <div style="font-size:.78rem;margin-top:8px;color:var(--text-muted)">Cases, alert triage, observables, enrichments, and audit log entries — all in one timeline.</div>
+        <div class="_ion-s-56a0948f69">Cases, alert triage, observables, enrichments, and audit log entries — all in one timeline.</div>
     </div>
 </div>
 
@@ -123,7 +123,7 @@ async function etSearch() {
         _activeFilters.clear();
         renderTimeline(_timelineData);
     } catch(e) {
-        $('et-content').innerHTML = `<div class="et-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+        $('et-content').innerHTML = `<div class="et-loading _ion-s-5dd0211252">${esc(e.message)}</div>`;
     }
 }
 
@@ -134,7 +134,7 @@ function renderTimeline(d) {
     html += `<div class="et-header">
         <span class="et-entity-type">${esc(d.entity_type)}</span>
         <span class="et-entity-value">${esc(d.entity_value)}</span>
-        <span style="color:var(--text-secondary);font-size:.82rem">${d.total_events} event${d.total_events!==1?'s':''} found across ${d.sources.length} source${d.sources.length!==1?'s':''}</span>
+        <span class="_ion-s-6363d7b7fb">${d.total_events} event${d.total_events!==1?'s':''} found across ${d.sources.length} source${d.sources.length!==1?'s':''}</span>
     </div>`;
 
     if (!d.events.length) {
@@ -151,7 +151,7 @@ function renderTimeline(d) {
     html += `<button class="et-filter active" data-click-action="etFilterAll" id="et-filter-all">All (${d.total_events})</button>`;
     for (const [src, count] of Object.entries(sourceCounts).sort((a,b)=>b[1]-a[1])) {
         html += `<button class="et-filter" data-click-action="etToggleFilter" data-args='["${src}"]' id="et-filter-${src}">
-            <span class="et-source-badge et-source-${src}" style="margin-right:2px">${src}</span> ${count}
+            <span class="et-source-badge et-source-${src} _ion-s-2574d57a62">${src}</span> ${count}
         </button>`;
     }
     html += '</div>';

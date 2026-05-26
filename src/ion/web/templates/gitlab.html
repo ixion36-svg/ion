@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Open issues, merge requests and assigned work.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn" data-click-action="showConfigModal" id="config-btn" style="display: none;">Configure</button>
-        <button class="btn btn-primary" data-click-action="showCreateIssueModal" id="new-issue-btn" style="display: none;">New Issue</button>
+        <button class="btn _ion-s-f2892a2e8a" data-click-action="showConfigModal" id="config-btn">Configure</button>
+        <button class="btn btn-primary _ion-s-f2892a2e8a" data-click-action="showCreateIssueModal" id="new-issue-btn">New Issue</button>
     </div>
 </section>
 
@@ -26,14 +26,14 @@
 </div>
 
 <!-- Not Configured State -->
-<div id="not-configured" class="empty-state" style="display: none;">
+<div id="not-configured" class="empty-state _ion-s-f2892a2e8a">
     <h2>GitLab Not Configured</h2>
     <p>Connect to GitLab to create, track, and manage issues directly from ION.</p>
     <button class="btn btn-primary" data-click-action="showConfigModal">Configure GitLab</button>
 </div>
 
 <!-- Issues Section -->
-<div id="issues-section" style="display: none;">
+<div class="_ion-s-f2892a2e8a" id="issues-section">
     <!-- Toolbar -->
     <div class="toolbar">
         <input type="text" id="search-input" placeholder="Search issues..." class="search-input">
@@ -59,7 +59,7 @@
 </div>
 
 <!-- Configuration Modal -->
-<div id="config-modal" class="modal" style="display: none;">
+<div id="config-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content modal-medium">
         <div class="modal-header">
             <h2>GitLab Configuration</h2>
@@ -83,7 +83,7 @@
             </div>
             <div class="modal-actions">
                 <button class="btn" data-click-action="closeConfigModal">Cancel</button>
-                <button class="btn btn-danger" data-click-action="disableGitLab" id="disable-gitlab-btn" style="display: none;">Disable</button>
+                <button class="btn btn-danger _ion-s-f2892a2e8a" data-click-action="disableGitLab" id="disable-gitlab-btn">Disable</button>
                 <button class="btn btn-primary" data-click-action="saveConfig">Save & Test</button>
             </div>
         </div>
@@ -91,7 +91,7 @@
 </div>
 
 <!-- Create Issue Modal -->
-<div id="create-issue-modal" class="modal" style="display: none;">
+<div id="create-issue-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2>Create Issue</h2>
@@ -141,7 +141,7 @@
 </div>
 
 <!-- Issue Detail Modal -->
-<div id="issue-detail-modal" class="modal" style="display: none;">
+<div id="issue-detail-modal" class="modal _ion-s-f2892a2e8a">
     <div class="modal-content modal-xlarge">
         <div class="modal-header">
             <h2 id="issue-detail-title">Issue #</h2>
@@ -554,7 +554,7 @@ async function loadIssues() {
                 </div>
                 ${issue.labels.length > 0 ? `
                     <div class="issue-labels">
-                        ${issue.labels.map(label => `<span class="issue-label" style="background: ${getLabelColor(label)}">${escapeHtml(label)}</span>`).join('')}
+                        ${issue.labels.map(label => `<span class="issue-label _ion-s-6d5b07f975">${escapeHtml(label)}</span>`).join('')}
                     </div>
                 ` : ''}
                 <div class="issue-footer">
@@ -791,7 +791,7 @@ async function showIssueDetail(iid) {
 
         // Labels
         document.getElementById('issue-detail-labels').innerHTML = issue.labels.length > 0
-            ? issue.labels.map(l => `<span class="issue-label" style="background: ${getLabelColor(l)}">${escapeHtml(l)}</span>`).join('')
+            ? issue.labels.map(l => `<span class="issue-label _ion-s-1ba644f98c">${escapeHtml(l)}</span>`).join('')
             : '<em>None</em>';
 
         // Assignees

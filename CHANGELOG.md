@@ -1,13 +1,93 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.20 -->
+<!-- ion-doc:version=0.31.21 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.21 — 2026-05-26
+
+**P11 FULLY CLOSED — Mostly Met → Met.** Last Mostly Met principle
+in the audit moves to Met. SECURE_BY_DESIGN audit summary advances
+from **18 Met / 2 Mostly Met / 0 Partial / 0 Gap** to
+**19 Met / 1 Mostly Met / 0 Partial / 0 Gap**. Only P1
+(single-maintainer structural) remains — and it cannot reach Met
+without onboarding a second human reviewer, an organisational
+decision outside the codebase. **Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): every inline `style=""` attribute retired
+
+`tools/migrate_inline_styles.py` (new) swept every template under
+`src/ion/web/templates/`, retired all **1,820 inline `style=""`
+attributes** across 65 templates by replacing each with a hashed
+CSS class (993 unique values dedup'd by SHA-1 prefix).
+
+Generated stylesheet at
+`src/ion/web/static/css/ion-migrated-styles.css` (77KB) holds the
+class definitions. Loaded from `base.html` `<head>` so styles apply
+before paint — no flash-of-unstyled-content during migration.
+
+Each class is hash-named (e.g. `_ion-s-d4e7b8a3f9`) so identical
+inline styles across templates collapse to a single rule. The
+script is idempotent — re-running picks up any newly-added inline
+styles and regenerates the CSS file accordingly.
+
+### feat(security): CSP `style-src-attr 'none'` enforced
+
+`src/ion/web/server.py:SecurityHeadersMiddleware` now sends
+`style-src-attr 'none'` instead of `'unsafe-inline'`. Combined with:
+
+* `script-src 'self' 'nonce-XXX'` (v0.31.3)
+* `style-src 'self' 'nonce-XXX'` (v0.31.3)
+* `script-src-attr 'none'` (v0.31.20)
+* `style-src-attr 'none'` (v0.31.21)
+
+the only ways CSS / JS can apply to an ION page now:
+
+* Source files served from same origin (`/static/css/*`, `/static/js/*`).
+* Inline `<script nonce>` / `<style nonce>` blocks with the
+  per-request nonce.
+* Programmatic event handlers via `addEventListener` and
+  programmatic style via `el.style.setProperty()` (CSSOM — not
+  subject to `*-src-attr`).
+
+Stored-XSS attempts to inject `<button onerror="...">` or
+`<img style="background:url(javascript:...)">` or any inline
+attribute carrying executable content **silently fail at the
+browser level**. The element renders; the attribute is stored as a
+string; the browser refuses to execute it.
+
+### chore(security): SECURE_BY_DESIGN.md final state
+
+* P11 status: Mostly Met → **Met** (v0.31.21).
+* Audit summary table: 18 → 19 Met, 2 → 1 Mostly Met.
+* §4 "Open named gaps" — strict-CSP entry struck through with
+  Closed v0.31.21 annotation.
+* Revision row 2.5 added.
+
+### What's next
+
+After v0.31.21, the audit posture is essentially **"done"** from a
+codebase perspective:
+
+* **19 Met** principles — every named security-engineering item
+  has a Met status.
+* **1 Mostly Met** — P1 (single-maintainer). This is structural;
+  closing it requires onboarding a second human reviewer (an
+  organisational change), not a code change. The six v0.31.9
+  mitigations (CONTRIBUTING.md, CODEOWNERS, security-reviewer
+  agent, pre-commit hooks, etc.) bring P1 as close as a
+  single-maintainer project structurally can.
+* **0 Partial / 0 Gap** — every previously-open item is closed.
+
+For higher-assurance deployments where P1 single-maintainer is a
+hard requirement, `docs/DEVELOPMENT_LIFECYCLE.md` §6.4 documents
+the customer-side Designated Security Officer pattern that closes
+the residual P1 risk via the deployment-layer review.
 
 ## v0.31.20 — 2026-05-26
 

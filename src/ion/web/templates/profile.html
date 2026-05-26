@@ -33,7 +33,7 @@
             <h2>Identity Mapping</h2>
         </div>
         <div class="card-body">
-            <p style="color:var(--text-muted); font-size:0.8125rem; margin-bottom:1rem;">
+            <p class="_ion-s-29c8400ca7">
                 Map your ION account to external services. These are used to sync case assignments to Kibana and filter GitLab issues.
             </p>
             <form id="identity-mapping-form" data-submit-action="saveIdentityMapping" data-args='["$event"]'>
@@ -46,17 +46,17 @@
                     <input type="text" id="id-gitlab-username" placeholder="Your GitLab username for 'My Issues' filtering">
                 </div>
                 <div class="form-group">
-                    <label>Elastic UID <span style="color:var(--text-muted); font-weight:normal;">(auto-resolved)</span></label>
-                    <div style="display:flex; gap:0.5rem; align-items:center;">
-                        <input type="text" id="id-elastic-uid" readonly style="opacity:0.7; flex:1;">
-                        <button type="button" class="btn btn-secondary" data-click-action="resolveElasticUid" id="resolve-btn" style="white-space:nowrap;">Resolve</button>
+                    <label>Elastic UID <span class="_ion-s-db99344e35">(auto-resolved)</span></label>
+                    <div class="_ion-s-8c300d3751">
+                        <input class="_ion-s-38e03a289e" type="text" id="id-elastic-uid" readonly>
+                        <button type="button" class="btn btn-secondary _ion-s-a9efa5449f" data-click-action="resolveElasticUid" id="resolve-btn">Resolve</button>
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Keycloak Subject ID <span style="color:var(--text-muted); font-weight:normal;">(auto-set on OIDC login)</span></label>
-                    <input type="text" id="id-keycloak-sub" readonly style="opacity:0.7;">
+                    <label>Keycloak Subject ID <span class="_ion-s-db99344e35">(auto-set on OIDC login)</span></label>
+                    <input class="_ion-s-68433eba3d" type="text" id="id-keycloak-sub" readonly>
                 </div>
-                <div id="resolve-result" style="display:none; margin-bottom:1rem;"></div>
+                <div class="_ion-s-4cdac52ae4" id="resolve-result"></div>
                 <button type="submit" class="btn btn-primary">Save Mappings</button>
             </form>
         </div>
@@ -67,7 +67,7 @@
             <h2>Change Password</h2>
         </div>
         <div class="card-body">
-            <div id="password-change-required" class="alert alert-warning" style="display: none;">
+            <div id="password-change-required" class="alert alert-warning _ion-s-f2892a2e8a">
                 You must change your password before continuing.
             </div>
             <form id="change-password-form" data-submit-action="changePassword" data-args='["$event"]'>
@@ -359,7 +359,7 @@ async function resolveElasticUid() {
                     document.getElementById('id-elastic-username').value = result.matched_username;
                 }
                 showToast(`Resolved Elastic UID via "${result.matched_username}"`, 'success');
-                resultDiv.innerHTML = `<div class="alert alert-success" style="font-size:0.8125rem;">
+                resultDiv.innerHTML = `<div class="alert alert-success _ion-s-4dbb3ddbaa">
                     Matched as <strong>${escapeHtml(result.matched_username)}</strong>
                     &mdash; UID: <code>${escapeHtml(result.elastic_uid)}</code>
                 </div>`;
@@ -367,12 +367,12 @@ async function resolveElasticUid() {
                 showToast('Could not resolve Elastic UID', 'error');
                 let profilesHtml = '';
                 if (result.profiles_found && result.profiles_found.length) {
-                    profilesHtml = '<p style="margin-top:0.5rem;">Available profiles found:</p><ul style="margin:0.25rem 0 0 1rem;">' +
+                    profilesHtml = '<p class="_ion-s-c9ef2a58eb">Available profiles found:</p><ul class="_ion-s-3245fd5a1a">' +
                         result.profiles_found.map(p =>
                             `<li><strong>${escapeHtml(p.username)}</strong> (${escapeHtml(p.full_name || p.email || '')})</li>`
-                        ).join('') + '</ul><p style="margin-top:0.5rem;">Set your <em>Elastic Username</em> to one of these and try again.</p>';
+                        ).join('') + '</ul><p class="_ion-s-c9ef2a58eb">Set your <em>Elastic Username</em> to one of these and try again.</p>';
                 }
-                resultDiv.innerHTML = `<div class="alert alert-warning" style="font-size:0.8125rem;">
+                resultDiv.innerHTML = `<div class="alert alert-warning _ion-s-4dbb3ddbaa">
                     No exact match found. Tried: ${result.candidates_tried.map(c => `"${escapeHtml(c)}"`).join(', ')}
                     ${profilesHtml}
                 </div>`;

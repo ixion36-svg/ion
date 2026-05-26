@@ -371,7 +371,7 @@
           <div class="deck-kpi"><div class="deck-kpi-label">Indices</div>
             <div class="deck-kpi-value muted">${esc(c.indices_count ?? '—')}</div></div>
           <div class="deck-kpi"><div class="deck-kpi-label">Storage</div>
-            <div class="deck-kpi-value muted" style="font-size: clamp(28px,4vw,56px);">${esc(c.store_size || '—')}</div></div>
+            <div class="deck-kpi-value muted _ion-s-df72aa4fcb">${esc(c.store_size || '—')}</div></div>
           <div class="deck-kpi"><div class="deck-kpi-label">Unassigned shards</div>
             <div class="deck-kpi-value ${(c.unassigned_shards || 0) > 0 ? 'crit' : 'ok'}">${esc(c.unassigned_shards ?? '—')}</div></div>
         </div>
@@ -386,9 +386,7 @@
     // the source has degraded — different from a clean empty state.
     const isFallback = a.source === 'ion_fallback';
     const fallback = isFallback
-      ? `<div style="margin-bottom: 2vh; padding: 10px 16px; background: rgba(251,191,36,0.08);
-                     border-left: 3px solid var(--ion-amber); border-radius: 4px;
-                     font-size: 12px; color: var(--ion-amber);">
+      ? `<div class="_ion-s-c3593ed150">
            <strong>ION-local fallback active</strong> ·
            ${esc(a.fallback_reason || 'ES returned no critical-severity matches')}
          </div>`
@@ -419,7 +417,7 @@
       html: `<div class="deck-slide" data-slide="criticals">
         <div class="deck-eyebrow">Section 2 · ${isFallback ? 'ION-Tracked Alerts' : 'Critical Alerts'} (Last 24h)</div>
         <div class="deck-title">${isFallback ? 'Recent Alerts' : 'Critical Alerts'}</div>
-        <div class="deck-kpi-row" style="grid-template-columns: minmax(220px, 320px);">
+        <div class="deck-kpi-row _ion-s-4423649d52">
           <div class="deck-kpi"><div class="deck-kpi-label">${isFallback ? 'Open (ION)' : 'Critical'}</div>
             <div class="deck-kpi-value crit">${esc(a.critical_count ?? 0)}</div>
             <div class="deck-kpi-sub">in last 24 hours</div></div>
@@ -445,16 +443,16 @@
         const rules = (r.triggered_rules && r.triggered_rules.length)
           ? r.triggered_rules.slice(0, 3).map(esc).join(', ')
             + (r.triggered_rules.length > 3 ? ` +${r.triggered_rules.length - 3}` : '')
-          : '<span style="color:var(--deck-faint);">—</span>';
+          : '<span class="_ion-s-e0b6f683ff">—</span>';
         return `<tr>
           <td class="mono">${esc(r.case_number || '')}</td>
           <td class="truncate">${esc(r.title || '')}</td>
-          <td class="truncate" style="max-width: 22vw;">${rules}</td>
+          <td class="truncate _ion-s-5d05e2e124">${rules}</td>
           <td>${sevPill(r.severity)}</td>
           <td class="mono">${esc(r.hours_open ?? 0)}h</td>
         </tr>`;
       }).join('');
-      body = `<div style="max-height: 56vh; overflow-y: auto; border-radius: 12px;">
+      body = `<div class="_ion-s-2289ace819">
         <table class="deck-table"><thead><tr>
           <th>Case</th><th>Title</th><th>Triggered Rules</th><th>Severity</th><th>Open</th>
         </tr></thead><tbody>${rows}</tbody></table>
@@ -465,7 +463,7 @@
       html: `<div class="deck-slide" data-slide="stale-cases">
         <div class="deck-eyebrow">Section 3 · Stale Cases (Open &gt; 24h, all)</div>
         <div class="deck-title">Stale Cases</div>
-        <div class="deck-kpi-row" style="grid-template-columns: minmax(220px, 320px);">
+        <div class="deck-kpi-row _ion-s-4423649d52">
           <div class="deck-kpi"><div class="deck-kpi-label">Open beyond threshold</div>
             <div class="deck-kpi-value ${list.length ? 'warn' : 'ok'}">${esc(c.count ?? list.length)}</div></div>
         </div>
@@ -545,7 +543,7 @@
       const cls = silent > 0 ? 'crit' : 'ok';
       return `<div class="deck-kpi">
         <div class="deck-kpi-label">${esc(label)}</div>
-        <div class="deck-kpi-value ${cls}">${esc(silent)} <span style="color:var(--deck-faint);font-size:0.5em;font-weight:400;">/ ${esc(total)}</span></div>
+        <div class="deck-kpi-value ${cls}">${esc(silent)} <span class="_ion-s-1fd9776cf9">/ ${esc(total)}</span></div>
         <div class="deck-kpi-sub">silent / total hosts</div>
       </div>`;
     };
@@ -578,7 +576,7 @@
         <td class="mono">${esc((x.last_failure || '').slice(0, 16).replace('T', ' '))}</td>
         <td>${sevPill(x.last_status || 'failure')}</td>
       </tr>`).join('');
-      body = `<div style="max-height: 56vh; overflow-y: auto; border-radius: 12px;">
+      body = `<div class="_ion-s-2289ace819">
         <table class="deck-table"><thead><tr>
           <th>Rule</th><th>Failures (24h)</th><th>Last failure</th><th>Status</th>
         </tr></thead><tbody>${rows}</tbody></table>
@@ -589,7 +587,7 @@
       html: `<div class="deck-slide" data-slide="rule-failures">
         <div class="deck-eyebrow">Section 7 · Detection Rule Failures (Last 24h)</div>
         <div class="deck-title">Rule Failures</div>
-        <div class="deck-kpi-row" style="grid-template-columns: minmax(220px, 320px);">
+        <div class="deck-kpi-row _ion-s-4423649d52">
           <div class="deck-kpi"><div class="deck-kpi-label">Failing rules</div>
             <div class="deck-kpi-value ${list.length ? 'crit' : 'ok'}">${esc(r.count ?? list.length)}</div></div>
         </div>
@@ -614,14 +612,10 @@
   function slideThreatSummary() {
     const text = _readLS('ion.standup.ai_summary');
     const body = text
-      ? `<div style="font-size: clamp(15px, 1.4vw, 20px); color: var(--deck-text);
-                     line-height: 1.6; white-space: pre-wrap;
-                     background: var(--deck-card); border: 1px solid var(--deck-line);
-                     border-radius: 12px; padding: 28px 32px;
-                     max-height: 56vh; overflow-y: auto; backdrop-filter: blur(6px);">${esc(text)}</div>`
+      ? `<div class="_ion-s-4f2d370f62">${esc(text)}</div>`
       : `<div class="deck-empty">
            No AI threat summary available.<br>
-           <span style="font-size:0.6em;color:var(--deck-faint);">
+           <span class="_ion-s-d900a9388d">
              Click <strong>Generate Summary</strong> on /daily-standup, then refresh this deck.
            </span>
          </div>`;
@@ -638,14 +632,10 @@
   function slideAOB() {
     const text = _readLS('ion.standup.aob');
     const body = text
-      ? `<div style="font-size: clamp(16px, 1.6vw, 24px); color: var(--deck-text);
-                     line-height: 1.6; white-space: pre-wrap;
-                     background: var(--deck-card); border: 1px solid var(--deck-line);
-                     border-radius: 12px; padding: 32px 36px;
-                     max-height: 56vh; overflow-y: auto; backdrop-filter: blur(6px);">${esc(text)}</div>`
+      ? `<div class="_ion-s-e4873e3c1b">${esc(text)}</div>`
       : `<div class="deck-empty">
            No AOB items recorded.<br>
-           <span style="font-size:0.6em;color:var(--deck-faint);">
+           <span class="_ion-s-d900a9388d">
              Add notes via the <strong>Additional Notes</strong> field on /daily-standup, then refresh this deck.
            </span>
          </div>`;
@@ -667,9 +657,9 @@
         <div class="deck-eyebrow">End of Standup</div>
         <div class="deck-title">Questions? Action items?</div>
         <div class="deck-subtitle">
-          <kbd style="font-family:ui-monospace,monospace;font-size:14px;padding:3px 8px;border-radius:5px;background:rgba(148,163,184,0.12);border:1px solid var(--deck-line);">←</kbd>
+          <kbd class="_ion-s-bc1acd9238">←</kbd>
           to revisit any section ·
-          <kbd style="font-family:ui-monospace,monospace;font-size:14px;padding:3px 8px;border-radius:5px;background:rgba(148,163,184,0.12);border:1px solid var(--deck-line);">Esc</kbd>
+          <kbd class="_ion-s-bc1acd9238">Esc</kbd>
           to exit
         </div>
       </div>`
@@ -776,7 +766,7 @@
     .then(render)
     .catch(err => {
       loading.innerHTML =
-        '<div style="color: var(--ion-coral);">Failed to load: ' + esc(err.message) + '</div>';
+        '<div class="_ion-s-02d8d99c2c">Failed to load: ' + esc(err.message) + '</div>';
     });
 })();
 </script>

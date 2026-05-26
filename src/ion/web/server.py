@@ -238,17 +238,22 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Browsers now block any attempt to add an inline event handler
         # (defence-in-depth against stored-XSS injection of a malicious
         # `onerror=` etc).
-        # Inline `style=""` attributes remain permitted via
-        # `style-src-attr 'unsafe-inline'` — 1,659 of them still in
-        # templates as of v0.31.20, mostly cosmetic positioning that doesn't
-        # carry executable JS. Migrating those to CSS classes is the v0.32+
-        # cosmetic-CSS-cleanup half of P11.
+        # v0.31.21: `style-src-attr 'none'` flipped on after
+        # tools/migrate_inline_styles.py retired every inline `style=""`
+        # attribute (1,820 instances → 993 unique hashed CSS classes in
+        # static/css/ion-migrated-styles.css, loaded via base.html). With
+        # strict `script-src-attr 'none'` (v0.31.20) AND strict
+        # `style-src-attr 'none'` (v0.31.21) AND strict nonce on inline
+        # `<script>` / `<style>` (v0.31.3), the only CSS that can apply to
+        # an ION page is from same-origin stylesheets, nonced `<style>`
+        # blocks, and programmatic CSSOM (`el.style.setProperty(...)`).
+        # P11 is now fully closed.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"script-src 'self' 'nonce-{nonce}'; "
             "script-src-attr 'none'; "
             f"style-src 'self' 'nonce-{nonce}'; "
-            "style-src-attr 'unsafe-inline'; "
+            "style-src-attr 'none'; "
             "img-src 'self' data:; "
             "font-src 'self'; "
             "connect-src 'self'; "
