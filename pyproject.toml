@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.31.24"
+version = "0.31.25"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,7 +20,15 @@ dependencies = [
     "markdown>=3.5",
     "beautifulsoup4>=4.12",
     "rich>=13.0",
-    "fastapi>=0.109.0",
+    # v0.31.25: fastapi 0.136.3 excluded — MAL-2026-4750 (PyPI malware
+    # advisory, confirmed via OSV). The 0.136.3 wheel ships modified
+    # pyproject.toml and PKG-INFO that add an undocumented optional dep
+    # on `fastar>=0.9.0` (a typo-squat package). ION doesn't use the
+    # [standard] extra, so the typo-squat never installs in practice,
+    # but the compromised release should not be in our supply chain.
+    # 0.136.3 is the only affected version per OSV; <0.136.3 floors
+    # us at 0.136.1 (the version pre-incident).
+    "fastapi>=0.109.0,<0.136.3",
     "uvicorn>=0.27.0",
     "python-multipart>=0.0.6",
     "passlib[bcrypt]>=1.7.4",
