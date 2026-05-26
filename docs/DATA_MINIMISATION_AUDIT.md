@@ -1,7 +1,7 @@
 <!-- ion-doc:type=DATA MINIMISATION AUDIT -->
 <!-- ion-doc:title=ION Data-Minimisation Audit -->
 <!-- ion-doc:subtitle=Schema-wide audit of stored fields, retention, and PII handling against Secure-by-Design P13 -->
-<!-- ion-doc:version=0.31.13 -->
+<!-- ion-doc:version=0.31.14 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, external auditors, data-protection officers -->
@@ -10,7 +10,7 @@
 # ION — Data-Minimisation Audit
 
 **Document owner:** Repository maintainer (`ixion36`)
-**Status:** Current as of v0.31.13 (2026-05-26)
+**Status:** Current as of v0.31.14 (2026-05-26)
 **Review cadence:** Every minor-version bump (v0.X.0) or when a new
 table is added that handles PII / free-text user content.
 **Primary framework:** Secure-by-Design P13 ("Reduce impact of
@@ -153,17 +153,16 @@ append-only by convention (no `update` or `delete` paths in
 Mitigated by C7 / C6 spirit. Acceptable for audit-logs which are
 inherently append-only by domain semantics.
 
-**Gap G2 (track-as-future-work):** No retention window. Audit logs
-grow unbounded. For typical SOC compliance regimes 365 days is the
-floor; air-gap deployments often want longer (3+ years). Recommended:
-introduce `ION_AUDIT_LOG_RETENTION_DAYS` env var with a sensible
-default (e.g., 365) and a periodic cleanup task. **Not blocking P13
-closure because (a) the air-gap deployment posture means logs never
-leave the customer-controlled environment, and (b) most ION
-customers have stricter retention requirements than ION's defaults
-would impose, so adding a default-365 retention without env override
-could lose compliance-required logs.** Recommended approach: ship the
-env var disabled by default; operators opt in per deployment.
+**~~Gap G2~~ — CLOSED v0.31.14.** New `ION_AUDIT_LOG_RETENTION_DAYS`
+env var. Unset/empty by default = no cleanup (preserves v0.31.13
+behaviour). Set to a positive integer N to enable: rows whose
+`timestamp` is older than N days are deleted on the next sweep.
+Implemented in `src/ion/services/data_retention_service.py` under
+advisory lock `LOCK_DATA_RETENTION_BG = 1024`. Default sweep
+interval: 24h (`ION_DATA_RETENTION_INTERVAL_HOURS`, floored at 60s).
+Loop is opt-OUT at the loop level (`ION_DATA_RETENTION_ENABLED`,
+default `true`) but each table's retention is opt-IN per the
+rationale above.
 
 ### 3.4 `security_events`
 
@@ -188,10 +187,14 @@ created_at, updated_at
 | `event_count`, `first_seen`, `last_seen` | Operational | Aggregation across repeated events | Keep |
 | `blocked`, `exported_to_siem` | Operational | Response state | Keep |
 
-**Gap G3 (track-as-future-work):** Same as G2 — no retention window.
-Security events accumulate. Same mitigation rationale applies (C1
-air-gap + customer-specific compliance needs argue against a default
-retention floor; ship as env-var-tunable opt-in).
+**~~Gap G3~~ — CLOSED v0.31.14.** New `ION_SECURITY_EVENTS_RETENTION_DAYS`
+env var, same pattern as G2 (unset = disabled; positive integer
+enables N-day retention). Implemented in the same
+`data_retention_service.py` module by appending a second
+`RetentionRule` tuple. The shared loop sweeps both tables on the
+same `ION_DATA_RETENTION_INTERVAL_HOURS` cadence; operators
+configure each independently. Targets `security_events.created_at`
+as the retention column (vs. `audit_logs.timestamp`).
 
 ### 3.5 `blocked_ips`
 
@@ -336,14 +339,14 @@ content, or audit-sensitive data. No column-level findings.
 | ID | Gap | Severity | Status | Recommended action |
 |----|-----|----------|--------|--------------------|
 | ~~G1~~ | ~~`user_sessions` accumulates expired rows for dormant users~~ | Low | **Closed v0.31.13** | New `src/ion/services/session_cleanup_service.py` background loop under advisory lock `LOCK_SESSION_CLEANUP_BG`. Honours `ION_SESSION_CLEANUP_ENABLED` / `ION_SESSION_CLEANUP_INTERVAL_HOURS` env vars (defaults: enabled, 6h). |
-| G2 | `audit_logs` has no retention policy | Low (air-gap mitigates) | Track | Introduce `ION_AUDIT_LOG_RETENTION_DAYS` env var (default: unbounded; opt-in cleanup). v0.32+ candidate. |
-| G3 | `security_events` has no retention policy | Low (air-gap mitigates) | Track | Same pattern as G2 — `ION_SECURITY_EVENTS_RETENTION_DAYS` env var. v0.32+ candidate. |
+| ~~G2~~ | ~~`audit_logs` has no retention policy~~ | Low (air-gap mitigates) | **Closed v0.31.14** | New `ION_AUDIT_LOG_RETENTION_DAYS` env var (default unset = disabled). When set, `src/ion/services/data_retention_service.py` deletes rows older than N days on its daily sweep under `LOCK_DATA_RETENTION_BG`. |
+| ~~G3~~ | ~~`security_events` has no retention policy~~ | Low (air-gap mitigates) | **Closed v0.31.14** | New `ION_SECURITY_EVENTS_RETENTION_DAYS` env var, same module + sweep as G2. Targets `security_events.created_at`. |
 | G4 | `ai_chat_sessions` / `ai_chat_messages` persist until user deletion | Acceptable | Accept-with-rationale | Optional future enhancement: `ION_AI_CHAT_RETENTION_DAYS` env var. Not required for P13 closure given user-controlled deletion + RBAC. |
 | G5 | `session_token` stored as plaintext in `user_sessions` table (not hashed at rest) | Low (token rotated on logout, server-side only — DB compromise required to abuse) | Track | Hash-at-rest variant for `session_token`. v0.32+ candidate. |
 
-After v0.31.13's G1 closure, **four** gaps remain — G2 / G3 / G4 / G5,
-all the same pattern (retention env vars or hash-at-rest), all
-tracked for v0.32+. All four are **low severity** because:
+After v0.31.14's G2 + G3 closures, **two** gaps remain — G4 and G5,
+both lower-priority than the closed three. All remaining gaps
+are **low severity** because:
 
 * ION's air-gap-first deployment pattern (C1) means PII never leaves
   the customer's network perimeter.
@@ -386,3 +389,4 @@ trail. The residual Mostly Met principles are:
 |---------|------------|------------|-------|
 | 1.0     | 2026-05-26 | Maintainer | Initial publication at v0.31.12. Closes the data-min audit gap from SECURE_BY_DESIGN.md rev 1.0–1.8. Catalogues 13 existing data-min controls; identifies 5 low-severity residual gaps tracked for v0.32+. P13 moves Mostly Met → Met. |
 | 1.1     | 2026-05-26 | Maintainer | v0.31.13: **G1 CLOSED.** New `src/ion/services/session_cleanup_service.py` wraps `AuthService.cleanup_expired_sessions()` in a periodic background loop. Under advisory lock `LOCK_SESSION_CLEANUP_BG = 1023` for cross-worker single-leader execution. Env vars `ION_SESSION_CLEANUP_ENABLED` (default true) + `ION_SESSION_CLEANUP_INTERVAL_HOURS` (default 6, floored at 60s). Wired into `web/server.py` startup. Audit advances from 5 residual gaps to 4 (G2 / G3 / G4 / G5 remain). |
+| 1.2     | 2026-05-26 | Maintainer | v0.31.14: **G2 + G3 CLOSED.** New `src/ion/services/data_retention_service.py` parameterised on a list of `RetentionRule` tuples — current rules cover `audit_logs.timestamp` and `security_events.created_at`. Under advisory lock `LOCK_DATA_RETENTION_BG = 1024`. Env vars `ION_AUDIT_LOG_RETENTION_DAYS` and `ION_SECURITY_EVENTS_RETENTION_DAYS` are **opt-IN** (unset = disabled — operators have wildly different compliance windows so silent default deletion is dangerous). Shared loop cadence via `ION_DATA_RETENTION_ENABLED` (loop kill switch, default `true`) + `ION_DATA_RETENTION_INTERVAL_HOURS` (default 24h, floored at 60s). G4 (AI chat retention) is the next natural fit — adds one tuple to `RETENTION_RULES`. Audit advances from 4 residual gaps to 2 (G4 / G5 remain). |
