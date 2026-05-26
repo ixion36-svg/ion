@@ -244,25 +244,25 @@ function renderFeed(posts) {
         for (const [emoji, info] of Object.entries(p.reactions || {})) {
             const icon = EMOJI_MAP[emoji] || emoji;
             const cls = info.reacted ? ' reacted' : '';
-            reactHtml += '<button class="social-react-btn' + cls + '" onclick="toggleReaction(' + p.id + ', \'' + emoji + '\')">' + icon + ' <span class="count">' + info.count + '</span></button>';
+            reactHtml += '<button class="social-react-btn' + cls + '" data-click-action="toggleReaction" data-args=\'[' + p.id + ', ' + JSON.stringify(emoji) + ']\'>' + icon + ' <span class="count">' + info.count + '</span></button>';
         }
         // Add reaction buttons for emojis not yet used
         for (const [key, icon] of Object.entries(EMOJI_MAP)) {
             if (!p.reactions || !p.reactions[key]) {
-                reactHtml += '<button class="social-react-btn" onclick="toggleReaction(' + p.id + ', \'' + key + '\')">' + icon + '</button>';
+                reactHtml += '<button class="social-react-btn" data-click-action="toggleReaction" data-args=\'[' + p.id + ', ' + JSON.stringify(key) + ']\'>' + icon + '</button>';
             }
         }
 
-        const commentBtn = '<button class="social-comment-toggle" data-click-action="toggleComments" data-args='[" + p.id + "]'>\ud83d\udcac ' + p.comment_count + ' comments</button>';
+        const commentBtn = `<button class="social-comment-toggle" data-click-action="toggleComments" data-args='[${p.id}]'>\ud83d\udcac ${p.comment_count} comments</button>`;
 
         // Admin actions
         let adminHtml = '';
         if (isAdminOrLead) {
-            adminHtml += '<button class="social-admin-btn" data-click-action="togglePin" data-args='[" + p.id + "]' title="' + (p.is_pinned ? 'Unpin' : 'Pin') + '">\ud83d\udccc</button>';
+            adminHtml += `<button class="social-admin-btn" data-click-action="togglePin" data-args='[${p.id}]' title="${p.is_pinned ? 'Unpin' : 'Pin'}">\ud83d\udccc</button>`;
         }
         const isMine = currentUserData && p.user_id === currentUserData.id;
         if (isMine || isAdminOrLead) {
-            adminHtml += '<button class="social-admin-btn" data-click-action="deletePost" data-args='[" + p.id + "]' title="Delete">\ud83d\uddd1\ufe0f</button>';
+            adminHtml += `<button class="social-admin-btn" data-click-action="deletePost" data-args='[${p.id}]' title="Delete">\ud83d\uddd1\ufe0f</button>`;
         }
 
         return '<div class="social-post' + pinnedClass + '" id="social-post-' + p.id + '">' +
@@ -356,14 +356,14 @@ async function toggleReaction(postId, emoji) {
                     for (const [emojiKey, info] of Object.entries(post.reactions || {})) {
                         const icon = EMOJI_MAP[emojiKey] || emojiKey;
                         const cls = info.reacted ? ' reacted' : '';
-                        reactHtml += '<button class="social-react-btn' + cls + '" onclick="toggleReaction(' + postId + ', \'' + emojiKey + '\')">' + icon + ' <span class="count">' + info.count + '</span></button>';
+                        reactHtml += '<button class="social-react-btn' + cls + '" data-click-action="toggleReaction" data-args=\'[' + postId + ', ' + JSON.stringify(emojiKey) + ']\'>' + icon + ' <span class="count">' + info.count + '</span></button>';
                     }
                     for (const [key, icon] of Object.entries(EMOJI_MAP)) {
                         if (!post.reactions || !post.reactions[key]) {
-                            reactHtml += '<button class="social-react-btn" onclick="toggleReaction(' + postId + ', \'' + key + '\')">' + icon + '</button>';
+                            reactHtml += '<button class="social-react-btn" data-click-action="toggleReaction" data-args=\'[' + postId + ', ' + JSON.stringify(key) + ']\'>' + icon + '</button>';
                         }
                     }
-                    const commentBtn = '<button class="social-comment-toggle" data-click-action="toggleComments" data-args='[" + postId + "]'>\ud83d\udcac ' + post.comment_count + ' comments</button>';
+                    const commentBtn = `<button class="social-comment-toggle" data-click-action="toggleComments" data-args='[${postId}]'>\ud83d\udcac ${post.comment_count} comments</button>`;
                     const adminBtns = actionsEl.querySelector('.social-post-admin-actions');
                     actionsEl.innerHTML = reactHtml + commentBtn + (adminBtns ? adminBtns.outerHTML : '');
                 }
@@ -417,7 +417,7 @@ async function loadComments(postId) {
             const av = (c.author_display || c.author || '?').charAt(0).toUpperCase();
             const isMine = currentUserData && c.user_id === currentUserData.id;
             const delBtn = (isMine || isAdminOrLead)
-                ? ' <button class="social-comment-delete" data-click-action="deleteComment" data-args='[" + postId + ", " + c.id + "]'>delete</button>'
+                ? ` <button class="social-comment-delete" data-click-action="deleteComment" data-args='[${postId}, ${c.id}]'>delete</button>`
                 : '';
             return '<div class="social-comment-item">' +
                 '<div class="social-comment-avatar">' + escapeHtml(av) + '</div>' +
@@ -429,10 +429,10 @@ async function loadComments(postId) {
             '</div>';
         }).join('');
 
-        html += '<div class="social-comment-form">' +
-            '<input type="text" id="comment-input-' + postId + '" placeholder="Add a comment..." onkeydown="if(event.key===\'Enter\')addComment(' + postId + ')">' +
-            '<button data-click-action="addComment" data-args='[" + postId + "]'>Post</button>' +
-        '</div>';
+        html += `<div class="social-comment-form">
+            <input type="text" id="comment-input-${postId}" placeholder="Add a comment..." data-enter-key-action="addComment" data-args='[${postId}]'>
+            <button data-click-action="addComment" data-args='[${postId}]'>Post</button>
+        </div>`;
 
         el.innerHTML = html;
     } catch (e) {

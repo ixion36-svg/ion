@@ -31,7 +31,7 @@
             <div class="can-modal-title" id="can-modal-title">New Canary</div>
             <button class="can-modal-close" data-click-action="canCloseForm" aria-label="Close">&times;</button>
         </div>
-        <form class="can-modal-body" id="can-form" onsubmit="return canSubmit(event)">
+        <form class="can-modal-body" id="can-form" data-validating-submit-action="canSubmit">
             <input type="hidden" id="can-id" value="">
 
             <div class="can-row">

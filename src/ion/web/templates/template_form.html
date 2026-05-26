@@ -618,11 +618,11 @@ function renderSections() {
             '<div class="se-card-icon">' + escapeHtml(st.icon) + '</div>' +
             '<span class="se-card-title">' + escapeHtml(titleText) + '</span>' +
             '<span class="se-card-type">' + escapeHtml(st.label) + '</span>' +
-            '<div class="se-card-actions">' +
-                '<button type="button" title="Move up" data-click-action="moveSection" data-args='[" + idx + ", -1]'><i class="icon-chevron-up"></i></button>' +
-                '<button type="button" title="Move down" data-click-action="moveSection" data-args='[" + idx + ", 1]'><i class="icon-chevron-down"></i></button>' +
-                '<button type="button" class="se-delete" title="Delete" data-click-action="removeSection" data-args='[" + idx + "]'><i class="icon-x"></i></button>' +
-            '</div>';
+            `<div class="se-card-actions">
+                <button type="button" title="Move up" data-click-action="moveSection" data-args='[${idx}, -1]'><i class="icon-chevron-up"></i></button>
+                <button type="button" title="Move down" data-click-action="moveSection" data-args='[${idx}, 1]'><i class="icon-chevron-down"></i></button>
+                <button type="button" class="se-delete" title="Delete" data-click-action="removeSection" data-args='[${idx}]'><i class="icon-x"></i></button>
+            </div>`;
         card.appendChild(header);
 
         // Body
@@ -637,7 +637,7 @@ function renderSections() {
         // Inline add button after each card
         const inlineAdd = document.createElement('div');
         inlineAdd.className = 'se-add-inline';
-        inlineAdd.innerHTML = '<button type="button" data-click-action="openLibrary" data-args='[" + idx + "]'>+ Add Section</button>';
+        inlineAdd.innerHTML = `<button type="button" data-click-action="openLibrary" data-args='[${idx}]'>+ Add Section</button>`;
         container.appendChild(inlineAdd);
     });
 
@@ -743,9 +743,9 @@ function buildListField(f, items, idx, itemType) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="items">';
     items.forEach((item, i) => {
         const text = typeof item === 'string' ? item : (item.text || '');
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
-    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'items\')">+ Add Item</button>';
+    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "items"]\'>+ Add Item</button>';
     html += '</div></div>';
     return html;
 }
@@ -755,9 +755,9 @@ function buildChecklistField(f, items, idx) {
     items.forEach((item, i) => {
         const text = typeof item === 'string' ? item : (item.text || '');
         const checked = typeof item === 'object' ? (item.checked || false) : false;
-        html += '<div class="se-list-item"><input type="checkbox" ' + (checked ? 'checked' : '') + ' data-list-idx="' + i + '" data-check="true"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="checkbox" ' + (checked ? 'checked' : '') + ' data-list-idx="' + i + '" data-check="true"><input type="text" value="' + escapeHtml(text) + '" data-list-idx="' + i + '"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
-    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'checklist\')">+ Add Item</button>';
+    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "checklist"]\'>+ Add Item</button>';
     html += '</div></div>';
     return html;
 }
@@ -765,9 +765,9 @@ function buildChecklistField(f, items, idx) {
 function buildPairsField(f, pairs, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="pairs">';
     pairs.forEach((p, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(p.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(p.value || '') + '" placeholder="Value" data-list-idx="' + i + '" data-pair="value"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(p.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(p.value || '') + '" placeholder="Value" data-list-idx="' + i + '" data-pair="value"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
-    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'pairs\')">+ Add Pair</button>';
+    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "pairs"]\'>+ Add Pair</button>';
     html += '</div></div>';
     return html;
 }
@@ -775,9 +775,9 @@ function buildPairsField(f, pairs, idx) {
 function buildColumnsField(f, columns, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="columns">';
     columns.forEach((col, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(col.name || '') + '" placeholder="Column name" data-list-idx="' + i + '"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(col.name || '') + '" placeholder="Column name" data-list-idx="' + i + '"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
-    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'columns\')">+ Add Column</button>';
+    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "columns"]\'>+ Add Column</button>';
     html += '</div></div>';
     return html;
 }
@@ -785,9 +785,9 @@ function buildColumnsField(f, columns, idx) {
 function buildMetadataFieldsField(f, fields, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="metadata">';
     fields.forEach((fld, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
-    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'metadata\')">+ Add Field</button>';
+    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "metadata"]\'>+ Add Field</button>';
     html += '</div></div>';
     return html;
 }
@@ -795,9 +795,9 @@ function buildMetadataFieldsField(f, fields, idx) {
 function buildSignatureRolesField(f, roles, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="signatures">';
     roles.forEach((r, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" onclick="removeListItem(' + idx + ', \'' + f.name + '\', ' + i + ')">&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name" style="font-family:monospace;"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
-    html += '<button type="button" class="se-list-add" onclick="addListItem(' + idx + ', \'' + f.name + '\', \'signatures\')">+ Add Role</button>';
+    html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "signatures"]\'>+ Add Role</button>';
     html += '</div></div>';
     return html;
 }

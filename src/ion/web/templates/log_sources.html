@@ -34,7 +34,7 @@
             <div class="ls-modal-title" id="ls-modal-title">New Log Source</div>
             <button class="ls-modal-close" data-click-action="lsCloseForm" aria-label="Close">&times;</button>
         </div>
-        <form class="ls-modal-body" id="ls-form" onsubmit="return lsSubmit(event)">
+        <form class="ls-modal-body" id="ls-form" data-validating-submit-action="lsSubmit">
             <input type="hidden" id="ls-id" value="">
 
             <div class="ls-row">

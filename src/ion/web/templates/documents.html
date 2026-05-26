@@ -135,7 +135,7 @@
                 <div class="tags-display">
                     <span id="modal-tags-list"></span>
                     <span class="tag-add-inline">
-                        <input type="text" id="modal-tag-input" placeholder="Add tag..." onkeydown="if(event.key==='Enter'){addDocTag();event.preventDefault();}">
+                        <input type="text" id="modal-tag-input" placeholder="Add tag..." data-enter-key-action="addDocTag" data-prevent-default>
                         <button class="btn btn-sm" data-click-action="addDocTag">+</button>
                     </span>
                 </div>
@@ -623,7 +623,7 @@ function renderFolderItems(folders, depth) {
         const indent = depth > 0 ? 'folder-children' : '';
 
         html += '<div class="' + indent + '">';
-        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" data-click-action="selectFolder" data-args='[" + f.id + "]'>';
+        html += `<div class="folder-item${isActive ? ' active' : ''}" data-id="${f.id}" data-click-action="selectFolder" data-args='[${f.id}]'>`;
         html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
         html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
         html += '<span class="folder-manage-counts">(' + (f.document_count || 0) + ')</span>';
@@ -670,7 +670,7 @@ function updateFolderPath() {
 
     const folder = allCollections.find(c => c.id === selectedFolderId);
     if (folder) {
-        pathEl.innerHTML = '<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
+        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>${escapeHtml(folder.full_path)}</span>`;
     }
 }
 
@@ -755,14 +755,14 @@ function renderDocuments(documents) {
         html += '</div>';
         html += '</div>';
         html += '<div class="list-item-actions">';
-        html += '<button class="btn btn-sm" data-click-action="viewDocument" data-args='[" + d.id + "]'>View</button>';
-        html += '<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[" + d.id + ", " + (d.collection_id || 'null') + "]'>Move</button>';
+        html += `<button class="btn btn-sm" data-click-action="viewDocument" data-args='[${d.id}]'>View</button>`;
+        html += `<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[${d.id}, ${d.collection_id || 'null'}]'>Move</button>`;
         if (isArchived) {
-            html += '<button class="btn btn-sm btn-success" data-click-action="restoreDocument" data-args='[" + d.id + "]'>Restore</button>';
+            html += `<button class="btn btn-sm btn-success" data-click-action="restoreDocument" data-args='[${d.id}]'>Restore</button>`;
         } else {
-            html += '<button class="btn btn-sm btn-warning" data-click-action="archiveDocument" data-args='[" + d.id + "]'>Archive</button>';
+            html += `<button class="btn btn-sm btn-warning" data-click-action="archiveDocument" data-args='[${d.id}]'>Archive</button>`;
         }
-        html += '<button class="btn btn-sm btn-danger" onclick="deleteDocument(' + d.id + ', \'' + escapeHtml(d.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteDocument" data-args='[${d.id}, ${JSON.stringify(d.name)}]'>Delete</button>`;
         html += '</div>';
         html += '</div>';
     });
@@ -957,9 +957,9 @@ async function loadVersions() {
             html += '<td>' + escapeHtml(v.amended_by || '-') + '</td>';
             html += '<td>' + formatDate(v.created_at) + '</td>';
             html += '<td>';
-            html += '<button class="btn btn-sm" data-click-action="previewVersion" data-args='[" + v.version_number + "]'>View</button>';
+            html += `<button class="btn btn-sm" data-click-action="previewVersion" data-args='[${v.version_number}]'>View</button>`;
             if (!isCurrent) {
-                html += ' <button class="btn btn-sm btn-warning" data-click-action="confirmRevert" data-args='[" + v.version_number + "]'>Revert</button>';
+                html += ` <button class="btn btn-sm btn-warning" data-click-action="confirmRevert" data-args='[${v.version_number}]'>Revert</button>`;
             }
             html += '</td>';
             html += '</tr>';
@@ -1102,7 +1102,7 @@ function renderFolderManageItems(folders, depth = 0) {
         html += '<span class="folder-manage-counts">' + (f.template_count || 0) + ' templates, ' + (f.document_count || 0) + ' docs</span>';
         html += '</div>';
         html += '<div>';
-        html += '<button class="btn btn-sm btn-danger" onclick="deleteFolder(' + f.id + ', \'' + escapeHtml(f.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteFolder" data-args='[${f.id}, ${JSON.stringify(f.name)}]'>Delete</button>`;
         html += '</div>';
         html += '</div>';
 
@@ -1449,7 +1449,7 @@ function renderDocumentTags() {
         let html = '';
         currentDocTags.forEach(function(tag) {
             html += '<span class="tag-chip">' + escapeHtml(tag);
-            html += ' <span class="tag-remove" onclick="removeDocTag(\'' + escapeHtml(tag).replace(/'/g, "\\'") + '\')">&times;</span>';
+            html += ` <span class="tag-remove" data-click-action="removeDocTag" data-args='[${JSON.stringify(tag)}]'>&times;</span>`;
             html += '</span> ';
         });
         tagsList.innerHTML = html;

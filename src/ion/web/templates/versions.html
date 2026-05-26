@@ -91,9 +91,9 @@ async function loadVersions() {
             html += '<span>' + formatDate(v.created_at) + '</span>';
             html += '</div>';
             html += '<div class="version-actions">';
-            html += '<button class="btn btn-sm" data-click-action="viewVersion" data-args='[" + v.version_number + "]'>View</button>';
+            html += `<button class="btn btn-sm" data-click-action="viewVersion" data-args='[${v.version_number}]'>View</button>`;
             if (v.version_number > 1) {
-                html += '<button class="btn btn-sm" data-click-action="showDiff" data-args='[" + (v.version_number - 1) + ", " + v.version_number + "]'>Diff</button>';
+                html += `<button class="btn btn-sm" data-click-action="showDiff" data-args='[${v.version_number - 1}, ${v.version_number}]'>Diff</button>`;
             }
             html += '</div>';
             html += '</div>';

@@ -3062,7 +3062,7 @@
 // event-delegation.js can't express directly. Exposed as window.* so
 // the dispatcher finds them by name.
 window.__toggleParentClassOpen = function(event) {
-    // Replaces `onclick="this.parentElement.classList.toggle('open')"` on
+    // Replaces `data-toggle-parent-class="open"` on
     // collapsible-section headers. `event.currentTarget` is the element
     // carrying the data-click-action attribute.
     if (event.currentTarget && event.currentTarget.parentElement) {
