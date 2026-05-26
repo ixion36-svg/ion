@@ -1,13 +1,84 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.9 -->
+<!-- ion-doc:version=0.31.10 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.10 — 2026-05-26
+
+Secure-by-Design **P15 Partial → Met.** Branch protection on `main`
+advanced from Tier 1 to Tier 2: `required_signatures=true` enforced
+server-side via the GitHub branch-protection API, after registering
+a dedicated ed25519 Signing Key on the maintainer's GitHub account
+and configuring local git for SSH commit signing. The v0.31.10
+release commit is the first signed commit on `main` and the
+implicit acceptance test for the new server-side rule. P15 was the
+last named Partial gap; SECURE_BY_DESIGN audit summary now reads
+**17 Met / 3 Mostly Met / 0 Partial / 0 Gap** (was 16 / 3 / 1 / 0).
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(infra): SSH commit signing + required_signatures on main
+
+The closure of P15 ("Secure your code repository") is a two-axis
+control:
+
+1. **Server-side rule** — `required_signatures=true` added to the
+   `main` branch protection rule via:
+   ```
+   gh api --method POST repos/ixion36-svg/ion/branches/main/protection/required_signatures
+   ```
+   Combined with the v0.31.0 Tier 1 set (`required_linear_history=true`,
+   `allow_force_pushes=false`, `allow_deletions=false`), `main` now
+   rejects unsigned, non-linear, and force-push commits at the
+   GitHub edge. `enforce_admins=false` preserves the single-maintainer
+   direct-push workflow; `required_pull_request_reviews` activates
+   when a second human reviewer joins.
+
+2. **Workstation-side signing** — a new ed25519 keypair at
+   `~/.ssh/id_ed25519_github` (dedicated to GitHub commit signing,
+   isolated from any other SSH identity) is registered as a
+   **Signing Key** on the maintainer's GitHub account. Local git
+   configured globally:
+   * `gpg.format=ssh`
+   * `user.signingkey=~/.ssh/id_ed25519_github.pub`
+   * `commit.gpgsign=true`, `tag.gpgsign=true`
+   * `gpg.ssh.allowedSignersFile=~/.config/git/allowed_signers`
+   The `allowed_signers` file maps the committer email to the
+   pubkey so `git verify-commit` works locally.
+   The repo-local committer email is the GitHub noreply form
+   (`229949365+ixion36-svg@users.noreply.github.com`), which is
+   auto-verified by GitHub; signed commits therefore land with the
+   green "Verified" badge in the GitHub UI without requiring email
+   confirmation against the maintainer's personal inbox.
+
+### docs(sbd): SECURE_BY_DESIGN.md, SDLC, CONTRIBUTING harmonised
+
+- `docs/SECURE_BY_DESIGN.md` — P15 audit body rewritten with the
+  v0.31.10 controls; status moved Partial → Met; summary table
+  count updated; the §4 "Open named gaps" branch-protection bullet
+  marked Closed v0.31.10; revision row 1.8 added.
+- `docs/DEVELOPMENT_LIFECYCLE.md` — §4 NCSC cross-reference row for
+  "Protect your code repository" upgraded from Partial → Met;
+  §6.4 (Separation of duty) extended with branch-protection +
+  signed-commits bullets; §8 Known Gaps strikethroughs on both
+  the branch-protection and signed-commits rows.
+- `CONTRIBUTING.md` — new §2.1 "Sign your commits" with the
+  copy-paste key-gen + git-config recipe future contributors will
+  follow; existing §2.1/§2.2/§2.3 renumbered to §2.2/§2.3/§2.4.
+  TL;DR updated to lead with signing.
+
+### chore(security): release commit ritual now produces signed commits
+
+The 8-file release bump remains mechanical; the only new constraint
+is that every commit on `main` — including the `chore(release):`
+bump — must carry an SSH signature. The release-bump skill is
+unchanged; the change is in the workstation-side git config, not in
+the ritual itself. Future releases inherit signing for free.
 
 ## v0.31.9 — 2026-05-14
 

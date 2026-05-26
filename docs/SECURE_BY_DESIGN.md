@@ -1,11 +1,11 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.8 -->
+<!-- ion-doc:version=0.31.10 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
-<!-- ion-doc:date=2026-05-14 -->
+<!-- ion-doc:date=2026-05-26 -->
 
 # ION — Secure by Design Principles
 
@@ -425,10 +425,26 @@ history integrity, and review are part of the trust chain.
 * `main` is the only release-eligible branch.
 * No secrets in history — `.env` is gitignored; `.env.deploy` is a
   template only.
+* **Branch protection on `main`** (v0.31.0 Tier 1; v0.31.10 Tier 2):
+  `required_linear_history=true`, `allow_force_pushes=false`,
+  `allow_deletions=false`, `required_signatures=true`. The single
+  maintainer can still direct-push (`enforce_admins=false`); the
+  `required_pull_request_reviews` rule activates when a second
+  maintainer joins.
+* **Signed commits** (v0.31.10) — all commits on `main` are
+  SSH-signed against an ed25519 key dedicated to GitHub commit
+  signing (`~/.ssh/id_ed25519_github`, registered as a Signing Key
+  on the maintainer's GitHub account). Verification chain:
+  `gpg.format=ssh` + `user.signingkey` + `gpg.ssh.allowedSignersFile`
+  → `~/.config/git/allowed_signers`. Committer identity uses the
+  GitHub noreply form so signatures resolve against an
+  account-verified address; GitHub renders a "Verified" badge per
+  commit and `git verify-commit` returns success locally.
 
-**Status:** Partial — branch protection rules are not enforced
-server-side; signed-commit (GPG/Sigstore) policy is not in place.
-Tracked in `docs/DEVELOPMENT_LIFECYCLE.md` §8.
+**Status:** Met (v0.31.10). Branch protection enforced server-side
+and signed commits required. The single-maintainer workflow is
+preserved via `enforce_admins=false`; required PR reviews will be
+re-enabled when a second human reviewer is onboarded.
 
 #### P16. Secure the build and deployment pipeline
 
@@ -553,9 +569,9 @@ Aggregating §3 across 20 principles:
 
 | Status | Count | Principles |
 |---|---|---|
-| **Met** | 16 | P2, P3, P4, P5, P6, P7, P8, P9, P10, P12, P14, P16, P17, P18, P19, P20 |
+| **Met** | 17 | P2, P3, P4, P5, P6, P7, P8, P9, P10, P12, P14, P15, P16, P17, P18, P19, P20 |
 | **Mostly Met** | 3 | P1 (single maintainer; six artifacts in place), P11 (CSP strict — inline handlers in 69 templates still pending), P13 (data-min audit) |
-| **Partial** | 1 | P15 (branch protection + signed commits) |
+| **Partial** | 0 | — |
 | **Gap** | 0 | — |
 
 Open named gaps (also in `docs/DEVELOPMENT_LIFECYCLE.md` §8):
@@ -577,8 +593,13 @@ Open named gaps (also in `docs/DEVELOPMENT_LIFECYCLE.md` §8):
   can. For higher-assurance deployments, the customer-side
   Designated Security Officer pattern in `docs/DEVELOPMENT_LIFECYCLE.md`
   §6.4 closes the remaining gap.
-* **Branch protection rules** + **signed commits** — repository-side
-  enforcement to match the documented policy (P15).
+* ~~**Branch protection rules** + **signed commits**~~ — **CLOSED v0.31.10.**
+  Branch protection enforced on `main` via GitHub API
+  (`required_linear_history`, `allow_force_pushes=false`,
+  `allow_deletions=false`, `required_signatures=true`). All commits
+  must be SSH-signed; the maintainer's signing key (ed25519,
+  dedicated to GitHub) is registered as a Signing Key on the
+  ixion36-svg account.
 
 None of the gaps is load-bearing for a single deployment; each is a
 defence-in-depth improvement.
@@ -614,3 +635,4 @@ is the phase guide. If the two ever disagree, this doc wins for
 | 1.5     | 2026-05-14 | Maintainer | v0.31.7: P11 follow-up #4 — training.html migrated (119 handlers). 2 hand-fixed JS-source-escape spots; migration script patched to detect `\\'` / `\\"` escape sequences and skip them. P11 audit body updated (368 handlers migrated; 69 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.6     | 2026-05-14 | Maintainer | v0.31.8: **P17 CLOSED.** `python-jose[cryptography]` retired in favour of `PyJWT[crypto]>=2.8.0`. Transitive `ecdsa` dep (CVE-2024-23342, Minerva timing attack on P-256) removed from the resolved tree. CI `--ignore-vuln CVE-2024-23342` flag dropped. `src/ion/auth/oidc.py` migrated: `PyJWK.from_dict(jwk).key` wraps the JWKS dict before `jwt.decode`; same RS256-only semantics. New `tests/test_v031_8_oidc_pyjwt.py` (8 cases) pins happy path + tampered signature + expired + wrong audience/issuer + missing/unknown kid + missing sub. P17 status: **Mostly Met → Met.** Audit summary: **16 Met / 2 Mostly Met / 2 Partial / 0 Gap** (was 15 / 3 / 2 / 0). |
 | 1.7     | 2026-05-14 | Maintainer | v0.31.9: **P1 PARTIAL → MOSTLY MET.** Four artifacts ship to systematize the single-maintainer review pattern: `CONTRIBUTING.md` (codified expectations + PR template), `CODEOWNERS` (review responsibility per path), `.claude/agents/security-reviewer.md` (focused SbD-walk agent invoked before commit), `.pre-commit-config.yaml` (ruff + bandit + pip-audit at the workstation; mirrors CI). P1 cannot reach Met without onboarding a second human reviewer. Audit summary: **16 Met / 3 Mostly Met / 1 Partial / 0 Gap** (was 16 / 2 / 2 / 0). |
+| 1.8     | 2026-05-26 | Maintainer | v0.31.10: **P15 PARTIAL → MET.** Branch protection on `main` advanced from Tier 1 to Tier 2 — `required_signatures=true` added via `gh api POST .../protection/required_signatures` after registering a dedicated ed25519 Signing Key (`~/.ssh/id_ed25519_github.pub`) on the maintainer's GitHub account. Local git configured for SSH commit signing (`gpg.format=ssh` + `gpg.ssh.allowedSignersFile`); committer identity switched to the GitHub noreply form so signatures resolve to a verified-by-GitHub address. The release commit for v0.31.10 is the first signed commit on `main` and the implicit acceptance test for the new server-side rule. Audit summary: **17 Met / 3 Mostly Met / 0 Partial / 0 Gap** (was 16 / 3 / 1 / 0). |

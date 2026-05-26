@@ -1,16 +1,16 @@
 <!-- ion-doc:type=DEVELOPMENT LIFECYCLE -->
 <!-- ion-doc:title=ION Development Lifecycle -->
 <!-- ion-doc:subtitle=Secure-by-Design SDLC; 5-phase reference aligned with NCSC SD&D and SSDF -->
-<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:version=0.31.10 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, compliance reviewers, customer DA -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-05-26 -->
 
 # ION Development Lifecycle
 
 **Document owner:** Repository maintainer (`ixion36`)
-**Status:** Current as of v0.31.2 (2026-05-14)
+**Status:** Current as of v0.31.10 (2026-05-26)
 **Review cadence:** Every minor-version bump (v0.X.0) or on material process change, whichever is sooner.
 **Primary framework:** Secure by Design (SbD) — see `docs/SECURE_BY_DESIGN.md` for the canonical 20-principle list.
 **Secondary references:** NCSC *Secure Development and Deployment Guidance* (8 principles); NIST SP 800-218 (SSDF); CISA *Secure by Design*; OWASP SAMM; Saltzer & Schroeder (1975).
@@ -389,7 +389,7 @@ The NCSC's 8 principles map to ION's existing practice as follows. Where a princ
 | NCSC Principle | ION Implementation | Status |
 |----------------|-------------------|--------|
 | **1. Secure development environment** | Maintainer's workstation uses Windows 11 with BitLocker; AI pair-programmer (Claude Opus 4.7) runs locally via Claude Code. No third-party access to the dev environment. | **Partial** — formal DSE hardening checklist not documented. |
-| **2. Protect your code repository** | GitHub private repository, SSH-keyed access, branch `main` is the only release-eligible branch. | **Partial** — branch protection not enabled; signed commits not enforced (§3.4.1). |
+| **2. Protect your code repository** | GitHub private repository, SSH-keyed access, branch `main` is the only release-eligible branch. Branch protection on `main` enforces linear history, no force-pushes, no deletions, and signed commits (v0.31.10). | **Met** — server-side branch protection + `required_signatures` since v0.31.10. |
 | **3. Secure-by-default configuration** | `.env.deploy` template ships secure defaults. Cookie Secure flag warned at startup. Debug mode default-off. Admin password forced to be non-default in production. | **Met** — see `docs/DEPLOYMENT.md`. |
 | **4. Manage third-party risk** | Dependencies declared in `pyproject.toml` with version-floor constraints. Licence policy stated (§3.2.3). `pip-audit` runs in CI against the OSV database on every push and PR (v0.25.0). `syft` generates a SPDX-JSON SBOM at Docker build, shipped at `/app/sbom.spdx.json` in the image (v0.26.0). | **Met** — SCA + SBOM in place. Exact-pinned versions remain a §8 candidate for reproducible builds but are not load-bearing for third-party risk management. |
 | **5. Plan for vulnerabilities** | `SECURITY_ASSESSMENT.md` reviewed every release. Per-finding fix-by-version target stated. SLA documented in §3.5.4. `SECURITY.md` (v0.30.0) documents the private reporting channels, severity-aligned fix SLAs, supported versions, and the disclosure timeline. | **Met**. |
@@ -474,6 +474,8 @@ The current single-maintainer model is a known control weakness. Mitigations in 
 - **`CODEOWNERS`** (v0.31.9) routes review responsibility per path; pairs with branch-protection rules (P15 closure path) once a second maintainer joins.
 - **`.claude/agents/security-reviewer.md`** (v0.31.9) — focused agent that walks the diff against the 20 SbD principles before commit. The release ritual's `release-checker` agent handles version-drift; this agent handles security-review.
 - **`.pre-commit-config.yaml`** (v0.31.9) — `ruff` + `bandit` + `pip-audit` run at the workstation BEFORE every commit, mirroring the CI gates so issues are caught at design time, not after push.
+- **Branch protection on `main`** (v0.31.0 Tier 1; v0.31.10 Tier 2) — server-side rules prevent force-pushes, deletions, and non-linear history; `required_signatures=true` rejects unsigned commits at push time. The single maintainer can still direct-push (`enforce_admins=false`), preserving the solo-maintainer workflow while keeping the audit trail mechanical. `required_pull_request_reviews` activates when a second human reviewer joins.
+- **Signed commits** (v0.31.10) — every commit on `main` carries an SSH signature against an ed25519 key dedicated to GitHub commit signing (`~/.ssh/id_ed25519_github`, registered as a Signing Key on the maintainer's GitHub account). Committer email is the GitHub noreply form, auto-verified by GitHub, so signatures resolve to "Verified" badges. The signing private key never leaves the maintainer's workstation; an attacker with workstation access but no key control still cannot land changes on `main` under the maintainer's identity.
 
 **For higher-assurance deployments:** a customer-side Designated Security Officer reviewing the per-release `CHANGELOG.md` + `SECURITY_ASSESSMENT.md` delta before the operator deploys it is the recommended additional control. This remains the canonical path to closing the residual single-maintainer risk for environments where one human + AI + automated gates aren't sufficient.
 
@@ -518,8 +520,8 @@ The following items are **not currently in place** and represent the delta betwe
 | Gap | Status | Indicative target |
 |-----|--------|-------------------|
 | ~~Public vulnerability disclosure channel (`SECURITY.md` + GPG contact)~~ | **Closed v0.30.0** — `SECURITY.md` at repo root documents private reporting via GitHub Security Advisory (preferred) and maintainer email (fallback), with disclosure timeline and severity-aligned SLAs cross-referencing §3.5.4. GPG fingerprint deferred; the GitHub Security Advisory channel provides end-to-end encryption for the preferred path. |
-| Branch protection on `main` (force-push, required reviews) | Not in place | Configurable at the GitHub level — administrative, not code |
-| Signed commits enforced | Not in place | Configurable at the GitHub level |
+| ~~Branch protection on `main` (force-push, required reviews)~~ | **Closed v0.31.10** — `required_linear_history=true`, `allow_force_pushes=false`, `allow_deletions=false` enforced server-side via `gh api PUT .../branches/main/protection`. `required_pull_request_reviews` deferred until a second maintainer joins (single-maintainer workflow preserved). |
+| ~~Signed commits enforced~~ | **Closed v0.31.10** — `required_signatures=true` enforced on `main`. Local git uses SSH signing against an ed25519 key dedicated to GitHub (`~/.ssh/id_ed25519_github`, registered as Signing Key on the maintainer's account). |
 | Independent design review for solo-maintainer changes | Partially mitigated by AI pair (§6.3) | Requires customer-side DSO — deployment-specific |
 | Formal Incident Response Plan (separate doc) | Embedded in §3.5.4; not separate doc | v0.25.x or earlier on customer request |
 | End-of-life calendar for shipped releases | Not in place | Process-only; can be authored without code change |
