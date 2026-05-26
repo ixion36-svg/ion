@@ -1,13 +1,87 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.24 -->
+<!-- ion-doc:version=0.31.25 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.25 — 2026-05-26
+
+**🔴 SUPPLY-CHAIN SECURITY DISCLOSURE + fix.** v0.31.24's now-working
+pip-audit gate caught a real PyPI malware advisory in the dependency
+tree: **MAL-2026-4750 — fastapi 0.136.3 ships modified
+`pyproject.toml` + `PKG-INFO`** that add an undocumented optional
+dependency on `fastar>=0.9.0` (a typo-squat of `fastapi`) via the
+`[standard]` extra. Confirmed via OSV at
+`https://api.osv.dev/v1/vulns/MAL-2026-4750` — "Malicious code in
+fastapi (PyPI)". Single affected version (0.136.3).
+
+### Affected images
+
+**ION Docker images v0.31.10 through v0.31.24 all ship the
+malicious fastapi 0.136.3 wheel.** pip resolved `fastapi>=0.109.0`
+(the prior pyproject floor) to the latest available, which was the
+compromised 0.136.3 at the time those images were built.
+
+### Exploitability — bounded but real
+
+ION's `pyproject.toml` specifies the bare `fastapi>=0.109.0`
+dependency, NOT `fastapi[standard]`. The malicious `fastar`
+typo-squat is gated to the `[standard]` extra; pip never installs
+it in ION's supply chain. So the active attack vector (the
+typo-squat package executing on import) does NOT trigger in ION's
+deployments.
+
+However:
+
+* The compromised wheel files are present in every v0.31.10–v0.31.24
+  image. We cannot rule out that the fastapi source code itself was
+  also modified (the OSV advisory only describes the
+  pyproject.toml/PKG-INFO changes, but full body of the wheel was
+  not inspected by us). Treating any compromised release as fully
+  compromised is the prudent default.
+* Anyone who later builds their own deployment of ION using
+  `pip install -e ".[standard]"` (no such extra exists in our
+  pyproject today, but a future contributor adding it would
+  re-expose the typo-squat).
+* Downstream consumers who use ION as a dependency might
+  transitively pull the compromised fastapi if their constraint
+  permits 0.136.3.
+
+### v0.31.25 closes
+
+* **`pyproject.toml`** — fastapi constraint changed from
+  `fastapi>=0.109.0` to `fastapi>=0.109.0,<0.136.3`. pip now
+  resolves to 0.136.1, the immediate pre-incident release. (0.136.2
+  was pulled from PyPI during the incident response and isn't
+  available; 0.136.3 is the malicious republish.)
+* **Docker image** — v0.31.25 rebuild excludes the compromised
+  wheel. Confirmed by `pip-audit --vulnerability-service pypi`
+  reporting no findings post-pin.
+* **`SECURITY_ASSESSMENT.md`** — supply-chain disclosure paragraph
+  added with the OSV reference, affected-image inventory, and
+  exploitability assessment.
+
+### Recommended action for v0.31.10–v0.31.24 image users
+
+Upgrade to `ixion36/ion:0.31.25` or later. The malicious wheel
+sitting in the image filesystem is the issue regardless of
+exploitability today; a future configuration change could activate
+it.
+
+### Process learning
+
+This finding wouldn't have surfaced if v0.31.22's CI fix-up had
+not made pip-audit actually fail correctly on real vulnerabilities.
+The v0.31.10–v0.31.21 chain had silenced pip-audit by inheriting
+the pre-session OSV parser bug. The "checks and balances"
+follow-through after the 12-release sprint is what caught this.
+**Net new findings: 0C / 1H / 0M / 0L** (MAL-2026-4750 categorised
+as High due to malware-in-supply-chain severity).
 
 ## v0.31.24 — 2026-05-26
 
