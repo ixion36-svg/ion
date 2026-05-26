@@ -1,0 +1,93 @@
+﻿SR ID,Statement
+SR-AUTH-001,Local password auth uses bcrypt and is rate-limited via slowapi
+SR-AUTH-002,OIDC auth supports RS256 only; HS256 rejected at verification time
+SR-AUTH-003,"Sessions are server-side, cookie-bound, with Secure/HttpOnly/SameSite=Lax flags"
+SR-RBAC-001,7-tier role hierarchy with explicit Permission/RolePermission binding
+SR-RBAC-002,Every endpoint enforces a permission via @permission_required(...)
+SR-RBAC-003,Every service-layer mutation re-checks auth before commit (TOCTOU defence)
+SR-ALERT-001,ES Security adapter pulls alerts on a 30-second schedule into ION's cache
+SR-ALERT-002,"/alerts displays alerts sorted by severity DESC, age ASC"
+SR-ALERT-003,"Each alert row exposes severity, age, rule, technique, host/user, timestamp, status"
+SR-AI-001,Bob template selection uses a 5-tier matcher: rule_id -> regex -> technique -> tactic -> groups
+SR-AI-002,Bob output validates against a Pydantic-bound schema (AlertPromptOutput); arbitrary text refused
+SR-AI-003,Bob confidence is reported as 0-100 + low/medium/high band; low-confidence triggers UI circuit breaker
+SR-AI-004,Bob never closes a case; CaseClosureReason selection is analyst-only
+SR-AI-005,Bob outputs are joinable to audit_log via bob_verdict_id
+SR-AI-006,confidence_threshold_override per template; admin-editable via /alert-prompts
+SR-AI-007,Eval harness replays templates against historical alerts; reports P/R/F1; advisory-lock-blocked when a live investigation loop is active
+SR-CASE-001,Cases are first-class entities (Investigation) with status / priority / closure_reason / assignee
+SR-CASE-002,"case_grouper_service correlates alerts by host/user/technique/timewindow into cases (every 5 min, advisory lock CGP)"
+SR-CASE-003,/cases/{id} renders linked alerts + observables + similar cases + entity timelines + workbench + attack story on initial load
+SR-CASE-004,Case kanban view supports drag-to-update status
+SR-PIN-001,Workbench pin operation accepts alert / observable / query / note / file pin types
+SR-PIN-002,Every pin produces a CaseEvidencePin row + a CaseEvidenceLedger row in the same transaction
+SR-LEDGER-001,CaseEvidenceLedger.event_hash = sha256(prev_hash + json(payload))
+SR-LEDGER-002,Tamper detection walks the chain by insertion order; flags row-level breaks
+SR-LEDGER-003,ForensicCase ledger uses distinct advisory-lock namespace FCWL
+SR-SIM-001,Closed cases are embedded with nomic-embed-text via Ollama; stored in CaseEmbedding
+SR-SIM-002,Similarity lookup uses pgvector + HNSW indexes
+SR-SIM-003,Top-5 similar-cases panel appears on case detail page
+SR-PCAP-001,Case-create triggers PCAP analysis for alerts with community_id OR source/destination IP + timestamp
+SR-PCAP-002,Arkime adapter uses community_id preferred; IP+time fallback when community_id misses
+SR-PCAP-003,PCAP heuristic analysis runs 12 detectors; findings post to case Workbench as pinned comment
+SR-FOR-001,ForensicCase is parallel to AlertCase with own Workbench (advisory lock FCWL)
+SR-FOR-002,Every EvidenceItem has a CustodyLogEntry audit chain
+SR-FOR-003,Forensic playbooks are NIST SP 800-86 aligned
+SR-TI-001,"OpenCTI adapter provides threat landscape, actors, IOCs, reports"
+SR-TI-002,Threat Watch Gap raises alert when a watched actor gains a technique not covered by TIDE rules
+SR-TI-003,Unified /threat-intel page replaces 3 prior pages (v0.27.0 consolidation)
+SR-DE-001,/engineering/analytics ranks rules by FP rate x volume
+SR-DE-002,/tuning-proposals supports full lifecycle: file -> review -> sync to TIDE -> close
+SR-DE-003,/cyab/attack-heatmap renders bundled ATT&CK v15.1 (v0.22.0) with TIDE rule overlay
+SR-DE-004,"/compliance maps TIDE rules to NIST CSF, ISO 27001, ACSC E8, DefStan, and exports a coverage report"
+SR-OPS-001,"/briefing aggregates: P1/P2 incidents, alert volume, noisy rules, SLA breaches, tuning queue"
+SR-OPS-002,/shift-handover pre-populates from shift state; persists for next shift's briefing
+SR-OPS-003,/analyst-efficiency shows per-analyst metrics fairly (no surveillance signals)
+SR-OPS-004,Executive briefing generator produces editable / exportable summary (v0.27.0)
+SR-ADMIN-001,Each integration is configurable via /integrations + smoke Test action
+SR-ADMIN-002,Users/roles/permissions managed via dedicated admin pages
+SR-ADMIN-003,Settings table is runtime-mutable via /settings for non-secret operational parameters
+SR-ADMIN-004,/audit-log supports filter + CSV export
+SR-ADMIN-005,/workbench-audit recomputes sha256 chain and reports integrity
+SR-CURR-001,/training exposes modules -> lessons -> quizzes; tracks per-user progress
+SR-CURR-002,Lab system runs containerised exercises (v0.20.1; 4 known bugs queued for v0.30.0)
+SR-DPO-001,SAR query returns every row referencing a named subject (SQL in DPIA Appendix A)
+SR-DPO-002,Erasure query anonymises personal identifiers (SQL in DPIA Appendix B)
+SR-NFR-AIRGAP,Image bundles ATT&CK + KEV snapshots; no live external feed dependency at runtime
+SR-NFR-LOG,stdout JSON-lines ECS-compliant; one log entry per request and per state-mutating action
+SR-NFR-AUDIT,Every 2xx state-mutating response generates an AuditLog row
+SR-NFR-RTO,Postgres backup + image redeploy procedure documented; RTO <= 1h target
+SR-NFR-RPO,Customer-side backup cadence <= 24h
+SR-NFR-INTEG,Each adapter raises IntegrationUnavailable on exhaustion; surfaces show banner; core pages remain functional
+SR-NFR-SBOM,SPDX-JSON SBOM bundled in image at /app/sbom.spdx.json
+SR-NFR-SCA,pip-audit + bandit + ruff run in CI on every commit
+SR-NFR-IMG,Docker Hub tags are digest-pinned; image not re-pushed under same tag
+SR-INV-MEM-001,Investigation memory persists analyst working notes per case across sessions
+SR-AI-CHAT-001,/ai-chat surface routes NL queries to Ollama; conversation persisted per user
+SR-AI-CHAT-002,Case-scoped AI chat panel constrains chat context to the current case
+SR-AI-CHAT-003,NL-to-Elasticsearch converter emits query JSON preview before execution
+SR-AI-DOC-001,AI document generation produces editable drafts from template + context prompt
+SR-KG-001,Knowledge graph surface renders entity-relation graph with click-to-pivot
+SR-D3FEND-001,D3FEND defensive technique map; bidirectional cross-reference with ATT&CK
+SR-ATTACK-NAV-001,ATT&CK Navigator layer JSON export from /cyab/attack-heatmap
+SR-DASH-001,Per-user dashboard layout; persists across sessions; drag-to-rearrange
+SR-HEALTH-001,GET /health returns stable JSON schema documented in docs/RUNBOOK.md; non-2xx on degraded state
+SR-CSP-001,Strict CSP middleware on every response; inline scripts nonce-based; no unsafe-eval
+SR-TZ-001,DB timestamps in UTC; per-user TZ preference renders display-side; logs always UTC
+SR-NOTIF-001,/notifications surface; in-app unread count badge; mark-read clears
+SR-TI-LANDSCAPE-001,Threat landscape briefing generator produces editable exportable text (v0.27.0)
+SR-TI-ACTOR-001,"Actor profile page includes aliases, motivations, sectors, techniques + ATT&CK click-through, IOC sparkline (v0.27.0)"
+SR-TI-IOC-FEED-001,"Live IOC feed surface with type, confidence, last-seen"
+SR-OP-DEPLOY-001,docs/DEPLOYMENT.md end-to-end deployment procedure; smoke check at completion
+SR-OP-BACKUP-001,Postgres backup + restore procedure documented; meets RTO <= 1h
+SR-OP-SLOWQ-001,slow_query_threshold_ms configurable; threshold-exceeding queries emit ECS log row
+SR-OP-POOL-001,"Pool size, overflow, in-use exposed on /health or /admin/health-detail"
+SR-NET-CMDB-001,/network-assets CMDB + /topology graph render
+SR-NET-LOG-HEALTH-001,"/log-source-health shows per-source ingest status, volume trend, silent flags"
+SR-KM-NOTES-001,/notes with folders + tags + search; attachable to cases / observables
+SR-KM-DOCS-001,"/templates + /documents with markdown editing, versioning, template-fill"
+SR-EM-PLAN-001,/emulation plan library with steps tied to ATT&CK techniques
+SR-EM-EXEC-001,Emulation execution tracked per step (pass/fail); failed-step -> tuning proposal flow
+SR-CA-DEPLOY-001,/canaries CRUD for honeydoc / credential / DNS tokens
+SR-CA-TRIP-001,Canary trip auto-creates severity: critical alert with pre-populated context + playbook suggestion
+SR-API-WEBHOOK-001,HMAC-signed outbound webhook on configurable events; retry on transient failure; delivery log

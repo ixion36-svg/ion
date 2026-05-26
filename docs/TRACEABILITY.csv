@@ -1,0 +1,82 @@
+﻿UR,SR(s),HLD ref,LLD ref,Use Case(s),Gap(s),Test(s),Status
+UR-L1-001,SR-ALERT-002,S6.3,S10.1,UC-L1-01,GAP-01,test_alert_queue_order.py,Met
+UR-L1-002,SR-ALERT-003,S6.3,S10.1,UC-L1-01,GAP-01,test_alert_row_fields.py,Met
+UR-L1-003,SR-AI-001; SR-AI-002,S7.5,S7.1; S7.2,UC-L1-01,GAP-02; GAP-03,test_bob_template_match.py; test_bob_output_contract.py,Met
+UR-L1-004,SR-AI-003,S7.5,S7.1,UC-L1-01,GAP-16,test_bob_confidence_band.py,Met
+UR-L1-005,SR-CASE-001,S4,S5,UC-L1-01,GAP-01,test_bulk_close.py,Met
+UR-L1-006,SR-CASE-001; SR-CASE-002,S4,S5; S6.2,UC-L1-02,GAP-01,test_case_create_from_alerts.py; test_case_grouper.py,Met
+UR-L1-007,SR-OPS-002,S4.2,S10.1,UC-L1-03,GAP-12,test_shift_handover.py,Met
+UR-L2-001,SR-CASE-003,S4,S10.1,UC-L2-01,GAP-04; GAP-06,test_case_landing_page.py,Met
+UR-L2-002,SR-PIN-001; SR-PIN-002,S7.3,S3.3; S10.4,UC-L2-01,GAP-04,test_workbench_pin_lifecycle.py,Met
+UR-L2-003,SR-LEDGER-001; SR-LEDGER-002,S7.3,S9.2,UC-AD-04,GAP-04; GAP-17,test_ledger_chain.py; test_ledger_tamper_detection.py,Met
+UR-L2-004,SR-SIM-001; SR-SIM-002; SR-SIM-003,S4.2,S10.5,UC-L2-01,GAP-06,test_case_similarity.py; test_case_embedding_backfill.py,Met
+UR-L2-005,SR-CASE-003,S4.2,S10.1,UC-L2-01,GAP-19,test_entity_timeline.py,Met
+UR-L2-006,SR-PCAP-001; SR-PCAP-002; SR-PCAP-003,S4.2,S10.2,UC-L2-01,GAP-07,test_pcap_auto_analysis.py; test_pcap_ip_fallback.py,Met
+UR-L2-007,SR-CASE-004,S4,S10.1,UC-L2-01,GAP-04,test_case_kanban.py,Met
+UR-L3-001,SR-FOR-001; SR-LEDGER-003,S4.2,S3.3; S10.4,UC-L3-01,GAP-05,test_forensic_case_lifecycle.py; test_forensic_workbench.py,Met
+UR-L3-002,SR-FOR-002,S4.2,S3.1,UC-L3-01,GAP-05,test_custody_log.py,Met
+UR-L3-003,SR-TI-001; SR-TI-002,S4.2,S10.1,UC-L3-02,GAP-08,test_threat_intel_landscape.py; test_threat_watch_gap.py,Met
+UR-L3-004,SR-CASE-002,S4.2,S10.1,UC-L3-03,GAP-08,test_attack_story.py,Met
+UR-DE-001,SR-DE-001,S4.2,S10.1,UC-DE-01,GAP-09,test_engineering_analytics.py; test_ai_feedback_dual_write.py,Met
+UR-DE-002,SR-DE-002,S4.2,S10.1,UC-DE-01,GAP-09,test_tuning_proposal_lifecycle.py,Met
+UR-DE-003,SR-DE-003,S4.2,S10.1,UC-L3-02; UC-DE-02,GAP-10,test_attack_heatmap.py,Met
+UR-DE-004,SR-DE-004,S4.2,S10.1,UC-DE-02,GAP-11,test_compliance_mapping.py,Met
+UR-DE-005,SR-AI-006,S7.5,S7.1,UC-DE-03,GAP-02; GAP-16,test_alert_prompt_crud.py; test_confidence_threshold_override.py,Met
+UR-DE-006,SR-AI-007,S7.5,S7.3,UC-DE-03,GAP-16,test_bob_eval_harness.py,Met
+UR-SM-001,SR-OPS-001,S4.2,S10.1,UC-SM-01,GAP-12,test_briefing_aggregation.py,Met
+UR-SM-002,SR-OPS-003,S4.2,S10.1,UC-SM-02,GAP-13,test_analyst_efficiency.py,Met
+UR-SM-003,SR-OPS-004; SR-TI-003,S4.2,S10.1,UC-SM-03,GAP-08,test_executive_report_generator.py; test_threat_landscape_brief.py,Met
+UR-SM-004,SR-CASE-001,S4,S5,UC-SM-01,GAP-12,test_sla_breach_log.py,Met
+UR-SM-005,SR-OPS-001,S4.2,S10.1,UC-SM-01,(general),test_maturity_scorecard.py,Met
+UR-AD-001,SR-ADMIN-001,S9,S12,UC-AD-01,GAP-19,test_integration_config.py; test_integration_smoke_action.py,Met
+UR-AD-002,SR-RBAC-001; SR-ADMIN-002,S7.2,S8.3,UC-AD-02,GAP-19,test_user_role_lifecycle.py; test_permission_grant.py,Met
+UR-AD-003,SR-AUTH-002,S7.1,S8.2,UC-AD-02,GAP-19,test_oidc_rs256_only.py; test_oidc_hs256_refused.py,Met
+UR-AD-004,SR-ADMIN-003,S7.2,S12.1,UC-AD-01,(general),test_settings_runtime_mutation.py,Met
+UR-AD-005,SR-ADMIN-004; SR-NFR-AUDIT,S7.3,S9.1,UC-AD-03; UC-CO-01,GAP-17,test_audit_log_filter.py; test_audit_log_export.py,Met
+UR-AD-006,SR-ADMIN-005; SR-LEDGER-002,S7.3,S9.2,UC-AD-04,GAP-17,test_workbench_audit_verify.py,Met
+UR-LR-001,SR-CURR-001; SR-CURR-002,S4.2,S3.1,UC-LR-01,GAP-14,test_curriculum_lifecycle.py (lab tests partial - 4 bugs queued v0.30.0),Partial
+UR-LR-002,SR-CURR-001,S4.2,S3.1,UC-LR-02,GAP-14,test_course_assignment.py,Met
+UR-CO-001,SR-DPO-001,S6.7,S12,UC-CO-01,GAP-17,test_sar_query.py; DPIA App. A SQL,Met
+UR-CO-002,SR-DPO-002,S6.7,S12,UC-CO-02,GAP-17,test_erasure_anonymise.py; DPIA App. B SQL,Met
+UR-CO-003,SR-LEDGER-002,S7.3,S9.2,UC-AD-04,GAP-04; GAP-17,test_ledger_chain.py; test_ledger_tamper_detection.py,Met
+UR-CO-004,(NFR; cross-cutting),S6.6,(cross-cutting),(all UCs),(general),_mod_wcag_audit.md tier-1+2 audit,Partial
+UR-NFR-001,SR-NFR-AIRGAP,S6.8; S8.3,S12.2,(operator),GAP-15,test_airgap_no_network_calls.py; image inspection,Met
+UR-NFR-002,(perf),S6.2,(cross-cutting),(all UCs),(general),Empirical only; formal load-test planned v0.31.0+,Partial
+UR-NFR-003,SR-NFR-AUDIT,S6.5; S7.3,S9.1,UC-AD-03,GAP-17,test_audit_log_every_mutation.py,Met
+UR-NFR-004,SR-NFR-LOG,S7.4,S11.2,(SIEM team),GAP-19,test_ecs_log_shape.py; _mod_log_shipping_spec.md,Met
+UR-NFR-005,SR-NFR-RTO; SR-NFR-RPO,S6.1,S12,(operator),(general),_mod_iteap.md S5 DR drill,Met
+UR-NFR-006,SR-NFR-INTEG,S9,S11.2,(all UCs),GAP-19,test_integration_failure_modes.py (x7 per adapter),Met
+UR-NFR-007,SR-NFR-SBOM,S6.4,S13.2,(customer security),(general),Image-inspection step in _mod_iteap.md,Met
+UR-NFR-008,SR-NFR-SCA,S6.4,S13.2,(customer security),(general),.github/workflows/test.yml,Met
+UR-NFR-009,(none yet),S11,(n/a),(n/a),(general),Not implemented,Planned
+UR-NFR-010,SR-NFR-IMG,S6.4,S13,(operator),(general),Docker Hub digest immutability,Met
+UR-L2-008,SR-INV-MEM-001,S4.2,S10.1,UC-L2-01,GAP-04,test_investigation_memory.py,Met
+UR-L2-009,SR-AI-CHAT-002,S7.5,S7,UC-L2-01; UC-AI-01,GAP-16,test_ai_chat_case_scope.py,Met
+UR-L3-005,SR-KG-001,S4.2,S10.1,UC-L3-02,GAP-08,test_knowledge_graph_nav.py,Met
+UR-DE-007,SR-D3FEND-001,S4.2,S10.1,UC-DE-02,GAP-10; GAP-11,test_d3fend_mapping.py,Met
+UR-DE-008,SR-ATTACK-NAV-001,S4.2,S10.1,UC-DE-02,GAP-10,test_attack_navigator_export.py,Met
+UR-SM-006,SR-DASH-001,S4.2,S10.1,(cross-cutting),(general),test_dashboard_layout.py,Met
+UR-AD-007,SR-HEALTH-001,S6.1; S7.4,S11,UC-OP-01; UC-OP-03,(general),test_health_endpoint.py,Met
+UR-NFR-011,SR-CSP-001,S6.4,S11,(cross-cutting),(general),test_csp_header.py,Met
+UR-NFR-012,SR-TZ-001,S6.4,S3,(cross-cutting),(general),test_timezone_handling.py,Met
+UR-NFR-013,SR-NOTIF-001,S4.2,S10.1,(cross-cutting),(general),test_notifications.py,Met
+UR-TI-001,SR-TI-LANDSCAPE-001,S4.2,S10.1,UC-TI-01,GAP-08,test_threat_landscape_brief.py,Met
+UR-TI-002,SR-TI-ACTOR-001,S4.2,S10.1,UC-TI-02,GAP-08,test_actor_profile.py; test_actor_ioc_sparkline.py,Met
+UR-TI-003,SR-TI-IOC-FEED-001,S4.2,S10.1,UC-TI-02,GAP-08,test_live_ioc_feed.py,Met
+UR-TI-004,SR-TI-002,S4.2,S10.1,UC-TI-02,GAP-08; GAP-10,test_threat_watch_gap.py,Met
+UR-OP-001,SR-OP-DEPLOY-001,S8.1; S8.2; S8.3,S12,UC-OP-01,(general),_mod_iteap.md S1 functional + deployment smoke,Met
+UR-OP-002,SR-OP-BACKUP-001; SR-NFR-RTO; SR-NFR-RPO,S6.1,S12,UC-OP-02,(general),_mod_iteap.md S5 DR drill,Met
+UR-OP-003,SR-OP-SLOWQ-001; SR-NFR-LOG,S7.4,S11.2,UC-OP-03,(general),test_slow_query_log_emit.py; _mod_log_shipping_spec.md,Met
+UR-OP-004,SR-OP-POOL-001; SR-HEALTH-001,S7.4,S11,UC-OP-03,(general),test_pool_metrics_exposed.py,Met
+UR-AI-001,SR-AI-CHAT-001,S7.5,S7,UC-AI-01,GAP-19,test_ai_chat_grounded.py,Met
+UR-AI-002,SR-AI-CHAT-003,S7.5,S7,UC-AI-02,GAP-02,test_nl_to_es.py,Met
+UR-AI-003,SR-AI-DOC-001,S7.5,S7,UC-SM-03; UC-AI-01,(general),test_ai_document_gen.py,Met
+UR-NET-001,SR-NET-CMDB-001,S4.2,S10.1,UC-NET-01,(general),test_network_asset_cmdb.py; test_topology_render.py,Met
+UR-NET-002,SR-NET-LOG-HEALTH-001,S4.2,S10.1,UC-NET-01,(general),test_log_source_health.py,Met
+UR-KM-001,SR-KM-NOTES-001,S4.2,S10.1,(cross-cutting),(general),test_notes_crud.py,Met
+UR-KM-002,SR-KM-DOCS-001,S4.2,S10.1,(cross-cutting),(general),test_templates_crud.py; test_documents_crud.py,Met
+UR-EM-001,SR-EM-PLAN-001,S4.2,S10.1,UC-EM-01,(general),test_emulation_plan_library.py,Met
+UR-EM-002,SR-EM-EXEC-001,S4.2,S10.1,UC-EM-01,GAP-10,test_emulation_execution.py,Met
+UR-CA-001,SR-CA-DEPLOY-001,S4.2,S10.1,UC-CA-01,(general),test_canary_deploy.py,Met
+UR-CA-002,SR-CA-TRIP-001,S4.2,S10.1,UC-CA-01,(general),test_canary_trip_alert.py,Met
+UR-API-001,SR-API-WEBHOOK-001,S9; S11.2,S12,UC-API-01,GAP-19,test_webhook_signed.py; test_webhook_retry.py,Met

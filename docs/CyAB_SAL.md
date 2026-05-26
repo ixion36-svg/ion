@@ -1,3 +1,12 @@
+<!-- ion-doc:type=CYAB REFERENCE -->
+<!-- ion-doc:title=ION CyAB — Security Assurance Levels -->
+<!-- ion-doc:subtitle=Cyber Assurance Base — SAL definitions and per-pillar maturity reference -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=SOC managers, CyAB assessors, detection engineers -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # CyAB — Cyber Assurance Base
 ## Security Assurance Levels (SAL)
 

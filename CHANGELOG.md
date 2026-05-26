@@ -1,13 +1,73 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.15 -->
+<!-- ion-doc:version=0.31.16 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.16 — 2026-05-26
+
+Working-tree hygiene release. Brings 40+ untracked legitimate docs
+and tooling artefacts into version control; updates `.gitignore` to
+explicitly exclude regenerable artefacts. **No code changes.**
+**No security-relevant changes.** No new attack surface, no schema
+migrations, no permission shifts. SECURE_BY_DESIGN audit summary
+unchanged at **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. **Net
+new findings: 0C / 0H / 0M / 0L.**
+
+### chore(repo): commit previously-untracked legitimate artefacts
+
+* **Architecture docs** — `docs/HLD.md`, `docs/LLD.md`,
+  `docs/API.md`, `docs/CONFIG_MGMT.md`, `docs/CRYPTOGRAPHY.md`,
+  `docs/BACKUP_RESTORE.md`, `docs/CAPACITY.md`, `docs/VULN_MGMT.md`,
+  `docs/GAPS_FILLED.md`, `docs/ION_STACK_BRIEF.md`. These are
+  customer-deliverable architecture references that had been
+  authored but never tracked.
+* **Spec traceability artefacts** — `docs/TRACEABILITY.md/csv`,
+  `docs/TRACEABILITY_SR.csv`, `docs/USE_CASES.md/csv`,
+  `docs/USER_REQUIREMENTS.md/csv`. Spec→code→test mapping referenced
+  by SDLC §3.3 but never committed.
+* **AI pair-programmer tooling** — `.claude/agents/release-checker.md`,
+  `.claude/agents/workbench-ledger-reviewer.md`, `.claude/hooks/`
+  (`ruff_check.py`, `sensitive_paths_guard.py`), `.claude/skills/`
+  (`alert-prompt-add/`, `release-bump/`), `.claude/settings.json`.
+  Referenced throughout `CLAUDE.md`'s "Tooling installed under
+  `.claude/`" section; previously workstation-local.
+* **PDF generator** — `tools/pdf_build/` (`build_csv.py`,
+  `build_docs.py`, `build_export.py`, `ion_pdf.css`). The tooling
+  that produces `*.pdf` from `*.md`; output dirs (`_build/`,
+  `_test/`) remain gitignored.
+* **Session checkpoint working docs** — `_handoff_v0_26.md`,
+  `_handoff_v0_32.md`, `_backlog_v0_27.md`, `_spec_v0_22.md`,
+  `_spec_v0_25.md`, `_spec_v0_26.md`, and 11 `_research_*.md` files.
+  Referenced from `CLAUDE.md` as session checkpoints; previously
+  workstation-local.
+* **Doc-header standardisation** — 10 tracked files (`SETUP.md`,
+  `STACK.md`, `CLAUDE.md`, `docs/AI_OUTPUT_CONTRACT.md`,
+  `docs/ARCHITECTURE.md`, `docs/CyAB_SAL.md`, `docs/DEPLOYMENT.md`,
+  `docs/RUNBOOK.md`, `docs/SOC_TEMPLATES.md`) gain the standardised
+  `<!-- ion-doc:type=... -->` header block matching every other ION
+  doc. Cosmetic only.
+
+### chore(repo): .gitignore updates
+
+Five new patterns codify what should NOT be committed:
+
+* `*.pdf` — PDFs are regenerable from `.md` via `tools/pdf_build/`.
+  The source of truth is markdown; PDFs are build artefacts.
+* `docs/impex/` — the per-export bundle directory. Mirrors `docs/`
+  content but is generated per customer scope.
+* `.local-*` — workstation-only test scripts (caught
+  `.local-test-bob.py`).
+* `seed_test_data.py` — dev-only seed for DEMO- prefixed rows;
+  contains hardcoded test data and shouldn't be in the production
+  image.
+* `.mcp.json` — workspace-specific MCP server configuration
+  (per-developer; lists local servers not shared with the repo).
 
 ## v0.31.15 — 2026-05-26
 

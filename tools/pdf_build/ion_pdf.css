@@ -1,0 +1,400 @@
+/* ============================================================
+ * ION PDF stylesheet
+ * Print-optimised, ION-branded.
+ * Loaded by tools/pdf_build/ion_pdf_template.html.
+ * Light-mode for paper readability while retaining ION accents.
+ * ============================================================ */
+
+/* ── Page setup ─────────────────────────────────────────────── */
+@page {
+    size: A4;
+    margin: 22mm 18mm 24mm 18mm;
+}
+
+@page :first {
+    margin: 0;
+}
+
+/* ── Brand tokens (light variant of ION palette) ────────────── */
+:root {
+    --ion-cyan:        #0891b2;
+    --ion-cyan-dim:    #0e7490;
+    --ion-cyan-soft:   #cffafe;
+    --ion-blue:        #2563eb;
+    --ion-purple:      #7c3aed;
+    --ion-green:       #059669;
+    --ion-yellow:      #d97706;
+    --ion-red:         #dc2626;
+    --ion-ink:         #0f172a;
+    --ion-ink-soft:    #334155;
+    --ion-muted:       #64748b;
+    --ion-line:        #cbd5e1;
+    --ion-line-soft:   #e2e8f0;
+    --ion-bg-soft:     #f1f5f9;
+    --ion-bg-callout:  #f8fafc;
+    --ion-radius:      6px;
+}
+
+/* ── Base typography ────────────────────────────────────────── */
+html { font-size: 10.5pt; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                 "Helvetica Neue", Arial, sans-serif;
+    color: var(--ion-ink);
+    line-height: 1.5;
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--ion-ink);
+    margin: 1.6em 0 0.55em 0;
+    page-break-after: avoid;
+}
+
+h1 {
+    font-size: 22pt;
+    border-bottom: 3px solid var(--ion-cyan);
+    padding-bottom: 6px;
+    color: var(--ion-cyan-dim);
+    margin-top: 0.8em;
+    page-break-before: auto;
+}
+
+h2 {
+    font-size: 16pt;
+    color: var(--ion-cyan-dim);
+    border-bottom: 1px solid var(--ion-line);
+    padding-bottom: 4px;
+}
+
+h3 {
+    font-size: 13pt;
+    color: var(--ion-ink);
+}
+
+h4 {
+    font-size: 11.5pt;
+    color: var(--ion-ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+h5, h6 {
+    font-size: 11pt;
+    color: var(--ion-ink-soft);
+}
+
+p { margin: 0 0 0.6em 0; }
+
+strong { color: var(--ion-ink); }
+em { color: var(--ion-ink-soft); }
+
+a, a:visited {
+    color: var(--ion-cyan-dim);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--ion-cyan-dim);
+}
+
+/* ── Lists ──────────────────────────────────────────────────── */
+ul, ol { margin: 0.3em 0 0.9em 1.6em; padding: 0; }
+li { margin: 0.15em 0; }
+li > p { margin: 0; }
+
+/* ── Code ──────────────────────────────────────────────────── */
+code {
+    font-family: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+    font-size: 0.86em;
+    background: var(--ion-bg-soft);
+    color: var(--ion-cyan-dim);
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid var(--ion-line-soft);
+}
+
+pre {
+    font-family: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+    font-size: 8.5pt;
+    line-height: 1.45;
+    background: var(--ion-bg-soft);
+    border: 1px solid var(--ion-line-soft);
+    border-left: 3px solid var(--ion-cyan);
+    border-radius: var(--ion-radius);
+    padding: 10px 12px;
+    margin: 0.8em 0;
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    color: var(--ion-ink);
+    page-break-inside: avoid;
+}
+
+pre code {
+    background: transparent;
+    border: none;
+    color: inherit;
+    padding: 0;
+    font-size: inherit;
+}
+
+/* ── Tables ─────────────────────────────────────────────────── */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0.9em 0;
+    font-size: 9.5pt;
+    page-break-inside: auto;
+}
+
+thead { display: table-header-group; }
+tr { page-break-inside: avoid; page-break-after: auto; }
+
+th, td {
+    border: 1px solid var(--ion-line);
+    padding: 6px 9px;
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    background: var(--ion-cyan);
+    color: #ffffff;
+    font-weight: 600;
+    font-size: 9pt;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    border-color: var(--ion-cyan);
+}
+
+tbody tr:nth-child(even) td {
+    background: var(--ion-bg-callout);
+}
+
+/* ── Blockquotes / callouts ─────────────────────────────────── */
+blockquote {
+    margin: 1em 0;
+    padding: 10px 14px;
+    background: var(--ion-bg-callout);
+    border-left: 4px solid var(--ion-cyan);
+    border-radius: 0 var(--ion-radius) var(--ion-radius) 0;
+    color: var(--ion-ink-soft);
+    font-style: normal;
+}
+
+blockquote p { margin: 0 0 0.3em 0; }
+blockquote p:last-child { margin-bottom: 0; }
+
+/* ── Horizontal rule ───────────────────────────────────────── */
+hr {
+    border: 0;
+    border-top: 1px solid var(--ion-line);
+    margin: 1.5em 0;
+}
+
+/* ── Images ────────────────────────────────────────────────── */
+img {
+    max-width: 100%;
+    height: auto;
+    page-break-inside: avoid;
+}
+
+/* ── Status badges via "Green" / "Amber" / "Red" / "Yes" / "No" inline text ── */
+.ion-status-green, .ion-status-amber, .ion-status-red {
+    display: inline-block;
+    font-weight: 600;
+    font-size: 0.85em;
+    padding: 1px 6px;
+    border-radius: 999px;
+}
+
+.ion-status-green { background: #d1fae5; color: #065f46; }
+.ion-status-amber { background: #fef3c7; color: #92400e; }
+.ion-status-red   { background: #fee2e2; color: #991b1b; }
+
+/* ── Cover page ─────────────────────────────────────────────── */
+.ion-cover {
+    page-break-after: always;
+    background: linear-gradient(140deg, #0a0c12 0%, #11141c 55%, #1e3a52 100%);
+    color: #e2e8f0;
+    width: 100%;
+    height: 297mm;
+    padding: 32mm 24mm;
+    margin: 0;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.ion-cover::before {
+    content: "";
+    position: absolute;
+    top: -20%;
+    right: -10%;
+    width: 65%;
+    height: 80%;
+    background: radial-gradient(circle, rgba(109, 228, 255, 0.18) 0%, transparent 65%);
+    pointer-events: none;
+}
+
+.ion-cover::after {
+    content: "";
+    position: absolute;
+    bottom: -10%;
+    left: -10%;
+    width: 60%;
+    height: 60%;
+    background: radial-gradient(circle, rgba(154, 140, 255, 0.10) 0%, transparent 65%);
+    pointer-events: none;
+}
+
+.ion-cover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    position: relative;
+    z-index: 1;
+}
+
+.ion-cover-logo {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 28pt;
+    font-weight: 900;
+    letter-spacing: 8px;
+    color: #6de4ff;
+    text-shadow: 0 0 24px rgba(109, 228, 255, 0.5);
+}
+
+.ion-cover-logo-sub {
+    font-size: 8pt;
+    letter-spacing: 4px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+
+.ion-cover-classification {
+    text-align: right;
+    font-size: 8pt;
+    letter-spacing: 3px;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 4px 10px;
+    border-radius: 4px;
+}
+
+.ion-cover-body {
+    position: relative;
+    z-index: 1;
+}
+
+.ion-cover-doctype {
+    font-size: 11pt;
+    color: #6de4ff;
+    text-transform: uppercase;
+    letter-spacing: 6px;
+    margin-bottom: 14px;
+    font-weight: 600;
+}
+
+.ion-cover-title {
+    font-size: 44pt;
+    font-weight: 900;
+    line-height: 1.05;
+    color: #ffffff;
+    margin: 0 0 18px 0;
+    letter-spacing: -1px;
+}
+
+.ion-cover-subtitle {
+    font-size: 14pt;
+    color: #cbd5e1;
+    font-weight: 400;
+    line-height: 1.35;
+    margin: 0 0 32px 0;
+    max-width: 90%;
+}
+
+.ion-cover-meta {
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px 28px;
+    font-size: 9.5pt;
+}
+
+.ion-cover-meta-label {
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-size: 7.5pt;
+    margin-bottom: 2px;
+}
+
+.ion-cover-meta-value { color: #ffffff; font-weight: 500; }
+
+.ion-cover-footer {
+    position: relative;
+    z-index: 1;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    padding-top: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 8pt;
+    color: #94a3b8;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+}
+
+.ion-cover-footer-brand { color: #6de4ff; font-weight: 600; }
+
+/* ── Document body wrapper ─────────────────────────────────── */
+.ion-body {
+    padding: 0;
+    max-width: 100%;
+}
+
+/* ── TOC ───────────────────────────────────────────────────── */
+.ion-toc {
+    page-break-after: always;
+}
+
+.ion-toc h2 {
+    margin-top: 0;
+    border-bottom: 2px solid var(--ion-cyan);
+}
+
+.ion-toc ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.ion-toc li {
+    padding: 4px 0;
+    border-bottom: 1px dotted var(--ion-line-soft);
+    font-size: 10pt;
+}
+
+.ion-toc li.lvl-2 { padding-left: 0; font-weight: 600; }
+.ion-toc li.lvl-3 { padding-left: 18px; color: var(--ion-ink-soft); }
+.ion-toc li.lvl-4 { padding-left: 36px; color: var(--ion-muted); font-size: 9pt; }
+
+.ion-toc a {
+    color: var(--ion-ink);
+    text-decoration: none;
+    border: none;
+}
+
+/* ── Misc print-fidelity safety ─────────────────────────────── */
+.no-break { page-break-inside: avoid; }
+.page-break { page-break-before: always; }

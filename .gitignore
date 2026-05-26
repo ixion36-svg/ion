@@ -94,3 +94,38 @@ Thumbs.db
 
 # Brainstorming companion mockups (per-session)
 .superpowers/
+
+# Customer-specific compliance scoping (NEVER commit to public repo).
+# These artefacts map the customer-agnostic docs/DEVELOPMENT_LIFECYCLE.md
+# to a specific buyer's framework requirements (e.g. MOD/Defence JSPs,
+# DART/CAAT registers, DefStan 00-055). Keep local. The customer-
+# agnostic SDLC doc stays the public surface.
+_mod_*.md
+_mod_*.pdf
+_mod_*.html
+_mod_*.csv
+
+# PDF build artefacts (regenerable from .md sources)
+tools/pdf_build/_build/
+tools/pdf_build/_test/
+
+# Export bundle (regenerable; MOD-local content lives inside)
+export/
+
+# Generated PDFs at the repo root and under docs/ — all regenerable
+# from the .md sources via tools/pdf_build/. Never commit a PDF to
+# the repo; the source of truth is markdown.
+*.pdf
+
+# Per-export docs/impex/ bundle (regenerable export, often customer-
+# scoped). Mirrors content already present under docs/ as markdown.
+docs/impex/
+
+# Local-only test scripts (not part of the shipped image — these
+# stay on the developer workstation only).
+.local-*
+seed_test_data.py
+
+# Workspace-specific MCP server configuration (per-developer; lists
+# local servers like pentest-mcp that aren't shared in the repo).
+.mcp.json

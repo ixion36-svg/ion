@@ -2,7 +2,7 @@
 
 ION (Intelligent Operating Network) is a Security Operations Portal. Stack: FastAPI + Jinja2 + Postgres (+ pgvector) + Ollama. **No SPA** — server-rendered HTML throughout. Ships to **air-gapped / siloed** environments; no live external feeds.
 
-Current released version: **v0.31.1** (see `pyproject.toml`). Memory above (`~/.claude/projects/.../memory/`) holds the cross-session context; this file is the repo-scoped index.
+Current released version: **v0.31.9** (see `pyproject.toml`). Memory above (`~/.claude/projects/.../memory/`) holds the cross-session context; this file is the repo-scoped index. Latest end-of-session handoff: `_handoff_v0_32.md`.
 
 ## Where to look first
 
@@ -15,7 +15,7 @@ Current released version: **v0.31.1** (see `pyproject.toml`). Memory above (`~/.
 | SDLC / Secure-by-Design (phases) | `docs/DEVELOPMENT_LIFECYCLE.md` (customer-agnostic — keep that way) |
 | Secure-by-Design (principles + audit) | `docs/SECURE_BY_DESIGN.md` — 20 numbered principles, ION audit per principle, gap list |
 | Recent change history | `CHANGELOG.md` |
-| Backlog / next release | latest `_backlog_v*.md` (v0.27 candidate file present but stale — through v0.31.1 has shipped) |
+| Backlog / next release | latest `_handoff_v*.md` (v0.32 captures the post-v0.31.9 state including the P15 pause point) |
 | Latest handoff snapshot | latest `_handoff_v*.md` (v0.26 present; refresh on next release) |
 
 ## Load-bearing design choices
