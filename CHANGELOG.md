@@ -1,13 +1,91 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.11 -->
+<!-- ion-doc:version=0.31.12 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.12 — 2026-05-26
+
+Secure-by-Design **P13 ("Reduce impact of compromise") Mostly Met → Met.**
+The named gap that kept P13 short of Met across audit revisions 1.0
+through 1.8 — *"formal data-minimisation audit is pending"* — is now
+closed. SECURE_BY_DESIGN audit summary advances from
+**17 Met / 3 Mostly Met / 0 Partial / 0 Gap** to
+**18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. The two remaining
+Mostly Met principles are P1 (single-maintainer structural limit) and
+P11 (CSP strict — 69 templates of mechanical inline-handler migration).
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### docs(security): docs/DATA_MINIMISATION_AUDIT.md
+
+New schema-wide audit document. Walks the ~100-table ION data layer
+across 47 SQLAlchemy model files:
+
+* **Tier 1 deep-read** — `users`, `user_sessions`, `audit_logs`,
+  `security_events`, `blocked_ips`, `analyst_notes`,
+  `ai_chat_sessions` / `ai_chat_messages`, `observables`, `ai_feedback`.
+  Column-by-column categorisation: PII / free-text / operational /
+  credential. Every PII-bearing column has a feature-justification or
+  is documented as a tracked residual.
+* **Tier 2 skim** — alert / case suite, annotation suite, social,
+  custody, integration, escalation, change-log tables. No
+  column-level data-min issues beyond patterns covered in Tier 1.
+* **Tier 3 out of scope** — operational state, vector embeddings,
+  training/grading rows, reference data.
+
+**13 existing data-min controls catalogued (C1–C13):**
+
+| # | Control |
+|---|---------|
+| C1 | Air-gap-first deployment pattern (most ION customers, no outbound internet) |
+| C2 | Container isolation + non-root user |
+| C3 | bcrypt password storage |
+| C4 | `closure_reason` enum (no free-text verdict surface) |
+| C5 | `ION_BOB_STORE_REASONING` env-var gate on Bob's reasoning |
+| C6 | Append-only ledgers with sha256 chain (Workbench) |
+| C7 | Soft-delete pattern for cases and alerts |
+| C8 | Per-user expired-session cleanup at login |
+| C9 | TLP / PAP markings on observables (sharing classification) |
+| C10 | No shared secrets between integrations (per-integration creds) |
+| C11 | Service-account interactive-login short-circuit |
+| C12 | WeasyPrint external-URL fetcher blocked (v0.20.1) |
+| C13 | CSP nonce on inline `<script>` / `<style>` (v0.31.3) |
+
+**5 low-severity residual gaps identified, tracked for v0.32+:**
+
+* **G1** — `cleanup_expired_sessions()` exists at `auth/service.py:347`
+  but has no scheduled caller (dormant-user sessions accumulate).
+  Mitigated by C1 + C8.
+* **G2** — `audit_logs` has no retention env var (logs accumulate
+  unbounded). Mitigated by C1 + air-gap means logs don't leave
+  customer perimeter.
+* **G3** — `security_events` has no retention env var.
+  Same mitigation as G2.
+* **G4** — `ai_chat_sessions` / `ai_chat_messages` persist until
+  user-initiated deletion. Mitigated by user-controlled deletion +
+  RBAC + C1.
+* **G5** — `session_token` stored as plaintext in `user_sessions`
+  (not hashed at rest). Mitigated by server-side-only token +
+  rotate-on-logout + DB compromise required to abuse.
+
+All five gaps are **defence-in-depth improvements**, not unresolved
+P13 attack surface. They are tracked the same way P11's remaining
+69-template migration is tracked — as ordinary future work bounded
+by orthogonal controls.
+
+### docs(security): SECURE_BY_DESIGN.md update
+
+* P13 status moves **Mostly Met → Met** with the audit doc reference.
+* P13 ION-application bullets extended with the v0.31.12 audit
+  outcome.
+* Audit summary table: **Met 17 → 18**, **Mostly Met 3 → 2**.
+* §4 "Open named gaps" data-minimisation bullet marked Closed v0.31.12.
+* Revision history row 1.9 added.
 
 ## v0.31.11 — 2026-05-26
 
