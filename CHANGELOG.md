@@ -1,13 +1,58 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.10 -->
+<!-- ion-doc:version=0.31.11 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.11 — 2026-05-26
+
+Docs-only release. Formalises ION's acceptance of two upstream-unpatched,
+not-reachable image-level CVEs surfaced by Docker Scout against v0.31.10:
+`tar` CVE-2025-45582 and `libxml2` CVE-2026-6732. Both report
+`Fixed version: not fixed` in the Debian trixie security tracker — no
+rebuild closes them. Reachability analysis (in `SECURITY_ASSESSMENT.md`
+v0.31.11 paragraph) documents that neither code path is invoked by
+ION's runtime: `tar` is only used by `apt` during Docker build,
+not by the web app; `libxml2` is transitive via `shared-mime-info`
+under Pango/GDK-Pixbuf, used for MIME lookup but not invoked by
+WeasyPrint's HTML/CSS-via-html5lib PDF pipeline (and WeasyPrint's
+external-URL fetcher has been SSRF-guarded since v0.20.1). The 51 Low
+CVEs Scout reports against the image are background base-image
+churn distributed across `apt` / `cairo` / `coreutils` / `expat` /
+`gcc-14-base` and friends, with no single removable cluster.
+**ION-side findings count unchanged: 0C / 0H / 3M / 4L. Net new
+ION-introduced findings: 0C / 0H / 0M / 0L.**
+
+### docs(security): SECURITY_ASSESSMENT.md — v0.31.11 base-image
+### CVE acceptance paragraph
+
+New top-of-Executive-Summary narrative paragraph documenting:
+
+* The two Mediums + the 51 Lows surfaced by Scout against v0.31.10.
+* Per-CVE reachability analysis with code-path citations.
+* Why upstream-unpatched + not-reachable is an auditor-defensible
+  acceptance pattern (mirrors v0.31.8's `ecdsa` / python-jose
+  closure documentation).
+* Separation between "ION-introduced findings" (the metric the
+  severity table tracks) and "image-level Scout findings" (reported
+  in the narrative per release).
+* Forward guidance for higher-assurance deployments — re-scan and
+  optionally rebase to alpine if the customer's CVE policy treats
+  upstream-unpatched as load-bearing.
+
+### chore(release): v0.31.11 image is functionally identical to v0.31.10
+
+The Docker image label is the only material change between
+`ixion36/ion:0.31.10` and `ixion36/ion:0.31.11`. Layer hashes for
+src/ + venv + SBOM are the same modulo build-time timestamps. The
+release exercises the new signed-commit + `required_signatures=true`
+workflow with a low-risk docs-only payload — confirms the
+workstation signing chain stays green between releases.
 
 ## v0.31.10 — 2026-05-26
 
