@@ -1,13 +1,39 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.14 -->
+<!-- ion-doc:version=0.31.15 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.15 — 2026-05-26
+
+Data-min P13 sub-gap **G4 closed**. One tuple appended to the
+parameterised `RetentionRule` list introduced in v0.31.14 — covers
+`ai_chat_messages` retention via `ION_AI_CHAT_RETENTION_DAYS` (default
+unset = disabled). The audit-doc abstraction worked exactly as
+intended: closure required zero new infrastructure (no new module,
+no new lock, no new startup wiring). DATA_MINIMISATION_AUDIT residual
+gaps drop from 2 to 1 (G5 — `session_token` hash-at-rest — remains).
+SECURE_BY_DESIGN audit summary unchanged at **18 Met / 2 Mostly Met /
+0 Partial / 0 Gap**. **Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): AI chat message retention env var
+
+* `src/ion/services/data_retention_service.py` — `RETENTION_RULES`
+  list extended with one tuple targeting `ai_chat_messages.created_at`.
+* Targets messages, not sessions. The CASCADE delete on
+  `AIChatSession` removal already handles session-level lifecycle;
+  the new rule bounds message-level retention without affecting the
+  session shell (so a user's session list stays visible even if old
+  messages have been pruned).
+* `ION_AI_CHAT_RETENTION_DAYS` — default unset = disabled. Set to a
+  positive integer N to delete messages older than N days at sweep
+  time. Inherits the existing `ION_DATA_RETENTION_ENABLED` /
+  `_INTERVAL_HOURS` controls from v0.31.14.
 
 ## v0.31.14 — 2026-05-26
 

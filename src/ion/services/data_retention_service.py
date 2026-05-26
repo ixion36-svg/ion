@@ -30,8 +30,12 @@ Environment variables:
   disabled). When set to a positive integer N, deletes
   ``security_events`` rows whose ``created_at`` is older than N
   days at sweep time.
+* ``ION_AI_CHAT_RETENTION_DAYS`` (default: unset = disabled). When
+  set to a positive integer N, deletes ``ai_chat_messages`` rows
+  whose ``created_at`` is older than N days. Sessions are NOT
+  cascaded — only messages.
 
-See ``docs/DATA_MINIMISATION_AUDIT.md`` G2 and G3 for the rationale.
+See ``docs/DATA_MINIMISATION_AUDIT.md`` G2, G3, and G4 for the rationale.
 """
 
 import asyncio
@@ -77,6 +81,18 @@ RETENTION_RULES: List[RetentionRule] = [
         model_dotted_path="ion.models.security:SecurityEvent",
         timestamp_column="created_at",
         label="security_events",
+    ),
+    # G4 closure (v0.31.15) — AI chat retention. Targets messages (not
+    # sessions); CASCADE delete on session removal already handles the
+    # session lifecycle. Deleting messages without their session leaves
+    # the session row referencing an empty conversation, which is
+    # acceptable — the UI handles empty sessions and the user can
+    # explicitly delete a session for full cleanup.
+    RetentionRule(
+        env_var="ION_AI_CHAT_RETENTION_DAYS",
+        model_dotted_path="ion.models.ai_chat:AIChatMessage",
+        timestamp_column="created_at",
+        label="ai_chat_messages",
     ),
 ]
 
