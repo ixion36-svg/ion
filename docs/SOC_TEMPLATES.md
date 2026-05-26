@@ -1,3 +1,12 @@
+<!-- ion-doc:type=SOC TEMPLATES -->
+<!-- ion-doc:title=ION SOC Documentation Templates -->
+<!-- ion-doc:subtitle=Standard SOC document templates with framework alignment (NIST, ISO 27001, SOC-CMM) -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=SOC managers, detection engineers, compliance team -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # SOC Documentation Templates & Framework Alignment
 
 > **Version:** 0.9.43

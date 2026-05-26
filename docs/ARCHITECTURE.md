@@ -1,3 +1,12 @@
+<!-- ion-doc:type=ARCHITECTURE REFERENCE -->
+<!-- ion-doc:title=ION Architecture Reference -->
+<!-- ion-doc:subtitle=Components, data flow, schema — the original architectural reference (peer to HLD/LLD) -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=Architects, engineers, operators -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # ION Architecture
 
 Technical architecture overview for ION (Intelligent Operating Network).

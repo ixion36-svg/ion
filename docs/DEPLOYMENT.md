@@ -1,3 +1,12 @@
+<!-- ion-doc:type=DEPLOYMENT GUIDE -->
+<!-- ion-doc:title=ION Deployment Guide -->
+<!-- ion-doc:subtitle=Production deployment topology, container orchestration, environment configuration -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=Operators, SREs, deployment engineers -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # ION Deployment Guide
 
 Production deployment guide for ION (Intelligent Operating Network).

@@ -1,3 +1,12 @@
+<!-- ion-doc:type=OPERATOR RUNBOOK -->
+<!-- ion-doc:title=ION SOC Lead Runbook -->
+<!-- ion-doc:subtitle=Daily operational duties, integration configuration, troubleshooting, release ritual -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=SOC leads, operators, SDM -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # ION SOC Lead Runbook
 
 Operational guide for SOC leads running ION (Intelligent Operating Network).

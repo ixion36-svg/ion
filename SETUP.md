@@ -1,3 +1,12 @@
+<!-- ion-doc:type=SETUP GUIDE -->
+<!-- ion-doc:title=ION Setup Guide -->
+<!-- ion-doc:subtitle=Local development setup — prerequisites, quick start, container topology -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=Developers, contributors -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # ION Setup Guide
 
 ## Prerequisites

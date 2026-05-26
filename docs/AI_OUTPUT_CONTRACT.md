@@ -1,3 +1,12 @@
+<!-- ion-doc:type=AI OUTPUT CONTRACT -->
+<!-- ion-doc:title=ION AI Investigation Output Contract -->
+<!-- ion-doc:subtitle=The Pydantic-bound output schema every LLM-driven investigation returns; the safety boundary for Bob -->
+<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:classification=PUBLIC -->
+<!-- ion-doc:owner=ION Maintainer (ixion36) -->
+<!-- ion-doc:audience=Detection engineers, AI safety reviewers, integrators -->
+<!-- ion-doc:date=2026-05-12 -->
+
 # AI Investigation Output Contract
 
 Every LLM-driven investigation in ION returns a single JSON object conforming
