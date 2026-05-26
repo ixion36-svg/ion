@@ -230,17 +230,23 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # Content Security Policy — CSP3 split-directive policy.
         # Strict-nonce on `<script>` and `<style>` element bodies (the main
-        # XSS injection surface). Inline event handlers (`onclick=`) and
-        # inline `style=` attributes remain permitted via `script-src-attr` /
-        # `style-src-attr` so the 1,185 onclicks + 1,659 inline styles in
-        # current templates don't need to be refactored in one go. See
-        # docs/SECURE_BY_DESIGN.md P11. Removing `script-src-attr`/`style-src-attr`
-        # `'unsafe-inline'` is a future tightening once those handlers are
-        # migrated to addEventListener + CSS classes.
+        # XSS injection surface). v0.31.20: `script-src-attr 'none'` flipped
+        # on after the v0.31.4–v0.31.19 inline-handler migration retired
+        # every `onclick=`/`onkeydown=`/etc attribute (~1,150 handlers) in
+        # favour of `data-click-action` / `data-keydown-action` + the
+        # event-delegation helper at static/js/event-delegation.js.
+        # Browsers now block any attempt to add an inline event handler
+        # (defence-in-depth against stored-XSS injection of a malicious
+        # `onerror=` etc).
+        # Inline `style=""` attributes remain permitted via
+        # `style-src-attr 'unsafe-inline'` — 1,659 of them still in
+        # templates as of v0.31.20, mostly cosmetic positioning that doesn't
+        # carry executable JS. Migrating those to CSS classes is the v0.32+
+        # cosmetic-CSS-cleanup half of P11.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"script-src 'self' 'nonce-{nonce}'; "
-            "script-src-attr 'unsafe-inline'; "
+            "script-src-attr 'none'; "
             f"style-src 'self' 'nonce-{nonce}'; "
             "style-src-attr 'unsafe-inline'; "
             "img-src 'self' data:; "

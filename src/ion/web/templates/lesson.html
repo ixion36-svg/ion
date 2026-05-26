@@ -410,7 +410,7 @@ async function _loadLabHistory() {
         ? `<div id="${cardId}-crit" style="display:none;margin-top:0.4rem;padding:0.3rem 0.5rem;border-top:1px solid rgba(255,255,255,0.06);">${criteriaRows}</div>`
         : '';
       const toggle = criteriaRows
-        ? `<button onclick="(function(){const el=document.getElementById('${cardId}-crit');if(el)el.style.display=el.style.display==='none'?'block':'none';})()" style="background:none;border:none;color:#a5b4fc;cursor:pointer;font-size:0.74rem;padding:0;">Show breakdown ▾</button>`
+        ? `<button data-click-action="toggleCardCriteria" data-args='[${JSON.stringify(cardId)}]' style="background:none;border:none;color:#a5b4fc;cursor:pointer;font-size:0.74rem;padding:0;">Show breakdown ▾</button>`
         : '';
       return `<div id="${cardId}" style="padding:0.4rem 0.6rem;margin-bottom:0.3rem;border:1px solid rgba(255,255,255,0.08);border-radius:0.4rem;background:rgba(0,0,0,0.15);">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">

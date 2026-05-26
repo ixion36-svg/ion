@@ -23,7 +23,53 @@
          `script-src-attr` drops `'unsafe-inline'`). Templates declare
          `data-click-action="foo"` and the helper dispatches. See
          static/js/event-delegation.js for the supported attributes. -->
-    <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v=0.31.7"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v=0.31.19"></script>
+    <!-- v0.31.20: page-specific data-click-action wrappers needed to retire
+         the last few multi-statement inline handlers. Living here in base.html
+         so every page has them in scope. Kept tiny so the global namespace
+         doesn't bloat. -->
+    <script nonce="{{ csp_nonce }}">
+    // observables.html — pattern-observables modal close + detail open
+    window.showObsAndClosePatterns = function(id) {
+        if (typeof showObservableDetail === 'function') showObservableDetail(id);
+        if (typeof closePatternsModal === 'function') closePatternsModal();
+    };
+    // guide_sim.html — reveal hints inside the sibling container then hide self
+    window.simShowHints = function(event) {
+        var trigger = event.target.closest('.sim-show-hints');
+        if (!trigger) return;
+        var sib = trigger.nextElementSibling;
+        if (sib) sib.querySelectorAll('.sim-hint').forEach(function (h) { h.classList.remove('hidden'); });
+        trigger.style.display = 'none';
+    };
+    // lesson.html — toggle the criteria sub-card by id
+    window.toggleCardCriteria = function(cardId) {
+        var el = document.getElementById(cardId + '-crit');
+        if (!el) return;
+        el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    };
+    // threat_intel.html — close drill panel then drill to a different technique
+    window.tiCloseAndDrillTechnique = function(id) {
+        if (typeof tiCloseDrill === 'function') tiCloseDrill();
+        if (typeof tiDrillTechnique === 'function') tiDrillTechnique(id);
+    };
+    // threat_intel.html — copy IOC to clipboard, flash button text
+    window.tiCopyIOC = function(event, value) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(value);
+        }
+        var btn = event.target.closest('button');
+        if (btn) {
+            var original = btn.textContent;
+            btn.textContent = 'Copied';
+            setTimeout(function () { btn.textContent = original || 'Copy'; }, 1500);
+        }
+    };
+    // threat_intel_actor.html — navigate to the drill page for a technique id
+    window.navigateToTechnique = function(id) {
+        window.location.href = '/threat-intel?drill=' + encodeURIComponent(id);
+    };
+    </script>
 </head>
 <body>
     <!-- ═══════════════════ TAILWIND TOP NAV ═══════════════════ -->

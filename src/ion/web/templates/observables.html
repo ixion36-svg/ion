@@ -2045,7 +2045,7 @@ function renderPatterns(patterns) {
             </div>
             <div class="pattern-observables">
                 ${p.observables.map(o => `
-                    <span class="pattern-observable" onclick="showObservableDetail(${o.id}); closePatternsModal();">
+                    <span class="pattern-observable" data-click-action="showObsAndClosePatterns" data-args='[${o.id}]'>
                         <span class="obs-type-badge ${o.type}">${o.type}</span>
                         <span>${escapeHtml(o.value.substring(0, 40))}${o.value.length > 40 ? '...' : ''}</span>
                         <span class="threat-badge ${o.threat_level}" style="font-size:0.5625rem;">${o.threat_level}</span>

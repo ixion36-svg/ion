@@ -340,7 +340,7 @@ function renderSimulation() {
 
         // Hints
         if (step.hints && step.hints.length) {
-            html += `<div class="sim-show-hints" onclick="this.nextElementSibling.querySelectorAll('.sim-hint').forEach(h=>h.classList.remove('hidden'));this.style.display='none'">Show hints (${step.hints.length})</div>`;
+            html += `<div class="sim-show-hints" data-click-action="simShowHints">Show hints (${step.hints.length})</div>`;
             html += '<div class="sim-hints">';
             for (const hint of step.hints) {
                 html += `<div class="sim-hint hidden">${esc(hint)}</div>`;

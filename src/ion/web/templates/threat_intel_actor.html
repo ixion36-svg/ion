@@ -145,7 +145,7 @@
       ttpsEl.innerHTML = '<div class="text-slate-500 text-sm">No TTPs surfaced by OpenCTI for this actor.</div>';
     } else {
       ttpsEl.innerHTML = '<div class="flex flex-wrap gap-2">' + ttps.slice(0, 30).map(t => `
-        <a href="javascript:void(0)" onclick="(function(){ window.location.href='/threat-intel?drill=' + encodeURIComponent('${esc(t.mitre_id || t.id || '')}'); })()"
+        <a href="javascript:void(0)" data-click-action="navigateToTechnique" data-args='[${JSON.stringify(t.mitre_id || t.id || '')}]'
            class="px-2 py-1 rounded bg-ion-amber/10 text-ion-amber border border-ion-amber/30 text-[11px] font-mono hover:bg-ion-amber/20 transition"
            title="${esc(t.name || '')}">${esc(t.mitre_id || t.id || '?')}</a>`).join('') + '</div>';
     }
