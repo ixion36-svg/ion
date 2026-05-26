@@ -144,8 +144,20 @@ jobs:
       # pinned to algorithms=["RS256"] (RSA, never ECDSA). v0.31.8 retired
       # python-jose entirely in favour of PyJWT, removing the ecdsa dep
       # from the resolved tree. The --ignore-vuln flag is dropped here.
+      #
+      # v0.31.22: vulnerability service switched from `osv` to `pypi`
+      # after pip-audit/_service/osv.py hit a KeyError: 'ranges' on a
+      # malformed OSV response (the OSV API ships affected[] entries
+      # that occasionally omit the 'ranges' key — pip-audit doesn't
+      # tolerate that yet). PyPI's vulnerability database (osv.dev's
+      # ecosystem-PyPI subset, served via PyPI's JSON API) gives us
+      # equivalent CVE coverage for Python packages without the OSV
+      # API quirk that's blocking CI. If a CVE only appears in OSV's
+      # broader catalogue, we'll catch it via Docker Scout's container
+      # scan instead. Flip back to `osv` when pip-audit upstream
+      # patches the missing-`ranges` guard.
       - name: Run pip-audit
         run: |
           pip-audit \
-            --vulnerability-service osv \
+            --vulnerability-service pypi \
             --strict

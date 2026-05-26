@@ -123,8 +123,10 @@ class TestBuildPcapFlows:
 
         assert called["es_calls"] == 0
         assert flows == [
-            {"community_id": "1:flow-a", "node_hint": "n1", "alert_id": "a1"},
-            {"community_id": "1:flow-b", "node_hint": "n2", "alert_id": "a2"},
+            {"community_id": "1:flow-a", "node_hint": "n1", "alert_id": "a1",
+             "source_ip": None, "destination_ip": None, "alert_timestamp": None},
+            {"community_id": "1:flow-b", "node_hint": "n2", "alert_id": "a2",
+             "source_ip": None, "destination_ip": None, "alert_timestamp": None},
         ]
 
     def test_falls_back_to_es_when_raw_data_missing(self, monkeypatch):
@@ -160,8 +162,10 @@ class TestBuildPcapFlows:
 
         assert observed["requested_ids"] == ["a-multi-1", "a-multi-2"]
         assert flows == [
-            {"community_id": "1:fetched", "node_hint": "cap-9", "alert_id": "a-multi-1"},
-            {"community_id": "1:other", "node_hint": "cap-9", "alert_id": "a-multi-2"},
+            {"community_id": "1:fetched", "node_hint": "cap-9", "alert_id": "a-multi-1",
+             "source_ip": None, "destination_ip": None, "alert_timestamp": None},
+            {"community_id": "1:other", "node_hint": "cap-9", "alert_id": "a-multi-2",
+             "source_ip": None, "destination_ip": None, "alert_timestamp": None},
         ]
 
     def test_hybrid_context_some_ids_via_es(self, monkeypatch):
@@ -214,7 +218,8 @@ class TestBuildPcapFlows:
             ],
         ))
         assert flows == [
-            {"community_id": "1:still-here", "node_hint": None, "alert_id": "a-ctx"},
+            {"community_id": "1:still-here", "node_hint": None, "alert_id": "a-ctx",
+             "source_ip": None, "destination_ip": None, "alert_timestamp": None},
         ]
 
     def test_alerts_without_community_id_are_dropped(self, monkeypatch):
@@ -235,7 +240,8 @@ class TestBuildPcapFlows:
             ],
         ))
         assert flows == [
-            {"community_id": "1:keep", "node_hint": None, "alert_id": "a2"},
+            {"community_id": "1:keep", "node_hint": None, "alert_id": "a2",
+             "source_ip": None, "destination_ip": None, "alert_timestamp": None},
         ]
 
 

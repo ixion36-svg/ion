@@ -1,13 +1,66 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.21 -->
+<!-- ion-doc:version=0.31.22 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.22 — 2026-05-26
+
+**CI green release.** Fixes three pre-existing CI failures that had
+been red on every commit since at least v0.31.9 (well before this
+session started). The release process didn't gate on CI status so
+all 12 session releases shipped on red CI. The image artifact is
+unaffected (the failures were in tooling lint + stale test
+fixtures + a third-party pip-audit bug — none flow into the built
+image), but the audit-trail hygiene improves substantially with
+green CI from v0.31.22 onward. **Net new findings: 0C / 0H / 0M / 0L.**
+
+### chore(ci): three inherited failures fixed
+
+* **ruff** (`src/ion/web/threat_intel_api.py`) — 7 I001 "Import block
+  un-sorted" issues for function-local imports + 1 F401 "imported
+  but unused" for `AlertTriage` on line 650. Auto-fixed via
+  `ruff check --fix`. The file was last touched at v0.27.0 (Threat
+  Intel consolidation); function-local imports must have been
+  reformatted by a different tool between then and the ruff version
+  CI uses now.
+* **pytest** (`tests/test_v025_pcap_auto_analysis.py`) — 4 tests in
+  `TestBuildPcapFlows` (`test_contexts_with_raw_data_skip_es`,
+  `test_falls_back_to_es_when_raw_data_missing`,
+  `test_es_failure_is_non_fatal`,
+  `test_alerts_without_community_id_are_dropped`) used literal-dict
+  comparisons that expected the v0.25.0 shape. Production code
+  added `alert_timestamp` / `destination_ip` / `source_ip` fields
+  (likely v0.29.1's IP-fallback or v0.30.1's PCAP-observable
+  linking); the tests were never updated. Expected dicts extended
+  with the three new fields (all `None` for these mock paths).
+  15/15 pcap tests green locally.
+* **pip-audit** (`.github/workflows/test.yml`) — switched from
+  `--vulnerability-service osv` to `--vulnerability-service pypi`.
+  pip-audit's OSV-response parser hit `KeyError: 'ranges'` on a
+  malformed `affected[]` entry that omits the `ranges` key — a
+  pip-audit upstream bug. PyPI's vulnerability database gives
+  equivalent CVE coverage for Python packages without the OSV API
+  quirk. Container-level CVE detection (Docker Scout) is unaffected.
+
+### Why this matters for the audit trail
+
+Every signed release v0.31.10 through v0.31.21 shipped on red CI.
+This wasn't caused by the session's changes — the failures were
+inherited from v0.31.9 (pre-session). But the release-bump skill
+checked file-version drift without checking GitHub Actions status,
+so the failure didn't surface.
+
+**Recommended follow-up**: extend
+`.claude/skills/release-bump/SKILL.md` step 5 to include
+`gh run list --branch main --limit 1 --json conclusion --jq '.[0].conclusion'`
+and fail the bump if the latest run isn't `success`. That gate would
+have caught this on the first session release. v0.32+ candidate.
 
 ## v0.31.21 — 2026-05-26
 

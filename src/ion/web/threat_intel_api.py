@@ -280,6 +280,7 @@ async def unified_search(
     Auth: ``observable:read`` (same gate as the other TI endpoints).
     """
     from sqlalchemy import or_
+
     from ion.models.alert_triage import AlertCase
 
     out: dict = {"q": q, "actors": [], "campaigns": [], "iocs": [], "cases": []}
@@ -307,7 +308,8 @@ async def unified_search(
     # column we cast to text first; SQLAlchemy's ``cast()`` handles the
     # type translation across dialects.
     try:
-        from sqlalchemy import cast, String as _SQLString
+        from sqlalchemy import String as _SQLString
+        from sqlalchemy import cast
         like = f"%{q}%"
         case_rows = (
             session.query(AlertCase)
@@ -399,6 +401,7 @@ def recently_active(
     """
     from collections import Counter
     from datetime import datetime, timedelta, timezone
+
     from ion.models.alert_triage import AlertCase, AlertTriage
 
     cutoff = datetime.now(timezone.utc) - timedelta(days=int(days))
@@ -482,7 +485,10 @@ def ioc_sightings(
     """
     from collections import OrderedDict
     from datetime import datetime, timedelta, timezone
-    from sqlalchemy import cast, String as _SQLString
+
+    from sqlalchemy import String as _SQLString
+    from sqlalchemy import cast
+
     from ion.models.alert_triage import AlertCase
 
     now = datetime.now(timezone.utc)
@@ -546,7 +552,10 @@ def technique_drill(
         unconfigured deployment doesn't 500 the panel.
     """
     from datetime import datetime, timedelta, timezone
-    from sqlalchemy import cast, String as _SQLString
+
+    from sqlalchemy import String as _SQLString
+    from sqlalchemy import cast
+
     from ion.models.alert_triage import AlertCase, AlertTriage
     from ion.services.mitre_heatmap_service import (
         _get_snapshot,
@@ -646,8 +655,11 @@ async def actor_profile(
     half; missing local cases don't break the OpenCTI half.
     """
     from datetime import datetime, timedelta, timezone
-    from sqlalchemy import cast, String as _SQLString, or_
-    from ion.models.alert_triage import AlertCase, AlertTriage
+
+    from sqlalchemy import String as _SQLString
+    from sqlalchemy import cast, or_
+
+    from ion.models.alert_triage import AlertCase
 
     out: dict = {
         "entity_id": entity_id, "entity_class": entity_class,
