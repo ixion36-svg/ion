@@ -1,13 +1,99 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.22 -->
+<!-- ion-doc:version=0.31.23 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.23 — 2026-05-26
+
+Code-review hardening + CI uncovered-issue fix-up. Acts on findings
+from the `feature-dev:code-reviewer` agent's review of the
+v0.31.10–v0.31.22 chain and on additional CI failures exposed by
+v0.31.22's now-correct ruff/pytest gating.
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): code-review findings #1 + #2 — migration hardening
+
+`storage/database.py` — the v0.31.17 G5 migration (`session_token` →
+`session_token_hash` hash-at-rest) had two latent issues:
+
+1. **No DB-level NOT NULL**: the ORM declares `nullable=False` but
+   that only binds at `CREATE TABLE` time, not on the upgrade path's
+   `ALTER TABLE ADD COLUMN`. On upgraded Postgres instances a direct
+   SQL insert could write a NULL hash. Fixed: after backfill, run
+   `ALTER TABLE user_sessions ALTER COLUMN session_token_hash SET
+   NOT NULL` (Postgres only; SQLite has no `ALTER COLUMN`, and its
+   single-process use of ION means new inserts are covered by the
+   ORM's `nullable=False` alone).
+2. **Multi-worker race**: `_run_migrations` runs on every worker on
+   startup, not gated by the `LOCK_RUN_MIGRATIONS` advisory. Two
+   workers could both pass the "needs migration" inspect and race
+   the `ADD COLUMN` — one wins, one crashes. Fixed: `ADD COLUMN IF
+   NOT EXISTS` on Postgres, and a `try/except OperationalError`
+   around the whole migration block that tolerates the SQLite
+   "duplicate column" + Postgres "column already exists" messages
+   without crashing startup (idempotent — next startup will see the
+   work is done and skip the block entirely).
+
+### feat(security): code-review finding #3 — event-delegation action allowlist
+
+`static/js/event-delegation.js` — every `data-*-action` attribute's
+function-name string previously went straight to `window[name]`,
+which is the attribute-driven equivalent of inline-handler XSS:
+stored-XSS injecting `data-click-action="eval"` or
+`data-validating-submit-action="fetch"` would dispatch onto a
+dangerous global. New `resolveAction(name)` helper guards every
+lookup with two layers:
+
+* `ACTION_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/` — accepts only
+  the camelCase-identifier shape that every ION action follows.
+  Rejects `eval`, `Function`, `["alert"]`, `window.constructor`,
+  etc.
+* `ACTION_DENYLIST` — explicit deny for known-dangerous globals
+  that would otherwise pass the regex: `eval`, `Function`,
+  `setTimeout`, `setInterval`, `alert`, `confirm`, `prompt`,
+  `fetch`, `XMLHttpRequest`, `WebSocket`, `open`, `close`,
+  `postMessage`, `location`, `history`, `navigator`, `document`,
+  `window`, `self`, `top`, `parent`, `localStorage`,
+  `sessionStorage`, `indexedDB`, `importScripts`, `Worker`,
+  `SharedWorker`, `ServiceWorker`.
+
+Both the main dispatcher and the validating-submit / keydown
+handlers route through `resolveAction()`. Rejected names emit a
+`console.warn` so during development the failure is visible. Null /
+empty names (legitimate "no attribute" case) bypass the warning to
+avoid log noise.
+
+### chore: code-review finding #4 — data_retention session-reuse note
+
+`services/data_retention_service.py` — added a comment block
+explaining the SQLAlchemy 2.x autobegin behaviour that makes the
+post-rollback session reuse safe across the rule loop, and a note
+that SQLAlchemy 1.x legacy mode would require an explicit
+`session.begin()` or per-rule sessions.
+
+### chore(ci): pip-audit --skip-editable
+
+v0.31.22 switched pip-audit from OSV to PyPI to bypass the OSV
+parser bug. PyPI strictly required every installed distribution to
+be on PyPI; the `ion` package itself is editable (`pip install -e .`)
+and not on PyPI, so pip-audit blew up with
+"Dependency not found on PyPI". Added `--skip-editable` so the
+project's own editable install is skipped (pip-audit only needs to
+audit third-party deps anyway).
+
+### chore(lint): ruff auto-fix on server.py + database.py
+
+v0.31.22's ruff run uncovered I001 import-block-ordering issues in
+`web/server.py` (a 90+ line block of router imports that latest ruff
+treats as unsorted) and `storage/database.py` (function-local imports
+in the v0.31.17 / v0.31.23 migration block). Both fixed via
+`ruff check --fix src/`.
 
 ## v0.31.22 — 2026-05-26
 

@@ -192,6 +192,15 @@ async def _loop(engine: Engine) -> None:
                         logger.error(
                             "Retention sweep for %s failed: %s", rule.label, e,
                         )
+                        # v0.31.23 (code review): on SQLAlchemy 2.x the
+                        # session's autobegin behaviour opens a fresh
+                        # implicit transaction after rollback so the
+                        # remaining rules in this sweep get clean state.
+                        # If ION ever moves back to SA 1.4 legacy mode
+                        # (autobegin=False), this rollback-then-reuse
+                        # pattern needs an explicit `session.begin()` or
+                        # a new session per rule. Tracked in pyproject:
+                        # the sqlalchemy pin should be >=2.0.
                         session.rollback()
             finally:
                 session.close()

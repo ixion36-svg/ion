@@ -160,4 +160,5 @@ jobs:
         run: |
           pip-audit \
             --vulnerability-service pypi \
+            --skip-editable \
             --strict

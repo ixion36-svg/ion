@@ -401,65 +401,112 @@ def _run_migrations(engine: Engine) -> None:
     # v0.31.17: G5 (data-min audit closure) — session_token hash-at-rest.
     # If the user_sessions table still carries the plaintext session_token
     # column, migrate it: add session_token_hash, backfill SHA-256 digests
-    # from the plaintext rows, add a UNIQUE index on the hash, then drop
-    # the plaintext column. After this migration the DB only ever holds
-    # SHA-256 hex digests of session tokens; the plaintext lives in the
-    # client cookie only. Existing logged-in users' sessions remain valid
-    # because the hash is deterministic — their cookie value still maps to
-    # the same row, just via the new column.
+    # from the plaintext rows, add a UNIQUE index on the hash, ENFORCE
+    # NOT NULL on the new column, then drop the plaintext column. After
+    # this migration the DB only ever holds SHA-256 hex digests of session
+    # tokens; the plaintext lives in the client cookie only. Existing
+    # logged-in users' sessions remain valid because the hash is
+    # deterministic — their cookie value still maps to the same row, just
+    # via the new column.
+    #
+    # v0.31.23 hardening (from code review): make the migration
+    # multi-worker-safe (IF NOT EXISTS on Postgres; tolerate duplicate-
+    # column OperationalError on SQLite — caller pattern is "every worker
+    # runs this on startup", so two workers may race the ADD COLUMN) AND
+    # actually enforce NOT NULL at the DB level after backfill instead of
+    # relying solely on the ORM's nullable=False (which only affects
+    # CREATE TABLE, not ALTER ADD COLUMN).
     if insp.has_table("user_sessions"):
         existing = {col["name"] for col in insp.get_columns("user_sessions")}
         if "session_token" in existing and "session_token_hash" not in existing:
             import hashlib as _hashlib
-            with engine.begin() as conn:
-                # Step 1: add the new nullable column.
-                conn.execute(
-                    text("ALTER TABLE user_sessions ADD COLUMN session_token_hash VARCHAR(64)")
-                )
-                # Step 2: backfill SHA-256 digests for every existing row.
-                rows = conn.execute(
-                    text("SELECT id, session_token FROM user_sessions")
-                ).fetchall()
-                for row in rows:
-                    tok = row[1]
-                    if tok is None:
-                        # Defensive — orphaned NULL token rows can't be
-                        # rehashed; drop them so the NOT NULL invariant
-                        # holds after backfill. There shouldn't be any
-                        # given the prior schema declared NOT NULL.
+
+            from sqlalchemy.exc import OperationalError, ProgrammingError
+            is_pg = _is_postgres(engine)
+            try:
+                with engine.begin() as conn:
+                    # Step 1: add the new nullable column. IF NOT EXISTS on
+                    # Postgres for multi-worker safety; bare ADD on SQLite
+                    # with the outer try/except handling duplicate-column.
+                    add_col_sql = (
+                        "ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS "
+                        "session_token_hash VARCHAR(64)"
+                        if is_pg
+                        else "ALTER TABLE user_sessions ADD COLUMN session_token_hash VARCHAR(64)"
+                    )
+                    conn.execute(text(add_col_sql))
+                    # Step 2: backfill SHA-256 digests for every existing row.
+                    rows = conn.execute(
+                        text("SELECT id, session_token FROM user_sessions")
+                    ).fetchall()
+                    for row in rows:
+                        tok = row[1]
+                        if tok is None:
+                            # Defensive — orphaned NULL token rows can't be
+                            # rehashed; drop them so the NOT NULL invariant
+                            # holds after backfill.
+                            conn.execute(
+                                text("DELETE FROM user_sessions WHERE id = :id"),
+                                {"id": row[0]},
+                            )
+                            continue
+                        digest = _hashlib.sha256(tok.encode("utf-8")).hexdigest()
                         conn.execute(
-                            text("DELETE FROM user_sessions WHERE id = :id"),
-                            {"id": row[0]},
+                            text(
+                                "UPDATE user_sessions SET session_token_hash = :h "
+                                "WHERE id = :id"
+                            ),
+                            {"h": digest, "id": row[0]},
                         )
-                        continue
-                    digest = _hashlib.sha256(tok.encode("utf-8")).hexdigest()
+                    # Step 3: add the UNIQUE index. The model declares
+                    # unique=True + index=True; replay that constraint here
+                    # for the upgraded table.
                     conn.execute(
                         text(
-                            "UPDATE user_sessions SET session_token_hash = :h "
-                            "WHERE id = :id"
-                        ),
-                        {"h": digest, "id": row[0]},
+                            "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_sessions_session_token_hash "
+                            "ON user_sessions(session_token_hash)"
+                        )
                     )
-                # Step 3: add the UNIQUE index. The model declares
-                # unique=True + index=True; replay that constraint here
-                # for the upgraded table.
-                conn.execute(
-                    text(
-                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_sessions_session_token_hash "
-                        "ON user_sessions(session_token_hash)"
+                    # Step 4 (v0.31.23): enforce NOT NULL at the DB level
+                    # on Postgres. SQLite has no ALTER COLUMN — the
+                    # backfill guarantees no NULLs exist and the ORM
+                    # nullable=False covers new inserts from this point
+                    # forward, which is sufficient for SQLite's dev-only
+                    # use of ION.
+                    if is_pg:
+                        conn.execute(
+                            text(
+                                "ALTER TABLE user_sessions ALTER COLUMN "
+                                "session_token_hash SET NOT NULL"
+                            )
+                        )
+                    # Step 5: drop the plaintext column. Removes the
+                    # plaintext storage that the data-min audit flagged as
+                    # G5. ALTER TABLE DROP COLUMN cascades the column's
+                    # implicit unique constraint + index.
+                    conn.execute(
+                        text("ALTER TABLE user_sessions DROP COLUMN session_token")
                     )
-                )
-                # Step 4: drop the plaintext column. Removes the
-                # plaintext storage that the data-min audit flagged as
-                # G5. ALTER TABLE DROP COLUMN cascades the column's
-                # implicit unique constraint + index.
-                conn.execute(
-                    text("ALTER TABLE user_sessions DROP COLUMN session_token")
-                )
-                logger.info(
-                    "Migrated: user_sessions plaintext token -> SHA-256 hash "
-                    "(rows backfilled: %d)", len(rows),
-                )
+                    logger.info(
+                        "Migrated: user_sessions plaintext token -> SHA-256 hash "
+                        "(rows backfilled: %d)", len(rows),
+                    )
+            except (OperationalError, ProgrammingError) as exc:
+                msg = str(exc).lower()
+                # Multi-worker race: another worker won the ADD COLUMN
+                # ahead of us. SQLite reports "duplicate column name"; PG
+                # reports "column ... already exists" (rarely reached with
+                # IF NOT EXISTS but kept defensively). Either way, the
+                # second worker should NOT crash — re-inspect on next
+                # startup will see the migration is done and skip the
+                # block entirely.
+                if "duplicate column" in msg or "already exists" in msg:
+                    logger.info(
+                        "user_sessions migration already applied by another "
+                        "worker; skipping"
+                    )
+                else:
+                    raise
 
     # v0.10.3: MITRE columns on alert_prompt_templates
     if insp.has_table("alert_prompt_templates"):
