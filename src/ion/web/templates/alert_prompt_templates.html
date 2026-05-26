@@ -21,7 +21,7 @@
     <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Alert Prompt Templates</h1>
     <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Per-rule investigation guides that the AI analyst auto-selects for each alert.</p>
   </div>
-  <button id="btn-new-prompt" onclick="showCreateModal()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+  <button id="btn-new-prompt" data-click-action="showCreateModal" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
     + New Template
   </button>
 </section>
@@ -31,10 +31,10 @@
         <h2>Templates</h2>
         <div class="filter-controls">
             <label class="checkbox-label">
-                <input type="checkbox" id="filter-enabled-only" onchange="loadPrompts()">
+                <input type="checkbox" id="filter-enabled-only" data-change-action="loadPrompts">
                 Enabled only
             </label>
-            <button class="btn" onclick="showResolveModal()">Test match</button>
+            <button class="btn" data-click-action="showResolveModal">Test match</button>
         </div>
     </div>
     <div class="table-container">
@@ -64,7 +64,7 @@
     <div class="modal-dialog modal-large">
         <div class="modal-header">
             <h3 id="prompt-modal-title">New Alert Prompt Template</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeModal">&times;</button>
         </div>
         <div class="modal-body">
             <form id="prompt-form" onsubmit="return false;">
@@ -160,8 +160,8 @@
             </form>
         </div>
         <div class="modal-footer">
-            <button class="btn" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="saveTemplate()">Save</button>
+            <button class="btn" data-click-action="closeModal">Cancel</button>
+            <button class="btn btn-primary" data-click-action="saveTemplate">Save</button>
         </div>
     </div>
 </div>
@@ -171,7 +171,7 @@
     <div class="modal-dialog modal-large">
         <div class="modal-header">
             <h3>Test Match</h3>
-            <button class="modal-close" onclick="closeResolveModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeResolveModal">&times;</button>
         </div>
         <div class="modal-body">
             <p class="form-help">Paste an alert JSON (or a minimal <code>{"rule": {"id": "...", "groups": [...]}}</code>) and see which template would be selected.</p>
@@ -190,8 +190,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn" onclick="closeResolveModal()">Close</button>
-            <button class="btn btn-primary" onclick="runResolve()">Resolve</button>
+            <button class="btn" data-click-action="closeResolveModal">Close</button>
+            <button class="btn btn-primary" data-click-action="runResolve">Resolve</button>
         </div>
     </div>
 </div>
@@ -338,8 +338,8 @@ function renderPrompts(items) {
                 <td>${renderScorecard(t.id)}</td>
                 <td>${statusBadge}</td>
                 <td>
-                    <button class="btn" onclick="editTemplate(${t.id})">Edit</button>
-                    <button class="btn btn-danger" onclick="deleteTemplate(${t.id})">Delete</button>
+                    <button class="btn" data-click-action="editTemplate" data-args='[${t.id}]'>Edit</button>
+                    <button class="btn btn-danger" data-click-action="deleteTemplate" data-args='[${t.id}]'>Delete</button>
                 </td>
             </tr>`;
     }).join('');

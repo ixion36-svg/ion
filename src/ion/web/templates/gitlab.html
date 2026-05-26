@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Open issues, merge requests and assigned work.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn" onclick="showConfigModal()" id="config-btn" style="display: none;">Configure</button>
-        <button class="btn btn-primary" onclick="showCreateIssueModal()" id="new-issue-btn" style="display: none;">New Issue</button>
+        <button class="btn" data-click-action="showConfigModal" id="config-btn" style="display: none;">Configure</button>
+        <button class="btn btn-primary" data-click-action="showCreateIssueModal" id="new-issue-btn" style="display: none;">New Issue</button>
     </div>
 </section>
 
@@ -29,7 +29,7 @@
 <div id="not-configured" class="empty-state" style="display: none;">
     <h2>GitLab Not Configured</h2>
     <p>Connect to GitLab to create, track, and manage issues directly from ION.</p>
-    <button class="btn btn-primary" onclick="showConfigModal()">Configure GitLab</button>
+    <button class="btn btn-primary" data-click-action="showConfigModal">Configure GitLab</button>
 </div>
 
 <!-- Issues Section -->
@@ -37,19 +37,19 @@
     <!-- Toolbar -->
     <div class="toolbar">
         <input type="text" id="search-input" placeholder="Search issues..." class="search-input">
-        <select id="scope-filter" class="filter-select" onchange="loadIssues()">
+        <select id="scope-filter" class="filter-select" data-change-action="loadIssues">
             <option value="my">My Issues</option>
             <option value="all">All Issues</option>
         </select>
-        <select id="state-filter" class="filter-select" onchange="loadIssues()">
+        <select id="state-filter" class="filter-select" data-change-action="loadIssues">
             <option value="all">All States</option>
             <option value="opened">Open</option>
             <option value="closed">Closed</option>
         </select>
-        <select id="label-filter" class="filter-select" onchange="loadIssues()">
+        <select id="label-filter" class="filter-select" data-change-action="loadIssues">
             <option value="">All Labels</option>
         </select>
-        <button class="btn" onclick="loadIssues()">Refresh</button>
+        <button class="btn" data-click-action="loadIssues">Refresh</button>
     </div>
 
     <!-- Issues List -->
@@ -63,7 +63,7 @@
     <div class="modal-content modal-medium">
         <div class="modal-header">
             <h2>GitLab Configuration</h2>
-            <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeConfigModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -82,9 +82,9 @@
                 <small>Project path (e.g., "mygroup/myproject") or numeric ID</small>
             </div>
             <div class="modal-actions">
-                <button class="btn" onclick="closeConfigModal()">Cancel</button>
-                <button class="btn btn-danger" onclick="disableGitLab()" id="disable-gitlab-btn" style="display: none;">Disable</button>
-                <button class="btn btn-primary" onclick="saveConfig()">Save & Test</button>
+                <button class="btn" data-click-action="closeConfigModal">Cancel</button>
+                <button class="btn btn-danger" data-click-action="disableGitLab" id="disable-gitlab-btn" style="display: none;">Disable</button>
+                <button class="btn btn-primary" data-click-action="saveConfig">Save & Test</button>
             </div>
         </div>
     </div>
@@ -95,7 +95,7 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2>Create Issue</h2>
-            <button class="modal-close" onclick="closeCreateIssueModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeCreateIssueModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="form-group">
@@ -133,8 +133,8 @@
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn" onclick="closeCreateIssueModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="createIssue()">Create Issue</button>
+                <button class="btn" data-click-action="closeCreateIssueModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="createIssue">Create Issue</button>
             </div>
         </div>
     </div>
@@ -145,7 +145,7 @@
     <div class="modal-content modal-xlarge">
         <div class="modal-header">
             <h2 id="issue-detail-title">Issue #</h2>
-            <button class="modal-close" onclick="closeIssueDetailModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeIssueDetailModal">&times;</button>
         </div>
         <div class="modal-body">
             <div class="issue-detail-layout">
@@ -159,7 +159,7 @@
 
                         <div class="add-comment">
                             <textarea id="new-comment" class="form-control" rows="3" placeholder="Add a comment..."></textarea>
-                            <button class="btn btn-primary" onclick="addComment()">Add Comment</button>
+                            <button class="btn btn-primary" data-click-action="addComment">Add Comment</button>
                         </div>
                     </div>
                 </div>
@@ -167,7 +167,7 @@
                     <div class="sidebar-section">
                         <h4>Status</h4>
                         <span id="issue-detail-state" class="issue-state"></span>
-                        <button id="toggle-state-btn" class="btn btn-sm" onclick="toggleIssueState()"></button>
+                        <button id="toggle-state-btn" class="btn btn-sm" data-click-action="toggleIssueState"></button>
                     </div>
                     <div class="sidebar-section">
                         <h4>Labels</h4>
@@ -546,7 +546,7 @@ async function loadIssues() {
         }
 
         listDiv.innerHTML = data.issues.map(issue => `
-            <div class="issue-card" onclick="showIssueDetail(${issue.iid})">
+            <div class="issue-card" data-click-action="showIssueDetail" data-args='[${issue.iid}]'>
                 <div class="issue-header">
                     <span class="issue-id">#${issue.iid}</span>
                     <span class="issue-title-text">${escapeHtml(issue.title)}</span>

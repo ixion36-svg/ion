@@ -18,7 +18,7 @@
         Edit raw JSON below; validation runs on save and again at execution time.
       </p>
     </div>
-    <button onclick="storiesNew()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+    <button data-click-action="storiesNew" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
       + New story
     </button>
   </section>
@@ -70,7 +70,7 @@
         return;
       }
       ul.innerHTML = _stories.map(s => `
-        <li class="px-3 py-2 cursor-pointer hover:bg-white/5 ${_currentId === s.id ? 'bg-white/5' : ''}" onclick="storiesOpen(${s.id})">
+        <li class="px-3 py-2 cursor-pointer hover:bg-white/5 ${_currentId === s.id ? 'bg-white/5' : ''}" data-click-action="storiesOpen" data-args='[${s.id}]'>
           <div class="font-semibold text-slate-200">${esc(s.name)}</div>
           <div class="text-slate-500 text-[10px] mt-0.5">
             ${s.enabled ? '<span class="text-ion-lime">●</span> enabled' : '<span class="text-slate-600">○</span> disabled'}
@@ -166,14 +166,14 @@
         </div>
         <div id="story-validation" class="hidden text-[11px] rounded border px-3 py-2"></div>
         <div class="flex flex-wrap items-center gap-2 pt-2 border-t border-white/10">
-          <button onclick="storiesSave(${s.id ?? 'null'})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition">
+          <button data-click-action="storiesSave" data-args='[${s.id ?? 'null'}]' class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition">
             ${s.id ? 'Save' : 'Create'}
           </button>
           ${s.id ? `
-            <button onclick="storiesRun(${s.id})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+            <button data-click-action="storiesRun" data-args='[${s.id}]' class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
               Run…
             </button>
-            <button onclick="storiesDelete(${s.id})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-ion-coral hover:bg-ion-coral/10 border border-ion-coral/30 text-[12px] font-semibold transition ml-auto">
+            <button data-click-action="storiesDelete" data-args='[${s.id}]' class="inline-flex items-center gap-2 h-9 px-4 rounded-md text-ion-coral hover:bg-ion-coral/10 border border-ion-coral/30 text-[12px] font-semibold transition ml-auto">
               Delete
             </button>
           ` : ''}

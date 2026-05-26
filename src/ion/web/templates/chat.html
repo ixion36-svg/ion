@@ -105,26 +105,26 @@
 
             <!-- AI Knowledge Sources -->
             <div class="ai-section" id="chat-rag-section">
-                <div class="ai-section-label ai-collapsible" onclick="toggleSettingsPanel()">
+                <div class="ai-section-label ai-collapsible" data-click-action="toggleSettingsPanel">
                     Knowledge Sources
                     <svg class="ai-chevron" id="ai-settings-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 </div>
                 <div class="ai-settings-panel" id="ai-settings-panel" style="display: none;">
-                    <label class="ai-check"><input type="checkbox" id="pref-rag-kb" onchange="saveAIPreferences()"> Knowledge Base</label>
-                    <label class="ai-check"><input type="checkbox" id="pref-rag-notes" onchange="saveAIPreferences()"> Analyst Notes</label>
-                    <label class="ai-check"><input type="checkbox" id="pref-rag-playbooks" onchange="saveAIPreferences()"> Playbooks</label>
+                    <label class="ai-check"><input type="checkbox" id="pref-rag-kb" data-change-action="saveAIPreferences"> Knowledge Base</label>
+                    <label class="ai-check"><input type="checkbox" id="pref-rag-notes" data-change-action="saveAIPreferences"> Analyst Notes</label>
+                    <label class="ai-check"><input type="checkbox" id="pref-rag-playbooks" data-change-action="saveAIPreferences"> Playbooks</label>
                     <div class="ai-settings-divider"></div>
-                    <label class="ai-check"><input type="checkbox" id="pref-show-citations" checked onchange="saveAIPreferences()"> Show citations</label>
+                    <label class="ai-check"><input type="checkbox" id="pref-show-citations" checked data-change-action="saveAIPreferences"> Show citations</label>
                     <div class="ai-settings-row">
                         <span>Max references</span>
-                        <select id="pref-max-refs" onchange="saveAIPreferences()">
+                        <select id="pref-max-refs" data-change-action="saveAIPreferences">
                             <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
                         </select>
                     </div>
                     <div class="ai-settings-divider"></div>
-                    <textarea id="pref-custom-instructions" maxlength="500" placeholder="Custom instructions for the AI..." onchange="saveAIPreferences()" oninput="updateCharCount()"></textarea>
+                    <textarea id="pref-custom-instructions" maxlength="500" placeholder="Custom instructions for the AI..." data-change-action="saveAIPreferences" data-input-action="updateCharCount"></textarea>
                     <div class="ai-char-count" id="ai-char-count">0/500</div>
                 </div>
             </div>
@@ -161,7 +161,7 @@
                     <span id="ai-chat-context-title">Cyber Security Expert</span>
                 </div>
                 <div class="ai-header-actions">
-                    <button class="ai-icon-btn" onclick="exportPageAIChat()" title="Export Chat">
+                    <button class="ai-icon-btn" data-click-action="exportPageAIChat" title="Export Chat">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -286,13 +286,13 @@
                     </div>
 
                     <div class="docgen-actions">
-                        <button class="btn-gen" id="docgen-stream-btn" onclick="streamGenerateDocument()">
+                        <button class="btn-gen" id="docgen-stream-btn" data-click-action="streamGenerateDocument">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                             </svg>
                             Generate Preview
                         </button>
-                        <button class="btn-gen-save" id="docgen-save-btn" onclick="generateAndSaveDocument()" style="display: none;">
+                        <button class="btn-gen-save" id="docgen-save-btn" data-click-action="generateAndSaveDocument" style="display: none;">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                                 <polyline points="17 21 17 13 7 13 7 21"/>
@@ -319,10 +319,10 @@
                     <div class="docgen-preview-header">
                         <span>Preview</span>
                         <div class="docgen-preview-actions">
-                            <button class="ai-icon-btn" onclick="copyDocgenContent()" title="Copy to clipboard">
+                            <button class="ai-icon-btn" data-click-action="copyDocgenContent" title="Copy to clipboard">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                             </button>
-                            <button class="ai-icon-btn" onclick="exportDocgenPdf()" title="Export as PDF">
+                            <button class="ai-icon-btn" data-click-action="exportDocgenPdf" title="Export as PDF">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                             </button>
                         </div>
@@ -1798,8 +1798,8 @@
 
     function renderFeedback(msgId) {
         return `<div class="ai-feedback-row" data-msg-id="${msgId}">
-            <button class="ai-fb-btn" onclick="submitFeedback(this, 'up')" title="Good">\u{1F44D}</button>
-            <button class="ai-fb-btn" onclick="submitFeedback(this, 'down')" title="Poor">\u{1F44E}</button>
+            <button class="ai-fb-btn" data-click-action="submitFeedback" data-args='["$target", "up"]' title="Good">\u{1F44D}</button>
+            <button class="ai-fb-btn" data-click-action="submitFeedback" data-args='["$target", "down"]' title="Poor">\u{1F44E}</button>
         </div>`;
     }
 
@@ -1967,7 +1967,7 @@
                     <div class="ai-file-name">${escapeHtml(f.name)}</div>
                     <div class="ai-file-meta">${formatFileSize(f.size)}</div>
                 </div>
-                <button class="ai-file-delete" onclick="event.stopPropagation(); deleteUploadedFile('${f.id}')">
+                <button class="ai-file-delete" data-click-action="deleteUploadedFile" data-stop-propagation data-args='["${f.id}"]'>
                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
             </div>
@@ -2017,10 +2017,10 @@
                     <div class="ai-file-modal-header">
                         <h3>${escapeHtml(file.name)}</h3>
                         <div class="ai-file-modal-actions">
-                            <button class="btn btn-sm" onclick="toggleFileEdit(this)">Edit</button>
-                            <button class="btn btn-sm btn-primary" onclick="saveFileEdit('${file.id}')" style="display:none" id="save-file-btn">Save</button>
-                            <button class="btn btn-sm" onclick="downloadFile('${file.id}')">Download</button>
-                            <button class="btn btn-sm" onclick="closeFileModal()">Close</button>
+                            <button class="btn btn-sm" data-click-action="toggleFileEdit" data-args='["$target"]'>Edit</button>
+                            <button class="btn btn-sm btn-primary" data-click-action="saveFileEdit" data-args='["${file.id}"]' style="display:none" id="save-file-btn">Save</button>
+                            <button class="btn btn-sm" data-click-action="downloadFile" data-args='["${file.id}"]'>Download</button>
+                            <button class="btn btn-sm" data-click-action="closeFileModal">Close</button>
                         </div>
                     </div>
                     <div class="ai-file-modal-body">

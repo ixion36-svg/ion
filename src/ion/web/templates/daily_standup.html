@@ -27,7 +27,7 @@
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button onclick="runChecks()" id="btn-run-checks" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+        <button data-click-action="runChecks" id="btn-run-checks" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
           <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks
         </button>
         {# v0.19.9: presentation-mode + pptx download — same data the
@@ -37,15 +37,15 @@
            title="Open the slide-deck view in a new tab (keyboard navigable, fullscreen-friendly)">
           <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg> Present
         </a>
-        <a href="#" onclick="dsDownloadPptx(event)"
+        <a href="#" data-click-action="dsDownloadPptx" data-args='["$event"]'
            class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"
            title="Download the standup as a PowerPoint deck (.pptx) — includes AI summary + AOB if present">
           <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> .pptx
         </a>
-        <button onclick="exportPDF()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <button data-click-action="exportPDF" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
           <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> PDF
         </button>
-        <button onclick="saveStandup()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+        <button data-click-action="saveStandup" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
           <svg class="w-3.5 h-3.5"><use href="#i-check-circle"/></svg> Save &amp; Sign Off
         </button>
       </div>
@@ -290,7 +290,7 @@
           <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2">
             <svg class="w-4 h-4 text-ion-iris"><use href="#i-sparkles"/></svg> Threat Landscape AI Summary
           </h2>
-          <button onclick="generateThreatSummary()" class="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[11px] font-semibold transition">
+          <button data-click-action="generateThreatSummary" class="inline-flex items-center gap-2 h-8 px-3 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[11px] font-semibold transition">
             <svg class="w-3 h-3"><use href="#i-sparkles"/></svg> Generate Summary
           </button>
         </div>
@@ -378,10 +378,10 @@
       <span id="save-status" class="text-slate-500">Unsaved changes</span>
     </div>
     <div class="flex items-center gap-2">
-      <button onclick="exportPDF()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="exportPDF" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         <svg class="w-3.5 h-3.5"><use href="#i-download"/></svg> Export PDF
       </button>
-      <button onclick="saveStandup()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+      <button data-click-action="saveStandup" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
         <svg class="w-3.5 h-3.5"><use href="#i-check-circle"/></svg> Save &amp; Sign Off
       </button>
     </div>

@@ -67,7 +67,7 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2 id="version-modal-title">Version Preview</h2>
-            <button class="modal-close" onclick="closeVersionModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeVersionModal">&times;</button>
         </div>
         <div class="modal-body">
             <div id="version-meta" class="meta-bar"></div>
@@ -84,7 +84,7 @@
         </div>
         <div class="modal-footer">
             <button id="rollback-btn" class="btn btn-warning">Rollback to This Version</button>
-            <button class="btn" onclick="closeVersionModal()">Close</button>
+            <button class="btn" data-click-action="closeVersionModal">Close</button>
         </div>
     </div>
 </div>
@@ -361,9 +361,9 @@ async function loadVersions() {
             html += '<td>' + escapeHtml(v.author || '-') + '</td>';
             html += '<td>' + formatDate(v.created_at) + '</td>';
             html += '<td>';
-            html += '<button class="btn btn-sm" onclick="previewVersion(' + v.version_number + ')">View</button>';
+            html += '<button class="btn btn-sm" data-click-action="previewVersion" data-args='[" + v.version_number + "]'>View</button>';
             if (!isCurrent) {
-                html += ' <button class="btn btn-sm btn-warning" onclick="confirmRollback(' + v.version_number + ')">Rollback</button>';
+                html += ' <button class="btn btn-sm btn-warning" data-click-action="confirmRollback" data-args='[" + v.version_number + "]'>Rollback</button>';
             }
             html += '</td>';
             html += '</tr>';

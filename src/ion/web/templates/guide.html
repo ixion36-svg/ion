@@ -31,12 +31,12 @@
 <!-- Role selector -->
 <div class="g-role-bar">
     <span class="g-role-label">I am a:</span>
-    <button class="g-role-btn active" data-role="all" onclick="gSetRole('all')">Everyone</button>
-    <button class="g-role-btn" data-role="analyst" onclick="gSetRole('analyst')">L1 Analyst</button>
-    <button class="g-role-btn" data-role="senior" onclick="gSetRole('senior')">L2/L3 Analyst</button>
-    <button class="g-role-btn" data-role="lead" onclick="gSetRole('lead')">SOC Lead</button>
-    <button class="g-role-btn" data-role="engineer" onclick="gSetRole('engineer')">Engineer</button>
-    <button class="g-role-btn" data-role="dfir" onclick="gSetRole('dfir')">DFIR</button>
+    <button class="g-role-btn active" data-role="all" data-click-action="gSetRole" data-args='["all"]'>Everyone</button>
+    <button class="g-role-btn" data-role="analyst" data-click-action="gSetRole" data-args='["analyst"]'>L1 Analyst</button>
+    <button class="g-role-btn" data-role="senior" data-click-action="gSetRole" data-args='["senior"]'>L2/L3 Analyst</button>
+    <button class="g-role-btn" data-role="lead" data-click-action="gSetRole" data-args='["lead"]'>SOC Lead</button>
+    <button class="g-role-btn" data-role="engineer" data-click-action="gSetRole" data-args='["engineer"]'>Engineer</button>
+    <button class="g-role-btn" data-role="dfir" data-click-action="gSetRole" data-args='["dfir"]'>DFIR</button>
 </div>
 
 <!-- Quick nav -->

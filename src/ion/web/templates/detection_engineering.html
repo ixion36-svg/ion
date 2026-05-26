@@ -18,26 +18,26 @@
     <span id="de-tide-badge" title="Click for sync status" class="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 cursor-pointer hover:bg-white/10 transition">
       <span class="de-tide-dot h-1.5 w-1.5 rounded-full bg-ion-lime"></span> TIDE
     </span>
-    <select id="de-space-select" onchange="deChangeSpace(this.value)" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 font-mono cursor-pointer hover:bg-white/10 transition appearance-none" style="min-width:120px;" title="SIEM / Kibana space filter">
+    <select id="de-space-select" data-change-action="deChangeSpace" data-args='["$value"]' class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 font-mono cursor-pointer hover:bg-white/10 transition appearance-none" style="min-width:120px;" title="SIEM / Kibana space filter">
       <option value="">Loading spaces…</option>
     </select>
-    <button onclick="deSyncTide()" title="Pull fresh data from TIDE now" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Sync TIDE</button>
-    <button onclick="deRefresh()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Refresh</button>
+    <button data-click-action="deSyncTide" title="Pull fresh data from TIDE now" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Sync TIDE</button>
+    <button data-click-action="deRefresh" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Refresh</button>
   </div>
 </section>
 
 <!-- Tabs -->
 <div class="de-tabs" id="de-tabs">
-    <button class="de-tab active" data-tab="posture" onclick="deSwitch('posture')">Posture</button>
-    <button class="de-tab" data-tab="killchains" onclick="deSwitch('killchains')">Use Cases</button>
-    <button class="de-tab" data-tab="rules" onclick="deSwitch('rules')">Rules</button>
-    <button class="de-tab" data-tab="execution" onclick="deSwitch('execution')">Execution</button>
-    <button class="de-tab" data-tab="readiness" onclick="deSwitch('readiness')">Actor Readiness</button>
-    <button class="de-tab" data-tab="progression" onclick="deSwitch('progression')">Kill Chain</button>
-    <button class="de-tab" data-tab="gaps" onclick="deSwitch('gaps')">Gaps</button>
-    <button class="de-tab" data-tab="d3fend" onclick="deSwitch('d3fend')">D3FEND</button>
-    <button class="de-tab" data-tab="emulation" onclick="deSwitch('emulation')">Emulation</button>
-    <button class="de-tab" data-tab="vulns" onclick="deSwitch('vulns')">Vulnerabilities</button>
+    <button class="de-tab active" data-tab="posture" data-click-action="deSwitch" data-args='["posture"]'>Posture</button>
+    <button class="de-tab" data-tab="killchains" data-click-action="deSwitch" data-args='["killchains"]'>Use Cases</button>
+    <button class="de-tab" data-tab="rules" data-click-action="deSwitch" data-args='["rules"]'>Rules</button>
+    <button class="de-tab" data-tab="execution" data-click-action="deSwitch" data-args='["execution"]'>Execution</button>
+    <button class="de-tab" data-tab="readiness" data-click-action="deSwitch" data-args='["readiness"]'>Actor Readiness</button>
+    <button class="de-tab" data-tab="progression" data-click-action="deSwitch" data-args='["progression"]'>Kill Chain</button>
+    <button class="de-tab" data-tab="gaps" data-click-action="deSwitch" data-args='["gaps"]'>Gaps</button>
+    <button class="de-tab" data-tab="d3fend" data-click-action="deSwitch" data-args='["d3fend"]'>D3FEND</button>
+    <button class="de-tab" data-tab="emulation" data-click-action="deSwitch" data-args='["emulation"]'>Emulation</button>
+    <button class="de-tab" data-tab="vulns" data-click-action="deSwitch" data-args='["vulns"]'>Vulnerabilities</button>
 </div>
 
 <!-- Tab panels -->
@@ -553,20 +553,20 @@ async function loadRules() {
 function renderRulesToolbar() {
     $('de-panel-rules').innerHTML = `
         <div class="de-rules-toolbar">
-            <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." value="${esc(_rulesPage.search)}" onkeydown="if(event.key==='Enter')deRulesSearch()">
-            <select id="de-rules-sev" onchange="deRulesSearch()">
+            <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." value="${esc(_rulesPage.search)}" data-keydown-action="if" data-args='[event.key==='Enter')deRulesSearch(]'>
+            <select id="de-rules-sev" data-change-action="deRulesSearch">
                 <option value="">All Severities</option>
                 <option value="critical"${_rulesPage.severity==='critical'?' selected':''}>Critical</option>
                 <option value="high"${_rulesPage.severity==='high'?' selected':''}>High</option>
                 <option value="medium"${_rulesPage.severity==='medium'?' selected':''}>Medium</option>
                 <option value="low"${_rulesPage.severity==='low'?' selected':''}>Low</option>
             </select>
-            <select id="de-rules-enabled" onchange="deRulesSearch()">
+            <select id="de-rules-enabled" data-change-action="deRulesSearch">
                 <option value="">Enabled & Disabled</option>
                 <option value="1"${_rulesPage.enabled==='1'?' selected':''}>Enabled</option>
                 <option value="0"${_rulesPage.enabled==='0'?' selected':''}>Disabled</option>
             </select>
-            <button class="btn btn-secondary" onclick="deRulesSearch()" style="padding:7px 14px;font-size:.82rem">Search</button>
+            <button class="btn btn-secondary" data-click-action="deRulesSearch" style="padding:7px 14px;font-size:.82rem">Search</button>
         </div>
         <div id="de-rules-body"><div class="de-loading"><div class="de-spinner"></div><div>Loading...</div></div></div>`;
 }
@@ -632,8 +632,8 @@ function renderRulesTable() {
     html += `<div class="de-pager">
         <div class="de-pager-info">Showing ${from}-${to} of ${p.total.toLocaleString()}</div>
         <div class="de-pager-btns">
-            <button onclick="deRulesPage('prev')" ${p.offset===0?'disabled':''}>Prev</button>
-            <button onclick="deRulesPage('next')" ${p.offset+p.limit>=p.total?'disabled':''}>Next</button>
+            <button data-click-action="deRulesPage" data-args='["prev"]' ${p.offset===0?'disabled':''}>Prev</button>
+            <button data-click-action="deRulesPage" data-args='["next"]' ${p.offset+p.limit>=p.total?'disabled':''}>Next</button>
         </div>
     </div>`;
 
@@ -676,7 +676,7 @@ function renderExecution(d) {
 
     let html = `<div class="de-exec-time">
         <span style="font-size:.78rem;color:var(--text-secondary)">Time range:</span>
-        ${timeRanges.map(t => `<button class="${_execHours===t.h?'active':''}" onclick="deExecSetHours(${t.h})">${t.label}</button>`).join('')}
+        ${timeRanges.map(t => `<button class="${_execHours===t.h?'active':''}" data-click-action="deExecSetHours" data-args='[${t.h}]'>${t.label}</button>`).join('')}
     </div>`;
 
     // Summary stats
@@ -847,8 +847,8 @@ async function loadReadiness() {
                 <option value="">All Systems (Global)</option>
                 ${sysOpts}
             </select>
-            <input type="text" id="de-readiness-search" placeholder="Search threat actors (e.g. APT29, Lazarus)..." value="${esc(_readinessSearch)}" onkeydown="if(event.key==='Enter')deReadinessSearch()" style="flex:1;min-width:200px;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:.82rem">
-            <button class="de-btn-report" onclick="deReadinessSearch()">Search</button>
+            <input type="text" id="de-readiness-search" placeholder="Search threat actors (e.g. APT29, Lazarus)..." value="${esc(_readinessSearch)}" data-keydown-action="if" data-args='[event.key==='Enter')deReadinessSearch(]' style="flex:1;min-width:200px;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:.82rem">
+            <button class="de-btn-report" data-click-action="deReadinessSearch">Search</button>
         </div>
         <div id="de-readiness-body"><div class="de-loading"><div class="de-spinner"></div><div>Querying OpenCTI + TIDE...</div></div></div>`;
     await fetchReadiness();
@@ -973,7 +973,7 @@ function renderSystemReadiness(data, actorId, actorType) {
                 <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)">${esc(r.actor.name)} vs ${sysLabel}</div>
                 <div style="font-size:.72rem;color:var(--text-secondary);margin-top:2px">${r.covered_count} covered, ${r.gap_count} gaps, ${r.total_ttps} total TTPs</div>
             </div>
-            <button class="de-btn-pdf" onclick="deDownloadPdf('${actorId}','${actorType}')">Download PDF</button>
+            <button class="de-btn-pdf" data-click-action="deDownloadPdf" data-args='["${actorId}", "${actorType}"]'>Download PDF</button>
         </div>
         <div class="de-readiness-gauge">
             <span style="font-size:1.2rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:${barColor};min-width:50px">${r.readiness_pct}%</span>
@@ -1018,7 +1018,7 @@ function renderReadiness(data, container) {
         const countryName = a.country_name || '';
 
         html += `<div class="de-actor">
-            <div class="de-actor-header" onclick="toggleActorDetail(this)">
+            <div class="de-actor-header" data-click-action="toggleActorDetail" data-args='["$target"]'>
                 <span class="de-actor-chevron">\u25B6</span>
                 <div style="flex:1">
                     <div class="de-actor-name">${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ` : ''}${esc(a.name)}</div>
@@ -1073,8 +1073,8 @@ function renderReadiness(data, container) {
 
         // Action buttons + system readiness placeholder
         html += `<div style="display:flex;gap:8px;margin-top:12px;align-items:center">
-            <button class="de-btn-report" onclick="deGenerateReport('${a.id}','${a.entity_type}')">Assess${_selectedSystemId ? ' (System)' : ' (Global)'}</button>
-            <button class="de-btn-pdf" onclick="deDownloadPdf('${a.id}','${a.entity_type}')">Download PDF</button>
+            <button class="de-btn-report" data-click-action="deGenerateReport" data-args='["${a.id}", "${a.entity_type}"]'>Assess${_selectedSystemId ? ' (System)' : ' (Global)'}</button>
+            <button class="de-btn-pdf" data-click-action="deDownloadPdf" data-args='["${a.id}", "${a.entity_type}"]'>Download PDF</button>
         </div>
         <div id="de-sysreadiness-${a.id.substring(0,8)}"></div>`;
 
@@ -1120,7 +1120,7 @@ function renderProgression(d) {
 
     let html = `<div class="de-exec-time">
         <span style="font-size:.78rem;color:var(--text-secondary)">Time window:</span>
-        ${timeRanges.map(t=>`<button class="${_progHours===t.h?'active':''}" onclick="deProgSetHours(${t.h})">${t.label}</button>`).join('')}
+        ${timeRanges.map(t=>`<button class="${_progHours===t.h?'active':''}" data-click-action="deProgSetHours" data-args='[${t.h}]'>${t.label}</button>`).join('')}
         <span style="font-size:.72rem;color:var(--text-secondary);margin-left:auto">${d.total_hosts_checked||0} hosts scanned, ${d.playbook_count||0} playbooks</span>
     </div>`;
 
@@ -1361,7 +1361,7 @@ async function loadEmulation() {
 
         html += `<div class="de-section"><div class="de-section-title">
             Adversary Emulation Plans
-            <button class="btn btn-primary btn-sm" onclick="emCreatePrompt()" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New Plan</button>
+            <button class="btn btn-primary btn-sm" data-click-action="emCreatePrompt" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New Plan</button>
         </div>`;
 
         if (!totalPlans) {
@@ -1370,14 +1370,14 @@ async function loadEmulation() {
             html += '<table class="de-table"><thead><tr><th>Name</th><th>Actor</th><th>Status</th><th>Steps</th><th>Coverage</th><th>Updated</th><th></th></tr></thead><tbody>';
             for (const p of _emCache) {
                 const color = (p.coverage_pct||0) >= 80 ? 'var(--mitre-covered,#3fb950)' : (p.coverage_pct||0) >= 50 ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
-                html += `<tr style="cursor:pointer" onclick="emOpenPlan(${p.id})">
+                html += `<tr style="cursor:pointer" data-click-action="emOpenPlan" data-args='[${p.id}]'>
                     <td><strong>${esc(p.name)}</strong></td>
                     <td>${esc(p.actor_name||'-')}</td>
                     <td>${esc(p.status)}</td>
                     <td>${p.passed_count||0}/${p.step_count||0}</td>
                     <td><span style="font-family:'JetBrains Mono',monospace;color:${color};font-weight:700">${p.coverage_pct||0}%</span></td>
                     <td>${p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '-'}</td>
-                    <td><button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();emDeletePlan(${p.id})" style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                    <td><button class="btn btn-secondary btn-sm" data-click-action="emDeletePlan" data-stop-propagation data-args='[${p.id}]' style="padding:2px 8px;font-size:.7rem">Delete</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -1436,9 +1436,9 @@ window.emOpenPlan = async function(id) {
             </div>
             ${tids ? `<div style="margin-top:5px">${tids}</div>` : ''}
             <div style="margin-top:6px;display:flex;gap:5px">
-                <button class="btn btn-secondary btn-sm" onclick="emExecuteStep(${s.id})" style="padding:3px 9px;font-size:.7rem">Mark Executed</button>
-                <button class="btn btn-secondary btn-sm" onclick="emVerifyStep(${s.id})" style="padding:3px 9px;font-size:.7rem">Verify in ES</button>
-                <button class="btn btn-secondary btn-sm" onclick="emDeleteStep(${s.id})" style="padding:3px 9px;font-size:.7rem">Delete</button>
+                <button class="btn btn-secondary btn-sm" data-click-action="emExecuteStep" data-args='[${s.id}]' style="padding:3px 9px;font-size:.7rem">Mark Executed</button>
+                <button class="btn btn-secondary btn-sm" data-click-action="emVerifyStep" data-args='[${s.id}]' style="padding:3px 9px;font-size:.7rem">Verify in ES</button>
+                <button class="btn btn-secondary btn-sm" data-click-action="emDeleteStep" data-args='[${s.id}]' style="padding:3px 9px;font-size:.7rem">Delete</button>
             </div>
         </div>`;
     }
@@ -1446,7 +1446,7 @@ window.emOpenPlan = async function(id) {
     html += `<div style="background:var(--bg-tertiary);border:1px dashed var(--border);border-radius:6px;padding:10px 14px;margin-top:10px">
         <input id="em-newstep-title" placeholder="Step title" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:.78rem;margin-bottom:6px">
         <input id="em-newstep-tids" placeholder="Techniques: T1003, T1059.001" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:.78rem;margin-bottom:6px">
-        <button class="btn btn-primary btn-sm" onclick="emAddStep(${p.id})" style="padding:5px 14px;font-size:.78rem">+ Add Step</button>
+        <button class="btn btn-primary btn-sm" data-click-action="emAddStep" data-args='[${p.id}]' style="padding:5px 14px;font-size:.78rem">+ Add Step</button>
     </div></div>`;
     det.innerHTML = html;
 };
@@ -1513,7 +1513,7 @@ async function loadVulns() {
 
         html += `<div class="de-section"><div class="de-section-title">
             Vulnerabilities
-            <button class="btn btn-primary btn-sm" onclick="vlnCreatePrompt()" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New CVE</button>
+            <button class="btn btn-primary btn-sm" data-click-action="vlnCreatePrompt" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New CVE</button>
         </div>`;
 
         const items = _vulnsCache.vulnerabilities || [];
@@ -1533,7 +1533,7 @@ async function loadVulns() {
                     <td>${esc(v.status)}</td>
                     <td>${tids || '<span style="color:var(--text-secondary);font-size:.7rem">none</span>'}</td>
                     <td><div style="color:${verdictColor};font-weight:700;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px">${esc(verdict)}</div><div style="font-size:.66rem;color:var(--text-secondary)">${cov.total > 0 ? `${cov.covered}/${cov.total} TTPs &middot; ${cov.rules} rules` : 'no TTPs set'}</div></td>
-                    <td><button class="btn btn-secondary btn-sm" onclick="vlnDelete(${v.id})" style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                    <td><button class="btn btn-secondary btn-sm" data-click-action="vlnDelete" data-args='[${v.id}]' style="padding:2px 8px;font-size:.7rem">Delete</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';

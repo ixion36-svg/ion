@@ -25,7 +25,7 @@
     </p>
   </div>
   <div class="flex gap-3">
-    <button onclick="openRunModal()" class="btn btn-primary">Run Eval</button>
+    <button data-click-action="openRunModal" class="btn btn-primary">Run Eval</button>
   </div>
 </section>
 
@@ -87,7 +87,7 @@
           <td class="text-xs text-slate-400">{{ run.started_at or "-" }}</td>
           <td>{{ run.triggered_by_id or "-" }}</td>
           <td>
-            <a href="#" onclick="viewSamples({{ run.id }})" class="text-ion-iris text-xs hover:underline">Samples</a>
+            <a href="#" data-click-action="viewSamples" data-args='[{{ run.id }}]' class="text-ion-iris text-xs hover:underline">Samples</a>
           </td>
         </tr>
         {% else %}
@@ -104,7 +104,7 @@
 <section class="section rise d-3 hidden" id="samples-section">
   <div class="section-header">
     <h2>Samples — Run <span id="samples-run-id"></span></h2>
-    <button onclick="closeSamples()" class="btn btn-ghost btn-sm">Close</button>
+    <button data-click-action="closeSamples" class="btn btn-ghost btn-sm">Close</button>
   </div>
   <div class="overflow-x-auto">
     <table class="data-table w-full" id="samples-table">
@@ -131,7 +131,7 @@
 <div id="run-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60">
   <div class="bg-slate-800 border border-slate-700 rounded-xl shadow-2xl w-full max-w-md mx-4 p-6">
     <h2 class="text-lg font-semibold text-white mb-4">Run Evaluation</h2>
-    <form id="run-form" onsubmit="submitRun(event)">
+    <form id="run-form" data-submit-action="submitRun" data-args='["$event"]'>
       <div class="mb-4">
         <label class="block text-sm text-slate-300 mb-1">Template</label>
         <select id="run-template-id" name="template_id" class="form-control w-full">
@@ -154,7 +154,7 @@
         />
       </div>
       <div class="flex justify-end gap-3">
-        <button type="button" onclick="closeRunModal()" class="btn btn-ghost">Cancel</button>
+        <button type="button" data-click-action="closeRunModal" class="btn btn-ghost">Cancel</button>
         <button type="submit" class="btn btn-primary">Start</button>
       </div>
     </form>
@@ -231,10 +231,10 @@ async function loadSamplesPage(runId, page) {
   const pgEl = document.getElementById('samples-pagination');
   pgEl.innerHTML = `Page ${data.page} of ${data.total_pages} (${data.total} total)`;
   if (data.page > 1) {
-    pgEl.innerHTML += ` <a href="#" onclick="loadSamplesPage(${runId},${data.page-1})" class="text-ion-iris ml-3">Prev</a>`;
+    pgEl.innerHTML += ` <a href="#" data-click-action="loadSamplesPage" data-args='[${runId}, ${data.page-1}]' class="text-ion-iris ml-3">Prev</a>`;
   }
   if (data.page < data.total_pages) {
-    pgEl.innerHTML += ` <a href="#" onclick="loadSamplesPage(${runId},${data.page+1})" class="text-ion-iris ml-3">Next</a>`;
+    pgEl.innerHTML += ` <a href="#" data-click-action="loadSamplesPage" data-args='[${runId}, ${data.page+1}]' class="text-ion-iris ml-3">Next</a>`;
   }
 }
 

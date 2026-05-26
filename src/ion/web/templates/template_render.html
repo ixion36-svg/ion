@@ -66,7 +66,7 @@
     <div class="modal-content" style="max-width: 500px;">
         <div class="modal-header">
             <h2>User Preferences</h2>
-            <button class="modal-close" onclick="closeSettingsModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeSettingsModal">&times;</button>
         </div>
         <div class="modal-body">
             <p class="muted" style="margin-bottom: 1rem;">These values will be auto-filled in author/preparer fields.</p>
@@ -91,8 +91,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-primary" onclick="savePreferences()">Save Preferences</button>
-            <button class="btn" onclick="closeSettingsModal()">Cancel</button>
+            <button class="btn btn-primary" data-click-action="savePreferences">Save Preferences</button>
+            <button class="btn" data-click-action="closeSettingsModal">Cancel</button>
         </div>
     </div>
 </div>
@@ -557,11 +557,11 @@ function buildSectionCards(sections) {
         const isHeader = !sec.num;
         const openClass = isHeader ? ' se-open' : '';
         html += '<div class="se-card' + openClass + '" data-idx="' + idx + '">';
-        html += '<div class="se-header" onclick="toggleSection(this)">';
+        html += '<div class="se-header" data-click-action="toggleSection" data-args='["$target"]'>';
         html += '<span class="se-num">' + label + '</span>';
         html += '<span class="se-title">' + escapeHtml(sec.title) + '</span>';
         // Edit pencil icon
-        html += '<button type="button" class="se-edit-btn" onclick="event.stopPropagation();toggleEdit(this)" title="Edit section">&#9998;</button>';
+        html += '<button type="button" class="se-edit-btn" data-click-action="toggleEdit" data-stop-propagation data-args='["$target"]' title="Edit section">&#9998;</button>';
         html += '<svg class="se-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
         html += '</div>';
         html += '<div class="se-body">';

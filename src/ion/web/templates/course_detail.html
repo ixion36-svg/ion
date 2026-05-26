@@ -109,7 +109,7 @@ function render(c) {
            </span>`
         : `<span class="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-white/5 text-slate-300 text-[12px] font-semibold">Enrolled</span>`
       )
-    : `<button onclick="enrol(${c.id})" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold">Enrol</button>`;
+    : `<button data-click-action="enrol" data-args='[${c.id}]' class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold">Enrol</button>`;
 
   document.getElementById('cd-root').innerHTML = `
     <div class="mb-4">

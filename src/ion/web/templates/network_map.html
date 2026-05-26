@@ -23,7 +23,7 @@
       <p class="mt-1 text-[14px] text-slate-400">Asset inventory auto-populated from Elasticsearch host data.</p>
     </div>
     <div class="flex items-center gap-3">
-      <button onclick="triggerSync()" class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition flex items-center gap-1.5" id="sync-btn">
+      <button data-click-action="triggerSync" class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition flex items-center gap-1.5" id="sync-btn">
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
         Sync Now
       </button>
@@ -54,15 +54,15 @@
   <section class="flex flex-wrap items-center gap-3 mb-6 rise d-3">
     <input type="text" id="filter-search" placeholder="Search hostname or IP…"
            class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200 placeholder:text-slate-500 w-64 focus:border-ion-cyan/50 focus:outline-none transition"
-           oninput="debounceLoad()">
-    <select id="filter-env" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+           data-input-action="debounceLoad">
+    <select id="filter-env" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
       <option value="">All Environments</option>
       <option value="prod">Production</option>
       <option value="staging">Staging</option>
       <option value="dev">Development</option>
       <option value="unknown">Unknown</option>
     </select>
-    <select id="filter-crit" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+    <select id="filter-crit" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
       <option value="">All Criticality</option>
       <option value="critical">Critical</option>
       <option value="high">High</option>
@@ -70,21 +70,21 @@
       <option value="low">Low</option>
       <option value="unknown">Unknown</option>
     </select>
-    <select id="filter-system" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+    <select id="filter-system" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
       <option value="">All Systems</option>
     </select>
-    <select id="filter-seen" onchange="loadAssets()" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+    <select id="filter-seen" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
       <option value="">All Time</option>
       <option value="24h">Last 24h</option>
       <option value="7d">Last 7 days</option>
       <option value="30d">Last 30 days</option>
     </select>
-    <button onclick="clearFilters()" class="h-9 px-3 rounded-lg border border-white/10 text-[12px] text-slate-400 hover:text-white transition">Clear</button>
+    <button data-click-action="clearFilters" class="h-9 px-3 rounded-lg border border-white/10 text-[12px] text-slate-400 hover:text-white transition">Clear</button>
     <span id="results-count" class="text-[12px] text-slate-500 ml-auto"></span>
     <div class="flex items-center gap-1 p-0.5 rounded-md bg-white/5 border border-white/5 ml-2">
-      <button id="view-table-btn" onclick="setView('table')" class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Table</button>
-      <button id="view-graph-btn" onclick="setView('graph')" class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Graph</button>
-      <button id="view-topology-btn" onclick="setView('topology')" class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Topology</button>
+      <button id="view-table-btn" data-click-action="setView" data-args='["table"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Table</button>
+      <button id="view-graph-btn" data-click-action="setView" data-args='["graph"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Graph</button>
+      <button id="view-topology-btn" data-click-action="setView" data-args='["topology"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Topology</button>
     </div>
   </section>
 
@@ -146,7 +146,7 @@
     <div class="h-full overflow-y-auto p-6">
       <div class="flex items-center justify-between mb-6">
         <h2 id="drawer-hostname" class="font-sans font-semibold text-[20px] text-white"></h2>
-        <button onclick="closeDrawer()" class="h-8 w-8 rounded-md hover:bg-white/5 grid place-items-center text-slate-400 hover:text-white">
+        <button data-click-action="closeDrawer" class="h-8 w-8 rounded-md hover:bg-white/5 grid place-items-center text-slate-400 hover:text-white">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>
@@ -300,7 +300,7 @@ function renderTable(assets) {
   $('assets-tbody').innerHTML = assets.map(a => {
     const os = [a.os_name, a.os_version].filter(Boolean).join(' ') || '—';
     const systems = (a.source_systems || []).map(s => `<span class="inline-block px-1.5 py-0.5 rounded bg-white/5 text-[10px] text-slate-400 mr-1">${esc(s)}</span>`).join('');
-    return `<tr class="row-hover border-b border-white/[0.03] cursor-pointer" onclick="openDetail(${a.id})">
+    return `<tr class="row-hover border-b border-white/[0.03] cursor-pointer" data-click-action="openDetail" data-args='[${a.id}]'>
       <td class="px-4 py-3 font-mono text-[12px] text-ion-cyan">${esc(a.display_hostname)}</td>
       <td class="px-4 py-3 font-mono text-[12px] text-slate-300">${esc(a.primary_ip || '—')}</td>
       <td class="px-4 py-3 text-slate-300">${esc(os)}</td>
@@ -318,8 +318,8 @@ function renderPagination(total, offset, limit) {
   const current = Math.floor(offset / limit);
   if (pages <= 1) { $('pagination').innerHTML = ''; return; }
   let html = `<span>Page ${current + 1} of ${pages}</span><div class="flex gap-1">`;
-  if (current > 0) html += `<button onclick="goPage(${current - 1})" class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Prev</button>`;
-  if (current < pages - 1) html += `<button onclick="goPage(${current + 1})" class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Next</button>`;
+  if (current > 0) html += `<button data-click-action="goPage" data-args='[${current - 1}]' class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Prev</button>`;
+  if (current < pages - 1) html += `<button data-click-action="goPage" data-args='[${current + 1}]' class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Next</button>`;
   html += '</div>';
   $('pagination').innerHTML = html;
 }
@@ -406,7 +406,7 @@ function renderDrawer(a) {
           <textarea id="edit-notes" rows="3" placeholder="Free-text notes…"
                     class="mt-1 w-full px-2 py-1.5 rounded border border-white/10 bg-ink-800 text-[12px] text-slate-200 resize-y">${esc(a.notes || '')}</textarea>
         </div>
-        <button onclick="saveEnrichment(${a.id})" class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition">Save</button>
+        <button data-click-action="saveEnrichment" data-args='[${a.id}]' class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition">Save</button>
       </div>
 
       <!-- IP History -->
@@ -779,7 +779,7 @@ async function renderTopology() {
       const os = h.os || [h.os_name, h.os_version].filter(Boolean).join(' ') || '—';
       const hCrit = h.criticality || 'unknown';
       const dotCls = TOPO_CRIT_COLORS[hCrit] || TOPO_CRIT_COLORS.unknown;
-      return `<div class="rounded-lg border border-white/5 bg-white/[0.02] p-3 cursor-pointer hover:bg-white/[0.04] transition" onclick="openDetail(${h.id})">
+      return `<div class="rounded-lg border border-white/5 bg-white/[0.02] p-3 cursor-pointer hover:bg-white/[0.04] transition" data-click-action="openDetail" data-args='[${h.id}]'>
         <div class="flex items-center gap-2 mb-1.5">
           <span class="w-2 h-2 rounded-full ${dotCls} flex-shrink-0"></span>
           <span class="font-mono text-[12px] text-ion-cyan truncate">${esc(hostName)}</span>
@@ -793,7 +793,7 @@ async function renderTopology() {
     }).join('');
 
     return `<div class="rounded-xl border border-white/5 bg-ink-900/40 overflow-hidden" id="topo-subnet-${idx}">
-      <div class="px-4 py-3 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition" onclick="toggleSubnet(${idx})">
+      <div class="px-4 py-3 flex items-center gap-4 cursor-pointer hover:bg-white/5 transition" data-click-action="toggleSubnet" data-args='[${idx}]'>
         <svg id="topo-chevron-${idx}" class="w-4 h-4 text-slate-500 transform transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
         <span class="font-mono text-[13px] text-white font-semibold">${esc(s.subnet || s.cidr || '?')}</span>
         <span class="text-[11px] text-slate-400">${s.host_count} host${s.host_count === 1 ? '' : 's'}</span>

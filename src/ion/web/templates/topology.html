@@ -636,7 +636,7 @@
         <h1><i class="icon-network"></i> Platform Topology</h1>
         <div class="topo-header-actions">
             <span id="last-checked" style="font-size:.78rem;color:var(--text-secondary);"></span>
-            <button class="btn btn-secondary btn-sm" onclick="refreshAll()">
+            <button class="btn btn-secondary btn-sm" data-click-action="refreshAll">
                 <i class="icon-refresh-cw"></i> Refresh
             </button>
         </div>
@@ -1481,11 +1481,11 @@ function injectFlowControls() {
     controls.className = 'flow-controls';
     controls.id = 'flow-controls';
     controls.innerHTML = `
-        <button class="flow-btn" id="flow-btn-reset" onclick="flowReset()" title="Reset">&#x27F2; Reset</button>
-        <button class="flow-btn" id="flow-btn-prev" onclick="flowRetreat()" title="Previous">&#x25C0; Prev</button>
+        <button class="flow-btn" id="flow-btn-reset" data-click-action="flowReset" title="Reset">&#x27F2; Reset</button>
+        <button class="flow-btn" id="flow-btn-prev" data-click-action="flowRetreat" title="Previous">&#x25C0; Prev</button>
         <span class="flow-step-counter" id="flow-step-counter">Step 1 / 8</span>
-        <button class="flow-btn" id="flow-btn-next" onclick="flowAdvance()" title="Next">Next &#x25B6;</button>
-        <button class="flow-btn" id="flow-btn-auto" onclick="flowAutoToggle()" title="Auto Play">&#x25B6; Auto Play</button>`;
+        <button class="flow-btn" id="flow-btn-next" data-click-action="flowAdvance" title="Next">Next &#x25B6;</button>
+        <button class="flow-btn" id="flow-btn-auto" data-click-action="flowAutoToggle" title="Auto Play">&#x25B6; Auto Play</button>`;
     header.appendChild(controls);
 }
 

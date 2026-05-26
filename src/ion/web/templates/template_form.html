@@ -44,14 +44,14 @@
     <!-- Legacy template notice (shown when editing raw templates) -->
     <div id="legacy-notice" class="se-legacy-notice" style="display:none;">
         <p>This template was created with the raw editor. To use the section editor, the existing content will be placed in a single Text section.</p>
-        <button type="button" class="btn btn-sm" onclick="convertToSections()">Convert to Sections</button>
+        <button type="button" class="btn btn-sm" data-click-action="convertToSections">Convert to Sections</button>
     </div>
 
     <!-- Section Builder -->
     <div class="se-builder">
         <div class="se-header">
             <label>Template Sections</label>
-            <button type="button" class="btn btn-sm btn-primary" onclick="openLibrary(-1)">+ Add Section</button>
+            <button type="button" class="btn btn-sm btn-primary" data-click-action="openLibrary" data-args='[-1]'>+ Add Section</button>
         </div>
 
         <div id="sections-container" class="se-sections">
@@ -62,11 +62,11 @@
     </div>
 
     <!-- Section Library Panel -->
-    <div id="section-library-overlay" class="se-library-overlay" style="display:none;" onclick="closeLibrary()"></div>
+    <div id="section-library-overlay" class="se-library-overlay" style="display:none;" data-click-action="closeLibrary"></div>
     <div id="section-library" class="se-library" style="display:none;">
         <div class="se-library-header">
             <h3>Section Library</h3>
-            <button type="button" class="se-library-close" onclick="closeLibrary()">&times;</button>
+            <button type="button" class="se-library-close" data-click-action="closeLibrary">&times;</button>
         </div>
         <div class="se-library-body">
             <h4>Generic</h4>
@@ -91,7 +91,7 @@
 
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">{% if template_id %}Save Changes{% else %}Create Template{% endif %}</button>
-        <button type="button" class="btn btn-secondary" onclick="previewTemplate()">Preview</button>
+        <button type="button" class="btn btn-secondary" data-click-action="previewTemplate">Preview</button>
         <a href="/templates" class="btn btn-secondary">Cancel</a>
     </div>
 </form>
@@ -101,13 +101,13 @@
     <div class="modal-content modal-large">
         <div class="modal-header">
             <h2>Template Preview (Generated Jinja2)</h2>
-            <button class="modal-close" onclick="closePreview()">&times;</button>
+            <button class="modal-close" data-click-action="closePreview">&times;</button>
         </div>
         <div class="modal-body">
             <pre id="preview-content" class="code-block"></pre>
         </div>
         <div class="modal-footer">
-            <button class="btn" onclick="closePreview()">Close</button>
+            <button class="btn" data-click-action="closePreview">Close</button>
         </div>
     </div>
 </div>
@@ -619,9 +619,9 @@ function renderSections() {
             '<span class="se-card-title">' + escapeHtml(titleText) + '</span>' +
             '<span class="se-card-type">' + escapeHtml(st.label) + '</span>' +
             '<div class="se-card-actions">' +
-                '<button type="button" title="Move up" onclick="moveSection(' + idx + ', -1)"><i class="icon-chevron-up"></i></button>' +
-                '<button type="button" title="Move down" onclick="moveSection(' + idx + ', 1)"><i class="icon-chevron-down"></i></button>' +
-                '<button type="button" class="se-delete" title="Delete" onclick="removeSection(' + idx + ')"><i class="icon-x"></i></button>' +
+                '<button type="button" title="Move up" data-click-action="moveSection" data-args='[" + idx + ", -1]'><i class="icon-chevron-up"></i></button>' +
+                '<button type="button" title="Move down" data-click-action="moveSection" data-args='[" + idx + ", 1]'><i class="icon-chevron-down"></i></button>' +
+                '<button type="button" class="se-delete" title="Delete" data-click-action="removeSection" data-args='[" + idx + "]'><i class="icon-x"></i></button>' +
             '</div>';
         card.appendChild(header);
 
@@ -637,7 +637,7 @@ function renderSections() {
         // Inline add button after each card
         const inlineAdd = document.createElement('div');
         inlineAdd.className = 'se-add-inline';
-        inlineAdd.innerHTML = '<button type="button" onclick="openLibrary(' + idx + ')">+ Add Section</button>';
+        inlineAdd.innerHTML = '<button type="button" data-click-action="openLibrary" data-args='[" + idx + "]'>+ Add Section</button>';
         container.appendChild(inlineAdd);
     });
 

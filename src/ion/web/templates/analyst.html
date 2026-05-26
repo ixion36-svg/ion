@@ -99,8 +99,8 @@
       <div class="flex gap-2">
         <input id="ioc-input" type="text" placeholder="IP, domain, hash..."
                class="flex-1 h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-[13px] text-white placeholder:text-slate-600 focus:outline-none focus:border-ion-cyan/50 focus:ring-1 focus:ring-ion-cyan/20 transition"
-               onkeydown="if(event.key==='Enter')doIOCLookup()">
-        <button onclick="doIOCLookup()" class="h-9 px-4 rounded-lg bg-ion-cyan/15 text-ion-cyan text-[12px] font-semibold hover:bg-ion-cyan/25 transition-colors">Lookup</button>
+               data-keydown-action="if" data-args='[event.key==='Enter')doIOCLookup(]'>
+        <button data-click-action="doIOCLookup" class="h-9 px-4 rounded-lg bg-ion-cyan/15 text-ion-cyan text-[12px] font-semibold hover:bg-ion-cyan/25 transition-colors">Lookup</button>
       </div>
       <div id="ioc-result" class="mt-3 hidden"></div>
     </div>
@@ -148,7 +148,7 @@
   <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">Knowledge Base</div>
   <input id="kb-search" type="text" placeholder="Search knowledge base articles..."
          class="w-full h-10 px-4 rounded-lg border border-white/10 bg-white/5 text-[13px] text-white placeholder:text-slate-600 focus:outline-none focus:border-ion-cyan/50 focus:ring-1 focus:ring-ion-cyan/20 transition"
-         oninput="debounceKBSearch()">
+         data-input-action="debounceKBSearch">
   <div id="kb-results" class="mt-3 hidden divide-y divide-white/5"></div>
 </section>
 

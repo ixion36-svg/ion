@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">SOC-CMM aligned capability scoring and roadmap.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" onclick="matShowHistory()">History</button>
-        <button class="btn btn-primary" onclick="matStartNew()">New Assessment</button>
+        <button class="btn btn-secondary" data-click-action="matShowHistory">History</button>
+        <button class="btn btn-primary" data-click-action="matStartNew">New Assessment</button>
     </div>
 </section>
 
@@ -413,7 +413,7 @@ function matRenderQuestionnaire() {
                 <div class="mat-q-text">${matEsc(question.text)}</div>
                 <div class="mat-q-guidance">${matEsc(question.guidance)}</div>
                 <div class="mat-q-score" id="mat-q-${question.id}">
-                    ${[1,2,3,4,5].map(n => `<button onclick="matScore('${domain.id}','${question.id}',${n},this)">${n}</button>`).join('')}
+                    ${[1,2,3,4,5].map(n => `<button data-click-action="matScore" data-args='["${domain.id}", "${question.id}", ${n}, "$target"]'>${n}</button>`).join('')}
                 </div>
                 <input class="mat-q-notes" placeholder="Notes (optional)" id="mat-notes-${question.id}">
             </div>`;
@@ -424,7 +424,7 @@ function matRenderQuestionnaire() {
 
     html += `<div class="mat-submit">
         <input id="mat-title" type="text" placeholder="Assessment title (optional)" style="flex:1;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:8px 12px;border-radius:var(--radius);font:inherit;font-size:.85rem">
-        <button class="btn btn-primary" onclick="matSubmit()">Submit Assessment</button>
+        <button class="btn btn-primary" data-click-action="matSubmit">Submit Assessment</button>
     </div>`;
 
     c.innerHTML = html;
@@ -513,8 +513,8 @@ function matRenderResult(a) {
     html += '</div>';
 
     html += `<div style="display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn btn-secondary" onclick="matShowHistory()">View History</button>
-        <button class="btn btn-primary" onclick="matStartNew()">New Assessment</button>
+        <button class="btn btn-secondary" data-click-action="matShowHistory">View History</button>
+        <button class="btn btn-primary" data-click-action="matStartNew">New Assessment</button>
     </div>`;
 
     c.innerHTML = html;
@@ -532,7 +532,7 @@ async function matShowHistory() {
             c.innerHTML = `<div class="mat-intro" style="text-align:center">
                 <h3 style="color:var(--text-primary);margin-bottom:8px">No assessments yet</h3>
                 <p>Run your first SOC maturity assessment to establish a baseline.</p>
-                <button class="btn btn-primary" onclick="matStartNew()" style="margin-top:14px">Start Assessment</button>
+                <button class="btn btn-primary" data-click-action="matStartNew" style="margin-top:14px">Start Assessment</button>
             </div>`;
             return;
         }
@@ -551,7 +551,7 @@ async function matShowHistory() {
                 <td>${(s.process||{}).score||'-'}</td>
                 <td>${(s.technology||{}).score||'-'}</td>
                 <td>${(s.services||{}).score||'-'}</td>
-                <td><button class="btn btn-secondary btn-sm" onclick="matDelete(${a.id})" style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                <td><button class="btn btn-secondary btn-sm" data-click-action="matDelete" data-args='[${a.id}]' style="padding:2px 8px;font-size:.7rem">Delete</button></td>
             </tr>`;
         }
         html += '</tbody></table>';

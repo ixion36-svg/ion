@@ -22,13 +22,13 @@
     <div class="flex items-center gap-2 flex-wrap">
       <label class="label-tiny text-slate-500">Window (days)</label>
       <select id="sc-window" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white"
-              onchange="scLoad()">
+              data-change-action="scLoad">
         <option value="7">7</option>
         <option value="30" selected>30</option>
         <option value="90">90</option>
         <option value="365">365</option>
       </select>
-      <button onclick="scLoad()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="scLoad" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         Refresh
       </button>
     </div>

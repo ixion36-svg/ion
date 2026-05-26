@@ -24,15 +24,15 @@
 
 <!-- Tool Tabs -->
 <div class="tools-tabs">
-    <button class="tool-tab active" onclick="switchToolTab('ioc')">IOC Processor</button>
-    <button class="tool-tab" onclick="switchToolTab('timestamp')">Timestamp</button>
-    <button class="tool-tab" onclick="switchToolTab('hash')">Hash Identifier</button>
-    <button class="tool-tab" onclick="switchToolTab('url')">URL Parser</button>
-    <button class="tool-tab" onclick="switchToolTab('regex')">Regex Tester</button>
-    <button class="tool-tab" onclick="switchToolTab('email')">Email Headers</button>
-    <button class="tool-tab" onclick="switchToolTab('log')">Log Parser</button>
-    <button class="tool-tab" onclick="switchToolTab('encoding')">Encoding</button>
-    <button class="tool-tab" onclick="switchToolTab('lookup')">IOC Lookup</button>
+    <button class="tool-tab active" data-click-action="switchToolTab" data-args='["ioc"]'>IOC Processor</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["timestamp"]'>Timestamp</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["hash"]'>Hash Identifier</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["url"]'>URL Parser</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["regex"]'>Regex Tester</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["email"]'>Email Headers</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["log"]'>Log Parser</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["encoding"]'>Encoding</button>
+    <button class="tool-tab" data-click-action="switchToolTab" data-args='["lookup"]'>IOC Lookup</button>
 </div>
 
 <!-- ==================== IOC PROCESSOR TAB ==================== -->
@@ -42,19 +42,19 @@
             <div class="panel-header">
                 <h3>Input</h3>
                 <div class="panel-actions">
-                    <button class="btn btn-sm" onclick="clearInput()">Clear</button>
-                    <button class="btn btn-sm" onclick="loadFile()">Load File</button>
+                    <button class="btn btn-sm" data-click-action="clearInput">Clear</button>
+                    <button class="btn btn-sm" data-click-action="loadFile">Load File</button>
                 </div>
             </div>
-            <textarea id="input-text" class="tools-textarea" placeholder="Paste or type text here..." oninput="processText()"></textarea>
+            <textarea id="input-text" class="tools-textarea" placeholder="Paste or type text here..." data-input-action="processText"></textarea>
         </div>
 
         <div class="tools-panel">
             <div class="panel-header">
                 <h3>Output</h3>
                 <div class="panel-actions">
-                    <button class="btn btn-sm btn-primary" onclick="copyOutput()">Copy</button>
-                    <button class="btn btn-sm" onclick="downloadOutput()">Download</button>
+                    <button class="btn btn-sm btn-primary" data-click-action="copyOutput">Copy</button>
+                    <button class="btn btn-sm" data-click-action="downloadOutput">Download</button>
                 </div>
             </div>
             <textarea id="output-text" class="tools-textarea" readonly placeholder="Processed output will appear here..."></textarea>
@@ -65,7 +65,7 @@
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Detected IOCs</h3>
-            <button class="btn btn-sm" onclick="toggleIocDetails()" id="ioc-toggle-btn">Show Details</button>
+            <button class="btn btn-sm" data-click-action="toggleIocDetails" id="ioc-toggle-btn">Show Details</button>
         </div>
         <div class="ioc-stats" id="ioc-stats">
             <span class="ioc-stat">URLs: <strong id="ioc-urls">0</strong></span>
@@ -87,20 +87,20 @@
             <h3>Quick Actions</h3>
         </div>
         <div class="quick-actions">
-            <button class="btn btn-primary" onclick="applyAction('defangAll')">Defang All</button>
-            <button class="btn btn-primary" onclick="applyAction('refangAll')">Refang All</button>
-            <button class="btn" onclick="applyAction('extractIOCs')">Extract IOCs Only</button>
-            <button class="btn" onclick="applyAction('base64Encode')">Base64 Enc</button>
-            <button class="btn" onclick="applyAction('base64Decode')">Base64 Dec</button>
-            <button class="btn" onclick="applyAction('urlEncode')">URL Encode</button>
-            <button class="btn" onclick="applyAction('urlDecode')">URL Decode</button>
-            <button class="btn" onclick="applyAction('uppercase')">Uppercase</button>
-            <button class="btn" onclick="applyAction('lowercase')">Lowercase</button>
-            <button class="btn" onclick="applyAction('removeEmptyLines')">Remove Empty Lines</button>
-            <button class="btn" onclick="applyAction('sortLines')">Sort Lines</button>
-            <button class="btn" onclick="applyAction('uniqueLines')">Unique Lines</button>
-            <button class="btn" onclick="applyAction('trimLines')">Trim</button>
-            <button class="btn" onclick="applyAction('reverseLines')">Reverse Lines</button>
+            <button class="btn btn-primary" data-click-action="applyAction" data-args='["defangAll"]'>Defang All</button>
+            <button class="btn btn-primary" data-click-action="applyAction" data-args='["refangAll"]'>Refang All</button>
+            <button class="btn" data-click-action="applyAction" data-args='["extractIOCs"]'>Extract IOCs Only</button>
+            <button class="btn" data-click-action="applyAction" data-args='["base64Encode"]'>Base64 Enc</button>
+            <button class="btn" data-click-action="applyAction" data-args='["base64Decode"]'>Base64 Dec</button>
+            <button class="btn" data-click-action="applyAction" data-args='["urlEncode"]'>URL Encode</button>
+            <button class="btn" data-click-action="applyAction" data-args='["urlDecode"]'>URL Decode</button>
+            <button class="btn" data-click-action="applyAction" data-args='["uppercase"]'>Uppercase</button>
+            <button class="btn" data-click-action="applyAction" data-args='["lowercase"]'>Lowercase</button>
+            <button class="btn" data-click-action="applyAction" data-args='["removeEmptyLines"]'>Remove Empty Lines</button>
+            <button class="btn" data-click-action="applyAction" data-args='["sortLines"]'>Sort Lines</button>
+            <button class="btn" data-click-action="applyAction" data-args='["uniqueLines"]'>Unique Lines</button>
+            <button class="btn" data-click-action="applyAction" data-args='["trimLines"]'>Trim</button>
+            <button class="btn" data-click-action="applyAction" data-args='["reverseLines"]'>Reverse Lines</button>
         </div>
     </div>
 
@@ -108,13 +108,13 @@
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Custom Find/Replace Rules</h3>
-            <button class="btn btn-sm btn-primary" onclick="addRule()">+ Add</button>
+            <button class="btn btn-sm btn-primary" data-click-action="addRule">+ Add</button>
         </div>
         <div class="rules-list" id="rules-list"></div>
         <div class="rules-actions">
-            <button class="btn btn-sm" onclick="saveRules()">Save Rules</button>
-            <button class="btn btn-sm" onclick="loadRules()">Load Rules</button>
-            <button class="btn btn-sm btn-danger" onclick="clearRules()">Clear Rules</button>
+            <button class="btn btn-sm" data-click-action="saveRules">Save Rules</button>
+            <button class="btn btn-sm" data-click-action="loadRules">Load Rules</button>
+            <button class="btn btn-sm btn-danger" data-click-action="clearRules">Clear Rules</button>
         </div>
     </div>
 </div>
@@ -128,32 +128,32 @@
         <div class="timestamp-grid">
             <div class="timestamp-field">
                 <label>Unix Timestamp (seconds)</label>
-                <input type="text" id="ts-unix" placeholder="1706454000" oninput="convertTimestamp('unix')">
+                <input type="text" id="ts-unix" placeholder="1706454000" data-input-action="convertTimestamp" data-args='["unix"]'>
             </div>
             <div class="timestamp-field">
                 <label>Unix Timestamp (milliseconds)</label>
-                <input type="text" id="ts-unix-ms" placeholder="1706454000000" oninput="convertTimestamp('unix-ms')">
+                <input type="text" id="ts-unix-ms" placeholder="1706454000000" data-input-action="convertTimestamp" data-args='["unix-ms"]'>
             </div>
             <div class="timestamp-field">
                 <label>ISO 8601 / UTC</label>
-                <input type="text" id="ts-iso" placeholder="2024-01-28T15:00:00Z" oninput="convertTimestamp('iso')">
+                <input type="text" id="ts-iso" placeholder="2024-01-28T15:00:00Z" data-input-action="convertTimestamp" data-args='["iso"]'>
             </div>
             <div class="timestamp-field">
                 <label>Local Time</label>
-                <input type="text" id="ts-local" placeholder="2024-01-28 15:00:00" oninput="convertTimestamp('local')">
+                <input type="text" id="ts-local" placeholder="2024-01-28 15:00:00" data-input-action="convertTimestamp" data-args='["local"]'>
             </div>
             <div class="timestamp-field">
                 <label>RFC 2822</label>
-                <input type="text" id="ts-rfc" placeholder="Sun, 28 Jan 2024 15:00:00 +0000" oninput="convertTimestamp('rfc')">
+                <input type="text" id="ts-rfc" placeholder="Sun, 28 Jan 2024 15:00:00 +0000" data-input-action="convertTimestamp" data-args='["rfc"]'>
             </div>
             <div class="timestamp-field">
                 <label>Windows FILETIME</label>
-                <input type="text" id="ts-filetime" placeholder="133508412000000000" oninput="convertTimestamp('filetime')">
+                <input type="text" id="ts-filetime" placeholder="133508412000000000" data-input-action="convertTimestamp" data-args='["filetime"]'>
             </div>
         </div>
         <div class="timestamp-actions">
-            <button class="btn btn-primary" onclick="setCurrentTime()">Now</button>
-            <button class="btn" onclick="clearTimestamps()">Clear</button>
+            <button class="btn btn-primary" data-click-action="setCurrentTime">Now</button>
+            <button class="btn" data-click-action="clearTimestamps">Clear</button>
         </div>
         <div class="timestamp-info" id="timestamp-info"></div>
     </div>
@@ -169,7 +169,7 @@
             <label>Enter Hash(es) - one per line</label>
             <textarea id="hash-input" class="tools-textarea" rows="6" placeholder="Enter hashes to identify...
 e.g., d41d8cd98f00b204e9800998ecf8427e
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" oninput="identifyHashes()"></textarea>
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" data-input-action="identifyHashes"></textarea>
         </div>
         <div class="hash-results" id="hash-results"></div>
     </div>
@@ -183,7 +183,7 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" oninput="ident
         </div>
         <div class="form-group">
             <label>Enter URL</label>
-            <input type="text" id="url-input" class="form-control" placeholder="https://example.com:8080/path/to/page?query=value&foo=bar#section" oninput="parseUrl()">
+            <input type="text" id="url-input" class="form-control" placeholder="https://example.com:8080/path/to/page?query=value&foo=bar#section" data-input-action="parseUrl">
         </div>
         <div class="url-results" id="url-results"></div>
     </div>
@@ -199,14 +199,14 @@ e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" oninput="ident
             <label>Regular Expression</label>
             <div class="regex-input-row">
                 <span class="regex-delimiter">/</span>
-                <input type="text" id="regex-pattern" placeholder="[a-zA-Z0-9]+" oninput="testRegex()">
+                <input type="text" id="regex-pattern" placeholder="[a-zA-Z0-9]+" data-input-action="testRegex">
                 <span class="regex-delimiter">/</span>
-                <input type="text" id="regex-flags" value="gi" size="4" placeholder="gi" oninput="testRegex()">
+                <input type="text" id="regex-flags" value="gi" size="4" placeholder="gi" data-input-action="testRegex">
             </div>
         </div>
         <div class="form-group">
             <label>Test String</label>
-            <textarea id="regex-test" class="tools-textarea" rows="6" placeholder="Enter text to test against..." oninput="testRegex()"></textarea>
+            <textarea id="regex-test" class="tools-textarea" rows="6" placeholder="Enter text to test against..." data-input-action="testRegex"></textarea>
         </div>
         <div class="regex-results" id="regex-results"></div>
     </div>
@@ -227,7 +227,7 @@ From: Sender Name <sender@example.com>
 To: recipient@example.com
 Subject: Test Email
 Date: Mon, 28 Jan 2024 10:00:00 +0000
-..." oninput="parseEmailHeaders()"></textarea>
+..." data-input-action="parseEmailHeaders"></textarea>
         </div>
         <div class="email-results" id="email-results"></div>
     </div>
@@ -241,7 +241,7 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
         </div>
         <div class="form-group">
             <label>Log Format</label>
-            <select id="log-format" onchange="parseLog()">
+            <select id="log-format" data-change-action="parseLog">
                 <option value="auto">Auto-detect</option>
                 <option value="json">JSON</option>
                 <option value="cef">CEF (Common Event Format)</option>
@@ -253,7 +253,7 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
         </div>
         <div class="form-group">
             <label>Log Entry</label>
-            <textarea id="log-input" class="tools-textarea" rows="8" placeholder="Paste log entry here..." oninput="parseLog()"></textarea>
+            <textarea id="log-input" class="tools-textarea" rows="8" placeholder="Paste log entry here..." data-input-action="parseLog"></textarea>
         </div>
         <div class="log-results" id="log-results"></div>
     </div>
@@ -268,23 +268,23 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
         <div class="encoding-grid">
             <div class="encoding-section">
                 <h4>Text Input</h4>
-                <textarea id="enc-text" class="tools-textarea" rows="4" placeholder="Enter text..." oninput="updateEncodings()"></textarea>
+                <textarea id="enc-text" class="tools-textarea" rows="4" placeholder="Enter text..." data-input-action="updateEncodings"></textarea>
             </div>
             <div class="encoding-section">
                 <h4>Base64</h4>
-                <textarea id="enc-base64" class="tools-textarea" rows="3" placeholder="Base64..." oninput="decodeFromBase64()"></textarea>
+                <textarea id="enc-base64" class="tools-textarea" rows="3" placeholder="Base64..." data-input-action="decodeFromBase64"></textarea>
             </div>
             <div class="encoding-section">
                 <h4>Hex</h4>
-                <textarea id="enc-hex" class="tools-textarea" rows="3" placeholder="48 65 6c 6c 6f..." oninput="decodeFromHex()"></textarea>
+                <textarea id="enc-hex" class="tools-textarea" rows="3" placeholder="48 65 6c 6c 6f..." data-input-action="decodeFromHex"></textarea>
             </div>
             <div class="encoding-section">
                 <h4>URL Encoded</h4>
-                <textarea id="enc-url" class="tools-textarea" rows="3" placeholder="Hello%20World..." oninput="decodeFromUrl()"></textarea>
+                <textarea id="enc-url" class="tools-textarea" rows="3" placeholder="Hello%20World..." data-input-action="decodeFromUrl"></textarea>
             </div>
             <div class="encoding-section">
                 <h4>HTML Entities</h4>
-                <textarea id="enc-html" class="tools-textarea" rows="3" placeholder="&lt;script&gt;..." oninput="decodeFromHtml()"></textarea>
+                <textarea id="enc-html" class="tools-textarea" rows="3" placeholder="&lt;script&gt;..." data-input-action="decodeFromHtml"></textarea>
             </div>
             <div class="encoding-section">
                 <h4>Binary</h4>
@@ -292,7 +292,7 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
             </div>
             <div class="encoding-section">
                 <h4>ROT13</h4>
-                <textarea id="enc-rot13" class="tools-textarea" rows="3" placeholder="ROT13..." oninput="decodeFromRot13()"></textarea>
+                <textarea id="enc-rot13" class="tools-textarea" rows="3" placeholder="ROT13..." data-input-action="decodeFromRot13"></textarea>
             </div>
             <div class="encoding-section">
                 <h4>ASCII Decimal</h4>
@@ -312,7 +312,7 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
             <label>Enter IOC (IP, Domain, Hash, URL)</label>
             <div class="lookup-input-row">
                 <input type="text" id="lookup-ioc" class="form-control" placeholder="e.g., 8.8.8.8, evil.com, d41d8cd98f00b204e9800998ecf8427e">
-                <button class="btn btn-primary" onclick="lookupIOC()">Lookup</button>
+                <button class="btn btn-primary" data-click-action="lookupIOC">Lookup</button>
             </div>
         </div>
         <div class="lookup-results" id="lookup-results">
@@ -331,8 +331,8 @@ evil.com
 d41d8cd98f00b204e9800998ecf8427e"></textarea>
         </div>
         <div class="form-actions">
-            <button class="btn btn-primary" onclick="bulkLookupIOCs()">Lookup All</button>
-            <button class="btn" onclick="exportLookupResults()">Export Results</button>
+            <button class="btn btn-primary" data-click-action="bulkLookupIOCs">Lookup All</button>
+            <button class="btn" data-click-action="exportLookupResults">Export Results</button>
         </div>
         <div class="bulk-lookup-results" id="bulk-lookup-results"></div>
     </div>
@@ -403,7 +403,7 @@ function updateIOCStats(iocs) {
             detailsHtml += `<div class="ioc-type-section">
                 <h4>${typeLabels[type]} (${matches.length})</h4>
                 <ul class="ioc-list">
-                    ${matches.map(m => `<li><code>${escapeHtml(m)}</code> <button class="btn btn-sm" onclick="lookupFromList('${escapeHtml(m)}')">Lookup</button></li>`).join('')}
+                    ${matches.map(m => `<li><code>${escapeHtml(m)}</code> <button class="btn btn-sm" data-click-action="lookupFromList" data-args='["${escapeHtml(m)}"]'>Lookup</button></li>`).join('')}
                 </ul>
             </div>`;
         }
@@ -485,12 +485,12 @@ function renderRules() {
     }
     container.innerHTML = customRules.map((rule, i) => `
         <div class="rule-item">
-            <input type="checkbox" ${rule.enabled ? 'checked' : ''} onchange="toggleRule(${i})">
+            <input type="checkbox" ${rule.enabled ? 'checked' : ''} data-change-action="toggleRule" data-args='[${i}]'>
             <span class="rule-label">Find:</span>
-            <input type="text" class="rule-input" value="${escapeHtml(rule.find)}" onchange="updateRule(${i}, 'find', this.value)">
+            <input type="text" class="rule-input" value="${escapeHtml(rule.find)}" data-change-action="updateRule" data-args='[${i}, "find", "$value"]'>
             <span class="rule-label">Replace:</span>
-            <input type="text" class="rule-input" value="${escapeHtml(rule.replace)}" onchange="updateRule(${i}, 'replace', this.value)">
-            <button class="btn btn-sm btn-danger" onclick="deleteRule(${i})">X</button>
+            <input type="text" class="rule-input" value="${escapeHtml(rule.replace)}" data-change-action="updateRule" data-args='[${i}, "replace", "$value"]'>
+            <button class="btn btn-sm btn-danger" data-click-action="deleteRule" data-args='[${i}]'>X</button>
         </div>
     `).join('');
 }

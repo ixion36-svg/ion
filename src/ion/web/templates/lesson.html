@@ -120,10 +120,10 @@ function render() {
            Click <em>Launch lab</em> to seed practice alerts/cases into ION for this exercise.
          </div>
          <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-           <button id="ln-lab-launch-btn" class="ln-btn-primary" onclick="launchLab()" style="font-size:0.8rem;padding:0.45rem 1rem;">
+           <button id="ln-lab-launch-btn" class="ln-btn-primary" data-click-action="launchLab" style="font-size:0.8rem;padding:0.45rem 1rem;">
              Launch lab
            </button>
-           <button id="ln-lab-complete-btn" class="ln-btn-secondary" onclick="completeLab()" style="font-size:0.8rem;padding:0.45rem 1rem;">
+           <button id="ln-lab-complete-btn" class="ln-btn-secondary" data-click-action="completeLab" style="font-size:0.8rem;padding:0.45rem 1rem;">
              Complete lab
            </button>
          </div>
@@ -143,10 +143,10 @@ function render() {
   }
 
   const completeBtn = (l.lesson_type === 'reading')
-    ? `<button class="ln-btn-primary" onclick="markComplete()" ${l.user_status === 'completed' ? 'disabled' : ''}>
+    ? `<button class="ln-btn-primary" data-click-action="markComplete" ${l.user_status === 'completed' ? 'disabled' : ''}>
          ${l.user_status === 'completed' ? '✓ Completed' : 'Mark complete →'}
        </button>`
-    : `<button id="ln-submit-btn" class="ln-btn-primary" onclick="submitQuiz()">Submit answers</button>`;
+    : `<button id="ln-submit-btn" class="ln-btn-primary" data-click-action="submitQuiz">Submit answers</button>`;
 
   const pdfLink = _courseSlug
     ? `<a class="ln-btn-secondary" href="/api/courses/${_courseSlug}/lessons/${l.id}/export.pdf" download style="font-size:0.78rem;padding:0.55rem 1rem;">Download PDF</a>`
@@ -289,7 +289,7 @@ function renderResults(d) {
 
   // Replace submit button with retry / next
   document.querySelector('.ln-actions').innerHTML = `
-    <button class="ln-btn-secondary" onclick="loadLesson()">Re-attempt</button>
+    <button class="ln-btn-secondary" data-click-action="loadLesson">Re-attempt</button>
     <a class="ln-btn-primary" href="javascript:history.back()">Back to course →</a>
   `;
 }

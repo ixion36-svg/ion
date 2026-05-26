@@ -29,7 +29,7 @@
     <div class="modal-content">
         <div class="modal-header">
             <h2>Version <span id="modal-version-num"></span></h2>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <button class="modal-close" data-click-action="closeModal">&times;</button>
         </div>
         <div class="modal-body">
             <div id="modal-meta" class="meta-bar"></div>
@@ -42,7 +42,7 @@
         </div>
         <div class="modal-footer">
             <button id="rollback-btn" class="btn btn-danger">Rollback to This Version</button>
-            <button class="btn" onclick="closeModal()">Close</button>
+            <button class="btn" data-click-action="closeModal">Close</button>
         </div>
     </div>
 </div>
@@ -91,9 +91,9 @@ async function loadVersions() {
             html += '<span>' + formatDate(v.created_at) + '</span>';
             html += '</div>';
             html += '<div class="version-actions">';
-            html += '<button class="btn btn-sm" onclick="viewVersion(' + v.version_number + ')">View</button>';
+            html += '<button class="btn btn-sm" data-click-action="viewVersion" data-args='[" + v.version_number + "]'>View</button>';
             if (v.version_number > 1) {
-                html += '<button class="btn btn-sm" onclick="showDiff(' + (v.version_number - 1) + ', ' + v.version_number + ')">Diff</button>';
+                html += '<button class="btn btn-sm" data-click-action="showDiff" data-args='[" + (v.version_number - 1) + ", " + v.version_number + "]'>Diff</button>';
             }
             html += '</div>';
             html += '</div>';

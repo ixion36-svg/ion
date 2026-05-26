@@ -14,7 +14,7 @@
     <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Forensics</h1>
     <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Evidence tracking and investigation management.</p>
   </div>
-  <button id="btn-new-investigation" onclick="showNewCaseModal()" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+  <button id="btn-new-investigation" data-click-action="showNewCaseModal" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
     <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
     New Investigation
   </button>
@@ -50,11 +50,11 @@
 
 <!-- Tabs -->
 <div class="fr-tabs">
-    <button class="fr-tab active" data-tab="pipeline" onclick="switchTab('pipeline')">Investigation Pipeline</button>
-    <button class="fr-tab" data-tab="investigations" onclick="switchTab('investigations')">All Investigations</button>
-    <button class="fr-tab" data-tab="evidence" onclick="switchTab('evidence')">Evidence Tracker</button>
-    <button class="fr-tab" data-tab="playbooks" onclick="switchTab('playbooks')">Forensic Playbooks</button>
-    <button class="fr-tab" data-tab="reference" onclick="switchTab('reference')">Reference Docs</button>
+    <button class="fr-tab active" data-tab="pipeline" data-click-action="switchTab" data-args='["pipeline"]'>Investigation Pipeline</button>
+    <button class="fr-tab" data-tab="investigations" data-click-action="switchTab" data-args='["investigations"]'>All Investigations</button>
+    <button class="fr-tab" data-tab="evidence" data-click-action="switchTab" data-args='["evidence"]'>Evidence Tracker</button>
+    <button class="fr-tab" data-tab="playbooks" data-click-action="switchTab" data-args='["playbooks"]'>Forensic Playbooks</button>
+    <button class="fr-tab" data-tab="reference" data-click-action="switchTab" data-args='["reference"]'>Reference Docs</button>
 </div>
 
 <!-- ==================== PIPELINE TAB (Stage Kanban) ==================== -->
@@ -90,8 +90,8 @@
 <!-- ==================== ALL INVESTIGATIONS TAB ==================== -->
 <div class="fr-panel" id="panel-investigations" style="display:none;">
     <div class="cases-filters-bar">
-        <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." oninput="debouncedFilter()">
-        <select id="filter-status" class="cases-filter-select" onchange="loadCases()">
+        <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." data-input-action="debouncedFilter">
+        <select id="filter-status" class="cases-filter-select" data-change-action="loadCases">
             <option value="">All Statuses</option>
             <option value="intake">Intake</option>
             <option value="evidence_collection">Evidence Collection</option>
@@ -100,8 +100,8 @@
             <option value="review">Review</option>
             <option value="closed">Closed</option>
         </select>
-        <select id="filter-type" class="cases-filter-select" onchange="loadCases()"></select>
-        <select id="filter-priority" class="cases-filter-select" onchange="loadCases()">
+        <select id="filter-type" class="cases-filter-select" data-change-action="loadCases"></select>
+        <select id="filter-priority" class="cases-filter-select" data-change-action="loadCases">
             <option value="">All Priorities</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
@@ -121,7 +121,7 @@
 <!-- ==================== EVIDENCE TAB ==================== -->
 <div class="fr-panel" id="panel-evidence" style="display:none;">
     <div class="cases-filters-bar">
-        <select id="evidence-case-select" class="cases-filter-select" onchange="loadEvidenceForCase()"><option value="">Select an investigation...</option></select>
+        <select id="evidence-case-select" class="cases-filter-select" data-change-action="loadEvidenceForCase"><option value="">Select an investigation...</option></select>
     </div>
     <div class="table-container">
         <table class="data-table" id="evidence-table">
@@ -135,8 +135,8 @@
 <!-- ==================== PLAYBOOKS TAB ==================== -->
 <div class="fr-panel" id="panel-playbooks" style="display:none;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-        <select id="pb-filter-type" class="cases-filter-select" onchange="loadPlaybooks()"><option value="">All Types</option></select>
-        <button class="btn btn-primary" onclick="showNewPlaybookModal()">+ New Playbook</button>
+        <select id="pb-filter-type" class="cases-filter-select" data-change-action="loadPlaybooks"><option value="">All Types</option></select>
+        <button class="btn btn-primary" data-click-action="showNewPlaybookModal">+ New Playbook</button>
     </div>
     <div class="table-container">
         <table class="data-table" id="playbooks-table">
@@ -157,13 +157,13 @@
 <!-- New Investigation Modal (Wizard: playbook → details) -->
 <div class="modal-overlay" id="modal-new-case" style="display:none;">
     <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
-        <div class="modal-header"><h2>New Forensic Investigation</h2><button class="modal-close" onclick="closeModal('modal-new-case')">&times;</button></div>
+        <div class="modal-header"><h2>New Forensic Investigation</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-new-case"]'>&times;</button></div>
         <div class="modal-body">
             <!-- Step 1: Select Playbook -->
             <div id="nc-step-1">
                 <label>Select a Forensic Playbook</label>
                 <p style="color:var(--text-secondary);font-size:.8rem;margin:0 0 8px;">Choose a playbook to guide the investigation with pre-defined sections, or skip to create a blank investigation.</p>
-                <select id="nc-playbook" class="form-input" onchange="onPlaybookSelect()">
+                <select id="nc-playbook" class="form-input" data-change-action="onPlaybookSelect">
                     <option value="">-- No Playbook (blank investigation) --</option>
                 </select>
                 <div id="nc-playbook-preview" style="margin-top:12px;display:none;">
@@ -190,8 +190,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-new-case')">Cancel</button>
-            <button class="btn btn-primary" onclick="createCase()">Create Investigation</button>
+            <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-new-case"]'>Cancel</button>
+            <button class="btn btn-primary" data-click-action="createCase">Create Investigation</button>
         </div>
     </div>
 </div>
@@ -200,9 +200,9 @@
 <div class="modal-overlay" id="modal-case-detail" style="display:none;">
     <div class="modal-dialog" style="max-width:960px;max-height:90vh;overflow-y:auto;">
         <div class="modal-header">
-            <h2 id="cd-title" class="editable-title" onclick="startEditTitle()" title="Click to edit title">Investigation Detail</h2>
-            <input type="text" id="cd-title-input" class="form-input" style="display:none;font-size:1.3rem;font-weight:700;flex:1;" onblur="saveTitle()" onkeydown="if(event.key==='Enter')saveTitle();if(event.key==='Escape')cancelEditTitle();">
-            <button class="modal-close" onclick="closeModal('modal-case-detail')">&times;</button>
+            <h2 id="cd-title" class="editable-title" data-click-action="startEditTitle" title="Click to edit title">Investigation Detail</h2>
+            <input type="text" id="cd-title-input" class="form-input" style="display:none;font-size:1.3rem;font-weight:700;flex:1;" data-blur-action="saveTitle" onkeydown="if(event.key==='Enter')saveTitle();if(event.key==='Escape')cancelEditTitle();">
+            <button class="modal-close" data-click-action="closeModal" data-args='["modal-case-detail"]'>&times;</button>
         </div>
         <div class="modal-body" id="cd-body">
             <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
@@ -213,10 +213,10 @@
                 <span id="cd-playbook-name" style="color:var(--accent,#00e5ff);font-size:.8rem;"></span>
                 <span id="cd-lock-indicator" style="font-size:.8rem;"></span>
                 <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
-                    <select id="cd-status-select" class="form-input" style="width:auto;padding:4px 8px;" onchange="updateCaseStatus()"></select>
-                    <button class="btn btn-secondary" style="padding:4px 10px;" id="cd-lock-btn" onclick="toggleLock()">Lock</button>
-                    <button class="btn btn-secondary" style="padding:4px 10px;" onclick="showCloseModal()">Close</button>
-                    <button class="btn btn-secondary" style="padding:4px 10px;" onclick="generateReport()">Report</button>
+                    <select id="cd-status-select" class="form-input" style="width:auto;padding:4px 8px;" data-change-action="updateCaseStatus"></select>
+                    <button class="btn btn-secondary" style="padding:4px 10px;" id="cd-lock-btn" data-click-action="toggleLock">Lock</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;" data-click-action="showCloseModal">Close</button>
+                    <button class="btn btn-secondary" style="padding:4px 10px;" data-click-action="generateReport">Report</button>
                 </div>
             </div>
             <!-- SLA Badges -->
@@ -231,29 +231,29 @@
                     <div id="cd-progress-fill" style="height:100%;background:var(--accent,#00e5ff);border-radius:4px;transition:width .3s;width:0%;"></div>
                 </div>
             </div>
-            <div id="cd-description" class="editable-desc" style="margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;min-height:20px;cursor:pointer;" onclick="startEditDesc()" title="Click to edit description"></div>
-            <textarea id="cd-desc-input" class="form-input" style="display:none;margin-bottom:16px;font-size:.85rem;" rows="3" onblur="saveDesc()" onkeydown="if(event.key==='Escape')cancelEditDesc();"></textarea>
+            <div id="cd-description" class="editable-desc" style="margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;min-height:20px;cursor:pointer;" data-click-action="startEditDesc" title="Click to edit description"></div>
+            <textarea id="cd-desc-input" class="form-input" style="display:none;margin-bottom:16px;font-size:.85rem;" rows="3" data-blur-action="saveDesc" data-keydown-action="if" data-args='[event.key==='Escape')cancelEditDesc(]'></textarea>
             <!-- Sub-tabs: Sections is now the primary tab -->
             <div class="fr-tabs" style="margin-bottom:12px;">
-                <button class="fr-tab active" onclick="switchDetailTab('sections')">Sections</button>
-                <button class="fr-tab" onclick="switchDetailTab('evidence')">Evidence</button>
-                <button class="fr-tab" onclick="switchDetailTab('timeline')">Timeline</button>
-                <button class="fr-tab" onclick="switchDetailTab('report')">Report</button>
-                <button class="fr-tab" onclick="switchDetailTab('annotations')">Annotations</button>
+                <button class="fr-tab active" data-click-action="switchDetailTab" data-args='["sections"]'>Sections</button>
+                <button class="fr-tab" data-click-action="switchDetailTab" data-args='["evidence"]'>Evidence</button>
+                <button class="fr-tab" data-click-action="switchDetailTab" data-args='["timeline"]'>Timeline</button>
+                <button class="fr-tab" data-click-action="switchDetailTab" data-args='["report"]'>Report</button>
+                <button class="fr-tab" data-click-action="switchDetailTab" data-args='["annotations"]'>Annotations</button>
             </div>
             <!-- Sections Tab (fillable investigation steps) -->
             <div id="cd-tab-sections">
                 <div id="cd-sections-list"></div>
-                <button class="btn btn-secondary" style="margin-top:8px;" onclick="showAddStepModal()">+ Add Section</button>
+                <button class="btn btn-secondary" style="margin-top:8px;" data-click-action="showAddStepModal">+ Add Section</button>
             </div>
             <div id="cd-tab-evidence" style="display:none;">
-                <button class="btn btn-primary" style="margin-bottom:12px;" onclick="showAddEvidenceModal()">+ Add Evidence</button>
+                <button class="btn btn-primary" style="margin-bottom:12px;" data-click-action="showAddEvidenceModal">+ Add Evidence</button>
                 <div id="cd-evidence-list"></div>
             </div>
             <div id="cd-tab-timeline" style="display:none;">
                 <div style="display:flex;gap:8px;margin-bottom:12px;">
                     <input type="text" id="cd-note-input" class="form-input" placeholder="Add a timeline note..." style="flex:1;">
-                    <button class="btn btn-primary" onclick="addTimelineNote()">Add</button>
+                    <button class="btn btn-primary" data-click-action="addTimelineNote">Add</button>
                 </div>
                 <div id="cd-timeline" style="max-height:400px;overflow-y:auto;"></div>
             </div>
@@ -269,11 +269,11 @@
                     <input type="datetime-local" id="forensic-ann-ts" style="width:100%;margin-bottom:6px;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;color:var(--text-primary);font-size:.85rem;">
                     <textarea id="forensic-ann-body" rows="3" placeholder="Add a timeline annotation..." style="width:100%;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:6px 8px;color:var(--text-primary);font-size:.85rem;resize:vertical;box-sizing:border-box;"></textarea>
                     <div style="display:flex;gap:6px;margin-top:6px;">
-                        <button class="btn btn-primary" style="font-size:.8rem;padding:4px 12px;" onclick="submitForensicAnnotation()">Save</button>
-                        <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" onclick="toggleForensicAnnotationForm()">Cancel</button>
+                        <button class="btn btn-primary" style="font-size:.8rem;padding:4px 12px;" data-click-action="submitForensicAnnotation">Save</button>
+                        <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" data-click-action="toggleForensicAnnotationForm">Cancel</button>
                     </div>
                 </div>
-                <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" onclick="toggleForensicAnnotationForm()">+ Add annotation</button>
+                <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" data-click-action="toggleForensicAnnotationForm">+ Add annotation</button>
             </div>
         </div>
     </div>
@@ -282,7 +282,7 @@
 <!-- Close Investigation Modal -->
 <div class="modal-overlay" id="modal-close-case" style="display:none;">
     <div class="modal-dialog" style="max-width:600px;">
-        <div class="modal-header"><h2>Close Investigation</h2><button class="modal-close" onclick="closeModal('modal-close-case')">&times;</button></div>
+        <div class="modal-header"><h2>Close Investigation</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-close-case"]'>&times;</button></div>
         <div class="modal-body">
             <p style="color:var(--text-secondary);margin-bottom:12px;">Closing will auto-generate a report in the Document Library under "Forensic Reports".</p>
             <label>Summary</label><textarea id="cc-summary" class="form-input" rows="3" placeholder="Executive summary..."></textarea>
@@ -290,8 +290,8 @@
             <label>Recommendations</label><textarea id="cc-recommendations" class="form-input" rows="3" placeholder="Recommended actions..."></textarea>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-close-case')">Cancel</button>
-            <button class="btn btn-primary" onclick="closeCaseSubmit()">Close Investigation</button>
+            <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-close-case"]'>Cancel</button>
+            <button class="btn btn-primary" data-click-action="closeCaseSubmit">Close Investigation</button>
         </div>
     </div>
 </div>
@@ -299,7 +299,7 @@
 <!-- Add Evidence Modal -->
 <div class="modal-overlay" id="modal-add-evidence" style="display:none;">
     <div class="modal-dialog" style="max-width:600px;">
-        <div class="modal-header"><h2>Add Evidence</h2><button class="modal-close" onclick="closeModal('modal-add-evidence')">&times;</button></div>
+        <div class="modal-header"><h2>Add Evidence</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-add-evidence"]'>&times;</button></div>
         <div class="modal-body">
             <label>Name *</label><input type="text" id="ae-name" class="form-input" placeholder="Evidence item name">
             <label>Evidence Type *</label><select id="ae-type" class="form-input"></select>
@@ -310,8 +310,8 @@
             <label>Description</label><textarea id="ae-description" class="form-input" rows="3" placeholder="Evidence description..."></textarea>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-add-evidence')">Cancel</button>
-            <button class="btn btn-primary" onclick="addEvidence()">Add Evidence</button>
+            <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-add-evidence"]'>Cancel</button>
+            <button class="btn btn-primary" data-click-action="addEvidence">Add Evidence</button>
         </div>
     </div>
 </div>
@@ -319,7 +319,7 @@
 <!-- Custody Action Modal -->
 <div class="modal-overlay" id="modal-custody" style="display:none;">
     <div class="modal-dialog" style="max-width:500px;">
-        <div class="modal-header"><h2>Log Custody Action</h2><button class="modal-close" onclick="closeModal('modal-custody')">&times;</button></div>
+        <div class="modal-header"><h2>Log Custody Action</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-custody"]'>&times;</button></div>
         <div class="modal-body">
             <label>Action *</label><select id="cust-action" class="form-input"></select>
             <label>Location</label><input type="text" id="cust-location" class="form-input" placeholder="Location">
@@ -327,8 +327,8 @@
             <label>Notes</label><textarea id="cust-notes" class="form-input" rows="3" placeholder="Notes..."></textarea>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-custody')">Cancel</button>
-            <button class="btn btn-primary" onclick="submitCustody()">Log Action</button>
+            <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-custody"]'>Cancel</button>
+            <button class="btn btn-primary" data-click-action="submitCustody">Log Action</button>
         </div>
     </div>
 </div>
@@ -336,7 +336,7 @@
 <!-- Custody Log Modal -->
 <div class="modal-overlay" id="modal-custody-log" style="display:none;">
     <div class="modal-dialog" style="max-width:700px;">
-        <div class="modal-header"><h2 id="cl-title">Chain of Custody</h2><button class="modal-close" onclick="closeModal('modal-custody-log')">&times;</button></div>
+        <div class="modal-header"><h2 id="cl-title">Chain of Custody</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-custody-log"]'>&times;</button></div>
         <div class="modal-body"><div id="cl-entries" style="max-height:500px;overflow-y:auto;"></div></div>
     </div>
 </div>
@@ -344,15 +344,15 @@
 <!-- Add Section Modal (ad-hoc step) -->
 <div class="modal-overlay" id="modal-add-step" style="display:none;">
     <div class="modal-dialog" style="max-width:500px;">
-        <div class="modal-header"><h2>Add Investigation Section</h2><button class="modal-close" onclick="closeModal('modal-add-step')">&times;</button></div>
+        <div class="modal-header"><h2>Add Investigation Section</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-add-step"]'>&times;</button></div>
         <div class="modal-body">
             <label>Section Title *</label><input type="text" id="as-title" class="form-input" placeholder="e.g. Network Analysis">
             <label>Guidance / Description</label><textarea id="as-description" class="form-input" rows="3" placeholder="What should be documented in this section?"></textarea>
             <div style="display:flex;align-items:center;gap:8px;margin-top:8px;"><input type="checkbox" id="as-required"><label for="as-required" style="margin:0;">Required section</label></div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-add-step')">Cancel</button>
-            <button class="btn btn-primary" onclick="addCaseStep()">Add Section</button>
+            <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-add-step"]'>Cancel</button>
+            <button class="btn btn-primary" data-click-action="addCaseStep">Add Section</button>
         </div>
     </div>
 </div>
@@ -360,7 +360,7 @@
 <!-- IOC Extract Modal -->
 <div class="modal-overlay" id="modal-ioc-extract" style="display:none;">
     <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
-        <div class="modal-header"><h2>Extract IOCs</h2><button class="modal-close" onclick="closeModal('modal-ioc-extract')">&times;</button></div>
+        <div class="modal-header"><h2>Extract IOCs</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-ioc-extract"]'>&times;</button></div>
         <div class="modal-body">
             <div class="ioc-upload-area" id="ioc-drop-zone">
                 <div id="ioc-upload-prompt">
@@ -374,13 +374,13 @@
             <div style="text-align:center;color:var(--text-secondary);font-size:.85rem;margin:8px 0;">— or paste text directly —</div>
             <textarea class="form-input" id="ioc-paste-text" rows="4" placeholder="Paste IOC data, log snippets, threat intel reports, etc."></textarea>
             <div style="margin-top:10px;display:flex;gap:8px;">
-                <button class="btn btn-primary" onclick="runIOCExtraction()">Extract IOCs</button>
-                <button class="btn btn-secondary" onclick="clearIOCModal()">Clear</button>
+                <button class="btn btn-primary" data-click-action="runIOCExtraction">Extract IOCs</button>
+                <button class="btn btn-secondary" data-click-action="clearIOCModal">Clear</button>
             </div>
             <div id="ioc-results" style="display:none;margin-top:16px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                     <h3 style="margin:0;">Extracted IOCs <span id="ioc-total-badge" class="badge" style="font-size:.75rem;"></span></h3>
-                    <button class="btn btn-primary" style="padding:5px 14px;" onclick="applyIOCsToStep()">Apply to Section Fields</button>
+                    <button class="btn btn-primary" style="padding:5px 14px;" data-click-action="applyIOCsToStep">Apply to Section Fields</button>
                 </div>
                 <div id="ioc-results-body"></div>
             </div>
@@ -391,7 +391,7 @@
 <!-- New/Edit Playbook Modal -->
 <div class="modal-overlay" id="modal-playbook" style="display:none;">
     <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
-        <div class="modal-header"><h2 id="pb-modal-title">New Forensic Playbook</h2><button class="modal-close" onclick="closeModal('modal-playbook')">&times;</button></div>
+        <div class="modal-header"><h2 id="pb-modal-title">New Forensic Playbook</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-playbook"]'>&times;</button></div>
         <div class="modal-body">
             <label>Name *</label><input type="text" id="pb-name" class="form-input" placeholder="Playbook name">
             <label>Investigation Type</label><select id="pb-type" class="form-input"><option value="">Any</option></select>
@@ -399,11 +399,11 @@
             <label>Description</label><textarea id="pb-desc" class="form-input" rows="3" placeholder="Playbook description..."></textarea>
             <h3 style="margin:16px 0 8px;">Steps</h3>
             <div id="pb-steps-list"></div>
-            <button class="btn btn-secondary" style="margin-top:8px;" onclick="addPlaybookStepRow()">+ Add Step</button>
+            <button class="btn btn-secondary" style="margin-top:8px;" data-click-action="addPlaybookStepRow">+ Add Step</button>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-playbook')">Cancel</button>
-            <button class="btn btn-primary" onclick="savePlaybook()">Save</button>
+            <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-playbook"]'>Cancel</button>
+            <button class="btn btn-primary" data-click-action="savePlaybook">Save</button>
         </div>
     </div>
 </div>
@@ -411,11 +411,11 @@
 <!-- Report Modal -->
 <div class="modal-overlay" id="modal-report" style="display:none;">
     <div class="modal-dialog" style="max-width:800px;max-height:90vh;overflow-y:auto;">
-        <div class="modal-header"><h2 id="rpt-title">Investigation Report</h2><button class="modal-close" onclick="closeModal('modal-report')">&times;</button></div>
+        <div class="modal-header"><h2 id="rpt-title">Investigation Report</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-report"]'>&times;</button></div>
         <div class="modal-body"><div id="rpt-content" style="white-space:pre-wrap;font-family:monospace;background:var(--bg-secondary);padding:16px;border-radius:8px;"></div></div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="closeModal('modal-report')">Close</button>
-            <button class="btn btn-primary" onclick="copyReport()">Copy to Clipboard</button>
+            <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-report"]'>Close</button>
+            <button class="btn btn-primary" data-click-action="copyReport">Copy to Clipboard</button>
         </div>
     </div>
 </div>
@@ -423,7 +423,7 @@
 <!-- Reference Doc Viewer Modal -->
 <div class="modal-overlay" id="modal-ref-doc" style="display:none;">
     <div class="modal-dialog" style="max-width:800px;max-height:90vh;overflow-y:auto;">
-        <div class="modal-header"><h2 id="ref-doc-title">Reference Document</h2><button class="modal-close" onclick="closeModal('modal-ref-doc')">&times;</button></div>
+        <div class="modal-header"><h2 id="ref-doc-title">Reference Document</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-ref-doc"]'>&times;</button></div>
         <div class="modal-body"><div id="ref-doc-content" class="ref-doc-body"></div></div>
     </div>
 </div>
@@ -899,7 +899,7 @@ function renderCasesTable(){
     const tbody=document.getElementById('cases-tbody'),empty=document.getElementById('cases-empty');
     if(!filtered.length){tbody.innerHTML='';empty.style.display='';return}
     empty.style.display='none';
-    tbody.innerHTML=filtered.map(c=>`<tr onclick="openCaseDetail(${c.id})">
+    tbody.innerHTML=filtered.map(c=>`<tr data-click-action="openCaseDetail" data-args='[${c.id}]'>
         <td><strong>${esc(c.case_number)}</strong></td><td>${esc(c.title)}</td><td>${fmtLabel(c.investigation_type)}</td>
         <td><span class="badge badge-${c.priority}">${c.priority}</span></td>
         <td><span class="badge badge-${c.status}">${fmtLabel(c.status)}</span></td>
@@ -931,7 +931,7 @@ function renderPipeline(){
         const col=document.getElementById('pipe-col-'+s);
         const cards=allCases.filter(c=>c.status===s);
         document.getElementById('pipe-'+s).textContent=cards.length;
-        col.innerHTML=cards.map(c=>`<div class="fr-card" onclick="openCaseDetail(${c.id})">
+        col.innerHTML=cards.map(c=>`<div class="fr-card" data-click-action="openCaseDetail" data-args='[${c.id}]'>
             <div class="fr-card-num">${esc(c.case_number)}</div>
             <div class="fr-card-title">${esc(c.title)}</div>
             ${stepProgress(c)}
@@ -1008,8 +1008,8 @@ function renderFieldInput(field, value, stepId) {
         case 'list': {
             const items = Array.isArray(value) ? value : [];
             let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-list" id="${fid}" data-field-key="${k}" data-field-type="list">`;
-            items.forEach((v,i) => { html += `<div class="sf-list-row"><input class="form-input sf-input" value="${esc(v)}" placeholder="${ph}"><button type="button" class="btn-icon sf-list-remove" onclick="this.parentElement.remove()" title="Remove">&times;</button></div>`; });
-            html += `</div><button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" onclick="addListItem('${fid}','${ph}')">+ Add</button></div>`;
+            items.forEach((v,i) => { html += `<div class="sf-list-row"><input class="form-input sf-input" value="${esc(v)}" placeholder="${ph}"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">&times;</button></div>`; });
+            html += `</div><button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" data-click-action="addListItem" data-args='["${fid}", "${ph}"]'>+ Add</button></div>`;
             return html;
         }
         case 'table': {
@@ -1018,10 +1018,10 @@ function renderFieldInput(field, value, stepId) {
             let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-table-wrap" id="${fid}" data-field-key="${k}" data-field-type="table" data-cols='${JSON.stringify(cols)}'>`;
             html += `<table class="sf-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th style="width:30px"></th></tr></thead><tbody>`;
             rows.forEach(row => {
-                html += `<tr>${cols.map(c=>`<td><input class="form-input sf-input" value="${esc(row[c]||'')}" data-col="${esc(c)}"></td>`).join('')}<td><button type="button" class="btn-icon sf-list-remove" onclick="this.closest('tr').remove()" title="Remove">&times;</button></td></tr>`;
+                html += `<tr>${cols.map(c=>`<td><input class="form-input sf-input" value="${esc(row[c]||'')}" data-col="${esc(c)}"></td>`).join('')}<td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">&times;</button></td></tr>`;
             });
             html += `</tbody></table>`;
-            html += `<button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" onclick="addTableRow('${fid}')">+ Add Row</button></div></div>`;
+            html += `<button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" data-click-action="addTableRow" data-args='["${fid}"]'>+ Add Row</button></div></div>`;
             return html;
         }
         case 'select': {
@@ -1043,7 +1043,7 @@ function addListItem(containerId, placeholder) {
     const c = document.getElementById(containerId);
     const row = document.createElement('div');
     row.className = 'sf-list-row';
-    row.innerHTML = `<input class="form-input sf-input" placeholder="${placeholder||''}"><button type="button" class="btn-icon sf-list-remove" onclick="this.parentElement.remove()" title="Remove">&times;</button>`;
+    row.innerHTML = `<input class="form-input sf-input" placeholder="${placeholder||''}"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">&times;</button>`;
     c.appendChild(row);
     row.querySelector('input').focus();
 }
@@ -1053,7 +1053,7 @@ function addTableRow(containerId) {
     const cols = JSON.parse(wrap.dataset.cols || '[]');
     const tbody = wrap.querySelector('tbody');
     const tr = document.createElement('tr');
-    tr.innerHTML = cols.map(c => `<td><input class="form-input sf-input" data-col="${esc(c)}"></td>`).join('') + `<td><button type="button" class="btn-icon sf-list-remove" onclick="this.closest('tr').remove()" title="Remove">&times;</button></td>`;
+    tr.innerHTML = cols.map(c => `<td><input class="form-input sf-input" data-col="${esc(c)}"></td>`).join('') + `<td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">&times;</button></td>`;
     tbody.appendChild(tr);
     tr.querySelector('input').focus();
 }
@@ -1103,7 +1103,7 @@ function renderSections(steps) {
         const fd = s.fields_data || {};
         const hasFields = fields.length > 0;
         return `<div class="section-card ${s.is_completed ? 'completed' : ''}" id="section-${s.id}">
-            <div class="section-card-header" onclick="toggleSection(${s.id})">
+            <div class="section-card-header" data-click-action="toggleSection" data-args='[${s.id}]'>
                 <span class="section-num">${s.is_completed ? '&#10003;' : s.step_order}</span>
                 <div class="section-card-title">
                     ${esc(s.title)}
@@ -1119,13 +1119,13 @@ function renderSections(steps) {
                     <textarea class="form-input sf-input" id="section-content-${s.id}" rows="${hasFields ? 3 : 6}" placeholder="Enter your findings, analysis, and documentation...">${esc(s.content || '')}</textarea>
                 </div>
                 <div class="section-card-actions">
-                    <button class="btn btn-primary" style="padding:6px 16px;" onclick="saveSection(${s.id})">Save</button>
+                    <button class="btn btn-primary" style="padding:6px 16px;" data-click-action="saveSection" data-args='[${s.id}]'>Save</button>
                     ${!s.is_completed
-                        ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--mitre-covered);" onclick="completeSection('+s.id+')">Mark Complete</button>'
-                        : '<button class="btn btn-secondary" style="padding:6px 16px;color:#f0c000;" onclick="reopenSection('+s.id+')">Reopen</button>'
+                        ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--mitre-covered);" data-click-action="completeSection" data-args='["+s.id+"]'>Mark Complete</button>'
+                        : '<button class="btn btn-secondary" style="padding:6px 16px;color:#f0c000;" data-click-action="reopenSection" data-args='["+s.id+"]'>Reopen</button>'
                     }
-                    <button class="btn-extract-ioc" onclick="showIOCExtractModal(${s.id})">&#128269; Extract IOCs</button>
-                    ${!s.playbook_step_id ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--sev-critical);margin-left:auto;" onclick="deleteSection('+s.id+')">Delete</button>' : ''}
+                    <button class="btn-extract-ioc" data-click-action="showIOCExtractModal" data-args='[${s.id}]'>&#128269; Extract IOCs</button>
+                    ${!s.playbook_step_id ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--sev-critical);margin-left:auto;" data-click-action="deleteSection" data-args='["+s.id+"]'>Delete</button>' : ''}
                 </div>
             </div>
         </div>`;
@@ -1476,7 +1476,7 @@ function renderTimeline(entries){
 function renderDetailEvidence(items){
     const d=document.getElementById('cd-evidence-list');
     if(!items.length){d.innerHTML='<div class="empty-state">No evidence items</div>';return}
-    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'}" style="font-size:.7rem;">${fmtLabel(e.status)}</span></div><div style="display:flex;gap:6px;"><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="showCustodyLog(${e.id},'${esc(e.evidence_number)}')">Custody (${e.custody_entries||0})</button><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="showCustodyModal(${e.id})">+ Action</button></div></div><div style="font-size:.8rem;color:var(--text-secondary);">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
+    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'}" style="font-size:.7rem;">${fmtLabel(e.status)}</span></div><div style="display:flex;gap:6px;"><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="showCustodyLog" data-args='[${e.id}, "${esc(e.evidence_number)}"]'>Custody (${e.custody_entries||0})</button><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="showCustodyModal" data-args='[${e.id}]'>+ Action</button></div></div><div style="font-size:.8rem;color:var(--text-secondary);">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
 }
 
 // ======== CASE ACTIONS ========
@@ -1558,7 +1558,7 @@ async function loadEvidenceForCase(){
 function renderEvidenceTable(items){
     const tbody=document.getElementById('evidence-tbody'),empty=document.getElementById('evidence-empty');
     if(!items.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" onclick="event.stopPropagation();showCustodyLog(${e.id},'${esc(e.evidence_number)}')">${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="event.stopPropagation();showCustodyModal(${e.id})">+ Custody</button></td></tr>`).join('');
+    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" data-click-action="showCustodyLog" data-stop-propagation data-args='[${e.id}, "${esc(e.evidence_number)}"]'>${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="showCustodyModal" data-stop-propagation data-args='[${e.id}]'>+ Custody</button></td></tr>`).join('');
 }
 function showAddEvidenceModal(){['ae-name','ae-source','ae-storage','ae-md5','ae-sha256','ae-description'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-add-evidence').style.display='flex'}
 async function addEvidence(){
@@ -1586,7 +1586,7 @@ async function loadPlaybooks(){
 function renderPlaybooksTable(pbs){
     const tbody=document.getElementById('playbooks-tbody'),empty=document.getElementById('playbooks-empty');
     if(!pbs.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span style="color:var(--mitre-covered);">Active</span>':'<span style="color:#6e7681;">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" onclick="editPlaybook(${p.id})">Edit</button> <button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;color:var(--sev-critical);" onclick="deletePlaybook(${p.id})">Delete</button></td></tr>`).join('');
+    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span style="color:var(--mitre-covered);">Active</span>':'<span style="color:#6e7681;">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="editPlaybook" data-args='[${p.id}]'>Edit</button> <button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;color:var(--sev-critical);" data-click-action="deletePlaybook" data-args='[${p.id}]'>Delete</button></td></tr>`).join('');
 }
 function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').innerHTML='';addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
 async function editPlaybook(id){
@@ -1609,7 +1609,7 @@ async function deletePlaybook(id){if(!confirm('Delete this playbook?'))return;tr
 // ======== REFERENCE DOCS ========
 function renderReferenceDocs(){
     const grid=document.getElementById('ref-docs-grid');
-    grid.innerHTML=referenceDocs.map(d=>`<div class="fr-ref-card" onclick="viewRefDoc('${d.id}')"><div class="fr-ref-category">${esc(d.category)}</div><div class="fr-ref-title">${esc(d.title)}</div><div class="fr-ref-preview">${esc(d.content.substring(0,200))}...</div></div>`).join('')||'<div class="empty-state">No reference documents available</div>';
+    grid.innerHTML=referenceDocs.map(d=>`<div class="fr-ref-card" data-click-action="viewRefDoc" data-args='["${d.id}"]'><div class="fr-ref-category">${esc(d.category)}</div><div class="fr-ref-title">${esc(d.title)}</div><div class="fr-ref-preview">${esc(d.content.substring(0,200))}...</div></div>`).join('')||'<div class="empty-state">No reference documents available</div>';
 }
 function viewRefDoc(id){
     const doc=referenceDocs.find(d=>d.id===id);if(!doc)return;
@@ -1665,7 +1665,7 @@ function renderForensicAnnotations(annotations) {
             + '<span>&middot;</span><span>' + (author||'') + '</span>'
             + '<span style="margin-left:auto;display:flex;gap:4px;">'
             + '<button type="button" onclick="editForensicAnnotation(' + a.id + ',\'' + (a.body||'').replace(/'/g,"\\'") + '\')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&#9998;</button>'
-            + '<button type="button" onclick="deleteForensicAnnotation(' + a.id + ')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&times;</button>'
+            + '<button type="button" data-click-action="deleteForensicAnnotation" data-args='[" + a.id + "]' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&times;</button>'
             + '</span></div>'
             + '<div style="font-size:.8rem;color:var(--text-primary);white-space:pre-wrap;">' + (a.body||'') + '</div>'
             + '</div>';

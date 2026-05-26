@@ -24,7 +24,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Team-vs-team attack/defend exercises.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" onclick="crBack()" id="cr-back-btn" style="display:none"><i class="icon-arrow-left"></i> Scenarios</button>
+        <button class="btn btn-secondary" data-click-action="crBack" id="cr-back-btn" style="display:none"><i class="icon-arrow-left"></i> Scenarios</button>
     </div>
 </section>
 <div id="cr-content"><div class="cr-loading"><span class="cr-spinner"></span> Loading scenarios...</div></div>
@@ -178,7 +178,7 @@ async function crInit(){
 
 function renderList(scenarios){
     let h='<div style="margin-bottom:16px"><p style="color:var(--text-secondary);font-size:.88rem">Interactive red team vs blue team training. Execute attack commands in a Cobalt Strike-style interface.</p></div><div class="cr-scenarios">';
-    for(const s of scenarios)h+=`<div class="cr-sc-card" onclick="crStart('${s.id}')"><div class="cr-sc-title">${esc(s.title)}</div><div class="cr-sc-desc">${esc(s.description)}</div><div class="cr-sc-meta"><span class="sev-badge sev-critical" style="font-size:.65rem">${esc(s.difficulty)}</span><span>${s.estimated_minutes}m</span><span>${s.stage_count} stages</span><span>${s.total_commands} cmds</span></div></div>`;
+    for(const s of scenarios)h+=`<div class="cr-sc-card" data-click-action="crStart" data-args='["${s.id}"]'><div class="cr-sc-title">${esc(s.title)}</div><div class="cr-sc-desc">${esc(s.description)}</div><div class="cr-sc-meta"><span class="sev-badge sev-critical" style="font-size:.65rem">${esc(s.difficulty)}</span><span>${s.estimated_minutes}m</span><span>${s.stage_count} stages</span><span>${s.total_commands} cmds</span></div></div>`;
     h+='</div>';$('cr-content').innerHTML=h;$('cr-back-btn').style.display='none';
 }
 
@@ -265,7 +265,7 @@ function renderCS(){
     // Command bar
     if(stage&&cmd){
         const cmdShort=cmd.cmd.split('\\n')[0];
-        h+=`<div class="cr-cmd-bar"><span class="cr-cmd-prompt">beacon&gt;</span><span class="cr-cmd-desc" title="${esc(cmd.description)}">${esc(cmdShort)}</span><button class="cr-cmd-btn" onclick="crExec()" id="cr-exec-btn">EXECUTE</button></div>`;
+        h+=`<div class="cr-cmd-bar"><span class="cr-cmd-prompt">beacon&gt;</span><span class="cr-cmd-desc" title="${esc(cmd.description)}">${esc(cmdShort)}</span><button class="cr-cmd-btn" data-click-action="crExec" id="cr-exec-btn">EXECUTE</button></div>`;
     }else{
         h+='<div class="cr-cmd-bar"><span class="cr-cmd-prompt">beacon&gt;</span><span class="cr-cmd-desc" style="color:#3fb950">Engagement complete. All objectives achieved.</span></div>';
     }
@@ -274,9 +274,9 @@ function renderCS(){
 
     // Bottom panel
     h+='<div class="cr-bottom"><div class="cr-bottom-tabs">';
-    h+=`<div class="cr-btab blue ${bottomTab==='logs'?'active':''}" onclick="crBTab('logs')">Event Log (${blueLogs.length})</div>`;
-    h+=`<div class="cr-btab alert ${bottomTab==='alerts'?'active':''}" onclick="crBTab('alerts')">Alerts (${blueAlerts.length})</div>`;
-    h+=`<div class="cr-btab user ${bottomTab==='user'?'active':''}" onclick="crBTab('user')">Victim View</div>`;
+    h+=`<div class="cr-btab blue ${bottomTab==='logs'?'active':''}" data-click-action="crBTab" data-args='["logs"]'>Event Log (${blueLogs.length})</div>`;
+    h+=`<div class="cr-btab alert ${bottomTab==='alerts'?'active':''}" data-click-action="crBTab" data-args='["alerts"]'>Alerts (${blueAlerts.length})</div>`;
+    h+=`<div class="cr-btab user ${bottomTab==='user'?'active':''}" data-click-action="crBTab" data-args='["user"]'>Victim View</div>`;
     h+='</div><div class="cr-bottom-feed" id="cr-feed">';
 
     if(bottomTab==='logs'){

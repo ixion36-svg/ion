@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Tripwire tokens and canary accounts for early breach detection.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" onclick="canScan()">Scan Recent Alerts</button>
-        <button class="btn btn-primary" onclick="canOpenForm()">+ New Canary</button>
+        <button class="btn btn-secondary" data-click-action="canScan">Scan Recent Alerts</button>
+        <button class="btn btn-primary" data-click-action="canOpenForm">+ New Canary</button>
     </div>
 </section>
 
@@ -29,7 +29,7 @@
     <div class="can-modal">
         <div class="can-modal-head">
             <div class="can-modal-title" id="can-modal-title">New Canary</div>
-            <button class="can-modal-close" onclick="canCloseForm()" aria-label="Close">&times;</button>
+            <button class="can-modal-close" data-click-action="canCloseForm" aria-label="Close">&times;</button>
         </div>
         <form class="can-modal-body" id="can-form" onsubmit="return canSubmit(event)">
             <input type="hidden" id="can-id" value="">
@@ -75,7 +75,7 @@
             </div>
 
             <div class="can-form-actions">
-                <button type="button" class="btn btn-secondary" onclick="canCloseForm()">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-click-action="canCloseForm">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save Canary</button>
             </div>
         </form>
@@ -213,7 +213,7 @@ function canRender(canaries, stats, hits) {
         html += `<div class="can-section"><div class="can-empty">
             <h3>No canaries planted yet</h3>
             <p>Plant a decoy file, account, host, or token. ION will scan recent alerts for any mention and raise a high-confidence breach alert when one fires.</p>
-            <button class="btn btn-primary" onclick="canOpenForm()" style="margin-top:16px">+ Create First Canary</button>
+            <button class="btn btn-primary" data-click-action="canOpenForm" style="margin-top:16px">+ Create First Canary</button>
         </div></div>`;
     } else {
         html += `<div class="can-section"><div class="can-section-head">
@@ -233,8 +233,8 @@ function canRender(canaries, stats, hits) {
                 <td>${ca.hit_count || 0}</td>
                 <td>${canFmtTime(ca.last_hit_at)}</td>
                 <td><div class="can-actions">
-                    <button class="can-iconbtn" onclick="canEdit(${ca.id})">Edit</button>
-                    <button class="can-iconbtn danger" onclick="canDelete(${ca.id})">Delete</button>
+                    <button class="can-iconbtn" data-click-action="canEdit" data-args='[${ca.id}]'>Edit</button>
+                    <button class="can-iconbtn danger" data-click-action="canDelete" data-args='[${ca.id}]'>Delete</button>
                 </div></td>
             </tr>`;
         }

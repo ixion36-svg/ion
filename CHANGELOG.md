@@ -1,13 +1,69 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.17 -->
+<!-- ion-doc:version=0.31.18 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.18 — 2026-05-26
+
+P11 mass migration. `tools/migrate_inline_handlers.py` swept across
+the 65 remaining templates and mechanically retired **778 of 825
+inline event handlers** (94.3%). 47 remain unmigratable in 24
+templates — they need hand-fixes (rewrite the JS source that builds
+handlers via string concatenation, or split compound-statement
+handlers). Those will land in subsequent releases before the final
+CSP flip to `script-src-attr 'none'`. SECURE_BY_DESIGN audit summary
+unchanged at **18 Met / 2 Mostly Met / 0 Partial / 0 Gap** (P11 stays
+Mostly Met until ALL inline handlers are gone AND the CSP flip ships).
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): inline handler retirement across 65 templates
+
+* Templates migrated: all 65 remaining .html files under
+  `src/ion/web/templates/`. Cumulative across v0.31.4 (base.html, 7),
+  v0.31.5 (cases.html, 48), v0.31.6 (alerts.html, 194), v0.31.7
+  (training.html, 119), and this release (~778) = ~1,146 handlers
+  migrated to delegated `data-action`/`data-args` attributes.
+* `tools/migrate_inline_handlers.py` extended with two new pattern
+  translations:
+  * `this.parentElement.remove()` → `data-remove-parent`
+  * `this.closest('SELECTOR').remove()` → `data-remove-closest="SELECTOR"`
+  Both helper attributes were already implemented in
+  `static/js/event-delegation.js` (v0.31.6) but the migration script
+  hadn't been taught the source-side patterns until now.
+
+### chore(security): remaining unmigratable handlers — 47 in 24 templates
+
+To be hand-fixed in subsequent releases. Categorisation:
+
+* **JS-source-escape patterns** (~13): HTML attributes built via JS
+  string concatenation with `\\'` escapes around dynamic values.
+  Need a refactor of the JS source to use `createElement` +
+  `addEventListener` or to escape via `data-args` with HTML-safe
+  inner-quote encoding. Found in: `documents.html`, `forensics.html`,
+  `social.html`, `templates.html`, `threat_intel.html`.
+* **Multi-statement handlers** (~14): handlers that chain a `.remove()`
+  with another function call, or two separate function calls. The
+  delegated helper supports only one action attribute per element.
+  Hand-fix: move the chain to a wrapper function called via
+  `data-click-action`. Concentrated in `template_form.html` (12
+  similar `removeListItem`/`addListItem` patterns).
+* **Compound-condition handlers** (~3): `onkeydown="if(key==='Enter')A();if(key==='Escape')B()"`
+  in `forensics.html`, `social.html`, `documents.html`. Hand-fix:
+  bind `keydown` programmatically in a `<script nonce>` block and
+  dispatch by key.
+* **Simple-but-unhandled** (~17): `onclick="window.print()"`,
+  `onsubmit="return false"`, `onclick="this.parentElement.classList.toggle('open')"`,
+  IIFEs, DOM-method calls. Either extend the script with new
+  patterns, or hand-fix individually.
+* **Macro-parameter handlers** (2 in `_components.html`):
+  `onclick="{{ onclick }}"` in a Jinja macro — needs the macro
+  itself refactored to accept a `data-action` parameter instead.
 
 ## v0.31.17 — 2026-05-26
 

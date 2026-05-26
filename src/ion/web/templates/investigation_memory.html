@@ -17,10 +17,10 @@
       <p class="mt-3 text-[13px] text-slate-400 max-w-2xl">Past investigations, IOC sighting history, and known false-positive signatures used to rehydrate context on repeat alerts.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button onclick="imRefresh()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="imRefresh" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
         <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
       </button>
-      <button onclick="imShowFpModal()" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+      <button data-click-action="imShowFpModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
         <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>New FP signature
       </button>
     </div>
@@ -28,9 +28,9 @@
 
   <!-- Tabs -->
   <div class="flex items-center gap-1 mb-6 border-b border-white/5">
-    <button id="im-tab-inv" class="im-tab im-tab-active" onclick="imSwitchTab('inv')">Investigations</button>
-    <button id="im-tab-iocs" class="im-tab" onclick="imSwitchTab('iocs')">IOC Sightings</button>
-    <button id="im-tab-fps" class="im-tab" onclick="imSwitchTab('fps')">False Positives</button>
+    <button id="im-tab-inv" class="im-tab im-tab-active" data-click-action="imSwitchTab" data-args='["inv"]'>Investigations</button>
+    <button id="im-tab-iocs" class="im-tab" data-click-action="imSwitchTab" data-args='["iocs"]'>IOC Sightings</button>
+    <button id="im-tab-fps" class="im-tab" data-click-action="imSwitchTab" data-args='["fps"]'>False Positives</button>
   </div>
 
   <!-- =============== Investigations Tab =============== -->
@@ -38,11 +38,11 @@
     <div class="flex flex-wrap items-end gap-2 mb-4">
       <div class="flex-1 min-w-[200px]">
         <label class="label-tiny block mb-1 text-slate-500">Signature</label>
-        <input type="text" id="im-filter-signature" class="h-9 w-full rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" placeholder="e.g. Suspicious PowerShell" oninput="imDebouncedLoadInv()">
+        <input type="text" id="im-filter-signature" class="h-9 w-full rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" placeholder="e.g. Suspicious PowerShell" data-input-action="imDebouncedLoadInv">
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Verdict</label>
-        <select id="im-filter-verdict" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+        <select id="im-filter-verdict" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
           <option value="">All</option>
           <option value="true_positive">True positive</option>
           <option value="false_positive">False positive</option>
@@ -52,7 +52,7 @@
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Status</label>
-        <select id="im-filter-status" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+        <select id="im-filter-status" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
           <option value="">All</option>
           <option value="pending">Pending</option>
           <option value="running">Running</option>
@@ -62,17 +62,17 @@
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Host</label>
-        <input type="text" id="im-filter-host" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" oninput="imDebouncedLoadInv()">
+        <input type="text" id="im-filter-host" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-input-action="imDebouncedLoadInv">
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">From</label>
-        <input type="date" id="im-filter-from" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+        <input type="date" id="im-filter-from" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">To</label>
-        <input type="date" id="im-filter-to" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadInvestigations()">
+        <input type="date" id="im-filter-to" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
       </div>
-      <button class="h-9 px-3 rounded-md bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 text-[12px] font-semibold" onclick="imClearInvFilters()">Clear</button>
+      <button class="h-9 px-3 rounded-md bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 text-[12px] font-semibold" data-click-action="imClearInvFilters">Clear</button>
     </div>
 
     <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
@@ -101,7 +101,7 @@
     <div class="flex flex-wrap items-end gap-2 mb-4">
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Type</label>
-        <select id="im-ioc-type" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadIocs()">
+        <select id="im-ioc-type" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadIocs">
           <option value="">All types</option>
           <option value="ip">IP</option>
           <option value="domain">Domain</option>
@@ -115,7 +115,7 @@
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Flag</label>
-        <select id="im-ioc-bad" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" onchange="imLoadIocs()">
+        <select id="im-ioc-bad" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadIocs">
           <option value="">All</option>
           <option value="true">Known bad</option>
           <option value="false">Not known bad</option>
@@ -176,11 +176,11 @@
   <div class="modal-content modal-large">
     <div class="modal-header">
       <h2 id="im-inv-modal-title">Investigation</h2>
-      <button class="modal-close" onclick="imCloseInvModal()">&times;</button>
+      <button class="modal-close" data-click-action="imCloseInvModal">&times;</button>
     </div>
     <div class="modal-body" id="im-inv-modal-body">Loading…</div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="imCloseInvModal()">Close</button>
+      <button class="btn btn-secondary" data-click-action="imCloseInvModal">Close</button>
     </div>
   </div>
 </div>
@@ -190,10 +190,10 @@
   <div class="modal-content">
     <div class="modal-header">
       <h2>New false-positive signature</h2>
-      <button class="modal-close" onclick="imCloseFpModal()">&times;</button>
+      <button class="modal-close" data-click-action="imCloseFpModal">&times;</button>
     </div>
     <div class="modal-body">
-      <form id="im-fp-form" onsubmit="imSubmitFp(event)" class="flex flex-col gap-3">
+      <form id="im-fp-form" data-submit-action="imSubmitFp" data-args='["$event"]' class="flex flex-col gap-3">
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">Rule ID
           <input name="rule_id" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
         </label>
@@ -219,8 +219,8 @@
       </form>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-secondary" onclick="imCloseFpModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="imSubmitFp(event)">Create</button>
+      <button class="btn btn-secondary" data-click-action="imCloseFpModal">Cancel</button>
+      <button class="btn btn-primary" data-click-action="imSubmitFp" data-args='["$event"]'>Create</button>
     </div>
   </div>
 </div>
@@ -376,7 +376,7 @@
         return;
       }
       tbody.innerHTML = rows.map(r => `
-        <tr style="cursor:pointer" onclick="imShowInv(${r.id})">
+        <tr style="cursor:pointer" data-click-action="imShowInv" data-args='[${r.id}]'>
           <td>${imEscape(imFmtDate(r.created_at))}</td>
           <td><span class="text-white font-medium">${imEscape(r.alert_signature)}</span></td>
           <td>${imEscape(r.host || '-')}</td>
@@ -536,8 +536,8 @@
           <td>${imEscape(imFmtDate(r.last_matched_at))}</td>
           <td class="max-w-xs truncate" title="${imEscape(r.reason)}">${imEscape(r.reason)}</td>
           <td class="whitespace-nowrap">
-            <button class="text-[11px] text-ion-cyan hover:underline" onclick="imToggleFp(${r.id})">${r.enabled ? 'Disable' : 'Enable'}</button>
-            <button class="text-[11px] text-ion-coral hover:underline ml-2" onclick="imDeleteFp(${r.id})">Delete</button>
+            <button class="text-[11px] text-ion-cyan hover:underline" data-click-action="imToggleFp" data-args='[${r.id}]'>${r.enabled ? 'Disable' : 'Enable'}</button>
+            <button class="text-[11px] text-ion-coral hover:underline ml-2" data-click-action="imDeleteFp" data-args='[${r.id}]'>Delete</button>
           </td>
         </tr>
       `).join('');

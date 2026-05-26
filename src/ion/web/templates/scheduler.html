@@ -16,8 +16,8 @@
     <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Run arbitrary handlers on a cron schedule. Every dispatch is recorded with duration, status and output.</p>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
-    <button class="btn btn-secondary" onclick="schRefresh()">Refresh</button>
-    <button class="btn btn-primary" onclick="schOpenForm()">+ New Job</button>
+    <button class="btn btn-secondary" data-click-action="schRefresh">Refresh</button>
+    <button class="btn btn-primary" data-click-action="schOpenForm">+ New Job</button>
   </div>
 </section>
 
@@ -27,7 +27,7 @@
   <div class="sch-modal">
     <div class="sch-modal-head">
       <div class="sch-modal-title" id="sch-modal-title">New Job</div>
-      <button class="sch-modal-close" onclick="schCloseForm()" aria-label="Close">&times;</button>
+      <button class="sch-modal-close" data-click-action="schCloseForm" aria-label="Close">&times;</button>
     </div>
     <form class="sch-modal-body" id="sch-form" onsubmit="return schSubmit(event)">
       <input type="hidden" id="sch-id" value="">
@@ -70,7 +70,7 @@
       </div>
 
       <div class="sch-form-actions">
-        <button type="button" class="btn btn-secondary" onclick="schCloseForm()">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-click-action="schCloseForm">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
@@ -81,7 +81,7 @@
   <div class="sch-modal">
     <div class="sch-modal-head">
       <div class="sch-modal-title" id="sch-exec-title">Recent executions</div>
-      <button class="sch-modal-close" onclick="schCloseExec()" aria-label="Close">&times;</button>
+      <button class="sch-modal-close" data-click-action="schCloseExec" aria-label="Close">&times;</button>
     </div>
     <div class="sch-modal-body" id="sch-exec-body">
       <div class="sch-loading"><span class="sch-spinner"></span> Loading...</div>
@@ -194,7 +194,7 @@ function schRender() {
     c.innerHTML = `<div class="sch-empty">
       <h3>No scheduled jobs yet</h3>
       <p>Create a job to run a registered handler on a cron schedule.</p>
-      <button class="btn btn-primary" style="margin-top:14px" onclick="schOpenForm()">+ New Job</button>
+      <button class="btn btn-primary" style="margin-top:14px" data-click-action="schOpenForm">+ New Job</button>
     </div>`;
     return;
   }
@@ -217,10 +217,10 @@ function schRender() {
           <span>last: <strong>${schFmtTime(j.last_run_at)}</strong></span>
         </div>
         <div class="sch-card-actions">
-          <button class="sch-iconbtn" onclick="schRun(${j.id})">Run now</button>
-          <button class="sch-iconbtn" onclick="schShowExec(${j.id}, '${schEsc(j.name)}')">History</button>
-          <button class="sch-iconbtn" onclick="schOpenForm(${j.id})">Edit</button>
-          <button class="sch-iconbtn danger" onclick="schDelete(${j.id})">Delete</button>
+          <button class="sch-iconbtn" data-click-action="schRun" data-args='[${j.id}]'>Run now</button>
+          <button class="sch-iconbtn" data-click-action="schShowExec" data-args='[${j.id}, "${schEsc(j.name)}"]'>History</button>
+          <button class="sch-iconbtn" data-click-action="schOpenForm" data-args='[${j.id}]'>Edit</button>
+          <button class="sch-iconbtn danger" data-click-action="schDelete" data-args='[${j.id}]'>Delete</button>
         </div>
       </div>`;
   }).join('');
