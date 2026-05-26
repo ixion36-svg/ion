@@ -1,11 +1,11 @@
 <!-- ion-doc:type=CONTRIBUTING -->
 <!-- ion-doc:title=Contributing to ION -->
 <!-- ion-doc:subtitle=Security-first review expectations, PR template, release ritual pointers -->
-<!-- ion-doc:version=0.31.9 -->
+<!-- ion-doc:version=0.31.10 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Future contributors, external auditors, anyone preparing a PR -->
-<!-- ion-doc:date=2026-05-14 -->
+<!-- ion-doc:date=2026-05-26 -->
 
 # Contributing to ION
 
@@ -14,12 +14,13 @@ through a deliberate security review. This file codifies the
 expectations so a future contributor or external auditor sees the
 same policy applied consistently.
 
-> **TL;DR.** Read `docs/SECURE_BY_DESIGN.md`, walk your diff
-> against the 20 principles before submitting, update
-> `SECURITY_ASSESSMENT.md` if your change introduces new attack
-> surface, run the pre-commit hooks (`pre-commit install` then
-> `pre-commit run --all-files`), and ship a PR with a clear "why"
-> in the title.
+> **TL;DR.** Sign your commits (SSH or GPG — `main` enforces
+> `required_signatures=true`), read `docs/SECURE_BY_DESIGN.md`,
+> walk your diff against the 20 principles before submitting,
+> update `SECURITY_ASSESSMENT.md` if your change introduces new
+> attack surface, run the pre-commit hooks (`pre-commit install`
+> then `pre-commit run --all-files`), and ship a PR with a clear
+> "why" in the title.
 
 ## 1. Read these before opening a PR
 
@@ -32,7 +33,54 @@ same policy applied consistently.
 
 ## 2. Before you commit
 
-### 2.1 Run pre-commit hooks
+### 2.1 Sign your commits
+
+`main` enforces `required_signatures=true` via GitHub branch
+protection (v0.31.10). Unsigned commits are rejected at push time.
+Set up commit signing once per workstation:
+
+```bash
+# 1. Generate a dedicated signing key (ed25519). No passphrase if
+#    you rely on workstation disk encryption; otherwise wrap with
+#    ssh-agent.
+ssh-keygen -t ed25519 -C "<your-email> - GitHub signing" -f ~/.ssh/id_ed25519_github
+
+# 2. Register the public half on GitHub as a Signing Key:
+#    https://github.com/settings/ssh/new
+#    Set "Key type" dropdown to "Signing Key" (NOT Authentication Key).
+cat ~/.ssh/id_ed25519_github.pub  # paste this into GitHub
+
+# 3. Configure git to sign with that key
+git config --global gpg.format ssh
+git config --global user.signingkey ~/.ssh/id_ed25519_github.pub
+git config --global commit.gpgsign true
+git config --global tag.gpgsign true
+
+# 4. Configure allowed_signers so `git verify-commit` works locally
+mkdir -p ~/.config/git
+EMAIL=$(git config --get user.email)
+printf '%s namespaces="git" %s\n' "$EMAIL" \
+  "$(cat ~/.ssh/id_ed25519_github.pub)" \
+  > ~/.config/git/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.config/git/allowed_signers
+
+# 5. Verify on the next commit
+git commit --allow-empty -m "test: signature probe"
+git log -1 --show-signature   # expects "Good \"git\" signature for <EMAIL>"
+git reset --soft HEAD~1       # discard the test (soft preserves working tree)
+```
+
+The committer email used in `git config user.email` must match an
+email verified on your GitHub account, or use the GitHub noreply
+form (`<userid>+<login>@users.noreply.github.com`), which is
+auto-verified. Otherwise GitHub renders the commit "Unverified" even
+though the signature is technically valid.
+
+GPG signing also works if you prefer — set `gpg.format=openpgp` and
+register the public key under "GPG keys" on GitHub. The
+branch-protection rule accepts both SSH and GPG signatures.
+
+### 2.2 Run pre-commit hooks
 
 ION ships a `.pre-commit-config.yaml` with the same checks CI runs.
 Install once per workstation:
@@ -53,7 +101,7 @@ These are the same gates CI enforces — running them locally catches
 issues at the workstation rather than after push. If a hook complains,
 fix the issue and re-commit; do not `--no-verify`.
 
-### 2.2 Walk the Secure by Design principles
+### 2.3 Walk the Secure by Design principles
 
 For substantive changes (anything beyond a typo fix), walk your diff
 against the 20 principles in `docs/SECURE_BY_DESIGN.md` and answer:
@@ -83,7 +131,7 @@ to walk the diff against the full 20:
 (See `.claude/agents/security-reviewer.md` for what it checks. The
 agent reports findings; the human author decides what to address.)
 
-### 2.3 Update SECURITY_ASSESSMENT.md if you touch attack surface
+### 2.4 Update SECURITY_ASSESSMENT.md if you touch attack surface
 
 The release commit appends a delta block to `SECURITY_ASSESSMENT.md`
 covering:
