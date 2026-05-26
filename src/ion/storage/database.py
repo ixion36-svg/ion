@@ -398,6 +398,69 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: users.is_service_account")
 
+    # v0.31.17: G5 (data-min audit closure) — session_token hash-at-rest.
+    # If the user_sessions table still carries the plaintext session_token
+    # column, migrate it: add session_token_hash, backfill SHA-256 digests
+    # from the plaintext rows, add a UNIQUE index on the hash, then drop
+    # the plaintext column. After this migration the DB only ever holds
+    # SHA-256 hex digests of session tokens; the plaintext lives in the
+    # client cookie only. Existing logged-in users' sessions remain valid
+    # because the hash is deterministic — their cookie value still maps to
+    # the same row, just via the new column.
+    if insp.has_table("user_sessions"):
+        existing = {col["name"] for col in insp.get_columns("user_sessions")}
+        if "session_token" in existing and "session_token_hash" not in existing:
+            import hashlib as _hashlib
+            with engine.begin() as conn:
+                # Step 1: add the new nullable column.
+                conn.execute(
+                    text("ALTER TABLE user_sessions ADD COLUMN session_token_hash VARCHAR(64)")
+                )
+                # Step 2: backfill SHA-256 digests for every existing row.
+                rows = conn.execute(
+                    text("SELECT id, session_token FROM user_sessions")
+                ).fetchall()
+                for row in rows:
+                    tok = row[1]
+                    if tok is None:
+                        # Defensive — orphaned NULL token rows can't be
+                        # rehashed; drop them so the NOT NULL invariant
+                        # holds after backfill. There shouldn't be any
+                        # given the prior schema declared NOT NULL.
+                        conn.execute(
+                            text("DELETE FROM user_sessions WHERE id = :id"),
+                            {"id": row[0]},
+                        )
+                        continue
+                    digest = _hashlib.sha256(tok.encode("utf-8")).hexdigest()
+                    conn.execute(
+                        text(
+                            "UPDATE user_sessions SET session_token_hash = :h "
+                            "WHERE id = :id"
+                        ),
+                        {"h": digest, "id": row[0]},
+                    )
+                # Step 3: add the UNIQUE index. The model declares
+                # unique=True + index=True; replay that constraint here
+                # for the upgraded table.
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS ix_user_sessions_session_token_hash "
+                        "ON user_sessions(session_token_hash)"
+                    )
+                )
+                # Step 4: drop the plaintext column. Removes the
+                # plaintext storage that the data-min audit flagged as
+                # G5. ALTER TABLE DROP COLUMN cascades the column's
+                # implicit unique constraint + index.
+                conn.execute(
+                    text("ALTER TABLE user_sessions DROP COLUMN session_token")
+                )
+                logger.info(
+                    "Migrated: user_sessions plaintext token -> SHA-256 hash "
+                    "(rows backfilled: %d)", len(rows),
+                )
+
     # v0.10.3: MITRE columns on alert_prompt_templates
     if insp.has_table("alert_prompt_templates"):
         existing = {

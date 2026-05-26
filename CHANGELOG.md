@@ -1,13 +1,83 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.16 -->
+<!-- ion-doc:version=0.31.17 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.17 — 2026-05-26
+
+Data-min P13 sub-gap **G5 closed — last audit residual**. Every
+named gap (G1 / G2 / G3 / G4 / G5) from the original v0.31.12
+data-minimisation audit has now shipped a behaviour change.
+DATA_MINIMISATION_AUDIT residual gaps count drops from 1 to **0**.
+SECURE_BY_DESIGN audit summary unchanged at **18 Met / 2 Mostly Met /
+0 Partial / 0 Gap** (sub-principle work; P13 itself was already Met
+at v0.31.12). **Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): session_token stored as SHA-256 hash at rest
+
+* **`user_sessions.session_token` column dropped** — replaced with
+  `user_sessions.session_token_hash` (`VARCHAR(64)`, UNIQUE,
+  INDEXED). The DB now only ever holds the SHA-256 hex digest; the
+  plaintext token exists only in the client cookie. An attacker
+  with read access to a DB dump cannot extract usable session
+  tokens.
+* **New helper** `_hash_session_token(token)` in
+  `src/ion/storage/auth_repository.py`. Pure-Python `hashlib.sha256`;
+  no salt because session tokens are 32 bytes of CSPRNG output (256
+  bits of entropy), so preimage attacks are computationally
+  infeasible and slow hashes like bcrypt buy nothing. The helper
+  is the single point that knows the hash format.
+* **All four `SessionRepository` methods** (`create`, `get_by_token`,
+  `get_valid_session`, `delete_by_token`) now hash the plaintext
+  token internally before DB ops. Caller-facing signatures
+  unchanged — services still pass plaintext.
+* **`UserSession.session_token_hash` model column** declared
+  `String(64), nullable=False, unique=True, index=True`. Replaces
+  the previous `session_token: Mapped[str] = mapped_column(String(255), ...)`.
+
+### chore(migration): atomic in-place upgrade
+
+`_run_migrations` in `storage/database.py` carries the upgrade for
+existing deployments:
+
+1. Detect: `user_sessions` table has `session_token` but not
+   `session_token_hash` → run.
+2. `ALTER TABLE user_sessions ADD COLUMN session_token_hash VARCHAR(64)`.
+3. Backfill: SELECT every row, compute SHA-256 of `session_token`,
+   UPDATE the new column. Drops orphaned NULL-token rows
+   defensively (shouldn't exist given the prior NOT NULL schema).
+4. `CREATE UNIQUE INDEX IF NOT EXISTS ix_user_sessions_session_token_hash`.
+5. `ALTER TABLE user_sessions DROP COLUMN session_token` — removes
+   the plaintext column and its implicit unique constraint.
+
+All five steps run inside one transaction (`with engine.begin()`),
+so a partial-completion failure rolls the table back to pre-upgrade
+state. Existing logged-in users' sessions remain valid because the
+hash is deterministic — their cookie value still maps to the same
+row via the new column.
+
+### chore(audit-doc): all 5 audit residuals now closed
+
+`docs/DATA_MINIMISATION_AUDIT.md`:
+
+* Section 3.2 (`user_sessions`) — `session_token` row rewritten as
+  `session_token_hash` with the v0.31.17 implementation note.
+* Section 6 (gaps inventory table) — G5 row struck through with
+  Closed v0.31.17 status. **All five gaps in the table are now
+  struck through.**
+* Section 6 lead-in — count updated "1 remaining" → "0 remaining".
+* Revision row 1.4 added.
+
+`docs/SECURE_BY_DESIGN.md`:
+
+* P13 ION-application bullets extended with G5 closure reference;
+  rev 2.3 added.
 
 ## v0.31.16 — 2026-05-26
 

@@ -1,7 +1,7 @@
 <!-- ion-doc:type=DATA MINIMISATION AUDIT -->
 <!-- ion-doc:title=ION Data-Minimisation Audit -->
 <!-- ion-doc:subtitle=Schema-wide audit of stored fields, retention, and PII handling against Secure-by-Design P13 -->
-<!-- ion-doc:version=0.31.15 -->
+<!-- ion-doc:version=0.31.17 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, external auditors, data-protection officers -->
@@ -10,7 +10,7 @@
 # ION — Data-Minimisation Audit
 
 **Document owner:** Repository maintainer (`ixion36`)
-**Status:** Current as of v0.31.15 (2026-05-26)
+**Status:** Current as of v0.31.17 (2026-05-26)
 **Review cadence:** Every minor-version bump (v0.X.0) or when a new
 table is added that handles PII / free-text user content.
 **Primary framework:** Secure-by-Design P13 ("Reduce impact of
@@ -109,7 +109,7 @@ created_at, active_role_id
 
 | Column | Category | Justification | Action |
 |--------|----------|---------------|--------|
-| `session_token` | Secret (token form, not hashed) | Server-side session id; rotated on logout | Keep — moved into a hashed-at-rest variant would be a v0.32+ enhancement, not load-bearing for this audit |
+| `session_token_hash` | Hash of secret (v0.31.17+) | Server-side session id; rotated on logout | Keep — now stored as SHA-256 hex digest (G5 closed v0.31.17). Plaintext lives only in the client cookie. |
 | `expires_at` | Operational | TTL | Keep |
 | `ip_address` (45) | **PII (GDPR)** | "Where did this session originate?" + audit context | Keep — feature-justified |
 | `user_agent` (500) | PII-adjacent (fingerprint) | "Is this an unusual device?" + active-session UI | Keep — feature-justified |
@@ -344,10 +344,12 @@ content, or audit-sensitive data. No column-level findings.
 | ~~G2~~ | ~~`audit_logs` has no retention policy~~ | Low (air-gap mitigates) | **Closed v0.31.14** | New `ION_AUDIT_LOG_RETENTION_DAYS` env var (default unset = disabled). When set, `src/ion/services/data_retention_service.py` deletes rows older than N days on its daily sweep under `LOCK_DATA_RETENTION_BG`. |
 | ~~G3~~ | ~~`security_events` has no retention policy~~ | Low (air-gap mitigates) | **Closed v0.31.14** | New `ION_SECURITY_EVENTS_RETENTION_DAYS` env var, same module + sweep as G2. Targets `security_events.created_at`. |
 | ~~G4~~ | ~~`ai_chat_messages` persist until user deletion~~ | Acceptable | **Closed v0.31.15** | New `ION_AI_CHAT_RETENTION_DAYS` env var (default unset = disabled). Appended to `RETENTION_RULES` in `data_retention_service.py` — no new module / lock / wiring needed. Targets `ai_chat_messages.created_at`; sessions left untouched (user-controlled deletion remains the mechanism for full session removal). |
-| G5 | `session_token` stored as plaintext in `user_sessions` table (not hashed at rest) | Low (token rotated on logout, server-side only — DB compromise required to abuse) | Track | Hash-at-rest variant for `session_token`. v0.32+ candidate. |
+| ~~G5~~ | ~~`session_token` stored as plaintext in `user_sessions`~~ | Low (token rotated on logout, server-side only — DB compromise required to abuse) | **Closed v0.31.17** | `session_token` column dropped from `user_sessions`; replaced with `session_token_hash` (SHA-256 hex digest). DB only ever holds the digest; plaintext lives in the client cookie only. Migration in `_run_migrations` backfills hashes from existing tokens so logged-in users' sessions remain valid. Lookup path hashes the incoming cookie value before matching. |
 
-After v0.31.15's G4 closure, **one** gap remains — G5
-(`session_token` hash-at-rest). It is **low severity** because:
+After v0.31.17's G5 closure, **zero** residual gaps remain. Every
+named gap from the original v0.31.12 audit has shipped a behaviour
+change. The historical low-severity rationale (recorded for the
+audit trail):
 
 * ION's air-gap-first deployment pattern (C1) means PII never leaves
   the customer's network perimeter.
@@ -390,5 +392,6 @@ trail. The residual Mostly Met principles are:
 |---------|------------|------------|-------|
 | 1.0     | 2026-05-26 | Maintainer | Initial publication at v0.31.12. Closes the data-min audit gap from SECURE_BY_DESIGN.md rev 1.0–1.8. Catalogues 13 existing data-min controls; identifies 5 low-severity residual gaps tracked for v0.32+. P13 moves Mostly Met → Met. |
 | 1.1     | 2026-05-26 | Maintainer | v0.31.13: **G1 CLOSED.** New `src/ion/services/session_cleanup_service.py` wraps `AuthService.cleanup_expired_sessions()` in a periodic background loop. Under advisory lock `LOCK_SESSION_CLEANUP_BG = 1023` for cross-worker single-leader execution. Env vars `ION_SESSION_CLEANUP_ENABLED` (default true) + `ION_SESSION_CLEANUP_INTERVAL_HOURS` (default 6, floored at 60s). Wired into `web/server.py` startup. Audit advances from 5 residual gaps to 4 (G2 / G3 / G4 / G5 remain). |
+| 1.4     | 2026-05-26 | Maintainer | v0.31.17: **G5 CLOSED — last audit residual.** `session_token` column replaced with `session_token_hash` in `user_sessions`. New `_hash_session_token()` helper in `storage/auth_repository.py` computes SHA-256 of the plaintext (256-bit entropy from `secrets.token_urlsafe(32)` — no salt needed). `SessionRepository.create / get_by_token / get_valid_session / delete_by_token` all hash the incoming plaintext before DB ops. Migration in `_run_migrations` adds the hash column, backfills SHA-256 digests for every existing row, adds UNIQUE INDEX, and drops the plaintext column — atomically (transactional). Existing logged-in users' sessions remain valid because the hash is deterministic. After this release: **all 5 audit residuals (G1–G5) closed.** The audit doc has nothing outstanding. |
 | 1.3     | 2026-05-26 | Maintainer | v0.31.15: **G4 CLOSED.** One-tuple append to `RETENTION_RULES`: (`ION_AI_CHAT_RETENTION_DAYS`, `ion.models.ai_chat:AIChatMessage`, `created_at`, `ai_chat_messages`). Opt-IN like G2/G3 (default unset = disabled). The audit-doc abstraction worked exactly as intended — closure required no new module, no new lock, no new startup wiring. Audit advances from 2 residual gaps to 1 (G5 — `session_token` hash-at-rest — remains). |
 | 1.2     | 2026-05-26 | Maintainer | v0.31.14: **G2 + G3 CLOSED.** New `src/ion/services/data_retention_service.py` parameterised on a list of `RetentionRule` tuples — current rules cover `audit_logs.timestamp` and `security_events.created_at`. Under advisory lock `LOCK_DATA_RETENTION_BG = 1024`. Env vars `ION_AUDIT_LOG_RETENTION_DAYS` and `ION_SECURITY_EVENTS_RETENTION_DAYS` are **opt-IN** (unset = disabled — operators have wildly different compliance windows so silent default deletion is dangerous). Shared loop cadence via `ION_DATA_RETENTION_ENABLED` (loop kill switch, default `true`) + `ION_DATA_RETENTION_INTERVAL_HOURS` (default 24h, floored at 60s). G4 (AI chat retention) is the next natural fit — adds one tuple to `RETENTION_RULES`. Audit advances from 4 residual gaps to 2 (G4 / G5 remain). |
