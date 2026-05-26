@@ -400,7 +400,7 @@ function matRenderQuestionnaire() {
 
     for (const domain of q.domains) {
         html += `<div class="mat-domain">
-            <div class="mat-domain-head" onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+            <div class="mat-domain-head" data-toggle-next-display>
                 <div>
                     <div class="mat-domain-name">${matEsc(domain.name)}</div>
                     <div class="mat-domain-desc">${matEsc(domain.description)}</div>

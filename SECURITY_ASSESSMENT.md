@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.31.18 -->
+<!-- ion-doc:version=0.31.19 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -10,8 +10,8 @@
 # ION Security Assessment Report
 
 **Assessment Date:** 2026-05-26 (v0.31.18 + v0.31.17 + v0.31.16 + v0.31.15 + v0.31.14 + v0.31.13 + v0.31.12 + v0.31.11 + v0.31.10 deltas) / 2026-05-14 (v0.31.9 + v0.31.8 + v0.31.7 + v0.31.6 + v0.31.5 + v0.31.4 + v0.31.3 + v0.31.2 deltas) / 2026-05-13 (v0.31.1 + v0.31.0 + v0.30.1 + v0.30.0 deltas) / 2026-05-12 (v0.29.1 + v0.29.0 + v0.28.0 + v0.27.0 + v0.26.1 deltas) / 2026-05-11 (v0.26.0 + v0.25.x + v0.24.0 + v0.23.x + v0.22.1) / 2026-05-09 (v0.22.0-rc body below)
-**Application Version:** 0.31.18 (P11 mass migration: 778/825 inline handlers across 65 templates retired mechanically. 47 unmigratable handlers will hand-fix in subsequent releases before final CSP flip. ION-side findings count unchanged at 0C / 0H / 3M / 4L.)
-**Previous Assessment Version:** 0.31.17 (2026-05-26)
+**Application Version:** 0.31.19 (P11 regression-fix + final-mile push. v0.31.18 mass migration produced JS-string-concat regressions in 24 lines and onkeydown mis-translations in 6 lines — all fixed via template-literal refactor + new data-enter-key-action / data-escape-key-action helpers. 8 new event-delegation built-ins land. ~25 more handlers migrated; 7 complex stragglers staged for v0.31.20. ION-side findings count unchanged at 0C / 0H / 3M / 4L.)
+**Previous Assessment Version:** 0.31.18 (2026-05-26)
 **Scope:** Web application security review — authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
 **Reviewer:** Security Audit Agent

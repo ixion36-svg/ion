@@ -238,6 +238,34 @@ def _translate_handler(value: str) -> Optional[dict[str, Optional[str]]]:
         flags["data-remove-closest"] = m.group(1)
         return flags
 
+    # window.print() — print-button pattern
+    if s == "window.print()":
+        flags["data-window-print"] = ""
+        return flags
+
+    # document.getElementById('FOO').click() — file-input proxy pattern
+    m = re.fullmatch(
+        r"document\.getElementById\(\s*['\"]([^'\"]+)['\"]\s*\)\.click\(\)",
+        s,
+    )
+    if m:
+        flags["data-click-target"] = m.group(1)
+        return flags
+
+    # this.parentElement.classList.toggle('CLASS') — accordion / disclosure
+    m = re.fullmatch(
+        r"this\.parentElement\.classList\.toggle\(\s*['\"]([^'\"]+)['\"]\s*\)",
+        s,
+    )
+    if m:
+        flags["data-toggle-parent-class"] = m.group(1)
+        return flags
+
+    # Bare `return false` (e.g. onsubmit="return false") — prevent-default
+    if s in ("return false", "return false;"):
+        flags["data-prevent-default"] = ""
+        return flags
+
     # Chained user-function calls: fn1(...); fn2(...);
     # Can't represent as a single data-action; flag for manual.
     if ";" in s and re.search(r"\)\s*;\s*\w+\s*\(", s):

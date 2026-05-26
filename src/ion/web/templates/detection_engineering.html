@@ -553,7 +553,7 @@ async function loadRules() {
 function renderRulesToolbar() {
     $('de-panel-rules').innerHTML = `
         <div class="de-rules-toolbar">
-            <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." value="${esc(_rulesPage.search)}" data-keydown-action="if" data-args='[event.key==='Enter')deRulesSearch(]'>
+            <input type="text" id="de-rules-search" placeholder="Search rules or MITRE IDs..." value="${esc(_rulesPage.search)}" data-enter-key-action="deRulesSearch">
             <select id="de-rules-sev" data-change-action="deRulesSearch">
                 <option value="">All Severities</option>
                 <option value="critical"${_rulesPage.severity==='critical'?' selected':''}>Critical</option>
@@ -829,6 +829,12 @@ let _readinessSearch = '';
 let _tideSystems = null;
 let _selectedSystemId = '';
 
+// v0.31.19: data-change-action helper for the system selector
+// (replaces inline onchange="_selectedSystemId=this.value").
+window.__setSelectedSystemId = function(event) {
+    _selectedSystemId = event.target.value;
+};
+
 async function loadReadiness() {
     const panel = $('de-panel-readiness');
 
@@ -843,11 +849,11 @@ async function loadReadiness() {
     panel.innerHTML = `
         <div class="de-report-bar">
             <label>System:</label>
-            <select id="de-readiness-system" onchange="_selectedSystemId=this.value">
+            <select id="de-readiness-system" data-change-action="__setSelectedSystemId">
                 <option value="">All Systems (Global)</option>
                 ${sysOpts}
             </select>
-            <input type="text" id="de-readiness-search" placeholder="Search threat actors (e.g. APT29, Lazarus)..." value="${esc(_readinessSearch)}" data-keydown-action="if" data-args='[event.key==='Enter')deReadinessSearch(]' style="flex:1;min-width:200px;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:.82rem">
+            <input type="text" id="de-readiness-search" placeholder="Search threat actors (e.g. APT29, Lazarus)..." value="${esc(_readinessSearch)}" data-enter-key-action="deReadinessSearch" style="flex:1;min-width:200px;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:.82rem">
             <button class="de-btn-report" data-click-action="deReadinessSearch">Search</button>
         </div>
         <div id="de-readiness-body"><div class="de-loading"><div class="de-spinner"></div><div>Querying OpenCTI + TIDE...</div></div></div>`;

@@ -676,7 +676,7 @@
                     <option value="ERROR">ERROR+</option>
                     <option value="CRITICAL">CRITICAL</option>
                 </select>
-                <input type="text" id="log-search" placeholder="Search logs..." data-keydown-action="if" data-args='[event.key==='Enter') loadSystemLogs(]'>
+                <input type="text" id="log-search" placeholder="Search logs..." data-enter-key-action="loadSystemLogs">
                 <select id="log-limit">
                     <option value="100">100 entries</option>
                     <option value="200" selected>200 entries</option>

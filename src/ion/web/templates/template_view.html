@@ -361,9 +361,9 @@ async function loadVersions() {
             html += '<td>' + escapeHtml(v.author || '-') + '</td>';
             html += '<td>' + formatDate(v.created_at) + '</td>';
             html += '<td>';
-            html += '<button class="btn btn-sm" data-click-action="previewVersion" data-args='[" + v.version_number + "]'>View</button>';
+            html += `<button class="btn btn-sm" data-click-action="previewVersion" data-args='[${v.version_number}]'>View</button>`;
             if (!isCurrent) {
-                html += ' <button class="btn btn-sm btn-warning" data-click-action="confirmRollback" data-args='[" + v.version_number + "]'>Rollback</button>';
+                html += ` <button class="btn btn-sm btn-warning" data-click-action="confirmRollback" data-args='[${v.version_number}]'>Rollback</button>`;
             }
             html += '</td>';
             html += '</tr>';

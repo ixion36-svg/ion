@@ -201,7 +201,7 @@
     <div class="modal-dialog" style="max-width:960px;max-height:90vh;overflow-y:auto;">
         <div class="modal-header">
             <h2 id="cd-title" class="editable-title" data-click-action="startEditTitle" title="Click to edit title">Investigation Detail</h2>
-            <input type="text" id="cd-title-input" class="form-input" style="display:none;font-size:1.3rem;font-weight:700;flex:1;" data-blur-action="saveTitle" onkeydown="if(event.key==='Enter')saveTitle();if(event.key==='Escape')cancelEditTitle();">
+            <input type="text" id="cd-title-input" class="form-input" style="display:none;font-size:1.3rem;font-weight:700;flex:1;" data-blur-action="saveTitle" data-enter-key-action="saveTitle" data-escape-key-action="cancelEditTitle">
             <button class="modal-close" data-click-action="closeModal" data-args='["modal-case-detail"]'>&times;</button>
         </div>
         <div class="modal-body" id="cd-body">
@@ -232,7 +232,7 @@
                 </div>
             </div>
             <div id="cd-description" class="editable-desc" style="margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;min-height:20px;cursor:pointer;" data-click-action="startEditDesc" title="Click to edit description"></div>
-            <textarea id="cd-desc-input" class="form-input" style="display:none;margin-bottom:16px;font-size:.85rem;" rows="3" data-blur-action="saveDesc" data-keydown-action="if" data-args='[event.key==='Escape')cancelEditDesc(]'></textarea>
+            <textarea id="cd-desc-input" class="form-input" style="display:none;margin-bottom:16px;font-size:.85rem;" rows="3" data-blur-action="saveDesc" data-escape-key-action="cancelEditDesc"></textarea>
             <!-- Sub-tabs: Sections is now the primary tab -->
             <div class="fr-tabs" style="margin-bottom:12px;">
                 <button class="fr-tab active" data-click-action="switchDetailTab" data-args='["sections"]'>Sections</button>
@@ -1594,10 +1594,17 @@ async function editPlaybook(id){
 }
 function addPlaybookStepRow(data){
     const div=document.getElementById('pb-steps-list'),idx=div.children.length+1,row=document.createElement('div');row.className='pb-step-row';
-    row.innerHTML=`<span class="pb-step-num">${idx}</span><div style="flex:1;"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc" rows="2" placeholder="Description" style="margin-top:4px;">${esc((data&&data.description)||'')}</textarea><div style="display:flex;gap:12px;align-items:center;margin-top:4px;"><label style="margin:0;font-size:.8rem;"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label style="margin:0;font-size:.8rem;">Est. hours: <input type="number" class="pb-step-hours" style="width:60px;" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary" style="padding:2px 8px;color:var(--sev-critical);align-self:flex-start;" onclick="this.parentElement.remove();renumberSteps();">&times;</button>`;
+    row.innerHTML=`<span class="pb-step-num">${idx}</span><div style="flex:1;"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc" rows="2" placeholder="Description" style="margin-top:4px;">${esc((data&&data.description)||'')}</textarea><div style="display:flex;gap:12px;align-items:center;margin-top:4px;"><label style="margin:0;font-size:.8rem;"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label style="margin:0;font-size:.8rem;">Est. hours: <input type="number" class="pb-step-hours" style="width:60px;" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary" style="padding:2px 8px;color:var(--sev-critical);align-self:flex-start;" data-click-action="removeStepAndRenumber">&times;</button>`;
     div.appendChild(row);
 }
 function renumberSteps(){document.querySelectorAll('#pb-steps-list .pb-step-num').forEach((el,i)=>el.textContent=i+1)}
+// v0.31.19: data-click-action wrapper for the playbook-step delete button
+// (replaces inline onclick="this.parentElement.remove();renumberSteps();").
+window.removeStepAndRenumber = function(event) {
+    var btn = event.target.closest('button');
+    if (btn && btn.parentElement) btn.parentElement.remove();
+    renumberSteps();
+};
 function collectSteps(){return Array.from(document.querySelectorAll('#pb-steps-list .pb-step-row')).map(row=>({title:row.querySelector('.pb-step-title').value.trim(),description:row.querySelector('.pb-step-desc').value.trim()||null,is_required:row.querySelector('.pb-step-req').checked,expected_duration_hours:parseFloat(row.querySelector('.pb-step-hours').value)||null})).filter(s=>s.title)}
 async function savePlaybook(){
     const name=document.getElementById('pb-name').value.trim();if(!name){showToast('Name required',true);return}
@@ -1664,8 +1671,8 @@ function renderForensicAnnotations(annotations) {
             + '<span style="color:#818cf8;font-weight:600;">' + (ts||'') + '</span>'
             + '<span>&middot;</span><span>' + (author||'') + '</span>'
             + '<span style="margin-left:auto;display:flex;gap:4px;">'
-            + '<button type="button" onclick="editForensicAnnotation(' + a.id + ',\'' + (a.body||'').replace(/'/g,"\\'") + '\')" style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&#9998;</button>'
-            + '<button type="button" data-click-action="deleteForensicAnnotation" data-args='[" + a.id + "]' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&times;</button>'
+            + `<button type="button" data-click-action="editForensicAnnotation" data-args='[${a.id}, ${JSON.stringify(a.body || '')}]' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&#9998;</button>`
+            + `<button type="button" data-click-action="deleteForensicAnnotation" data-args='[${a.id}]' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&times;</button>`
             + '</span></div>'
             + '<div style="font-size:.8rem;color:var(--text-primary);white-space:pre-wrap;">' + (a.body||'') + '</div>'
             + '</div>';

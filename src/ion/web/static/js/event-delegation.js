@@ -91,6 +91,10 @@
       'closeTarget', 'closeOnSelfClick', 'args',
       'removeTarget', 'removeSelfOnSelfClick', 'scriptOnerrorFlag',
       'removeParent', 'removeClosest',
+      // v0.31.19: simple-pattern data-attributes for the P11 final-mile cleanup.
+      'windowPrint', 'clickTarget', 'toggleParentClass',
+      'enterKeyAction', 'escapeKeyAction',
+      'validatingSubmitAction', 'clearTarget', 'toggleNextDisplay',
     ]);
     var out = {};
     for (var key in el.dataset) {
@@ -253,6 +257,98 @@
     if (event.target === trigger) {
       trigger.style.display = 'none';
     }
+  });
+
+  // Built-in: data-window-print — fires window.print(). Replaces
+  // `onclick="window.print()"` print-button pattern.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-window-print]');
+    if (!trigger) return;
+    window.print();
+  });
+
+  // Built-in: data-click-target — programmatically click another element
+  // by id. Replaces `onclick="document.getElementById('X').click()"`
+  // file-input proxy pattern (visible button delegates to a hidden input).
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-click-target]');
+    if (!trigger) return;
+    var targetId = trigger.getAttribute('data-click-target');
+    var target = document.getElementById(targetId);
+    if (target) target.click();
+  });
+
+  // Built-in: data-toggle-parent-class — toggle a class on this element's
+  // parentElement. Replaces inline
+  // `onclick="this.parentElement.classList.toggle('open')"` accordion /
+  // disclosure pattern.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-toggle-parent-class]');
+    if (!trigger) return;
+    var cls = trigger.getAttribute('data-toggle-parent-class');
+    if (cls && trigger.parentElement) {
+      trigger.parentElement.classList.toggle(cls);
+    }
+  });
+
+  // Built-in: data-enter-key-action / data-escape-key-action — fire the named
+  // function when the user presses Enter / Escape on this element. Replaces
+  // the inline `onkeydown="if(event.key==='Enter')fn()"` input-on-Enter
+  // pattern; common on free-text inputs that submit on Enter.
+  // Reads optional data-args (same JSON convention as the action dispatchers).
+  function keyHandler(keyName, attr) {
+    return function (event) {
+      if (event.key !== keyName) return;
+      var trigger = event.target.closest('[' + attr + ']');
+      if (!trigger) return;
+      var name = trigger.getAttribute(attr);
+      var fn = window[name];
+      if (typeof fn !== 'function') return;
+      var argsAttr = trigger.dataset.args;
+      var args = [];
+      if (argsAttr) {
+        try { args = JSON.parse(argsAttr); }
+        catch (e) { return; }
+        args = substituteRuntimeArgs(args, event);
+      }
+      if (trigger.hasAttribute('data-prevent-default')) event.preventDefault();
+      fn.apply(trigger, args);
+    };
+  }
+  document.addEventListener('keydown', keyHandler('Enter', 'data-enter-key-action'));
+  document.addEventListener('keydown', keyHandler('Escape', 'data-escape-key-action'));
+
+  // Built-in: data-validating-submit-action — fire the named function on form
+  // submit; if it returns falsy, call event.preventDefault(). Replaces the
+  // legacy `onsubmit="return canSubmit(event)"` pattern from form validators.
+  document.addEventListener('submit', function (event) {
+    var trigger = event.target.closest('[data-validating-submit-action]');
+    if (!trigger) return;
+    var name = trigger.getAttribute('data-validating-submit-action');
+    var fn = window[name];
+    if (typeof fn !== 'function') return;
+    var result = fn(event);
+    if (!result) event.preventDefault();
+  });
+
+  // Built-in: data-clear-target — clear the .value of the element with that id.
+  // Replaces `onclick="document.getElementById('X').value = ''"`.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-clear-target]');
+    if (!trigger) return;
+    var targetId = trigger.getAttribute('data-clear-target');
+    var target = document.getElementById(targetId);
+    if (target) target.value = '';
+  });
+
+  // Built-in: data-toggle-next-display — toggle display:none / display:block on
+  // this element's nextElementSibling. Replaces inline DOM-toggle pattern.
+  document.addEventListener('click', function (event) {
+    var trigger = event.target.closest('[data-toggle-next-display]');
+    if (!trigger) return;
+    var nxt = trigger.nextElementSibling;
+    if (!nxt) return;
+    nxt.style.display = nxt.style.display === 'none' ? 'block' : 'none';
   });
 
   // Built-in: data-script-onerror-flag — replaces inline `onerror=` on

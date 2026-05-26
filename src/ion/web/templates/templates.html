@@ -342,7 +342,7 @@ function renderFolderItems(folders, depth) {
         const indent = depth > 0 ? 'folder-children' : '';
 
         html += '<div class="' + indent + '">';
-        html += '<div class="folder-item' + (isActive ? ' active' : '') + '" data-id="' + f.id + '" data-click-action="selectFolder" data-args='[" + f.id + "]'>';
+        html += `<div class="folder-item${isActive ? ' active' : ''}" data-id="${f.id}" data-click-action="selectFolder" data-args='[${f.id}]'>`;
         html += '<span class="folder-icon">' + (f.children.length > 0 ? '<i class="icon-folder-open"></i>' : '<i class="icon-folder"></i>') + '</span>';
         html += '<span class="folder-name">' + escapeHtml(f.name) + '</span>';
         html += '<span class="folder-manage-counts">(' + f.template_count + ')</span>';
@@ -389,7 +389,7 @@ function updateFolderPath() {
 
     const folder = allCollections.find(c => c.id === selectedFolderId);
     if (folder) {
-        pathEl.innerHTML = '<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>' + escapeHtml(folder.full_path) + '</span>';
+        pathEl.innerHTML = `<span data-click-action="selectFolder" data-args='[null]'>All</span> / <span>${escapeHtml(folder.full_path)}</span>`;
     }
 }
 
@@ -474,8 +474,8 @@ function renderTemplates(templates) {
         html += '<div class="card-footer">';
         html += '<a href="/templates/' + t.id + '/render" class="btn btn-sm btn-primary">Render</a>';
         html += '<a href="/templates/' + t.id + '/edit" class="btn btn-sm">Edit</a>';
-        html += '<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[" + t.id + ", " + (t.collection_id || 'null') + "]'>Move</button>';
-        html += '<button class="btn btn-sm btn-danger" onclick="deleteTemplate(' + t.id + ', \'' + escapeHtml(t.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += `<button class="btn btn-sm move-btn" data-click-action="showMoveModal" data-args='[${t.id}, ${t.collection_id || 'null'}]'>Move</button>`;
+        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteTemplate" data-args='[${t.id}, ${JSON.stringify(t.name)}]'>Delete</button>`;
         html += '</div>';
         html += '</div>';
     });
@@ -574,7 +574,7 @@ function renderFolderManageItems(folders, depth = 0) {
         html += '<span class="folder-manage-counts">' + f.template_count + ' templates, ' + (f.document_count || 0) + ' docs</span>';
         html += '</div>';
         html += '<div>';
-        html += '<button class="btn btn-sm btn-danger" onclick="deleteFolder(' + f.id + ', \'' + escapeHtml(f.name).replace(/'/g, "\\'") + '\')">Delete</button>';
+        html += `<button class="btn btn-sm btn-danger" data-click-action="deleteFolder" data-args='[${f.id}, ${JSON.stringify(f.name)}]'>Delete</button>`;
         html += '</div>';
         html += '</div>';
 

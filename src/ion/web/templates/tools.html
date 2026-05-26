@@ -959,7 +959,7 @@ async function lookupIOC() {
 function lookupFromList(ioc) {
     document.getElementById('lookup-ioc').value = ioc;
     switchToolTab('lookup');
-    document.querySelector('[onclick="switchToolTab(\'lookup\')"]').classList.add('active');
+    document.querySelector('[data-click-action="switchToolTab"][data-args=\'["lookup"]\']').classList.add('active');
     lookupIOC();
 }
 

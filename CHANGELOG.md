@@ -1,13 +1,93 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.18 -->
+<!-- ion-doc:version=0.31.19 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.19 — 2026-05-26
+
+P11 final-mile push and **v0.31.18 regression fix**. The v0.31.18
+mass migration mechanically translated 778 inline handlers but
+produced **two classes of regression** that needed urgent fixes:
+
+1. **JS-string-concat regression** (~24 lines across 7 templates):
+   When the migration script encountered an inline handler being
+   built via JS string concatenation
+   (`html += '<button onclick="fn(' + id + ')">'`), it converted to
+   `'<button data-args='[" + id + "]'>'` — the inner `'` characters
+   break the outer JS single-quoted string, producing invalid JS
+   that crashes the page when the template renders.
+2. **`onkeydown="if(...)"` mis-translation** (6 lines across 6
+   templates): The script parsed `if(event.key==='Enter')fn()` as a
+   function call with `if` as the function name, producing
+   `data-keydown-action="if" data-args='[event.key==='Enter')fn(]'`
+   — also invalid JS.
+
+Both regressions are now fixed. The JS-string-concat templates were
+converted to use template literals (backticks) so `data-args='[...]'`
+fits cleanly inside the JS expression. The mis-translated keydown
+patterns were rewritten to use the new `data-enter-key-action` /
+`data-escape-key-action` helpers (see below).
+
+### feat(security): 8 new event-delegation built-ins
+
+`static/js/event-delegation.js` extended with attributes that the
+P11 final-mile cleanup needs:
+
+| Attribute | Replaces | Used in |
+|---|---|---|
+| `data-window-print` | `onclick="window.print()"` | executive_report, guide, shift_handover |
+| `data-click-target="ID"` | `onclick="document.getElementById('X').click()"` | pcap |
+| `data-toggle-parent-class="CLASS"` | `onclick="this.parentElement.classList.toggle('open')"` | training |
+| `data-enter-key-action="fn"` | `onkeydown="if(event.key==='Enter')fn()"` | social, documents, forensics, analyst, entity_timeline, settings, detection_engineering (×2) |
+| `data-escape-key-action="fn"` | `onkeydown="if(event.key==='Escape')fn()"` | forensics (×2) |
+| `data-validating-submit-action="fn"` | `onsubmit="return fn(event)"` | canaries, scheduler, log_sources |
+| `data-clear-target="ID"` | `onclick="document.getElementById('X').value = ''"` | discover |
+| `data-toggle-next-display` | inline-DOM `this.nextElementSibling.style.display` toggle | maturity |
+
+### feat(security): migration script extended
+
+`tools/migrate_inline_handlers.py` learned five more patterns to
+auto-translate next time it runs:
+
+* `window.print()` → `data-window-print`
+* `document.getElementById('X').click()` → `data-click-target="X"`
+* `this.parentElement.classList.toggle('CLASS')` → `data-toggle-parent-class="CLASS"`
+* Bare `return false` / `return false;` → `data-prevent-default`
+* (The `data-enter-key-action` / `data-escape-key-action` patterns
+  are too compound for auto-translation; the helper is intended for
+  hand-fix migrations.)
+
+### chore(security): remaining handlers — 7 across 6 templates
+
+Staged for v0.31.20:
+
+* **guide_sim.html** — multi-statement DOM dance (nextElementSibling
+  querySelectorAll + style.display flip).
+* **lesson.html** — IIFE accessing template-literal `${cardId}`.
+* **observables.html** — multi-statement
+  (`showObservableDetail(${id}); closePatternsModal();`).
+* **threat_intel.html** (×2) — multi-statement `tiCloseDrill();
+  tiDrillTechnique(...)` and the clipboard-write +
+  textContent-flip + setTimeout chain.
+* **threat_intel_actor.html** — IIFE with `window.location.href`
+  assignment.
+* **_components.html** (×2) — Jinja macro `onclick="{{ onclick }}"`
+  where the handler comes from the macro parameter; the macro
+  itself needs refactoring to accept a `click_action` parameter
+  instead of a raw `onclick` string.
+
+After v0.31.20 closes these 7 and v0.31.21 flips
+`script-src-attr 'none'` / `style-src-attr 'none'`, P11 moves from
+**Mostly Met → Met** and the SbD audit advances to **19/1/0/0**.
+
+SECURE_BY_DESIGN audit summary unchanged at **18 Met / 2 Mostly Met /
+0 Partial / 0 Gap** at v0.31.19. **Net new findings: 0C / 0H / 0M / 0L.**
 
 ## v0.31.18 — 2026-05-26
 
