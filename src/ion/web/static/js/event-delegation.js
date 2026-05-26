@@ -121,6 +121,53 @@
     });
   }
 
+  // v0.31.23 (code review): action-name dispatch hardening. The function
+  // name comes from a DOM attribute, so stored-XSS that lands inside or
+  // adjacent to a real element could inject `data-click-action="eval"` or
+  // `data-validating-submit-action="fetch"` to redirect dispatch onto a
+  // dangerous global. Two defences:
+  //
+  // 1. ACTION_NAME_RE — accept only the camelCase-identifier shape that
+  //    every ION action follows. Rejects things like `eval`, `Function`,
+  //    `window.constructor`, `["alert"]`, etc.  Matches conservatively;
+  //    legit ION functions all start with a lower-case letter or
+  //    underscore and use only letters / digits / underscores.
+  // 2. ACTION_DENYLIST — explicit deny for known-dangerous globals that
+  //    would slip past the regex (`alert`, `fetch`, etc. are technically
+  //    valid identifiers). Belt-and-braces.
+  var ACTION_NAME_RE = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
+  var ACTION_DENYLIST = new Set([
+    'eval', 'Function', 'setTimeout', 'setInterval',
+    'alert', 'confirm', 'prompt',
+    'fetch', 'XMLHttpRequest', 'WebSocket',
+    'open', 'close', 'postMessage',
+    'location', 'history', 'navigator',
+    'document', 'window', 'self', 'top', 'parent',
+    'localStorage', 'sessionStorage', 'indexedDB',
+    'importScripts', 'Worker', 'SharedWorker', 'ServiceWorker',
+  ]);
+
+  function resolveAction(name) {
+    // Null/undefined is the "no attribute" case — return silently. The
+    // dispatch path will fall through to the existing debug-log branch
+    // for the "function not defined" case rather than spamming warnings.
+    if (typeof name !== 'string' || !name) return null;
+    if (!ACTION_NAME_RE.test(name)) {
+      if (window.console && console.warn) {
+        console.warn('[delegation] rejected action name (bad shape):', name);
+      }
+      return null;
+    }
+    if (ACTION_DENYLIST.has(name)) {
+      if (window.console && console.warn) {
+        console.warn('[delegation] rejected action name (denylist):', name);
+      }
+      return null;
+    }
+    var fn = window[name];
+    return typeof fn === 'function' ? fn : null;
+  }
+
   function dispatch(event, attr) {
     var hit = pickAction(event.target, attr);
     if (!hit) {
@@ -140,10 +187,12 @@
     if (hit.el.hasAttribute('data-only-self-click') && event.target !== hit.el) return;
     if (hit.el.hasAttribute('data-prevent-default')) event.preventDefault();
     if (hit.el.hasAttribute('data-stop-propagation')) event.stopPropagation();
-    var fn = window[hit.name];
-    if (typeof fn !== 'function') {
+    var fn = resolveAction(hit.name);
+    if (!fn) {
       // Surface during development; non-fatal so partial migrations don't
-      // brick navigation.
+      // brick navigation. resolveAction emits its own warning for the
+      // bad-shape / denylist rejection paths; this debug line covers the
+      // "function not defined" case.
       if (window.console && console.debug) {
         console.debug('[delegation] missing action:', hit.name);
       }
@@ -302,8 +351,8 @@
       var trigger = event.target.closest('[' + attr + ']');
       if (!trigger) return;
       var name = trigger.getAttribute(attr);
-      var fn = window[name];
-      if (typeof fn !== 'function') return;
+      var fn = resolveAction(name);
+      if (!fn) return;
       var argsAttr = trigger.dataset.args;
       var args = [];
       if (argsAttr) {
@@ -321,12 +370,14 @@
   // Built-in: data-validating-submit-action — fire the named function on form
   // submit; if it returns falsy, call event.preventDefault(). Replaces the
   // legacy `onsubmit="return canSubmit(event)"` pattern from form validators.
+  // v0.31.23: name goes through resolveAction() so the regex + denylist
+  // applies here too.
   document.addEventListener('submit', function (event) {
     var trigger = event.target.closest('[data-validating-submit-action]');
     if (!trigger) return;
     var name = trigger.getAttribute('data-validating-submit-action');
-    var fn = window[name];
-    if (typeof fn !== 'function') return;
+    var fn = resolveAction(name);
+    if (!fn) return;
     var result = fn(event);
     if (!result) event.preventDefault();
   });
