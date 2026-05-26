@@ -151,7 +151,7 @@
 {% endmacro %}
 
 {# ──────────────────────────────── BUTTON ──────────────────────────────── #}
-{% macro button(label, variant='primary', size='md', icon=None, href=None, type='button', id='', onclick='', extra_class='') %}
+{% macro button(label, variant='primary', size='md', icon=None, href=None, type='button', id='', click_action='', extra_class='') %}
   {% set variants = {
       'primary':   'bg-ion-cyan text-ink-950 hover:brightness-110 shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]',
       'secondary': 'bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10',
@@ -170,7 +170,7 @@
       {{ label }}
     </a>
   {% else %}
-    <button type="{{ type }}" {% if id %}id="{{ id }}"{% endif %} {% if onclick %}onclick="{{ onclick }}"{% endif %} class="{{ common }}">
+    <button type="{{ type }}" {% if id %}id="{{ id }}"{% endif %} {% if click_action %}data-click-action="{{ click_action }}"{% endif %} class="{{ common }}">
       {% if icon %}<svg class="w-3.5 h-3.5"><use href="#{{ icon }}"/></svg>{% endif %}
       {{ label }}
     </button>
@@ -178,8 +178,8 @@
 {% endmacro %}
 
 {# ──────────────────────── PILL (toggle-group segment) ──────────────────────── #}
-{% macro pill(label, active=false, onclick='', extra_class='') %}
-  <button onclick="{{ onclick }}" class="px-3 py-1.5 rounded-md label-tiny transition {% if active %}text-ink-950 bg-ion-cyan shadow-[0_0_18px_-6px_rgba(109,228,255,0.8)]{% else %}text-slate-400 hover:text-white{% endif %} {{ extra_class }}">{{ label }}</button>
+{% macro pill(label, active=false, click_action='', extra_class='') %}
+  <button {% if click_action %}data-click-action="{{ click_action }}"{% endif %} class="px-3 py-1.5 rounded-md label-tiny transition {% if active %}text-ink-950 bg-ion-cyan shadow-[0_0_18px_-6px_rgba(109,228,255,0.8)]{% else %}text-slate-400 hover:text-white{% endif %} {{ extra_class }}">{{ label }}</button>
 {% endmacro %}
 
 {# ──────────────────── DATA ROW (severity-bar + body + time) ──────────────────── #}

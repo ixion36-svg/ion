@@ -1,13 +1,75 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.19 -->
+<!-- ion-doc:version=0.31.20 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.20 — 2026-05-26
+
+**P11 script-attr half closed.** `script-src-attr` flipped from
+`'unsafe-inline'` to `'none'` in the SecurityHeadersMiddleware CSP.
+After v0.31.4–v0.31.19 retired every inline event handler from every
+template (~1,150 handlers cumulatively migrated), v0.31.20 closes
+the last 7 complex multi-statement handlers and flips the
+CSP-attr restriction. Browsers now block any attempt to add an
+inline event handler at runtime — a defence-in-depth gate against
+stored-XSS injection of `onerror=` / `onclick=` / etc. P11 stays
+**Mostly Met** because `style-src-attr 'unsafe-inline'` still
+permits 1,659 inline `style=""` attributes — the cosmetic-CSS half
+of P11, tracked for v0.32+. SECURE_BY_DESIGN audit summary
+unchanged at **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**.
+**Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): `script-src-attr 'none'` enforced
+
+`src/ion/web/server.py:SecurityHeadersMiddleware` now sends
+`script-src-attr 'none'` instead of `'unsafe-inline'`. Combined with
+the strict `script-src 'self' 'nonce-XXX'` already in place since
+v0.31.3, the only JS that can execute in an ION page is:
+* Source files served from same origin (`/static/js/*`).
+* Inline `<script nonce>` blocks with the per-request nonce.
+* Programmatic event handlers attached via `addEventListener` (which
+  the event-delegation helper does centrally).
+
+Attempts to inject `<button onerror="...">` or `<img onload="...">`
+via stored-XSS now silently fail. The element renders; the attribute
+is parsed and stored as a string; the browser refuses to execute it.
+
+### feat(security): last 7 multi-statement handlers retired
+
+In v0.31.19's commit, six base.html-scoped wrapper functions were
+defined (`window.showObsAndClosePatterns`, `window.simShowHints`,
+`window.toggleCardCriteria`, `window.tiCloseAndDrillTechnique`,
+`window.tiCopyIOC`, `window.navigateToTechnique`). v0.31.20
+finishes the wiring: the corresponding templates emit
+`data-click-action` referencing those wrappers instead of inline
+multi-statement bodies.
+
+### feat(security): `_components.html` macro refactor
+
+The reusable button + pill macros previously accepted an `onclick`
+parameter that rendered as `<button onclick="{{ onclick }}">` — an
+inline-handler injection point. v0.31.20 renames the parameter to
+`click_action` and outputs `data-click-action="{{ click_action }}"`
+instead. No callers in the current template tree use these macros
+(confirmed via grep), so the refactor is API-only with no caller
+updates required.
+
+### chore(security): residual P11 work
+
+* **Inline `style=""` migration** (~1,659 attributes). Cosmetic
+  positioning that doesn't carry executable JS. Migrating to CSS
+  classes would let `style-src-attr 'none'` flip and fully close
+  P11. v0.32+ candidate.
+
+After style-attr flips, P11 → Met and the audit advances to
+**19 Met / 1 Mostly Met / 0 Partial / 0 Gap** (only P1
+single-maintainer remains).
 
 ## v0.31.19 — 2026-05-26
 

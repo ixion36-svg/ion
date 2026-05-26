@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.17 -->
+<!-- ion-doc:version=0.31.20 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
@@ -340,7 +340,17 @@ descend from this principle.
   inline `style=""` and are queued for per-template migration. Once all are migrated, `script-src-attr 'none'`
   and `style-src-attr 'none'` can be enforced and P11 moves to Met.
 
-**Status:** Mostly Met — inline event handlers + inline `style=""`
+**Status:** Mostly Met (v0.31.20). **Script-attr half complete.** Every
+inline event handler in every template is gone (~1,150 migrated
+cumulatively across v0.31.4 → v0.31.19); CSP now sends
+`script-src-attr 'none'` — browsers block any attempt to inject an
+inline event handler at runtime. Inline `style=""` attributes
+(1,659 across templates) remain permitted via
+`style-src-attr 'unsafe-inline'` — that's the residual half of P11,
+tracked for v0.32+ as cosmetic-CSS-cleanup work. Stays Mostly Met
+until both halves complete.
+
+(Historical) — pre-v0.31.20 status: Mostly Met — inline event handlers + inline `style=""`
 attributes still permitted; full strict-CSP requires refactoring those
 to `addEventListener` + CSS classes.
 
@@ -620,17 +630,19 @@ Aggregating §3 across 20 principles:
 | Status | Count | Principles |
 |---|---|---|
 | **Met** | 18 | P2, P3, P4, P5, P6, P7, P8, P9, P10, P12, P13, P14, P15, P16, P17, P18, P19, P20 |
-| **Mostly Met** | 2 | P1 (single maintainer; six artifacts in place), P11 (CSP strict — inline handlers in 69 templates still pending) |
+| **Mostly Met** | 2 | P1 (single maintainer; six artifacts in place), P11 (script-attr closed v0.31.20; style-attr `'unsafe-inline'` remains — 1,659 inline `style=""` attributes still pending) |
 | **Partial** | 0 | — |
 | **Gap** | 0 | — |
 
 Open named gaps (also in `docs/DEVELOPMENT_LIFECYCLE.md` §8):
 
-* **Strict CSP** — eliminate `'unsafe-inline'` from `script-src-attr` /
-  `style-src-attr` by migrating 1,185 inline event handlers to
-  `addEventListener` and 1,659 inline `style=""` attributes to CSS
-  classes (P11). The `<script>`/`<style>` block nonce work itself is
-  done as of v0.31.3.
+* **Strict CSP** — `script-src-attr 'none'` **closed v0.31.20**
+  (every inline event handler retired; browsers now block runtime
+  inline-handler injection). `style-src-attr 'unsafe-inline'`
+  remains; 1,659 inline `style=""` attributes still in templates
+  need migration to CSS classes (P11 cosmetic half — v0.32+ work).
+  The `<script>`/`<style>` block nonce work itself is done as of
+  v0.31.3.
 * ~~**Data-minimisation audit**~~ — **CLOSED v0.31.12.** Full
   schema-wide audit produced at `docs/DATA_MINIMISATION_AUDIT.md`.
   13 existing controls catalogued; 5 low-severity residual gaps
@@ -687,6 +699,7 @@ is the phase guide. If the two ever disagree, this doc wins for
 | 1.5     | 2026-05-14 | Maintainer | v0.31.7: P11 follow-up #4 — training.html migrated (119 handlers). 2 hand-fixed JS-source-escape spots; migration script patched to detect `\\'` / `\\"` escape sequences and skip them. P11 audit body updated (368 handlers migrated; 69 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.6     | 2026-05-14 | Maintainer | v0.31.8: **P17 CLOSED.** `python-jose[cryptography]` retired in favour of `PyJWT[crypto]>=2.8.0`. Transitive `ecdsa` dep (CVE-2024-23342, Minerva timing attack on P-256) removed from the resolved tree. CI `--ignore-vuln CVE-2024-23342` flag dropped. `src/ion/auth/oidc.py` migrated: `PyJWK.from_dict(jwk).key` wraps the JWKS dict before `jwt.decode`; same RS256-only semantics. New `tests/test_v031_8_oidc_pyjwt.py` (8 cases) pins happy path + tampered signature + expired + wrong audience/issuer + missing/unknown kid + missing sub. P17 status: **Mostly Met → Met.** Audit summary: **16 Met / 2 Mostly Met / 2 Partial / 0 Gap** (was 15 / 3 / 2 / 0). |
 | 1.7     | 2026-05-14 | Maintainer | v0.31.9: **P1 PARTIAL → MOSTLY MET.** Four artifacts ship to systematize the single-maintainer review pattern: `CONTRIBUTING.md` (codified expectations + PR template), `CODEOWNERS` (review responsibility per path), `.claude/agents/security-reviewer.md` (focused SbD-walk agent invoked before commit), `.pre-commit-config.yaml` (ruff + bandit + pip-audit at the workstation; mirrors CI). P1 cannot reach Met without onboarding a second human reviewer. Audit summary: **16 Met / 3 Mostly Met / 1 Partial / 0 Gap** (was 16 / 2 / 2 / 0). |
+| 2.4     | 2026-05-26 | Maintainer | v0.31.20: **P11 script-attr half closed.** `script-src-attr` flipped from `'unsafe-inline'` to `'none'` in `SecurityHeadersMiddleware` after v0.31.4–v0.31.19 retired every inline event handler from every template (~1,150 handlers cumulatively migrated to `data-click-action` / `data-keydown-action` + the event-delegation helper). v0.31.18 mass-migration regression-fixed in v0.31.19 (JS-string-concat + onkeydown mis-translations). v0.31.20 adds 8 new event-delegation built-ins (windowPrint, clickTarget, toggleParentClass, enterKeyAction, escapeKeyAction, validatingSubmitAction, clearTarget, toggleNextDisplay), wraps the last 6 multi-statement handlers in named functions in base.html, and refactors `_components.html` macros to accept `click_action` instead of raw `onclick`. P11 stays Mostly Met because `style-src-attr 'unsafe-inline'` still permits 1,659 inline `style=""` attributes — the cosmetic half of P11. Audit summary unchanged: **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. Style-attr migration is the v0.32+ remaining work to fully close P11. |
 | 2.3     | 2026-05-26 | Maintainer | v0.31.17: **G5 sub-gap closed — last audit residual.** `session_token` column replaced with `session_token_hash` in `user_sessions`. SHA-256 of the plaintext stored at rest; plaintext lives in the client cookie only. `_hash_session_token()` helper in `storage/auth_repository.py`. Migration in `_run_migrations` adds the hash column, backfills, adds UNIQUE INDEX, and drops the plaintext column — atomically. Existing logged-in users' sessions preserved (hash is deterministic). DATA_MINIMISATION_AUDIT residual gaps drop from 1 to **0** — every G1–G5 from the original audit has shipped a behaviour change. Audit summary unchanged: **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. |
 | 2.2     | 2026-05-26 | Maintainer | v0.31.15: **G4 sub-gap closed.** One-tuple append to `RETENTION_RULES` in `data_retention_service.py`: `RetentionRule("ION_AI_CHAT_RETENTION_DAYS", "ion.models.ai_chat:AIChatMessage", "created_at", "ai_chat_messages")`. Opt-IN default (unset = disabled). Targets messages, not sessions — preserves user-controlled session lifecycle while bounding message PII retention. The parameterised abstraction did its job: closure required zero new infrastructure. DATA_MINIMISATION_AUDIT residual gaps drop from 2 to 1 (G5 remains). Audit summary unchanged: **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. |
 | 2.1     | 2026-05-26 | Maintainer | v0.31.14: **G2 + G3 sub-gaps closed.** New `src/ion/services/data_retention_service.py` is parameterised on a `RetentionRule` list — current rules: (`ION_AUDIT_LOG_RETENTION_DAYS`, `audit_logs.timestamp`) and (`ION_SECURITY_EVENTS_RETENTION_DAYS`, `security_events.created_at`). Single background loop under advisory lock `LOCK_DATA_RETENTION_BG = 1024`. Both retention env vars are opt-IN (default unset = disabled) because compliance windows vary by jurisdiction; loop has whole-loop kill switch `ION_DATA_RETENTION_ENABLED` (default `true`) + cadence `ION_DATA_RETENTION_INTERVAL_HOURS` (default 24h, floored at 60s). Future G4 (AI chat retention) will fit by appending one tuple to `RETENTION_RULES`. P13 already Met at v0.31.12 — this is sub-principle defence-in-depth work. DATA_MINIMISATION_AUDIT residual gaps drop from 4 to 2 (G4 / G5 remain). Audit summary unchanged: **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. |

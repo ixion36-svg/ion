@@ -550,7 +550,7 @@
             }
             if (d.is_subtechnique && d.parent_id) {
                 sections.push(`<div style="font-size:.78rem;color:var(--text-secondary);margin-bottom:14px;">
-                    Sub-technique of <a href="javascript:void(0)" onclick="tiCloseDrill();tiDrillTechnique('${escapeHtml(d.parent_id)}');" style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;">${escapeHtml(d.parent_id)}</a>
+                    Sub-technique of <a href="javascript:void(0)" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(d.parent_id)}]' style="color:var(--ion-cyan,#6de4ff);text-decoration:none;font-family:'JetBrains Mono',monospace;">${escapeHtml(d.parent_id)}</a>
                 </div>`);
             }
 
@@ -740,7 +740,7 @@
                     <td>${escapeHtml(i.source || '—')}</td>
                     <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span style="font-size:.7rem;color:var(--text-muted);">…</span></span></td>
                     <td>
-                        <button class="ti-btn-outline ti-btn-sm" onclick="navigator.clipboard.writeText('${escapeHtml(i.ioc_value)}');this.textContent='Copied';setTimeout(()=>{this.textContent='Copy';},1500);">Copy</button>
+                        <button class="ti-btn-outline ti-btn-sm" data-click-action="tiCopyIOC" data-args='["$event", ${JSON.stringify(i.ioc_value)}]'>Copy</button>
                     </td>
                 </tr>`;
             }).join('');
