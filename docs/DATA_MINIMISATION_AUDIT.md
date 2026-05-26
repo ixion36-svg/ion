@@ -1,7 +1,7 @@
 <!-- ion-doc:type=DATA MINIMISATION AUDIT -->
 <!-- ion-doc:title=ION Data-Minimisation Audit -->
 <!-- ion-doc:subtitle=Schema-wide audit of stored fields, retention, and PII handling against Secure-by-Design P13 -->
-<!-- ion-doc:version=0.31.12 -->
+<!-- ion-doc:version=0.31.13 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, external auditors, data-protection officers -->
@@ -10,7 +10,7 @@
 # ION — Data-Minimisation Audit
 
 **Document owner:** Repository maintainer (`ixion36`)
-**Status:** Current as of v0.31.12 (2026-05-26)
+**Status:** Current as of v0.31.13 (2026-05-26)
 **Review cadence:** Every minor-version bump (v0.X.0) or when a new
 table is added that handles PII / free-text user content.
 **Primary framework:** Secure-by-Design P13 ("Reduce impact of
@@ -119,16 +119,18 @@ created_at, active_role_id
 the user's next login. So a session row's max lifetime is bounded by
 the owner-user's next login, not by `expires_at`.
 
-**Gap G1 (track-as-future-work):** the system-wide cleanup function
-`AuthService.cleanup_expired_sessions()` exists at
-`src/ion/auth/service.py:347` but has no scheduled caller. For users
-who never log back in (departed staff, abandoned accounts), their
-expired session rows persist indefinitely. **Mitigated by C1
-(air-gap deployment limits PII spread) and C8 (active-user cleanup);
-risk is bounded but not zero.** Recommended fix: wire
-`cleanup_expired_sessions()` to a periodic background loop or daily
-scheduled job. Tracked as v0.32+ work; not blocking P13 closure
-given the orthogonal controls.
+**~~Gap G1~~ — CLOSED v0.31.13.** A new background loop at
+`src/ion/services/session_cleanup_service.py` wraps the existing
+`AuthService.cleanup_expired_sessions()` helper and runs it on a
+configurable cadence. Wired into ION's startup hook (`web/server.py`)
+under advisory lock `LOCK_SESSION_CLEANUP_BG = 1023`, so only one
+worker per cluster runs the sweep. New env vars:
+`ION_SESSION_CLEANUP_ENABLED` (default `true` — opt-out, since
+data-min is the safer default) and `ION_SESSION_CLEANUP_INTERVAL_HOURS`
+(default `6`, floored at 60s). Active-user cleanup at login (C8)
+remains the primary control; this loop catches the dormant-user
+tail. Loop logs `deleted N expired sessions` only when N > 0 — silent
+when the table is clean.
 
 ### 3.3 `audit_logs`
 
@@ -333,13 +335,15 @@ content, or audit-sensitive data. No column-level findings.
 
 | ID | Gap | Severity | Status | Recommended action |
 |----|-----|----------|--------|--------------------|
-| G1 | `user_sessions` accumulates expired rows for dormant users | Low | Track | Wire `cleanup_expired_sessions()` (`auth/service.py:347`) to a periodic background loop or daily scheduled job. v0.32+ candidate. |
+| ~~G1~~ | ~~`user_sessions` accumulates expired rows for dormant users~~ | Low | **Closed v0.31.13** | New `src/ion/services/session_cleanup_service.py` background loop under advisory lock `LOCK_SESSION_CLEANUP_BG`. Honours `ION_SESSION_CLEANUP_ENABLED` / `ION_SESSION_CLEANUP_INTERVAL_HOURS` env vars (defaults: enabled, 6h). |
 | G2 | `audit_logs` has no retention policy | Low (air-gap mitigates) | Track | Introduce `ION_AUDIT_LOG_RETENTION_DAYS` env var (default: unbounded; opt-in cleanup). v0.32+ candidate. |
 | G3 | `security_events` has no retention policy | Low (air-gap mitigates) | Track | Same pattern as G2 — `ION_SECURITY_EVENTS_RETENTION_DAYS` env var. v0.32+ candidate. |
 | G4 | `ai_chat_sessions` / `ai_chat_messages` persist until user deletion | Acceptable | Accept-with-rationale | Optional future enhancement: `ION_AI_CHAT_RETENTION_DAYS` env var. Not required for P13 closure given user-controlled deletion + RBAC. |
 | G5 | `session_token` stored as plaintext in `user_sessions` table (not hashed at rest) | Low (token rotated on logout, server-side only — DB compromise required to abuse) | Track | Hash-at-rest variant for `session_token`. v0.32+ candidate. |
 
-All five gaps are **low severity** because:
+After v0.31.13's G1 closure, **four** gaps remain — G2 / G3 / G4 / G5,
+all the same pattern (retention env vars or hash-at-rest), all
+tracked for v0.32+. All four are **low severity** because:
 
 * ION's air-gap-first deployment pattern (C1) means PII never leaves
   the customer's network perimeter.
@@ -381,3 +385,4 @@ trail. The residual Mostly Met principles are:
 | Version | Date       | Author     | Notes |
 |---------|------------|------------|-------|
 | 1.0     | 2026-05-26 | Maintainer | Initial publication at v0.31.12. Closes the data-min audit gap from SECURE_BY_DESIGN.md rev 1.0–1.8. Catalogues 13 existing data-min controls; identifies 5 low-severity residual gaps tracked for v0.32+. P13 moves Mostly Met → Met. |
+| 1.1     | 2026-05-26 | Maintainer | v0.31.13: **G1 CLOSED.** New `src/ion/services/session_cleanup_service.py` wraps `AuthService.cleanup_expired_sessions()` in a periodic background loop. Under advisory lock `LOCK_SESSION_CLEANUP_BG = 1023` for cross-worker single-leader execution. Env vars `ION_SESSION_CLEANUP_ENABLED` (default true) + `ION_SESSION_CLEANUP_INTERVAL_HOURS` (default 6, floored at 60s). Wired into `web/server.py` startup. Audit advances from 5 residual gaps to 4 (G2 / G3 / G4 / G5 remain). |

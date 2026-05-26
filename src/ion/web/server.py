@@ -736,6 +736,23 @@ async def startup_event():
                hold_until_close=True)
 
     # ---------------------------------------------------------------
+    # Session cleanup background loop (v0.31.13 — data-min P13 G1).
+    # Periodically sweeps user_sessions rows whose owner-user hasn't
+    # logged back in to trigger the per-user cleanup. Honours
+    # ION_SESSION_CLEANUP_ENABLED (default true) and
+    # ION_SESSION_CLEANUP_INTERVAL_HOURS (default 6).
+    # ---------------------------------------------------------------
+    from ion.storage.database import LOCK_SESSION_CLEANUP_BG
+    def _start_session_cleanup():
+        from ion.services.session_cleanup_service import (
+            start_background_loop as _sc_bg,
+        )
+        _sc_bg(engine)
+        logger.info("Session cleanup background loop started")
+    run_locked(engine, LOCK_SESSION_CLEANUP_BG, "session_cleanup_bg_loop", _start_session_cleanup,
+               hold_until_close=True)
+
+    # ---------------------------------------------------------------
     # Ticker background producer — REMOVED v0.26.1.
     # The loop crashed every tick on an enum-case mismatch
     # (AlertTriageStatus stored as the enum NAME 'OPEN', queried for
