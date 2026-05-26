@@ -1,13 +1,69 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.12 -->
+<!-- ion-doc:version=0.31.13 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.13 — 2026-05-26
+
+Data-min P13 sub-gap **G1 closed** — first behaviour change acting on
+the v0.31.12 audit findings. The audit identified that
+`AuthService.cleanup_expired_sessions()` (at `auth/service.py:347`)
+existed but had no scheduled caller, so dormant-user expired session
+rows accumulated in `user_sessions` indefinitely (each row carrying
+`ip_address` + `user_agent`). This release wires the helper into
+ION's existing background-loop pattern. SECURE_BY_DESIGN audit summary
+unchanged at **18 Met / 2 Mostly Met / 0 Partial / 0 Gap** — G1 is a
+sub-P13 gap and P13 was already Met at v0.31.12. **Net new findings:
+0C / 0H / 0M / 0L.**
+
+### feat(security): periodic session-cleanup background loop
+
+* **New module** `src/ion/services/session_cleanup_service.py` —
+  thin wrapper around `AuthService.cleanup_expired_sessions()`. Uses
+  the same `asyncio.create_task` + `_running` flag pattern as
+  `tide_sync_service` / other background loops. Logs `deleted N
+  expired sessions` only when N > 0 — silent when the table is clean.
+* **New advisory lock** `LOCK_SESSION_CLEANUP_BG = 1023` in
+  `storage/database.py`. Acquired with `hold_until_close=True` so
+  exactly one worker per cluster runs the sweep — same pattern as
+  `LOCK_ANALYTICS_BG_LOOP`, `LOCK_TIDE_BG_SYNC`, etc.
+* **Startup wiring** in `web/server.py` `@app.on_event("startup")`,
+  placed inside the existing background-loop cluster between the
+  case-grouper start and the (removed) ticker block. `run_locked(...)`
+  guards cross-worker duplication; worker crash hands ownership to a
+  sibling worker on the next restart cycle (the advisory lock
+  auto-releases on connection drop).
+* **New env vars**:
+  * `ION_SESSION_CLEANUP_ENABLED` — default `true`. Opt-out by
+    setting to `false`/`0`/`no`/`off`/empty-string. Data-min is the
+    safer default for a security-ops product, so the loop runs by
+    default.
+  * `ION_SESSION_CLEANUP_INTERVAL_HOURS` — default `6`. Floored at
+    60s to prevent busy-spinning if misconfigured.
+
+### docs(security): DATA_MINIMISATION_AUDIT.md update
+
+* Section 3.2 (`user_sessions`) — Gap G1 block rewritten as Closed
+  with the implementation details. Mentions the new module + lock +
+  env vars + cadence.
+* Section 6 (gaps inventory table) — G1 row struck through with
+  Closed v0.31.13 status.
+* Section 6 lead-in — counts updated from "5 residual gaps" to "4
+  residual gaps" (G2 / G3 / G4 / G5 remain).
+* Revision history row 1.1 added.
+
+### docs(security): SECURE_BY_DESIGN.md P13 follow-up
+
+* P13 ION-application bullets extended with v0.31.13 G1 closure
+  reference. Audit summary unchanged (P13 was already Met; this is
+  sub-principle work).
+* Revision history row 2.0 added.
 
 ## v0.31.12 — 2026-05-26
 
