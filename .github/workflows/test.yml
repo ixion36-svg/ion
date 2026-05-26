@@ -156,9 +156,15 @@ jobs:
       # broader catalogue, we'll catch it via Docker Scout's container
       # scan instead. Flip back to `osv` when pip-audit upstream
       # patches the missing-`ranges` guard.
+      # v0.31.24: dropped --strict. pip-audit treats "skip" events as errors
+      # under --strict, which makes --skip-editable contradictory: we want
+      # to skip the editable `ion` distribution gracefully but --strict
+      # promotes that skip to a hard failure. Without --strict, real
+      # vulnerability findings still exit non-zero (pip-audit's default
+      # behaviour) — only the skip warnings go quiet, which is what we
+      # actually want for a project-on-its-own-source audit.
       - name: Run pip-audit
         run: |
           pip-audit \
             --vulnerability-service pypi \
-            --skip-editable \
-            --strict
+            --skip-editable
