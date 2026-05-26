@@ -116,7 +116,7 @@ async function brfLoad(withAI) {
         if (!r.ok) throw new Error('Briefing request failed');
         brfRender(await r.json());
     } catch (e) {
-        c.innerHTML = `<div class="brf-loading" style="color:var(--sev-critical,#f85149)">${brfEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="brf-loading _ion-s-3c9b2ebd4d">${brfEsc(e.message)}</div>`;
     }
 }
 
@@ -193,7 +193,7 @@ function brfRender(b) {
     if ((octi.actors || []).length) {
         html += '<ul class="brf-list">';
         for (const a of octi.actors) {
-            html += `<li><span>${brfEsc(a.name || '-')}${a.aliases && a.aliases.length ? ' <em style="color:var(--text-secondary);font-size:.7rem">(' + a.aliases.map(brfEsc).join(', ') + ')</em>' : ''}</span></li>`;
+            html += `<li><span>${brfEsc(a.name || '-')}${a.aliases && a.aliases.length ? ' <em class="_ion-s-18f820e713">(' + a.aliases.map(brfEsc).join(', ') + ')</em>' : ''}</span></li>`;
         }
         html += '</ul>';
     } else {
@@ -212,7 +212,7 @@ function brfRender(b) {
             <li><span>Avg quality score</span><strong>${tide.quality_avg ?? '-'}</strong></li>
         </ul>`;
     } else {
-        html += '<div class="brf-empty">TIDE not configured. Add it in <a href="/settings#tide" style="color:var(--primary)">Settings</a>.</div>';
+        html += '<div class="brf-empty">TIDE not configured. Add it in <a class="_ion-s-dc2e428fc7" href="/settings#tide">Settings</a>.</div>';
     }
     html += '</div>';
 
@@ -221,7 +221,7 @@ function brfRender(b) {
     if (!b.narrative && b._ai_requested) {
         html += `<div class="brf-narrative empty">
             <div class="brf-narrative-label">AI Briefing</div>
-            <div class="brf-narrative-body" style="color:var(--sev-medium,#d29922)">AI summary unavailable — Ollama is not configured or not reachable. Check Settings → AI to configure.</div>
+            <div class="brf-narrative-body _ion-s-71bebebb15">AI summary unavailable — Ollama is not configured or not reachable. Check Settings → AI to configure.</div>
         </div>`;
     } else if (!b.narrative) {
         html += `<div class="brf-narrative empty">

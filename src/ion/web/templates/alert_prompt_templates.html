@@ -60,7 +60,7 @@
 </section>
 
 <!-- Create / Edit Modal -->
-<div class="modal-overlay" id="prompt-modal" style="display:none;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="prompt-modal">
     <div class="modal-dialog modal-large">
         <div class="modal-header">
             <h3 id="prompt-modal-title">New Alert Prompt Template</h3>
@@ -73,11 +73,11 @@
                 <div class="form-section">
                     <h4>Identity</h4>
                     <div class="form-row">
-                        <div class="form-group" style="flex: 2;">
+                        <div class="form-group _ion-s-c2d2e263dc">
                             <label for="prompt-name">Name *</label>
                             <input type="text" id="prompt-name" class="form-control" required>
                         </div>
-                        <div class="form-group" style="flex: 1;">
+                        <div class="form-group _ion-s-ee3d55bf99">
                             <label for="prompt-priority">Priority (lower = higher)</label>
                             <input type="number" id="prompt-priority" class="form-control" value="100" min="0">
                         </div>
@@ -132,7 +132,7 @@
                         <textarea id="prompt-checklist" class="form-control" rows="6" placeholder="- What is the parent process?&#10;- ..."></textarea>
                     </div>
                     <div class="form-row">
-                        <div class="form-group" style="flex: 1;">
+                        <div class="form-group _ion-s-ee3d55bf99">
                             <label for="prompt-severity">Severity Hint</label>
                             <select id="prompt-severity" class="form-control">
                                 <option value="">(none)</option>
@@ -142,15 +142,15 @@
                                 <option value="critical">critical</option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex: 2;">
+                        <div class="form-group _ion-s-c2d2e263dc">
                             <label for="prompt-outputs">Expected Output Fields (one per line)</label>
                             <textarea id="prompt-outputs" class="form-control" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
                         </div>
                     </div>
                     <!-- v0.22.1 (L6): row hidden for users without system:settings; -->
                     <!-- backend also enforces the gate so this is defence-in-depth. -->
-                    <div class="form-row" id="prompt-confidence-threshold-row" style="display:none;">
-                        <div class="form-group" style="flex: 1;">
+                    <div class="form-row _ion-s-c8be1ccba6" id="prompt-confidence-threshold-row">
+                        <div class="form-group _ion-s-ee3d55bf99">
                             <label for="prompt-confidence-threshold">Confidence Threshold Override (0-100)</label>
                             <input type="number" id="prompt-confidence-threshold" class="form-control" min="0" max="100" placeholder="e.g. 70 — leave blank to use global default">
                             <p class="form-help">When set, Bob must reach this confidence score to write a verdict for alerts matched by this template. Overrides ION_BOB_CONFIDENCE_THRESHOLD (default 60).</p>
@@ -167,7 +167,7 @@
 </div>
 
 <!-- Resolve / Test Match Modal -->
-<div class="modal-overlay" id="resolve-modal" style="display:none;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="resolve-modal">
     <div class="modal-dialog modal-large">
         <div class="modal-header">
             <h3>Test Match</h3>
@@ -186,7 +186,7 @@
             </div>
             <div class="form-group">
                 <label>Result</label>
-                <pre id="resolve-output" style="background: var(--bg-tertiary); padding: 0.75rem; border-radius: 4px; max-height: 320px; overflow:auto;">(click Resolve)</pre>
+                <pre class="_ion-s-f72ff42b6c" id="resolve-output">(click Resolve)</pre>
             </div>
         </div>
         <div class="modal-footer">
@@ -290,7 +290,7 @@ let _scorecards = {};
 function renderScorecard(tplId) {
     const s = _scorecards[tplId];
     if (!s || !s.sample_size) {
-        return '<span style="color:var(--text-secondary); font-size:0.75rem;">no data</span>';
+        return '<span class="_ion-s-a513d343e2">no data</span>';
     }
     const agree = s.agreement_pct;
     let color = 'color:var(--text-secondary);';
@@ -299,11 +299,11 @@ function renderScorecard(tplId) {
         else if (agree >= 60) color = 'color:#f59e0b;';
         else color = 'color:#ef4444; font-weight:600;';
     }
-    const flag = s.tuning_needed ? ' <span style="color:#ef4444;" title="Agreement below 60% on 10+ samples — prompt may need tuning">⚠️ tune</span>' : '';
+    const flag = s.tuning_needed ? ' <span class="_ion-s-9dd1207e58" title="Agreement below 60% on 10+ samples — prompt may need tuning">⚠️ tune</span>' : '';
     const agreeStr = agree !== null && agree !== undefined ? `${agree}%` : '—';
-    return `<div style="${color} font-size:0.78rem;">
+    return `<div class="_ion-s-2722fec7fb">
         agree <strong>${agreeStr}</strong> · n=${s.sample_size}${flag}
-        <div style="color:var(--text-secondary); font-size:0.7rem;">TP ${s.tp_rate ?? 0}% · FP ${s.fp_rate ?? 0}% · BTP ${s.btp_rate ?? 0}%</div>
+        <div class="_ion-s-707a537f4d">TP ${s.tp_rate ?? 0}% · FP ${s.fp_rate ?? 0}% · BTP ${s.btp_rate ?? 0}%</div>
     </div>`;
 }
 
@@ -314,22 +314,22 @@ function renderPrompts(items) {
         return;
     }
     body.innerHTML = items.map(t => {
-        const ruleIds = (t.rule_ids || []).map(r => `<span class="chip">${esc(r)}</span>`).join('') || '<span style="color:var(--text-secondary);">—</span>';
-        const ruleGroups = (t.rule_groups || []).map(g => `<span class="chip">${esc(g)}</span>`).join('') || '<span style="color:var(--text-secondary);">—</span>';
-        const pattern = t.rule_id_pattern ? `<code>${esc(t.rule_id_pattern)}</code>` : '<span style="color:var(--text-secondary);">—</span>';
+        const ruleIds = (t.rule_ids || []).map(r => `<span class="chip">${esc(r)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
+        const ruleGroups = (t.rule_groups || []).map(g => `<span class="chip">${esc(g)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
+        const pattern = t.rule_id_pattern ? `<code>${esc(t.rule_id_pattern)}</code>` : '<span class="_ion-s-0e42856cf0">—</span>';
         const sevClass = t.severity_hint ? `sev-${t.severity_hint}` : '';
-        const sev = t.severity_hint ? `<span class="${sevClass}">${esc(t.severity_hint)}</span>` : '<span style="color:var(--text-secondary);">—</span>';
+        const sev = t.severity_hint ? `<span class="${sevClass}">${esc(t.severity_hint)}</span>` : '<span class="_ion-s-0e42856cf0">—</span>';
         const statusBadge = t.enabled
             ? `<span class="status-badge status-enabled">Enabled</span>`
             : `<span class="status-badge status-disabled">Disabled</span>`;
         const techChips = (t.mitre_techniques || []).map(x => `<span class="chip">${esc(x)}</span>`).join('');
         const tacticChips = (t.mitre_tactics || []).map(x => `<span class="chip">${esc(x)}</span>`).join('');
         const mitreLine = (techChips || tacticChips)
-            ? `<div style="margin-top:0.3rem; font-size:0.75rem;"><span style="color:var(--text-secondary);">MITRE:</span> ${techChips}${tacticChips}</div>`
+            ? `<div class="_ion-s-6def4d2d95"><span class="_ion-s-0e42856cf0">MITRE:</span> ${techChips}${tacticChips}</div>`
             : '';
         return `
             <tr>
-                <td><strong>${esc(t.name)}</strong><div style="color:var(--text-secondary); font-size:0.8rem;">${esc(t.description || '')}</div>${mitreLine}</td>
+                <td><strong>${esc(t.name)}</strong><div class="_ion-s-9c82e5036d">${esc(t.description || '')}</div>${mitreLine}</td>
                 <td>${ruleIds}</td>
                 <td>${ruleGroups}</td>
                 <td>${pattern}</td>

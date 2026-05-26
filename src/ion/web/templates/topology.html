@@ -635,7 +635,7 @@
     <div class="topo-header">
         <h1><i class="icon-network"></i> Platform Topology</h1>
         <div class="topo-header-actions">
-            <span id="last-checked" style="font-size:.78rem;color:var(--text-secondary);"></span>
+            <span class="_ion-s-6e06904f9e" id="last-checked"></span>
             <button class="btn btn-secondary btn-sm" data-click-action="refreshAll">
                 <i class="icon-refresh-cw"></i> Refresh
             </button>
@@ -890,7 +890,7 @@ function drawConnections() {
         if (status === 'healthy') {
             for (let p = 0; p < 2; p++) {
                 svgContent += `
-                    <circle r="3" class="topo-particle active" style="animation-delay:${p * 1.2}s;">
+                    <circle r="3" class="topo-particle active _ion-s-ae5ce075fb">
                         <animateMotion dur="2.5s" begin="${p * 1.2}s" repeatCount="indefinite" rotate="auto">
                             <mpath href="#${pathId}"/>
                         </animateMotion>
@@ -1126,7 +1126,7 @@ function renderDetailCards() {
             metricsHtml += `
                 <div class="topo-metric">
                     <div class="topo-metric-label">Health</div>
-                    <div class="topo-metric-value" style="color:${csColor};">${d.cluster_status.toUpperCase()}</div>
+                    <div class="topo-metric-value _ion-s-74c9db8ded">${d.cluster_status.toUpperCase()}</div>
                 </div>`;
         }
         if (d.node_count != null) {
@@ -1147,22 +1147,22 @@ function renderDetailCards() {
             metricsHtml += `
                 <div class="topo-metric">
                     <div class="topo-metric-label">Model</div>
-                    <div class="topo-metric-value" style="font-size:.75rem;">${escapeHtml(d.model)}</div>
+                    <div class="topo-metric-value _ion-s-a5982facce">${escapeHtml(d.model)}</div>
                 </div>`;
         }
         if (d.url) {
             const shortUrl = d.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
             metricsHtml += `
-                <div class="topo-metric" style="grid-column: 1/-1;">
+                <div class="topo-metric _ion-s-90e9d2a572">
                     <div class="topo-metric-label">Endpoint</div>
-                    <div class="topo-metric-value" style="font-size:.75rem;">${escapeHtml(shortUrl)}</div>
+                    <div class="topo-metric-value _ion-s-a5982facce">${escapeHtml(shortUrl)}</div>
                 </div>`;
         }
         if (d.error) {
             metricsHtml += `
-                <div class="topo-metric" style="grid-column: 1/-1;">
+                <div class="topo-metric _ion-s-90e9d2a572">
                     <div class="topo-metric-label">Error</div>
-                    <div class="topo-metric-value" style="color:#ef4444;font-size:.75rem;">${escapeHtml(String(d.error))}</div>
+                    <div class="topo-metric-value _ion-s-d873f81784">${escapeHtml(String(d.error))}</div>
                 </div>`;
         }
 
@@ -1174,8 +1174,8 @@ function renderDetailCards() {
                         <div class="topo-detail-title">${svc.name}</div>
                         <div class="topo-detail-status">
                             <span class="status-text ${h.status}">${statusLabel[h.status] || h.status}</span>
-                            <span style="color:var(--text-secondary);">·</span>
-                            <span style="color:var(--text-secondary);font-size:.72rem;">${svc.description}</span>
+                            <span class="_ion-s-0e42856cf0">·</span>
+                            <span class="_ion-s-2243767b95">${svc.description}</span>
                         </div>
                     </div>
                 </div>
@@ -1362,9 +1362,9 @@ function createFlowSlide() {
 
         if (stage.decision) {
             el.innerHTML = `
-                <div class="flow-stage-card" style="border: 2px solid ${stage.color}55;">
+                <div class="flow-stage-card _ion-s-499d77db44">
                     <div class="flow-stage-inner">
-                        <div class="flow-stage-icon" style="background:${stage.color}22;color:${stage.color};">
+                        <div class="flow-stage-icon _ion-s-838ae0074a">
                             <i class="${stage.icon}"></i>
                         </div>
                         <div class="flow-stage-name">${stage.name}</div>
@@ -1377,9 +1377,9 @@ function createFlowSlide() {
                 </div>`;
         } else {
             el.innerHTML = `
-                <div class="flow-stage-card" style="border-color:${stage.color}33;">
-                    <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${stage.color};border-radius:10px 10px 0 0;"></div>
-                    <div class="flow-stage-icon" style="background:${stage.color}22;color:${stage.color};">
+                <div class="flow-stage-card _ion-s-093390a704">
+                    <div class="_ion-s-7f433a77d0"></div>
+                    <div class="flow-stage-icon _ion-s-838ae0074a">
                         <i class="${stage.icon}"></i>
                     </div>
                     <div class="flow-stage-name">${stage.name}</div>
@@ -1400,9 +1400,9 @@ function createFlowSlide() {
         el.className = 'flow-harrow flow-pipe-step';
         el.dataset.step = step;
         el.innerHTML = `
-            <div class="flow-harrow-line" style="background:${color};"></div>
-            <div class="flow-harrow-head" style="border-left-color:${color};"></div>
-            <div class="flow-harrow-dot" style="background:${color};animation-delay:${delay || 0}s;"></div>`;
+            <div class="flow-harrow-line _ion-s-0260826a3b"></div>
+            <div class="flow-harrow-head _ion-s-1c22937527"></div>
+            <div class="flow-harrow-dot _ion-s-5551ed09aa"></div>`;
         return el;
     }
 
@@ -1466,7 +1466,7 @@ function renderFlowLegend() {
 
     legend.innerHTML = items.map(it =>
         `<div class="flow-legend-item">
-            <div class="flow-legend-dot" style="background:${it.color};box-shadow:0 0 6px ${it.color}66;"></div>
+            <div class="flow-legend-dot _ion-s-ccf801e77c"></div>
             ${it.label}
         </div>`
     ).join('');

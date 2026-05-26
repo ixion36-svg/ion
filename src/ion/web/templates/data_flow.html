@@ -166,7 +166,7 @@
         <div class="df-grid">
             <div>
                 <!-- Pipeline -->
-                <div class="df-pipeline" style="margin-bottom: 24px;">
+                <div class="df-pipeline _ion-s-8d703344e0">
                     <div class="df-pipeline-track">
                         <div class="df-pipeline-line"></div>
                         <div class="df-node" data-click-action="dfSelectNode" data-args='[0]'>
@@ -203,28 +203,28 @@
                             <span>Target User Resolution</span>
                             <span class="df-metric-status fail" id="df-m1-status">FAILED</span>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill red" id="df-m1-bar" style="width: 0%;"></div></div>
+                        <div class="df-bar"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m1-bar"></div></div>
                     </div>
                     <div class="df-metric">
                         <div class="df-metric-header">
                             <span>Member SID Preservation</span>
                             <span class="df-metric-status fail" id="df-m2-status">LOST</span>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill red" id="df-m2-bar" style="width: 0%;"></div></div>
+                        <div class="df-bar"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m2-bar"></div></div>
                     </div>
                     <div class="df-metric">
                         <div class="df-metric-header">
                             <span>NiFi Overhead</span>
                             <span class="df-metric-status warn" id="df-m3-status">High</span>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill orange" id="df-m3-bar" style="width: 80%;"></div></div>
+                        <div class="df-bar"><div class="df-bar-fill orange _ion-s-3bc928abb5" id="df-m3-bar"></div></div>
                     </div>
                     <div class="df-metric">
                         <div class="df-metric-header">
                             <span>Analyst Readiness</span>
                             <span class="df-metric-status fail" id="df-m4-status">BLOCKED</span>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill red" id="df-m4-bar" style="width: 15%;"></div></div>
+                        <div class="df-bar"><div class="df-bar-fill red _ion-s-a659372d50" id="df-m4-bar"></div></div>
                     </div>
                 </div>
 
@@ -250,20 +250,20 @@
     </div>
 
     <!-- Comparison view -->
-    <div id="df-compare-view" style="display: none;">
+    <div class="_ion-s-f2892a2e8a" id="df-compare-view">
         <div class="df-compare-grid">
             <!-- Legacy column -->
             <div class="df-compare-col">
                 <h3 class="legacy">Legacy End State (Missing Fields)</h3>
                 <div id="df-compare-kibana-legacy"></div>
                 <div class="df-field-analysis">
-                    <h4><i class="icon-eye-off" style="color: var(--danger);"></i> Field Analysis</h4>
+                    <h4><i class="icon-eye-off _ion-s-f75d63c1ee"></i> Field Analysis</h4>
                     <table class="df-field-table">
                         <thead><tr><th>Target Field</th><th>Status</th></tr></thead>
                         <tbody>
-                            <tr><td style="color: rgba(239,68,68,.7);">user.target.name</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
-                            <tr><td style="color: rgba(239,68,68,.7);">winlog.event_data.MemberSid</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
-                            <tr><td style="color: rgba(239,68,68,.7);">group.domain</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
+                            <tr><td class="_ion-s-a072892b2b">user.target.name</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
+                            <tr><td class="_ion-s-a072892b2b">winlog.event_data.MemberSid</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
+                            <tr><td class="_ion-s-a072892b2b">group.domain</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -273,13 +273,13 @@
                 <h3 class="modern">Modern End State (Full Visibility)</h3>
                 <div id="df-compare-kibana-modern"></div>
                 <div class="df-field-analysis">
-                    <h4><i class="icon-shield-check" style="color: var(--success);"></i> Field Analysis</h4>
+                    <h4><i class="icon-shield-check _ion-s-2ab631d078"></i> Field Analysis</h4>
                     <table class="df-field-table">
                         <thead><tr><th>Target Field</th><th>Status</th></tr></thead>
                         <tbody>
-                            <tr><td style="color: rgba(16,185,129,.7);">user.target.name</td><td><span class="df-badge present">PRESENT</span></td></tr>
-                            <tr><td style="color: rgba(16,185,129,.7);">user.target.id (SID)</td><td><span class="df-badge present">PRESENT</span></td></tr>
-                            <tr><td style="color: rgba(16,185,129,.7);">winlog.event_data.MemberName</td><td><span class="df-badge present">PRESENT</span></td></tr>
+                            <tr><td class="_ion-s-e4aef55874">user.target.name</td><td><span class="df-badge present">PRESENT</span></td></tr>
+                            <tr><td class="_ion-s-e4aef55874">user.target.id (SID)</td><td><span class="df-badge present">PRESENT</span></td></tr>
+                            <tr><td class="_ion-s-e4aef55874">winlog.event_data.MemberName</td><td><span class="df-badge present">PRESENT</span></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -393,14 +393,14 @@
         return `
         <div class="df-winlog">
             <div class="df-winlog-titlebar">
-                <span><i class="icon-server" style="margin-right:6px;"></i> Event Viewer - [Event 4728, Security]</span>
+                <span><i class="icon-server _ion-s-869d91af1b"></i> Event Viewer - [Event 4728, Security]</span>
                 <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot red"></div></div>
             </div>
             <div class="df-winlog-body">
                 <h4>General</h4>
-                <p style="margin:0 0 12px;">A member was added to a security-enabled global group.</p>
+                <p class="_ion-s-a0612bbb59">A member was added to a security-enabled global group.</p>
                 <div class="df-winlog-row"><span class="lbl">Keywords:</span><span class="val">Audit Success</span></div>
-                <div class="df-winlog-row"><span class="lbl">Event ID:</span><span class="val" style="font-weight:900;">4728</span></div>
+                <div class="df-winlog-row"><span class="lbl">Event ID:</span><span class="val _ion-s-92fb99917f">4728</span></div>
                 <div class="df-winlog-row"><span class="lbl">Task Category:</span><span class="val">Security Group Management</span></div>
                 <div class="df-winlog-detail">
                     <p class="df-winlog-section">Member Information:</p>
@@ -421,9 +421,9 @@
             <table class="df-kib-table">
                 <thead><tr><th>Admin User</th><th>Action</th><th>Target Group</th><th>Target User</th></tr></thead>
                 <tbody><tr>
-                    <td style="color: var(--warning); font-weight:700;">Admin_Bob</td>
-                    <td style="color: var(--text-secondary);">Added Member</td>
-                    <td style="color: var(--info); font-weight:600;">Privileged_Admins</td>
+                    <td class="_ion-s-0cf2671df2">Admin_Bob</td>
+                    <td class="_ion-s-0f6b1ef9a5">Added Member</td>
+                    <td class="_ion-s-3043802241">Privileged_Admins</td>
                     <td>${isMissing
                         ? '<span class="df-kib-missing"><i class="icon-eye-off"></i> MISSING</span>'
                         : '<span class="df-kib-present">John Doe</span>'

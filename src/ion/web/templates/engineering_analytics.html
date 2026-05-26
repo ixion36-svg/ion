@@ -591,7 +591,7 @@ async function loadSystemAnalytics() {
 function showNotConfigured() {
     const grid = document.getElementById('systems-grid');
     grid.innerHTML = `
-        <div class="es-not-configured" style="grid-column: 1/-1;">
+        <div class="es-not-configured _ion-s-90e9d2a572">
             <h3>Elasticsearch Not Connected</h3>
             <p>Configure your Elasticsearch connection in Settings to see per-system analytics.</p>
         </div>`;
@@ -683,7 +683,7 @@ function renderSystemCards(systems) {
     if (countEl) countEl.textContent = `${systems.length} system${systems.length !== 1 ? 's' : ''} detected`;
 
     if (!systems.length) {
-        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="empty-icon">&#x1F50D;</div>No systems found in this time range</div>`;
+        grid.innerHTML = `<div class="empty-state _ion-s-97294b207c"><div class="empty-icon">&#x1F50D;</div>No systems found in this time range</div>`;
         return;
     }
 
@@ -701,7 +701,7 @@ function renderSystemCard(sys) {
     if (sev.high) sevHtml += `<span class="sev-pill high">H ${sev.high}</span>`;
     if (sev.medium) sevHtml += `<span class="sev-pill med">M ${sev.medium}</span>`;
     if (sev.low) sevHtml += `<span class="sev-pill low">L ${sev.low}</span>`;
-    if (!sevHtml) sevHtml = '<span class="sev-pill" style="color:var(--text-muted);">No severity data</span>';
+    if (!sevHtml) sevHtml = '<span class="sev-pill _ion-s-b8e0b1fa55">No severity data</span>';
 
     // Sparkline
     const sparkHtml = renderMiniSparkline(sys.timeline || [], iconColor);
@@ -734,12 +734,12 @@ function renderSystemCard(sys) {
     // TIDE enrichment
     let tideHtml = '';
     if (sys.tide_id) {
-        tideHtml = `<div class="system-meta" style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px;">
-            <span title="TIDE detection rules" style="color:var(--primary);">TIDE: ${sys.tide_rule_count || 0} rules</span>
+        tideHtml = `<div class="system-meta _ion-s-f66824a574">
+            <span class="_ion-s-90010faf15" title="TIDE detection rules">TIDE: ${sys.tide_rule_count || 0} rules</span>
             ${sys.tide_classification ? `<span title="Classification">${escapeHtml(sys.tide_classification)}</span>` : ''}
         </div>`;
         if (sys.tide_description) {
-            tideHtml += `<div style="font-size:.7rem;color:var(--text-muted);margin-top:4px;line-height:1.3;">${escapeHtml(sys.tide_description).substring(0, 120)}</div>`;
+            tideHtml += `<div class="_ion-s-8122ff50ac">${escapeHtml(sys.tide_description).substring(0, 120)}</div>`;
         }
     }
 
@@ -755,10 +755,10 @@ function renderSystemCard(sys) {
     <div class="system-card">
         <div class="system-card-header">
             <div class="system-name">
-                <span class="system-icon" style="background:${iconColor};">${icon}</span>
+                <span class="system-icon _ion-s-80f2c6f575">${icon}</span>
                 ${escapeHtml(sys.system)}
             </div>
-            <div class="system-alert-count">${(sys.alert_count || 0).toLocaleString()}<div style="font-size:.55rem;color:var(--text-muted);font-weight:400;text-transform:uppercase;letter-spacing:.5px">${sys.alert_count ? 'alerts' : sys.event_count ? (sys.event_count || 0).toLocaleString() + ' events' : 'no data'}</div></div>
+            <div class="system-alert-count">${(sys.alert_count || 0).toLocaleString()}<div class="_ion-s-a905fbfb77">${sys.alert_count ? 'alerts' : sys.event_count ? (sys.event_count || 0).toLocaleString() + ' events' : 'no data'}</div></div>
         </div>
         <div class="system-card-body">
             <div class="severity-row">${sevHtml}</div>
@@ -836,7 +836,7 @@ function renderIndexTable(indices, total) {
             <td><span class="idx-count">${idx.count.toLocaleString()}</span></td>
             <td>
                 <div class="idx-bar-container">
-                    <div class="idx-bar" style="width:${pct}%"></div>
+                    <div class="idx-bar _ion-s-95aea49e0e"></div>
                 </div>
             </td>
             <td><div class="idx-sev-pills">${sevPills || '-'}</div></td>

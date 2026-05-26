@@ -184,7 +184,7 @@ async function schLoad() {
     schCache = data.jobs || [];
     schRender();
   } catch (e) {
-    c.innerHTML = `<div class="sch-loading" style="color:var(--sev-critical,#f85149)">${schEsc(e.message || 'Failed to load')}</div>`;
+    c.innerHTML = `<div class="sch-loading _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 
@@ -194,7 +194,7 @@ function schRender() {
     c.innerHTML = `<div class="sch-empty">
       <h3>No scheduled jobs yet</h3>
       <p>Create a job to run a registered handler on a cron schedule.</p>
-      <button class="btn btn-primary" style="margin-top:14px" data-click-action="schOpenForm">+ New Job</button>
+      <button class="btn btn-primary _ion-s-d6f2af6e0a" data-click-action="schOpenForm">+ New Job</button>
     </div>`;
     return;
   }
@@ -210,7 +210,7 @@ function schRender() {
           </div>
           <span class="sch-card-status ${cls}">${schEsc(statusTxt)}</span>
         </div>
-        ${j.description ? `<div style="color:var(--text-secondary);font-size:.78rem;margin-top:4px">${schEsc(j.description)}</div>` : ''}
+        ${j.description ? `<div class="_ion-s-d027def9f2">${schEsc(j.description)}</div>` : ''}
         <div class="sch-card-meta">
           <span class="sch-card-cron">${schEsc(j.cron_expr)}</span>
           <span>next: <strong>${schFmtTime(j.next_run_at)}</strong></span>
@@ -343,7 +343,7 @@ async function schShowExec(id, name) {
       </div>`;
     }).join('');
   } catch (e) {
-    body.innerHTML = `<div class="sch-loading" style="color:var(--sev-critical,#f85149)">${schEsc(e.message || 'Failed to load')}</div>`;
+    body.innerHTML = `<div class="sch-loading _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 

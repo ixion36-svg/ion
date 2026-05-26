@@ -84,7 +84,7 @@ async function cgLoad() {
     const data = await r.json();
     cgRender(data);
   } catch (e) {
-    c.innerHTML = `<div class="cg-loading" style="color:var(--sev-critical,#f85149)">${cgEsc(e.message || 'Failed to load')}</div>`;
+    c.innerHTML = `<div class="cg-loading _ion-s-3c9b2ebd4d">${cgEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 
@@ -142,7 +142,7 @@ function cgRender(s) {
         <span class="cg-label">Auto-run investigation pipeline</span>
         <span class="cg-badge ${s.auto_investigate ? 'ok' : 'off'}">${s.auto_investigate ? 'on' : 'off'}</span>
       </div>
-      <div class="cg-row" style="margin-top:4px;color:var(--text-secondary);font-size:.75rem">
+      <div class="cg-row _ion-s-a41031e958">
         <span>Toggle via ION_CASE_GROUPER_PUSH_TO_KIBANA / ION_CASE_GROUPER_AUTO_INVESTIGATE.</span>
         <span></span>
       </div>

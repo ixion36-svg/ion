@@ -108,29 +108,29 @@ function render() {
   const l = _lesson;
   const isQuizLike = (l.lesson_type === 'quiz' || l.lesson_type === 'lab');
   const labLink = (l.lesson_type === 'lab' && l.lab_target_url)
-    ? `<div class="ln-banner" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.3);color:#fbbf24;">
+    ? `<div class="ln-banner _ion-s-99d9b53847">
          <strong>Hands-on lab.</strong> Open <a class="underline" href="${escHtml(l.lab_target_url)}" target="_blank">${escHtml(l.lab_target_url)}</a>
          in another tab and complete the task before answering the verification questions.
        </div>` : '';
 
   const labFixturesSection = (l.lesson_type === 'lab')
-    ? `<div id="ln-lab-fixtures" class="ln-banner" style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.3);color:#a5b4fc;margin-bottom:0.75rem;">
-         <div style="font-weight:700;margin-bottom:0.5rem;">Lab environment</div>
-         <div id="ln-lab-status" style="font-size:0.82rem;color:var(--text-secondary);">
+    ? `<div id="ln-lab-fixtures" class="ln-banner _ion-s-ba14db93df">
+         <div class="_ion-s-586dee8c5b">Lab environment</div>
+         <div class="_ion-s-d110d4972e" id="ln-lab-status">
            Click <em>Launch lab</em> to seed practice alerts/cases into ION for this exercise.
          </div>
-         <div style="margin-top:0.6rem;display:flex;gap:0.5rem;flex-wrap:wrap;">
-           <button id="ln-lab-launch-btn" class="ln-btn-primary" data-click-action="launchLab" style="font-size:0.8rem;padding:0.45rem 1rem;">
+         <div class="_ion-s-82ea167a73">
+           <button id="ln-lab-launch-btn" class="ln-btn-primary _ion-s-1b3ebf28b4" data-click-action="launchLab">
              Launch lab
            </button>
-           <button id="ln-lab-complete-btn" class="ln-btn-secondary" data-click-action="completeLab" style="font-size:0.8rem;padding:0.45rem 1rem;">
+           <button id="ln-lab-complete-btn" class="ln-btn-secondary _ion-s-1b3ebf28b4" data-click-action="completeLab">
              Complete lab
            </button>
          </div>
-         <div id="ln-lab-links" style="margin-top:0.5rem;font-size:0.78rem;"></div>
+         <div class="_ion-s-e9c02e2a09" id="ln-lab-links"></div>
          <!-- v0.26.0: lab attempt history. JS-populated by _loadLabHistory(). -->
-         <div id="ln-lab-history" style="margin-top:0.75rem;display:none;">
-           <div style="font-weight:700;margin-bottom:0.4rem;font-size:0.82rem;color:var(--text-primary);">Lab attempt history</div>
+         <div class="_ion-s-d4c3d39ab0" id="ln-lab-history">
+           <div class="_ion-s-eccba22010">Lab attempt history</div>
            <div id="ln-lab-history-list"></div>
          </div>
        </div>`
@@ -138,7 +138,7 @@ function render() {
 
   let questionsHtml = '';
   if (isQuizLike && (l.questions || []).length) {
-    questionsHtml = '<h2 style="margin-top:2rem;">Verification questions</h2>' +
+    questionsHtml = '<h2 class="_ion-s-6e58ee35af">Verification questions</h2>' +
       (l.questions || []).map(q => renderQuestion(q)).join('');
   }
 
@@ -149,7 +149,7 @@ function render() {
     : `<button id="ln-submit-btn" class="ln-btn-primary" data-click-action="submitQuiz">Submit answers</button>`;
 
   const pdfLink = _courseSlug
-    ? `<a class="ln-btn-secondary" href="/api/courses/${_courseSlug}/lessons/${l.id}/export.pdf" download style="font-size:0.78rem;padding:0.55rem 1rem;">Download PDF</a>`
+    ? `<a class="ln-btn-secondary _ion-s-c1224911b6" href="/api/courses/${_courseSlug}/lessons/${l.id}/export.pdf" download>Download PDF</a>`
     : '';
 
   document.getElementById('ln-root').innerHTML = `
@@ -354,15 +354,15 @@ function _renderLabCriteria(d) {
     const mark = c.matched ? '✓' : '✗';
     const colour = c.matched ? '#34d399' : '#f87171';
     const label = escHtml(c.kind);
-    return `<div style="display:flex;justify-content:space-between;gap:0.5rem;padding:0.2rem 0;">
-              <span style="color:${colour};">${mark}</span>
-              <span style="flex:1;color:var(--text-secondary);">${label}</span>
-              <span style="color:var(--text-secondary);">${c.points_earned}/${c.points_max}</span>
+    return `<div class="_ion-s-74e2e4902a">
+              <span class="_ion-s-ea197f191f">${mark}</span>
+              <span class="_ion-s-a76779735c">${label}</span>
+              <span class="_ion-s-0e42856cf0">${c.points_earned}/${c.points_max}</span>
             </div>`;
   }).join('');
   host.innerHTML =
-    '<div style="margin-top:0.4rem;padding:0.4rem 0.6rem;border:1px solid rgba(255,255,255,0.08);border-radius:0.4rem;background:rgba(0,0,0,0.2);">'
-    + '<div style="font-weight:600;color:var(--text-primary);margin-bottom:0.25rem;font-size:0.78rem;">Rubric</div>'
+    '<div class="_ion-s-d1b1c0a49d">'
+    + '<div class="_ion-s-3965425ce7">Rubric</div>'
     + rows
     + '</div>';
 }
@@ -400,25 +400,25 @@ async function _loadLabHistory() {
       const criteriaRows = (s.criteria || []).map(c => {
         const mark = c.matched ? '✓' : '✗';
         const mcol = c.matched ? '#34d399' : '#f87171';
-        return `<div style="display:flex;justify-content:space-between;gap:0.5rem;padding:0.15rem 0;font-size:0.78rem;">
-                  <span style="color:${mcol};">${mark}</span>
-                  <span style="flex:1;color:var(--text-secondary);">${escHtml(c.kind)}</span>
-                  <span style="color:var(--text-secondary);">${c.points_earned}/${c.points_max}</span>
+        return `<div class="_ion-s-21d5a347b4">
+                  <span class="_ion-s-f63701491e">${mark}</span>
+                  <span class="_ion-s-a76779735c">${escHtml(c.kind)}</span>
+                  <span class="_ion-s-0e42856cf0">${c.points_earned}/${c.points_max}</span>
                 </div>`;
       }).join('');
       const criteriaBlock = criteriaRows
-        ? `<div id="${cardId}-crit" style="display:none;margin-top:0.4rem;padding:0.3rem 0.5rem;border-top:1px solid rgba(255,255,255,0.06);">${criteriaRows}</div>`
+        ? `<div class="_ion-s-ebfdcc23be" id="${cardId}-crit">${criteriaRows}</div>`
         : '';
       const toggle = criteriaRows
-        ? `<button data-click-action="toggleCardCriteria" data-args='[${JSON.stringify(cardId)}]' style="background:none;border:none;color:#a5b4fc;cursor:pointer;font-size:0.74rem;padding:0;">Show breakdown ▾</button>`
+        ? `<button class="_ion-s-d6d316dc26" data-click-action="toggleCardCriteria" data-args='[${JSON.stringify(cardId)}]'>Show breakdown ▾</button>`
         : '';
-      return `<div id="${cardId}" style="padding:0.4rem 0.6rem;margin-bottom:0.3rem;border:1px solid rgba(255,255,255,0.08);border-radius:0.4rem;background:rgba(0,0,0,0.15);">
-                <div style="display:flex;justify-content:space-between;align-items:center;gap:0.5rem;">
-                  <span style="color:${colour};font-weight:600;font-size:0.8rem;">${label}</span>
-                  <span style="color:var(--text-primary);font-size:0.78rem;">Attempt ${s.attempt_number}</span>
-                  <span style="flex:1;text-align:right;color:var(--text-secondary);font-size:0.78rem;">${score}</span>
+      return `<div class="_ion-s-bdbf1f7451" id="${cardId}">
+                <div class="_ion-s-b93035ced5">
+                  <span class="_ion-s-7ee8d1002a">${label}</span>
+                  <span class="_ion-s-37149aea5a">Attempt ${s.attempt_number}</span>
+                  <span class="_ion-s-d997572aeb">${score}</span>
                 </div>
-                <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.2rem;">${escHtml(completedAt)} · pass mark ${threshold}%</div>
+                <div class="_ion-s-27fae56e60">${escHtml(completedAt)} · pass mark ${threshold}%</div>
                 ${toggle}
                 ${criteriaBlock}
               </div>`;
@@ -434,7 +434,7 @@ function _renderLabLinks(d) {
   const links = (d.observable_links || []).filter(Boolean);
   if (!links.length) return;
   el.innerHTML = 'Seeded: ' + links.map(l =>
-    `<a href="${escHtml(l)}" target="_blank" class="underline" style="color:#a5b4fc;margin-right:0.5rem;">${escHtml(l)}</a>`
+    `<a href="${escHtml(l)}" target="_blank" class="underline _ion-s-c51489969c">${escHtml(l)}</a>`
   ).join('');
 }
 

@@ -24,7 +24,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Hands-on alert triage scenarios.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" data-click-action="simBack" id="sim-back-btn" style="display:none"><i class="icon-arrow-left"></i> Back to Scenarios</button>
+        <button class="btn btn-secondary _ion-s-6b99de8b69" data-click-action="simBack" id="sim-back-btn"><i class="icon-arrow-left"></i> Back to Scenarios</button>
     </div>
 </section>
 <div id="sim-content"><div class="sim-loading"><span class="sim-spinner"></span> Loading scenarios...</div></div>
@@ -191,12 +191,12 @@ async function simInit() {
         const d = await r.json();
         renderScenarioList(d.scenarios);
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="sim-loading" style="color:var(--sev-critical)">Failed to load scenarios</div>';
+        $('sim-content').innerHTML = '<div class="sim-loading _ion-s-5dd0211252">Failed to load scenarios</div>';
     }
 }
 
 function renderScenarioList(scenarios) {
-    let html = '<div style="margin-bottom:16px"><p style="font-size:.9rem;color:var(--text-secondary)">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
+    let html = '<div class="_ion-s-87c136dfd0"><p class="_ion-s-53cce34fa0">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
     html += '<div class="sim-scenarios">';
     for (const s of scenarios) {
         html += `<div class="sim-scenario-card ${s.difficulty}" data-click-action="simStart" data-args='["${s.id}"]'>
@@ -227,7 +227,7 @@ async function simStart(scenarioId) {
         $('sim-back-btn').style.display = '';
         renderSimulation();
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="sim-loading" style="color:var(--sev-critical)">Failed to load scenario</div>';
+        $('sim-content').innerHTML = '<div class="sim-loading _ion-s-5dd0211252">Failed to load scenario</div>';
     }
 }
 
@@ -256,9 +256,9 @@ function renderSimulation() {
                 ${a.user ? '<span><strong>User:</strong> '+esc(a.user)+'</span>' : ''}
                 <span><strong>Time:</strong> ${new Date(a.timestamp).toLocaleString()}</span>
             </div>
-            ${a.mitre_technique_id ? `<div style="margin-bottom:8px"><span style="padding:2px 6px;background:var(--primary-dim);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-size:.72rem;font-family:monospace;color:var(--primary)">${esc(a.mitre_technique_id)}</span> <span style="font-size:.78rem;color:var(--text-secondary)">${esc(a.mitre_technique_name)} (${esc(a.mitre_tactic_name)})</span></div>` : ''}
+            ${a.mitre_technique_id ? `<div class="_ion-s-fdf33f2304"><span class="_ion-s-b1a8a836ea">${esc(a.mitre_technique_id)}</span> <span class="_ion-s-a975440d91">${esc(a.mitre_technique_name)} (${esc(a.mitre_tactic_name)})</span></div>` : ''}
             <div class="sim-alert-message">${esc(a.message)}</div>
-            <details><summary style="font-size:.78rem;color:var(--primary);cursor:pointer;margin-bottom:4px">View Raw Data</summary>
+            <details><summary class="_ion-s-1c8066d23c">View Raw Data</summary>
             <div class="sim-raw-data">${Object.entries(a.raw_data||{}).map(([k,v])=>`<div><span class="sim-raw-key">${esc(k)}</span>: <span class="sim-raw-val">${esc(String(v))}</span></div>`).join('')}</div>
             </details>
         </div>
@@ -271,7 +271,7 @@ function renderSimulation() {
             html += `<div class="sim-related-alert">
                 <div class="sim-ra-title"><span class="sev-badge sev-${ra.severity}">${esc(ra.severity)}</span> ${esc(ra.title)}</div>
                 <div class="sim-ra-meta">${esc(ra.rule_name)} | ${esc(ra.host||'')} | ${new Date(ra.timestamp).toLocaleTimeString()} | ${esc(ra.mitre_tactic_name||'')}</div>
-                <div style="font-size:.82rem;color:var(--text-secondary);margin-top:4px">${esc(ra.message)}</div>
+                <div class="_ion-s-a86ebff019">${esc(ra.message)}</div>
             </div>`;
         }
         html += '</div></div>';
@@ -285,7 +285,7 @@ function renderSimulation() {
         html += `<div>
             <div class="sim-ob ${isEnriched?'enriched':''}" id="sim-ob-${i}">
                 <span class="sim-ob-type">${esc(o.type)}</span>
-                <div style="flex:1">
+                <div class="_ion-s-97445a8d93">
                     <div class="sim-ob-value">${esc(o.value)}</div>
                     <div class="sim-ob-context">${esc(o.context)}</div>
                 </div>
@@ -303,9 +303,9 @@ function renderSimulation() {
         const ti = s.threat_intel;
         html += `<div class="sim-panel"><div class="sim-panel-header"><i class="icon-eye"></i> Threat Intelligence</div><div class="sim-panel-body">
             <div class="sim-ti">
-                <div style="font-weight:700;color:var(--text-primary);margin-bottom:4px">${esc(ti.actor)}</div>
-                <div style="font-size:.78rem;color:var(--text-secondary)">Confidence: <strong>${ti.confidence}%</strong></div>
-                <div style="font-size:.82rem;color:var(--text-secondary);margin-top:6px">${esc(ti.context)}</div>
+                <div class="_ion-s-947b39942a">${esc(ti.actor)}</div>
+                <div class="_ion-s-a975440d91">Confidence: <strong>${ti.confidence}%</strong></div>
+                <div class="_ion-s-96628d4d70">${esc(ti.context)}</div>
                 <div class="sim-ti-ttps">${(ti.ttps||[]).map(t=>`<span class="sim-ti-ttp">${esc(t)}</span>`).join('')}</div>
             </div>
         </div></div>`;
@@ -322,7 +322,7 @@ function renderSimulation() {
     const pct = Math.round(completedSteps / totalSteps * 100);
     html += `<div class="sim-progress">
         <div class="sim-progress-title">${esc(s.title)}</div>
-        <div class="sim-progress-bar"><div class="sim-progress-fill" style="width:${pct}%"></div></div>
+        <div class="sim-progress-bar"><div class="sim-progress-fill _ion-s-95aea49e0e"></div></div>
         <div class="sim-progress-text">Step ${Math.min(currentStep+1, totalSteps)} of ${totalSteps} | ${pct}% complete</div>
     </div>`;
 
@@ -365,8 +365,8 @@ function renderSimulation() {
 
     // Score button (shown when all steps completed)
     if (currentStep >= s.steps.length) {
-        html += `<div style="text-align:center;padding:16px">
-            <button class="sim-btn sim-btn-primary" style="padding:12px 32px;font-size:.95rem" data-click-action="simScore">View Score</button>
+        html += `<div class="_ion-s-766e488b93">
+            <button class="sim-btn sim-btn-primary _ion-s-3599ef6997" data-click-action="simScore">View Score</button>
         </div>`;
     }
 
@@ -399,10 +399,10 @@ function renderQuestion(q, stepIdx) {
 
 function renderEnrichment(value, scenario) {
     const er = (scenario.enrichment_results || {})[value];
-    if (!er) return '<div style="font-size:.82rem;color:var(--text-muted)">No enrichment data available for this observable.</div>';
+    if (!er) return '<div class="_ion-s-ebb3a47e42">No enrichment data available for this observable.</div>';
     const levelCls = er.threat_level === 'high' ? 'high' : er.threat_level === 'medium' ? 'medium' : 'low';
     return `<div class="sim-enrich-source">Source: ${esc(er.source)}</div>
-        <div style="font-size:.82rem;color:var(--text-secondary);line-height:1.5">${esc(er.details)}</div>
+        <div class="_ion-s-d9f8a31df1">${esc(er.details)}</div>
         <div class="sim-enrich-verdict ${levelCls}">${esc(er.verdict)}</div>`;
 }
 
@@ -440,7 +440,7 @@ function simSelectOption(qId, optId, type) {
             if (check) check.innerHTML = isSelected ? '&#10003;' : '';
             const radio = opt.querySelector('.sim-option-radio');
             if (radio) {
-                if (isSelected) radio.innerHTML = '<div style="width:8px;height:8px;border-radius:50%;background:var(--primary)"></div>';
+                if (isSelected) radio.innerHTML = '<div class="_ion-s-de4bcf5c43"></div>';
                 else radio.innerHTML = '';
             }
         });
@@ -539,7 +539,7 @@ async function simScore() {
         const d = await r.json();
         renderScore(d);
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="sim-loading" style="color:var(--sev-critical)">Failed to calculate score</div>';
+        $('sim-content').innerHTML = '<div class="sim-loading _ion-s-5dd0211252">Failed to calculate score</div>';
     }
 }
 
@@ -547,9 +547,9 @@ function renderScore(d) {
     const color = d.percentage >= 90 ? 'var(--mitre-covered)' : d.percentage >= 75 ? 'var(--quality-good)' : d.percentage >= 60 ? 'var(--sev-medium)' : 'var(--sev-critical)';
 
     let html = '<div class="sim-score">';
-    html += `<div class="sim-score-ring" style="background:conic-gradient(${color} ${d.percentage}%, rgba(99,110,123,.2) ${d.percentage}%)">
+    html += `<div class="sim-score-ring _ion-s-0f5db95de5">
         <div class="sim-score-inner">
-            <div class="sim-score-grade" style="color:${color}">${d.grade}</div>
+            <div class="sim-score-grade _ion-s-2243cc4df3">${d.grade}</div>
             <div class="sim-score-pct">${d.percentage}%</div>
         </div>
     </div>`;
@@ -563,16 +563,16 @@ function renderScore(d) {
 
     html += '<div class="sim-score-breakdown">';
     for (const r of d.results) {
-        const icon = r.correct ? '<span style="color:var(--mitre-covered)">&#10003;</span>' : '<span style="color:var(--sev-critical)">&#10007;</span>';
+        const icon = r.correct ? '<span class="_ion-s-b00112b508">&#10003;</span>' : '<span class="_ion-s-5dd0211252">&#10007;</span>';
         html += `<div class="sim-score-row">
             <span>${icon}</span>
             <span class="sim-score-row-q">${esc(r.feedback)}</span>
-            <span class="sim-score-row-pts" style="color:${r.correct ? 'var(--mitre-covered)' : 'var(--sev-critical)'}">${r.earned}/${r.possible}</span>
+            <span class="sim-score-row-pts _ion-s-9ab1d4805f">${r.earned}/${r.possible}</span>
         </div>`;
     }
     html += '</div>';
 
-    html += `<div style="margin-top:24px;display:flex;gap:12px;justify-content:center">
+    html += `<div class="_ion-s-5367325448">
         <button class="sim-btn sim-btn-primary" data-click-action="simStart" data-args='["${currentScenario.id}"]'>Retry Scenario</button>
         <button class="sim-btn sim-btn-secondary" data-click-action="simBack">All Scenarios</button>
     </div>`;

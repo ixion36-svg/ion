@@ -18,7 +18,7 @@
     <span id="de-tide-badge" title="Click for sync status" class="inline-flex items-center gap-2 h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 cursor-pointer hover:bg-white/10 transition">
       <span class="de-tide-dot h-1.5 w-1.5 rounded-full bg-ion-lime"></span> TIDE
     </span>
-    <select id="de-space-select" data-change-action="deChangeSpace" data-args='["$value"]' class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 font-mono cursor-pointer hover:bg-white/10 transition appearance-none" style="min-width:120px;" title="SIEM / Kibana space filter">
+    <select id="de-space-select" data-change-action="deChangeSpace" data-args='["$value"]' class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[11px] text-slate-300 font-mono cursor-pointer hover:bg-white/10 transition appearance-none _ion-s-c7f080acfc" title="SIEM / Kibana space filter">
       <option value="">Loading spaces…</option>
     </select>
     <button data-click-action="deSyncTide" title="Pull fresh data from TIDE now" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Sync TIDE</button>
@@ -381,8 +381,8 @@ function renderPosture(d, disabledCrit) {
         <div class="de-section">
             <div class="de-section-title"><i class="icon-star"></i> Quality Distribution</div>
             ${renderQualityBar(q, d.total_rules)}
-            <div style="margin-top:12px;font-size:.78rem;color:var(--text-secondary)">
-                Average quality: <span style="color:var(--text-primary);font-weight:700;font-family:'JetBrains Mono',monospace">${q.avg_quality || 0}</span>/100
+            <div class="_ion-s-dec3a3b757">
+                Average quality: <span class="_ion-s-3dd3e46be9">${q.avg_quality || 0}</span>/100
             </div>
         </div>
     </div>`;
@@ -427,11 +427,11 @@ function renderSeverityDonut(d) {
         cumPct += p;
     }
     const legend = slices.map(sl =>
-        `<div class="de-donut-legend-item"><div class="de-donut-legend-dot" style="background:${sl.color}"></div>${sl.label}: ${sl.value}</div>`
+        `<div class="de-donut-legend-item"><div class="de-donut-legend-dot _ion-s-c2af6d0417"></div>${sl.label}: ${sl.value}</div>`
     ).join('');
 
     return `<div class="de-donut-wrap">
-        <div class="de-donut" style="background:conic-gradient(${gradParts.join(',')})">
+        <div class="de-donut _ion-s-8735cb1b5d">
             <div class="de-donut-center"><span class="de-donut-pct">${total}</span><span class="de-donut-label">rules</span></div>
         </div>
         <div class="de-donut-legend">${legend}</div>
@@ -441,7 +441,7 @@ function renderSeverityDonut(d) {
 function renderSeverityTable(d) {
     const sev = d.severity || {};
     const order = ['critical','high','medium','low'];
-    let html = '<table class="de-table" style="margin-top:12px"><thead><tr><th>Severity</th><th>Total</th><th>Enabled</th><th>Disabled</th></tr></thead><tbody>';
+    let html = '<table class="de-table _ion-s-56f4356299"><thead><tr><th>Severity</th><th>Total</th><th>Enabled</th><th>Disabled</th></tr></thead><tbody>';
     for (const s of order) {
         const v = sev[s] || {total:0,enabled:0,disabled:0};
         html += `<tr><td><span class="de-sev ${s}">${s}</span></td><td class="mono">${v.total}</td><td class="mono de-enabled">${v.enabled}</td><td class="mono de-disabled">${v.disabled}</td></tr>`;
@@ -461,12 +461,12 @@ function renderQualityBar(q, total) {
     let bar = '<div class="de-qbar">';
     for (const s of segs) {
         const w = s.val/total*100;
-        if (w > 0) bar += `<div class="de-qbar-seg ${s.cls}" style="width:${w}%" title="${s.label}: ${s.val}">${w>5?s.val:''}</div>`;
+        if (w > 0) bar += `<div class="de-qbar-seg ${s.cls} _ion-s-0e54b83fb0" title="${s.label}: ${s.val}">${w>5?s.val:''}</div>`;
     }
     bar += '</div>';
-    bar += '<div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">';
+    bar += '<div class="_ion-s-9153f5cee8">';
     for (const s of segs) {
-        bar += `<div class="de-donut-legend-item"><div class="de-donut-legend-dot ${s.cls}" style="background:${s.cls==='excellent'?'var(--quality-excellent)':s.cls==='good'?'var(--quality-good)':s.cls==='fair'?'var(--quality-fair)':'var(--quality-poor)'}"></div>${s.label}: <strong>${s.val}</strong></div>`;
+        bar += `<div class="de-donut-legend-item"><div class="de-donut-legend-dot ${s.cls} _ion-s-47b73cef7f"></div>${s.label}: <strong>${s.val}</strong></div>`;
     }
     bar += '</div>';
     return bar;
@@ -519,17 +519,17 @@ function renderKillChains(playbooks) {
                     ruleInfo = '<span class="bad">No rules</span>';
                 }
             } else {
-                ruleInfo = '<span style="color:var(--text-secondary)">No techniques linked</span>';
+                ruleInfo = '<span class="_ion-s-ce14cb276b">No techniques linked</span>';
             }
 
             const techChips = step.techniques.map(t=>`<span class="de-mitre-chip">${esc(t)}</span>`).join(' ');
-            const tacticLabel = step.tactic ? `<div style="font-size:.65rem;color:var(--text-secondary);margin-top:2px;text-transform:uppercase;letter-spacing:.3px">${esc(step.tactic)}</div>` : '';
-            const reqRule = step.required_rule ? `<div style="font-size:.68rem;color:var(--text-secondary);margin-top:3px;font-style:italic">Req: ${esc(step.required_rule)}</div>` : '';
+            const tacticLabel = step.tactic ? `<div class="_ion-s-dfba04b9d6">${esc(step.tactic)}</div>` : '';
+            const reqRule = step.required_rule ? `<div class="_ion-s-9234e9d6e5">Req: ${esc(step.required_rule)}</div>` : '';
             html += `<div class="de-kc-node ${stepState}">
                 <div class="de-kc-node-header">Step ${step.order}</div>
                 <div class="de-kc-node-name">${esc(step.name)}</div>
                 ${tacticLabel}
-                <div style="margin-top:4px">${techChips||''}</div>
+                <div class="_ion-s-96ad6099e2">${techChips||''}</div>
                 ${reqRule}
                 <div class="de-kc-node-rules">${ruleInfo}</div>
             </div>`;
@@ -566,7 +566,7 @@ function renderRulesToolbar() {
                 <option value="1"${_rulesPage.enabled==='1'?' selected':''}>Enabled</option>
                 <option value="0"${_rulesPage.enabled==='0'?' selected':''}>Disabled</option>
             </select>
-            <button class="btn btn-secondary" data-click-action="deRulesSearch" style="padding:7px 14px;font-size:.82rem">Search</button>
+            <button class="btn btn-secondary _ion-s-183a453139" data-click-action="deRulesSearch">Search</button>
         </div>
         <div id="de-rules-body"><div class="de-loading"><div class="de-spinner"></div><div>Loading...</div></div></div>`;
 }
@@ -675,7 +675,7 @@ function renderExecution(d) {
     ];
 
     let html = `<div class="de-exec-time">
-        <span style="font-size:.78rem;color:var(--text-secondary)">Time range:</span>
+        <span class="_ion-s-a975440d91">Time range:</span>
         ${timeRanges.map(t => `<button class="${_execHours===t.h?'active':''}" data-click-action="deExecSetHours" data-args='[${t.h}]'>${t.label}</button>`).join('')}
     </div>`;
 
@@ -714,10 +714,10 @@ function renderExecution(d) {
         html += '<table class="de-table"><thead><tr><th>Rule</th><th>Alerts</th><th>Close Rate</th><th>TIDE</th></tr></thead><tbody>';
         for (const r of (d.top_firing||[]).slice(0, 20)) {
             const tideTag = r.in_tide
-                ? `<span class="de-sev ${sevClass(r.tide_severity)}" style="font-size:.65rem">${esc(r.tide_severity)}</span>`
-                : '<span style="font-size:.68rem;color:var(--text-secondary)">-</span>';
+                ? `<span class="de-sev ${sevClass(r.tide_severity)} _ion-s-7171988908">${esc(r.tide_severity)}</span>`
+                : '<span class="_ion-s-4d3fe1280f">-</span>';
             html += `<tr>
-                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.rule_name)}">${esc(r.rule_name)}</td>
+                <td class="_ion-s-67afccd4c4" title="${esc(r.rule_name)}">${esc(r.rule_name)}</td>
                 <td class="mono">${r.alert_count}</td>
                 <td>${renderRateBar(r.close_rate)}</td>
                 <td>${tideTag}</td>
@@ -731,12 +731,12 @@ function renderExecution(d) {
 
     // Noisy rules
     html += `<div class="de-section">
-        <div class="de-section-title"><i class="icon-volume-2"></i> Noisy Rules <span style="font-size:.68rem;color:var(--text-secondary);font-weight:400">(high volume, mostly closed)</span></div>`;
+        <div class="de-section-title"><i class="icon-volume-2"></i> Noisy Rules <span class="_ion-s-ad3c6656f3">(high volume, mostly closed)</span></div>`;
     if ((d.noisy_rules||[]).length) {
         html += '<table class="de-table"><thead><tr><th>Rule</th><th>Alerts</th><th>Close Rate</th><th>Open</th></tr></thead><tbody>';
         for (const r of (d.noisy_rules||[]).slice(0, 15)) {
             html += `<tr>
-                <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(r.rule_name)}">${esc(r.rule_name)}</td>
+                <td class="_ion-s-67afccd4c4" title="${esc(r.rule_name)}">${esc(r.rule_name)}</td>
                 <td class="mono">${r.alert_count}</td>
                 <td>${renderRateBar(r.close_rate)}</td>
                 <td class="mono">${r.open}</td>
@@ -744,14 +744,14 @@ function renderExecution(d) {
         }
         html += '</tbody></table>';
     } else {
-        html += '<div class="de-empty" style="padding:20px">No noisy rules detected</div>';
+        html += '<div class="de-empty _ion-s-769fed374b">No noisy rules detected</div>';
     }
     html += '</div></div>'; // close cols
 
     // Silent rules
     if ((d.silent_rules||[]).length) {
         html += `<div class="de-section">
-            <div class="de-section-title"><i class="icon-volume-x"></i> Silent Rules <span style="font-size:.68rem;color:var(--text-secondary);font-weight:400">(enabled in TIDE, 0 alerts in ES)</span></div>
+            <div class="de-section-title"><i class="icon-volume-x"></i> Silent Rules <span class="_ion-s-ad3c6656f3">(enabled in TIDE, 0 alerts in ES)</span></div>
             <table class="de-table"><thead><tr><th>Rule</th><th>TIDE Severity</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>`;
         for (const r of (d.silent_rules||[]).slice(0, 30)) {
             const mitre = (r.mitre_ids||[]).slice(0,5).map(m=>`<span class="de-mitre-chip">${esc(m)}</span>`).join(' ');
@@ -776,7 +776,7 @@ function renderVolumeChart(timeline) {
         const h = Math.max(t.count/max*100, 1);
         const ts = t.timestamp ? new Date(t.timestamp).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
         const color = t.count > max*0.8 ? 'var(--sev-critical)' : t.count > max*0.5 ? 'var(--sev-medium)' : 'var(--mitre-covered)';
-        bars += `<div class="de-vol-bar" style="height:${h}%;background:${color}"><div class="de-vol-tip">${ts}: ${t.count}</div></div>`;
+        bars += `<div class="de-vol-bar _ion-s-2978dd0ca9"><div class="de-vol-tip">${ts}: ${t.count}</div></div>`;
     }
     return `<div class="de-vol-chart"><div class="de-vol-bars">${bars}</div></div>`;
 }
@@ -804,23 +804,23 @@ function renderSevTimeline(timeline) {
             const v = t[s]||0;
             if (v > 0) {
                 const h = v/maxTotal*100;
-                segs += `<div style="height:${h}%;background:${sevColors[s]};width:100%;border-radius:1px" title="${s}: ${v}"></div>`;
+                segs += `<div class="_ion-s-9f194acfd6" title="${s}: ${v}"></div>`;
             }
         }
         const h = Math.max(total/maxTotal*100, 1);
-        bars += `<div class="de-vol-bar" style="height:${h}%;display:flex;flex-direction:column-reverse;background:transparent"><div class="de-vol-tip">${ts}: ${total}</div>${segs}</div>`;
+        bars += `<div class="de-vol-bar _ion-s-4be9060e79"><div class="de-vol-tip">${ts}: ${total}</div>${segs}</div>`;
     }
     return `<div class="de-vol-chart"><div class="de-vol-bars">${bars}</div></div>
-        <div style="display:flex;gap:12px;margin-top:8px">
-            ${sevOrder.map(s=>`<div class="de-donut-legend-item"><div class="de-donut-legend-dot" style="background:${sevColors[s]}"></div>${s}</div>`).join('')}
+        <div class="_ion-s-b7d7ed081e">
+            ${sevOrder.map(s=>`<div class="de-donut-legend-item"><div class="de-donut-legend-dot _ion-s-665cbcd35e"></div>${s}</div>`).join('')}
         </div>`;
 }
 
 function renderRateBar(rate) {
     const color = rate >= 70 ? 'var(--sev-critical)' : rate >= 40 ? 'var(--sev-medium)' : 'var(--mitre-covered)';
     return `<div class="de-rate-bar">
-        <div class="de-rate-track"><div class="de-rate-fill" style="width:${rate}%;background:${color}"></div></div>
-        <div class="de-rate-val" style="color:${color}">${rate}%</div>
+        <div class="de-rate-track"><div class="de-rate-fill _ion-s-9ef11a686c"></div></div>
+        <div class="de-rate-val _ion-s-2243cc4df3">${rate}%</div>
     </div>`;
 }
 
@@ -853,7 +853,7 @@ async function loadReadiness() {
                 <option value="">All Systems (Global)</option>
                 ${sysOpts}
             </select>
-            <input type="text" id="de-readiness-search" placeholder="Search threat actors (e.g. APT29, Lazarus)..." value="${esc(_readinessSearch)}" data-enter-key-action="deReadinessSearch" style="flex:1;min-width:200px;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-size:.82rem">
+            <input class="_ion-s-2063dd1af8" type="text" id="de-readiness-search" placeholder="Search threat actors (e.g. APT29, Lazarus)..." value="${esc(_readinessSearch)}" data-enter-key-action="deReadinessSearch">
             <button class="de-btn-report" data-click-action="deReadinessSearch">Search</button>
         </div>
         <div id="de-readiness-body"><div class="de-loading"><div class="de-spinner"></div><div>Querying OpenCTI + TIDE...</div></div></div>`;
@@ -974,28 +974,28 @@ function renderSystemReadiness(data, actorId, actorType) {
     const sysLabel = r.system ? esc(r.system.name) : 'Global (All TIDE Rules)';
 
     let html = `<div class="de-sys-readiness">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="_ion-s-5c9f90ebdd">
             <div>
-                <div style="font-size:.85rem;font-weight:700;color:var(--text-primary)">${esc(r.actor.name)} vs ${sysLabel}</div>
-                <div style="font-size:.72rem;color:var(--text-secondary);margin-top:2px">${r.covered_count} covered, ${r.gap_count} gaps, ${r.total_ttps} total TTPs</div>
+                <div class="_ion-s-58848cfd4d">${esc(r.actor.name)} vs ${sysLabel}</div>
+                <div class="_ion-s-3c23bffe20">${r.covered_count} covered, ${r.gap_count} gaps, ${r.total_ttps} total TTPs</div>
             </div>
             <button class="de-btn-pdf" data-click-action="deDownloadPdf" data-args='["${actorId}", "${actorType}"]'>Download PDF</button>
         </div>
         <div class="de-readiness-gauge">
-            <span style="font-size:1.2rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:${barColor};min-width:50px">${r.readiness_pct}%</span>
-            <div class="de-readiness-bar"><div class="de-readiness-fill" style="width:${r.readiness_pct}%;background:${barColor}"></div></div>
+            <span class="_ion-s-c9338fc931">${r.readiness_pct}%</span>
+            <div class="de-readiness-bar"><div class="de-readiness-fill _ion-s-afd6266613"></div></div>
         </div>`;
 
     if (r.ai_summary) {
-        html += `<div style="padding:10px;background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.15);border-radius:6px;margin:8px 0;font-size:.78rem;color:var(--text-primary);line-height:1.5">${esc(r.ai_summary)}</div>`;
+        html += `<div class="_ion-s-384838e25d">${esc(r.ai_summary)}</div>`;
     }
 
     // Compact coverage matrix
-    html += '<table class="de-table" style="margin-top:8px"><thead><tr><th>Technique</th><th>Status</th><th>Rules</th><th>Enabled</th></tr></thead><tbody>';
+    html += '<table class="de-table _ion-s-8a77e5a311"><thead><tr><th>Technique</th><th>Status</th><th>Rules</th><th>Enabled</th></tr></thead><tbody>';
     for (const e of r.coverage_matrix) {
         const st = e.covered
-            ? '<span style="color:var(--mitre-covered);font-weight:700">COVERED</span>'
-            : '<span style="color:var(--mitre-gap);font-weight:700">GAP</span>';
+            ? '<span class="_ion-s-1b4f657f9e">COVERED</span>'
+            : '<span class="_ion-s-b2e8613e37">GAP</span>';
         html += `<tr><td><span class="de-mitre-chip">${esc(e.mitre_id)}</span> ${esc(e.name)}</td><td>${st}</td><td class="mono">${e.rule_count}</td><td class="mono">${e.enabled_rules}</td></tr>`;
     }
     html += '</tbody></table></div>';
@@ -1010,9 +1010,9 @@ function renderReadiness(data, container) {
         return;
     }
 
-    let html = `<div style="font-size:.78rem;color:var(--text-secondary);margin-bottom:12px">
-        TIDE covers <strong style="color:var(--text-primary)">${data.tide_covered_techniques}</strong>/${data.tide_total_techniques} MITRE techniques globally.
-        Showing readiness against <strong style="color:var(--text-primary)">${actors.length}</strong> threat actors.
+    let html = `<div class="_ion-s-9d185facbd">
+        TIDE covers <strong class="_ion-s-3c6f5e4b4e">${data.tide_covered_techniques}</strong>/${data.tide_total_techniques} MITRE techniques globally.
+        Showing readiness against <strong class="_ion-s-3c6f5e4b4e">${actors.length}</strong> threat actors.
     </div>`;
 
     for (const a of actors) {
@@ -1026,18 +1026,18 @@ function renderReadiness(data, container) {
         html += `<div class="de-actor">
             <div class="de-actor-header" data-click-action="toggleActorDetail" data-args='["$target"]'>
                 <span class="de-actor-chevron">\u25B6</span>
-                <div style="flex:1">
+                <div class="_ion-s-97445a8d93">
                     <div class="de-actor-name">${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ` : ''}${esc(a.name)}</div>
                     ${aliases ? `<div class="de-actor-aliases">${esc(aliases)}</div>` : ''}
                 </div>
                 <div class="de-actor-meta">
-                    <div class="de-actor-meta-item" style="color:${ringColor}">${a.covered_count}/${a.total_ttps} TTPs</div>
+                    <div class="de-actor-meta-item _ion-s-d1b54a49e1">${a.covered_count}/${a.total_ttps} TTPs</div>
                     <div class="de-actor-meta-item">${a.gap_count} gaps</div>
                 </div>
                 <div class="de-actor-gauge">
-                    <div class="de-actor-gauge-ring" style="background:${ringBg}">
-                        <div style="width:36px;height:36px;border-radius:50%;background:var(--bg-secondary);display:flex;align-items:center;justify-content:center">
-                            <span class="de-actor-gauge-val" style="color:${ringColor}">${a.readiness_pct}%</span>
+                    <div class="de-actor-gauge-ring _ion-s-75af97713e">
+                        <div class="_ion-s-11a7a6dc49">
+                            <span class="de-actor-gauge-val _ion-s-d1b54a49e1">${a.readiness_pct}%</span>
                         </div>
                     </div>
                     <div class="de-actor-gauge-label">Readiness</div>
@@ -1046,13 +1046,13 @@ function renderReadiness(data, container) {
             <div class="de-actor-body">`;
 
         if (a.description) {
-            html += `<div style="font-size:.78rem;color:var(--text-secondary);margin:12px 0 8px">${esc(a.description)}</div>`;
+            html += `<div class="_ion-s-ce1c3340e5">${esc(a.description)}</div>`;
         }
 
         html += '<div class="de-actor-ttp-grid">';
 
         // Covered column
-        html += '<div class="de-ttp-covered"><div class="de-section-title" style="margin-bottom:8px"><i class="icon-shield-check"></i> Covered TTPs (${a.covered_count})</div>';
+        html += '<div class="de-ttp-covered"><div class="de-section-title _ion-s-fdf33f2304"><i class="icon-shield-check"></i> Covered TTPs (${a.covered_count})</div>';
         if (a.covered.length) {
             html += '<table class="de-table"><thead><tr><th>Technique</th><th>Rules</th><th>Enabled</th></tr></thead><tbody>';
             for (const t of a.covered) {
@@ -1060,25 +1060,25 @@ function renderReadiness(data, container) {
             }
             html += '</tbody></table>';
         } else {
-            html += '<div style="font-size:.78rem;color:var(--text-secondary);padding:8px">None</div>';
+            html += '<div class="_ion-s-0ce0a4d066">None</div>';
         }
         html += '</div>';
 
         // Gaps column
-        html += `<div class="de-ttp-gap"><div class="de-section-title" style="margin-bottom:8px;color:var(--mitre-gap)"><i class="icon-alert-triangle"></i> Detection Gaps (${a.gap_count})</div>`;
+        html += `<div class="de-ttp-gap"><div class="de-section-title _ion-s-1d461319c2"><i class="icon-alert-triangle"></i> Detection Gaps (${a.gap_count})</div>`;
         if (a.gaps.length) {
             for (const t of a.gaps) {
-                html += `<div style="padding:4px 0;border-bottom:1px solid rgba(99,110,123,.1);font-size:.78rem"><span class="de-mitre-chip">${esc(t.mitre_id)}</span> ${esc(t.name)}</div>`;
+                html += `<div class="_ion-s-a0154b5cb1"><span class="de-mitre-chip">${esc(t.mitre_id)}</span> ${esc(t.name)}</div>`;
             }
         } else {
-            html += '<div style="font-size:.78rem;color:var(--mitre-covered);padding:8px">Full coverage!</div>';
+            html += '<div class="_ion-s-7327b5ab8a">Full coverage!</div>';
         }
         html += '</div>';
 
         html += '</div>';
 
         // Action buttons + system readiness placeholder
-        html += `<div style="display:flex;gap:8px;margin-top:12px;align-items:center">
+        html += `<div class="_ion-s-19aa71ae20">
             <button class="de-btn-report" data-click-action="deGenerateReport" data-args='["${a.id}", "${a.entity_type}"]'>Assess${_selectedSystemId ? ' (System)' : ' (Global)'}</button>
             <button class="de-btn-pdf" data-click-action="deDownloadPdf" data-args='["${a.id}", "${a.entity_type}"]'>Download PDF</button>
         </div>
@@ -1125,17 +1125,17 @@ function renderProgression(d) {
     ];
 
     let html = `<div class="de-exec-time">
-        <span style="font-size:.78rem;color:var(--text-secondary)">Time window:</span>
+        <span class="_ion-s-a975440d91">Time window:</span>
         ${timeRanges.map(t=>`<button class="${_progHours===t.h?'active':''}" data-click-action="deProgSetHours" data-args='[${t.h}]'>${t.label}</button>`).join('')}
-        <span style="font-size:.72rem;color:var(--text-secondary);margin-left:auto">${d.total_hosts_checked||0} hosts scanned, ${d.playbook_count||0} playbooks</span>
+        <span class="_ion-s-24c35fd361">${d.total_hosts_checked||0} hosts scanned, ${d.playbook_count||0} playbooks</span>
     </div>`;
 
     const progs = d.progressions || [];
     if (!progs.length) {
-        html += `<div class="de-section" style="text-align:center;padding:40px">
-            <div style="font-size:1.5rem;margin-bottom:8px;color:var(--mitre-covered)"><i class="icon-shield-check"></i></div>
-            <div style="font-size:.9rem;font-weight:600;color:var(--text-primary)">No Kill Chain Progressions Detected</div>
-            <div style="font-size:.78rem;color:var(--text-secondary);margin-top:4px">No hosts show multi-step attack sequences matching TIDE playbooks in the last ${_progHours}h.</div>
+        html += `<div class="de-section _ion-s-c282580208">
+            <div class="_ion-s-a4303afcec"><i class="icon-shield-check"></i></div>
+            <div class="_ion-s-29bd3f0dc0">No Kill Chain Progressions Detected</div>
+            <div class="_ion-s-37c66f99aa">No hosts show multi-step attack sequences matching TIDE playbooks in the last ${_progHours}h.</div>
         </div>`;
         $('de-panel-progression').innerHTML = html;
         return;
@@ -1145,7 +1145,7 @@ function renderProgression(d) {
     const critCount = progs.filter(p=>p.severity==='critical').length;
     const highCount = progs.filter(p=>p.severity==='high').length;
     const medCount = progs.filter(p=>p.severity==='medium').length;
-    html += `<div class="de-stats" style="margin-bottom:16px">
+    html += `<div class="de-stats _ion-s-87c136dfd0">
         <div class="de-stat crit"><div class="de-stat-label">Critical</div><div class="de-stat-val">${critCount}</div><div class="de-stat-sub">&ge;75% steps fired</div></div>
         <div class="de-stat high"><div class="de-stat-label">High</div><div class="de-stat-val">${highCount}</div><div class="de-stat-sub">&ge;50% steps fired</div></div>
         <div class="de-stat med"><div class="de-stat-label">Medium</div><div class="de-stat-val">${medCount}</div><div class="de-stat-sub">2+ steps fired</div></div>
@@ -1159,8 +1159,8 @@ function renderProgression(d) {
                 <span class="de-sev ${p.severity}">${esc(p.severity)}</span>
                 <span class="de-prog-host">${esc(p.host)}</span>
                 <span class="de-prog-playbook">${esc(p.playbook_name)}</span>
-                <span style="margin-left:auto"></span>
-                <span class="de-prog-pct" style="color:${p.severity==='critical'?'var(--sev-critical)':p.severity==='high'?'var(--sev-high)':'var(--sev-medium)'}">${p.fired_steps}/${p.total_steps} steps (${p.pct_complete}%)</span>
+                <span class="_ion-s-6d00061700"></span>
+                <span class="de-prog-pct _ion-s-1106fdb72c">${p.fired_steps}/${p.total_steps} steps (${p.pct_complete}%)</span>
             </div>
             <div class="de-prog-steps">`;
 
@@ -1174,15 +1174,15 @@ function renderProgression(d) {
             if (step.fired && step.alert_data) {
                 const ad = step.alert_data;
                 const rules = (ad.rules||[]).slice(0,2).join(', ');
-                detail = `<div class="de-prog-step-detail"><span style="color:var(--sev-critical)">${ad.count} alert${ad.count>1?'s':''}</span>${rules ? '<br>'+esc(rules) : ''}</div>`;
+                detail = `<div class="de-prog-step-detail"><span class="_ion-s-5dd0211252">${ad.count} alert${ad.count>1?'s':''}</span>${rules ? '<br>'+esc(rules) : ''}</div>`;
             } else if (!step.fired) {
-                detail = '<div class="de-prog-step-detail" style="color:var(--mitre-covered)">Not fired</div>';
+                detail = '<div class="de-prog-step-detail _ion-s-b00112b508">Not fired</div>';
             }
 
             html += `<div class="de-prog-step ${cls}">
                 <div class="de-prog-step-num">${step.tactic || 'Step '+step.order}</div>
                 <div class="de-prog-step-name">${esc(step.name)}</div>
-                <div style="margin-top:3px">${techChips}</div>
+                <div class="_ion-s-c00d39129e">${techChips}</div>
                 ${detail}
             </div>`;
         }
@@ -1208,7 +1208,7 @@ async function loadGaps() {
 
 function renderGaps(d) {
     let html = `
-    <div class="de-stats" style="margin-bottom:20px">
+    <div class="de-stats _ion-s-49f14f8f83">
         <div class="de-stat crit"><div class="de-stat-label">Blind Spots</div><div class="de-stat-val">${d.total_blind_spots}</div><div class="de-stat-sub">MITRE techniques with 0 rules</div></div>
         <div class="de-stat warn"><div class="de-stat-label">Unmapped Rules</div><div class="de-stat-val">${d.unmapped_rules.length}</div><div class="de-stat-sub">rules with no MITRE mapping</div></div>
         <div class="de-stat green"><div class="de-stat-label">Quick Wins</div><div class="de-stat-val">${d.quick_wins.length}</div><div class="de-stat-sub">disabled high-quality crit/high rules</div></div>
@@ -1231,7 +1231,7 @@ function renderGaps(d) {
             for (const t of techs.slice(0, 10)) {
                 html += `<div class="de-gap-item"><code>${esc(t.id)}</code> ${esc(t.name)}</div>`;
             }
-            if (techs.length > 10) html += `<div class="de-gap-item" style="color:var(--neon-cyan)">+${techs.length-10} more</div>`;
+            if (techs.length > 10) html += `<div class="de-gap-item _ion-s-bdcb2533ca">+${techs.length-10} more</div>`;
             html += '</div></div>';
         }
         html += '</div></div>';
@@ -1307,7 +1307,7 @@ async function loadD3fend() {
         </div>`;
 
         if (!s.tide_enabled) {
-            html += '<div class="de-section" style="border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.06)"><div style="font-size:.78rem;color:var(--text-secondary)"><strong>TIDE not connected.</strong> All D3FEND techniques shown as blind. Configure TIDE in <a href="/settings#tide" style="color:var(--neon-cyan)">Settings</a> to compute live coverage.</div></div>';
+            html += '<div class="de-section _ion-s-1d547cd27a"><div class="_ion-s-a975440d91"><strong>TIDE not connected.</strong> All D3FEND techniques shown as blind. Configure TIDE in <a class="_ion-s-bdcb2533ca" href="/settings#tide">Settings</a> to compute live coverage.</div></div>';
         }
 
         // Group techniques by tactic
@@ -1320,24 +1320,24 @@ async function loadD3fend() {
             const techs = byTac[tac.id] || [];
             const pct = tac.coverage_pct || 0;
             const barColor = pct >= 80 ? 'var(--mitre-covered,#3fb950)' : pct >= 50 ? 'var(--quality-good,#58a6ff)' : pct >= 25 ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
-            html += `<div style="margin-bottom:14px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-                    <div style="font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:.5px;font-size:.78rem">${esc(tac.name)}</div>
-                    <div style="font-size:.7rem;color:var(--text-secondary)">${tac.covered_count||0}/${tac.technique_count||0} &middot; ${pct}%</div>
+            html += `<div class="_ion-s-2b583d7389">
+                <div class="_ion-s-02617c9246">
+                    <div class="_ion-s-47faf90ee7">${esc(tac.name)}</div>
+                    <div class="_ion-s-4d2abfd40f">${tac.covered_count||0}/${tac.technique_count||0} &middot; ${pct}%</div>
                 </div>
-                <div style="height:4px;background:rgba(99,110,123,.2);border-radius:2px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:${pct}%;background:${barColor}"></div></div>
-                <div style="display:flex;flex-wrap:wrap;gap:5px">`;
+                <div class="_ion-s-e8fc4fc43f"><div class="_ion-s-5991e152f2"></div></div>
+                <div class="_ion-s-8a462ecb5f">`;
             for (const t of techs) {
                 const cls = t.state === 'full' ? 'green' : t.state === 'partial' ? 'warn' : 'crit';
                 const color = t.state === 'full' ? 'var(--mitre-covered,#3fb950)' : t.state === 'partial' ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
-                html += `<span title="${esc(t.description)} — ${t.covered_attacks||0}/${t.total_attacks||0} ATT&CK techniques covered" style="display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid ${color};border-radius:4px;font-size:.7rem;color:${color}"><span class="mono">${esc(t.id)}</span> ${esc(t.name)} <span style="opacity:.7">${t.coverage_pct||0}%</span></span>`;
+                html += `<span class="_ion-s-12e1606814" title="${esc(t.description)} — ${t.covered_attacks||0}/${t.total_attacks||0} ATT&CK techniques covered"><span class="mono">${esc(t.id)}</span> ${esc(t.name)} <span class="_ion-s-2a1f67ee37">${t.coverage_pct||0}%</span></span>`;
             }
             html += '</div></div>';
         }
         html += '</div>';
         panel.innerHTML = html;
     } catch (e) {
-        panel.innerHTML = `<div class="de-section" style="color:var(--sev-critical)">Error: ${esc(e.message)}</div>`;
+        panel.innerHTML = `<div class="de-section _ion-s-5dd0211252">Error: ${esc(e.message)}</div>`;
     }
 }
 
@@ -1367,23 +1367,23 @@ async function loadEmulation() {
 
         html += `<div class="de-section"><div class="de-section-title">
             Adversary Emulation Plans
-            <button class="btn btn-primary btn-sm" data-click-action="emCreatePrompt" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New Plan</button>
+            <button class="btn btn-primary btn-sm _ion-s-02d75ce02c" data-click-action="emCreatePrompt">+ New Plan</button>
         </div>`;
 
         if (!totalPlans) {
-            html += '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-style:italic">No plans yet. Create a per-actor purple-team plan, add TTP steps, mark them executed, then click Verify to check Elasticsearch for matching detections.</div>';
+            html += '<div class="_ion-s-f8ee941641">No plans yet. Create a per-actor purple-team plan, add TTP steps, mark them executed, then click Verify to check Elasticsearch for matching detections.</div>';
         } else {
             html += '<table class="de-table"><thead><tr><th>Name</th><th>Actor</th><th>Status</th><th>Steps</th><th>Coverage</th><th>Updated</th><th></th></tr></thead><tbody>';
             for (const p of _emCache) {
                 const color = (p.coverage_pct||0) >= 80 ? 'var(--mitre-covered,#3fb950)' : (p.coverage_pct||0) >= 50 ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
-                html += `<tr style="cursor:pointer" data-click-action="emOpenPlan" data-args='[${p.id}]'>
+                html += `<tr class="_ion-s-3b6a3a65d8" data-click-action="emOpenPlan" data-args='[${p.id}]'>
                     <td><strong>${esc(p.name)}</strong></td>
                     <td>${esc(p.actor_name||'-')}</td>
                     <td>${esc(p.status)}</td>
                     <td>${p.passed_count||0}/${p.step_count||0}</td>
-                    <td><span style="font-family:'JetBrains Mono',monospace;color:${color};font-weight:700">${p.coverage_pct||0}%</span></td>
+                    <td><span class="_ion-s-8e0f4618a7">${p.coverage_pct||0}%</span></td>
                     <td>${p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '-'}</td>
-                    <td><button class="btn btn-secondary btn-sm" data-click-action="emDeletePlan" data-stop-propagation data-args='[${p.id}]' style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                    <td><button class="btn btn-secondary btn-sm _ion-s-a318f9408e" data-click-action="emDeletePlan" data-stop-propagation data-args='[${p.id}]'>Delete</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -1391,7 +1391,7 @@ async function loadEmulation() {
         html += '</div><div id="de-emulation-detail"></div>';
         panel.innerHTML = html;
     } catch (e) {
-        panel.innerHTML = `<div class="de-section" style="color:var(--sev-critical)">Error: ${esc(e.message)}</div>`;
+        panel.innerHTML = `<div class="de-section _ion-s-5dd0211252">Error: ${esc(e.message)}</div>`;
     }
 }
 
@@ -1420,8 +1420,8 @@ window.emOpenPlan = async function(id) {
     const p = await r.json();
     const det = $('de-emulation-detail');
     let html = `<div class="de-section"><div class="de-section-title">${esc(p.name)} (${esc(p.actor_name||'-')})</div>`;
-    if (p.description) html += `<div style="color:var(--text-secondary);font-size:.82rem;margin-bottom:10px">${esc(p.description)}</div>`;
-    html += `<div class="de-stats" style="margin-bottom:14px">
+    if (p.description) html += `<div class="_ion-s-9d37fe6a5d">${esc(p.description)}</div>`;
+    html += `<div class="de-stats _ion-s-2b583d7389">
         <div class="de-stat"><div class="de-stat-label">Coverage</div><div class="de-stat-val">${p.coverage_pct||0}%</div></div>
         <div class="de-stat green"><div class="de-stat-label">Passed</div><div class="de-stat-val">${p.passed_count||0}</div></div>
         <div class="de-stat crit"><div class="de-stat-label">Failed</div><div class="de-stat-val">${p.failed_count||0}</div></div>
@@ -1431,28 +1431,28 @@ window.emOpenPlan = async function(id) {
 
     for (const s of p.steps || []) {
         const color = s.result === 'passed' ? 'var(--mitre-covered,#3fb950)' : s.result === 'failed' ? 'var(--sev-critical,#f85149)' : s.result === 'partial' ? 'var(--sev-medium,#d29922)' : 'var(--text-secondary)';
-        const tids = (s.mitre_techniques||[]).map(t => `<span class="mono" style="background:rgba(0,212,255,.06);border:1px solid var(--border);padding:1px 6px;border-radius:3px;font-size:.7rem">${esc(t)}</span>`).join(' ');
-        html += `<div style="background:var(--bg-tertiary);border:1px solid var(--border);border-left:3px solid ${color};border-radius:6px;padding:10px 14px;margin-bottom:6px">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        const tids = (s.mitre_techniques||[]).map(t => `<span class="mono _ion-s-7d20d4a2c5">${esc(t)}</span>`).join(' ');
+        html += `<div class="_ion-s-6f26a1ac92">
+            <div class="_ion-s-c6926f1dd7">
                 <div><strong>${(s.order_index||0)+1}. ${esc(s.title)}</strong></div>
-                <div style="display:flex;align-items:center;gap:8px">
-                    <span class="mono" style="font-size:.7rem;color:${color}">${esc(s.result)}</span>
-                    ${s.matched_alert_count != null ? `<span style="font-size:.7rem;color:var(--text-secondary)">${s.matched_alert_count} alerts</span>` : ''}
+                <div class="_ion-s-015a5e7fbe">
+                    <span class="mono _ion-s-7b3392fe6d">${esc(s.result)}</span>
+                    ${s.matched_alert_count != null ? `<span class="_ion-s-4d2abfd40f">${s.matched_alert_count} alerts</span>` : ''}
                 </div>
             </div>
-            ${tids ? `<div style="margin-top:5px">${tids}</div>` : ''}
-            <div style="margin-top:6px;display:flex;gap:5px">
-                <button class="btn btn-secondary btn-sm" data-click-action="emExecuteStep" data-args='[${s.id}]' style="padding:3px 9px;font-size:.7rem">Mark Executed</button>
-                <button class="btn btn-secondary btn-sm" data-click-action="emVerifyStep" data-args='[${s.id}]' style="padding:3px 9px;font-size:.7rem">Verify in ES</button>
-                <button class="btn btn-secondary btn-sm" data-click-action="emDeleteStep" data-args='[${s.id}]' style="padding:3px 9px;font-size:.7rem">Delete</button>
+            ${tids ? `<div class="_ion-s-55cec09fd9">${tids}</div>` : ''}
+            <div class="_ion-s-9bad7be784">
+                <button class="btn btn-secondary btn-sm _ion-s-80e6328de0" data-click-action="emExecuteStep" data-args='[${s.id}]'>Mark Executed</button>
+                <button class="btn btn-secondary btn-sm _ion-s-80e6328de0" data-click-action="emVerifyStep" data-args='[${s.id}]'>Verify in ES</button>
+                <button class="btn btn-secondary btn-sm _ion-s-80e6328de0" data-click-action="emDeleteStep" data-args='[${s.id}]'>Delete</button>
             </div>
         </div>`;
     }
 
-    html += `<div style="background:var(--bg-tertiary);border:1px dashed var(--border);border-radius:6px;padding:10px 14px;margin-top:10px">
-        <input id="em-newstep-title" placeholder="Step title" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:.78rem;margin-bottom:6px">
-        <input id="em-newstep-tids" placeholder="Techniques: T1003, T1059.001" style="width:100%;background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:4px;font-size:.78rem;margin-bottom:6px">
-        <button class="btn btn-primary btn-sm" data-click-action="emAddStep" data-args='[${p.id}]' style="padding:5px 14px;font-size:.78rem">+ Add Step</button>
+    html += `<div class="_ion-s-78cae35616">
+        <input class="_ion-s-5bb9279430" id="em-newstep-title" placeholder="Step title">
+        <input class="_ion-s-5bb9279430" id="em-newstep-tids" placeholder="Techniques: T1003, T1059.001">
+        <button class="btn btn-primary btn-sm _ion-s-1e2e62567e" data-click-action="emAddStep" data-args='[${p.id}]'>+ Add Step</button>
     </div></div>`;
     det.innerHTML = html;
 };
@@ -1514,32 +1514,32 @@ async function loadVulns() {
         </div>`;
 
         if (!s.tide_enabled) {
-            html += '<div class="de-section" style="border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.06)"><div style="font-size:.78rem;color:var(--text-secondary)"><strong>TIDE not connected.</strong> All verdicts shown as unknown. Configure TIDE in <a href="/settings#tide" style="color:var(--neon-cyan)">Settings</a> for live coverage.</div></div>';
+            html += '<div class="de-section _ion-s-1d547cd27a"><div class="_ion-s-a975440d91"><strong>TIDE not connected.</strong> All verdicts shown as unknown. Configure TIDE in <a class="_ion-s-bdcb2533ca" href="/settings#tide">Settings</a> for live coverage.</div></div>';
         }
 
         html += `<div class="de-section"><div class="de-section-title">
             Vulnerabilities
-            <button class="btn btn-primary btn-sm" data-click-action="vlnCreatePrompt" style="margin-left:auto;padding:4px 12px;font-size:.75rem">+ New CVE</button>
+            <button class="btn btn-primary btn-sm _ion-s-02d75ce02c" data-click-action="vlnCreatePrompt">+ New CVE</button>
         </div>`;
 
         const items = _vulnsCache.vulnerabilities || [];
         if (!items.length) {
-            html += '<div style="text-align:center;padding:30px;color:var(--text-secondary);font-style:italic">Add CVEs and tag them with the ATT&CK techniques attackers would use to exploit them. ION will tell you whether your TIDE rules can detect exploitation.</div>';
+            html += '<div class="_ion-s-f8ee941641">Add CVEs and tag them with the ATT&CK techniques attackers would use to exploit them. ION will tell you whether your TIDE rules can detect exploitation.</div>';
         } else {
             html += '<table class="de-table"><thead><tr><th>CVE / Title</th><th>Severity</th><th>CVSS</th><th>Status</th><th>Techniques</th><th>Detection</th><th></th></tr></thead><tbody>';
             for (const v of items) {
                 const cov = v.coverage || {};
                 const verdict = cov.verdict || 'unknown';
                 const verdictColor = verdict === 'covered' ? 'var(--mitre-covered,#3fb950)' : verdict === 'partial' ? 'var(--sev-medium,#d29922)' : verdict === 'blind' ? 'var(--sev-critical,#f85149)' : 'var(--text-secondary)';
-                const tids = (cov.by_tid||[]).map(t => `<span class="mono" style="font-size:.66rem;background:rgba(0,212,255,.06);border:1px solid ${t.covered ? 'var(--mitre-covered,#3fb950)' : 'var(--border)'};color:${t.covered ? 'var(--mitre-covered,#3fb950)' : 'var(--text-secondary)'};padding:1px 5px;border-radius:3px">${esc(t.tid)}</span>`).join(' ');
+                const tids = (cov.by_tid||[]).map(t => `<span class="mono _ion-s-47e3af0bb3">${esc(t.tid)}</span>`).join(' ');
                 html += `<tr>
-                    <td>${v.cve_id ? `<div class="mono" style="color:var(--neon-cyan,#00d4ff);font-size:.78rem">${esc(v.cve_id)}</div>` : ''}<div>${esc(v.title)}</div></td>
+                    <td>${v.cve_id ? `<div class="mono _ion-s-4a1ff1de6d">${esc(v.cve_id)}</div>` : ''}<div>${esc(v.title)}</div></td>
                     <td><span class="de-sev ${esc(v.severity)}">${esc(v.severity)}</span></td>
                     <td>${v.cvss_score ?? '-'}</td>
                     <td>${esc(v.status)}</td>
-                    <td>${tids || '<span style="color:var(--text-secondary);font-size:.7rem">none</span>'}</td>
-                    <td><div style="color:${verdictColor};font-weight:700;text-transform:uppercase;font-size:.7rem;letter-spacing:.5px">${esc(verdict)}</div><div style="font-size:.66rem;color:var(--text-secondary)">${cov.total > 0 ? `${cov.covered}/${cov.total} TTPs &middot; ${cov.rules} rules` : 'no TTPs set'}</div></td>
-                    <td><button class="btn btn-secondary btn-sm" data-click-action="vlnDelete" data-args='[${v.id}]' style="padding:2px 8px;font-size:.7rem">Delete</button></td>
+                    <td>${tids || '<span class="_ion-s-18f820e713">none</span>'}</td>
+                    <td><div class="_ion-s-4a9a3dd721">${esc(verdict)}</div><div class="_ion-s-46766d8657">${cov.total > 0 ? `${cov.covered}/${cov.total} TTPs &middot; ${cov.rules} rules` : 'no TTPs set'}</div></td>
+                    <td><button class="btn btn-secondary btn-sm _ion-s-a318f9408e" data-click-action="vlnDelete" data-args='[${v.id}]'>Delete</button></td>
                 </tr>`;
             }
             html += '</tbody></table>';
@@ -1547,7 +1547,7 @@ async function loadVulns() {
         html += '</div>';
         panel.innerHTML = html;
     } catch (e) {
-        panel.innerHTML = `<div class="de-section" style="color:var(--sev-critical)">Error: ${esc(e.message)}</div>`;
+        panel.innerHTML = `<div class="de-section _ion-s-5dd0211252">Error: ${esc(e.message)}</div>`;
     }
 }
 

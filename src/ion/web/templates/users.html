@@ -126,11 +126,11 @@
             </div>
             <div class="form-group">
                 <label for="edit-elastic-uid">Elastic UID</label>
-                <input type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana" readonly style="opacity:0.7">
+                <input class="_ion-s-383082bf69" type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana" readonly>
             </div>
             <div class="form-group">
                 <label for="edit-keycloak-sub">Keycloak Subject ID</label>
-                <input type="text" id="edit-keycloak-sub" placeholder="Auto-set on OIDC login" readonly style="opacity:0.7">
+                <input class="_ion-s-383082bf69" type="text" id="edit-keycloak-sub" placeholder="Auto-set on OIDC login" readonly>
             </div>
             <div class="form-group">
                 <label>Roles</label>
@@ -277,7 +277,7 @@ function renderRoleCheckboxes() {
       const caps = permissionCapabilities(role.permissions || []);
       const permCount = (role.permissions || []).length;
       return `
-        <label class="role-widget" style="--role-color:${meta.color}">
+        <label class="role-widget _ion-s-7fbdd8e6b3">
           <input type="checkbox" value="${role.name}" name="${containerId}" class="role-widget-input">
           <div class="role-widget-card">
             <div class="role-widget-header">
@@ -323,8 +323,8 @@ async function loadUsers() {
                 <td>${escapeHtml(user.email)}</td>
                 <td>${escapeHtml(user.display_name || '-')}</td>
                 <td>${user.roles.map(r => `<span class="role-badge role-${r}">${r}</span>`).join(' ')}</td>
-                <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:${user.elastic_uid ? 'var(--primary)' : 'var(--text-muted)'};max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(user.elastic_uid || '')}">${escapeHtml(user.elastic_uid || '-')}${user.elastic_username ? '<br><span style="color:var(--text-secondary);font-size:.65rem">' + escapeHtml(user.elastic_username) + '</span>' : ''}</td>
-                <td style="font-family:'JetBrains Mono',monospace;font-size:.72rem;color:${user.keycloak_sub ? 'var(--primary)' : 'var(--text-muted)'};max-width:180px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(user.keycloak_sub || '')}">${escapeHtml(user.keycloak_sub || '-')}</td>
+                <td class="_ion-s-dc02658502" title="${escapeHtml(user.elastic_uid || '')}">${escapeHtml(user.elastic_uid || '-')}${user.elastic_username ? '<br><span class="_ion-s-5c71f29a29">' + escapeHtml(user.elastic_username) + '</span>' : ''}</td>
+                <td class="_ion-s-ebee7e459c" title="${escapeHtml(user.keycloak_sub || '')}">${escapeHtml(user.keycloak_sub || '-')}</td>
                 <td><span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
                 <td class="actions">

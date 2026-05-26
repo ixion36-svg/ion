@@ -174,7 +174,7 @@
                     <span class="form-help">Disable for self-signed certificates (not recommended for production)</span>
                 </div>
 
-                <h3 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--text-primary);">User Assignment Mapping</h3>
+                <h3 class="_ion-s-340c480b1f">User Assignment Mapping</h3>
                 <p class="section-description">Map an Elasticsearch index containing user profiles for alert assignment. When analysts assign alerts, the user name is written back to the configured field on the alert document.</p>
 
                 <div class="form-row">
@@ -465,11 +465,11 @@
                 <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_enabled" name="arkime_enabled"> Enable Arkime Integration</label></div>
                 <div class="form-group"><label for="arkime_url">Arkime URL</label><input type="url" id="arkime_url" name="arkime_url" placeholder="https://viewer.guardedglass.internal"></div>
                 <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_verify_ssl" name="arkime_verify_ssl"> Verify SSL Certificate</label></div>
-                <h3 style="margin-top:1rem;">Authentication (Keycloak preferred)</h3>
+                <h3 class="_ion-s-0cf8f93b0e">Authentication (Keycloak preferred)</h3>
                 <div class="form-group"><label for="arkime_keycloak_issuer">Keycloak Issuer URL</label><input type="url" id="arkime_keycloak_issuer" name="arkime_keycloak_issuer" placeholder="https://keycloak.guardedglass.internal/realms/soc"></div>
                 <div class="form-group"><label for="arkime_keycloak_client_id">Keycloak Client ID</label><input type="text" id="arkime_keycloak_client_id" name="arkime_keycloak_client_id" placeholder="arkime"></div>
                 <div class="form-group"><label for="arkime_keycloak_client_secret">Keycloak Client Secret</label><input type="password" id="arkime_keycloak_client_secret" name="arkime_keycloak_client_secret" placeholder="Leave blank to keep current"></div>
-                <h3 style="margin-top:1rem;">Basic Auth Fallback</h3>
+                <h3 class="_ion-s-0cf8f93b0e">Basic Auth Fallback</h3>
                 <div class="form-group"><label for="arkime_username">Username</label><input type="text" id="arkime_username" name="arkime_username" placeholder="Optional basic auth fallback"></div>
                 <div class="form-group"><label for="arkime_password">Password</label><input type="password" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
                 <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
@@ -627,10 +627,10 @@
                 <h3>Data Cleanup</h3>
                 <p class="section-description">Remove old logs and temporary data to free up space.</p>
                 <div class="cleanup-form">
-                    <div class="form-group" style="max-width: 200px;">
+                    <div class="form-group _ion-s-8d1f4ab850">
                         <label for="cleanup-days">Keep data from last</label>
-                        <div style="display: flex; align-items: center; gap: 0.5rem;">
-                            <input type="number" id="cleanup-days" value="30" min="1" max="365" style="width: 80px;">
+                        <div class="_ion-s-85056bada5">
+                            <input class="_ion-s-1b3b307987" type="number" id="cleanup-days" value="30" min="1" max="365">
                             <span>days</span>
                         </div>
                     </div>
@@ -649,12 +649,12 @@
                 <div class="loading">Loading technologies...</div>
             </div>
 
-            <h3 style="margin-top: 2rem;">System Details</h3>
+            <h3 class="_ion-s-cee5c5825a">System Details</h3>
             <div id="system-info" class="info-grid">
                 <div class="loading">Loading system information...</div>
             </div>
 
-            <h3 style="margin-top: 2rem;">Environment Variables</h3>
+            <h3 class="_ion-s-cee5c5825a">Environment Variables</h3>
             <p class="section-description">ION-related environment variables (sensitive values masked).</p>
 
             <div id="env-vars" class="env-vars-list">
@@ -684,7 +684,7 @@
                     <option value="1000">1000 entries</option>
                 </select>
                 <button class="btn btn-sm" data-click-action="loadSystemLogs">Refresh</button>
-                <label style="display:flex;align-items:center;gap:0.3rem;font-size:0.85rem;color:var(--text-secondary);">
+                <label class="_ion-s-ae67ec2b38">
                     <input type="checkbox" id="log-auto-refresh"> Auto-refresh (10s)
                 </label>
             </div>
@@ -692,7 +692,7 @@
             <div id="logs-container" class="logs-container">
                 <div class="loading">Click Refresh or select this tab to load logs...</div>
             </div>
-            <div id="logs-count" style="padding:0.5rem 0;font-size:0.8rem;color:var(--text-secondary);"></div>
+            <div class="_ion-s-992dc32f95" id="logs-count"></div>
         </section>
     </div>
 </div>
@@ -2341,7 +2341,7 @@ async function loadDatabaseStats() {
                 <div class="info-card-label">Total Rows</div>
                 <div class="info-card-value">${formatNumber(stats.total_rows || 0)}</div>
             </div>
-            <div class="info-card" style="grid-column: 1 / -1;">
+            <div class="info-card _ion-s-d5b43342a2">
                 <div class="info-card-label">Tables</div>
                 <div class="table-stats">
                     ${stats.tables.map(t => `
@@ -2373,7 +2373,7 @@ async function loadBackups() {
         const data = await response.json();
 
         if (data.backups.length === 0) {
-            container.innerHTML = '<div class="loading" style="padding: 1rem;">No backups found. Click "Create Backup" to create one.</div>';
+            container.innerHTML = '<div class="loading _ion-s-ef7142f76c">No backups found. Click "Create Backup" to create one.</div>';
             return;
         }
 
@@ -2561,7 +2561,7 @@ async function loadSystemInfo() {
                 <div class="info-card-label">PCAP Analysis</div>
                 <div class="info-card-value">dpkt ${info.packages['dpkt'] || ''}</div>
             </div>
-            <div class="info-card" style="grid-column: 1 / -1;">
+            <div class="info-card _ion-s-d5b43342a2">
                 <div class="info-card-label">Key Dependencies</div>
                 <div class="packages-list">
                     ${Object.entries(info.packages).map(([name, version]) =>
@@ -2645,7 +2645,7 @@ async function loadSystemLogs() {
         const data = await response.json();
 
         if (!data.logs || data.logs.length === 0) {
-            container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No log entries found</div>';
+            container.innerHTML = '<div class="_ion-s-5e084f50f9">No log entries found</div>';
             countEl.textContent = '';
             return;
         }
@@ -2676,7 +2676,7 @@ async function loadSystemLogs() {
         countEl.textContent = `Showing ${data.logs.length} entries (newest first)`;
 
     } catch (error) {
-        container.innerHTML = `<div style="padding:1rem;color:var(--sev-critical);">Failed to load logs: ${escapeHtml(error.message)}</div>`;
+        container.innerHTML = `<div class="_ion-s-75c5100a5b">Failed to load logs: ${escapeHtml(error.message)}</div>`;
         countEl.textContent = '';
     }
 

@@ -81,7 +81,7 @@
           </div>
         </div>
         <!-- v0.19.15: shown only when the API falls back to ION-local data -->
-        <div id="alerts-fallback-banner" class="mb-3 px-3 py-2 rounded-md text-[11px] bg-ion-amber/8 text-ion-amber border-l-2 border-ion-amber" style="display:none;"></div>
+        <div id="alerts-fallback-banner" class="mb-3 px-3 py-2 rounded-md text-[11px] bg-ion-amber/8 text-ion-amber border-l-2 border-ion-amber _ion-s-c8be1ccba6"></div>
         <div id="alerts-table-wrap" class="overflow-x-auto">
           <table class="w-full text-[12px]">
             <thead><tr><th class="dth">Time</th><th class="dth">Severity</th><th class="dth">Rule Name</th><th class="dth">Host</th><th class="dth">Status</th></tr></thead>
@@ -640,7 +640,7 @@ function renderLogHealth(prefix, data) {
     return '<div class="ds-host-widget ' + widgetClass + '" title="' + tooltip + '">'
       + '<div class="ds-hw-light ' + lightClass + '"></div>'
       + '<div class="ds-hw-name">' + esc(name) + '</div>'
-      + '<div class="ds-hw-meta">' + events + (gaps > 0 ? '<br><span style="color:#ef4444;">' + gaps + 'h gap</span>' : '') + '</div>'
+      + '<div class="ds-hw-meta">' + events + (gaps > 0 ? '<br><span class="_ion-s-9dd1207e58">' + gaps + 'h gap</span>' : '') + '</div>'
       + '</div>';
   }).join('');
 }
@@ -665,13 +665,13 @@ function renderArkime(countries) {
       if (count > 0 && c.nodes && c.nodes.length) {
         let html = '';
         c.nodes.forEach(n => {
-          html += '<div style="font-size:9px;color:#94a3b8;margin-top:4px;text-align:left;width:100%;">';
-          html += '<span style="color:#6de4ff;">' + esc(n.node) + '</span>: ' + n.session_count + ' session' + (n.session_count !== 1 ? 's' : '');
+          html += '<div class="_ion-s-39c5d3e3a3">';
+          html += '<span class="_ion-s-a9768081c1">' + esc(n.node) + '</span>: ' + n.session_count + ' session' + (n.session_count !== 1 ? 's' : '');
           if (n.sessions && n.sessions.length) {
             n.sessions.forEach(s => {
               const proto = s.protocol || '?';
               const bytes = s.bytes ? (s.bytes > 1048576 ? (s.bytes/1048576).toFixed(1)+'MB' : s.bytes > 1024 ? (s.bytes/1024).toFixed(0)+'KB' : s.bytes+'B') : '0B';
-              html += '<div style="padding-left:8px;color:#64748b;">' + esc(s.src_ip||'?') + ' &rarr; ' + esc(s.dst_ip||'?') + ' [' + esc(proto) + '] ' + bytes + '</div>';
+              html += '<div class="_ion-s-8485d4bd42">' + esc(s.src_ip||'?') + ' &rarr; ' + esc(s.dst_ip||'?') + ' [' + esc(proto) + '] ' + bytes + '</div>';
             });
           }
           html += '</div>';

@@ -93,7 +93,7 @@
                     <div class="ai-files-empty">No files attached</div>
                 </div>
                 <label class="ai-upload-area">
-                    <input type="file" id="ai-file-input" style="display:none" accept=".txt,.log,.json,.yaml,.yml,.xml,.csv,.py,.js,.ts,.html,.css,.sh,.bash,.ps1,.conf,.cfg,.ini,.toml,.md,.rst,.sql,.kql,.spl,.yar,.yara,.sigma,.rule,.rules">
+                    <input class="_ion-s-6b99de8b69" type="file" id="ai-file-input" accept=".txt,.log,.json,.yaml,.yml,.xml,.csv,.py,.js,.ts,.html,.css,.sh,.bash,.ps1,.conf,.cfg,.ini,.toml,.md,.rst,.sql,.kql,.spl,.yar,.yara,.sigma,.rule,.rules">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="17 8 12 3 7 8"/>
@@ -111,7 +111,7 @@
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 </div>
-                <div class="ai-settings-panel" id="ai-settings-panel" style="display: none;">
+                <div class="ai-settings-panel _ion-s-f2892a2e8a" id="ai-settings-panel">
                     <label class="ai-check"><input type="checkbox" id="pref-rag-kb" data-change-action="saveAIPreferences"> Knowledge Base</label>
                     <label class="ai-check"><input type="checkbox" id="pref-rag-notes" data-change-action="saveAIPreferences"> Analyst Notes</label>
                     <label class="ai-check"><input type="checkbox" id="pref-rag-playbooks" data-change-action="saveAIPreferences"> Playbooks</label>
@@ -216,7 +216,7 @@
             </div>
 
             <div class="ai-input-area">
-                <div class="ai-typing" id="ai-page-typing" style="display: none;">
+                <div class="ai-typing _ion-s-f2892a2e8a" id="ai-page-typing">
                     <span class="dot"></span><span class="dot"></span><span class="dot"></span>
                     <span class="ai-typing-label">AI is thinking...</span>
                 </div>
@@ -238,7 +238,7 @@
         </div>
 
         <!-- Document Generator Panel (hidden by default) -->
-        <div class="ai-main" id="ai-main-docgen" style="display: none;">
+        <div class="ai-main _ion-s-f2892a2e8a" id="ai-main-docgen">
             <div class="ai-main-header">
                 <div class="ai-header-left">
                     <div class="ai-header-icon docgen">
@@ -292,7 +292,7 @@
                             </svg>
                             Generate Preview
                         </button>
-                        <button class="btn-gen-save" id="docgen-save-btn" data-click-action="generateAndSaveDocument" style="display: none;">
+                        <button class="btn-gen-save _ion-s-f2892a2e8a" id="docgen-save-btn" data-click-action="generateAndSaveDocument">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                                 <polyline points="17 21 17 13 7 13 7 21"/>
@@ -315,7 +315,7 @@
                     </div>
                 </div>
 
-                <div class="docgen-preview-area" id="docgen-preview-area" style="display: none;">
+                <div class="docgen-preview-area _ion-s-f2892a2e8a" id="docgen-preview-area">
                     <div class="docgen-preview-header">
                         <span>Preview</span>
                         <div class="docgen-preview-actions">
@@ -1887,7 +1887,7 @@
             saveBtn.style.display = 'inline-flex';
             showToast('Document generated successfully', 'success');
         } catch (error) {
-            previewContent.innerHTML = `<div style="color: var(--danger); padding: 12px;">Error: ${escapeHtml(error.message)}</div>`;
+            previewContent.innerHTML = `<div class="_ion-s-af82c00c21">Error: ${escapeHtml(error.message)}</div>`;
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Preview';
@@ -2018,14 +2018,14 @@
                         <h3>${escapeHtml(file.name)}</h3>
                         <div class="ai-file-modal-actions">
                             <button class="btn btn-sm" data-click-action="toggleFileEdit" data-args='["$target"]'>Edit</button>
-                            <button class="btn btn-sm btn-primary" data-click-action="saveFileEdit" data-args='["${file.id}"]' style="display:none" id="save-file-btn">Save</button>
+                            <button class="btn btn-sm btn-primary _ion-s-6b99de8b69" data-click-action="saveFileEdit" data-args='["${file.id}"]' id="save-file-btn">Save</button>
                             <button class="btn btn-sm" data-click-action="downloadFile" data-args='["${file.id}"]'>Download</button>
                             <button class="btn btn-sm" data-click-action="closeFileModal">Close</button>
                         </div>
                     </div>
                     <div class="ai-file-modal-body">
                         <pre id="file-content-view">${escapeHtml(file.content)}</pre>
-                        <textarea id="file-content-edit" style="display:none">${escapeHtml(file.content)}</textarea>
+                        <textarea class="_ion-s-6b99de8b69" id="file-content-edit">${escapeHtml(file.content)}</textarea>
                     </div>
                 </div>`;
             modal.addEventListener('click', e => { if (e.target === modal) closeFileModal(); });

@@ -78,7 +78,7 @@ async function erLoad(){
         if(!r.ok) throw new Error('Failed');
         renderReport(await r.json());
     } catch(e){
-        $('er-content').innerHTML = `<div class="er-loading" style="color:var(--sev-critical)">${esc(e.message)}</div>`;
+        $('er-content').innerHTML = `<div class="er-loading _ion-s-5dd0211252">${esc(e.message)}</div>`;
     }
 }
 
@@ -92,7 +92,7 @@ function renderReport(d){
     const a = d.alerts||{};
     let html = '';
 
-    html += `<div style="font-size:.85rem;color:var(--text-secondary);margin-bottom:16px">${fmtDate(d.period_start)} \u2014 ${fmtDate(d.period_end)} (${d.period_days} days)</div>`;
+    html += `<div class="_ion-s-0b305c2aa7">${fmtDate(d.period_start)} \u2014 ${fmtDate(d.period_end)} (${d.period_days} days)</div>`;
 
     html += '<div class="er-stats">';
     html += erStat(c.opened||0, 'Cases Opened', '');
@@ -115,25 +115,25 @@ function renderReport(d){
             const ch = Math.max(day.closed/maxVal*80,2);
             html += `<div class="er-trend-group">
                 <div class="er-trend-bars">
-                    <div class="er-trend-bar" style="height:${oh}px;background:var(--sev-high)" title="Opened: ${day.opened}"></div>
-                    <div class="er-trend-bar" style="height:${ch}px;background:var(--mitre-covered)" title="Closed: ${day.closed}"></div>
+                    <div class="er-trend-bar _ion-s-aaedcd59fa" title="Opened: ${day.opened}"></div>
+                    <div class="er-trend-bar _ion-s-26f4da1bb9" title="Closed: ${day.closed}"></div>
                 </div>
                 <span class="er-trend-label">${day.date.substring(5)}</span>
             </div>`;
         }
-        html += '</div><div style="display:flex;gap:12px;font-size:.72rem;color:var(--text-secondary);margin-top:8px"><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--sev-high);border-radius:2px"></span>Opened</span><span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;background:var(--mitre-covered);border-radius:2px"></span>Closed</span></div></div>';
+        html += '</div><div class="_ion-s-d2c5f04842"><span class="_ion-s-8f813ee01f"><span class="_ion-s-b01217e141"></span>Opened</span><span class="_ion-s-8f813ee01f"><span class="_ion-s-d27032f0a8"></span>Closed</span></div></div>';
     }
 
     // Closure reasons
     const reasons = c.closure_reasons||{};
     if(Object.keys(reasons).length){
         html += '<div class="er-section"><div class="er-section-title"><i class="icon-pie-chart"></i> Closure Reasons</div>';
-        html += '<div style="display:flex;gap:20px;flex-wrap:wrap">';
+        html += '<div class="_ion-s-42cd01a7ba">';
         const total = Object.values(reasons).reduce((a,b)=>a+b,0);
         for(const [reason,count] of Object.entries(reasons).sort((a,b)=>b[1]-a[1])){
             const pct = Math.round(count/total*100);
             const color = reason==='true_positive'?'var(--mitre-covered)':reason==='false_positive'?'var(--sev-critical)':'var(--text-secondary)';
-            html += `<div style="text-align:center"><div class="mono" style="font-size:1.1rem;font-weight:700;color:${color}">${count}</div><div style="font-size:.72rem;color:var(--text-secondary);text-transform:capitalize">${reason.replace(/_/g,' ')} (${pct}%)</div></div>`;
+            html += `<div class="_ion-s-91a87015f4"><div class="mono _ion-s-2871763e47">${count}</div><div class="_ion-s-e65c44381d">${reason.replace(/_/g,' ')} (${pct}%)</div></div>`;
         }
         html += '</div></div>';
     }
@@ -144,7 +144,7 @@ function renderReport(d){
         html += '<div class="er-section"><div class="er-section-title"><i class="icon-alert-triangle"></i> Notable Incidents</div>';
         html += '<table class="er-table"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead><tbody>';
         for(const inc of incidents){
-            html += `<tr><td class="mono">${esc(inc.case_number)}</td><td>${esc(inc.title)}</td><td><span class="sev-badge sev-${inc.severity}">${esc(inc.severity)}</span></td><td>${esc(inc.status)}</td><td style="font-size:.78rem">${fmtDate(inc.created_at)}</td></tr>`;
+            html += `<tr><td class="mono">${esc(inc.case_number)}</td><td>${esc(inc.title)}</td><td><span class="sev-badge sev-${inc.severity}">${esc(inc.severity)}</span></td><td>${esc(inc.status)}</td><td class="_ion-s-f63147b2ed">${fmtDate(inc.created_at)}</td></tr>`;
         }
         html += '</tbody></table></div>';
     }
@@ -154,7 +154,7 @@ function renderReport(d){
     if(team.length){
         html += '<div class="er-section"><div class="er-section-title"><i class="icon-users"></i> Team Performance</div>';
         html += '<table class="er-table"><thead><tr><th>Analyst</th><th>Cases Closed</th><th>Total Actions</th></tr></thead><tbody>';
-        for(const t of team) html += `<tr><td style="font-weight:600">${esc(t.username)}</td><td class="mono">${t.cases_closed}</td><td class="mono">${t.total_actions}</td></tr>`;
+        for(const t of team) html += `<tr><td class="_ion-s-eed0f8fb89">${esc(t.username)}</td><td class="mono">${t.cases_closed}</td><td class="mono">${t.total_actions}</td></tr>`;
         html += '</tbody></table></div>';
     }
 

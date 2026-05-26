@@ -151,7 +151,7 @@
             <span id="wb-bob-agreement-num" class="text-[12px] text-slate-300 tabular-nums">— / —</span>
           </div>
           <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
-            <div id="wb-bob-agreement-fill" class="h-full rounded-full bg-gradient-to-r from-ion-iris to-ion-cyan transition-[width] duration-700" style="width:0%"></div>
+            <div id="wb-bob-agreement-fill" class="h-full rounded-full bg-gradient-to-r from-ion-iris to-ion-cyan transition-[width] duration-700 _ion-s-d2fba0f353"></div>
           </div>
         </div>
       </section>
@@ -250,7 +250,7 @@
   </div>
 
   <!-- Embed Lucide icon sprite (subset used here) -->
-  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <svg class="_ion-s-bb6a43fd28" width="0" height="0" aria-hidden="true">
     <symbol id="i-sparkles" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/></symbol>
     <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
   </svg>
@@ -436,7 +436,7 @@ function renderAlerts(a) {
     row.innerHTML = `
       <div class="text-slate-400 capitalize">${escHtml(label)}</div>
       <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div class="${cls} h-full rounded-full transition-[width] duration-700" style="width:${pct}%"></div>
+        <div class="${cls} h-full rounded-full transition-[width] duration-700 _ion-s-95aea49e0e"></div>
       </div>
       <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
     bars.appendChild(row);
@@ -476,7 +476,7 @@ function renderCases(c) {
     row.innerHTML = `
       <div class="text-slate-400 capitalize">${escHtml(key)}</div>
       <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div class="${cls} h-full rounded-full transition-[width] duration-700" style="width:${pct}%"></div>
+        <div class="${cls} h-full rounded-full transition-[width] duration-700 _ion-s-95aea49e0e"></div>
       </div>
       <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
     bars.appendChild(row);
@@ -543,8 +543,8 @@ function renderRules(r) {
     row.innerHTML = `
       <div class="text-slate-400 capitalize">${escHtml(key)}</div>
       <div class="h-1.5 rounded-full bg-white/5 overflow-hidden relative">
-        <div class="${cls} h-full rounded-full opacity-30" style="width:${totalPct}%"></div>
-        <div class="${cls} h-full rounded-full absolute inset-y-0 left-0" style="width:${Math.round(totalPct * enabledPct / 100)}%"></div>
+        <div class="${cls} h-full rounded-full opacity-30 _ion-s-5cee91ad0d"></div>
+        <div class="${cls} h-full rounded-full absolute inset-y-0 left-0 _ion-s-8d4e2abbc4"></div>
       </div>
       <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v.total)}</div>`;
     bars.appendChild(row);

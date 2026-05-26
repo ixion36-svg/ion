@@ -24,7 +24,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Team-vs-team attack/defend exercises.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" data-click-action="crBack" id="cr-back-btn" style="display:none"><i class="icon-arrow-left"></i> Scenarios</button>
+        <button class="btn btn-secondary _ion-s-6b99de8b69" data-click-action="crBack" id="cr-back-btn"><i class="icon-arrow-left"></i> Scenarios</button>
     </div>
 </section>
 <div id="cr-content"><div class="cr-loading"><span class="cr-spinner"></span> Loading scenarios...</div></div>
@@ -173,12 +173,12 @@ function esc(s){if(!s)return'';const d=document.createElement('div');d.textConte
 let scenario=null,currentStage=0,currentCmd=0,blueLogs=[],blueAlerts=[],userEvents=[],hostStates={},beacons=[],bottomTab='logs',isExecuting=false;
 
 async function crInit(){
-    try{const r=await fetch(API+'/scenarios');const d=await r.json();renderList(d.scenarios)}catch(e){$('cr-content').innerHTML='<div class="cr-loading" style="color:var(--sev-critical)">Failed</div>'}
+    try{const r=await fetch(API+'/scenarios');const d=await r.json();renderList(d.scenarios)}catch(e){$('cr-content').innerHTML='<div class="cr-loading _ion-s-5dd0211252">Failed</div>'}
 }
 
 function renderList(scenarios){
-    let h='<div style="margin-bottom:16px"><p style="color:var(--text-secondary);font-size:.88rem">Interactive red team vs blue team training. Execute attack commands in a Cobalt Strike-style interface.</p></div><div class="cr-scenarios">';
-    for(const s of scenarios)h+=`<div class="cr-sc-card" data-click-action="crStart" data-args='["${s.id}"]'><div class="cr-sc-title">${esc(s.title)}</div><div class="cr-sc-desc">${esc(s.description)}</div><div class="cr-sc-meta"><span class="sev-badge sev-critical" style="font-size:.65rem">${esc(s.difficulty)}</span><span>${s.estimated_minutes}m</span><span>${s.stage_count} stages</span><span>${s.total_commands} cmds</span></div></div>`;
+    let h='<div class="_ion-s-87c136dfd0"><p class="_ion-s-1ddeb06923">Interactive red team vs blue team training. Execute attack commands in a Cobalt Strike-style interface.</p></div><div class="cr-scenarios">';
+    for(const s of scenarios)h+=`<div class="cr-sc-card" data-click-action="crStart" data-args='["${s.id}"]'><div class="cr-sc-title">${esc(s.title)}</div><div class="cr-sc-desc">${esc(s.description)}</div><div class="cr-sc-meta"><span class="sev-badge sev-critical _ion-s-7171988908">${esc(s.difficulty)}</span><span>${s.estimated_minutes}m</span><span>${s.stage_count} stages</span><span>${s.total_commands} cmds</span></div></div>`;
     h+='</div>';$('cr-content').innerHTML=h;$('cr-back-btn').style.display='none';
 }
 
@@ -186,7 +186,7 @@ async function crStart(id){
     $('cr-content').innerHTML='<div class="cr-loading"><span class="cr-spinner"></span> Initializing range...</div>';
     try{const r=await fetch(API+'/scenarios/'+id);scenario=await r.json();currentStage=0;currentCmd=0;blueLogs=[];blueAlerts=[];userEvents=[];beacons=[];bottomTab='logs';isExecuting=false;
         hostStates={};for(const h of(scenario.environment.hosts||[]))hostStates[h.hostname]={...h};
-        $('cr-back-btn').style.display='';renderCS()}catch(e){$('cr-content').innerHTML='<div class="cr-loading" style="color:var(--sev-critical)">Failed</div>'}
+        $('cr-back-btn').style.display='';renderCS()}catch(e){$('cr-content').innerHTML='<div class="cr-loading _ion-s-5dd0211252">Failed</div>'}
 }
 function crBack(){scenario=null;crInit()}
 
@@ -212,10 +212,10 @@ function renderCS(){
 
     // Session table
     h+='<div class="cr-sessions"><table class="cr-sess-table"><thead><tr><th></th><th>Host</th><th>User</th><th>Process</th><th>PID</th><th>Sleep</th><th>Last</th><th>Note</th></tr></thead><tbody>';
-    if(!beacons.length)h+='<tr><td colspan="8" style="color:#2a2a4a;text-align:center;padding:8px">No active beacons. Execute commands to establish access.</td></tr>';
+    if(!beacons.length)h+='<tr><td class="_ion-s-865f9ff974" colspan="8">No active beacons. Execute commands to establish access.</td></tr>';
     for(const b of beacons){
         const elev=b.state==='elevated'||b.state==='owned';
-        h+=`<tr class="${b===beacons[beacons.length-1]?'active':''}"><td><span class="cr-sess-icon ${elev?'elevated':'windows'}">${elev?'&#9733;':'&#9632;'}</span></td><td class="cr-sess-host">${esc(b.hostname)}</td><td class="cr-sess-user">${esc(b.user)}</td><td class="cr-sess-pid">${esc(b.process||'-')}</td><td class="cr-sess-pid">${esc(b.pid||'-')}</td><td class="cr-sess-sleep">${esc(b.sleep||'60s')}</td><td class="cr-sess-last">${esc(b.last||'just now')}</td><td style="color:#4a4a6a">${esc(b.note||'')}</td></tr>`;
+        h+=`<tr class="${b===beacons[beacons.length-1]?'active':''}"><td><span class="cr-sess-icon ${elev?'elevated':'windows'}">${elev?'&#9733;':'&#9632;'}</span></td><td class="cr-sess-host">${esc(b.hostname)}</td><td class="cr-sess-user">${esc(b.user)}</td><td class="cr-sess-pid">${esc(b.process||'-')}</td><td class="cr-sess-pid">${esc(b.pid||'-')}</td><td class="cr-sess-sleep">${esc(b.sleep||'60s')}</td><td class="cr-sess-last">${esc(b.last||'just now')}</td><td class="_ion-s-efaee0e4c8">${esc(b.note||'')}</td></tr>`;
     }
     h+='</tbody></table></div>';
 
@@ -224,7 +224,7 @@ function renderCS(){
 
     // Topology
     h+='<div class="cr-topo">';
-    h+='<div class="cr-legend"><span class="cr-legend-item"><span class="cr-legend-dot" style="background:#3fb950"></span>Clean</span><span class="cr-legend-item"><span class="cr-legend-dot" style="background:#58a6ff"></span>Scanned</span><span class="cr-legend-item"><span class="cr-legend-dot" style="background:#f0883e"></span>Beacon</span><span class="cr-legend-item"><span class="cr-legend-dot" style="background:#f85149"></span>Elevated</span><span class="cr-legend-item"><span class="cr-legend-dot" style="background:#f85149;box-shadow:0 0 4px #f85149"></span>Owned</span></div>';
+    h+='<div class="cr-legend"><span class="cr-legend-item"><span class="cr-legend-dot _ion-s-76d19a0156"></span>Clean</span><span class="cr-legend-item"><span class="cr-legend-dot _ion-s-2bb98b3958"></span>Scanned</span><span class="cr-legend-item"><span class="cr-legend-dot _ion-s-2e2d5e0cb8"></span>Beacon</span><span class="cr-legend-item"><span class="cr-legend-dot _ion-s-12fd79867c"></span>Elevated</span><span class="cr-legend-item"><span class="cr-legend-dot _ion-s-6638751246"></span>Owned</span></div>';
 
     const hosts=Object.values(hostStates);
     const subnets={};for(const h2 of hosts){const sn=h2.subnet||'other';if(!subnets[sn])subnets[sn]=[];subnets[sn].push(h2)}
@@ -233,7 +233,7 @@ function renderCS(){
         for(const host of hlist){
             const st=host.state||'online';
             const icon=host.role==='Domain Controller'?'&#9881;':host.role==='Workstation'?'&#9634;':'&#9638;';
-            h+=`<div class="cr-host state-${st}"><span class="cr-host-icon">${icon}</span><div style="flex:1;overflow:hidden"><div class="cr-host-name">${esc(host.hostname)}</div><div class="cr-host-ip">${esc(host.ip)} | ${esc(host.os)}</div></div><div class="cr-host-state ${st}"></div></div>`;
+            h+=`<div class="cr-host state-${st}"><span class="cr-host-icon">${icon}</span><div class="_ion-s-c8e1a1adb7"><div class="cr-host-name">${esc(host.hostname)}</div><div class="cr-host-ip">${esc(host.ip)} | ${esc(host.os)}</div></div><div class="cr-host-state ${st}"></div></div>`;
         }
     }
     h+='</div>';
@@ -267,7 +267,7 @@ function renderCS(){
         const cmdShort=cmd.cmd.split('\\n')[0];
         h+=`<div class="cr-cmd-bar"><span class="cr-cmd-prompt">beacon&gt;</span><span class="cr-cmd-desc" title="${esc(cmd.description)}">${esc(cmdShort)}</span><button class="cr-cmd-btn" data-click-action="crExec" id="cr-exec-btn">EXECUTE</button></div>`;
     }else{
-        h+='<div class="cr-cmd-bar"><span class="cr-cmd-prompt">beacon&gt;</span><span class="cr-cmd-desc" style="color:#3fb950">Engagement complete. All objectives achieved.</span></div>';
+        h+='<div class="cr-cmd-bar"><span class="cr-cmd-prompt">beacon&gt;</span><span class="cr-cmd-desc _ion-s-c141e8cb58">Engagement complete. All objectives achieved.</span></div>';
     }
     h+='</div>'; // term-wrap
     h+='</div>'; // mid
@@ -280,13 +280,13 @@ function renderCS(){
     h+='</div><div class="cr-bottom-feed" id="cr-feed">';
 
     if(bottomTab==='logs'){
-        if(!blueLogs.length)h+='<div style="color:#2a2a4a;text-align:center;padding:12px">Waiting for activity...</div>';
+        if(!blueLogs.length)h+='<div class="_ion-s-bf6b8b4f0e">Waiting for activity...</div>';
         for(const l of blueLogs)h+=`<div class="cr-log"><span class="cr-log-time">${esc(l.time)}</span><span class="cr-log-src">${esc(l.source)}</span><span class="cr-log-lvl ${l.level}">${esc(l.level)}</span><span class="cr-log-msg">${esc(l.msg)}</span></div>`;
     }else if(bottomTab==='alerts'){
-        if(!blueAlerts.length)h+='<div style="color:#2a2a4a;text-align:center;padding:12px">No alerts fired yet.</div>';
-        for(const a of blueAlerts)h+=`<div class="cr-alert ${a.severity}"><div class="cr-alert-title"><span style="font-size:.6rem;font-weight:700;text-transform:uppercase;margin-right:4px;color:${a.severity==='critical'?'#f85149':'#f0883e'}">${esc(a.severity)}</span>${esc(a.title)}</div><div class="cr-alert-meta"><span>${esc(a.rule)}</span><span>${esc(a.host)}</span><span class="cr-alert-mitre">${esc(a.mitre)}</span></div></div>`;
+        if(!blueAlerts.length)h+='<div class="_ion-s-bf6b8b4f0e">No alerts fired yet.</div>';
+        for(const a of blueAlerts)h+=`<div class="cr-alert ${a.severity}"><div class="cr-alert-title"><span class="_ion-s-979f3129c0">${esc(a.severity)}</span>${esc(a.title)}</div><div class="cr-alert-meta"><span>${esc(a.rule)}</span><span>${esc(a.host)}</span><span class="cr-alert-mitre">${esc(a.mitre)}</span></div></div>`;
     }else{
-        if(!userEvents.length)h+='<div style="color:#2a2a4a;text-align:center;padding:12px">Execute commands to see victim perspective.</div>';
+        if(!userEvents.length)h+='<div class="_ion-s-bf6b8b4f0e">Execute commands to see victim perspective.</div>';
         for(const ue of userEvents)for(const ev of ue.events)h+=`<div class="cr-ue"><span class="cr-ue-app">${esc(ev.app)}</span> ${ev.title?'— '+esc(ev.title):''}<div class="cr-ue-detail">${esc(ev.detail)}</div></div>`;
     }
     h+='</div></div>'; // bottom

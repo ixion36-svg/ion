@@ -42,7 +42,7 @@
   </div>
 
   <!-- ── Attention Banner (JS-populated) ── -->
-  <div id="alert-attn-banner" class="mb-4 rounded-[12px] border border-ion-amber/30 bg-ion-amber/5 px-5 py-3 flex items-center gap-3" style="display:none;">
+  <div id="alert-attn-banner" class="mb-4 rounded-[12px] border border-ion-amber/30 bg-ion-amber/5 px-5 py-3 flex items-center gap-3 _ion-s-c8be1ccba6">
     <svg class="w-4 h-4 text-ion-amber shrink-0"><use href="#i-alert-triangle"/></svg>
     <span class="label-tiny text-ion-amber">Needs attention:</span>
     <div id="alert-attn-chips" class="flex items-center gap-2 flex-wrap flex-1"></div>
@@ -103,7 +103,7 @@
         <span id="analytics-toggle-icon"><i class="icon-chevron-right"></i></span> Analytics Dashboard
     </button>
 </div>
-<div class="analytics-dashboard" id="analytics-dashboard" style="display:none;">
+<div class="analytics-dashboard _ion-s-c8be1ccba6" id="analytics-dashboard">
     <!-- Key Metrics Strip -->
     <div class="ad-metrics-strip">
         <div class="ad-metric" id="ad-metric-mttr">
@@ -148,11 +148,11 @@
                 <div id="chart-trend" class="chart-container"></div>
             </div>
             <div class="ad-card">
-                <div class="ad-card-header"><span class="ad-card-icon" style="color:var(--danger);">&#9679;</span> Severity</div>
+                <div class="ad-card-header"><span class="ad-card-icon _ion-s-defa93481e">&#9679;</span> Severity</div>
                 <div id="chart-severity" class="chart-container chart-container-sm"></div>
             </div>
             <div class="ad-card">
-                <div class="ad-card-header"><span class="ad-card-icon" style="color:var(--primary);">&#9679;</span> Triage Status</div>
+                <div class="ad-card-header"><span class="ad-card-icon _ion-s-90010faf15">&#9679;</span> Triage Status</div>
                 <div id="chart-triage-status" class="chart-container chart-container-sm"></div>
             </div>
         </div>
@@ -174,21 +174,21 @@
 
     <!-- Tab: MITRE ATT&CK -->
     <div class="ad-panel" id="ad-panel-mitre">
-        <div class="ad-card mitre-heatmap-card" style="grid-column:1/-1;">
-            <div class="ad-card-header"><span class="ad-card-icon" style="color:#f44336;">&#9862;</span> MITRE ATT&CK Technique Heatmap</div>
+        <div class="ad-card mitre-heatmap-card _ion-s-97294b207c">
+            <div class="ad-card-header"><span class="ad-card-icon _ion-s-6e1e5d161f">&#9862;</span> MITRE ATT&CK Technique Heatmap</div>
             <div class="ad-card-hint">Click a technique to filter alerts</div>
-            <div id="mitre-heatmap-legend" class="mitre-heatmap-legend" style="display:none;"></div>
+            <div id="mitre-heatmap-legend" class="mitre-heatmap-legend _ion-s-c8be1ccba6"></div>
             <div id="chart-mitre-heatmap" class="mitre-heatmap"></div>
         </div>
     </div>
 
     <!-- Tab: Threat Map -->
     <div class="ad-panel" id="ad-panel-geo">
-        <div class="ad-card" style="grid-column:1/-1;">
+        <div class="ad-card _ion-s-97294b207c">
             <div class="ad-card-header"><span class="ad-card-icon">&#127760;</span> Attack Origin Map</div>
             <div class="globe-container">
                 <canvas id="globe-canvas"></canvas>
-                <div class="globe-tooltip" id="globe-tooltip" style="display:none;"></div>
+                <div class="globe-tooltip _ion-s-c8be1ccba6" id="globe-tooltip"></div>
             </div>
         </div>
     </div>
@@ -215,7 +215,7 @@
 </div>
 
 <!-- Pattern Detections Panel -->
-<div class="pattern-detections-panel" id="pattern-detections-panel" style="display:none;">
+<div class="pattern-detections-panel _ion-s-c8be1ccba6" id="pattern-detections-panel">
     <div class="pattern-panel-header" data-click-action="togglePatternPanel">
         <div class="pattern-panel-title">
             <span class="pattern-panel-icon" id="pattern-panel-icon"><i class="icon-chevron-right"></i></span>
@@ -224,13 +224,13 @@
         </div>
         <button class="btn btn-sm btn-link pattern-dismiss-btn" data-click-action="dismissPatternPanel" data-stop-propagation title="Dismiss for this session">&#10005;</button>
     </div>
-    <div class="pattern-panel-body" id="pattern-panel-body" style="display:none;">
+    <div class="pattern-panel-body _ion-s-c8be1ccba6" id="pattern-panel-body">
         <div id="pattern-cards-container"></div>
     </div>
 </div>
 
 <!-- Active Filter Banner -->
-<div class="active-filter-banner" id="active-filter-banner" style="display: none;">
+<div class="active-filter-banner _ion-s-f2892a2e8a" id="active-filter-banner">
     <span id="active-filter-text"></span>
     <button class="btn btn-sm" data-click-action="clearEntityFilter">&#10005; Clear Filter</button>
 </div>
@@ -247,7 +247,7 @@
         <option value="720">Last 30 Days</option>
         <option value="custom">Custom Range...</option>
     </select>
-    <div id="custom-time-range" class="custom-time-range" style="display:none;">
+    <div id="custom-time-range" class="custom-time-range _ion-s-c8be1ccba6">
         <input type="datetime-local" id="custom-time-from" class="custom-time-input" title="From">
         <span class="custom-time-sep">&rarr;</span>
         <input type="datetime-local" id="custom-time-to" class="custom-time-input" title="To">
@@ -285,7 +285,7 @@
 </div>
 
 <!-- Bulk Actions Toolbar -->
-<div class="bulk-actions-toolbar" id="bulk-actions-toolbar" style="display: none;">
+<div class="bulk-actions-toolbar _ion-s-f2892a2e8a" id="bulk-actions-toolbar">
     <div class="bulk-actions-info">
         <input type="checkbox" id="select-all-cb" data-change-action="toggleSelectAll" title="Select all visible alerts">
         <span id="selected-count">0</span> alerts selected
@@ -317,7 +317,7 @@
 </div>
 
 <!-- Alert Context Menu -->
-<div id="alert-context-menu" class="context-menu" style="display: none;">
+<div id="alert-context-menu" class="context-menu _ion-s-f2892a2e8a">
     <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["open"]'>
         <span class="context-icon"><i class="icon-eye"></i></span> View Details
     </div>
@@ -342,9 +342,9 @@
             <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["close-as", "benign"]' style="color:#10b981;">&#10003; Benign</div>
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["close-as", "escalated"]' style="color:#fbbf24;">&#9650; Escalated</div>
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["close-as", "false_positive"]' style="color:#ef4444;">&#10007; False Positive</div>
+            <div class="context-menu-item _ion-s-568dd5ecc1" data-click-action="contextMenuAction" data-args='["close-as", "benign"]'>&#10003; Benign</div>
+            <div class="context-menu-item _ion-s-2ddf87696d" data-click-action="contextMenuAction" data-args='["close-as", "escalated"]'>&#9650; Escalated</div>
+            <div class="context-menu-item _ion-s-9dd1207e58" data-click-action="contextMenuAction" data-args='["close-as", "false_positive"]'>&#10007; False Positive</div>
         </div>
     </div>
     <div class="context-menu-submenu">
@@ -383,8 +383,8 @@
             <table class="data-table" id="alerts-table">
                 <thead>
                     <tr>
-                        <th style="width:40px;" class="checkbox-col"><input type="checkbox" id="header-select-all" data-change-action="toggleSelectAll" title="Select all visible alerts"></th>
-                        <th style="width:32px;"></th>
+                        <th class="checkbox-col _ion-s-907a32b95c"><input type="checkbox" id="header-select-all" data-change-action="toggleSelectAll" title="Select all visible alerts"></th>
+                        <th class="_ion-s-5aec6ffae3"></th>
                         <th class="sortable" data-click-action="sortBy" data-args='["severity"]'>
                             Severity <span class="sort-arrow" id="sort-severity"></span>
                         </th>
@@ -406,7 +406,7 @@
                         <th class="sortable" data-click-action="sortBy" data-args='["timestamp"]'>
                             Time <span class="sort-arrow" id="sort-timestamp"></span>
                         </th>
-                        <th style="width:80px;">Actions</th>
+                        <th class="_ion-s-1a91ef9eca">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="alerts-tbody">
@@ -494,14 +494,14 @@
 <div class="acp-overlay" id="acp-overlay" data-click-action="closeCasePanel"></div>
 <div class="acp-panel" id="acp-panel" data-case-id="">
   <div class="acp-header">
-    <div style="min-width:0;flex:1;">
+    <div class="_ion-s-ec92352525">
       <span class="acp-number" id="acp-number"></span>
       <span class="acp-title" id="acp-title"></span>
     </div>
     <button class="acp-close" data-click-action="closeCasePanel" title="Close (Esc)">&times;</button>
   </div>
   <div class="acp-body" id="acp-body">
-    <p style="color:var(--text-secondary);text-align:center;padding:2rem;">Loading...</p>
+    <p class="_ion-s-bca8b928a3">Loading...</p>
   </div>
 </div>
 
@@ -513,9 +513,9 @@
       <button class="acp-closure-close" data-click-action="cancelCasePanelClosure">&times;</button>
     </div>
     <div class="acp-closure-body">
-      <div class="form-group" style="margin-bottom:0.75rem;">
-        <label style="display:block;margin-bottom:0.25rem;color:var(--text-muted);font-size:0.8rem;">Closure Reason *</label>
-        <select id="acp-closure-reason" class="form-control" style="width:100%;padding:0.5rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;">
+      <div class="form-group _ion-s-90634e1f6b">
+        <label class="_ion-s-06c7fb4577">Closure Reason *</label>
+        <select id="acp-closure-reason" class="form-control _ion-s-656ea72a2e">
           <option value="">Select reason...</option>
           <option value="true_positive">True Positive</option>
           <option value="false_positive">False Positive</option>
@@ -526,9 +526,9 @@
         </select>
       </div>
       <div class="form-group">
-        <label style="display:block;margin-bottom:0.25rem;color:var(--text-muted);font-size:0.8rem;">Closure Notes</label>
-        <textarea id="acp-closure-notes" rows="3" placeholder="Closure details..."
-          style="width:100%;padding:0.5rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;"></textarea>
+        <label class="_ion-s-06c7fb4577">Closure Notes</label>
+        <textarea class="_ion-s-c6d4c126db" id="acp-closure-notes" rows="3" placeholder="Closure details..."
+></textarea>
       </div>
     </div>
     <div class="acp-closure-footer">
@@ -3731,7 +3731,7 @@ function showNotification(message, type = 'info') {
     toast.className = `notification-toast notification-${type}`;
     toast.innerHTML = `
         <span>${escapeHtml(message)}</span>
-        <button data-remove-parent style="background:none;border:none;color:inherit;cursor:pointer;font-size:1.2rem;">&times;</button>
+        <button class="_ion-s-bebe7a95f4" data-remove-parent>&times;</button>
     `;
     document.body.appendChild(toast);
 
@@ -3767,11 +3767,11 @@ async function checkAIAvailability() {
 function formatAIContent(text) {
     return text
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/`(.*?)`/g, '<code style="background:rgba(59,130,246,0.1);padding:0.125rem 0.25rem;border-radius:3px;">$1</code>')
-        .replace(/^### (.+)$/gm, '<div style="font-weight:700;margin-top:0.5rem;">$1</div>')
-        .replace(/^## (.+)$/gm, '<div style="font-weight:700;font-size:0.9375rem;margin-top:0.75rem;">$1</div>')
-        .replace(/^- (.+)$/gm, '<div style="padding-left:1rem;">&bull; $1</div>')
-        .replace(/^\d+\.\s(.+)$/gm, '<div style="padding-left:1rem;">$&</div>');
+        .replace(/`(.*?)`/g, '<code class="_ion-s-ea5f495a0c">$1</code>')
+        .replace(/^### (.+)$/gm, '<div class="_ion-s-27b319fb95">$1</div>')
+        .replace(/^## (.+)$/gm, '<div class="_ion-s-3f89434a34">$1</div>')
+        .replace(/^- (.+)$/gm, '<div class="_ion-s-4468900cba">&bull; $1</div>')
+        .replace(/^\d+\.\s(.+)$/gm, '<div class="_ion-s-4468900cba">$&</div>');
 }
 
 // =========================================================================
@@ -3912,7 +3912,7 @@ function renderPatternCards() {
                 <div class="pattern-card-actions">
                     ${actionBtn}
                     <button class="btn btn-secondary" data-click-action="filterByPatternGroup" data-args='["${p.group_by}", "${escapeHtml(p.group_key)}"]'>Show Alerts</button>
-                    ${p.auto_started ? '<span style="font-size:0.6875rem;color:#22c55e;align-self:center;">Auto-started</span>' : ''}
+                    ${p.auto_started ? '<span class="_ion-s-26c19a7e4c">Auto-started</span>' : ''}
                 </div>
             </div>
         `;
@@ -4159,15 +4159,15 @@ function renderCasesSummary() {
     };
     container.innerHTML = casesData.slice(0, 10).map(c => {
         const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'acknowledged' ? '#f57c00' : '#616161';
-        const closureBadge = c.closure_reason ? `<span class="closure-reason-badge reason-${c.closure_reason}" style="font-size:0.625rem;padding:0.0625rem 0.3rem;margin-left:0.25rem;">${closureLabels[c.closure_reason] || c.closure_reason}</span>` : '';
+        const closureBadge = c.closure_reason ? `<span class="closure-reason-badge reason-${c.closure_reason} _ion-s-6cfc37a0ef">${closureLabels[c.closure_reason] || c.closure_reason}</span>` : '';
         // v0.31.0: open the slide-out case panel on /alerts so the
         // analyst can work the case without leaving the alerts page.
         return `
-            <div class="list-item" data-click-action="openCasePanel" data-args='[${c.id}]' title="${escapeHtml(c.title)}" style="cursor:pointer;">
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+            <div class="list-item _ion-s-63d058f849" data-click-action="openCasePanel" data-args='[${c.id}]' title="${escapeHtml(c.title)}">
+                <span class="_ion-s-1a3ecb21b1">
                     <strong>${escapeHtml(c.case_number)}</strong> ${escapeHtml(c.title)}${closureBadge}
                 </span>
-                <span class="list-item-count" style="background:${statusColor}">${c.alert_count}</span>
+                <span class="list-item-count _ion-s-e6b60de75d">${c.alert_count}</span>
             </div>
         `;
     }).join('');
@@ -4237,12 +4237,12 @@ function renderCaseManagementModal(caseData) {
 
     // Evidence summary
     const evidenceHtml = caseData.evidence_summary
-        ? `<div class="case-mgmt-section"><h5>Evidence Summary</h5><p style="font-size:0.8125rem;line-height:1.5;margin:0;">${escapeHtml(caseData.evidence_summary)}</p></div>`
+        ? `<div class="case-mgmt-section"><h5>Evidence Summary</h5><p class="_ion-s-9a49198523">${escapeHtml(caseData.evidence_summary)}</p></div>`
         : '';
 
     // Description
     const descHtml = caseData.description
-        ? `<div class="case-mgmt-section"><h5>Description</h5><div style="font-size:0.8125rem;line-height:1.5;margin:0;" class="case-description-md">${safeMarkdown(caseData.description)}</div></div>`
+        ? `<div class="case-mgmt-section"><h5>Description</h5><div class="case-description-md _ion-s-9a49198523">${safeMarkdown(caseData.description)}</div></div>`
         : '';
 
     // Linked alerts
@@ -4251,14 +4251,14 @@ function renderCaseManagementModal(caseData) {
         <div class="case-mgmt-section">
             <h5>Linked Alerts (${alerts.length})</h5>
             ${alerts.length > 0 ? alerts.map(a => `
-                <div class="related-alert-item" style="flex-wrap:wrap;">
+                <div class="related-alert-item _ion-s-9deb4d0bcc">
                     <span class="triage-dot triage-${a.status}"></span>
-                    <span style="font-size:0.8125rem;flex:1;cursor:pointer;" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
-                    <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
-                    <div style="display:flex;gap:0.25rem;margin-left:auto;">
-                        <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
-                        <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
-                        <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
+                    <span class="_ion-s-8b0d841953" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
+                    <span class="_ion-s-a2ac6e9272">${escapeHtml(a.priority || '')}</span>
+                    <div class="_ion-s-0b658b6173">
+                        <button class="alert-closure-btn benign _ion-s-d0905b1c5e" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
+                        <button class="alert-closure-btn escalated _ion-s-d0905b1c5e" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
+                        <button class="alert-closure-btn false-positive _ion-s-d0905b1c5e" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
                     </div>
                 </div>
             `).join('') : '<div class="empty-state">No linked alerts</div>'}
@@ -4270,9 +4270,9 @@ function renderCaseManagementModal(caseData) {
         <div class="case-mgmt-section">
             <h5>Playbook Executions</h5>
             <div id="case-playbook-executions-${caseData.id}" class="case-playbook-list">
-                <span style="font-size:0.8125rem;color:var(--text-muted);">Loading...</span>
+                <span class="_ion-s-325d55d845">Loading...</span>
             </div>
-            <div style="margin-top:0.5rem;">
+            <div class="_ion-s-c9ef2a58eb">
                 <button class="btn btn-sm btn-primary" data-click-action="showCasePlaybookPicker" data-args='[${caseData.id}]'>Start Playbook</button>
             </div>
         </div>
@@ -4297,7 +4297,7 @@ function renderCaseManagementModal(caseData) {
         });
     }
     notesHtml += `
-        <div class="comment-form" style="margin-top:0.75rem;">
+        <div class="comment-form _ion-s-21d8fb5d75">
             <textarea id="case-mgmt-note-input" placeholder="Add investigation note..."></textarea>
             <button class="btn btn-primary" data-click-action="addCaseNoteFromModal" data-args='[${caseData.id}]'>Add Note</button>
         </div>
@@ -4307,15 +4307,15 @@ function renderCaseManagementModal(caseData) {
         <div class="case-mgmt-modal">
             <h3>
                 <span>${escapeHtml(caseData.case_number)}: ${escapeHtml(caseData.title)}</span>
-                <div style="display:flex;align-items:center;gap:0.5rem;">
+                <div class="_ion-s-c2e70fe5d0">
                     ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSummarizeCase" data-args='[${caseData.id}]' title="AI case summary">AI Summary</button>` : ''}
                     <button class="close-btn" data-remove-target="case-mgmt-overlay" title="Close">&times;</button>
                 </div>
             </h3>
             <div class="ai-case-summary" id="ai-case-summary-${caseData.id}"></div>
             ${caseData.status !== 'closed' ? `
-            <div class="alert-closure-actions" style="margin:0.75rem 0;padding:0.75rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;display:flex;flex-wrap:wrap;gap:0.375rem;align-items:center;">
-                <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
+            <div class="alert-closure-actions _ion-s-1ecde3eb6a">
+                <span class="_ion-s-d09fef0291">Close Case As:</span>
                 <button class="alert-closure-btn true-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "true_positive"]'>&#9650; True Positive</button>
                 <button class="alert-closure-btn benign-true-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "benign_true_positive"]'>&#10003; Benign True Positive</button>
                 <button class="alert-closure-btn false-positive" data-click-action="closeCaseWithAlerts" data-args='[${caseData.id}, "false_positive"]'>&#10007; False Positive</button>
@@ -4352,19 +4352,19 @@ function renderCaseManagementModal(caseData) {
                     <div class="meta-value">${caseData.updated_at ? new Date(caseData.updated_at).toLocaleString() : '-'}</div>
                 </div>
             </div>
-            ${contextHtml ? `<div style="display:flex;flex-direction:column;gap:0.375rem;">${contextHtml}</div>` : ''}
+            ${contextHtml ? `<div class="_ion-s-9f66acde6f">${contextHtml}</div>` : ''}
             ${evidenceHtml}
             ${descHtml}
             ${alertsHtml}
             ${playbookExecHtml}
             ${notesHtml}
-            <div class="case-mgmt-footer" style="display:flex;justify-content:space-between;align-items:center;">
-                <div style="display:flex;gap:0.5rem;align-items:center;">
+            <div class="case-mgmt-footer _ion-s-8129723856">
+                <div class="_ion-s-ea8c8318eb">
                     ${caseData.dfir_iris_case_id
-                        ? `<a href="${escapeHtml(caseData.dfir_iris_url)}" target="_blank" class="btn btn-success" style="font-size:0.75rem;">View in DFIR-IRIS #${caseData.dfir_iris_case_id}</a>`
-                        : `<button class="btn btn-warning" style="font-size:0.75rem;" data-click-action="escalateToDFIRIRIS" data-args='[${caseData.id}]' id="escalate-iris-btn-${caseData.id}">Escalate to DFIR-IRIS</button>`
+                        ? `<a href="${escapeHtml(caseData.dfir_iris_url)}" target="_blank" class="btn btn-success _ion-s-07bbf13a37">View in DFIR-IRIS #${caseData.dfir_iris_case_id}</a>`
+                        : `<button class="btn btn-warning _ion-s-07bbf13a37" data-click-action="escalateToDFIRIRIS" data-args='[${caseData.id}]' id="escalate-iris-btn-${caseData.id}">Escalate to DFIR-IRIS</button>`
                     }
-                    ${caseData.kibana_url ? `<a href="${escapeHtml(caseData.kibana_url)}" target="_blank" class="btn btn-secondary" style="font-size:0.75rem;">View in Kibana</a>` : ''}
+                    ${caseData.kibana_url ? `<a href="${escapeHtml(caseData.kibana_url)}" target="_blank" class="btn btn-secondary _ion-s-07bbf13a37">View in Kibana</a>` : ''}
                 </div>
                 <button class="btn btn-secondary" data-remove-target="case-mgmt-overlay">Close</button>
             </div>
@@ -4412,10 +4412,10 @@ function closeCaseWithAlerts(caseId, closureType) {
     overlay.innerHTML = `
         <div class="closure-modal">
             <h4>Close Case as ${label}</h4>
-            <p style="font-size:0.8125rem;color:var(--text-muted);margin:0.5rem 0;">This will close the case and all linked alerts.</p>
-            <div class="form-group" style="margin:0.75rem 0;">
-                <label style="font-size:0.8125rem;">Reason / Notes</label>
-                <textarea id="case-closure-quick-notes" rows="3" style="width:100%;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:4px;color:var(--text-primary);padding:0.5rem;font-size:0.8125rem;" placeholder="Enter closure reason..."></textarea>
+            <p class="_ion-s-94e9a12b57">This will close the case and all linked alerts.</p>
+            <div class="form-group _ion-s-b166fa93fc">
+                <label class="_ion-s-4dbb3ddbaa">Reason / Notes</label>
+                <textarea class="_ion-s-5aef954e4f" id="case-closure-quick-notes" rows="3" placeholder="Enter closure reason..."></textarea>
             </div>
             <div class="closure-actions">
                 <button class="btn btn-secondary" data-remove-target="case-closure-quick-overlay">Cancel</button>
@@ -4535,13 +4535,13 @@ function showAlertClosureModal(alertId, closureType) {
 
     overlay.innerHTML = `
         <div class="closure-modal">
-            <h4 style="color:${color};">Close Alert as ${label}</h4>
+            <h4 class="_ion-s-e46afd2bd5">Close Alert as ${label}</h4>
             <label>Reason / Notes</label>
             <textarea id="alert-closure-notes" placeholder="Why is this alert being closed as ${label.toLowerCase()}?"></textarea>
 
             ${isFP ? `
-            <div class="kfp-section" style="margin-top:0.75rem;">
-                <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;margin-top:0;">
+            <div class="kfp-section _ion-s-21d8fb5d75">
+                <label class="_ion-s-77e62a693b">
                     <input type="checkbox" id="alert-kfp-checkbox" checked data-change-action="toggleAlertKFPFields">
                     <span>Add to Known False Positives Registry</span>
                 </label>
@@ -4718,23 +4718,23 @@ function showClosureReasonModal(caseId, newStatus, selectEl) {
     overlay.innerHTML = `
         <div class="closure-modal">
             <h4>Close Case — Select Reason</h4>
-            <label>Closure Reason <span style="color:#ef4444;">*</span></label>
+            <label>Closure Reason <span class="_ion-s-9dd1207e58">*</span></label>
             <select id="closure-reason-select" data-change-action="toggleKFPSection">${reasonOptions}</select>
 
             <label>Closure Notes</label>
             <textarea id="closure-notes-input" placeholder="Optional notes about why this case is being closed..."></textarea>
 
-            <div id="kfp-add-section" style="display:none;">
+            <div class="_ion-s-c8be1ccba6" id="kfp-add-section">
                 <div class="kfp-section">
-                    <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;">
+                    <label class="_ion-s-20094c9c23">
                         <input type="checkbox" id="kfp-add-checkbox" data-change-action="toggleKFPFields">
                         <span>Add to Known False Positives Registry</span>
                     </label>
-                    <div id="kfp-fields" style="display:none;">
+                    <div class="_ion-s-c8be1ccba6" id="kfp-fields">
                         <label>KFP Title</label>
                         <input type="text" id="kfp-title" value="">
 
-                        <label>Description / Reasoning <span style="color:#ef4444;">*</span></label>
+                        <label>Description / Reasoning <span class="_ion-s-9dd1207e58">*</span></label>
                         <textarea id="kfp-description" placeholder="Why is this a false positive? What should analysts know?"></textarea>
 
                         <label>Match Hosts</label>
@@ -4991,7 +4991,7 @@ async function checkKFPMatches(caseData) {
                 <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
                 <span class="fp-text">
                     Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
-                    <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.25rem;">(matched: ${match.matched_fields.join(', ')})</span>
+                    <span class="_ion-s-54fd62694c">(matched: ${match.matched_fields.join(', ')})</span>
                 </span>
                 <button class="btn btn-sm btn-warning" data-click-action="closeAsKnownFP" data-args='[${caseData.id}, ${match.id}]'>Close as Known FP</button>
                 <button class="fp-dismiss" data-remove-closest=".fp-suggestion-banner" title="Dismiss">&times;</button>
@@ -5067,7 +5067,7 @@ async function checkKFPMatchesForTab(caseData) {
                 <span class="fp-icon"><i class="icon-alert-triangle"></i></span>
                 <span class="fp-text">
                     Matches known false positive: <strong>${escapeHtml(match.title)}</strong>
-                    <span style="font-size:0.75rem;color:var(--text-muted);margin-left:0.25rem;">(matched: ${match.matched_fields.join(', ')})</span>
+                    <span class="_ion-s-54fd62694c">(matched: ${match.matched_fields.join(', ')})</span>
                 </span>
                 <button class="btn btn-sm btn-warning" data-click-action="closeAsKnownFP" data-args='[${caseData.id}, ${match.id}]'>Close as Known FP</button>
                 <button class="fp-dismiss" data-remove-closest=".fp-suggestion-banner" title="Dismiss">&times;</button>
@@ -5154,7 +5154,7 @@ async function loadCasePlaybookExecutions(caseId) {
         const executions = data.executions || [];
 
         if (executions.length === 0) {
-            container.innerHTML = '<span style="font-size:0.8125rem;color:var(--text-muted);">No playbook executions</span>';
+            container.innerHTML = '<span class="_ion-s-325d55d845">No playbook executions</span>';
             return;
         }
 
@@ -5170,28 +5170,28 @@ async function loadCasePlaybookExecutions(caseId) {
         container.innerHTML = executions.map(e => {
             const playbook = e.playbook || {};
             const statusClass = e.status === 'completed' ? 'status-active' : e.status === 'failed' ? 'status-inactive' : '';
-            const outcomeBadge = e.outcome ? `<span style="padding:0.125rem 0.375rem;border-radius:3px;font-size:0.625rem;font-weight:600;text-transform:uppercase;background:${outcomeColors[e.outcome] || 'rgba(158,158,158,0.2);color:#9e9e9e'}">${e.outcome.replace(/_/g, ' ')}</span>` : '';
-            const reportLink = e.report_document_id ? `<a href="/documents" style="font-size:0.675rem;color:var(--accent-color);">View Report</a>` : '';
+            const outcomeBadge = e.outcome ? `<span class="_ion-s-e78d4016b2">${e.outcome.replace(/_/g, ' ')}</span>` : '';
+            const reportLink = e.report_document_id ? `<a class="_ion-s-d5e8f9d8a5" href="/documents">View Report</a>` : '';
             return `
-                <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;background:var(--bg-secondary);border-radius:4px;margin-bottom:0.375rem;">
-                    <div style="flex:1;">
-                        <div style="font-size:0.8125rem;font-weight:600;">${escapeHtml(playbook.name || 'Unknown')}</div>
-                        <div style="display:flex;align-items:center;gap:0.5rem;margin-top:0.25rem;">
-                            <div style="flex:1;background:var(--bg-tertiary);border-radius:3px;height:6px;overflow:hidden;">
-                                <div style="height:100%;border-radius:3px;width:${e.progress_pct}%;background:${e.status === 'completed' ? '#4caf50' : e.status === 'failed' ? '#f44336' : '#ffc107'};"></div>
+                <div class="_ion-s-fe6a7bac96">
+                    <div class="_ion-s-7623f05545">
+                        <div class="_ion-s-2cb466e418">${escapeHtml(playbook.name || 'Unknown')}</div>
+                        <div class="_ion-s-3fe9a7ba37">
+                            <div class="_ion-s-422e9a49fe">
+                                <div class="_ion-s-a42bd416ca"></div>
                             </div>
-                            <span style="font-size:0.75rem;color:var(--text-muted);">${e.completed_steps}/${e.total_steps}</span>
-                            <span class="status-badge ${statusClass}" style="font-size:0.675rem;">${e.status.replace('_', ' ')}</span>
+                            <span class="_ion-s-a2ac6e9272">${e.completed_steps}/${e.total_steps}</span>
+                            <span class="status-badge ${statusClass} _ion-s-1d72a194c2">${e.status.replace('_', ' ')}</span>
                             ${outcomeBadge}
                             ${reportLink}
                         </div>
                     </div>
-                    ${e.status === 'in_progress' ? `<a href="/playbooks?execution=${e.id}" class="btn btn-sm" style="font-size:0.75rem;">Work</a>` : ''}
+                    ${e.status === 'in_progress' ? `<a href="/playbooks?execution=${e.id}" class="btn btn-sm _ion-s-07bbf13a37">Work</a>` : ''}
                 </div>
             `;
         }).join('');
     } catch (error) {
-        container.innerHTML = `<span style="font-size:0.8125rem;color:var(--text-muted);">Failed to load executions</span>`;
+        container.innerHTML = `<span class="_ion-s-325d55d845">Failed to load executions</span>`;
     }
 }
 
@@ -5217,17 +5217,17 @@ async function showCasePlaybookPicker(caseId) {
         picker.onclick = function(e) { if (e.target === picker) picker.remove(); };
 
         picker.innerHTML = `
-            <div class="case-mgmt-modal" style="max-width:500px;">
+            <div class="case-mgmt-modal _ion-s-5c0843b73b">
                 <h3>
                     <span>Start Playbook for Case</span>
                     <button class="close-btn" data-remove-target="case-playbook-picker">&times;</button>
                 </h3>
-                <div style="padding:1rem;">
+                <div class="_ion-s-c951e35a79">
                     ${activePlaybooks.map(p => `
-                        <div style="display:flex;align-items:center;gap:0.5rem;padding:0.625rem;background:var(--bg-secondary);border-radius:4px;margin-bottom:0.5rem;">
-                            <div style="flex:1;">
-                                <div style="font-weight:600;font-size:0.875rem;">${escapeHtml(p.name)}</div>
-                                <div style="font-size:0.75rem;color:var(--text-muted);">${p.step_count} steps | Priority: ${p.priority}</div>
+                        <div class="_ion-s-0d312fb41d">
+                            <div class="_ion-s-7623f05545">
+                                <div class="_ion-s-cea3b82bf1">${escapeHtml(p.name)}</div>
+                                <div class="_ion-s-a2ac6e9272">${p.step_count} steps | Priority: ${p.priority}</div>
                             </div>
                             <button class="btn btn-sm btn-primary" data-click-action="startCasePlaybook" data-args='[${caseId}, ${p.id}]'>Start</button>
                         </div>
@@ -5518,7 +5518,7 @@ function renderTriageBar(alertId, triage) {
             `<div class="observable-row" data-value="${escapeHtml(obs.value)}" data-type="${escapeHtml(obs.type)}">
                 <span class="observable-badge ${escapeHtml(obs.type)}">${escapeHtml(obs.type.replace('_', ' '))}</span>
                 <span class="observable-value observable-link" data-click-action="openObservableDetail" data-args='["${escapeHtml(obs.type)}", "${escapeHtml(obs.value)}"]' title="View in Observables">${escapeHtml(obs.value)}</span>
-                <span class="threat-indicator" id="threat-${idx}" style="display:none;"></span>
+                <span class="threat-indicator _ion-s-c8be1ccba6" id="threat-${idx}"></span>
                 <button class="btn-icon" data-click-action="removeObservable" data-args='["${escapeHtml(alertId)}", ${idx}]' title="Remove">&times;</button>
             </div>`
         ).join('');
@@ -5531,7 +5531,7 @@ function renderTriageBar(alertId, triage) {
     ).join('');
 
     bar.innerHTML = `
-        <div class="triage-row" style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;">
+        <div class="triage-row _ion-s-81147d4082">
             <div class="triage-group">
                 <label>Status</label>
                 <select data-change-action="updateTriage" data-args='["${escapeHtml(alertId)}", "status", "$value"]'>${statusOptions}</select>
@@ -5540,12 +5540,12 @@ function renderTriageBar(alertId, triage) {
                 <label>Priority</label>
                 <select data-change-action="updateTriage" data-args='["${escapeHtml(alertId)}", "priority", "$value"]'>${priorityOptions}</select>
             </div>
-            <div class="triage-group" style="margin-left:auto;">
+            <div class="triage-group _ion-s-690f054c4e">
                 ${caseHtml}
             </div>
         </div>
         <div class="alert-closure-actions">
-            <span style="font-size:0.75rem;font-weight:600;color:var(--text-muted);align-self:center;">Close as:</span>
+            <span class="_ion-s-ed489ddc1d">Close as:</span>
             <button class="alert-closure-btn benign" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "benign"]'>&#10003; Benign</button>
             <button class="alert-closure-btn escalated" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "escalated"]'>&#9650; Escalated</button>
             <button class="alert-closure-btn false-positive" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(alertId)}", "false_positive"]'>&#10007; False Positive</button>
@@ -5563,24 +5563,24 @@ function renderTriageBar(alertId, triage) {
                     color = '#ef4444'; label = 'Low';
                 }
                 const verdictStr = bobSuggestedVerdict ? ` &middot; ${escapeHtml(bobSuggestedVerdict.replace('_', ' '))}` : '';
-                parts.push(`<span title="Bob confidence score" style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.15rem 0.5rem;border-radius:9999px;font-size:0.72rem;font-weight:600;background:${color}22;color:${color};border:1px solid ${color}55;">&#129302; Bob ${label} ${bobConfidenceInt}%${verdictStr}</span>`);
+                parts.push(`<span class="_ion-s-078c78b1cd" title="Bob confidence score">&#129302; Bob ${label} ${bobConfidenceInt}%${verdictStr}</span>`);
             }
             if (bobEscalationBadge === 'low_confidence_triage') {
-                parts.push(`<span title="Bob could not produce a confident verdict — human review required" style="display:inline-flex;align-items:center;gap:0.3rem;padding:0.15rem 0.5rem;border-radius:9999px;font-size:0.72rem;font-weight:600;background:#f59e0b22;color:#f59e0b;border:1px solid #f59e0b55;">&#9650; Auto-escalated</span>`);
+                parts.push(`<span class="_ion-s-f273748172" title="Bob could not produce a confident verdict — human review required">&#9650; Auto-escalated</span>`);
             }
-            return parts.length ? `<div style="display:flex;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem;">${parts.join('')}</div>` : '';
+            return parts.length ? `<div class="_ion-s-71d3cbf74d">${parts.join('')}</div>` : '';
         })()}
-        <div class="triage-notes-row" style="margin-top:0.5rem;">
-            <label style="font-size:0.75rem;font-weight:600;display:block;margin-bottom:0.25rem;">Analyst Notes</label>
-            <div style="display:flex;gap:0.5rem;">
-                <textarea id="analyst-notes-input" placeholder="Add analyst assessment..." style="flex:1;min-height:2.5rem;resize:vertical;font-size:0.8125rem;padding:0.375rem;border:1px solid var(--border);border-radius:4px;background:var(--bg-secondary);color:var(--text-primary);">${escapeHtml(analystNotes)}</textarea>
-                <button class="btn btn-sm btn-primary" data-click-action="saveAnalystNotes" data-args='["${escapeHtml(alertId)}"]' style="align-self:flex-end;">Save</button>
+        <div class="triage-notes-row _ion-s-c9ef2a58eb">
+            <label class="_ion-s-bd345de0b7">Analyst Notes</label>
+            <div class="_ion-s-33344b8d5b">
+                <textarea class="_ion-s-96f6db8b1e" id="analyst-notes-input" placeholder="Add analyst assessment...">${escapeHtml(analystNotes)}</textarea>
+                <button class="btn btn-sm btn-primary _ion-s-8f3898fc2c" data-click-action="saveAnalystNotes" data-args='["${escapeHtml(alertId)}"]'>Save</button>
             </div>
         </div>
         <div class="observables-section">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.375rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;">
-                    <label style="margin-bottom:0;">Observables</label>
+            <div class="_ion-s-481738205a">
+                <div class="_ion-s-c2e70fe5d0">
+                    <label class="_ion-s-76084ee4e5">Observables</label>
                     ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiExtractObservables" data-args='["${escapeHtml(alertId)}"]' title="AI extract observables">AI Extract</button>` : ''}
                 </div>
                 <button class="enrich-btn" id="enrich-btn" data-click-action="enrichObservables" data-args='["${escapeHtml(alertId)}"]' ${observables.length === 0 ? 'disabled' : ''}>
@@ -5599,7 +5599,7 @@ function renderTriageBar(alertId, triage) {
         <div class="playbooks-section" id="playbooks-section">
             <label>Investigation Playbooks</label>
             <div id="playbooks-content">
-                <span style="color:var(--text-muted);font-size:0.8125rem;">Loading playbooks...</span>
+                <span class="_ion-s-75f6ba34af">Loading playbooks...</span>
             </div>
         </div>
     `;
@@ -5624,7 +5624,7 @@ function renderMitreSection(alertId, techniques) {
             </span>`;
         }).join('');
     } else {
-        techniquesListHtml = '<span style="color:var(--text-muted);font-size:0.8125rem;font-style:italic;">No MITRE techniques</span>';
+        techniquesListHtml = '<span class="_ion-s-8035b7e0fd">No MITRE techniques</span>';
     }
 
     // Build tactic dropdown options
@@ -5632,7 +5632,7 @@ function renderMitreSection(alertId, techniques) {
 
     return `
         <div class="mitre-section">
-            <div style="display:flex;align-items:center;gap:0.5rem;">
+            <div class="_ion-s-c2e70fe5d0">
                 <label>MITRE ATT&CK Techniques</label>
                 ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSuggestMitre" data-args='["${escapeHtml(alertId)}"]' title="AI suggest MITRE techniques">AI Suggest</button>` : ''}
             </div>
@@ -6208,7 +6208,7 @@ async function loadPlaybooksForAlert(alertId) {
         renderPlaybooksSection(alertId);
     } catch (error) {
         console.error('Failed to load playbooks:', error);
-        container.innerHTML = '<span style="color:var(--text-muted);font-size:0.8125rem;">Failed to load playbooks</span>';
+        container.innerHTML = '<span class="_ion-s-75f6ba34af">Failed to load playbooks</span>';
     }
 }
 
@@ -6218,7 +6218,7 @@ function renderPlaybooksSection(alertId) {
 
     const cached = playbookCache[alertId];
     if (!cached) {
-        container.innerHTML = '<span style="color:var(--text-muted);font-size:0.8125rem;">No playbooks available</span>';
+        container.innerHTML = '<span class="_ion-s-75f6ba34af">No playbooks available</span>';
         return;
     }
 
@@ -6246,17 +6246,17 @@ function renderPlaybooksSection(alertId) {
         `).join('');
         html += '</div>';
     } else if (!cached.activeExecution) {
-        html += '<span style="color:var(--text-muted);font-size:0.8125rem;">No matching playbooks for this alert</span>';
+        html += '<span class="_ion-s-75f6ba34af">No matching playbooks for this alert</span>';
     }
 
     // Browse Playbook Library link
     html += `<span class="playbook-library-toggle" data-click-action="togglePlaybookLibrary" data-args='["${escapeHtml(alertId)}"]'>Browse Playbook Library <i class="icon-chevron-down"></i></span>`;
-    html += `<div id="playbook-library-panel-${CSS.escape(alertId)}" style="display:none;"></div>`;
+    html += `<div class="_ion-s-c8be1ccba6" id="playbook-library-panel-${CSS.escape(alertId)}"></div>`;
 
     // Show completed executions count
     const completedCount = cached.allExecutions.filter(e => e.status === 'completed').length;
     if (completedCount > 0) {
-        html += `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.5rem;">${completedCount} playbook(s) completed previously</div>`;
+        html += `<div class="_ion-s-17b7da1164">${completedCount} playbook(s) completed previously</div>`;
     }
 
     container.innerHTML = html;
@@ -6272,7 +6272,7 @@ async function togglePlaybookLibrary(alertId) {
         return;
     }
 
-    panel.innerHTML = '<div style="padding:0.5rem;font-size:0.8125rem;color:var(--text-muted);">Loading library...</div>';
+    panel.innerHTML = '<div class="_ion-s-82327282be">Loading library...</div>';
     panel.style.display = 'block';
 
     try {
@@ -6281,13 +6281,13 @@ async function togglePlaybookLibrary(alertId) {
         const data = await resp.json();
         renderPlaybookLibraryPanel(alertId, panel, data.playbooks || []);
     } catch (err) {
-        panel.innerHTML = '<div style="padding:0.5rem;font-size:0.8125rem;color:#f44336;">Failed to load playbook library</div>';
+        panel.innerHTML = '<div class="_ion-s-92dec5183f">Failed to load playbook library</div>';
     }
 }
 
 function renderPlaybookLibraryPanel(alertId, panel, playbooks) {
     if (!playbooks.length) {
-        panel.innerHTML = '<div style="padding:0.5rem;font-size:0.8125rem;color:var(--text-muted);">No matching playbooks in library</div>';
+        panel.innerHTML = '<div class="_ion-s-82327282be">No matching playbooks in library</div>';
         return;
     }
 
@@ -6348,7 +6348,7 @@ function renderActiveExecution(alertId, execution) {
                        data-change-action="updateStepStatus" data-args='["${escapeHtml(alertId)}", ${execution.id}, ${step.id}, this.checked ? 'completed' : 'pending']'>
                 <span class="playbook-step-title">${escapeHtml(step.title)}</span>
                 ${step.is_required ? '<span class="playbook-step-required">Required</span>' : ''}
-                ${isSkipped ? '<span style="font-size:0.625rem;color:var(--text-muted);">(skipped)</span>' : ''}
+                ${isSkipped ? '<span class="_ion-s-39be4b1760">(skipped)</span>' : ''}
             </div>
         `;
     }).join('');
@@ -6362,13 +6362,13 @@ function renderActiveExecution(alertId, execution) {
                 <span class="playbook-execution-title">${escapeHtml(playbook.name)}</span>
                 <span class="playbook-execution-status ${execution.status}">${execution.status.replace('_', ' ')}</span>
             </div>
-            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:0.5rem;">
+            <div class="_ion-s-a2314e3580">
                 Progress: ${progress}% (${completedSteps}/${steps.length} steps)
             </div>
             <div class="playbook-steps-list">
                 ${stepsHtml}
             </div>
-            <div style="display:flex;gap:0.5rem;margin-top:0.5rem;">
+            <div class="_ion-s-4e67ac936a">
                 <button class="btn btn-sm" data-click-action="completePlaybookExecution" data-args='["${escapeHtml(alertId)}", ${execution.id}]'>Complete</button>
                 <button class="btn btn-sm" data-click-action="skipRemainingSteps" data-args='["${escapeHtml(alertId)}", ${execution.id}]'>Skip Remaining</button>
             </div>
@@ -6503,14 +6503,14 @@ async function enrichObservables(alertId) {
         .filter(Boolean);
 
     if (enrichable.length === 0) {
-        resultsContainer.innerHTML = '<div class="enrich-no-match" style="margin-top:0.5rem;">No enrichable observables (IPs, domains, URLs, hashes).</div>';
+        resultsContainer.innerHTML = '<div class="enrich-no-match _ion-s-c9ef2a58eb">No enrichable observables (IPs, domains, URLs, hashes).</div>';
         return;
     }
 
     // Show loading state
     btn.disabled = true;
     btn.innerHTML = '<span class="enrich-icon">&#8987;</span> Enriching...';
-    resultsContainer.innerHTML = '<div style="color:var(--text-muted);font-size:0.8125rem;margin-top:0.5rem;">Querying OpenCTI...</div>';
+    resultsContainer.innerHTML = '<div class="_ion-s-94377946ec">Querying OpenCTI...</div>';
 
     try {
         const payload = {
@@ -6530,7 +6530,7 @@ async function enrichObservables(alertId) {
         const data = await response.json();
 
         if (data.error) {
-            resultsContainer.innerHTML = `<div class="enrich-no-match" style="margin-top:0.5rem;">${escapeHtml(data.error)}</div>`;
+            resultsContainer.innerHTML = `<div class="enrich-no-match _ion-s-c9ef2a58eb">${escapeHtml(data.error)}</div>`;
             return;
         }
 
@@ -6548,7 +6548,7 @@ async function enrichObservables(alertId) {
         updateObservableEnrichDots(data.results || []);
     } catch (e) {
         console.error('Error enriching observables:', e);
-        resultsContainer.innerHTML = `<div class="enrich-no-match" style="margin-top:0.5rem;">Enrichment failed: ${escapeHtml(e.message)}</div>`;
+        resultsContainer.innerHTML = `<div class="enrich-no-match _ion-s-c9ef2a58eb">Enrichment failed: ${escapeHtml(e.message)}</div>`;
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<span class="enrich-icon">&#9733;</span> Enrich via OpenCTI';
@@ -6557,13 +6557,13 @@ async function enrichObservables(alertId) {
 
 function renderEnrichResults(container, results, enrichable) {
     if (!results || results.length === 0) {
-        container.innerHTML = '<div class="enrich-no-match" style="margin-top:0.5rem;">No results returned.</div>';
+        container.innerHTML = '<div class="enrich-no-match _ion-s-c9ef2a58eb">No results returned.</div>';
         return;
     }
 
     const foundCount = results.filter(r => r.found).length;
     let html = `<div class="enrich-results">
-        <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;margin-bottom:0.5rem;">
+        <div class="_ion-s-b5cc67b332">
             OpenCTI Enrichment &mdash; ${foundCount} of ${results.length} matched
         </div>`;
 
@@ -6577,24 +6577,24 @@ function renderEnrichResults(container, results, enrichable) {
             <div class="enrich-result-header">
                 ${matchBadge}
                 <span class="observable-badge ${escapeHtml(origType)}">${escapeHtml(origType.replace('_', ' '))}</span>
-                <span style="font-size:0.8125rem;font-weight:500;">${escapeHtml(r.value)}</span>
+                <span class="_ion-s-bc791f8c4f">${escapeHtml(r.value)}</span>
             </div>`;
 
         if (r.found) {
             // Labels
             if (r.labels && r.labels.length > 0) {
-                html += '<div style="margin:0.25rem 0;">';
+                html += '<div class="_ion-s-65861bc538">';
                 r.labels.forEach(lbl => {
                     const bg = lbl.color ? lbl.color + '22' : 'rgba(139,92,246,0.1)';
                     const fg = lbl.color || '#8b5cf6';
-                    html += `<span class="enrich-label" style="background:${bg};color:${fg};">${escapeHtml(lbl.value)}</span>`;
+                    html += `<span class="enrich-label _ion-s-0221e0106d">${escapeHtml(lbl.value)}</span>`;
                 });
                 html += '</div>';
             }
 
             // Threat actors
             if (r.threat_actors && r.threat_actors.length > 0) {
-                html += '<div style="margin:0.25rem 0;">';
+                html += '<div class="_ion-s-65861bc538">';
                 r.threat_actors.forEach(ta => {
                     html += `<span class="enrich-actor" title="${escapeHtml(ta.description || '')}">&#9760; ${escapeHtml(ta.name)}</span>`;
                 });
@@ -6614,12 +6614,12 @@ function renderEnrichResults(container, results, enrichable) {
 
             // Observable score
             if (r.observable && r.observable.score !== null && r.observable.score !== undefined) {
-                html += `<div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">Observable score: ${r.observable.score}</div>`;
+                html += `<div class="_ion-s-0bfefd1cc4">Observable score: ${r.observable.score}</div>`;
             }
         }
 
         if (r.error) {
-            html += `<div style="font-size:0.75rem;color:#ef4444;margin-top:0.25rem;">${escapeHtml(r.error)}</div>`;
+            html += `<div class="_ion-s-b54f13a45d">${escapeHtml(r.error)}</div>`;
         }
 
         html += '</div>';
@@ -6804,7 +6804,7 @@ function renderCommentsTab(alertId, comments) {
                     <div class="comment-header">
                         <span class="comment-user">${escapeHtml(c.user)}</span>
                         <span class="comment-time">${c.created_at ? new Date(c.created_at).toLocaleString() : ''}</span>
-                        <button class="cmt-translate-btn" type="button" data-click-action="translateComment" data-args='["${cmtId}"]' style="margin-left:auto; font-size:10px; background:none; border:1px solid rgba(255,255,255,0.1); color:#94a3b8; padding:2px 8px; border-radius:3px; cursor:pointer;">Translate</button>
+                        <button class="cmt-translate-btn _ion-s-b44129d947" type="button" data-click-action="translateComment" data-args='["${cmtId}"]'>Translate</button>
                     </div>
                     <div class="comment-body cpanel-note-markdown" id="${cmtId}" data-original-raw="${safeOriginalRaw}" data-rendered-html="${escapeHtml(rendered)}">${rendered}</div>
                 </div>
@@ -6869,7 +6869,7 @@ function renderCaseObservables(observables) {
             }
             if (obs.enrichment.threat_actors && obs.enrichment.threat_actors.length > 0) {
                 const names = obs.enrichment.threat_actors.map(ta => ta.name || ta).join(', ');
-                enrichBadge += `<span style="font-size:0.6875rem;color:#f97316;margin-left:0.25rem;" title="${escapeHtml(names)}">&#9888; ${escapeHtml(names)}</span>`;
+                enrichBadge += `<span class="_ion-s-1ff72e6281" title="${escapeHtml(names)}">&#9888; ${escapeHtml(names)}</span>`;
             }
         }
 
@@ -6936,7 +6936,7 @@ async function renderCaseTab(caseId) {
             });
         }
         notesHtml += `
-            <div class="comment-form" style="margin-top:0.75rem;">
+            <div class="comment-form _ion-s-21d8fb5d75">
                 <textarea id="case-note-input" placeholder="Add investigation note..."></textarea>
                 <button class="btn btn-primary" data-click-action="addCaseNote" data-args='[${c.id}]'>Add Note</button>
             </div>
@@ -6964,17 +6964,17 @@ async function renderCaseTab(caseId) {
 
         container.innerHTML = `
             <div class="case-detail-box">
-                <h4 style="display:flex;align-items:center;justify-content:space-between;">
+                <h4 class="_ion-s-e02c6d0480">
                     <span>${escapeHtml(c.case_number)}: ${escapeHtml(c.title)}</span>
-                    <div style="display:flex;align-items:center;gap:0.5rem;">
+                    <div class="_ion-s-c2e70fe5d0">
                         ${aiAvailable ? `<button class="ai-micro-btn" data-click-action="aiSummarizeCase" data-args='[${c.id}]' title="AI case summary">AI Summary</button>` : ''}
-                        <button class="btn btn-sm" data-click-action="showCaseDetail" data-args='[${c.id}]' title="Open case management modal" style="font-size:0.75rem;">Manage Case</button>
+                        <button class="btn btn-sm _ion-s-07bbf13a37" data-click-action="showCaseDetail" data-args='[${c.id}]' title="Open case management modal">Manage Case</button>
                     </div>
                 </h4>
                 <div class="ai-case-summary" id="ai-case-summary-${c.id}"></div>
                 ${c.status !== 'closed' ? `
-                <div class="alert-closure-actions" style="margin:0.5rem 0;padding:0.5rem;background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;display:flex;flex-wrap:wrap;gap:0.375rem;align-items:center;">
-                    <span style="font-size:0.75rem;color:var(--text-muted);margin-right:0.5rem;">Close Case As:</span>
+                <div class="alert-closure-actions _ion-s-d8269833ad">
+                    <span class="_ion-s-d09fef0291">Close Case As:</span>
                     <button class="alert-closure-btn true-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "true_positive"]'>&#9650; True Positive</button>
                     <button class="alert-closure-btn benign-true-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "benign_true_positive"]'>&#10003; Benign True Positive</button>
                     <button class="alert-closure-btn false-positive" data-click-action="closeCaseWithAlerts" data-args='[${c.id}, "false_positive"]'>&#10007; False Positive</button>
@@ -7003,21 +7003,21 @@ async function renderCaseTab(caseId) {
                         <div>${escapeHtml(c.assigned_to || 'Unassigned')}</div>
                     </div>
                 </div>
-                ${contextHtml ? `<div class="case-context-tags" style="margin:0.75rem 0;display:flex;flex-direction:column;gap:0.375rem;">${contextHtml}</div>` : ''}
+                ${contextHtml ? `<div class="case-context-tags _ion-s-b95a2b0351">${contextHtml}</div>` : ''}
                 ${evidenceHtml}
-                ${c.description ? `<p style="font-size:0.875rem;line-height:1.5;">${escapeHtml(c.description)}</p>` : ''}
+                ${c.description ? `<p class="_ion-s-90ad0b389a">${escapeHtml(c.description)}</p>` : ''}
                 ${renderCaseObservables(c.observables)}
                 <div class="case-alerts-list">
                     <h5>Linked Alerts (${c.alerts.length})</h5>
                     ${c.alerts.length > 0 ? c.alerts.map(a => `
-                        <div class="related-alert-item" style="flex-wrap:wrap;">
+                        <div class="related-alert-item _ion-s-9deb4d0bcc">
                             <span class="triage-dot triage-${a.status}"></span>
-                            <span style="font-size:0.8125rem;flex:1;cursor:pointer;" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
-                            <span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(a.priority || '')}</span>
-                            <div style="display:flex;gap:0.25rem;margin-left:auto;">
-                                <button class="alert-closure-btn benign" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
-                                <button class="alert-closure-btn escalated" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
-                                <button class="alert-closure-btn false-positive" style="padding:0.2rem 0.5rem;font-size:0.6875rem;" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
+                            <span class="_ion-s-8b0d841953" data-click-action="showAlertDetail" data-args='["${escapeHtml(a.es_alert_id)}"]'>${escapeHtml(a.es_alert_id)}</span>
+                            <span class="_ion-s-a2ac6e9272">${escapeHtml(a.priority || '')}</span>
+                            <div class="_ion-s-0b658b6173">
+                                <button class="alert-closure-btn benign _ion-s-d0905b1c5e" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "benign"]'>&#10003;</button>
+                                <button class="alert-closure-btn escalated _ion-s-d0905b1c5e" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "escalated"]'>&#9650;</button>
+                                <button class="alert-closure-btn false-positive _ion-s-d0905b1c5e" data-click-action="showAlertClosureModal" data-args='["${escapeHtml(a.es_alert_id)}", "false_positive"]'>&#10007;</button>
                             </div>
                         </div>
                     `).join('') : '<div class="empty-state">No other alerts linked</div>'}
@@ -7253,7 +7253,7 @@ async function loadSystemFilterOptions() {
 
 function renderSystemBadge(a) {
     if (!a.source_system && !a.cyab_system_name && !a.tide_system_name) {
-        return '<span style="color:var(--text-muted);">-</span>';
+        return '<span class="_ion-s-b8e0b1fa55">-</span>';
     }
     const cyabName = a.cyab_system_name;
     const tideName = a.tide_system_name;
@@ -7283,7 +7283,7 @@ function renderAlerts() {
         const triageStatus = triage ? triage.status : 'none';
         const caseName = triage && triage.case_number
             ? `<span class="case-link-badge" title="${escapeHtml(triage.case_title || '')}">${escapeHtml(triage.case_number)}</span>`
-            : '<span style="color:var(--text-muted);">-</span>';
+            : '<span class="_ion-s-b8e0b1fa55">-</span>';
         const mitreBadge = a.mitre_technique_id
             ? `<span class="mitre-inline-badge" title="${escapeHtml(a.mitre_technique_name || '')} (${escapeHtml(a.mitre_tactic_name || '')})">${escapeHtml(a.mitre_technique_id)}</span>`
             : '';
@@ -7300,7 +7300,7 @@ function renderAlerts() {
                 <input type="checkbox" class="alert-checkbox" data-alert-id="${escapeHtml(a.id)}"
                        ${isSelected ? 'checked' : ''} data-change-action="toggleAlertSelection" data-args='["${escapeHtml(a.id)}", "$checked"]'>
             </td>
-            <td style="width:32px;text-align:center;"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
+            <td class="_ion-s-e8205973d7"><span class="triage-dot triage-${triageStatus}" title="Triage: ${triageStatus}"></span></td>
             <td><span class="severity-badge severity-${a.severity}">${a.severity}</span></td>
             <td title="${escapeHtml(a.title)}">${escapeHtml(a.title)}${mitreBadge}${labFixtureBadge}</td>
             <td title="${escapeHtml(a.host || '-')}">${escapeHtml(a.host || '-')}</td>
@@ -7315,7 +7315,7 @@ function renderAlerts() {
                     <button class="quick-action-btn" data-click-action="quickAssignToMe" data-args='["${escapeHtml(a.id)}"]' title="Assign to me"><i class="icon-user-check"></i></button>
                     <button class="quick-action-btn" data-click-action="quickStatusChange" data-args='["${escapeHtml(a.id)}", "acknowledged"]' title="Acknowledge"><i class="icon-search"></i></button>
                     <button class="quick-action-btn" data-click-action="showCreateCaseForm" data-args='["${escapeHtml(a.id)}"]' title="Create case"><i class="icon-folder-plus"></i></button>
-                    ${(arkimeEnabled && (a.network_community_id || a.source_ip || a.destination_ip || a.arkime_node)) ? `<a class="quick-action-btn arkime-action-btn" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis${a.network_community_id ? '' : ' (IP search — no community ID)'}" data-stop-propagation style="color:#6de4ff;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
+                    ${(arkimeEnabled && (a.network_community_id || a.source_ip || a.destination_ip || a.arkime_node)) ? `<a class="quick-action-btn arkime-action-btn _ion-s-a9768081c1" href="/alerts/${encodeURIComponent(a.id)}/arkime" title="Arkime PCAP analysis${a.network_community_id ? '' : ' (IP search — no community ID)'}" data-stop-propagation><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg></a>` : ''}
                 </div>
             </td>
         </tr>
@@ -7416,7 +7416,7 @@ function renderSideList(containerId, countBadgeId, counts, entityType) {
 
     container.innerHTML = entries.map(([name, count]) => `
         <div class="list-item" data-click-action="filterByEntity" data-args='["${entityType}", "${escapeHtml(name)}"]' title="Filter by ${entityType}: ${escapeHtml(name)}">
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(name)}</span>
+            <span class="_ion-s-1a3ecb21b1">${escapeHtml(name)}</span>
             <span class="list-item-count">${count}</span>
         </div>
     `).join('');
@@ -7546,7 +7546,7 @@ async function loadAdSystems() {
         renderAdSystems(data);
         _adSystemsLoaded = true;
     } catch (e) {
-        grid.innerHTML = `<div class="ad-sys-loading" style="color:var(--danger);">Failed to load: ${escapeHtml(e.message)}</div>`;
+        grid.innerHTML = `<div class="ad-sys-loading _ion-s-defa93481e">Failed to load: ${escapeHtml(e.message)}</div>`;
     }
 }
 
@@ -7586,7 +7586,7 @@ function buildAdSysCard(sys) {
     if (sev.high) sevHtml += `<span class="ad-sys-sev-pill high">${sev.high} high</span>`;
     if (sev.medium) sevHtml += `<span class="ad-sys-sev-pill med">${sev.medium} med</span>`;
     if (sev.low) sevHtml += `<span class="ad-sys-sev-pill low">${sev.low} low</span>`;
-    if (!sevHtml) sevHtml = '<span style="font-size:0.75rem;color:var(--text-muted);">No alerts</span>';
+    if (!sevHtml) sevHtml = '<span class="_ion-s-a2ac6e9272">No alerts</span>';
 
     // Sparkline
     let sparkHtml = '';
@@ -7610,9 +7610,9 @@ function buildAdSysCard(sys) {
         tideHtml = `<div class="ad-sys-tide">
             <div class="ad-sys-tide-label">
                 <span>TIDE Detection Coverage</span>
-                <span style="font-family:monospace;font-weight:600;color:${barColor};">${pct}%</span>
+                <span class="_ion-s-adb1b720f0">${pct}%</span>
             </div>
-            <div class="ad-sys-tide-bar-track"><div class="ad-sys-tide-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
+            <div class="ad-sys-tide-bar-track"><div class="ad-sys-tide-bar-fill _ion-s-abec55f918"></div></div>
             <div class="ad-sys-tide-stats">
                 <span>${t.applied_rules || 0}/${t.total_rules || 0} rules</span>
                 <span>${t.enabled_rules || 0} enabled</span>
@@ -7621,14 +7621,14 @@ function buildAdSysCard(sys) {
         </div>`;
     } else if (isMapped && !sys.tide) {
         tideHtml = `<div class="ad-sys-tide">
-            <div class="ad-sys-tide-label"><span>TIDE Detection Coverage</span><span style="color:var(--text-muted);">Not linked</span></div>
+            <div class="ad-sys-tide-label"><span>TIDE Detection Coverage</span><span class="_ion-s-b8e0b1fa55">Not linked</span></div>
         </div>`;
     }
 
     // Unmapped badge
     let unmappedHtml = '';
     if (!isMapped) {
-        unmappedHtml = `<div class="ad-sys-unmapped">Not mapped to CyAB &mdash; <a href="/cyab" style="color:var(--primary);">configure</a></div>`;
+        unmappedHtml = `<div class="ad-sys-unmapped">Not mapped to CyAB &mdash; <a class="_ion-s-90010faf15" href="/cyab">configure</a></div>`;
     }
 
     return `<div class="ad-sys-card ${isMapped ? 'mapped' : ''}">
@@ -7671,7 +7671,7 @@ function renderMitreHeatmap() {
 
     // If no alert data AND no TIDE data, show empty state
     if (Object.keys(techCounts).length === 0 && !tideTechs) {
-        container.innerHTML = '<div class="empty-state" style="text-align:center;padding:1rem;color:var(--text-muted);">No MITRE ATT&CK data in current alerts</div>';
+        container.innerHTML = '<div class="empty-state _ion-s-6b93fa2d86">No MITRE ATT&CK data in current alerts</div>';
         const legendEl = document.getElementById('mitre-heatmap-legend');
         if (legendEl) legendEl.style.display = 'none';
         return;
@@ -7746,15 +7746,15 @@ function renderMitreHeatmap() {
         legendEl.style.display = 'flex';
         legendEl.innerHTML = `
             <div class="mitre-legend-item">
-                <div class="mitre-legend-swatch" style="background:rgba(255,87,34,0.45);"></div>
+                <div class="mitre-legend-swatch _ion-s-3cc56ca225"></div>
                 <span>Firing</span>
             </div>
             <div class="mitre-legend-item">
-                <div class="mitre-legend-swatch" style="background:rgba(0,200,83,0.15);border:1px solid rgba(0,200,83,0.3);"></div>
+                <div class="mitre-legend-swatch _ion-s-b86448ff40"></div>
                 <span>Covered (silent)</span>
             </div>
             <div class="mitre-legend-item">
-                <div class="mitre-legend-swatch" style="background:rgba(244,67,54,0.08);border:1px dashed rgba(244,67,54,0.3);"></div>
+                <div class="mitre-legend-swatch _ion-s-170c9817b7"></div>
                 <span>Blind spot</span>
             </div>
             <div class="mitre-tide-summary">
@@ -7793,7 +7793,7 @@ function renderMitreHeatmap() {
             <div class="mitre-heatmap-header" title="${escapeHtml(tactic)}">${escapeHtml(shortTactic)}</div>`;
 
         if (techniques.length === 0) {
-            html += `<div class="mitre-heatmap-cell heat-0" style="flex:1;">-</div>`;
+            html += `<div class="mitre-heatmap-cell heat-0 _ion-s-7623f05545">-</div>`;
         } else {
             techniques.forEach(tech => {
                 let cellClass, countDisplay, titleParts = [tech.name || tech.id];
@@ -7969,7 +7969,7 @@ function renderDonut(containerId, data, colors) {
     });
 
     // Center total
-    svg += `<text x="${cx}" y="${cy - 4}" text-anchor="middle" class="chart-value" style="font-size:16px;font-weight:bold;fill:currentColor;">${total}</text>`;
+    svg += `<text x="${cx}" y="${cy - 4}" text-anchor="middle" class="chart-value _ion-s-a1f1c5f50a">${total}</text>`;
     svg += `<text x="${cx}" y="${cy + 10}" text-anchor="middle" class="chart-value">total</text>`;
 
     // Legend
@@ -8547,7 +8547,7 @@ function handleMapHover(e) {
         const sevColor = closest.severity === 'critical' ? '#ff6c6c'
                        : closest.severity === 'high'     ? '#f8b33a'
                                                          : '#6de4ff';
-        tooltip.innerHTML = `<strong>${escapeHtml(loc)}</strong><br>${closest.count} alert${closest.count > 1 ? 's' : ''} <span style="color:${sevColor};">${closest.severity}</span>`;
+        tooltip.innerHTML = `<strong>${escapeHtml(loc)}</strong><br>${closest.count} alert${closest.count > 1 ? 's' : ''} <span class="_ion-s-6261c9a4a1">${closest.severity}</span>`;
         tooltip.style.display = 'block';
         tooltip.style.left = (mx + 14) + 'px';
         tooltip.style.top = (my - 10) + 'px';
@@ -8669,7 +8669,7 @@ function renderTopCountries() {
         return `
             <div class="hbar-row">
                 <span class="hbar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
-                <span class="hbar-track"><span class="hbar-fill" style="width:${pct}%;background:hsl(${hue},65%,55%);"></span></span>
+                <span class="hbar-track"><span class="hbar-fill _ion-s-fce14b1cd3"></span></span>
                 <span class="hbar-count">${count}</span>
             </div>
         `;
@@ -8699,7 +8699,7 @@ function renderHBarChart(containerId, alerts, field, color) {
         return `
             <div class="hbar-row">
                 <span class="hbar-label" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
-                <span class="hbar-track"><span class="hbar-fill" style="width:${pct}%;background:${color};"></span></span>
+                <span class="hbar-track"><span class="hbar-fill _ion-s-2c40970212"></span></span>
                 <span class="hbar-count">${count}</span>
             </div>
         `;
@@ -8719,7 +8719,7 @@ async function showAlertDetail(alertId) {
     document.getElementById('alert-detail-title').textContent = alert.title;
 
     // Triage bar placeholder
-    let html = `<div class="triage-bar" id="triage-bar"><span style="color:var(--text-muted);font-size:0.8125rem;">Loading triage...</span></div>`;
+    let html = `<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage...</span></div>`;
 
     // Metadata grid
     html += `<div class="alert-meta-grid">
@@ -8759,11 +8759,11 @@ async function showAlertDetail(alertId) {
 
     // Message — wrap so the v0.17.0 Translate button can replace its body in place.
     html += `<div class="alert-message-box" id="alert-message-box" data-original-message="${escapeHtml(alert.message || '')}">${escapeHtml(alert.message)}</div>`;
-    html += `<div class="alert-msg-translate-row" style="margin: -4px 0 8px; display:flex; align-items:center; gap:8px; font-size:11px; color:#94a3b8;">
-        <button class="btn btn-ghost btn-sm" type="button" data-click-action="translateAlertMessage" style="font-size:11px; padding:2px 8px;">
+    html += `<div class="alert-msg-translate-row _ion-s-379195f8b9">
+        <button class="btn btn-ghost btn-sm _ion-s-938b812d49" type="button" data-click-action="translateAlertMessage">
             Translate
         </button>
-        <select id="alert-msg-translate-target" style="background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#cbd5e1; font-size:11px; height:22px; padding:0 6px; border-radius:3px;">
+        <select class="_ion-s-d81e1fcfa4" id="alert-msg-translate-target">
             <option value="en" selected>→ English</option>
             <option value="ru">→ Russian</option>
             <option value="zh">→ Chinese</option>
@@ -8772,8 +8772,8 @@ async function showAlertDetail(alertId) {
             <option value="fr">→ French</option>
             <option value="de">→ German</option>
         </select>
-        <span id="alert-msg-translate-status" style="color:#64748b;"></span>
-        <button id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage" style="display:none; background:none; border:none; color:#64748b; cursor:pointer; font-size:11px; text-decoration:underline;">show original</button>
+        <span class="_ion-s-93e6231cbb" id="alert-msg-translate-status"></span>
+        <button class="_ion-s-df01b7ca34" id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage">show original</button>
     </div>`;
 
     // Tags
@@ -8787,7 +8787,7 @@ async function showAlertDetail(alertId) {
             <span class="mitre-badge auto" data-click-action="__filterMitreAndClose" data-tech-id="${escapeHtml(alert.mitre_technique_id)}" title="Click to filter by this technique">
                 <strong>${escapeHtml(alert.mitre_technique_id)}</strong>
                 ${alert.mitre_technique_name ? ` - ${escapeHtml(alert.mitre_technique_name)}` : ''}
-                ${alert.mitre_tactic_name ? ` <span style="opacity:0.7;">(${escapeHtml(alert.mitre_tactic_name)})</span>` : ''}
+                ${alert.mitre_tactic_name ? ` <span class="_ion-s-68433eba3d">(${escapeHtml(alert.mitre_tactic_name)})</span>` : ''}
             </span>
         </div>`;
     }
@@ -8796,7 +8796,7 @@ async function showAlertDetail(alertId) {
     if (aiAvailable) {
         html += `<div class="ai-analysis-bar">
             <button class="ai-assist-btn" data-click-action="aiAnalyzeAlert" data-args='["${escapeHtml(alert.id)}"]'>&#9733; AI Analyze</button>
-            <button class="ai-assist-btn" data-click-action="openAIChatWithContext" data-args='["${escapeHtml(alert.id)}"]' style="background:rgba(16,185,129,0.15);border-color:rgba(16,185,129,0.3);color:#10b981;">&#9993; Discuss with AI</button>
+            <button class="ai-assist-btn _ion-s-f34a398ced" data-click-action="openAIChatWithContext" data-args='["${escapeHtml(alert.id)}"]'>&#9993; Discuss with AI</button>
             <div class="ai-analysis-result" id="ai-analysis-result"></div>
         </div>`;
     }
@@ -8806,13 +8806,13 @@ async function showAlertDetail(alertId) {
         const arkimeHint = alert.network_community_id
             ? `Community ID: ${escapeHtml(alert.network_community_id)}`
             : `IP search: ${escapeHtml(alert.source_ip || alert.destination_ip || '')}`;
-        html += `<div class="ai-analysis-bar" style="margin-top:0.25rem;">
-            <a class="ai-assist-btn" href="/alerts/${encodeURIComponent(alert.id)}/arkime"
-               style="background:rgba(109,228,255,0.12);border-color:rgba(109,228,255,0.3);color:#6de4ff;text-decoration:none;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+        html += `<div class="ai-analysis-bar _ion-s-04cdf78d3c">
+            <a class="ai-assist-btn _ion-s-5acbd5004f" href="/alerts/${encodeURIComponent(alert.id)}/arkime"
+>
+                <svg class="_ion-s-a574d58441" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
                 Arkime PCAP Analysis
             </a>
-            <span style="color:var(--ion-text-secondary);font-size:0.75rem;margin-left:0.5rem;">${arkimeHint}</span>
+            <span class="_ion-s-e23b35fe83">${arkimeHint}</span>
         </div>`;
     }
 
@@ -8909,25 +8909,25 @@ function switchDetailTab(tabId, btn) {
                 .then(data => {
                     const events = data.events || [];
                     if (!events.length) {
-                        seqEl.innerHTML = '<div class="empty-state" style="padding:20px;text-align:center;color:#64748b;">No sequence events — this is not an EQL/correlation alert, or building blocks are not available.</div>';
+                        seqEl.innerHTML = '<div class="empty-state _ion-s-c8739bb5cb">No sequence events — this is not an EQL/correlation alert, or building blocks are not available.</div>';
                         return;
                     }
-                    let html = '<div style="font-size:11px;color:#64748b;margin-bottom:12px;">' + events.length + ' events in this sequence</div>';
+                    let html = '<div class="_ion-s-1b291a2eeb">' + events.length + ' events in this sequence</div>';
                     html += '<div class="sequence-timeline">';
                     events.forEach((ev, i) => {
                         const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleString() : '';
-                        html += '<div style="border-left:2px solid #334155;padding:8px 0 8px 16px;margin-left:8px;position:relative;">';
-                        html += '<div style="position:absolute;left:-5px;top:12px;width:8px;height:8px;border-radius:50%;background:#6de4ff;"></div>';
-                        html += '<div style="font-size:10px;color:#64748b;margin-bottom:4px;">Step ' + (i+1) + ' &middot; ' + escapeHtml(ts) + '</div>';
-                        if (ev.process_name) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Process:</span> <span style="color:#e2e8f0;font-family:monospace;font-size:11px;">' + escapeHtml(ev.process_name) + '</span></div>';
-                        if (ev.command_line) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Command:</span> <span style="color:#f8b33a;font-family:monospace;font-size:10px;word-break:break-all;">' + escapeHtml(ev.command_line) + '</span></div>';
-                        if (ev.parent_process) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Parent:</span> <span style="color:#94a3b8;font-family:monospace;font-size:11px;">' + escapeHtml(ev.parent_process) + '</span></div>';
-                        if (ev.file_name) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">File:</span> <span style="color:#e2e8f0;font-family:monospace;font-size:11px;">' + escapeHtml(ev.file_name) + '</span></div>';
-                        if (ev.file_hash) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Hash:</span> <span style="color:#64748b;font-family:monospace;font-size:10px;">' + escapeHtml(ev.file_hash) + '</span></div>';
-                        if (ev.source_ip || ev.destination_ip) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Network:</span> <span style="color:#e2e8f0;font-family:monospace;font-size:11px;">' + escapeHtml(ev.source_ip || '') + ' &rarr; ' + escapeHtml(ev.destination_ip || '') + '</span></div>';
-                        if (ev.host) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">Host:</span> <span style="color:#e2e8f0;font-size:11px;">' + escapeHtml(ev.host) + '</span></div>';
-                        if (ev.user) html += '<div style="margin-bottom:2px;"><span style="color:#94a3b8;font-size:10px;">User:</span> <span style="color:#e2e8f0;font-size:11px;">' + escapeHtml(ev.user) + '</span></div>';
-                        if (ev.event_action) html += '<div><span style="color:#94a3b8;font-size:10px;">Action:</span> <span style="color:#6de4ff;font-size:11px;">' + escapeHtml(ev.event_action) + '</span></div>';
+                        html += '<div class="_ion-s-11d17c6fcf">';
+                        html += '<div class="_ion-s-1412b0aeb4"></div>';
+                        html += '<div class="_ion-s-ba1f79c91c">Step ' + (i+1) + ' &middot; ' + escapeHtml(ts) + '</div>';
+                        if (ev.process_name) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Process:</span> <span class="_ion-s-df570f8a04">' + escapeHtml(ev.process_name) + '</span></div>';
+                        if (ev.command_line) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Command:</span> <span class="_ion-s-ac046f947e">' + escapeHtml(ev.command_line) + '</span></div>';
+                        if (ev.parent_process) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Parent:</span> <span class="_ion-s-de3b9d4658">' + escapeHtml(ev.parent_process) + '</span></div>';
+                        if (ev.file_name) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">File:</span> <span class="_ion-s-df570f8a04">' + escapeHtml(ev.file_name) + '</span></div>';
+                        if (ev.file_hash) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Hash:</span> <span class="_ion-s-83a55422b8">' + escapeHtml(ev.file_hash) + '</span></div>';
+                        if (ev.source_ip || ev.destination_ip) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Network:</span> <span class="_ion-s-df570f8a04">' + escapeHtml(ev.source_ip || '') + ' &rarr; ' + escapeHtml(ev.destination_ip || '') + '</span></div>';
+                        if (ev.host) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Host:</span> <span class="_ion-s-8d655b9a89">' + escapeHtml(ev.host) + '</span></div>';
+                        if (ev.user) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">User:</span> <span class="_ion-s-8d655b9a89">' + escapeHtml(ev.user) + '</span></div>';
+                        if (ev.event_action) html += '<div><span class="_ion-s-081bc4f452">Action:</span> <span class="_ion-s-8d3d885daf">' + escapeHtml(ev.event_action) + '</span></div>';
                         html += '</div>';
                     });
                     html += '</div>';
@@ -9057,7 +9057,7 @@ function renderRelatedSection(title, alerts, matchType) {
                     </div>
                 </div>
             `}).join('')}
-            ${alerts.length > 10 ? `<div style="padding:0.5rem;color:var(--text-muted);font-size:0.75rem;">...and ${alerts.length - 10} more</div>` : ''}
+            ${alerts.length > 10 ? `<div class="_ion-s-d5293cce9b">...and ${alerts.length - 10} more</div>` : ''}
         </div>
     `;
 }
@@ -9211,9 +9211,9 @@ function renderTimeline(container, alerts) {
                 <div class="timeline-item ${a._isCurrent ? 'current' : ''} severity-${a.severity}">
                     <div class="timeline-time">${new Date(a.timestamp).toLocaleString()}</div>
                     <div class="timeline-title">
-                        <span class="severity-badge severity-${a.severity}" style="font-size:0.65rem;">${a.severity}</span>
+                        <span class="severity-badge severity-${a.severity} _ion-s-8f3a589195">${a.severity}</span>
                         ${escapeHtml(a.title)}
-                        ${a._isCurrent ? '<span class="badge" style="margin-left:0.5rem;font-size:0.65rem;">CURRENT</span>' : ''}
+                        ${a._isCurrent ? '<span class="badge _ion-s-1060103330">CURRENT</span>' : ''}
                     </div>
                     <div class="timeline-host">${[a.host, a.user].filter(Boolean).join(' / ')}</div>
                 </div>
@@ -9507,14 +9507,14 @@ function manageSavedFilters() {
     const modalHtml = `
         <div id="saved-filters-modal" class="saved-filters-modal" data-remove-self-on-self-click>
             <div class="saved-filters-content">
-                <div class="modal-header" style="margin-bottom:1rem;">
+                <div class="modal-header _ion-s-16884469a8">
                     <h3>Manage Saved Views</h3>
                     <button class="modal-close" data-remove-target="saved-filters-modal">&times;</button>
                 </div>
                 <div class="saved-filters-list">
                     ${filterItems}
                 </div>
-                <div class="modal-footer" style="margin-top:1rem;text-align:right;">
+                <div class="modal-footer _ion-s-cd8d1897d6">
                     <button class="btn btn-secondary" data-remove-target="saved-filters-modal">Close</button>
                 </div>
             </div>
@@ -10048,15 +10048,15 @@ async function addToExistingCase() {
     ).join('');
 
     const modalHtml = `
-        <div id="add-to-case-modal" class="modal" style="display: flex;">
-            <div class="modal-content" style="max-width: 500px;">
+        <div id="add-to-case-modal" class="modal _ion-s-6b82cf24aa">
+            <div class="modal-content _ion-s-72fca94264">
                 <div class="modal-header">
                     <h3>Add Alerts to Case</h3>
                     <button class="modal-close" data-click-action="closeAddToCaseModal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <p>Adding ${selectedAlertIds.size} alert(s) to case:</p>
-                    <select id="target-case-id" class="form-control" style="width: 100%; margin: 1rem 0;">
+                    <select id="target-case-id" class="form-control _ion-s-76c3805f34">
                         ${caseOptions}
                     </select>
                 </div>
@@ -10311,12 +10311,12 @@ function showStatusQuickPicker() {
 function showKeyboardShortcutsHelp() {
     const helpHtml = `
         <div id="keyboard-help-modal" class="saved-filters-modal" data-remove-self-on-self-click>
-            <div class="saved-filters-content" style="max-width:400px;">
-                <div class="modal-header" style="margin-bottom:1rem;">
+            <div class="saved-filters-content _ion-s-6d09221a24">
+                <div class="modal-header _ion-s-16884469a8">
                     <h3>Keyboard Shortcuts</h3>
                     <button class="modal-close" data-remove-target="keyboard-help-modal">&times;</button>
                 </div>
-                <div style="display:grid;grid-template-columns:auto 1fr;gap:0.5rem 1rem;">
+                <div class="_ion-s-efe3b31783">
                     <kbd>j</kbd><span>Next alert</span>
                     <kbd>k</kbd><span>Previous alert</span>
                     <kbd>Enter</kbd><span>Open alert details</span>
@@ -10324,13 +10324,13 @@ function showKeyboardShortcutsHelp() {
                     <kbd>Esc</kbd><span>Close modal / Clear selection</span>
                     <kbd>r</kbd><span>Refresh alerts</span>
                     <kbd>?</kbd><span>Show this help</span>
-                    <div style="grid-column:span 2;border-top:1px solid var(--border);margin:0.5rem 0;"></div>
-                    <strong style="grid-column:span 2;">When viewing alert details:</strong>
+                    <div class="_ion-s-8b852346d9"></div>
+                    <strong class="_ion-s-36adee321a">When viewing alert details:</strong>
                     <kbd>a</kbd><span>Assign to me</span>
                     <kbd>s</kbd><span>Change status</span>
                     <kbd>c</kbd><span>Create case</span>
                 </div>
-                <div class="modal-footer" style="margin-top:1rem;text-align:right;">
+                <div class="modal-footer _ion-s-cd8d1897d6">
                     <button class="btn btn-secondary" data-remove-target="keyboard-help-modal">Close</button>
                 </div>
             </div>
@@ -10377,7 +10377,7 @@ async function openCasePanel(caseId) {
     panel.classList.add('open');
     overlay.classList.add('open');
     panel.dataset.caseId = String(caseId);
-    body.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:2rem;">Loading...</p>';
+    body.innerHTML = '<p class="_ion-s-bca8b928a3">Loading...</p>';
 
     try {
         const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId);
@@ -10387,7 +10387,7 @@ async function openCasePanel(caseId) {
         document.getElementById('acp-title').textContent = c.title || '';
         body.innerHTML = _renderAcpContent(c);
     } catch (e) {
-        body.innerHTML = '<p style="color:#ef4444;text-align:center;padding:2rem;">Failed to load case details</p>';
+        body.innerHTML = '<p class="_ion-s-263eca2cbb">Failed to load case details</p>';
     }
 }
 
@@ -10429,8 +10429,8 @@ function _renderAcpContent(c) {
     if (c.status === 'closed' && c.closure_reason) {
         html += `<div class="acp-closure-info">
             <div><strong>Closed:</strong> ${escapeHtml(_ACP_CLOSURE_LABELS[c.closure_reason] || c.closure_reason)}</div>
-            ${c.closure_notes ? `<div style="margin-top:0.25rem;color:var(--text-secondary);">${escapeHtml(c.closure_notes)}</div>` : ''}
-            <div style="margin-top:0.25rem;color:var(--text-muted);font-size:0.7rem;">
+            ${c.closure_notes ? `<div class="_ion-s-06cb94decb">${escapeHtml(c.closure_notes)}</div>` : ''}
+            <div class="_ion-s-7ebcd4139f">
                 Closed by ${escapeHtml(c.closed_by || 'unknown')}${c.closed_at ? ' on ' + new Date(c.closed_at).toLocaleString() : ''}
             </div>
         </div>`;
@@ -10465,7 +10465,7 @@ function _renderAcpContent(c) {
     html += `<div class="acp-section"><div class="acp-section-title">Linked alerts (${alerts.length})</div>
         <div class="acp-alerts-list">`;
     if (alerts.length === 0) {
-        html += '<div style="color:var(--text-muted);font-size:0.8rem;">No alerts linked.</div>';
+        html += '<div class="_ion-s-7fbb12fc14">No alerts linked.</div>';
     } else {
         alerts.slice(0, 25).forEach(a => {
             html += `<div class="acp-item">
@@ -10481,7 +10481,7 @@ function _renderAcpContent(c) {
     html += `<div class="acp-section"><div class="acp-section-title">Observables (${obs.length})</div>
         <div class="acp-obs-list">`;
     if (obs.length === 0) {
-        html += '<div style="color:var(--text-muted);font-size:0.8rem;">No observables.</div>';
+        html += '<div class="_ion-s-7fbb12fc14">No observables.</div>';
     } else {
         obs.slice(0, 50).forEach(o => {
             const v = o.value || o.normalized_value || JSON.stringify(o);
@@ -10497,20 +10497,20 @@ function _renderAcpContent(c) {
     html += `<div class="acp-section"><div class="acp-section-title">Notes (${notes.length})</div>
         <div class="acp-notes-list">`;
     if (notes.length === 0) {
-        html += '<div style="color:var(--text-muted);font-size:0.8rem;">No notes yet.</div>';
+        html += '<div class="_ion-s-7fbb12fc14">No notes yet.</div>';
     } else {
         notes.forEach(n => {
             html += `<div class="acp-item">
                 <div class="acp-item-meta">${escapeHtml(n.user || 'unknown')}
                   &middot; ${n.created_at ? new Date(n.created_at).toLocaleString() : ''}</div>
-                <div style="margin-top:0.25rem;white-space:pre-wrap;">${escapeHtml(n.content || '')}</div>
+                <div class="_ion-s-810962db37">${escapeHtml(n.content || '')}</div>
             </div>`;
         });
     }
-    html += `<div style="margin-top:0.5rem;display:flex;gap:0.375rem;">
-        <textarea id="acp-note-input" rows="2" placeholder="Add note..."
-          style="flex:1;padding:0.375rem;background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;resize:vertical;font-size:0.8rem;"></textarea>
-        <button class="btn btn-primary" data-click-action="acpAddNote" data-args='[${c.id}]' style="font-size:0.75rem;align-self:flex-start;">Add</button>
+    html += `<div class="_ion-s-38cfcbd8e3">
+        <textarea class="_ion-s-060839e417" id="acp-note-input" rows="2" placeholder="Add note..."
+></textarea>
+        <button class="btn btn-primary _ion-s-6989ee0d31" data-click-action="acpAddNote" data-args='[${c.id}]'>Add</button>
     </div>`;
     html += '</div></div>';
 

@@ -76,7 +76,7 @@
             <span class="ioc-stat">SHA1: <strong id="ioc-sha1">0</strong></span>
             <span class="ioc-stat">SHA256: <strong id="ioc-sha256">0</strong></span>
         </div>
-        <div class="ioc-details" id="ioc-details" style="display: none;">
+        <div class="ioc-details _ion-s-f2892a2e8a" id="ioc-details">
             <div class="ioc-details-content" id="ioc-details-content"></div>
         </div>
     </div>
@@ -480,7 +480,7 @@ function deleteRule(index) { customRules.splice(index, 1); renderRules(); proces
 function renderRules() {
     const container = document.getElementById('rules-list');
     if (customRules.length === 0) {
-        container.innerHTML = '<p class="muted" style="padding: 0.5rem;">No custom rules. Click "+ Add" to create one.</p>';
+        container.innerHTML = '<p class="muted _ion-s-986a034600">No custom rules. Click "+ Add" to create one.</p>';
         return;
     }
     container.innerHTML = customRules.map((rule, i) => `
@@ -662,7 +662,7 @@ function parseUrl() {
         html += '</table>';
 
         if (params.length) {
-            html += '<h4 style="margin-top:1rem;">Query Parameters</h4><table class="data-table"><tr><th>Key</th><th>Value</th></tr>';
+            html += '<h4 class="_ion-s-0cf8f93b0e">Query Parameters</h4><table class="data-table"><tr><th>Key</th><th>Value</th></tr>';
             for (const [k, v] of params) {
                 html += `<tr><td><code>${escapeHtml(k)}</code></td><td><code>${escapeHtml(v)}</code></td></tr>`;
             }
@@ -671,7 +671,7 @@ function parseUrl() {
 
         // Defanged version
         const defanged = input.replace(/^http/i, 'hxxp').replace(/\./g, '[.]');
-        html += `<h4 style="margin-top:1rem;">Defanged</h4><code>${escapeHtml(defanged)}</code>`;
+        html += `<h4 class="_ion-s-0cf8f93b0e">Defanged</h4><code>${escapeHtml(defanged)}</code>`;
 
         document.getElementById('url-results').innerHTML = html;
     } catch(e) {
@@ -719,7 +719,7 @@ function testRegex() {
         }
         parts.push(escapeHtml(test.slice(lastIndex)));
         const highlighted = parts.join('');
-        html += `<h4 style="margin-top:1rem;">Highlighted</h4><pre class="code-block">${highlighted}</pre>`;
+        html += `<h4 class="_ion-s-0cf8f93b0e">Highlighted</h4><pre class="code-block">${highlighted}</pre>`;
 
         document.getElementById('regex-results').innerHTML = html;
     } catch(e) {
@@ -770,13 +770,13 @@ function parseEmailHeaders() {
     const authHeaders = ['Authentication-Results', 'DKIM-Signature', 'ARC-Authentication-Results'];
     let authHtml = '';
     for (const h of authHeaders) {
-        if (headers[h]) authHtml += `<tr><td><strong>${h}</strong></td><td style="word-break:break-all;">${escapeHtml(headers[h])}</td></tr>`;
+        if (headers[h]) authHtml += `<tr><td><strong>${h}</strong></td><td class="_ion-s-29ee55a0c6">${escapeHtml(headers[h])}</td></tr>`;
     }
-    if (authHtml) html += `<h4 style="margin-top:1rem;">Authentication</h4><table class="data-table">${authHtml}</table>`;
+    if (authHtml) html += `<h4 class="_ion-s-0cf8f93b0e">Authentication</h4><table class="data-table">${authHtml}</table>`;
 
     // Received chain (mail path)
     if (receivedChain.length) {
-        html += '<h4 style="margin-top:1rem;">Mail Path (Received Headers)</h4><ol class="received-chain">';
+        html += '<h4 class="_ion-s-0cf8f93b0e">Mail Path (Received Headers)</h4><ol class="received-chain">';
         receivedChain.reverse().forEach((r, i) => {
             const fromMatch = r.match(/from\s+([^\s]+)/i);
             const byMatch = r.match(/by\s+([^\s]+)/i);
@@ -791,7 +791,7 @@ function parseEmailHeaders() {
     const iocs = detectIOCs(allText);
     const allIOCs = [...iocs.ip, ...iocs.domain, ...iocs.email].filter((v, i, a) => a.indexOf(v) === i);
     if (allIOCs.length) {
-        html += '<h4 style="margin-top:1rem;">Extracted IOCs</h4><ul class="ioc-list">';
+        html += '<h4 class="_ion-s-0cf8f93b0e">Extracted IOCs</h4><ul class="ioc-list">';
         allIOCs.forEach(ioc => html += `<li><code>${escapeHtml(ioc)}</code></li>`);
         html += '</ul>';
     }
@@ -981,7 +981,7 @@ function displayLookupResult(ioc, data) {
         html += '</table>';
 
         if (data.relationships && data.relationships.length) {
-            html += '<h4 style="margin-top:1rem;">Related Entities</h4><ul>';
+            html += '<h4 class="_ion-s-0cf8f93b0e">Related Entities</h4><ul>';
             data.relationships.slice(0, 10).forEach(r => html += `<li>${escapeHtml(r.type)}: ${escapeHtml(r.name || r.value)}</li>`);
             html += '</ul>';
         }

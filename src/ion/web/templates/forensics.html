@@ -88,7 +88,7 @@
 </div>
 
 <!-- ==================== ALL INVESTIGATIONS TAB ==================== -->
-<div class="fr-panel" id="panel-investigations" style="display:none;">
+<div class="fr-panel _ion-s-c8be1ccba6" id="panel-investigations">
     <div class="cases-filters-bar">
         <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." data-input-action="debouncedFilter">
         <select id="filter-status" class="cases-filter-select" data-change-action="loadCases">
@@ -114,12 +114,12 @@
             <thead><tr><th>Case #</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Lead</th><th>Progress</th><th>SLA</th><th>Lock</th><th>Created</th></tr></thead>
             <tbody id="cases-tbody"></tbody>
         </table>
-        <div class="empty-state" id="cases-empty" style="display:none;">No investigations found</div>
+        <div class="empty-state _ion-s-c8be1ccba6" id="cases-empty">No investigations found</div>
     </div>
 </div>
 
 <!-- ==================== EVIDENCE TAB ==================== -->
-<div class="fr-panel" id="panel-evidence" style="display:none;">
+<div class="fr-panel _ion-s-c8be1ccba6" id="panel-evidence">
     <div class="cases-filters-bar">
         <select id="evidence-case-select" class="cases-filter-select" data-change-action="loadEvidenceForCase"><option value="">Select an investigation...</option></select>
     </div>
@@ -133,8 +133,8 @@
 </div>
 
 <!-- ==================== PLAYBOOKS TAB ==================== -->
-<div class="fr-panel" id="panel-playbooks" style="display:none;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+<div class="fr-panel _ion-s-c8be1ccba6" id="panel-playbooks">
+    <div class="_ion-s-bebbec7442">
         <select id="pb-filter-type" class="cases-filter-select" data-change-action="loadPlaybooks"><option value="">All Types</option></select>
         <button class="btn btn-primary" data-click-action="showNewPlaybookModal">+ New Playbook</button>
     </div>
@@ -143,45 +143,45 @@
             <thead><tr><th>Name</th><th>Investigation Type</th><th>Steps</th><th>Active</th><th>Created By</th><th>Actions</th></tr></thead>
             <tbody id="playbooks-tbody"></tbody>
         </table>
-        <div class="empty-state" id="playbooks-empty" style="display:none;">No forensic playbooks found</div>
+        <div class="empty-state _ion-s-c8be1ccba6" id="playbooks-empty">No forensic playbooks found</div>
     </div>
 </div>
 
 <!-- ==================== REFERENCE DOCS TAB ==================== -->
-<div class="fr-panel" id="panel-reference" style="display:none;">
+<div class="fr-panel _ion-s-c8be1ccba6" id="panel-reference">
     <div class="fr-ref-grid" id="ref-docs-grid"></div>
 </div>
 
 <!-- ==================== MODALS ==================== -->
 
 <!-- New Investigation Modal (Wizard: playbook → details) -->
-<div class="modal-overlay" id="modal-new-case" style="display:none;">
-    <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-new-case">
+    <div class="modal-dialog _ion-s-99e5af0b5b">
         <div class="modal-header"><h2>New Forensic Investigation</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-new-case"]'>&times;</button></div>
         <div class="modal-body">
             <!-- Step 1: Select Playbook -->
             <div id="nc-step-1">
                 <label>Select a Forensic Playbook</label>
-                <p style="color:var(--text-secondary);font-size:.8rem;margin:0 0 8px;">Choose a playbook to guide the investigation with pre-defined sections, or skip to create a blank investigation.</p>
+                <p class="_ion-s-ed53d90520">Choose a playbook to guide the investigation with pre-defined sections, or skip to create a blank investigation.</p>
                 <select id="nc-playbook" class="form-input" data-change-action="onPlaybookSelect">
                     <option value="">-- No Playbook (blank investigation) --</option>
                 </select>
-                <div id="nc-playbook-preview" style="margin-top:12px;display:none;">
-                    <div style="font-weight:600;font-size:.9rem;margin-bottom:6px;" id="nc-pb-name"></div>
-                    <div style="color:var(--text-secondary);font-size:.8rem;margin-bottom:8px;" id="nc-pb-desc"></div>
-                    <div id="nc-pb-steps" style="max-height:200px;overflow-y:auto;"></div>
+                <div class="_ion-s-98ae68faa3" id="nc-playbook-preview">
+                    <div class="_ion-s-c34fc553ea" id="nc-pb-name"></div>
+                    <div class="_ion-s-8a1c0a044f" id="nc-pb-desc"></div>
+                    <div class="_ion-s-0f824c250e" id="nc-pb-steps"></div>
                 </div>
             </div>
-            <hr style="border:0;border-top:1px solid var(--border-color,#30363d);margin:16px 0;">
+            <hr class="_ion-s-fd3ef5ec34">
             <!-- Step 2: Case Details -->
             <div id="nc-step-2">
                 <label>Title *</label><input type="text" id="nc-title" class="form-input" placeholder="Investigation title">
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="_ion-s-adf555b36b">
                     <div><label>Investigation Type *</label><select id="nc-type" class="form-input"></select></div>
                     <div><label>Priority</label>
                     <select id="nc-priority" class="form-input"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="_ion-s-adf555b36b">
                     <div><label>Lead Investigator</label><select id="nc-lead" class="form-input"><option value="">Unassigned</option></select></div>
                     <div><label>Classification</label><input type="text" id="nc-classification" class="form-input" placeholder="e.g. TLP:RED"></div>
                 </div>
@@ -197,44 +197,44 @@
 </div>
 
 <!-- Case Detail Modal -->
-<div class="modal-overlay" id="modal-case-detail" style="display:none;">
-    <div class="modal-dialog" style="max-width:960px;max-height:90vh;overflow-y:auto;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-case-detail">
+    <div class="modal-dialog _ion-s-f58def8551">
         <div class="modal-header">
             <h2 id="cd-title" class="editable-title" data-click-action="startEditTitle" title="Click to edit title">Investigation Detail</h2>
-            <input type="text" id="cd-title-input" class="form-input" style="display:none;font-size:1.3rem;font-weight:700;flex:1;" data-blur-action="saveTitle" data-enter-key-action="saveTitle" data-escape-key-action="cancelEditTitle">
+            <input type="text" id="cd-title-input" class="form-input _ion-s-4fa05ae95b" data-blur-action="saveTitle" data-enter-key-action="saveTitle" data-escape-key-action="cancelEditTitle">
             <button class="modal-close" data-click-action="closeModal" data-args='["modal-case-detail"]'>&times;</button>
         </div>
         <div class="modal-body" id="cd-body">
-            <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+            <div class="_ion-s-49e3770117">
                 <span class="badge" id="cd-status-badge"></span>
                 <span class="badge" id="cd-priority-badge"></span>
-                <span id="cd-case-number" style="color:var(--text-secondary);font-size:.85rem;"></span>
-                <span id="cd-type" style="color:var(--text-secondary);font-size:.85rem;"></span>
-                <span id="cd-playbook-name" style="color:var(--accent,#00e5ff);font-size:.8rem;"></span>
-                <span id="cd-lock-indicator" style="font-size:.8rem;"></span>
-                <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;">
-                    <select id="cd-status-select" class="form-input" style="width:auto;padding:4px 8px;" data-change-action="updateCaseStatus"></select>
-                    <button class="btn btn-secondary" style="padding:4px 10px;" id="cd-lock-btn" data-click-action="toggleLock">Lock</button>
-                    <button class="btn btn-secondary" style="padding:4px 10px;" data-click-action="showCloseModal">Close</button>
-                    <button class="btn btn-secondary" style="padding:4px 10px;" data-click-action="generateReport">Report</button>
+                <span class="_ion-s-22af186b79" id="cd-case-number"></span>
+                <span class="_ion-s-22af186b79" id="cd-type"></span>
+                <span class="_ion-s-7de6a0d47a" id="cd-playbook-name"></span>
+                <span class="_ion-s-b8aeedb644" id="cd-lock-indicator"></span>
+                <div class="_ion-s-d3fd2ef966">
+                    <select id="cd-status-select" class="form-input _ion-s-72abfebb5d" data-change-action="updateCaseStatus"></select>
+                    <button class="btn btn-secondary _ion-s-108959c2fe" id="cd-lock-btn" data-click-action="toggleLock">Lock</button>
+                    <button class="btn btn-secondary _ion-s-108959c2fe" data-click-action="showCloseModal">Close</button>
+                    <button class="btn btn-secondary _ion-s-108959c2fe" data-click-action="generateReport">Report</button>
                 </div>
             </div>
             <!-- SLA Badges -->
-            <div id="cd-sla-badges" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;"></div>
+            <div class="_ion-s-3585f79fc9" id="cd-sla-badges"></div>
             <!-- Progress bar -->
-            <div id="cd-progress-bar" style="margin-bottom:16px;display:none;">
-                <div style="display:flex;justify-content:space-between;font-size:.8rem;color:var(--text-secondary);margin-bottom:4px;">
+            <div class="_ion-s-8c144f8194" id="cd-progress-bar">
+                <div class="_ion-s-c0cdaf2cdc">
                     <span id="cd-progress-label">Sections: 0/0</span>
                     <span id="cd-progress-pct">0%</span>
                 </div>
-                <div style="background:var(--border-color,#30363d);border-radius:4px;height:6px;overflow:hidden;">
-                    <div id="cd-progress-fill" style="height:100%;background:var(--accent,#00e5ff);border-radius:4px;transition:width .3s;width:0%;"></div>
+                <div class="_ion-s-e26f061ab9">
+                    <div class="_ion-s-b76ce82a4d" id="cd-progress-fill"></div>
                 </div>
             </div>
-            <div id="cd-description" class="editable-desc" style="margin-bottom:16px;color:var(--text-secondary);font-size:.85rem;min-height:20px;cursor:pointer;" data-click-action="startEditDesc" title="Click to edit description"></div>
-            <textarea id="cd-desc-input" class="form-input" style="display:none;margin-bottom:16px;font-size:.85rem;" rows="3" data-blur-action="saveDesc" data-escape-key-action="cancelEditDesc"></textarea>
+            <div id="cd-description" class="editable-desc _ion-s-f59cfb71a5" data-click-action="startEditDesc" title="Click to edit description"></div>
+            <textarea id="cd-desc-input" class="form-input _ion-s-6129b62c5b" rows="3" data-blur-action="saveDesc" data-escape-key-action="cancelEditDesc"></textarea>
             <!-- Sub-tabs: Sections is now the primary tab -->
-            <div class="fr-tabs" style="margin-bottom:12px;">
+            <div class="fr-tabs _ion-s-3ef1fa1aa1">
                 <button class="fr-tab active" data-click-action="switchDetailTab" data-args='["sections"]'>Sections</button>
                 <button class="fr-tab" data-click-action="switchDetailTab" data-args='["evidence"]'>Evidence</button>
                 <button class="fr-tab" data-click-action="switchDetailTab" data-args='["timeline"]'>Timeline</button>
@@ -244,47 +244,47 @@
             <!-- Sections Tab (fillable investigation steps) -->
             <div id="cd-tab-sections">
                 <div id="cd-sections-list"></div>
-                <button class="btn btn-secondary" style="margin-top:8px;" data-click-action="showAddStepModal">+ Add Section</button>
+                <button class="btn btn-secondary _ion-s-b1ecc496e0" data-click-action="showAddStepModal">+ Add Section</button>
             </div>
-            <div id="cd-tab-evidence" style="display:none;">
-                <button class="btn btn-primary" style="margin-bottom:12px;" data-click-action="showAddEvidenceModal">+ Add Evidence</button>
+            <div class="_ion-s-c8be1ccba6" id="cd-tab-evidence">
+                <button class="btn btn-primary _ion-s-3ef1fa1aa1" data-click-action="showAddEvidenceModal">+ Add Evidence</button>
                 <div id="cd-evidence-list"></div>
             </div>
-            <div id="cd-tab-timeline" style="display:none;">
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <input type="text" id="cd-note-input" class="form-input" placeholder="Add a timeline note..." style="flex:1;">
+            <div class="_ion-s-c8be1ccba6" id="cd-tab-timeline">
+                <div class="_ion-s-1ce40f0bd0">
+                    <input type="text" id="cd-note-input" class="form-input _ion-s-7623f05545" placeholder="Add a timeline note...">
                     <button class="btn btn-primary" data-click-action="addTimelineNote">Add</button>
                 </div>
-                <div id="cd-timeline" style="max-height:400px;overflow-y:auto;"></div>
+                <div class="_ion-s-0763f1beef" id="cd-timeline"></div>
             </div>
-            <div id="cd-tab-report" style="display:none;">
-                <div id="cd-report-content" style="white-space:pre-wrap;font-family:monospace;background:var(--bg-secondary);padding:16px;border-radius:8px;max-height:500px;overflow-y:auto;"></div>
+            <div class="_ion-s-c8be1ccba6" id="cd-tab-report">
+                <div class="_ion-s-22e6642774" id="cd-report-content"></div>
             </div>
             <!-- v0.22.0 Annotations Tab — separate from ForensicTimelineEntry items (spec 4.7) -->
-            <div id="cd-tab-annotations" style="display:none;">
-                <div id="forensic-annotations-body" style="margin-bottom:8px;">
-                    <div style="color:var(--text-secondary);font-size:.8rem;">Loading annotations...</div>
+            <div class="_ion-s-c8be1ccba6" id="cd-tab-annotations">
+                <div class="_ion-s-e4ad4a163b" id="forensic-annotations-body">
+                    <div class="_ion-s-4d90051488">Loading annotations...</div>
                 </div>
-                <div id="forensic-ann-form" style="display:none;margin-top:8px;">
-                    <input type="datetime-local" id="forensic-ann-ts" style="width:100%;margin-bottom:6px;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:4px 8px;color:var(--text-primary);font-size:.85rem;">
-                    <textarea id="forensic-ann-body" rows="3" placeholder="Add a timeline annotation..." style="width:100%;background:var(--bg-secondary);border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:6px 8px;color:var(--text-primary);font-size:.85rem;resize:vertical;box-sizing:border-box;"></textarea>
-                    <div style="display:flex;gap:6px;margin-top:6px;">
-                        <button class="btn btn-primary" style="font-size:.8rem;padding:4px 12px;" data-click-action="submitForensicAnnotation">Save</button>
-                        <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" data-click-action="toggleForensicAnnotationForm">Cancel</button>
+                <div class="_ion-s-dd8ef92034" id="forensic-ann-form">
+                    <input class="_ion-s-ed251af665" type="datetime-local" id="forensic-ann-ts">
+                    <textarea class="_ion-s-d39b2f98c7" id="forensic-ann-body" rows="3" placeholder="Add a timeline annotation..."></textarea>
+                    <div class="_ion-s-36efcdf14b">
+                        <button class="btn btn-primary _ion-s-a14ad73246" data-click-action="submitForensicAnnotation">Save</button>
+                        <button class="btn btn-secondary _ion-s-a14ad73246" data-click-action="toggleForensicAnnotationForm">Cancel</button>
                     </div>
                 </div>
-                <button class="btn btn-secondary" style="font-size:.8rem;padding:4px 12px;" data-click-action="toggleForensicAnnotationForm">+ Add annotation</button>
+                <button class="btn btn-secondary _ion-s-a14ad73246" data-click-action="toggleForensicAnnotationForm">+ Add annotation</button>
             </div>
         </div>
     </div>
 </div>
 
 <!-- Close Investigation Modal -->
-<div class="modal-overlay" id="modal-close-case" style="display:none;">
-    <div class="modal-dialog" style="max-width:600px;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-close-case">
+    <div class="modal-dialog _ion-s-c04fdcc96d">
         <div class="modal-header"><h2>Close Investigation</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-close-case"]'>&times;</button></div>
         <div class="modal-body">
-            <p style="color:var(--text-secondary);margin-bottom:12px;">Closing will auto-generate a report in the Document Library under "Forensic Reports".</p>
+            <p class="_ion-s-213089e108">Closing will auto-generate a report in the Document Library under "Forensic Reports".</p>
             <label>Summary</label><textarea id="cc-summary" class="form-input" rows="3" placeholder="Executive summary..."></textarea>
             <label>Findings</label><textarea id="cc-findings" class="form-input" rows="4" placeholder="Key findings..."></textarea>
             <label>Recommendations</label><textarea id="cc-recommendations" class="form-input" rows="3" placeholder="Recommended actions..."></textarea>
@@ -297,8 +297,8 @@
 </div>
 
 <!-- Add Evidence Modal -->
-<div class="modal-overlay" id="modal-add-evidence" style="display:none;">
-    <div class="modal-dialog" style="max-width:600px;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-add-evidence">
+    <div class="modal-dialog _ion-s-c04fdcc96d">
         <div class="modal-header"><h2>Add Evidence</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-add-evidence"]'>&times;</button></div>
         <div class="modal-body">
             <label>Name *</label><input type="text" id="ae-name" class="form-input" placeholder="Evidence item name">
@@ -317,8 +317,8 @@
 </div>
 
 <!-- Custody Action Modal -->
-<div class="modal-overlay" id="modal-custody" style="display:none;">
-    <div class="modal-dialog" style="max-width:500px;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-custody">
+    <div class="modal-dialog _ion-s-5c0843b73b">
         <div class="modal-header"><h2>Log Custody Action</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-custody"]'>&times;</button></div>
         <div class="modal-body">
             <label>Action *</label><select id="cust-action" class="form-input"></select>
@@ -334,21 +334,21 @@
 </div>
 
 <!-- Custody Log Modal -->
-<div class="modal-overlay" id="modal-custody-log" style="display:none;">
-    <div class="modal-dialog" style="max-width:700px;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-custody-log">
+    <div class="modal-dialog _ion-s-bdcaca75c4">
         <div class="modal-header"><h2 id="cl-title">Chain of Custody</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-custody-log"]'>&times;</button></div>
-        <div class="modal-body"><div id="cl-entries" style="max-height:500px;overflow-y:auto;"></div></div>
+        <div class="modal-body"><div class="_ion-s-e37d1b0263" id="cl-entries"></div></div>
     </div>
 </div>
 
 <!-- Add Section Modal (ad-hoc step) -->
-<div class="modal-overlay" id="modal-add-step" style="display:none;">
-    <div class="modal-dialog" style="max-width:500px;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-add-step">
+    <div class="modal-dialog _ion-s-5c0843b73b">
         <div class="modal-header"><h2>Add Investigation Section</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-add-step"]'>&times;</button></div>
         <div class="modal-body">
             <label>Section Title *</label><input type="text" id="as-title" class="form-input" placeholder="e.g. Network Analysis">
             <label>Guidance / Description</label><textarea id="as-description" class="form-input" rows="3" placeholder="What should be documented in this section?"></textarea>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:8px;"><input type="checkbox" id="as-required"><label for="as-required" style="margin:0;">Required section</label></div>
+            <div class="_ion-s-bcac039da8"><input type="checkbox" id="as-required"><label class="_ion-s-1da9facb4d" for="as-required">Required section</label></div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-add-step"]'>Cancel</button>
@@ -358,29 +358,29 @@
 </div>
 
 <!-- IOC Extract Modal -->
-<div class="modal-overlay" id="modal-ioc-extract" style="display:none;">
-    <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-ioc-extract">
+    <div class="modal-dialog _ion-s-99e5af0b5b">
         <div class="modal-header"><h2>Extract IOCs</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-ioc-extract"]'>&times;</button></div>
         <div class="modal-body">
             <div class="ioc-upload-area" id="ioc-drop-zone">
                 <div id="ioc-upload-prompt">
-                    <div style="font-size:2rem;margin-bottom:8px;">&#128196;</div>
-                    <div style="font-weight:600;margin-bottom:4px;">Drop a file here or click to upload</div>
-                    <div style="font-size:.8rem;color:var(--text-secondary);">CSV, TXT, LOG, JSON, TSV, IOC (max 10 MB)</div>
-                    <input type="file" id="ioc-file-input" accept=".csv,.txt,.log,.json,.md,.tsv,.ioc" style="display:none;">
+                    <div class="_ion-s-aa7bb3532c">&#128196;</div>
+                    <div class="_ion-s-63312162ba">Drop a file here or click to upload</div>
+                    <div class="_ion-s-2f96ca6c07">CSV, TXT, LOG, JSON, TSV, IOC (max 10 MB)</div>
+                    <input class="_ion-s-c8be1ccba6" type="file" id="ioc-file-input" accept=".csv,.txt,.log,.json,.md,.tsv,.ioc">
                 </div>
-                <div id="ioc-file-name" style="display:none;font-weight:600;"></div>
+                <div class="_ion-s-07c7125b80" id="ioc-file-name"></div>
             </div>
-            <div style="text-align:center;color:var(--text-secondary);font-size:.85rem;margin:8px 0;">— or paste text directly —</div>
+            <div class="_ion-s-0d1afec7bd">— or paste text directly —</div>
             <textarea class="form-input" id="ioc-paste-text" rows="4" placeholder="Paste IOC data, log snippets, threat intel reports, etc."></textarea>
-            <div style="margin-top:10px;display:flex;gap:8px;">
+            <div class="_ion-s-635fe5f2dc">
                 <button class="btn btn-primary" data-click-action="runIOCExtraction">Extract IOCs</button>
                 <button class="btn btn-secondary" data-click-action="clearIOCModal">Clear</button>
             </div>
-            <div id="ioc-results" style="display:none;margin-top:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <h3 style="margin:0;">Extracted IOCs <span id="ioc-total-badge" class="badge" style="font-size:.75rem;"></span></h3>
-                    <button class="btn btn-primary" style="padding:5px 14px;" data-click-action="applyIOCsToStep">Apply to Section Fields</button>
+            <div class="_ion-s-544a05bc41" id="ioc-results">
+                <div class="_ion-s-5a9738ff9e">
+                    <h3 class="_ion-s-1da9facb4d">Extracted IOCs <span id="ioc-total-badge" class="badge _ion-s-a5982facce"></span></h3>
+                    <button class="btn btn-primary _ion-s-d97e844048" data-click-action="applyIOCsToStep">Apply to Section Fields</button>
                 </div>
                 <div id="ioc-results-body"></div>
             </div>
@@ -389,17 +389,17 @@
 </div>
 
 <!-- New/Edit Playbook Modal -->
-<div class="modal-overlay" id="modal-playbook" style="display:none;">
-    <div class="modal-dialog" style="max-width:700px;max-height:90vh;overflow-y:auto;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-playbook">
+    <div class="modal-dialog _ion-s-99e5af0b5b">
         <div class="modal-header"><h2 id="pb-modal-title">New Forensic Playbook</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-playbook"]'>&times;</button></div>
         <div class="modal-body">
             <label>Name *</label><input type="text" id="pb-name" class="form-input" placeholder="Playbook name">
             <label>Investigation Type</label><select id="pb-type" class="form-input"><option value="">Any</option></select>
-            <div style="display:flex;align-items:center;gap:8px;margin:8px 0;"><input type="checkbox" id="pb-active" checked><label for="pb-active" style="margin:0;">Active</label></div>
+            <div class="_ion-s-09e4b5badb"><input type="checkbox" id="pb-active" checked><label class="_ion-s-1da9facb4d" for="pb-active">Active</label></div>
             <label>Description</label><textarea id="pb-desc" class="form-input" rows="3" placeholder="Playbook description..."></textarea>
-            <h3 style="margin:16px 0 8px;">Steps</h3>
+            <h3 class="_ion-s-8395ecd769">Steps</h3>
             <div id="pb-steps-list"></div>
-            <button class="btn btn-secondary" style="margin-top:8px;" data-click-action="addPlaybookStepRow">+ Add Step</button>
+            <button class="btn btn-secondary _ion-s-b1ecc496e0" data-click-action="addPlaybookStepRow">+ Add Step</button>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-playbook"]'>Cancel</button>
@@ -409,10 +409,10 @@
 </div>
 
 <!-- Report Modal -->
-<div class="modal-overlay" id="modal-report" style="display:none;">
-    <div class="modal-dialog" style="max-width:800px;max-height:90vh;overflow-y:auto;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-report">
+    <div class="modal-dialog _ion-s-babea46ba6">
         <div class="modal-header"><h2 id="rpt-title">Investigation Report</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-report"]'>&times;</button></div>
-        <div class="modal-body"><div id="rpt-content" style="white-space:pre-wrap;font-family:monospace;background:var(--bg-secondary);padding:16px;border-radius:8px;"></div></div>
+        <div class="modal-body"><div class="_ion-s-1b2774abc8" id="rpt-content"></div></div>
         <div class="modal-footer">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-report"]'>Close</button>
             <button class="btn btn-primary" data-click-action="copyReport">Copy to Clipboard</button>
@@ -421,8 +421,8 @@
 </div>
 
 <!-- Reference Doc Viewer Modal -->
-<div class="modal-overlay" id="modal-ref-doc" style="display:none;">
-    <div class="modal-dialog" style="max-width:800px;max-height:90vh;overflow-y:auto;">
+<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-ref-doc">
+    <div class="modal-dialog _ion-s-babea46ba6">
         <div class="modal-header"><h2 id="ref-doc-title">Reference Document</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-ref-doc"]'>&times;</button></div>
         <div class="modal-body"><div id="ref-doc-content" class="ref-doc-body"></div></div>
     </div>
@@ -861,14 +861,14 @@ function onPlaybookSelect() {
     const stepsDiv = document.getElementById('nc-pb-steps');
     stepsDiv.innerHTML = (pb.steps || []).map((s, i) => {
         const fc = (s.fields||[]).length;
-        return `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;padding:8px;background:var(--bg-secondary,#0d1117);border-radius:6px;">
-            <span class="section-num" style="min-width:24px;height:24px;font-size:.7rem;">${i+1}</span>
-            <div style="flex:1;font-size:.85rem;">
-                <strong>${esc(s.title)}</strong>${s.is_required?' <span style="color:#f0c000;font-size:.7rem;">REQUIRED</span>':''}${fc?' <span style="color:var(--text-secondary);font-size:.7rem;">'+fc+' fields</span>':''}
-                ${s.description?'<div style="color:var(--text-secondary);font-size:.8rem;margin-top:2px;">'+esc(s.description)+'</div>':''}
+        return `<div class="_ion-s-5eaab7cb30">
+            <span class="section-num _ion-s-9abe6668ed">${i+1}</span>
+            <div class="_ion-s-bce30e92dc">
+                <strong>${esc(s.title)}</strong>${s.is_required?' <span class="_ion-s-88b7273505">REQUIRED</span>':''}${fc?' <span class="_ion-s-8e39e0514f">'+fc+' fields</span>':''}
+                ${s.description?'<div class="_ion-s-5012c8138f">'+esc(s.description)+'</div>':''}
             </div>
         </div>`;
-    }).join('') || '<div style="color:var(--text-secondary);font-size:.8rem;">No steps defined</div>';
+    }).join('') || '<div class="_ion-s-4d90051488">No steps defined</div>';
 }
 
 // ======== CASES ========
@@ -885,11 +885,11 @@ function stepProgress(c) {
     if (!c.step_count) return '';
     const pct = c.step_count > 0 ? Math.round((c.steps_completed / c.step_count) * 100) : 0;
     const color = pct === 100 ? 'var(--mitre-covered)' : pct > 0 ? 'var(--primary)' : '#6e7681';
-    return `<div style="display:flex;align-items:center;gap:6px;" title="${c.steps_completed}/${c.step_count} sections">
-        <div style="flex:1;background:var(--border-color,#30363d);border-radius:3px;height:4px;min-width:40px;overflow:hidden;">
-            <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;"></div>
+    return `<div class="_ion-s-ac86ac1128" title="${c.steps_completed}/${c.step_count} sections">
+        <div class="_ion-s-a55ef5c079">
+            <div class="_ion-s-6e624bb262"></div>
         </div>
-        <span style="font-size:.7rem;color:${color};">${c.steps_completed}/${c.step_count}</span>
+        <span class="_ion-s-78f8e7f1d2">${c.steps_completed}/${c.step_count}</span>
     </div>`;
 }
 
@@ -906,7 +906,7 @@ function renderCasesTable(){
         <td>${esc(c.lead_investigator_username||'Unassigned')}</td>
         <td>${stepProgress(c)}</td>
         <td>${renderSlaCell(c)}</td>
-        <td>${c.is_locked?'<span style="color:#f0c000;" title="Locked by '+esc(c.locked_by_username||'')+'">Locked</span>':'-'}</td>
+        <td>${c.is_locked?'<span class="_ion-s-5d1c01077f" title="Locked by '+esc(c.locked_by_username||'')+'">Locked</span>':'-'}</td>
         <td>${fmtDate(c.created_at)}</td></tr>`).join('');
 }
 
@@ -936,12 +936,12 @@ function renderPipeline(){
             <div class="fr-card-title">${esc(c.title)}</div>
             ${stepProgress(c)}
             <div class="fr-card-meta">
-                <span class="badge badge-${c.priority}" style="font-size:.65rem;padding:1px 6px;">${c.priority}</span>
+                <span class="badge badge-${c.priority} _ion-s-e5f79bea0b">${c.priority}</span>
                 <span>${esc(c.lead_investigator_username||'Unassigned')}</span>
                 ${c.is_locked?'<span class="fr-card-lock" title="Locked">Locked</span>':''}
                 ${renderSlaCell(c)}
             </div>
-        </div>`).join('')||'<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:.8rem;">No cases</div>';
+        </div>`).join('')||'<div class="_ion-s-fc6a2a39eb">No cases</div>';
     });
 }
 
@@ -973,7 +973,7 @@ function renderCaseDetail(c){
     // Lock
     const lockInd=document.getElementById('cd-lock-indicator');
     const lockBtn=document.getElementById('cd-lock-btn');
-    if(c.is_locked){lockInd.innerHTML='<span style="color:#f0c000;">Locked by '+esc(c.locked_by_username||'unknown')+' ('+fmtDateTime(c.locked_at)+')</span>';lockBtn.textContent='Unlock';lockBtn.style.color='#f0c000'}
+    if(c.is_locked){lockInd.innerHTML='<span class="_ion-s-5d1c01077f">Locked by '+esc(c.locked_by_username||'unknown')+' ('+fmtDateTime(c.locked_at)+')</span>';lockBtn.textContent='Unlock';lockBtn.style.color='#f0c000'}
     else{lockInd.innerHTML='';lockBtn.textContent='Lock';lockBtn.style.color=''}
     // SLA
     const slaDiv=document.getElementById('cd-sla-badges');slaDiv.innerHTML='';
@@ -1009,19 +1009,19 @@ function renderFieldInput(field, value, stepId) {
             const items = Array.isArray(value) ? value : [];
             let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-list" id="${fid}" data-field-key="${k}" data-field-type="list">`;
             items.forEach((v,i) => { html += `<div class="sf-list-row"><input class="form-input sf-input" value="${esc(v)}" placeholder="${ph}"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">&times;</button></div>`; });
-            html += `</div><button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" data-click-action="addListItem" data-args='["${fid}", "${ph}"]'>+ Add</button></div>`;
+            html += `</div><button type="button" class="btn btn-secondary _ion-s-a7e651bd47" data-click-action="addListItem" data-args='["${fid}", "${ph}"]'>+ Add</button></div>`;
             return html;
         }
         case 'table': {
             const cols = field.columns || [];
             const rows = Array.isArray(value) ? value : [];
             let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-table-wrap" id="${fid}" data-field-key="${k}" data-field-type="table" data-cols='${JSON.stringify(cols)}'>`;
-            html += `<table class="sf-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th style="width:30px"></th></tr></thead><tbody>`;
+            html += `<table class="sf-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th class="_ion-s-322e3f5e05"></th></tr></thead><tbody>`;
             rows.forEach(row => {
                 html += `<tr>${cols.map(c=>`<td><input class="form-input sf-input" value="${esc(row[c]||'')}" data-col="${esc(c)}"></td>`).join('')}<td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">&times;</button></td></tr>`;
             });
             html += `</tbody></table>`;
-            html += `<button type="button" class="btn btn-secondary" style="padding:3px 10px;font-size:12px;margin-top:4px;" data-click-action="addTableRow" data-args='["${fid}"]'>+ Add Row</button></div></div>`;
+            html += `<button type="button" class="btn btn-secondary _ion-s-a7e651bd47" data-click-action="addTableRow" data-args='["${fid}"]'>+ Add Row</button></div></div>`;
             return html;
         }
         case 'select': {
@@ -1115,17 +1115,17 @@ function renderSections(steps) {
                 ${s.description ? '<div class="section-guidance">' + esc(s.description) + '</div>' : ''}
                 ${hasFields ? '<div class="sf-fields">' + fields.map(f => renderFieldInput(f, fd[f.key], s.id)).join('') + '</div>' : ''}
                 <div class="sf-notes-group">
-                    <label class="sf-label" style="margin-top:${hasFields ? '12px' : '0'};">${hasFields ? 'Additional Notes' : 'Findings & Analysis'}</label>
+                    <label class="sf-label _ion-s-58177e1de0">${hasFields ? 'Additional Notes' : 'Findings & Analysis'}</label>
                     <textarea class="form-input sf-input" id="section-content-${s.id}" rows="${hasFields ? 3 : 6}" placeholder="Enter your findings, analysis, and documentation...">${esc(s.content || '')}</textarea>
                 </div>
                 <div class="section-card-actions">
-                    <button class="btn btn-primary" style="padding:6px 16px;" data-click-action="saveSection" data-args='[${s.id}]'>Save</button>
+                    <button class="btn btn-primary _ion-s-e992d6326c" data-click-action="saveSection" data-args='[${s.id}]'>Save</button>
                     ${!s.is_completed
-                        ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--mitre-covered);" data-click-action="completeSection" data-args='["+s.id+"]'>Mark Complete</button>'
-                        : '<button class="btn btn-secondary" style="padding:6px 16px;color:#f0c000;" data-click-action="reopenSection" data-args='["+s.id+"]'>Reopen</button>'
+                        ? '<button class="btn btn-secondary _ion-s-eb4cdd53a8" data-click-action="completeSection" data-args='["+s.id+"]'>Mark Complete</button>'
+                        : '<button class="btn btn-secondary _ion-s-72978b0cd4" data-click-action="reopenSection" data-args='["+s.id+"]'>Reopen</button>'
                     }
                     <button class="btn-extract-ioc" data-click-action="showIOCExtractModal" data-args='[${s.id}]'>&#128269; Extract IOCs</button>
-                    ${!s.playbook_step_id ? '<button class="btn btn-secondary" style="padding:6px 16px;color:var(--sev-critical);margin-left:auto;" data-click-action="deleteSection" data-args='["+s.id+"]'>Delete</button>' : ''}
+                    ${!s.playbook_step_id ? '<button class="btn btn-secondary _ion-s-c14802f8b6" data-click-action="deleteSection" data-args='["+s.id+"]'>Delete</button>' : ''}
                 </div>
             </div>
         </div>`;
@@ -1310,7 +1310,7 @@ function renderIOCResults(data) {
     badge.style.color = total > 0 ? 'var(--mitre-covered)' : 'var(--sev-critical)';
 
     if (total === 0) {
-        body.innerHTML = '<div class="empty-state" style="padding:16px;">No IOCs found in the provided content.</div>';
+        body.innerHTML = '<div class="empty-state _ion-s-cf37034751">No IOCs found in the provided content.</div>';
         resultsDiv.style.display = '';
         return;
     }
@@ -1476,7 +1476,7 @@ function renderTimeline(entries){
 function renderDetailEvidence(items){
     const d=document.getElementById('cd-evidence-list');
     if(!items.length){d.innerHTML='<div class="empty-state">No evidence items</div>';return}
-    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'}" style="font-size:.7rem;">${fmtLabel(e.status)}</span></div><div style="display:flex;gap:6px;"><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="showCustodyLog" data-args='[${e.id}, "${esc(e.evidence_number)}"]'>Custody (${e.custody_entries||0})</button><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="showCustodyModal" data-args='[${e.id}]'>+ Action</button></div></div><div style="font-size:.8rem;color:var(--text-secondary);">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
+    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'} _ion-s-bf17975318">${fmtLabel(e.status)}</span></div><div class="_ion-s-1d8943fa86"><button class="btn btn-secondary _ion-s-072a519577" data-click-action="showCustodyLog" data-args='[${e.id}, "${esc(e.evidence_number)}"]'>Custody (${e.custody_entries||0})</button><button class="btn btn-secondary _ion-s-072a519577" data-click-action="showCustodyModal" data-args='[${e.id}]'>+ Action</button></div></div><div class="_ion-s-2f96ca6c07">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
 }
 
 // ======== CASE ACTIONS ========
@@ -1558,7 +1558,7 @@ async function loadEvidenceForCase(){
 function renderEvidenceTable(items){
     const tbody=document.getElementById('evidence-tbody'),empty=document.getElementById('evidence-empty');
     if(!items.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash" style="max-width:150px;overflow:hidden;text-overflow:ellipsis;">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" data-click-action="showCustodyLog" data-stop-propagation data-args='[${e.id}, "${esc(e.evidence_number)}"]'>${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="showCustodyModal" data-stop-propagation data-args='[${e.id}]'>+ Custody</button></td></tr>`).join('');
+    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash _ion-s-188cf2a080">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" data-click-action="showCustodyLog" data-stop-propagation data-args='[${e.id}, "${esc(e.evidence_number)}"]'>${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary _ion-s-072a519577" data-click-action="showCustodyModal" data-stop-propagation data-args='[${e.id}]'>+ Custody</button></td></tr>`).join('');
 }
 function showAddEvidenceModal(){['ae-name','ae-source','ae-storage','ae-md5','ae-sha256','ae-description'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-add-evidence').style.display='flex'}
 async function addEvidence(){
@@ -1586,7 +1586,7 @@ async function loadPlaybooks(){
 function renderPlaybooksTable(pbs){
     const tbody=document.getElementById('playbooks-tbody'),empty=document.getElementById('playbooks-empty');
     if(!pbs.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span style="color:var(--mitre-covered);">Active</span>':'<span style="color:#6e7681;">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;" data-click-action="editPlaybook" data-args='[${p.id}]'>Edit</button> <button class="btn btn-secondary" style="padding:2px 8px;font-size:.75rem;color:var(--sev-critical);" data-click-action="deletePlaybook" data-args='[${p.id}]'>Delete</button></td></tr>`).join('');
+    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span class="_ion-s-3ef7cdf8ea">Active</span>':'<span class="_ion-s-491883b797">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary _ion-s-072a519577" data-click-action="editPlaybook" data-args='[${p.id}]'>Edit</button> <button class="btn btn-secondary _ion-s-995639d86c" data-click-action="deletePlaybook" data-args='[${p.id}]'>Delete</button></td></tr>`).join('');
 }
 function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').innerHTML='';addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
 async function editPlaybook(id){
@@ -1594,7 +1594,7 @@ async function editPlaybook(id){
 }
 function addPlaybookStepRow(data){
     const div=document.getElementById('pb-steps-list'),idx=div.children.length+1,row=document.createElement('div');row.className='pb-step-row';
-    row.innerHTML=`<span class="pb-step-num">${idx}</span><div style="flex:1;"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc" rows="2" placeholder="Description" style="margin-top:4px;">${esc((data&&data.description)||'')}</textarea><div style="display:flex;gap:12px;align-items:center;margin-top:4px;"><label style="margin:0;font-size:.8rem;"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label style="margin:0;font-size:.8rem;">Est. hours: <input type="number" class="pb-step-hours" style="width:60px;" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary" style="padding:2px 8px;color:var(--sev-critical);align-self:flex-start;" data-click-action="removeStepAndRenumber">&times;</button>`;
+    row.innerHTML=`<span class="pb-step-num">${idx}</span><div class="_ion-s-7623f05545"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc _ion-s-a3a5568692" rows="2" placeholder="Description">${esc((data&&data.description)||'')}</textarea><div class="_ion-s-f8699a709d"><label class="_ion-s-253ab4603a"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label class="_ion-s-253ab4603a">Est. hours: <input type="number" class="pb-step-hours _ion-s-2b12d8628e" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary _ion-s-636166ba3e" data-click-action="removeStepAndRenumber">&times;</button>`;
     div.appendChild(row);
 }
 function renumberSteps(){document.querySelectorAll('#pb-steps-list .pb-step-num').forEach((el,i)=>el.textContent=i+1)}
@@ -1649,7 +1649,7 @@ async function loadForensicAnnotations(caseId) {
     if (!body) return;
     try {
         var resp = await fetch('/api/forensics/cases/' + caseId + '/annotations');
-        if (!resp.ok) { body.innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;">Failed to load annotations</div>'; return; }
+        if (!resp.ok) { body.innerHTML = '<div class="_ion-s-4d90051488">Failed to load annotations</div>'; return; }
         var data = await resp.json();
         var annotations = data.annotations || [];
         renderForensicAnnotations(annotations);
@@ -1660,21 +1660,21 @@ function renderForensicAnnotations(annotations) {
     var body = document.getElementById('forensic-annotations-body');
     if (!body) return;
     if (!annotations.length) {
-        body.innerHTML = '<div style="color:var(--text-secondary);font-size:.8rem;">No annotations yet.</div>';
+        body.innerHTML = '<div class="_ion-s-4d90051488">No annotations yet.</div>';
         return;
     }
     var html = annotations.map(function(a) {
         var ts = a.timeline_ts ? new Date(a.timeline_ts).toLocaleString() : '';
         var author = a.created_by_username || 'unknown';
-        return '<div style="border-left:3px solid #6366f1;padding:6px 6px 6px 10px;margin-bottom:8px;background:rgba(99,102,241,0.06);border-radius:0 4px 4px 0;" id="fann-' + a.id + '">'
-            + '<div style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--text-secondary);margin-bottom:4px;">'
-            + '<span style="color:#818cf8;font-weight:600;">' + (ts||'') + '</span>'
+        return '<div class="_ion-s-1a5a5c03c0" id="fann-' + a.id + '">'
+            + '<div class="_ion-s-d072a9e0e0">'
+            + '<span class="_ion-s-d176fb5b81">' + (ts||'') + '</span>'
             + '<span>&middot;</span><span>' + (author||'') + '</span>'
-            + '<span style="margin-left:auto;display:flex;gap:4px;">'
-            + `<button type="button" data-click-action="editForensicAnnotation" data-args='[${a.id}, ${JSON.stringify(a.body || '')}]' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&#9998;</button>`
-            + `<button type="button" data-click-action="deleteForensicAnnotation" data-args='[${a.id}]' style="background:none;border:none;color:#94a3b8;cursor:pointer;padding:0 3px;font-size:.8rem;">&times;</button>`
+            + '<span class="_ion-s-1b34e7eaf1">'
+            + `<button class="_ion-s-2185cbd5dd" type="button" data-click-action="editForensicAnnotation" data-args='[${a.id}, ${JSON.stringify(a.body || '')}]'>&#9998;</button>`
+            + `<button class="_ion-s-2185cbd5dd" type="button" data-click-action="deleteForensicAnnotation" data-args='[${a.id}]'>&times;</button>`
             + '</span></div>'
-            + '<div style="font-size:.8rem;color:var(--text-primary);white-space:pre-wrap;">' + (a.body||'') + '</div>'
+            + '<div class="_ion-s-68cd4ee40d">' + (a.body||'') + '</div>'
             + '</div>';
     }).join('');
     body.innerHTML = html;

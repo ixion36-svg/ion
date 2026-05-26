@@ -160,7 +160,7 @@
         <h3>Drop PCAP file here or click to browse</h3>
         <p>Supports .pcap, .pcapng, .cap &mdash; Max 100 MB</p>
     </div>
-    <input type="file" id="pcap-file-input" accept=".pcap,.pcapng,.cap" style="display:none">
+    <input class="_ion-s-6b99de8b69" type="file" id="pcap-file-input" accept=".pcap,.pcapng,.cap">
 
     <!-- Progress -->
     <div class="pcap-progress" id="pcap-progress">
@@ -195,20 +195,20 @@
             <button class="pcap-tab" data-panel="http">HTTP</button>
             <button class="pcap-tab" data-panel="tls">TLS</button>
             <button class="pcap-tab" data-panel="data">Data Transfer</button>
-            <button class="pcap-tab" data-panel="isakmp" id="tab-isakmp" style="display:none">ISAKMP/IKE</button>
-            <button class="pcap-tab" data-panel="files" id="tab-files" style="display:none">Extracted Files <span id="files-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="ja3" id="tab-ja3" style="display:none">JA3 Fingerprints <span id="ja3-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="creds" id="tab-creds" style="display:none">Credentials <span id="creds-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="ja3s" id="tab-ja3s" style="display:none">JA3S <span id="ja3s-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="hassh" id="tab-hassh" style="display:none">HASSH <span id="hassh-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="smb" id="tab-smb" style="display:none">SMB <span id="smb-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="kerberos" id="tab-kerberos" style="display:none">Kerberos <span id="kerberos-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="httpfiles" id="tab-httpfiles" style="display:none">HTTP Files <span id="httpfiles-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="arp" id="tab-arp" style="display:none">ARP <span id="arp-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="b64" id="tab-b64" style="display:none">Base64 <span id="b64-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="isakmp" id="tab-isakmp">ISAKMP/IKE</button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="files" id="tab-files">Extracted Files <span id="files-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="ja3" id="tab-ja3">JA3 Fingerprints <span id="ja3-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="creds" id="tab-creds">Credentials <span id="creds-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="ja3s" id="tab-ja3s">JA3S <span id="ja3s-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="hassh" id="tab-hassh">HASSH <span id="hassh-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="smb" id="tab-smb">SMB <span id="smb-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="kerberos" id="tab-kerberos">Kerberos <span id="kerberos-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="httpfiles" id="tab-httpfiles">HTTP Files <span id="httpfiles-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="arp" id="tab-arp">ARP <span id="arp-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="b64" id="tab-b64">Base64 <span id="b64-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab" data-panel="graph" id="tab-graph">Network Graph</button>
-            <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge" style="display:none"></span></button>
-            <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge" style="display:none"></span></button>
+            <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
         </div>
 
         <!-- Panels -->
@@ -409,7 +409,7 @@
             const cls = colors[proto] || 'other';
             bars += `<div class="proto-bar-row">
                 <div class="proto-label">${esc(proto)}</div>
-                <div class="proto-bar-bg"><div class="proto-bar-fill ${cls}" style="width:${pct}%"></div></div>
+                <div class="proto-bar-bg"><div class="proto-bar-fill ${cls} _ion-s-95aea49e0e"></div></div>
                 <div class="proto-count">${fmtNum(count)} (${pct}%)</div>
             </div>`;
         }
@@ -420,108 +420,108 @@
             const pct = (c.bytes / convMax * 100).toFixed(1);
             convBars += `<div class="conv-bar">
                 <div class="conv-pair" title="${esc(c.pair)}">${esc(c.pair)}</div>
-                <div class="conv-bar-bg"><div class="conv-bar-fill" style="width:${pct}%"></div></div>
+                <div class="conv-bar-bg"><div class="conv-bar-fill _ion-s-95aea49e0e"></div></div>
                 <div class="conv-bytes">${fmtBytes(c.bytes)}</div>
             </div>`;
         }
 
         document.getElementById('panel-overview').innerHTML =
-            `<h3 style="margin:0 0 12px;font-size:.95rem">Protocol Distribution</h3>${bars}` +
-            `<h3 style="margin:20px 0 12px;font-size:.95rem">Top Conversations</h3>${convBars || '<p style="color:var(--text-secondary);font-size:.85rem">No conversations recorded.</p>'}`;
+            `<h3 class="_ion-s-7b85582290">Protocol Distribution</h3>${bars}` +
+            `<h3 class="_ion-s-aa82ed175a">Top Conversations</h3>${convBars || '<p class="_ion-s-4b49548152">No conversations recorded.</p>'}`;
     }
 
     function renderNetwork(d) {
-        let html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">';
-        html += '<div><h3 style="margin:0 0 10px;font-size:.95rem">Top Source IPs</h3>' + ipTable(d.top_src_ips) + '</div>';
-        html += '<div><h3 style="margin:0 0 10px;font-size:.95rem">Top Destination IPs</h3>' + ipTable(d.top_dst_ips) + '</div>';
+        let html = '<div class="_ion-s-2e5f767e14">';
+        html += '<div><h3 class="_ion-s-87ccc4da73">Top Source IPs</h3>' + ipTable(d.top_src_ips) + '</div>';
+        html += '<div><h3 class="_ion-s-87ccc4da73">Top Destination IPs</h3>' + ipTable(d.top_dst_ips) + '</div>';
         html += '</div>';
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px">';
-        html += '<div><h3 style="margin:0 0 10px;font-size:.95rem">Top Source Ports</h3>' + portTable(d.top_src_ports) + '</div>';
-        html += '<div><h3 style="margin:0 0 10px;font-size:.95rem">Top Destination Ports</h3>' + portTable(d.top_dst_ports) + '</div>';
+        html += '<div class="_ion-s-008d8eee3d">';
+        html += '<div><h3 class="_ion-s-87ccc4da73">Top Source Ports</h3>' + portTable(d.top_src_ports) + '</div>';
+        html += '<div><h3 class="_ion-s-87ccc4da73">Top Destination Ports</h3>' + portTable(d.top_dst_ports) + '</div>';
         html += '</div>';
         document.getElementById('panel-network').innerHTML = html;
     }
 
     function ipTable(items) {
-        if (!items || !items.length) return '<p style="color:var(--text-secondary);font-size:.85rem">No data</p>';
+        if (!items || !items.length) return '<p class="_ion-s-4b49548152">No data</p>';
         let rows = items.slice(0, 15).map(i =>
-            `<tr><td style="font-family:monospace">${esc(i.ip)}</td><td style="text-align:right">${fmtNum(i.count)}</td></tr>`
+            `<tr><td class="_ion-s-72126da263">${esc(i.ip)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
         ).join('');
-        return `<table class="pcap-table"><thead><tr><th>IP Address</th><th style="text-align:right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
+        return `<table class="pcap-table"><thead><tr><th>IP Address</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function portTable(items) {
-        if (!items || !items.length) return '<p style="color:var(--text-secondary);font-size:.85rem">No data</p>';
+        if (!items || !items.length) return '<p class="_ion-s-4b49548152">No data</p>';
         let rows = items.slice(0, 15).map(i =>
-            `<tr><td>${i.port}</td><td style="text-align:right">${fmtNum(i.count)}</td></tr>`
+            `<tr><td>${i.port}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
         ).join('');
-        return `<table class="pcap-table"><thead><tr><th>Port</th><th style="text-align:right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
+        return `<table class="pcap-table"><thead><tr><th>Port</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderDns(d) {
         const items = d.dns_queries || [];
         if (!items.length) {
-            document.getElementById('panel-dns').innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">No DNS queries captured.</p>';
+            document.getElementById('panel-dns').innerHTML = '<p class="_ion-s-ff64cacc49">No DNS queries captured.</p>';
             return;
         }
         let rows = items.slice(0, 40).map(i =>
-            `<tr><td style="font-family:monospace;word-break:break-all">${esc(i.query)}</td><td style="text-align:right">${fmtNum(i.count)}</td></tr>`
+            `<tr><td class="_ion-s-6ec2942442">${esc(i.query)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
         ).join('');
         document.getElementById('panel-dns').innerHTML =
-            `<h3 style="margin:0 0 10px;font-size:.95rem">DNS Queries (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Query</th><th style="text-align:right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<h3 class="_ion-s-87ccc4da73">DNS Queries (${items.length} unique)</h3>` +
+            `<table class="pcap-table"><thead><tr><th>Query</th><th class="_ion-s-54c2afb7ba">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderHttp(d) {
         const items = d.http_requests || [];
         if (!items.length) {
-            document.getElementById('panel-http').innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">No HTTP requests captured.</p>';
+            document.getElementById('panel-http').innerHTML = '<p class="_ion-s-ff64cacc49">No HTTP requests captured.</p>';
             return;
         }
         let rows = items.slice(0, 40).map(i =>
-            `<tr><td style="font-family:monospace;word-break:break-all">${esc(i.request)}</td><td style="text-align:right">${fmtNum(i.count)}</td></tr>`
+            `<tr><td class="_ion-s-6ec2942442">${esc(i.request)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
         ).join('');
         document.getElementById('panel-http').innerHTML =
-            `<h3 style="margin:0 0 10px;font-size:.95rem">HTTP Requests (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Request</th><th style="text-align:right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<h3 class="_ion-s-87ccc4da73">HTTP Requests (${items.length} unique)</h3>` +
+            `<table class="pcap-table"><thead><tr><th>Request</th><th class="_ion-s-54c2afb7ba">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderTls(d) {
         const items = d.tls_handshakes || [];
         if (!items.length) {
-            document.getElementById('panel-tls').innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">No TLS handshakes captured.</p>';
+            document.getElementById('panel-tls').innerHTML = '<p class="_ion-s-ff64cacc49">No TLS handshakes captured.</p>';
             return;
         }
         let rows = items.slice(0, 40).map(i =>
-            `<tr><td style="font-family:monospace">${esc(i.sni)}</td><td style="text-align:right">${fmtNum(i.count)}</td></tr>`
+            `<tr><td class="_ion-s-72126da263">${esc(i.sni)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
         ).join('');
         document.getElementById('panel-tls').innerHTML =
-            `<h3 style="margin:0 0 10px;font-size:.95rem">TLS Server Name Indications (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>SNI</th><th style="text-align:right">Handshakes</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<h3 class="_ion-s-87ccc4da73">TLS Server Name Indications (${items.length} unique)</h3>` +
+            `<table class="pcap-table"><thead><tr><th>SNI</th><th class="_ion-s-54c2afb7ba">Handshakes</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderData(d) {
         const dt = d.data_transfer || {};
         const byIp = dt.by_ip || [];
         if (!byIp.length) {
-            document.getElementById('panel-data').innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">No data transfer information.</p>';
+            document.getElementById('panel-data').innerHTML = '<p class="_ion-s-ff64cacc49">No data transfer information.</p>';
             return;
         }
         let rows = byIp.slice(0, 20).map(i => {
             const total = i.sent + i.received;
             const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) : '∞';
             return `<tr>
-                <td style="font-family:monospace">${esc(i.ip)}</td>
-                <td style="text-align:right">${fmtBytes(i.sent)}</td>
-                <td style="text-align:right">${fmtBytes(i.received)}</td>
-                <td style="text-align:right">${fmtBytes(total)}</td>
-                <td style="text-align:right">${ratio}:1</td>
+                <td class="_ion-s-72126da263">${esc(i.ip)}</td>
+                <td class="_ion-s-54c2afb7ba">${fmtBytes(i.sent)}</td>
+                <td class="_ion-s-54c2afb7ba">${fmtBytes(i.received)}</td>
+                <td class="_ion-s-54c2afb7ba">${fmtBytes(total)}</td>
+                <td class="_ion-s-54c2afb7ba">${ratio}:1</td>
             </tr>`;
         }).join('');
         document.getElementById('panel-data').innerHTML =
-            `<h3 style="margin:0 0 4px;font-size:.95rem">Data Transfer</h3>` +
-            `<p style="color:var(--text-secondary);font-size:.82rem;margin:0 0 12px">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
-            `<table class="pcap-table"><thead><tr><th>IP</th><th style="text-align:right">Sent</th><th style="text-align:right">Received</th><th style="text-align:right">Total</th><th style="text-align:right">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<h3 class="_ion-s-18bb30f105">Data Transfer</h3>` +
+            `<p class="_ion-s-18b8744731">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
+            `<table class="pcap-table"><thead><tr><th>IP</th><th class="_ion-s-54c2afb7ba">Sent</th><th class="_ion-s-54c2afb7ba">Received</th><th class="_ion-s-54c2afb7ba">Total</th><th class="_ion-s-54c2afb7ba">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderIsakmp(d) {
@@ -535,23 +535,23 @@
         tab.style.display = '';
         const statusClass = s => s.toLowerCase().replace(/\s+/g, '-');
         let rows = items.map(s => {
-            const errStr = (s.errors || []).length ? `<br><span style="color:var(--sev-critical);font-size:.75rem">${s.errors.map(esc).join(', ')}</span>` : '';
+            const errStr = (s.errors || []).length ? `<br><span class="_ion-s-480b2c6894">${s.errors.map(esc).join(', ')}</span>` : '';
             return `<tr>
                 <td><span class="ike-status ${statusClass(s.status)}">${esc(s.status)}</span>${errStr}</td>
-                <td style="font-family:monospace;font-size:.75rem" title="Init: ${esc(s.init_spi)}">${esc(s.initiator || '-')}</td>
-                <td style="font-family:monospace;font-size:.75rem">${esc(s.responder || '-')}</td>
+                <td class="_ion-s-3d24b78687" title="Init: ${esc(s.init_spi)}">${esc(s.initiator || '-')}</td>
+                <td class="_ion-s-3d24b78687">${esc(s.responder || '-')}</td>
                 <td>${esc(s.ike_version)}</td>
-                <td style="font-size:.78rem">${(s.exchanges || []).map(esc).join(', ')}</td>
-                <td style="text-align:center">${s.initiator_packets}i / ${s.responder_packets}r</td>
-                <td style="text-align:center">${s.retransmits}</td>
-                <td style="text-align:right">${s.duration}s</td>
+                <td class="_ion-s-f63147b2ed">${(s.exchanges || []).map(esc).join(', ')}</td>
+                <td class="_ion-s-91a87015f4">${s.initiator_packets}i / ${s.responder_packets}r</td>
+                <td class="_ion-s-91a87015f4">${s.retransmits}</td>
+                <td class="_ion-s-54c2afb7ba">${s.duration}s</td>
             </tr>`;
         }).join('');
         const established = items.filter(s => s.status === 'Established').length;
         const failed = items.filter(s => s.status === 'Failed').length;
         const noResp = items.filter(s => s.status === 'No Response').length;
         const incomplete = items.filter(s => s.status === 'Incomplete').length;
-        let summary = `<div style="display:flex;gap:16px;margin-bottom:12px;flex-wrap:wrap">`;
+        let summary = `<div class="_ion-s-9ed45fb488">`;
         summary += `<span><strong>${items.length}</strong> session(s)</span>`;
         if (established) summary += `<span><span class="ike-status established">Established</span> ${established}</span>`;
         if (failed) summary += `<span><span class="ike-status failed">Failed</span> ${failed}</span>`;
@@ -559,12 +559,12 @@
         if (incomplete) summary += `<span><span class="ike-status incomplete">Incomplete</span> ${incomplete}</span>`;
         summary += '</div>';
         document.getElementById('panel-isakmp').innerHTML =
-            `<h3 style="margin:0 0 10px;font-size:.95rem">ISAKMP / IKE Sessions</h3>` +
+            `<h3 class="_ion-s-87ccc4da73">ISAKMP / IKE Sessions</h3>` +
             summary +
             `<table class="pcap-table"><thead><tr>
                 <th>Status</th><th>Initiator</th><th>Responder</th><th>IKE Ver</th>
-                <th>Exchanges</th><th style="text-align:center">Packets</th>
-                <th style="text-align:center">Retrans</th><th style="text-align:right">Duration</th>
+                <th>Exchanges</th><th class="_ion-s-91a87015f4">Packets</th>
+                <th class="_ion-s-91a87015f4">Retrans</th><th class="_ion-s-54c2afb7ba">Duration</th>
             </tr></thead><tbody>${rows}</tbody></table>`;
     }
 
@@ -581,14 +581,14 @@
 
         const panel = document.getElementById('panel-files');
         panel.innerHTML = `<h3>Extracted Files (${files.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Files carved from reassembled TCP streams by magic byte signature.</p>
+        <p class="_ion-s-0648c015b2">Files carved from reassembled TCP streams by magic byte signature.</p>
         <table class="pcap-table"><thead><tr><th>File</th><th>Type</th><th>Size</th><th>MD5</th><th>SHA-256</th><th>Source</th><th>Destination</th></tr></thead><tbody>
         ${files.map(f => `<tr>
             <td><strong>${esc(f.filename)}</strong></td>
             <td>${esc(f.mime_type)}</td>
             <td>${fmtBytes(f.size)}</td>
-            <td><code style="font-size:.7rem;word-break:break-all">${esc(f.md5)}</code></td>
-            <td><code style="font-size:.65rem;word-break:break-all">${esc(f.sha256)}</code></td>
+            <td><code class="_ion-s-bc426706c0">${esc(f.md5)}</code></td>
+            <td><code class="_ion-s-d1b8f9c0d0">${esc(f.sha256)}</code></td>
             <td>${esc(f.src_ip)}</td>
             <td>${esc(f.dst_ip)}</td>
         </tr>`).join('')}
@@ -609,14 +609,14 @@
 
         const panel = document.getElementById('panel-ja3');
         panel.innerHTML = `<h3>JA3 TLS Fingerprints (${fps.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
+        <p class="_ion-s-0648c015b2">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
         <table class="pcap-table"><thead><tr><th>JA3 Hash</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code style="font-size:.72rem">${esc(f.ja3_hash)}</code></td>
+        ${fps.map(f => `<tr class="_ion-s-a89f389da6">
+            <td><code class="_ion-s-dbd68c1058">${esc(f.ja3_hash)}</code></td>
             <td>${esc(f.sni || '-')}</td>
             <td>${esc(f.src_ip)}</td>
             <td>${esc(f.dst_ip)}:${f.dst_port}</td>
-            <td>${f.known_malware ? `<span style="color:var(--sev-critical);font-weight:700;">${esc(f.known_malware)}</span>` : '<span style="color:var(--text-secondary)">No match</span>'}</td>
+            <td>${f.known_malware ? `<span class="_ion-s-09ef8b0d06">${esc(f.known_malware)}</span>` : '<span class="_ion-s-ce14cb276b">No match</span>'}</td>
         </tr>`).join('')}
         </tbody></table>`;
     }
@@ -634,15 +634,15 @@
 
         const panel = document.getElementById('panel-creds');
         panel.innerHTML = `<h3>Captured Credentials (${creds.length})</h3>
-        <p style="color:var(--sev-critical);font-size:.82rem;margin-bottom:12px;font-weight:600;">Credentials and authentication hashes found in cleartext or weak protocols.</p>
+        <p class="_ion-s-47bf303051">Credentials and authentication hashes found in cleartext or weak protocols.</p>
         <table class="pcap-table"><thead><tr><th>Protocol</th><th>Username</th><th>Credential / Hash</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${creds.map(c => `<tr style="background:rgba(248,81,73,.05);">
+        ${creds.map(c => `<tr class="_ion-s-616924856b">
             <td><strong>${esc(c.protocol)}</strong></td>
             <td><code>${esc(c.username)}</code></td>
-            <td><code style="font-size:.7rem;word-break:break-all;max-width:200px;display:inline-block;overflow:hidden;text-overflow:ellipsis">${esc(c.credential)}</code></td>
+            <td><code class="_ion-s-a59edec31f">${esc(c.credential)}</code></td>
             <td>${esc(c.src_ip)}</td>
             <td>${esc(c.dst_ip)}</td>
-            <td style="font-size:.78rem;color:var(--text-secondary)">${esc(c.detail)}</td>
+            <td class="_ion-s-a975440d91">${esc(c.detail)}</td>
         </tr>`).join('')}
         </tbody></table>`;
     }
@@ -659,12 +659,12 @@
         badge.textContent = fps.length;
         badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
         document.getElementById('panel-ja3s').innerHTML = `<h3>JA3S Server Fingerprints (${fps.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
+        <p class="_ion-s-0648c015b2">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
         <table class="pcap-table"><thead><tr><th>JA3S Hash</th><th>Server</th><th>Client</th><th>Port</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code style="font-size:.72rem">${esc(f.ja3s_hash)}</code></td>
+        ${fps.map(f => `<tr class="_ion-s-a89f389da6">
+            <td><code class="_ion-s-dbd68c1058">${esc(f.ja3s_hash)}</code></td>
             <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port}</td>
-            <td>${f.known_malware ? `<span style="color:var(--sev-critical);font-weight:700">${esc(f.known_malware)}</span>` : '<span style="color:var(--text-secondary)">No match</span>'}</td>
+            <td>${f.known_malware ? `<span class="_ion-s-75d955e5ec">${esc(f.known_malware)}</span>` : '<span class="_ion-s-ce14cb276b">No match</span>'}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -679,13 +679,13 @@
         badge.textContent = fps.length;
         badge.style.cssText = 'display:inline;background:var(--primary);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-hassh').innerHTML = `<h3>HASSH SSH Fingerprints (${fps.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">SSH KEX_INIT fingerprints for client and server identification.</p>
+        <p class="_ion-s-0648c015b2">SSH KEX_INIT fingerprints for client and server identification.</p>
         <table class="pcap-table"><thead><tr><th>HASSH Hash</th><th>Direction</th><th>Source</th><th>Destination</th><th>SSH Version</th><th>Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code style="font-size:.72rem">${esc(f.hassh_hash)}</code></td>
+        ${fps.map(f => `<tr class="_ion-s-a89f389da6">
+            <td><code class="_ion-s-dbd68c1058">${esc(f.hassh_hash)}</code></td>
             <td>${esc(f.direction)}</td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
-            <td style="font-size:.78rem">${esc(f.ssh_version || '-')}</td>
-            <td>${f.known_malware ? `<span style="color:var(--sev-critical);font-weight:700">${esc(f.known_malware)}</span>` : '-'}</td>
+            <td class="_ion-s-f63147b2ed">${esc(f.ssh_version || '-')}</td>
+            <td>${f.known_malware ? `<span class="_ion-s-75d955e5ec">${esc(f.known_malware)}</span>` : '-'}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -700,9 +700,9 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--warning);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-smb').innerHTML = `<h3>SMB File Operations (${items.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
+        <p class="_ion-s-0648c015b2">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
         <table class="pcap-table"><thead><tr><th>Command</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(s => `<tr><td><strong>${esc(s.command)}</strong></td><td>${esc(s.src_ip)}</td><td>${esc(s.dst_ip)}</td><td style="font-size:.78rem;color:var(--text-secondary)">${esc(s.detail)}</td></tr>`).join('')}
+        ${items.map(s => `<tr><td><strong>${esc(s.command)}</strong></td><td>${esc(s.src_ip)}</td><td>${esc(s.dst_ip)}</td><td class="_ion-s-a975440d91">${esc(s.detail)}</td></tr>`).join('')}
         </tbody></table>`;
     }
 
@@ -717,9 +717,9 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-kerberos').innerHTML = `<h3>Kerberos Traffic (${items.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
+        <p class="_ion-s-0648c015b2">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
         <table class="pcap-table"><thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(k => `<tr><td><strong>${esc(k.msg_type)}</strong></td><td>${esc(k.src_ip)}</td><td>${esc(k.dst_ip)}</td><td style="font-size:.78rem">${esc(k.detail)}</td></tr>`).join('')}
+        ${items.map(k => `<tr><td><strong>${esc(k.msg_type)}</strong></td><td>${esc(k.src_ip)}</td><td>${esc(k.dst_ip)}</td><td class="_ion-s-f63147b2ed">${esc(k.detail)}</td></tr>`).join('')}
         </tbody></table>`;
     }
 
@@ -734,11 +734,11 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-httpfiles').innerHTML = `<h3>HTTP File Transfers (${items.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
+        <p class="_ion-s-0648c015b2">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
         <table class="pcap-table"><thead><tr><th>Filename</th><th>Content-Type</th><th>Size</th><th>MD5</th><th>Source</th><th>Destination</th></tr></thead><tbody>
         ${items.map(f => `<tr>
             <td><strong>${esc(f.filename)}</strong></td><td>${esc(f.content_type)}</td><td>${fmtBytes(f.size)}</td>
-            <td><code style="font-size:.7rem">${esc(f.md5)}</code></td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
+            <td><code class="_ion-s-652db75ef3">${esc(f.md5)}</code></td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -753,12 +753,12 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-arp').innerHTML = `<h3>ARP Anomalies (${items.length})</h3>
-        <p style="color:var(--sev-critical);font-size:.82rem;margin-bottom:12px;font-weight:600;">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
+        <p class="_ion-s-47bf303051">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
         <table class="pcap-table"><thead><tr><th>MAC</th><th>IPs Claimed</th><th>Severity</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(a => `<tr style="background:rgba(248,81,73,.05);">
+        ${items.map(a => `<tr class="_ion-s-616924856b">
             <td><code>${esc(a.mac)}</code></td><td>${(a.ips||[]).map(ip => esc(ip)).join(', ')}</td>
-            <td><span style="color:var(--sev-${a.severity});font-weight:700">${esc(a.severity)}</span></td>
-            <td style="font-size:.78rem">${esc(a.detail)}</td>
+            <td><span class="_ion-s-70b267b459">${esc(a.severity)}</span></td>
+            <td class="_ion-s-f63147b2ed">${esc(a.detail)}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -773,12 +773,12 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-b64').innerHTML = `<h3>Base64 Encoded Payloads (${items.length})</h3>
-        <p style="color:var(--text-secondary);font-size:.82rem;margin-bottom:12px;">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
+        <p class="_ion-s-0648c015b2">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
         <table class="pcap-table"><thead><tr><th>Type</th><th>Encoded Size</th><th>Decoded Size</th><th>Source</th><th>Destination</th><th>Preview</th></tr></thead><tbody>
-        ${items.map(b => `<tr style="background:rgba(248,81,73,.05);">
+        ${items.map(b => `<tr class="_ion-s-616924856b">
             <td><strong>${esc(b.type)}</strong></td><td>${fmtBytes(b.encoded_length)}</td><td>${fmtBytes(b.decoded_length)}</td>
             <td>${esc(b.src_ip)}</td><td>${esc(b.dst_ip)}:${b.port}</td>
-            <td><code style="font-size:.68rem;word-break:break-all;max-width:300px;display:inline-block;overflow:hidden;text-overflow:ellipsis">${esc(b.preview)}</code></td>
+            <td><code class="_ion-s-12ac31e016">${esc(b.preview)}</code></td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -787,22 +787,22 @@
         const graph = d.network_graph || {};
         const panel = document.getElementById('panel-graph');
         if (!graph.nodes || !graph.nodes.length) {
-            panel.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">No graph data available.</p>';
+            panel.innerHTML = '<p class="_ion-s-6a1903f856">No graph data available.</p>';
             return;
         }
         const stats = graph.stats || {};
         panel.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
-                <h3 style="margin:0;">Network Graph</h3>
-                <div style="font-size:.75rem;color:var(--text-secondary);">
+            <div class="_ion-s-1924594b52">
+                <h3 class="_ion-s-1da9facb4d">Network Graph</h3>
+                <div class="_ion-s-6912997656">
                     ${stats.total_nodes||0} hosts &middot;
                     ${stats.total_edges||0} connections &middot;
-                    <span style="color:var(--primary)">${stats.internal_nodes||0} internal</span> &middot;
-                    <span style="color:var(--mitre-covered,#3fb950)">${stats.external_nodes||0} external</span>
-                    ${stats.suspicious_nodes ? ` &middot; <span style="color:var(--sev-critical)">${stats.suspicious_nodes} suspicious</span>` : ''}
+                    <span class="_ion-s-dc2e428fc7">${stats.internal_nodes||0} internal</span> &middot;
+                    <span class="_ion-s-da17fe6440">${stats.external_nodes||0} external</span>
+                    ${stats.suspicious_nodes ? ` &middot; <span class="_ion-s-5dd0211252">${stats.suspicious_nodes} suspicious</span>` : ''}
                 </div>
             </div>
-            <div id="pcap-graph-canvas" style="height:500px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:var(--radius-lg);"></div>
+            <div class="_ion-s-253aa86019" id="pcap-graph-canvas"></div>
         `;
         // Load vis-network and render
         const script = document.createElement('script');
@@ -832,12 +832,12 @@
         const items = d.findings || [];
         if (!items.length) {
             document.getElementById('panel-findings').innerHTML =
-                '<div style="text-align:center;padding:40px"><div style="font-size:2rem;margin-bottom:8px"><i class="icon-shield-check"></i></div><p style="color:var(--text-secondary);font-size:.9rem">No suspicious findings detected</p></div>';
+                '<div class="_ion-s-c282580208"><div class="_ion-s-8e1d1fec4a"><i class="icon-shield-check"></i></div><p class="_ion-s-d87618fbb5">No suspicious findings detected</p></div>';
             return;
         }
         const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         items.sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
-        let html = `<h3 style="margin:0 0 12px;font-size:.95rem">${items.length} Finding(s)</h3>`;
+        let html = `<h3 class="_ion-s-7b85582290">${items.length} Finding(s)</h3>`;
         for (const f of items) {
             html += `<div class="finding-card ${esc(f.severity)}">
                 <div class="finding-header">
@@ -857,14 +857,14 @@
         const badge = document.getElementById('ti-count-badge');
 
         if (!ti || ti.error) {
-            panel.innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">' +
+            panel.innerHTML = '<p class="_ion-s-ff64cacc49">' +
                 (ti && ti.error ? 'Enrichment error: ' + esc(ti.error) : 'No threat intelligence data — OpenCTI may not be configured.') + '</p>';
             return;
         }
 
         const obs = ti.observables || [];
         if (!obs.length) {
-            panel.innerHTML = '<p style="color:var(--text-secondary);font-size:.85rem;padding:20px">No external IPs or domains found to enrich.</p>';
+            panel.innerHTML = '<p class="_ion-s-ff64cacc49">No external IPs or domains found to enrich.</p>';
             return;
         }
 
@@ -877,11 +877,11 @@
 
         const threatColors = { unknown: 'var(--sev-low)', benign: 'var(--mitre-covered)', low: 'var(--info)', medium: 'var(--sev-medium)', high: 'var(--sev-high)', critical: 'var(--sev-critical)' };
 
-        let html = `<div style="margin-bottom:12px;display:flex;gap:16px;flex-wrap:wrap;font-size:.85rem;color:var(--text-secondary)">
+        let html = `<div class="_ion-s-a6c636e764">
             <span>IPs checked: <strong>${ti.ips_checked}</strong></span>
             <span>Domains checked: <strong>${ti.domains_checked}</strong></span>
             <span>Total observables: <strong>${ti.total}</strong></span>
-            <span style="color:${ti.malicious_count ? 'var(--sev-critical)' : 'var(--mitre-covered)'}">Malicious hits: <strong>${ti.malicious_count}</strong></span>
+            <span class="_ion-s-d2d795db29">Malicious hits: <strong>${ti.malicious_count}</strong></span>
         </div>`;
 
         html += '<table class="pcap-table"><thead><tr><th>Type</th><th>Value</th><th>Threat Level</th><th>Score</th><th>Labels</th><th>Threat Actors</th></tr></thead><tbody>';
@@ -891,15 +891,15 @@
             const level = o.threat_level || 'unknown';
             const color = threatColors[level] || '#8b949e';
             const score = e ? (e.score != null ? e.score : '—') : '—';
-            const labels = e && e.labels && e.labels.length ? e.labels.map(l => '<span style="background:' + color + '20;color:' + color + ';padding:1px 6px;border-radius:3px;font-size:.75rem;margin-right:3px">' + esc(typeof l === 'string' ? l : l.value || l.name || '') + '</span>').join('') : '—';
+            const labels = e && e.labels && e.labels.length ? e.labels.map(l => '<span class="_ion-s-7554583028">' + esc(typeof l === 'string' ? l : l.value || l.name || '') + '</span>').join('') : '—';
             const actors = e && e.threat_actors && e.threat_actors.length ? e.threat_actors.map(a => esc(typeof a === 'string' ? a : a.name || '')).join(', ') : '—';
             const rowBg = e && e.is_malicious ? 'background:rgba(248,81,73,0.06);' : '';
 
-            html += `<tr style="${rowBg}">
-                <td><span style="font-size:.75rem;text-transform:uppercase;color:var(--text-secondary)">${esc(o.type)}</span></td>
-                <td style="font-family:monospace;word-break:break-all"><a href="/observables?q=${encodeURIComponent(o.value)}" style="color:var(--text-primary);text-decoration:underline dotted">${esc(o.value)}</a></td>
-                <td><span style="color:${color};font-weight:600;font-size:.8rem">${esc(level)}</span></td>
-                <td style="text-align:center">${score}</td>
+            html += `<tr class="_ion-s-2da1142fc8">
+                <td><span class="_ion-s-de8dfac73b">${esc(o.type)}</span></td>
+                <td class="_ion-s-6ec2942442"><a class="_ion-s-b17605f04d" href="/observables?q=${encodeURIComponent(o.value)}">${esc(o.value)}</a></td>
+                <td><span class="_ion-s-a8287752f9">${esc(level)}</span></td>
+                <td class="_ion-s-91a87015f4">${score}</td>
                 <td>${labels}</td>
                 <td>${actors}</td>
             </tr>`;
