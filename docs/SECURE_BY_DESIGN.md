@@ -1,7 +1,7 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.13 -->
+<!-- ion-doc:version=0.31.14 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
@@ -406,8 +406,20 @@ radius is contained.
   `ION_SESSION_CLEANUP_ENABLED` (opt-out) and
   `ION_SESSION_CLEANUP_INTERVAL_HOURS`. Reduces dormant-user PII
   retention (`user_sessions.ip_address` / `user_agent`) from
-  "indefinite" to "≤ interval after expiry". Four gaps remain
-  (G2 / G3 / G4 / G5).
+  "indefinite" to "≤ interval after expiry".
+* **G2 + G3 closure (v0.31.14)** — parameterised retention service.
+  New `src/ion/services/data_retention_service.py` holds a list of
+  `RetentionRule(env_var, model, timestamp_column)` tuples; current
+  rules cover `audit_logs.timestamp` and `security_events.created_at`.
+  Single background loop under advisory lock `LOCK_DATA_RETENTION_BG`
+  sweeps every rule whose env var is set. New env vars:
+  `ION_AUDIT_LOG_RETENTION_DAYS` and `ION_SECURITY_EVENTS_RETENTION_DAYS`
+  (both unset by default — operators opt in per deployment because
+  compliance windows vary wildly across jurisdictions). Loop
+  cadence: `ION_DATA_RETENTION_INTERVAL_HOURS` (default 24h);
+  whole-loop kill switch: `ION_DATA_RETENTION_ENABLED` (default true).
+  Two gaps remain (G4 — AI chat retention is the next natural rule
+  to append; G5 — `session_token` hash-at-rest).
 
 **Status:** Met (v0.31.12). Audit produced; residual gaps documented
 and tracked the same way P11's template-migration backlog is — they
@@ -661,6 +673,7 @@ is the phase guide. If the two ever disagree, this doc wins for
 | 1.5     | 2026-05-14 | Maintainer | v0.31.7: P11 follow-up #4 — training.html migrated (119 handlers). 2 hand-fixed JS-source-escape spots; migration script patched to detect `\\'` / `\\"` escape sequences and skip them. P11 audit body updated (368 handlers migrated; 69 templates remaining). Audit summary unchanged: 15 Met / 3 Mostly Met / 2 Partial / 0 Gap. |
 | 1.6     | 2026-05-14 | Maintainer | v0.31.8: **P17 CLOSED.** `python-jose[cryptography]` retired in favour of `PyJWT[crypto]>=2.8.0`. Transitive `ecdsa` dep (CVE-2024-23342, Minerva timing attack on P-256) removed from the resolved tree. CI `--ignore-vuln CVE-2024-23342` flag dropped. `src/ion/auth/oidc.py` migrated: `PyJWK.from_dict(jwk).key` wraps the JWKS dict before `jwt.decode`; same RS256-only semantics. New `tests/test_v031_8_oidc_pyjwt.py` (8 cases) pins happy path + tampered signature + expired + wrong audience/issuer + missing/unknown kid + missing sub. P17 status: **Mostly Met → Met.** Audit summary: **16 Met / 2 Mostly Met / 2 Partial / 0 Gap** (was 15 / 3 / 2 / 0). |
 | 1.7     | 2026-05-14 | Maintainer | v0.31.9: **P1 PARTIAL → MOSTLY MET.** Four artifacts ship to systematize the single-maintainer review pattern: `CONTRIBUTING.md` (codified expectations + PR template), `CODEOWNERS` (review responsibility per path), `.claude/agents/security-reviewer.md` (focused SbD-walk agent invoked before commit), `.pre-commit-config.yaml` (ruff + bandit + pip-audit at the workstation; mirrors CI). P1 cannot reach Met without onboarding a second human reviewer. Audit summary: **16 Met / 3 Mostly Met / 1 Partial / 0 Gap** (was 16 / 2 / 2 / 0). |
+| 2.1     | 2026-05-26 | Maintainer | v0.31.14: **G2 + G3 sub-gaps closed.** New `src/ion/services/data_retention_service.py` is parameterised on a `RetentionRule` list — current rules: (`ION_AUDIT_LOG_RETENTION_DAYS`, `audit_logs.timestamp`) and (`ION_SECURITY_EVENTS_RETENTION_DAYS`, `security_events.created_at`). Single background loop under advisory lock `LOCK_DATA_RETENTION_BG = 1024`. Both retention env vars are opt-IN (default unset = disabled) because compliance windows vary by jurisdiction; loop has whole-loop kill switch `ION_DATA_RETENTION_ENABLED` (default `true`) + cadence `ION_DATA_RETENTION_INTERVAL_HOURS` (default 24h, floored at 60s). Future G4 (AI chat retention) will fit by appending one tuple to `RETENTION_RULES`. P13 already Met at v0.31.12 — this is sub-principle defence-in-depth work. DATA_MINIMISATION_AUDIT residual gaps drop from 4 to 2 (G4 / G5 remain). Audit summary unchanged: **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. |
 | 2.0     | 2026-05-26 | Maintainer | v0.31.13: **G1 sub-gap closed.** `src/ion/services/session_cleanup_service.py` background loop wraps `AuthService.cleanup_expired_sessions()` and runs periodically under advisory lock `LOCK_SESSION_CLEANUP_BG = 1023`. Env vars `ION_SESSION_CLEANUP_ENABLED` (default `true`) and `ION_SESSION_CLEANUP_INTERVAL_HOURS` (default 6, floored at 60s). DATA_MINIMISATION_AUDIT.md updated to reflect the closure; audit residual gaps count drops from 5 to 4 (G2 / G3 / G4 / G5). P13 already Met at v0.31.12 — this is sub-principle defence-in-depth work. Audit summary unchanged: **18 Met / 2 Mostly Met / 0 Partial / 0 Gap**. |
 | 1.9     | 2026-05-26 | Maintainer | v0.31.12: **P13 MOSTLY MET → MET.** `docs/DATA_MINIMISATION_AUDIT.md` published — schema-wide audit of the ~100-table ION data layer (47 SQLAlchemy model files). Tier 1 deep-read of `users` / `user_sessions` / `audit_logs` / `security_events` / `blocked_ips` / `analyst_notes` / `ai_chat_*` / `observables` / `ai_feedback`; Tier 2 skim of alert / case / annotation / social / custody / integration tables; Tier 3 noted as operational state out of column-level scope. 13 existing data-min controls catalogued (C1–C13: air-gap, bcrypt, closure_reason enum, ION_BOB_STORE_REASONING gate, append-only ledgers with sha256 chain, soft-delete, per-user session cleanup at login, TLP/PAP markings on observables, service-account auth short-circuit, WeasyPrint SSRF guard, CSP nonce, etc.). 5 low-severity residual gaps identified and tracked for v0.32+: G1 system-wide session cleanup scheduler (function exists at `auth/service.py:347`, no caller); G2 `audit_logs` retention env var; G3 `security_events` retention env var; G4 optional AI chat retention; G5 session_token hash-at-rest. All 5 gaps bounded by C1 (air-gap) + C2 (container isolation) + RBAC; classified as defence-in-depth improvements, not unresolved P13 attack surface. Audit summary: **18 Met / 2 Mostly Met / 0 Partial / 0 Gap** (was 17 / 3 / 0 / 0). |
 | 1.8     | 2026-05-26 | Maintainer | v0.31.10: **P15 PARTIAL → MET.** Branch protection on `main` advanced from Tier 1 to Tier 2 — `required_signatures=true` added via `gh api POST .../protection/required_signatures` after registering a dedicated ed25519 Signing Key (`~/.ssh/id_ed25519_github.pub`) on the maintainer's GitHub account. Local git configured for SSH commit signing (`gpg.format=ssh` + `gpg.ssh.allowedSignersFile`); committer identity switched to the GitHub noreply form so signatures resolve to a verified-by-GitHub address. The release commit for v0.31.10 is the first signed commit on `main` and the implicit acceptance test for the new server-side rule. Audit summary: **17 Met / 3 Mostly Met / 0 Partial / 0 Gap** (was 16 / 3 / 1 / 0). |

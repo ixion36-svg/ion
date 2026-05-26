@@ -753,6 +753,23 @@ async def startup_event():
                hold_until_close=True)
 
     # ---------------------------------------------------------------
+    # Data retention background loop (v0.31.14 — data-min P13 G2+G3).
+    # Default no-op: both ION_AUDIT_LOG_RETENTION_DAYS and
+    # ION_SECURITY_EVENTS_RETENTION_DAYS are unset by default.
+    # Operators opt in per deployment because compliance windows vary
+    # wildly (90d vs 7y). Daily sweep when enabled.
+    # ---------------------------------------------------------------
+    from ion.storage.database import LOCK_DATA_RETENTION_BG
+    def _start_data_retention():
+        from ion.services.data_retention_service import (
+            start_background_loop as _dr_bg,
+        )
+        _dr_bg(engine)
+        logger.info("Data retention background loop started")
+    run_locked(engine, LOCK_DATA_RETENTION_BG, "data_retention_bg_loop", _start_data_retention,
+               hold_until_close=True)
+
+    # ---------------------------------------------------------------
     # Ticker background producer — REMOVED v0.26.1.
     # The loop crashed every tick on an enum-case mismatch
     # (AlertTriageStatus stored as the enum NAME 'OPEN', queried for

@@ -1,13 +1,83 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.13 -->
+<!-- ion-doc:version=0.31.14 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-26 -->
 
 # Changelog
+
+## v0.31.14 — 2026-05-26
+
+Data-min P13 sub-gaps **G2 + G3 closed.** Two more residuals from
+the v0.31.12 audit shipped. SECURE_BY_DESIGN audit summary unchanged
+at **18 Met / 2 Mostly Met / 0 Partial / 0 Gap** — same reason as
+v0.31.13 (P13 already Met; sub-principle defence-in-depth work).
+DATA_MINIMISATION_AUDIT residual gaps drop from 4 to 2 (G4 and G5
+remain). **Net new findings: 0C / 0H / 0M / 0L.**
+
+### feat(security): parameterised data-retention background loop
+
+* **New module** `src/ion/services/data_retention_service.py`. Holds
+  a list of `RetentionRule(env_var, model_dotted_path,
+  timestamp_column, label)` tuples. Single background loop sweeps
+  every rule whose env var is set; rules whose env vars are unset
+  silently skip. Future retentions (G4 AI chat, additional tables)
+  ship by appending one tuple to `RETENTION_RULES` — no new module,
+  no new lock.
+* **New advisory lock** `LOCK_DATA_RETENTION_BG = 1024` in
+  `storage/database.py`. `hold_until_close=True` for single-leader
+  execution per cluster — same pattern as `LOCK_ANALYTICS_BG_LOOP`,
+  `LOCK_SESSION_CLEANUP_BG`, etc.
+* **Startup wiring** in `web/server.py` directly after the v0.31.13
+  session-cleanup block, keeping all data-min loops clustered.
+* **Current `RETENTION_RULES`**:
+  | env var | table | column |
+  |---------|-------|--------|
+  | `ION_AUDIT_LOG_RETENTION_DAYS` | `audit_logs` | `timestamp` |
+  | `ION_SECURITY_EVENTS_RETENTION_DAYS` | `security_events` | `created_at` |
+* **New env vars**:
+  * `ION_AUDIT_LOG_RETENTION_DAYS` — **default unset = disabled.**
+    Set to a positive integer N to delete `audit_logs` rows older
+    than N days at each sweep.
+  * `ION_SECURITY_EVENTS_RETENTION_DAYS` — **default unset =
+    disabled.** Set to a positive integer N to delete
+    `security_events` rows older than N days.
+  * `ION_DATA_RETENTION_ENABLED` — whole-loop kill switch. Default
+    `true`. Set to `false`/`0`/`no`/`off` to disable the loop even
+    if individual rules are configured.
+  * `ION_DATA_RETENTION_INTERVAL_HOURS` — sweep cadence. Default
+    `24` (daily). Floored at 60s.
+
+### Why default-unset (opt-IN), not opt-OUT?
+
+G1 (session cleanup, v0.31.13) shipped opt-OUT because session
+tokens are inherently ephemeral and a default-enabled cleanup
+matches the data-min posture. G2/G3 are different — they target
+**audit logs**, which compliance regimes regulate with windows that
+vary wildly:
+
+* PCI-DSS — 365-day minimum
+* HIPAA — 6 years
+* SOX — 7 years
+* Internal incident-response — often "indefinite" until a forensic
+  ticket closes
+
+ION can't pick a default that's safe across all customers. Shipping
+a default-365 retention would silently delete logs at a 7-year-SOX
+customer's deployment, which is worse than the data-min gap.
+Default-unset means: existing customers see no behaviour change;
+new deployments explicitly choose their retention window.
+
+### docs(security): DATA_MINIMISATION_AUDIT.md + SECURE_BY_DESIGN.md
+
+* Audit doc — G2 / G3 blocks rewritten as Closed v0.31.14; gap-count
+  summary updated "4 remaining" → "2 remaining (G4, G5)"; revision
+  row 1.2.
+* SECURE_BY_DESIGN.md — P13 ION-application bullets extended with
+  the v0.31.14 G2+G3 closure; revision row 2.1.
 
 ## v0.31.13 — 2026-05-26
 
