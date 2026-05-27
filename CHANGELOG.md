@@ -1,13 +1,62 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.31.25 -->
+<!-- ion-doc:version=0.32.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-05-26 -->
+<!-- ion-doc:date=2026-05-27 -->
 
 # Changelog
+
+## v0.32.0 — 2026-05-27
+
+**Critical reliability fix: circuit breakers were structurally inert.**
+All five module-level `CircuitBreaker` singletons (`es_breaker`, `ollama_breaker`,
+`kibana_breaker`, `opencti_breaker`, `tide_breaker`) were created and exported but
+never received `record_success()` or `record_failure()` calls. The `can_execute()`
+guards at call sites in `cyab_api.py` and `kibana_sync_service.py` checked the
+breaker state, but because the feedback path was absent the state was always
+`CLOSED` and `_failure_count` was always `0` — making the state machines
+permanently inert. Found via code review and fixed in this release for the three
+services that have owned HTTP transports (ES, Ollama, Kibana sync).
+
+### What changed
+
+**`ElasticsearchService._request()`** (single HTTP transport for all ES calls):
+- `es_breaker.record_success()` after any response (any HTTP status — 4xx means
+  ES is alive, the query was wrong, not a connectivity failure)
+- `es_breaker.record_failure()` on `ConnectError`, `ReadError`, `TimeoutException`,
+  and `HTTPError`
+
+**`OllamaService.chat()` / `chat_stream()` / `generate()`**:
+- `ollama_breaker.can_execute()` guard at entry to each method (raises / yields
+  error immediately when breaker is open — no HTTP call made)
+- `ollama_breaker.record_success()` after successful response parse
+- `ollama_breaker.record_failure()` on `ConnectError` and `TimeoutException`
+- Explicit `except httpx.ConnectError` handler added to all three methods
+  (previously swallowed by the generic `except Exception` arm, losing the signal)
+
+**`KibanaSyncService._background_sync_loop()`**:
+- `kibana_breaker.record_success()` after a successful full sync cycle
+- `kibana_breaker.record_failure()` on `httpx.ConnectError`, `TimeoutException`,
+  `ReadError`, or `NetworkError` (connectivity-class failures only; logical sync
+  errors do not trip the breaker)
+
+### Tests
+
+New `tests/test_v032_circuit_breaker_wiring.py` (11 tests):
+- `TestEsBreakerWiring` (5): success records success; ConnectError records failure;
+  TimeoutException records failure; N failures opens breaker;
+  4xx response does NOT trip the breaker
+- `TestOllamaBreakerWiring` (6): chat success; chat ConnectError; chat timeout;
+  chat open-breaker short-circuits without HTTP; generate success;
+  generate open-breaker short-circuits without HTTP
+
+All 33 tests pass (new 11 + OIDC 8 + queue-control 14). **Net new findings:
+0C / 0H / 0M / 0L.** No schema changes, no new attack surface, no permission
+gate changes. SECURE_BY_DESIGN audit summary unchanged at
+**19 Met / 1 Mostly Met / 0 Partial / 0 Gap.**
 
 ## v0.31.25 — 2026-05-26
 

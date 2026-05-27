@@ -1,15 +1,15 @@
 <!-- ion-doc:type=PROJECT OVERVIEW -->
 <!-- ion-doc:title=ION — Intelligent Operating Network -->
 <!-- ion-doc:subtitle=SOC analyst workbench: features, integrations, deployment, documentation index -->
-<!-- ion-doc:version=0.31.25 -->
+<!-- ion-doc:version=0.32.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Any reader; first-touch overview -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-05-27 -->
 
 # ION - Intelligent Operating Network
 
-![Version](https://img.shields.io/badge/version-0.31.25-blue)
+![Version](https://img.shields.io/badge/version-0.32.0-blue)
 ![Python](https://img.shields.io/badge/python-3.14-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ixion36%2Fion-blue)
