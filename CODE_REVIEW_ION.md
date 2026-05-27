@@ -39,14 +39,17 @@ The `es_breaker`, `ollama_breaker`, and `kibana_breaker` are **never updated**. 
 *   **Impact:** The circuit breaker will never trip even during total service failure, or if manually tripped, will never recover.
 *   **Location:** `src/ion/services/elasticsearch_service.py`, `ollama_service.py`, `kibana_sync_service.py`.
 
-### 🟡 Major: Shared Client Credential Leak/Collision
-The `_get_es_client` helper in `elasticsearch_service.py` lazily creates a shared `httpx.AsyncClient` using the `headers` and `auth` of the **first** instance that calls it.
-*   **Impact:** If multiple `ElasticsearchService` instances are created with different credentials (e.g., different API keys for different tenants), they will all share the credentials of whichever instance initialized the client first.
-*   **Location:** `src/ion/services/elasticsearch_service.py:27`.
+### ~~🟡 Major: Shared Client Credential Leak/Collision~~ ✅ Fixed v0.33.0
+`_get_es_client` now caches a SHA-256 fingerprint of `(headers, auth)` and recreates
+the client when the fingerprint changes (e.g. after an admin-wizard credential update).
+`_close_es_client` also clears the fingerprint. 8 unit tests in
+`tests/test_v033_es_client_credential_refresh.py`.
 
-### 🟡 Minor: Ticker Service Regression
-The `ticker` service was removed in v0.26.1 due to crashes and design conflicts, but dead code (imports, routers) remains in `server.py` and models.
-*   **Recommendation:** Clean up dead imports and routes to reduce attack surface and binary size.
+### ~~🟡 Minor: Ticker Service Regression~~ ✅ Fixed v0.33.0
+Removed the three dead `ticker:*` permission definitions from
+`auth/service.py._initialize_permissions()` and the `ticker:read`/`ticker:create`
+grants from the `ai_analyst` role. No API enforces these permissions; the Ticker
+model and wallboard query are intentionally retained for a future redesign.
 
 ---
 

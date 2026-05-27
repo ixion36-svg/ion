@@ -537,10 +537,6 @@ class AuthService:
             ("alert:comment", "alert", "comment", "Add notes/comments to alerts"),
             ("case:comment", "case", "comment", "Add notes/comments to cases"),
             ("case:link", "case", "link", "Link alerts / observables to cases"),
-            # Ticker permissions
-            ("ticker:read", "ticker", "read", "View active ticker items"),
-            ("ticker:create", "ticker", "create", "Create manual ticker entries"),
-            ("ticker:manage", "ticker", "manage", "Edit/delete/resolve any ticker entry"),
             # Tuning proposals (detection engineering feedback queue)
             ("tuning:read", "tuning", "read", "View tuning proposals"),
             ("tuning:review", "tuning", "review", "Accept/reject tuning proposals"),
@@ -720,9 +716,9 @@ class AuthService:
             (
                 # Assigned to the Bob service account. Scoped to the actions
                 # an AI analyst needs during autonomous investigation — read
-                # alerts/cases, post notes, suggest observables, post to the
-                # ticker, file tuning proposals. NOT granted: close case,
-                # delete, manage integrations, alter permissions.
+                # alerts/cases, post notes, suggest observables, file tuning
+                # proposals. NOT granted: close case, delete, manage
+                # integrations, alter permissions.
                 "ai_analyst",
                 "AI analyst service role (Bob) — investigation, notes, observables, tuning suggestions",
                 True,
@@ -733,7 +729,6 @@ class AuthService:
                     "playbook:read",
                     "ai:chat",
                     "investigation:run",
-                    "ticker:read", "ticker:create",
                     "tuning:read",
                 ],
             ),
