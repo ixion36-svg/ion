@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.33.0 -->
+<!-- ion-doc:version=0.33.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-27 -->
 
 # Changelog
+
+## v0.33.1 — 2026-05-27
+
+**CSP nonce fix: 11 API pages were fully unstyled / non-interactive.**
+
+Root cause: 11 API modules (investigation_api, investigation_memory_api, bob_eval_api, course_api, case_grouper_api, cyab_api, story_api, translator_api, tuning_proposal_api, wallboard_api, alert_prompt_api) each create their own `Jinja2Templates` instance to avoid circular imports with `server.py`. None of them had the `csp_nonce` Jinja global registered, so `{{ csp_nonce }}` rendered as empty string. The CSP blocked every `<script nonce="">` and `<style nonce="">` tag on those pages — including base.html's nav CSS block (`.tw-nav-link`, `.tw-drop-menu`, etc.) — making the nav bar appear as plain unstyled text and all page interactions non-functional.
+
+**Fix**: new `src/ion/web/_csp_nonce.py` module extracts `_csp_nonce_var` + `_CSPNonceProxy` out of `server.py` into a leaf module with no imports from `ion.web.*`. All 11 private templates instances now import and register the proxy. `server.py` also updated to import from the shared module.
+
+Also includes the P11 style-attr display:none cascade fix (v0.31.21 regression visible in v0.33.0 on any page whose page-local CSS had a higher-specificity display rule): hashed CSS classes that map `display:none` now use the `html body .` prefix (specificity 0,1,2) to win over single-class page CSS (0,1,0) without `!important`, preserving JS ability to show elements via `element.style.display`.
+
+**Audit impact**: no change. 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new security findings: 0C / 0H / 0M / 0L.
 
 ## v0.33.0 — 2026-05-27
 
