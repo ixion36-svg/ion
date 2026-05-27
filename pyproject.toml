@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.32.1"
+version = "0.33.0"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,9 +28,12 @@ dependencies = [
     # but the compromised release should not be in our supply chain.
     # 0.136.3 is the only affected version per OSV; <0.136.3 floors
     # us at 0.136.1 (the version pre-incident).
-    "fastapi>=0.109.0,<0.136.3",
+    # v0.33.0: floor raised to 0.136.1 — this version drops the starlette
+    # upper-cap (requires starlette>=0.46.0 only) allowing starlette 1.0.1+
+    # to be installed, closing PYSEC-2026-161 (Host-header URL reconstruction).
+    "fastapi>=0.136.1,<0.136.3",
     "uvicorn>=0.27.0",
-    "python-multipart>=0.0.6",
+    "python-multipart>=0.0.27",  # CVE-2026-40347/42561: multipart DoS
     "passlib[bcrypt]>=1.7.4",
     "bcrypt>=4.0.0,<4.1",
     # v0.31.8: migrated from python-jose[cryptography] to PyJWT[crypto].
@@ -40,7 +43,7 @@ dependencies = [
     # transitive dep kept appearing in scanner output. PyJWT has the
     # same JWT semantics for our usage (decode + verify exp/iat/aud/iss)
     # and pulls only `cryptography` (no ecdsa).
-    "PyJWT[crypto]>=2.8.0",
+    "PyJWT[crypto]>=2.12.0",  # PYSEC-2026-120: crit header bypass
     "httpx>=0.25.0",
     "aiosmtplib>=3.0.0",
     "email-validator>=2.0.0",
@@ -64,18 +67,29 @@ dependencies = [
     # Fast JSON serialisation (5-10x faster than stdlib json)
     "orjson>=3.9.0",
     # Used by seed scripts (seed_*.py) that call the ION API via HTTP
-    "requests>=2.31.0",
+    "requests>=2.33.0",  # CVE-2026-25645
     # Email validation (pydantic EmailStr field)
     "email-validator>=2.0.0",
     # v0.17.0: PDF text extraction for the Translator (~200 KB pure-Python)
     "pypdf>=4.0",
     # v0.19.9: PowerPoint export of the daily SOC standup
     "python-pptx>=0.6.21",
+    # v0.33.0: Security floor pins — explicitly constrain transitive deps to
+    # patched versions. pip-audit v0.32.1 found 26 CVEs in 15 packages;
+    # these pins close the 12 ION-reachable findings.
+    "cryptography>=46.0.7",    # PYSEC-2026-35/36: DNS constraint bypass + buffer overflow
+    "starlette>=1.0.1",        # PYSEC-2026-161: Host-header URL reconstruction (fastapi>=0.136.1 required)
+    "urllib3>=2.7.0",          # PYSEC-2026-141/142
+    "idna>=3.15",              # CVE-2026-45409
+    "lxml>=6.1.0",             # PYSEC-2026-87 (WeasyPrint dep)
+    "Pillow>=12.2.0",          # CVE-2026-40192 + 4 others (WeasyPrint dep)
+    "pyasn1>=0.6.3",           # CVE-2026-30922: recursion bomb DoS via crafted ASN.1
+    "pygments>=2.20.0",        # CVE-2026-4539: ReDoS in AdlLexer (local access)
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
+    "pytest>=9.0.3",  # CVE-2025-71176: /tmp race (Unix)
     "pytest-cov",
     "ruff",
     "mypy",

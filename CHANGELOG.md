@@ -1,13 +1,43 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.32.1 -->
+<!-- ion-doc:version=0.33.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-27 -->
 
 # Changelog
+
+## v0.33.0 — 2026-05-27
+
+**Dependency security sweep: 26 CVEs → 0 ION-relevant findings.**
+
+pip-audit against v0.32.1 found 26 known vulnerabilities in 15 packages. After filtering for ION reachability (excluding local-env residuals `ecdsa`/`python-jose`, `nltk`, and `pip` itself — none present in the Docker image), 12 ION-reachable findings remained across 8 packages. All 12 closed by updating direct-dep lower bounds and adding security floor pins for transitive deps.
+
+**Direct-dep changes:**
+- `fastapi`: floor raised to `>=0.136.1,<0.136.3` — installs 0.136.1 (latest non-malicious). fastapi 0.136.1 drops the starlette upper-cap (`starlette>=0.46.0` only), enabling starlette 1.x. `@app.on_event` DeprecationWarning surfaced by the upgrade is cosmetic — tracked for v0.34+. 810 tests green after upgrade.
+- `python-multipart>=0.0.27` (was 0.0.6) — CVE-2026-40347/42561: DoS in multipart preamble/epilogue + header parsing. Resolved to 0.0.29.
+- `PyJWT[crypto]>=2.12.0` (was 2.8.0) — PYSEC-2026-120: `crit` header parameter not validated per RFC 7515. Resolved to 2.13.0.
+- `requests>=2.33.0` (was 2.31.0) — CVE-2026-25645. Resolved to 2.34.2.
+- `pytest>=9.0.3` (was 7.0, dev extra) — CVE-2025-71176: `/tmp` race on Unix.
+
+**New security floor pins (transitive dep lower bounds):**
+- `starlette>=1.0.1` — PYSEC-2026-161: Host-header URL reconstruction bypass. Resolved to 1.1.0. ION uses only stable APIs (`BaseHTTPMiddleware`, `GZipMiddleware`, `Response`, `StaticFiles`); reachability for ION's token/DB-based auth model was low, but fixed regardless.
+- `cryptography>=46.0.7` — PYSEC-2026-35/36: DNS name-constraint bypass + non-contiguous buffer overflow. Resolved to 48.0.0.
+- `urllib3>=2.7.0` — PYSEC-2026-141/142. Resolved to 2.7.0.
+- `idna>=3.15` — CVE-2026-45409. Resolved to 3.16.
+- `lxml>=6.1.0` — PYSEC-2026-87 (WeasyPrint dep). Resolved to 6.1.1.
+- `Pillow>=12.2.0` — CVE-2026-40192 + 4 others (WeasyPrint dep). Resolved to 12.2.0.
+- `pyasn1>=0.6.3` — CVE-2026-30922: recursion-bomb DoS via crafted ASN.1. Resolved to 0.6.3.
+- `pygments>=2.20.0` — CVE-2026-4539: ReDoS in AdlLexer (local access only). Resolved to 2.20.0.
+
+**Residual findings (accepted, not ION deployment concerns):**
+- `ecdsa 0.19.1`: Required-by `python-jose` only — `python-jose` was removed from ION in v0.31.8 and is not present in the Docker image. CVE-2024-23342 has no upstream fix (project inactive). CVE-2026-33936 fix at 0.19.2 applies only to deployments that still ship python-jose.
+- `nltk 3.9.3`: No `Required-by` in ION's dep tree — local-env residual, not in pyproject.toml, not in Docker image.
+- `pip 26.0.1` / `26.1`: pip itself is the installer, not a runtime dep. The Docker builder layer runs `pip install --upgrade pip` so the runtime image carries the pip version current at build time.
+
+SECURE_BY_DESIGN audit summary unchanged at **19 Met / 1 Mostly Met / 0 Partial / 0 Gap**. **Net new findings: 0C / 0H / 0M / 0L.** No schema changes, no new attack surface, no permission gate changes.
 
 ## v0.32.1 — 2026-05-27
 
