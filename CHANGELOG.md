@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.33.1 -->
+<!-- ion-doc:version=0.33.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-27 -->
 
 # Changelog
+
+## v0.33.2 — 2026-05-27
+
+**FastAPI lifespan refactor — eliminates startup DeprecationWarning.**
+
+FastAPI 0.136.1 (shipped in v0.33.0) emits a `DeprecationWarning` for `@app.on_event("startup")`, which is slated for removal in a future FastAPI release. The startup hook has been migrated to the modern `asynccontextmanager` lifespan pattern: a `_lifespan` context manager is defined with `@asynccontextmanager`, all startup logic runs inside it (before `yield`), and it is passed as `lifespan=_lifespan` to `FastAPI()`. No behaviour change — all seeding, background loops, and advisory locks run identically.
+
+Also removes two stale pip-audit result files (`pip_audit_post.json`, `pip_audit_v0321.json`) that were sitting untracked in the repo root since the v0.33.0 dependency sweep.
+
+**Audit impact**: no change. 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new security findings: 0C / 0H / 0M / 0L.
 
 ## v0.33.1 — 2026-05-27
 

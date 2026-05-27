@@ -1,5 +1,6 @@
 """FastAPI web server for ION - Intelligent Operating Network."""
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
@@ -152,6 +153,12 @@ if not _app_config.cookie_secure:
         "TLS terminator or reverse proxy."
     )
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    await _startup_event()
+    yield
+
+
 app = FastAPI(
     title="ION",
     description="Intelligent Operating Network - Security Operations Portal for Guarded Glass",
@@ -162,6 +169,7 @@ app = FastAPI(
     docs_url="/docs" if _debug_mode else None,
     redoc_url="/redoc" if _debug_mode else None,
     openapi_url="/openapi.json" if _debug_mode else None,
+    lifespan=_lifespan,
 )
 
 
@@ -175,7 +183,7 @@ app = FastAPI(
 # instances can register the same proxy without circular imports.
 import secrets as _secrets
 
-from ion.web._csp_nonce import _CSPNonceProxy, _csp_nonce_var
+from ion.web._csp_nonce import _csp_nonce_var, _CSPNonceProxy
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -459,8 +467,7 @@ def _validate_startup_config():
     logger.info("Configuration validated: %d warning(s), 0 errors", len(warnings))
 
 
-@app.on_event("startup")
-async def startup_event():
+async def _startup_event():
     """Initialize database + run seed/background-task starters on startup.
 
     Every hook below is wrapped in a Postgres advisory lock via run_locked()
