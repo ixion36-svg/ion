@@ -12,6 +12,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
+from ion.core.circuit_breaker import es_breaker
 from ion.core.config import get_elasticsearch_config, get_ssl_verify
 
 logger = logging.getLogger(__name__)
@@ -279,13 +280,19 @@ class ElasticsearchService:
             if timeout is not None:
                 kwargs["timeout"] = httpx.Timeout(float(timeout), connect=3.0)
             response = await client.request(method, url, **kwargs)
+            # ES responded — any HTTP status means connectivity is healthy.
+            es_breaker.record_success()
         except httpx.ConnectError as e:
+            es_breaker.record_failure()
             raise ElasticsearchError(f"Failed to connect to Elasticsearch: {e}")
         except httpx.ReadError as e:
+            es_breaker.record_failure()
             raise ElasticsearchError(f"Connection error reading from Elasticsearch: {e}")
         except httpx.TimeoutException as e:
+            es_breaker.record_failure()
             raise ElasticsearchError(f"Request to Elasticsearch timed out: {e}")
         except httpx.HTTPError as e:
+            es_breaker.record_failure()
             raise ElasticsearchError(f"HTTP error communicating with Elasticsearch: {e}")
 
         if response.status_code >= 400:

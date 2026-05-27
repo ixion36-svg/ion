@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
+import httpx
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session, joinedload
 
@@ -901,7 +902,11 @@ class KibanaSyncService:
                 result = await self.sync_all_cases()
                 if result.get("synced", 0) > 0:
                     logger.info(f"Kibana sync: {result['synced']} comments synced from {result['cases']} cases")
+
+                kibana_breaker.record_success()
             except Exception as e:
+                if isinstance(e, (httpx.ConnectError, httpx.TimeoutException, httpx.ReadError, httpx.NetworkError)):
+                    kibana_breaker.record_failure()
                 logger.warning(f"Kibana sync error: {type(e).__name__}")
 
             await asyncio.sleep(interval_seconds)

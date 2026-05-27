@@ -11,6 +11,7 @@ from typing import Any, AsyncGenerator, Dict, List, Optional, Tuple
 
 import httpx
 
+from ion.core.circuit_breaker import ollama_breaker
 from ion.services.pii_anon_service import TokenMap, get_pii_anon_service
 
 logger = logging.getLogger(__name__)
@@ -558,6 +559,9 @@ class OllamaService:
         model = model or self.default_model
         request_id: Optional[str] = None
 
+        if not ollama_breaker.can_execute():
+            raise OllamaError("Ollama temporarily unavailable (circuit breaker open)")
+
         if not bypass_queue:
             # Check rate limit
             allowed, wait_time = await self._queue.check_rate_limit(user_id)
@@ -621,6 +625,7 @@ class OllamaService:
             )
             response.raise_for_status()
             data = response.json()
+            ollama_breaker.record_success()
 
             content = data.get("message", {}).get("content", "")
             if anon_active:
@@ -634,9 +639,13 @@ class OllamaService:
                 "eval_count": data.get("eval_count"),
             }
         except httpx.TimeoutException:
+            ollama_breaker.record_failure()
             raise OllamaError("Request timed out - model may still be loading")
         except OllamaError:
             raise
+        except httpx.ConnectError:
+            ollama_breaker.record_failure()
+            raise OllamaError("Failed to connect to Ollama")
         except Exception as e:
             logger.error("Chat failed: %s", e)
             raise OllamaError(f"Chat failed: {e}")
@@ -660,6 +669,10 @@ class OllamaService:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Send a chat message and stream the response."""
         model = model or self.default_model
+
+        if not ollama_breaker.can_execute():
+            yield {"error": "Ollama temporarily unavailable (circuit breaker open)"}
+            return
 
         # Check rate limit
         allowed, wait_time = await self._queue.check_rate_limit(user_id)
@@ -714,6 +727,7 @@ class OllamaService:
                 },
             ) as response:
                 response.raise_for_status()
+                ollama_breaker.record_success()
                 async for line in response.aiter_lines():
                     if line:
                         import json
@@ -727,7 +741,11 @@ class OllamaService:
                             "model": model,
                         }
         except httpx.TimeoutException:
+            ollama_breaker.record_failure()
             yield {"error": "Request timed out - model may still be loading"}
+        except httpx.ConnectError:
+            ollama_breaker.record_failure()
+            yield {"error": "Failed to connect to Ollama"}
         except Exception as e:
             logger.error("Chat stream failed: %s", e)
             yield {"error": f"Chat stream failed: {e}"}
@@ -743,6 +761,9 @@ class OllamaService:
     ) -> str:
         """Simple text generation (non-chat format)."""
         model = model or self.default_model
+
+        if not ollama_breaker.can_execute():
+            raise OllamaError("Ollama temporarily unavailable (circuit breaker open)")
 
         try:
             response = await self.client.post(
@@ -760,7 +781,16 @@ class OllamaService:
                 },
             )
             response.raise_for_status()
+            ollama_breaker.record_success()
             return response.json().get("response", "")
+        except httpx.TimeoutException:
+            ollama_breaker.record_failure()
+            raise OllamaError("Generate timed out - model may still be loading")
+        except httpx.ConnectError:
+            ollama_breaker.record_failure()
+            raise OllamaError("Failed to connect to Ollama")
+        except OllamaError:
+            raise
         except Exception as e:
             logger.error("Generate failed: %s", e)
             raise OllamaError(f"Generate failed: {e}")
