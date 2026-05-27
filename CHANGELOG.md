@@ -1,13 +1,27 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.33.2 -->
+<!-- ion-doc:version=0.34.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-27 -->
 
 # Changelog
+
+## v0.34.0 — 2026-05-27
+
+**Arkime auto-case + PCAP analysis; remove AI case-summary on close.**
+
+Two SOC workflow changes:
+
+1. **Arkime auto-case** (`src/ion/services/arkime_auto_case_service.py`). A new background loop (advisory lock `1025`) runs every 5 minutes and scans the last hour of ES alerts. Any alert carrying both `network.community_id` and `arkime_node` that has no `alert_triage` row is automatically promoted to an `AlertCase` (OPEN, attributed to Bob) with a linked `AlertTriage` row, and PCAP analysis is immediately queued via `pcap_analysis_service`. Analysts see these cases in their queue with the PCAP note posted by Bob once analysis completes. Configurable via `ION_ARKIME_AUTO_CASE_ENABLED` (default `true`), `ION_ARKIME_AUTO_CASE_INTERVAL_MINUTES` (default `5`), `ION_ARKIME_AUTO_CASE_SCAN_HOURS` (default `1`).
+
+2. **Remove AI case-summary on close.** `_background_ai_case_summary` was being enqueued as a background task every time a case was closed. The AI-generated executive summary was posting an unwanted automated comment to the case journal on close. The `background_tasks.add_task` call has been removed; the human-authored closure note ("Case closed as …") is still written as before.
+
+Also removes the MITRE ATT&CK heatmap feature from CyAB entirely. The heatmap required `CyabSubProfile` catalogue data and a `use_case_status` JSON column that was structurally too short (VARCHAR 64) to hold the required data. Rather than carry broken infrastructure, the feature has been removed: `mitre_heatmap_service.py`, `attack_heatmap.html`, `tests/test_mitre_heatmap.py`, the `/cyab/attack-heatmap` page route and API endpoint, and the ATT&CK Heatmap tab from the CyAB section nav. The `normalize_technique_id` / `_get_snapshot` utilities that powered the threat-intel technique-drill endpoint have been inlined into `threat_intel_api.py` so that feature is unaffected.
+
+**Audit impact**: no change. 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new security findings: 0C / 0H / 0M / 0L.
 
 ## v0.33.2 — 2026-05-27
 

@@ -2,7 +2,9 @@
 
 import json
 import logging
-from typing import Optional
+import re
+from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -18,6 +20,44 @@ from ion.services.threat_intel_service import ThreatIntelService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["threat-intel"])
+
+# ---------------------------------------------------------------------------
+# Bundled ATT&CK snapshot helpers (used by technique drill endpoint)
+# ---------------------------------------------------------------------------
+
+_SNAPSHOT_PATH = Path(__file__).parent.parent / "data" / "attack_techniques.json"
+_TECHNIQUE_NORM_RE = re.compile(r"^T?(\d{4}(?:\.\d{3})?)$", re.IGNORECASE)
+_snapshot_cache: Optional[Tuple[Dict[str, dict], Dict[str, str]]] = None
+
+
+def _load_snapshot() -> Tuple[Dict[str, dict], Dict[str, str]]:
+    raw = json.loads(_SNAPSHOT_PATH.read_text(encoding="utf-8"))
+    by_id: Dict[str, dict] = {}
+    by_name: Dict[str, str] = {}
+    for entry in raw:
+        tid = entry["id"].upper()
+        by_id[tid] = {
+            "name": entry["name"],
+            "tactic_ids": entry.get("tactic_ids", []),
+            "is_subtechnique": entry.get("is_subtechnique", False),
+            "parent_id": entry.get("parent_id"),
+        }
+        by_name[entry["name"].lower()] = tid
+    return by_id, by_name
+
+
+def _get_snapshot() -> Tuple[Dict[str, dict], Dict[str, str]]:
+    global _snapshot_cache
+    if _snapshot_cache is None:
+        _snapshot_cache = _load_snapshot()
+    return _snapshot_cache
+
+
+def normalize_technique_id(raw: str) -> Optional[str]:
+    m = _TECHNIQUE_NORM_RE.match(raw.strip())
+    if not m:
+        return None
+    return "T" + m.group(1).upper()
 
 
 # ---- Request/Response Models ----
@@ -557,10 +597,6 @@ def technique_drill(
     from sqlalchemy import cast
 
     from ion.models.alert_triage import AlertCase, AlertTriage
-    from ion.services.mitre_heatmap_service import (
-        _get_snapshot,
-        normalize_technique_id,
-    )
 
     tid = normalize_technique_id(technique_id)
     if not tid:

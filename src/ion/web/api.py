@@ -5640,9 +5640,6 @@ async def update_case(
             if case.kibana_case_id:
                 sync_note_to_kibana(case.kibana_case_id, current_user.username, closure_note.content)
 
-            # AI case summary — auto-generate executive summary on close
-            background_tasks.add_task(_background_ai_case_summary, case_id, current_user.id)
-
             # --- Auto-FP suppression: create KFP + investigation memory ---
             if data.closure_reason == "false_positive":
                 try:

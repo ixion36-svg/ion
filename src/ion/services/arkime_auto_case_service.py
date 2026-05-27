@@ -1,0 +1,223 @@
+"""Auto-case creation for alerts with Arkime PCAP capture data.
+
+When an alert carries both ``network.community_id`` (the Zeek/Arkime flow
+hash) and ``arkime_node`` (the capture node name), a case is automatically
+created and PCAP analysis queued — no analyst action required.
+
+Each pass:
+  1. Fetches recent ES alerts via ``ElasticsearchService.get_alerts``.
+  2. Filters to those with both ``network_community_id`` and ``arkime_node``.
+  3. Excludes alert IDs already present in ``alert_triage`` (touched by an
+     analyst or by a previous pass of this service).
+  4. For each genuinely new alert: creates an ``AlertCase`` + ``AlertTriage``
+     row and enqueues PCAP analysis via ``pcap_analysis_service``.
+
+Environment variables:
+
+* ``ION_ARKIME_AUTO_CASE_ENABLED``            (default ``true``)
+* ``ION_ARKIME_AUTO_CASE_INTERVAL_MINUTES``   (default ``5``)
+* ``ION_ARKIME_AUTO_CASE_SCAN_HOURS``         (default ``1``) — look-back window per pass
+"""
+
+import asyncio
+import logging
+import os
+from typing import Optional
+
+from sqlalchemy.engine import Engine
+
+logger = logging.getLogger(__name__)
+
+_task: Optional[asyncio.Task] = None
+_running = False
+
+_DEFAULT_INTERVAL_MINUTES = 5.0
+_DEFAULT_SCAN_HOURS = 1
+_MIN_INTERVAL_SECONDS = 60
+
+
+def _interval_seconds() -> int:
+    raw = os.environ.get(
+        "ION_ARKIME_AUTO_CASE_INTERVAL_MINUTES", str(_DEFAULT_INTERVAL_MINUTES)
+    )
+    try:
+        minutes = float(raw)
+    except (TypeError, ValueError):
+        minutes = _DEFAULT_INTERVAL_MINUTES
+    return max(_MIN_INTERVAL_SECONDS, int(minutes * 60))
+
+
+def _scan_hours() -> int:
+    raw = os.environ.get("ION_ARKIME_AUTO_CASE_SCAN_HOURS", str(_DEFAULT_SCAN_HOURS))
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return _DEFAULT_SCAN_HOURS
+
+
+def _enabled() -> bool:
+    val = os.environ.get("ION_ARKIME_AUTO_CASE_ENABLED", "true").strip().lower()
+    return val not in ("false", "0", "no", "off", "")
+
+
+async def _run_pass(engine: Engine) -> None:
+    """One sweep: find new Arkime-bearing alerts, create cases."""
+    try:
+        from ion.models.alert_triage import AlertTriage
+        from ion.services.ai_user import get_bob_user_id
+        from ion.services.elasticsearch_service import get_elasticsearch_service
+        from ion.services.pcap_analysis_service import enqueue_pcap_analysis_for_case
+        from ion.storage.database import get_session_factory
+    except Exception as exc:
+        logger.warning("arkime_auto_case: import failed: %s", exc)
+        return
+
+    # 1. Fetch recent alerts from ES.
+    try:
+        es = get_elasticsearch_service()
+        if not es.is_configured:
+            return
+        alerts = await es.get_alerts(hours=_scan_hours(), limit=500, include_closed=False)
+    except Exception as exc:
+        logger.debug("arkime_auto_case: ES fetch failed: %s", exc)
+        return
+
+    # 2. Keep only alerts with both community_id and arkime_node.
+    arkime_alerts = [
+        a for a in alerts
+        if a.network_community_id and a.arkime_node
+    ]
+    if not arkime_alerts:
+        return
+
+    alert_ids = [a.id for a in arkime_alerts]
+
+    factory = get_session_factory(engine)
+    session = factory()
+    try:
+        # 3. Exclude alert IDs already recorded in alert_triage.
+        existing = {
+            row[0]
+            for row in session.query(AlertTriage.es_alert_id).filter(
+                AlertTriage.es_alert_id.in_(alert_ids)
+            ).all()
+        }
+        new_alerts = [a for a in arkime_alerts if a.id not in existing]
+        if not new_alerts:
+            return
+
+        bob_id = get_bob_user_id(session)
+        if not bob_id:
+            logger.warning(
+                "arkime_auto_case: Bob user not seeded; skipping pass"
+            )
+            return
+
+        # 4. Create case + triage for each new alert.
+        for alert in new_alerts:
+            try:
+                _create_case_for_alert(
+                    session, alert, bob_id, enqueue_pcap_analysis_for_case
+                )
+            except Exception as exc:
+                session.rollback()
+                logger.warning(
+                    "arkime_auto_case: failed to create case for alert %s: %s",
+                    alert.id, exc,
+                )
+    finally:
+        session.close()
+
+
+def _create_case_for_alert(session, alert, bob_id: int, enqueue_fn) -> None:
+    """Create AlertCase + AlertTriage and enqueue PCAP for one alert."""
+    from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage
+
+    last_case = session.query(AlertCase).order_by(AlertCase.id.desc()).first()
+    next_num = 1 if not last_case else last_case.id + 1
+    case_number = f"CASE-{next_num:04d}"
+
+    node_label = f" [{alert.arkime_node}]" if alert.arkime_node else ""
+    case = AlertCase(
+        case_number=case_number,
+        title=f"[Auto] {alert.title}{node_label}",
+        description=(
+            f"Automatically created from Arkime-captured alert {alert.id}. "
+            f"PCAP analysis queued."
+        ),
+        status=AlertCaseStatus.OPEN,
+        severity=alert.severity,
+        created_by_id=bob_id,
+        assigned_to_id=bob_id,
+        source_alert_ids=[alert.id],
+    )
+    session.add(case)
+    session.flush()
+
+    triage = AlertTriage(
+        es_alert_id=alert.id,
+        case_id=case.id,
+        source_system=alert.source_system,
+    )
+    session.add(triage)
+    session.commit()
+
+    logger.info(
+        "arkime_auto_case: created %s for alert %s (community_id=%s node=%s)",
+        case_number, alert.id, alert.network_community_id, alert.arkime_node,
+    )
+
+    enqueue_fn(
+        case_id=case.id,
+        flows=[{
+            "community_id": alert.network_community_id,
+            "node_hint": alert.arkime_node,
+            "alert_id": alert.id,
+            "source_ip": alert.source_ip,
+            "destination_ip": alert.destination_ip,
+            "alert_timestamp": (
+                alert.timestamp.isoformat() if alert.timestamp else None
+            ),
+        }],
+    )
+
+
+async def _loop(engine: Engine) -> None:
+    global _running
+    interval = _interval_seconds()
+    logger.info(
+        "Arkime auto-case loop started; interval=%ds scan_hours=%d",
+        interval, _scan_hours(),
+    )
+    while _running:
+        try:
+            await asyncio.sleep(interval)
+        except asyncio.CancelledError:
+            break
+        if not _running:
+            break
+        await _run_pass(engine)
+
+
+def start_background_loop(engine: Engine) -> Optional[asyncio.Task]:
+    """Start the Arkime auto-case loop. Idempotent."""
+    global _task, _running
+    if not _enabled():
+        logger.info(
+            "Arkime auto-case disabled (ION_ARKIME_AUTO_CASE_ENABLED=false)"
+        )
+        return None
+    if _running:
+        return _task
+    _running = True
+    _task = asyncio.create_task(_loop(engine))
+    return _task
+
+
+def stop_background_loop() -> None:
+    """Cancel the loop. Used in tests."""
+    global _task, _running
+    _running = False
+    if _task is not None:
+        _task.cancel()
+        _task = None

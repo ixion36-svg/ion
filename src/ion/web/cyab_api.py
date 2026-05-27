@@ -3835,34 +3835,6 @@ def patch_data_source_uc_status(
 
 
 # ---------------------------------------------------------------------------
-# MITRE ATT&CK coverage heatmap (v0.22.0)
-# ---------------------------------------------------------------------------
-
-@router.get(
-    "/attack-heatmap",
-    dependencies=[Depends(require_permission("alert:read"))],
-)
-def get_attack_heatmap(
-    session: Session = Depends(get_db_session),
-    system_id: Optional[int] = None,
-):
-    """Return the MITRE ATT&CK technique coverage heatmap dict.
-
-    Optional ?system_id=N scopes catalogue declared state to one system.
-    Response is always fresh (Cache-Control: no-cache).
-    """
-    from fastapi.responses import JSONResponse as _JSONResponse
-
-    from ion.services.mitre_heatmap_service import get_heatmap
-
-    data = get_heatmap(session, system_id=system_id)
-    return _JSONResponse(
-        content=data,
-        headers={"Cache-Control": "no-cache"},
-    )
-
-
-# ---------------------------------------------------------------------------
 # Per-system sub-profile coverage
 # ---------------------------------------------------------------------------
 

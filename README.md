@@ -1,7 +1,7 @@
 <!-- ion-doc:type=PROJECT OVERVIEW -->
 <!-- ion-doc:title=ION — Intelligent Operating Network -->
 <!-- ion-doc:subtitle=SOC analyst workbench: features, integrations, deployment, documentation index -->
-<!-- ion-doc:version=0.33.2 -->
+<!-- ion-doc:version=0.34.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Any reader; first-touch overview -->

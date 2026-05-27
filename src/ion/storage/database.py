@@ -84,6 +84,7 @@ LOCK_SEED_CYAB_SUBPROFILES  = 1021  # v0.12.0 — Onboarding Studio catalogue se
 LOCK_BOB_EVAL_BG            = 1022  # v0.21.0 — Bob Prompt Eval Harness singleton guard
 LOCK_SESSION_CLEANUP_BG     = 1023  # v0.31.13 — data-min P13 G1: periodic expired-session cleanup
 LOCK_DATA_RETENTION_BG      = 1024  # v0.31.14 — data-min P13 G2+G3: audit_logs + security_events retention
+LOCK_ARKIME_AUTO_CASE_BG    = 1025  # v0.34.0  — auto-case + PCAP for Arkime-bearing alerts
 
 
 @contextmanager
