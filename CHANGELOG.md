@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.32.0 -->
+<!-- ion-doc:version=0.32.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-27 -->
 
 # Changelog
+
+## v0.32.1 — 2026-05-27
+
+**Code review follow-up: ES client credential refresh + dead ticker permissions removed.**
+
+- **`_get_es_client` credential collision (CODE_REVIEW_ION.md Finding #2):** After first connection establishment, runtime credential changes (e.g. admin-wizard update) were silently ignored — the stale client persisted until server restart. Fixed via a 16-char SHA-256 fingerprint (`_creds_fingerprint`) of `(headers, auth)` cached alongside the module-level client. `_get_es_client` now compares fingerprints on every call and recreates the client (gracefully closing the old one via `loop.create_task(aclose())`) on any mismatch. `_close_es_client` also clears the fingerprint. 8 unit tests in `tests/test_v033_es_client_credential_refresh.py` cover: same creds → same client, changed creds → new client, fingerprint updated after refresh, close clears both, dict insertion-order invariance.
+- **Dead ticker permissions (CODE_REVIEW_ION.md Finding #3):** `ticker:read`, `ticker:create`, and `ticker:manage` permission definitions were seeded on every fresh install, and `ticker:read`/`ticker:create` were granted to the `ai_analyst` role — but no API endpoint enforces any `ticker:*` permission. Removed from `_initialize_permissions()` and the `ai_analyst` role grant list. The Ticker model, `tickers` table, and `wallboard_service._collect_ticker()` are intentionally retained dormant for a future redesign.
+- **CODE_REVIEW_ION.md:** All four named findings now marked ✅ Fixed (v0.32.0 / v0.32.1).
+
+SECURE_BY_DESIGN audit summary unchanged at **19 Met / 1 Mostly Met / 0 Partial / 0 Gap**. **Net new findings: 0C / 0H / 0M / 0L.** No schema changes, no new attack surface, no permission gate changes.
 
 ## v0.32.0 — 2026-05-27
 

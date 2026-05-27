@@ -3,6 +3,8 @@
 Provides functionality to fetch alerts and security events from Elasticsearch.
 """
 
+import asyncio
+import hashlib
 import logging
 import os
 from dataclasses import dataclass
@@ -19,12 +21,29 @@ logger = logging.getLogger(__name__)
 
 # Shared persistent httpx client — avoids per-request connection overhead.
 _es_client: Optional[httpx.AsyncClient] = None
+_es_client_creds: Optional[str] = None  # fingerprint of (headers, auth) used at creation
+
+
+def _creds_fingerprint(headers: Dict, auth: Optional[tuple]) -> str:
+    raw = repr(sorted(headers.items())) + repr(auth)
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
 def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
-    """Return (and lazily create) the module-level shared async client."""
-    global _es_client
-    if _es_client is None or _es_client.is_closed:
+    """Return (and lazily create) the module-level shared async client.
+
+    Recreates the client when credentials change so a runtime credential
+    update (e.g. admin wizard) is picked up without a server restart.
+    """
+    global _es_client, _es_client_creds
+    fp = _creds_fingerprint(headers, auth)
+    if _es_client is None or _es_client.is_closed or fp != _es_client_creds:
+        if _es_client is not None and not _es_client.is_closed:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(_es_client.aclose())
+            except RuntimeError:
+                pass
         _es_client = httpx.AsyncClient(
             headers=headers,
             auth=auth,
@@ -32,20 +51,21 @@ def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
             timeout=timeout,
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         )
+        _es_client_creds = fp
     return _es_client
 
 
 def _close_es_client() -> None:
     """Close the shared ES client (call on config change)."""
-    global _es_client
+    global _es_client, _es_client_creds
     if _es_client is not None and not _es_client.is_closed:
         try:
-            import asyncio
             loop = asyncio.get_running_loop()
             loop.create_task(_es_client.aclose())
         except RuntimeError:
             pass
     _es_client = None
+    _es_client_creds = None
 
 
 def _redact_url(url: str) -> str:
