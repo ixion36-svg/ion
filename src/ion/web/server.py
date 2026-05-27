@@ -169,32 +169,13 @@ app = FastAPI(
 # Security Headers Middleware
 # =============================================================================
 
-# v0.31.3: per-request CSP nonce. The middleware seeds this contextvar at
-# request start; templates read it via the `csp_nonce` Jinja global below.
-# ContextVar is per-async-task safe — different concurrent requests get
-# different nonces without leaking across tasks.
-import contextvars as _contextvars
+# v0.31.3: per-request CSP nonce. The middleware seeds _csp_nonce_var at
+# request start; templates read it via the `csp_nonce` Jinja global.
+# Moved to _csp_nonce.py (v0.33.1) so API modules with private templates
+# instances can register the same proxy without circular imports.
 import secrets as _secrets
 
-_csp_nonce_var: _contextvars.ContextVar[str] = _contextvars.ContextVar(
-    "csp_nonce", default=""
-)
-
-
-class _CSPNonceProxy:
-    """Renders the current request's CSP nonce when interpolated in a template.
-
-    Used as `{{ csp_nonce }}` (no parens) inside `<script nonce="...">` and
-    `<style nonce="...">` opening tags. The nonce is base64-url and contains
-    no HTML-special characters, so `__html__()` returns it verbatim to avoid
-    Jinja's autoescape mangling it.
-    """
-
-    def __str__(self) -> str:
-        return _csp_nonce_var.get()
-
-    def __html__(self) -> str:
-        return _csp_nonce_var.get()
+from ion.web._csp_nonce import _CSPNonceProxy, _csp_nonce_var
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

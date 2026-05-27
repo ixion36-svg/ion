@@ -171,7 +171,15 @@ def main() -> None:
     for style_val, class_name in style_to_class.items():
         # Ensure trailing semicolon-cleanup; just wrap as { ...; }
         decls = style_val.strip().rstrip(";")
-        body_lines.append(f".{class_name} {{ {decls}; }}")
+        # display:none rules use 'html body .' prefix (specificity 0,1,2) so they
+        # beat single-class page CSS (0,1,0) without !important, preserving the
+        # ability for JS inline styles (specificity 1,0,0) to show elements.
+        import re as _re
+        if _re.search(r'display\s*:\s*none', decls):
+            selector_prefix = "html body "
+        else:
+            selector_prefix = ""
+        body_lines.append(f"{selector_prefix}.{class_name} {{ {decls}; }}")
     CSS_OUT.write_text(header + "\n".join(body_lines) + "\n", encoding="utf-8")
     print(f"wrote {CSS_OUT.relative_to(TEMPLATE_DIR.parent.parent.parent.parent)}")
 

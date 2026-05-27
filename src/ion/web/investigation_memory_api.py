@@ -45,8 +45,10 @@ router = APIRouter(tags=["investigation-memory"])
 # Shared Jinja env — resolve against the same templates/ dir the rest of
 # the app uses. Importing server.templates would create a circular import,
 # so we re-instantiate against the same directory.
+from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=_TEMPLATES_DIR)
+templates.env.globals["csp_nonce"] = _CspNonceProxy()
 
 
 # =========================================================================

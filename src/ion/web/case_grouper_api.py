@@ -35,8 +35,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["case-grouper"])
 
 # Reuse the same templates dir — importing server.templates would loop.
+from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=_TEMPLATES_DIR)
+templates.env.globals["csp_nonce"] = _CspNonceProxy()
 
 
 def _resolve_interval_s() -> int:

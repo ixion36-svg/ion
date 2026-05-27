@@ -29,8 +29,10 @@ router = APIRouter(tags=["alert-prompts"])
 # Templates dir — resolve relative to this file so we share server.py's dir.
 # We also mirror the ion_version global that server.py sets so {{ ion_version }}
 # in base.html renders correctly.
+from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 _templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
+_templates.env.globals["csp_nonce"] = _CspNonceProxy()
 try:
     import ion as _ion_pkg
     _templates.env.globals["ion_version"] = _ion_pkg.__version__
