@@ -97,32 +97,33 @@ async def _check_cluster_health() -> Dict[str, Any]:
 async def _check_critical_alerts() -> Dict[str, Any]:
     """Critical alerts in the last 24 h, with ION-local fallback.
 
-    v0.19.5: was Critical + High. Daily standup surfaces "what should
-    ops act on right now" — the High band diluted the focus. Operators
-    can still see High via /alerts.
-
-    v0.19.15: if the ES query returns zero results (wrong index path,
-    severity stored numerically by Wazuh/Sigma, ES temporarily
-    unreachable, etc.), fall back to ION's local AlertTriage table.
-    Limitation: AlertTriage doesn't store severity natively, so the
-    fallback returns ALL recent triage rows the analyst hasn't closed
-    yet — operationally useful (anything ION has seen and not yet
-    dispositioned) but coarser than a true severity match. The
-    response carries ``source`` so the UI can label the difference.
+    v0.19.5: was Critical + High.
+    v0.19.15: added ION-local fallback when ES is unreachable.
+    v0.34.2: fallback only fires when ES is NOT configured or returns an
+    error. A healthy ES responding with zero critical alerts is a valid
+    answer — the previous ``if es_alerts:`` guard fired the fallback
+    whenever ES returned ``[]``, so the standup always showed old triage
+    rows instead of "0 critical alerts". Also: ``rule_name`` now falls
+    back to ``title`` on the ES path, and the AlertTriage fallback never
+    exposes the raw ``es_alert_id`` as a display name.
     """
     from ion.services.elasticsearch_service import ElasticsearchService
 
     es = ElasticsearchService()
     es_alerts: list = []
     es_error: str = ""
+    es_queried = False  # True when ES responded without raising
 
     if es.is_configured:
         try:
             es_alerts = await es.get_alerts(hours=24, severity="critical", limit=50)
+            es_queried = True
         except Exception as e:
             es_error = str(e)[:100]
 
-    if es_alerts:
+    # ES answered (even with an empty result) — that IS the authoritative answer.
+    # Do not fall through to the AlertTriage table when ES is healthy.
+    if es_queried:
         return {
             "critical_count": len(es_alerts),
             "total": len(es_alerts),
@@ -135,13 +136,13 @@ async def _check_critical_alerts() -> Dict[str, Any]:
                     "status": a.status,
                     "host": a.host,
                     "timestamp": a.timestamp.isoformat(),
-                    "rule_name": a.rule_name,
+                    "rule_name": a.rule_name or a.title or "(rule unknown)",
                 }
                 for a in sorted(es_alerts, key=lambda x: x.timestamp, reverse=True)[:20]
             ],
         }
 
-    # ── Fallback to ION-local AlertTriage ──
+    # ── Fallback to ION-local AlertTriage — only when ES is down/unconfigured ──
     from ion.core.config import get_config
     from ion.models.alert_triage import AlertTriage, AlertTriageStatus
     from ion.storage.database import get_engine, get_session_factory
@@ -152,9 +153,6 @@ async def _check_critical_alerts() -> Dict[str, Any]:
     session = factory()
     try:
         cutoff = datetime.utcnow() - timedelta(hours=24)
-        # Show triage rows the analyst hasn't closed — these are the
-        # things ION has seen and that need attention. Sorted newest
-        # first to match the ES path's ordering.
         rows = (
             session.query(AlertTriage)
             .filter(AlertTriage.created_at >= cutoff)
@@ -169,21 +167,18 @@ async def _check_critical_alerts() -> Dict[str, Any]:
             "source": "ion_fallback",
             "fallback_reason": (
                 f"ES error: {es_error}" if es_error
-                else "ES query returned no critical alerts in last 24h"
+                else "ES not configured"
             ),
             "alerts": [
                 {
                     "id": r.es_alert_id,
-                    "title": r.rule_name or r.es_alert_id,
-                    # v0.19.15: AlertTriage doesn't store severity, so
-                    # fallback rows show "(unknown)". Once a future
-                    # release denormalises severity onto the triage
-                    # row, this becomes accurate.
+                    # Never expose the raw es_alert_id UUID as a display name.
+                    "title": r.rule_name or "(rule unknown)",
                     "severity": "(unknown)",
                     "status": r.status.value if hasattr(r.status, "value") else str(r.status),
                     "host": "—",
                     "timestamp": r.created_at.isoformat() if r.created_at else None,
-                    "rule_name": r.rule_name,
+                    "rule_name": r.rule_name or "(rule unknown)",
                 }
                 for r in rows
             ],

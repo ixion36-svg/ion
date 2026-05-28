@@ -1,13 +1,27 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.34.1 -->
+<!-- ion-doc:version=0.34.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-28 -->
 
 # Changelog
+
+## v0.34.2 — 2026-05-28
+
+**Fix daily standup critical-alerts panel always showing fallback data.**
+
+Two bugs in `_check_critical_alerts()` in `daily_standup_api.py`:
+
+1. **Wrong fallback trigger.** The original code checked `if es_alerts:` — so any empty result from ES, including a healthy cluster genuinely reporting zero critical alerts, triggered the ION-local `AlertTriage` fallback. The standup panel always showed stale triage rows. Fix: track `es_queried = True` when ES responds without error; if `es_queried` is set, return the ES answer directly (even if it is zero) without touching the fallback.
+
+2. **Rule ID shown instead of rule name.** When `rule_name` was `None` on an `AlertTriage` row, the fallback set `"title"` to `r.es_alert_id` (a raw Elasticsearch UUID). Since the template chain is `rule_name → title → "(rule unknown)"`, analysts saw the UUID as the displayed rule name. Fix: `"title"` in the fallback path now resolves to `r.rule_name or "(rule unknown)"` — the `es_alert_id` is never used as a display value. Also, the ES path now sets `"rule_name"` to `a.rule_name or a.title or "(rule unknown)"` so the field is never `null`.
+
+6 new unit tests in `tests/test_v034_standup_critical_alerts.py`.
+
+**Audit impact**: none. 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new security findings: 0C / 0H / 0M / 0L.
 
 ## v0.34.1 — 2026-05-28
 
