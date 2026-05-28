@@ -26,11 +26,11 @@
 
 <!-- Not-configured banner (hidden by default) -->
 <div id="atf-unconfigured" class="hidden mb-6 rounded-lg border border-amber-500/30 bg-amber-900/20 px-5 py-4 text-amber-300 text-sm">
-  <strong>Arkime not configured.</strong> Set <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_URL</code>, <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_USERNAME</code>, and <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_PASSWORD</code> in your environment to enable traffic analytics.
+  <strong>Demo mode</strong> — Arkime not configured, showing synthetic data. Set <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_URL</code>, <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_USERNAME</code>, and <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_PASSWORD</code> to connect live traffic.
 </div>
 
 <!-- Stats bar -->
-<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8" id="atf-stats">
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="atf-stats">
   <div class="atf-stat-card">
     <div class="atf-stat-value" id="stat-sessions">—</div>
     <div class="atf-stat-label">Total Sessions</div>
@@ -47,6 +47,14 @@
     <div class="atf-stat-value" id="stat-top-src">—</div>
     <div class="atf-stat-label">Top Source IP</div>
   </div>
+  <div class="atf-stat-card">
+    <div class="atf-stat-value text-emerald-400 font-mono" id="stat-top-src-country">—</div>
+    <div class="atf-stat-label">Top Src Country</div>
+  </div>
+  <div class="atf-stat-card">
+    <div class="atf-stat-value text-emerald-400 font-mono" id="stat-top-dst-country">—</div>
+    <div class="atf-stat-label">Top Dst Country</div>
+  </div>
 </div>
 
 <!-- Volume chart -->
@@ -55,7 +63,7 @@
     <h2 class="atf-card-title">Traffic Volume</h2>
     <span class="text-slate-500 text-xs" id="vol-subtitle"></span>
   </div>
-  <div class="relative" style="height: 260px;">
+  <div class="relative atf-chart-h-260">
     <canvas id="vol-chart"></canvas>
     <div id="vol-loading" class="atf-overlay">
       <div class="atf-spinner"></div>
@@ -72,7 +80,7 @@
     <div class="atf-card-header">
       <h2 class="atf-card-title">Protocol Mix</h2>
     </div>
-    <div class="relative" style="height: 220px;">
+    <div class="relative atf-chart-h-220">
       <canvas id="proto-chart"></canvas>
       <div id="proto-loading" class="atf-overlay">
         <div class="atf-spinner"></div>
@@ -104,6 +112,40 @@
     </table>
   </div>
 
+</div>
+
+<!-- Traffic by Sensor (per Arkime node) -->
+<div class="atf-card mb-6" id="node-card">
+  <div class="atf-card-header">
+    <div>
+      <h2 class="atf-card-title">Traffic by Sensor</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Volume per Arkime capture node — sampled from top flows</p>
+    </div>
+  </div>
+  <div class="relative atf-chart-h-220">
+    <canvas id="node-chart"></canvas>
+    <div id="node-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
+    <div id="node-empty" class="atf-overlay hidden text-slate-500 text-sm">No sensor data for this range</div>
+  </div>
+</div>
+
+<!-- Geographic Distribution -->
+<div class="atf-card mb-6" id="country-card">
+  <div class="atf-card-header">
+    <div>
+      <h2 class="atf-card-title">Geographic Distribution</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Volume by country — sampled from top flows</p>
+    </div>
+    <div class="flex gap-2">
+      <button class="atf-country-tab atf-country-active text-xs px-3 py-1 rounded" data-cdir="src">By Source</button>
+      <button class="atf-country-tab text-xs px-3 py-1 rounded" data-cdir="dst">By Destination</button>
+    </div>
+  </div>
+  <div class="relative atf-map-container">
+    <div id="world-map"></div>
+    <div id="country-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
+    <div id="country-empty" class="atf-overlay hidden text-slate-500 text-sm">No geo data for this range</div>
+  </div>
 </div>
 
 </div><!-- /max-w container -->
@@ -169,6 +211,7 @@
   border-radius: 0.75rem;
   z-index: 5;
 }
+.atf-overlay.hidden { display: none; }
 .atf-spinner {
   width: 28px; height: 28px;
   border: 3px solid #334155;
@@ -193,19 +236,38 @@
 #talkers-body td:not(:first-child) { text-align: right; }
 #talkers-body .ip-cell { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #7dd3fc; }
 #talkers-body .bytes-cell { color: #a78bfa; font-variant-numeric: tabular-nums; }
+
+.atf-country-tab { background: transparent; border: 1px solid #334155; color: #64748b; transition: all .15s; }
+.atf-country-tab:hover { color: #e2e8f0; border-color: #475569; }
+.atf-country-active { background: #0f172a; color: #38bdf8; border-color: #38bdf8; }
+.atf-chart-h-260 { height: 260px; }
+.atf-chart-h-220 { height: 220px; }
+.atf-map-container { height: 420px; }
+#world-map { width: 100%; height: 420px; }
+
+.jvectormap-tip { position: fixed; display: none; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 5px 10px; font-size: 12px; border-radius: 4px; pointer-events: none; z-index: 200; white-space: nowrap; }
+.jvectormap-tip.active { display: block; }
+.jvectormap-zoomin, .jvectormap-zoomout { display: none; }
+#world-map svg { max-width: 100%; }
 </style>
 
 <script nonce="{{ csp_nonce }}" src="/static/js/chart.umd.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/jsvectormap.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/jsvectormap-world.js"></script>
 <script nonce="{{ csp_nonce }}">
 (function () {
   'use strict';
 
   // ── State ──────────────────────────────────────────────────────────────────
-  let activeRange = '24h';
-  let activeDir   = 'src';
+  let activeRange       = '24h';
+  let activeDir         = 'src';
+  let activeCountryDir  = 'src';
   let volChart    = null;
   let protoChart  = null;
-  let talkersData = null;   // cached { by_src, by_dst, range }
+  let worldMap    = null;
+  let talkersData = null;
+  let countryData = null;
+  let nodeChart   = null;
 
   // ── Utility ────────────────────────────────────────────────────────────────
   function fmtBytes(b) {
@@ -414,6 +476,43 @@
     `).join('');
   }
 
+  // ── World map ──────────────────────────────────────────────────────────────
+  function destroyWorldMap() {
+    if (worldMap) { try { worldMap.destroy(); } catch (_) {} worldMap = null; }
+    var c = document.getElementById('world-map');
+    if (c) c.innerHTML = '';
+  }
+
+  function renderWorldMap() {
+    destroyWorldMap();
+    hideOverlay('country-loading');
+    if (!countryData) return;
+    var rows = activeCountryDir === 'src' ? (countryData.by_src || []) : (countryData.by_dst || []);
+    if (rows.length === 0) { showOverlay('country-empty'); return; }
+    hideOverlay('country-empty');
+    var values = {}, lookup = {};
+    rows.forEach(function(r) { values[r.country] = r.bytes; lookup[r.country] = r; });
+    worldMap = new jsVectorMap({
+      selector: '#world-map',
+      map: 'world',
+      backgroundColor: 'transparent',
+      zoomButtons: false,
+      zoomOnScroll: false,
+      regionStyle: {
+        initial: { fill: '#1e293b', stroke: '#0f172a', strokeWidth: 0.5 },
+        hover:   { fill: '#475569', cursor: 'default' },
+      },
+      visualizeData: {
+        scale: ['#164e63', '#0ea5e9'],
+        values: values,
+      },
+      onRegionTooltipShow: function(e, tooltip, code) {
+        var d = lookup[code];
+        tooltip.text(d ? code + ': ' + fmtBytes(d.bytes) + ' · ' + fmtNum(d.sessions) + ' sessions' : code);
+      },
+    });
+  }
+
   // ── Data fetchers ──────────────────────────────────────────────────────────
   async function loadOverview(range) {
     showOverlay('vol-loading');
@@ -476,12 +575,222 @@
     }
   }
 
+  async function loadTopCountries(range) {
+    showOverlay('country-loading');
+    hideOverlay('country-empty');
+    countryData = null;
+    destroyWorldMap();
+    try {
+      var resp = await fetch('/api/arkime/traffic/top-countries?range=' + range);
+      if (!resp.ok) {
+        var err = await resp.json().catch(function() { return { detail: resp.statusText }; });
+        throw new Error(err.detail || resp.statusText);
+      }
+      countryData = await resp.json();
+      var topSrc = (countryData.by_src || [])[0];
+      var topDst = (countryData.by_dst || [])[0];
+      var srcEl = document.getElementById('stat-top-src-country');
+      var dstEl = document.getElementById('stat-top-dst-country');
+      if (srcEl) srcEl.textContent = topSrc ? topSrc.country : '—';
+      if (dstEl) dstEl.textContent = topDst ? topDst.country : '—';
+      renderWorldMap();
+    } catch (e) {
+      hideOverlay('country-loading');
+      showOverlay('country-empty');
+      var emEl = document.getElementById('country-empty');
+      if (emEl) emEl.textContent = 'Error: ' + e.message;
+      console.error('Top countries error:', e);
+    }
+  }
+
+  function renderNodeChart(nodes) {
+    nodeChart = destroyChart(nodeChart);
+    hideOverlay('node-loading');
+    if (!nodes || nodes.length === 0) { showOverlay('node-empty'); return; }
+    hideOverlay('node-empty');
+    var labels = nodes.map(function(n) { return n.node; });
+    var bytes  = nodes.map(function(n) { return n.bytes; });
+    var COLORS = ['#0ea5e9','#38bdf8','#7dd3fc','#bae6fd','#e0f2fe'];
+    var ctx = document.getElementById('node-chart').getContext('2d');
+    nodeChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Volume',
+          data: bytes,
+          backgroundColor: labels.map(function(_, i) { return COLORS[i % COLORS.length]; }),
+          borderColor: 'transparent',
+          borderRadius: 4,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            callbacks: {
+              label: function(ctx) {
+                var n = nodes[ctx.dataIndex];
+                return ' ' + fmtBytes(n.bytes) + '  ·  ' + fmtNum(n.sessions) + ' sessions';
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: '#475569', font: { size: 10 }, callback: function(v) { return fmtBytes(v); } },
+            grid: { color: 'rgba(51,65,85,.4)' },
+          },
+          y: { ticks: { color: '#cbd5e1', font: { size: 11 } }, grid: { display: false } },
+        },
+      },
+    });
+  }
+
+  async function loadPerNode(range) {
+    showOverlay('node-loading');
+    hideOverlay('node-empty');
+    nodeChart = destroyChart(nodeChart);
+    try {
+      var resp = await fetch('/api/arkime/traffic/per-node?range=' + range);
+      if (!resp.ok) {
+        var err = await resp.json().catch(function() { return { detail: resp.statusText }; });
+        throw new Error(err.detail || resp.statusText);
+      }
+      var data = await resp.json();
+      renderNodeChart(data.nodes || []);
+    } catch (e) {
+      hideOverlay('node-loading');
+      showOverlay('node-empty');
+      console.error('Per-node error:', e);
+    }
+  }
+
   async function loadAll(range) {
-    await Promise.all([loadOverview(range), loadTopTalkers(range)]);
+    await Promise.all([loadOverview(range), loadTopTalkers(range), loadTopCountries(range), loadPerNode(range)]);
+  }
+
+  // ── Demo mode ──────────────────────────────────────────────────────────────
+  function _demoOverview(range) {
+    var secs = {'24h':86400,'7d':604800,'30d':2592000}[range]||86400;
+    var ivMs  = {'24h':30*60e3,'7d':3*3600e3,'30d':24*3600e3}[range];
+    var now   = Date.now(), start = now - secs*1000;
+    var src=[],dst=[];
+    for (var t=start; t<=now; t+=ivMs) {
+      var h = new Date(t).getHours();
+      var fac = 1 + 2*Math.max(0, 1-Math.abs(h-13)/6);
+      var noise = 0.65 + 0.7*((Math.sin(t/1e8)*0.5+0.5));
+      var v = Math.floor(1800000*fac*noise);
+      src.push([t,v]); dst.push([t,Math.floor(v*0.62)]);
+    }
+    return {src_histo:src, dst_histo:dst,
+      protocols:{tcp:15420,udp:3210,tls:892,dns:1205,http:445,smb:189},
+      total_sessions:21361,
+      total_bytes:src.reduce(function(s,p){return s+p[1];},0)+dst.reduce(function(s,p){return s+p[1];},0)};
+  }
+
+  var _DEMO_TALKERS = {
+    by_src:[
+      {ip:'10.10.45.23',  bytes:8547291648,sessions:2341},
+      {ip:'192.168.1.105',bytes:6213847552,sessions:1876},
+      {ip:'172.16.0.88',  bytes:4102938624,sessions:1234},
+      {ip:'10.0.0.45',    bytes:2847293440,sessions:987},
+      {ip:'203.0.113.67', bytes:1934857216,sessions:543},
+      {ip:'10.20.5.12',   bytes:1247293440,sessions:412},
+      {ip:'172.31.0.100', bytes:934857216, sessions:287},
+    ],
+    by_dst:[
+      {ip:'8.8.8.8',          bytes:12045678592,sessions:4521},
+      {ip:'1.1.1.1',          bytes:8934857216, sessions:3210},
+      {ip:'185.199.108.153',  bytes:5123847168, sessions:1876},
+      {ip:'140.82.121.4',     bytes:3847293440, sessions:1123},
+      {ip:'151.101.193.69',   bytes:2134857216, sessions:876},
+      {ip:'104.21.45.12',     bytes:1547293440, sessions:543},
+      {ip:'172.217.169.46',   bytes:934857216,  sessions:312},
+    ],
+  };
+
+  var _DEMO_NODES = {
+    nodes:[
+      {node:'dc-core-01',     bytes:52847291648, sessions:14231},
+      {node:'dc-dmz-02',      bytes:31213847552, sessions:8876},
+      {node:'branch-east-01', bytes:18934857216, sessions:5234},
+      {node:'branch-west-02', bytes:12547293440, sessions:3643},
+      {node:'vpn-gateway-01', bytes:7934857216,  sessions:2443},
+    ],
+  };
+
+  var _DEMO_COUNTRIES = {
+    by_src:[
+      {country:'US',bytes:18547291648,sessions:6341},
+      {country:'DE',bytes:8213847552, sessions:2876},
+      {country:'GB',bytes:5102938624, sessions:1834},
+      {country:'CN',bytes:4847293440, sessions:987},
+      {country:'NL',bytes:3934857216, sessions:843},
+      {country:'FR',bytes:2847293440, sessions:643},
+      {country:'RU',bytes:1934857216, sessions:443},
+      {country:'CA',bytes:1547291648, sessions:341},
+      {country:'JP',bytes:1213847552, sessions:276},
+      {country:'AU',bytes:934857216,  sessions:201},
+      {country:'BR',bytes:712938624,  sessions:187},
+      {country:'IN',bytes:583847216,  sessions:143},
+    ],
+    by_dst:[
+      {country:'US',bytes:22547291648,sessions:8341},
+      {country:'DE',bytes:7213847552, sessions:2576},
+      {country:'GB',bytes:4102938624, sessions:1634},
+      {country:'NL',bytes:3847293440, sessions:987},
+      {country:'FR',bytes:2934857216, sessions:743},
+      {country:'IE',bytes:2547293440, sessions:643},
+      {country:'SG',bytes:1934857216, sessions:443},
+      {country:'JP',bytes:1547291648, sessions:341},
+      {country:'CA',bytes:1213847552, sessions:276},
+      {country:'AU',bytes:834857216,  sessions:201},
+      {country:'KR',bytes:612938624,  sessions:167},
+      {country:'SE',bytes:483847216,  sessions:123},
+    ],
+  };
+
+  function loadDemoData(range) {
+    var ov = _demoOverview(range);
+    document.getElementById('stat-sessions').textContent = fmtNum(ov.total_sessions);
+    document.getElementById('stat-bytes').textContent    = fmtBytes(ov.total_bytes);
+    var topProto = Object.entries(ov.protocols).sort(function(a,b){return b[1]-a[1];})[0];
+    document.getElementById('stat-top-proto').textContent = topProto ? topProto[0].toUpperCase() : '—';
+    document.getElementById('stat-top-src').textContent   = _DEMO_TALKERS.by_src[0].ip;
+    var srcEl = document.getElementById('stat-top-src-country');
+    var dstEl = document.getElementById('stat-top-dst-country');
+    if (srcEl) srcEl.textContent = 'US';
+    if (dstEl) dstEl.textContent = 'US';
+
+    hideOverlay('vol-loading'); hideOverlay('proto-loading');
+    document.getElementById('talkers-loading').style.display='none';
+    hideOverlay('country-loading');
+    hideOverlay('node-loading');
+
+    renderVolumeChart(ov);
+    renderProtoChart(ov.protocols);
+    talkersData = _DEMO_TALKERS; renderTalkers();
+    renderNodeChart(_DEMO_NODES.nodes);
+    countryData = _DEMO_COUNTRIES; renderWorldMap();
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────
   async function init() {
+    if (new URLSearchParams(window.location.search).get('demo') === '1') {
+      document.getElementById('atf-unconfigured').classList.remove('hidden');
+      loadDemoData(activeRange);
+      return;
+    }
     // Check Arkime is configured
     try {
       const st = await fetch('/api/arkime/traffic/status');
@@ -489,9 +798,7 @@
         const { configured } = await st.json();
         if (!configured) {
           document.getElementById('atf-unconfigured').classList.remove('hidden');
-          hideOverlay('vol-loading');
-          hideOverlay('proto-loading');
-          document.getElementById('talkers-loading').style.display = 'none';
+          loadDemoData(activeRange);
           return;
         }
       }
@@ -524,6 +831,18 @@
       document.querySelectorAll('.atf-talker-tab').forEach(t => t.classList.remove('atf-talker-active'));
       btn.classList.add('atf-talker-active');
       renderTalkers();
+    });
+
+    // Country direction tabs
+    document.getElementById('country-card').addEventListener('click', function (e) {
+      var btn = e.target.closest('.atf-country-tab');
+      if (!btn) return;
+      var dir = btn.dataset.cdir;
+      if (dir === activeCountryDir) return;
+      activeCountryDir = dir;
+      document.querySelectorAll('.atf-country-tab').forEach(function(t) { t.classList.remove('atf-country-active'); });
+      btn.classList.add('atf-country-active');
+      renderWorldMap();
     });
 
     init();

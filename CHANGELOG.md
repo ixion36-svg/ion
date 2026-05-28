@@ -1,13 +1,37 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.34.3 -->
+<!-- ion-doc:version=0.34.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-28 -->
 
 # Changelog
+
+## v0.34.4 — 2026-05-28
+
+**Arkime Traffic Analytics — country map, per-sensor chart, private-IP filter.**
+
+Extends the Traffic Analytics page (`/arkime-traffic`) with three additions requested by analysts:
+
+**New features:**
+- **Country choropleth world map** — "Geographic Distribution" card renders a jsvectormap v1.5.3 SVG world map coloured by traffic volume. Each country's fill colour scales from dark teal (low) to bright cyan (high). Tooltips show country code, bytes, and session count. Two tabs switch between source and destination country view. Arkime `srcGEO`/`dstGEO` fields (MaxMind ISO 3166-1 alpha-2) match the map's path keys exactly.
+- **Traffic by Sensor chart** — "Traffic by Sensor" card shows a horizontal Chart.js bar chart (one bar per Arkime capture node). Tooltips include byte count and session count per node. Useful for per-segment capacity and anomaly detection.
+- **Private-to-private IP filter on Top Talkers** — `get_top_talkers` gains `exclude_private_to_private=True` (default on). Sessions where both src and dst are RFC-1918 addresses (`10/8`, `172.16/12`, `192.168/16`) are dropped before ranking, removing east-west internal chatter that dominated the Top Talkers list. Pass `?exclude_private=false` to the API to restore the old behaviour. The `_is_private_ip` helper uses explicit RFC-1918 CIDR checks (not Python's `is_private` which includes TEST-NET ranges in 3.11+).
+
+**Bug fixes:**
+- **CSP `style-src-attr: 'none'` violations fixed** — 4 inline `style=""` attributes on chart/map container divs (added in v0.34.3) were blocked by the strict CSP. Moved to the nonced `<style>` block as named CSS classes (`atf-chart-h-260`, `atf-chart-h-220`, `atf-map-container`). Also fixed `.atf-overlay.hidden { display: none }` specificity — Tailwind's single-class `.hidden` was losing the cascade to `.atf-overlay { display: flex }` causing loading/empty overlays to remain visible behind charts and the map.
+
+**New files:**
+- `src/ion/web/static/js/jsvectormap.min.js` — jsvectormap v1.5.3 vendored (32 KB, ISO alpha-2 world map, CSP-compatible via nonce).
+- `src/ion/web/static/js/jsvectormap-world.js` — world map path data (102 KB, 176 country paths).
+
+**Modified:**
+- `src/ion/services/arkime_service.py` — three additions: `get_top_countries(start_ts, stop_ts, limit=15)`, `get_per_node_traffic(start_ts, stop_ts)`, `_is_private_ip(ip)` static helper; `get_top_talkers` gains `exclude_private_to_private` parameter; new `_TALKER_SAMPLE = 500` constant.
+- `src/ion/web/arkime_traffic_analytics_api.py` — two new endpoints: `GET /top-countries`, `GET /per-node`; `/top-talkers` gains `exclude_private` query param.
+- `src/ion/web/templates/arkime_traffic.html` — sensor card + world map card + demo data + CSP fixes.
+- `tests/test_v034_arkime_traffic.py` — 11 new tests (4 country, 4 node, 3 private-filter); total 19. 0C/0H/0M/0L.
 
 ## v0.34.3 — 2026-05-28
 

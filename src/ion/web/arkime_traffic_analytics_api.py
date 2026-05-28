@@ -1,11 +1,13 @@
-"""Arkime Traffic Analytics API — volume histograms + protocol mix + top talkers.
+"""Arkime Traffic Analytics API — volume histograms + protocol mix + top talkers + geo.
 
-Three endpoints under /api/arkime/traffic:
+Five endpoints under /api/arkime/traffic:
   GET /status          — is Arkime configured?
   GET /overview        — time-bucketed ingress/egress bytes + protocol mix
   GET /top-talkers     — top source/dest IPs by total bytes
+  GET /top-countries   — top source/dest countries by total bytes (GeoIP)
+  GET /per-node        — traffic volume broken down per Arkime capture node
 
-All three are read-only and require alert:read permission (same level as
+All are read-only and require alert:read permission (same level as
 the existing Arkime PCAP workflow).
 """
 
@@ -85,13 +87,16 @@ async def traffic_overview(
 async def traffic_top_talkers(
     range: str = "24h",
     limit: int = 10,
+    exclude_private: bool = True,
     user: User = Depends(require_permission("alert:read")),
 ) -> Dict[str, Any]:
     """Return top source and destination IPs by total bytes.
 
     Query params:
-        range: 24h | 7d | 30d  (default 24h)
-        limit: how many IPs per direction (default 10, max 25)
+        range:           24h | 7d | 30d  (default 24h)
+        limit:           IPs per direction (default 10, max 25)
+        exclude_private: drop sessions where both endpoints are RFC-1918
+                         addresses (default true)
 
     Response shape:
         {
@@ -108,9 +113,75 @@ async def traffic_top_talkers(
         raise HTTPException(status_code=503, detail="Arkime is not configured")
     start_ts, stop_ts = _range_to_epoch(range)
     try:
-        data = await svc.get_top_talkers(start_ts, stop_ts, limit=limit)
+        data = await svc.get_top_talkers(
+            start_ts, stop_ts, limit=limit,
+            exclude_private_to_private=exclude_private,
+        )
         data["range"] = range
         return data
     except ArkimeError as exc:
         logger.warning("Arkime top-talkers error: %s", exc)
+        raise HTTPException(status_code=502, detail=safe_error(exc))
+
+
+@router.get("/top-countries")
+async def traffic_top_countries(
+    range: str = "24h",
+    user: User = Depends(require_permission("alert:read")),
+) -> Dict[str, Any]:
+    """Return top source and destination countries by total bytes.
+
+    Query params:
+        range: 24h | 7d | 30d  (default 24h)
+
+    Response shape:
+        {
+            "by_src": [{"country": "US", "bytes": N, "sessions": N}, ...],
+            "by_dst": [{"country": "US", "bytes": N, "sessions": N}, ...],
+            "range": "24h",
+        }
+    """
+    if range not in _RANGES:
+        raise HTTPException(status_code=400, detail=f"Invalid range '{range}'. Use: 24h, 7d, 30d")
+    svc = get_arkime_service()
+    if not svc.is_configured:
+        raise HTTPException(status_code=503, detail="Arkime is not configured")
+    start_ts, stop_ts = _range_to_epoch(range)
+    try:
+        data = await svc.get_top_countries(start_ts, stop_ts)
+        data["range"] = range
+        return data
+    except ArkimeError as exc:
+        logger.warning("Arkime top-countries error: %s", exc)
+        raise HTTPException(status_code=502, detail=safe_error(exc))
+
+
+@router.get("/per-node")
+async def traffic_per_node(
+    range: str = "24h",
+    user: User = Depends(require_permission("alert:read")),
+) -> Dict[str, Any]:
+    """Return traffic volume broken down per Arkime capture node/sensor.
+
+    Query params:
+        range: 24h | 7d | 30d  (default 24h)
+
+    Response shape:
+        {
+            "nodes": [{"node": "dc-core-01", "bytes": N, "sessions": N}, ...],
+            "range": "24h",
+        }
+    """
+    if range not in _RANGES:
+        raise HTTPException(status_code=400, detail=f"Invalid range '{range}'. Use: 24h, 7d, 30d")
+    svc = get_arkime_service()
+    if not svc.is_configured:
+        raise HTTPException(status_code=503, detail="Arkime is not configured")
+    start_ts, stop_ts = _range_to_epoch(range)
+    try:
+        data = await svc.get_per_node_traffic(start_ts, stop_ts)
+        data["range"] = range
+        return data
+    except ArkimeError as exc:
+        logger.warning("Arkime per-node error: %s", exc)
         raise HTTPException(status_code=502, detail=safe_error(exc))

@@ -435,6 +435,29 @@ class ArkimeService:
 
     # ── Traffic analytics ──────────────────────────────────────────────────
 
+    _COUNTRY_SAMPLE = 500  # sessions fetched for geo / node aggregation
+    _TALKER_SAMPLE  = 500  # sessions fetched when filtering private IPs
+
+    @staticmethod
+    def _is_private_ip(ip: str) -> bool:
+        """True for RFC-1918 addresses (10/8, 172.16/12, 192.168/16).
+
+        Intentionally narrow: only filter routable internal networks, not
+        documentation / test ranges (203.0.113.0/24 etc.) that show up in
+        real pcap but are not east-west internal traffic.
+        """
+        import ipaddress
+        _RFC1918 = (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+        )
+        try:
+            addr = ipaddress.ip_address(ip)
+            return any(addr in net for net in _RFC1918)
+        except ValueError:
+            return False
+
     async def get_traffic_overview(
         self,
         start_ts: int,
@@ -500,10 +523,14 @@ class ArkimeService:
         start_ts: int,
         stop_ts: int,
         limit: int = 10,
+        exclude_private_to_private: bool = True,
     ) -> Dict[str, Any]:
         """Fetch top sessions by total bytes for the given time window.
 
-        Returns lists of top source and destination IPs sorted by bytes.
+        When exclude_private_to_private=True (default), sessions where both
+        source and destination are RFC-1918 addresses are dropped before ranking
+        — this removes internal east-west chatter that floods the top-talker
+        list and obscures external flows of interest.
 
         Returns:
             {
@@ -513,8 +540,9 @@ class ArkimeService:
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
+        fetch_len = self._TALKER_SAMPLE if exclude_private_to_private else limit
         params = {
-            "length": str(limit),
+            "length": str(fetch_len),
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
@@ -548,6 +576,9 @@ class ArkimeService:
                 src = s.get("srcIp") or s.get("source", {}).get("ip", "")
                 dst = s.get("dstIp") or s.get("destination", {}).get("ip", "")
                 b = int(s.get("totBytes") or 0)
+                if exclude_private_to_private and src and dst:
+                    if self._is_private_ip(src) and self._is_private_ip(dst):
+                        continue
                 if src:
                     entry = src_map.setdefault(src, {"bytes": 0, "sessions": 0})
                     entry["bytes"] += b
@@ -569,6 +600,144 @@ class ArkimeService:
             raise
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime top-talkers error: {type(e).__name__}: {e}") from e
+
+    async def get_top_countries(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        limit: int = 15,
+    ) -> Dict[str, Any]:
+        """Fetch top countries by traffic volume for the given time window.
+
+        Aggregates srcGEO/dstGEO (Arkime MaxMind ISO 3166-1 alpha-2 codes)
+        across the top _COUNTRY_SAMPLE sessions by bytes. Bias towards heavy
+        sessions is intentional — country totals are dominated by high-byte flows.
+
+        Returns:
+            {
+                "by_src": [{"country": "US", "bytes": N, "sessions": N}, ...],
+                "by_dst": [{"country": "US", "bytes": N, "sessions": N}, ...],
+            }
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        params = {
+            "length": str(self._COUNTRY_SAMPLE),
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "order": "totBytes:desc",
+            "fields": "srcGEO,dstGEO,totBytes",
+        }
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions",
+                    headers=headers,
+                    params=params,
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime top-countries failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            content_type = resp.headers.get("content-type", "")
+            if "json" not in content_type:
+                raise ArkimeError(
+                    f"Arkime returned non-JSON ({content_type}) — check auth"
+                )
+            payload = resp.json()
+            sessions = payload.get("data") or []
+
+            src_map: Dict[str, Dict[str, int]] = {}
+            dst_map: Dict[str, Dict[str, int]] = {}
+            for s in sessions:
+                src_geo = (s.get("srcGEO") or "").strip().upper()
+                dst_geo = (s.get("dstGEO") or "").strip().upper()
+                b = int(s.get("totBytes") or 0)
+                if src_geo:
+                    entry = src_map.setdefault(src_geo, {"bytes": 0, "sessions": 0})
+                    entry["bytes"] += b
+                    entry["sessions"] += 1
+                if dst_geo:
+                    entry = dst_map.setdefault(dst_geo, {"bytes": 0, "sessions": 0})
+                    entry["bytes"] += b
+                    entry["sessions"] += 1
+
+            def _rank(m: Dict[str, Dict[str, int]]) -> List[Dict[str, Any]]:
+                return sorted(
+                    [{"country": cc, **stats} for cc, stats in m.items()],
+                    key=lambda x: x["bytes"],
+                    reverse=True,
+                )[:limit]
+
+            return {"by_src": _rank(src_map), "by_dst": _rank(dst_map)}
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime top-countries error: {type(e).__name__}: {e}") from e
+
+    async def get_per_node_traffic(
+        self,
+        start_ts: int,
+        stop_ts: int,
+    ) -> Dict[str, Any]:
+        """Aggregate traffic volume per Arkime capture node for the time window.
+
+        Returns:
+            {
+                "nodes": [{"node": "dc-core-01", "bytes": N, "sessions": N}, ...]
+            }
+            Sorted descending by bytes.
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        params = {
+            "length": str(self._COUNTRY_SAMPLE),
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "order": "totBytes:desc",
+            "fields": "node,totBytes",
+        }
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions",
+                    headers=headers,
+                    params=params,
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime per-node failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            content_type = resp.headers.get("content-type", "")
+            if "json" not in content_type:
+                raise ArkimeError(
+                    f"Arkime returned non-JSON ({content_type}) — check auth"
+                )
+            payload = resp.json()
+            sessions = payload.get("data") or []
+
+            node_map: Dict[str, Dict[str, int]] = {}
+            for s in sessions:
+                node = (s.get("node") or "unknown").strip()
+                b = int(s.get("totBytes") or 0)
+                entry = node_map.setdefault(node, {"bytes": 0, "sessions": 0})
+                entry["bytes"] += b
+                entry["sessions"] += 1
+
+            nodes = sorted(
+                [{"node": n, **stats} for n, stats in node_map.items()],
+                key=lambda x: x["bytes"],
+                reverse=True,
+            )
+            return {"nodes": nodes}
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime per-node error: {type(e).__name__}: {e}") from e
 
     async def download_pcap(self, node: str, session_id: str) -> bytes:
         """Download the raw PCAP bytes for a single Arkime session.

@@ -6,7 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -173,3 +172,206 @@ class TestGetTopTalkers:
         svc = _make_service(url="")
         with pytest.raises(ArkimeError):
             self._run(svc.get_top_talkers(0, 86400))
+
+
+# ---------------------------------------------------------------------------
+# ArkimeService.get_top_countries
+# ---------------------------------------------------------------------------
+
+class TestGetTopCountries:
+    def _run(self, coro):
+        return asyncio.run(coro)
+
+    def test_aggregates_by_src_and_dst_country(self):
+        payload = {
+            "data": [
+                {"srcGEO": "US", "dstGEO": "CN", "totBytes": 1000},
+                {"srcGEO": "US", "dstGEO": "DE", "totBytes": 500},
+                {"srcGEO": "CN", "dstGEO": "CN", "totBytes": 200},
+            ]
+        }
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_top_countries(0, 86400))
+
+        src_map = {r["country"]: r for r in result["by_src"]}
+        assert src_map["US"]["bytes"] == 1500
+        assert src_map["US"]["sessions"] == 2
+        dst_map = {r["country"]: r for r in result["by_dst"]}
+        assert dst_map["CN"]["bytes"] == 1200
+        assert dst_map["CN"]["sessions"] == 2
+
+    def test_sorted_descending_by_bytes(self):
+        payload = {
+            "data": [
+                {"srcGEO": "low", "dstGEO": "x", "totBytes": 10},
+                {"srcGEO": "HIGH", "dstGEO": "x", "totBytes": 9999},
+            ]
+        }
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_top_countries(0, 86400))
+
+        assert result["by_src"][0]["country"] == "HIGH"
+
+    def test_empty_data_returns_empty_lists(self):
+        payload = {"data": []}
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_top_countries(0, 86400))
+
+        assert result["by_src"] == []
+        assert result["by_dst"] == []
+
+    def test_raises_when_not_configured(self):
+        from ion.services.arkime_service import ArkimeError
+        svc = _make_service(url="")
+        with pytest.raises(ArkimeError):
+            self._run(svc.get_top_countries(0, 86400))
+
+
+# ---------------------------------------------------------------------------
+# ArkimeService.get_per_node_traffic
+# ---------------------------------------------------------------------------
+
+class TestGetPerNodeTraffic:
+    def _run(self, coro):
+        return asyncio.run(coro)
+
+    def test_aggregates_by_node(self):
+        payload = {
+            "data": [
+                {"node": "dc-core-01", "totBytes": 5000},
+                {"node": "dc-core-01", "totBytes": 3000},
+                {"node": "dc-dmz-02",  "totBytes": 2000},
+            ]
+        }
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_per_node_traffic(0, 86400))
+
+        node_map = {n["node"]: n for n in result["nodes"]}
+        assert node_map["dc-core-01"]["bytes"] == 8000
+        assert node_map["dc-core-01"]["sessions"] == 2
+        assert node_map["dc-dmz-02"]["bytes"] == 2000
+
+    def test_sorted_descending_by_bytes(self):
+        payload = {
+            "data": [
+                {"node": "small", "totBytes": 100},
+                {"node": "large", "totBytes": 9999},
+            ]
+        }
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_per_node_traffic(0, 86400))
+
+        assert result["nodes"][0]["node"] == "large"
+
+    def test_empty_data_returns_empty_list(self):
+        payload = {"data": []}
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_per_node_traffic(0, 86400))
+
+        assert result["nodes"] == []
+
+    def test_raises_when_not_configured(self):
+        from ion.services.arkime_service import ArkimeError
+        svc = _make_service(url="")
+        with pytest.raises(ArkimeError):
+            self._run(svc.get_per_node_traffic(0, 86400))
+
+
+# ---------------------------------------------------------------------------
+# ArkimeService.get_top_talkers — private IP filtering
+# ---------------------------------------------------------------------------
+
+class TestTopTalkersPrivateFilter:
+    def _run(self, coro):
+        return asyncio.run(coro)
+
+    def test_excludes_private_to_private_by_default(self):
+        payload = {
+            "data": [
+                {"srcIp": "10.0.0.1",  "dstIp": "192.168.1.1", "totBytes": 9999},
+                {"srcIp": "8.8.8.8",   "dstIp": "192.168.1.1", "totBytes": 100},
+            ]
+        }
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_top_talkers(0, 86400))
+
+        src_ips = {r["ip"] for r in result["by_src"]}
+        assert "10.0.0.1" not in src_ips, "private-to-private src should be excluded"
+        assert "8.8.8.8" in src_ips
+
+    def test_includes_private_to_private_when_disabled(self):
+        payload = {
+            "data": [
+                {"srcIp": "10.0.0.1", "dstIp": "192.168.1.1", "totBytes": 9999},
+            ]
+        }
+        svc = _make_service()
+        mock_resp = _mock_httpx_json_response(payload)
+        mock_client = AsyncMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+        mock_client.get = AsyncMock(return_value=mock_resp)
+
+        with patch.object(svc, "_client", return_value=mock_client):
+            result = self._run(svc.get_top_talkers(0, 86400, exclude_private_to_private=False))
+
+        src_ips = {r["ip"] for r in result["by_src"]}
+        assert "10.0.0.1" in src_ips
+
+    def test_is_private_ip_helper(self):
+        svc = _make_service()
+        assert svc._is_private_ip("10.0.0.1") is True
+        assert svc._is_private_ip("172.16.5.5") is True
+        assert svc._is_private_ip("192.168.1.100") is True
+        assert svc._is_private_ip("8.8.8.8") is False
+        assert svc._is_private_ip("185.199.108.153") is False
+        assert svc._is_private_ip("203.0.113.5") is False  # TEST-NET-3, not RFC-1918
