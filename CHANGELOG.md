@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.34.0 -->
+<!-- ion-doc:version=0.34.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-05-27 -->
+<!-- ion-doc:date=2026-05-28 -->
 
 # Changelog
+
+## v0.34.1 — 2026-05-28
+
+**Fix Bob analysis using wrong Ollama URL.**
+
+Bob's on-demand case analysis (`POST /api/elasticsearch/alerts/cases/{id}/bob-analysis`) was instantiating `OllamaService()` with no arguments, defaulting to `http://localhost:11434` and `llama3.1:8b`. Inside Docker, Ollama is at `http://ollama:11434`; the hardcoded default caused every Bob analysis request to fail with a connection error while AI chat (which uses `get_ollama_service()`) worked fine.
+
+Fix: replace the bare `OllamaService()` constructor call with `get_ollama_service()` — the config-aware singleton factory that reads `ION_OLLAMA_URL`, `ION_OLLAMA_MODEL`, and `ION_OLLAMA_TIMEOUT` from the ION config. Bob analysis was the only caller in the codebase not using this factory.
+
+**Audit impact**: none. 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new security findings: 0C / 0H / 0M / 0L.
 
 ## v0.34.0 — 2026-05-27
 

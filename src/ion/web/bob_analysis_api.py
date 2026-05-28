@@ -316,8 +316,8 @@ async def generate_bob_analysis(
     )
 
     try:
-        from ion.services.ollama_service import OllamaService
-        ollama = OllamaService()
+        from ion.services.ollama_service import get_ollama_service
+        ollama = get_ollama_service()
         if not getattr(ollama, "enabled", True):
             raise HTTPException(
                 status_code=503,
