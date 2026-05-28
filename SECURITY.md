@@ -21,18 +21,14 @@ Two channels are accepted; pick whichever you can use:
 
 Open a **private** advisory via the repository's **Security** tab → **Report a vulnerability**. GitHub routes the advisory directly to the maintainers and gives us a private space to triage, agree a fix, and coordinate the disclosure window.
 
-If the repository is not visible to you, fall back to email.
+If the GitHub Security Advisory form is unavailable, open a **GitHub issue** with the title `[SECURITY] <brief description>` — do not include reproducer details in the public issue body. The maintainer will open a private advisory and link it.
 
-### Email
-
-Send to **[contact-via-github-security-advisory]** with the subject line `[ION SECURITY]` so it's filtered to triage. Encrypt where possible. Include:
+### What to include
 
 - ION version (`/health/deep` exposes the running version, or read `pyproject.toml`)
 - Deployment shape (Docker compose / bare-metal / air-gapped / internet-reachable)
 - A minimal proof-of-concept or reproducer
 - Your preferred attribution (named credit, handle, or anonymous)
-
-GPG key fingerprint for encrypted reports: *not yet published — request via the email above and a key will be issued before sharing reproducer details. This row will be updated in a future release once the fingerprint is published.*
 
 ### Please do NOT
 
