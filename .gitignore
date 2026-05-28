@@ -129,3 +129,15 @@ seed_test_data.py
 # Workspace-specific MCP server configuration (per-developer; lists
 # local servers like pentest-mcp that aren't shared in the repo).
 .mcp.json
+
+# Claude Code project context — contains internal architecture detail,
+# development notes, and system references that should not be public.
+CLAUDE.md
+
+# Internal working documents (planning, specs, research, handoffs).
+# Committed in v0.31.16 for local reference; excluded from public repo
+# going forward. Existing history entries remain in git log.
+_handoff_v*.md
+_spec_v*.md
+_backlog_v*.md
+_research_*.md
