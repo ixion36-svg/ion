@@ -22,12 +22,12 @@
 
 ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy ORM parameterised queries throughout the main codebase, SandboxedEnvironment Jinja2 rendering, DOMPurify XSS mitigation, RBAC with 7-tier role hierarchy, rate limiting on auth endpoints, circuit breakers on all external integrations, and ECS-compliant audit logging. v0.19.17â€“v0.20.0 closed several moderate-to-low findings from the last assessment. v0.21.0-rc added the Bob Eval Harness, per-template confidence threshold overrides, and the `reasoning_text` storage gate. v0.22.0-rc adds two well-gated read/write surfaces (MITRE coverage heatmap and timeline annotations) AND removes a latent SSRF/unvalidated-write path (`POST /api/elasticsearch/config`) along with several legacy-route dead-code surfaces. Net new in v0.22.0: 0C / 0H / 0M / 0L. The removed write path is a findings-quality improvement, not a counted closure.
 
-| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 | v0.31.2 | v0.31.3 | v0.31.4 | v0.31.5 | v0.31.6 | v0.31.7 | v0.31.8 | v0.31.9 | v0.31.10 | v0.31.11 | v0.31.12 | v0.31.13 | v0.31.14 | v0.31.15 | v0.31.16 | v0.31.17 | v0.31.18 | v0.31.19 | v0.31.20 | v0.31.21 | v0.31.22 | v0.31.23 | v0.31.24 | v0.31.25 | v0.32.0 | v0.32.1 | v0.33.0 | v0.33.1 | v0.33.2 | v0.34.0 | v0.34.1 | v0.34.2 |
-|---------|---------|---------|---------|-|---------|---------|---------|---------||---------|---------|---------|---------|---|---------|---------|---------|---------|---|---------|---------|---------|---------|---|---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||
-| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
-| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** |
-| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** |
+| Severity | v0.9.43 | v0.20.1-rc | v0.21.0-rc | v0.22.0-rc | v0.22.1 | v0.23.0 | v0.23.1 | v0.23.2 | v0.24.0 | v0.25.0 | v0.25.1 | v0.26.0 | v0.26.1 | v0.27.0 | v0.28.0 | v0.29.0 | v0.29.1 | v0.30.0 | v0.30.1 | v0.31.0 | v0.31.1 | v0.31.2 | v0.31.3 | v0.31.4 | v0.31.5 | v0.31.6 | v0.31.7 | v0.31.8 | v0.31.9 | v0.31.10 | v0.31.11 | v0.31.12 | v0.31.13 | v0.31.14 | v0.31.15 | v0.31.16 | v0.31.17 | v0.31.18 | v0.31.19 | v0.31.20 | v0.31.21 | v0.31.22 | v0.31.23 | v0.31.24 | v0.31.25 | v0.32.0 | v0.32.1 | v0.33.0 | v0.33.1 | v0.33.2 | v0.34.0 | v0.34.1 | v0.34.2 | v0.34.3 |
+|---------|---------|---------|---------|-|---------|---------|---------|---------||---------|---------|---------|---------|---|---------|---------|---------|---------|---|---------|---------|---------|---------|---|---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------|-|---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---------|---------|---------|---------||---|
+| Critical | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| High | 0 | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** | **0** |
+| Medium | 2 | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **3** | **0** |
+| Low | 3 | **4** | **6** | **6** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **4** | **0** |
 | **Total** | **5** | **7** | **9** | **9** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** | **7** |
 
 v0.32.0 is a critical reliability fix: **circuit breakers were structurally inert**. All five `CircuitBreaker` singletons were created and exported from `ion.core.circuit_breaker` but never received `record_success()` or `record_failure()` calls anywhere in the codebase. The `can_execute()` guards at existing call sites (`cyab_api.py`, `kibana_sync_service.py`) checked breaker state, but because the feedback path was absent the state was always `CLOSED` and `_failure_count` was always `0` â€” making the CLOSEDâ†’OPENâ†’HALF_OPEN recovery cycle impossible. Fixed by wiring feedback into the three services with owned HTTP transports: `ElasticsearchService._request()` (single transport point for all ES calls â€” `es_breaker.record_success()` on any HTTP response, `record_failure()` on `ConnectError` / `ReadError` / `TimeoutException` / `HTTPError`); `OllamaService.chat()` / `chat_stream()` / `generate()` (each has a `can_execute()` guard at entry + `record_success()` after parse + `record_failure()` on connectivity exceptions â€” a new explicit `except httpx.ConnectError` handler was also added since ConnectError was previously swallowed by the generic `except Exception` arm); `KibanaSyncService._background_sync_loop()` (`kibana_breaker.record_success()` after a full sync cycle, `record_failure()` only on httpx connectivity-class exceptions â€” logical sync failures do not trip the breaker). `opencti_breaker` and `tide_breaker` remain unwired pending audit of `OpenCTIService` and `TIDEService` transport patterns. 11 new unit tests in `tests/test_v032_circuit_breaker_wiring.py` cover: success records success; ConnectError records failure; TimeoutException records failure; N consecutive failures opens the breaker; 4xx response records success not failure; open breaker short-circuits without making an HTTP call. SECURE_BY_DESIGN audit summary unchanged at **19 Met / 1 Mostly Met / 0 Partial / 0 Gap**. **Net new findings: 0C / 0H / 0M / 0L.** No schema changes, no new attack surface, no permission gate changes.
@@ -404,7 +404,7 @@ Still confirmed.
 **File:** `src/ion/web/forensic_workbench_api.py`
 
 | Concern | Assessment |
-|---------|---------|---------|---------||---------|---------|---------|---------|---|
+|---------|---------|---------|---------||---------|---------|---------|---------|---|---|
 | Auth | All endpoints gated: `forensic:read` (GETs), `forensic:update` (mutations), `forensic:create` (upload). Mirrors `forensics_api.py` pattern. PASS. |
 | Upload size cap | `MAX_EVIDENCE_FILE_SIZE = 50 * 1024 * 1024` enforced via `read_upload_capped`. Consistent with translator cap. PASS. |
 | File hashing | `hashlib.sha256(content).hexdigest()` computed before row insert. Stored in `hash_sha256`. PASS. |
@@ -432,7 +432,7 @@ Lesson content is operator/author-authored (`playbook:create`/`playbook:update`)
 **File:** `src/ion/web/skill_publisher_api.py`; `src/ion/services/skill_publisher_service.py`
 
 | Concern | Assessment |
-|---------|---------|---------|---------||---------|---------|---------|---------|---|
+|---------|---------|---------|---------||---------|---------|---------|---------|---|---|
 | Auth | Both routes: `_user: User = Depends(require_permission("system:settings"))`. Admin-only. No path for lower-privileged access. PASS. |
 | Zip-slip in member names | `folder_name = _slug(tmpl.name)` â€” `_slug` applies `re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")`. No path separators (`/`, `..`) can survive the slug transform. `extras` is currently always `{}` (service returns empty dict). If extras are added in future, `rel_path` from `extras.items()` goes directly into `zf.writestr(f"{folder_name}/{rel_path}", data)` without sanitisation â€” zip-slip possible. ADVISORY for future extras. Current implementation: PASS. |
 | Frontmatter injection | `_yaml_str()` quotes values containing `:`, `#`, `'`, `"`, `\n`, `[`. The template `description` and `name` come from DB-stored operator input. A description containing a YAML block-scalar marker (`|` or `>`) is not in the quoted-character set and could potentially inject a multi-line value into the frontmatter. However, `description` is placed as a scalar value (`description: {_yaml_str(description)}`), and `_yaml_str` wraps in double-quotes if any special char is present. A `|` character alone would not trigger quoting. Recommend adding `|` and `>` to the special-character check in `_yaml_str`. LOW risk because the SKILL.md consumer (`skill_loader.py`) uses PyYAML's safe_load, which would not execute code from a malformed description. ADVISORY. |
@@ -447,7 +447,7 @@ Lesson content is operator/author-authored (`playbook:create`/`playbook:update`)
 **File:** `src/ion/web/labs_api.py`; `src/ion/services/lab_fixture_service.py`
 
 | Concern | Assessment |
-|---------|---------|---------|---------||---------|---------|---------|---------|---|
+|---------|---------|---------|---------||---------|---------|---------|---------|---|---|
 | `target_table` allowlist enforcement | `_validate_target_table()` in `lab_fixture_service.py` line 51 raises `ValueError` for any table not in `frozenset({"alerts", "alert_triage", "alert_cases", "observables"})`. Called both in `seed_lab` (line 100) and `teardown_lab` (line 167) for every row. PASS. |
 | SQL injection via `payload` JSONB columns | See **M4** above. Column names are not quoted; injection possible if an operator controls a fixture payload key. Requires DB write access. Medium severity. |
 | Cross-tenant `enrollment_id` isolation | `labs_api.py` `_require_enrollment()` (line 56): queries `WHERE user_id = current_user.id AND course_id = course_id`. An analyst cannot supply another user's `enrollment_id` â€” the enrollment is looked up from the current user's record, not taken from the request body. `seed_lab` and `teardown_lab` only accept the `enrollment_id` returned from `_require_enrollment`. PASS. |
@@ -478,7 +478,7 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 ## Re-evaluation of Carried-Forward Findings (M1, M2, L1â€“L3)
 
 | Finding | v0.9.43 Status | v0.20.1-rc Status | Change |
-|---------|---------|---------|---------||---------|---------|---------|---------|------|---------|---------|---------|---------||---------|---------|---------|---------||--------|
+|---------|---------|---------|---------||---------|---------|---------|---------|------|---------|---------|---------|---------||---------|---------|---------|---------||--------|---|
 | M1: CSP `unsafe-inline` | Open | Open | No change |
 | M2: SIEM webhook SSRF | Open | Partially mitigated (config-save guarded, call-time not guarded) | Partially closed |
 | L1: Default admin password | Open | Open | No change â€” warning improved |
@@ -490,7 +490,7 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 ## Security Features â€” Updated Status
 
 | Feature | Status |
-|---------|---------|---------|---------||--------|
+|---------|---------|---------|---------||--------|---|
 | Password hashing | bcrypt via passlib |
 | SQL injection | Protected â€” SQLAlchemy ORM parameterised queries; raw SQL uses bind params except lab fixture column names (see M4) |
 | SSTI | Protected â€” SandboxedEnvironment |
@@ -509,6 +509,24 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 | PII logging | OIDC callback logs username only at INFO; email at DEBUG only |
 | Auto-playbook kill switch | `ION_AUTO_PLAYBOOK_ENABLED=false` default (v0.20.0) |
 | Tamper-evident ledger | sha256 chain on ForensicCase (v0.20.1) and AlertCase (v0.20.0); advisory-lock serialised appends |
+
+---
+
+## Net-New Surfaces in v0.34.3
+
+### Item N: Arkime Traffic Analytics — `GET /api/arkime/traffic/status`, `GET /api/arkime/traffic/overview`, `GET /api/arkime/traffic/top-talkers`, `GET /arkime-traffic`
+
+**Files:** `src/ion/web/arkime_traffic_analytics_api.py`, `src/ion/web/templates/arkime_traffic.html`, `src/ion/web/static/js/chart.umd.min.js`
+
+**Auth:** All three API endpoints require `alert:read` permission (authenticated). Page route (`/arkime-traffic`) requires the same permission. Unauthenticated access returns 401.
+
+**Data flow:** The API layer calls `ArkimeService.get_traffic_overview()` / `get_top_talkers()` which make outbound HTTP requests to the configured Arkime viewer. Arkime credentials (`ION_ARKIME_USERNAME` / `ION_ARKIME_PASSWORD`) are not surfaced to the browser.
+
+**Input validation:** `range` parameter validated against fixed allowlist `{"24h", "7d", "30d"}` — any other value returns HTTP 400. `limit` is clamped to `[1, 25]`. No user-controlled strings are interpolated into Arkime query expressions.
+
+**Threat assessment:** No new injection surfaces (enum-validated params). No new privilege escalation paths (read-only, same tier as existing Arkime endpoints). No new SSRF surface (same `ArkimeService` and configured URL). Chart.js v4.4.4 vendored locally — no runtime CDN fetch, covered by `script-src 'self'` CSP.
+
+**Net new findings:** 0C / 0H / 0M / 0L.
 
 ---
 
@@ -682,7 +700,7 @@ The eval harness de-duplicates `ai_feedback` rows by `MAX(id)` per `(alert_id, a
 **New Findings Summary (v0.21.0)**
 
 | ID | Severity | Surface | Issue |
-|----|---------|---------|---------|---------|-|---------|---------|---------|---------||-------|
+|----|---------|---------|---------|---------|-|---------|---------|---------|---------||-------|---|
 | L5 | Low | `POST /api/bob-eval/runs` | No per-template concurrency guard â€” two simultaneous runs for the same template both proceed, driving up to 2Ã— Ollama load |
 | L6 | Low | `PUT /api/alert-prompts/{id}` | `confidence_threshold_override` (circuit-breaker control) writable by `playbook:create/update` users, not restricted to `system:settings` |
 
@@ -704,7 +722,7 @@ The eval harness de-duplicates `ai_feedback` rows by `MAX(id)` per `(alert_id, a
 12. **Migrate from `python-jose`** to `PyJWT` or `authlib` at next dependency-refresh cycle.
 13. **Add `|` and `>` to `_yaml_str` special-character set** in `skill_publisher_service.py` as a belt-and-suspenders guard on SKILL.md frontmatter.
 14. **Add `storage_location` path sanitisation** in `forensics_api.py` `EvidenceCreate` schema proactively, before any feature uses the field as a filesystem path.
-|---------|---------|---------|---------|
-|---------|---------|---------|---------|
+|---------|---------|---------|---------|---|
+|---------|---------|---------|---------|---|
 
 

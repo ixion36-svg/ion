@@ -433,6 +433,143 @@ class ArkimeService:
             "other_matches": other_matches,
         }
 
+    # ── Traffic analytics ──────────────────────────────────────────────────
+
+    async def get_traffic_overview(
+        self,
+        start_ts: int,
+        stop_ts: int,
+    ) -> Dict[str, Any]:
+        """Fetch aggregated traffic histogram + protocol mix from Arkime.
+
+        Calls /api/sessions?facets=1&length=0 so Arkime returns only the
+        graph aggregations (srcDataHisto, dstDataHisto, protocols) with no
+        actual session rows in the payload — analogous to ES size=0 queries.
+
+        Returns:
+            {
+                "src_histo":  [[epoch_ms, bytes], ...],
+                "dst_histo":  [[epoch_ms, bytes], ...],
+                "protocols":  {"tcp": N, "udp": N, ...},
+                "total_sessions": N,
+                "total_bytes": N,
+            }
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        params = {
+            "facets": "1",
+            "length": "0",
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+        }
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions",
+                    headers=headers,
+                    params=params,
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime traffic overview failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            content_type = resp.headers.get("content-type", "")
+            if "json" not in content_type:
+                raise ArkimeError(
+                    f"Arkime returned non-JSON ({content_type}) — check auth"
+                )
+            payload = resp.json()
+            graph = payload.get("graph") or {}
+            return {
+                "src_histo": graph.get("srcDataHisto") or [],
+                "dst_histo": graph.get("dstDataHisto") or [],
+                "protocols": graph.get("protocols") or {},
+                "total_sessions": payload.get("recordsFiltered") or payload.get("total") or 0,
+                "total_bytes": graph.get("totDataBytes") or 0,
+            }
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime traffic overview error: {type(e).__name__}: {e}") from e
+
+    async def get_top_talkers(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """Fetch top sessions by total bytes for the given time window.
+
+        Returns lists of top source and destination IPs sorted by bytes.
+
+        Returns:
+            {
+                "by_src": [{"ip": "1.2.3.4", "bytes": N, "sessions": N}, ...],
+                "by_dst": [{"ip": "1.2.3.4", "bytes": N, "sessions": N}, ...],
+            }
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        params = {
+            "length": str(limit),
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "order": "totBytes:desc",
+            "fields": "srcIp,dstIp,totBytes,packets",
+        }
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions",
+                    headers=headers,
+                    params=params,
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime top-talkers failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            content_type = resp.headers.get("content-type", "")
+            if "json" not in content_type:
+                raise ArkimeError(
+                    f"Arkime returned non-JSON ({content_type}) — check auth"
+                )
+            payload = resp.json()
+            sessions = payload.get("data") or []
+
+            # Aggregate bytes + session count per src/dst IP
+            src_map: Dict[str, Dict[str, int]] = {}
+            dst_map: Dict[str, Dict[str, int]] = {}
+            for s in sessions:
+                src = s.get("srcIp") or s.get("source", {}).get("ip", "")
+                dst = s.get("dstIp") or s.get("destination", {}).get("ip", "")
+                b = int(s.get("totBytes") or 0)
+                if src:
+                    entry = src_map.setdefault(src, {"bytes": 0, "sessions": 0})
+                    entry["bytes"] += b
+                    entry["sessions"] += 1
+                if dst:
+                    entry = dst_map.setdefault(dst, {"bytes": 0, "sessions": 0})
+                    entry["bytes"] += b
+                    entry["sessions"] += 1
+
+            def _rank(m: Dict[str, Dict[str, int]]) -> List[Dict[str, Any]]:
+                return sorted(
+                    [{"ip": ip, **stats} for ip, stats in m.items()],
+                    key=lambda x: x["bytes"],
+                    reverse=True,
+                )[:limit]
+
+            return {"by_src": _rank(src_map), "by_dst": _rank(dst_map)}
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime top-talkers error: {type(e).__name__}: {e}") from e
+
     async def download_pcap(self, node: str, session_id: str) -> bytes:
         """Download the raw PCAP bytes for a single Arkime session.
 

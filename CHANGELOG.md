@@ -1,13 +1,37 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.34.2 -->
+<!-- ion-doc:version=0.34.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-05-28 -->
 
 # Changelog
+
+## v0.34.3 — 2026-05-28
+
+**Arkime Traffic Analytics page.**
+
+New Operations sub-page at `/arkime-traffic` giving SOC analysts a time-series view of network capture data from Arkime without leaving ION.
+
+**New files:**
+- `src/ion/web/arkime_traffic_analytics_api.py` — three read-only API endpoints under `/api/arkime/traffic`: `/status` (is Arkime configured?), `/overview?range=24h|7d|30d` (histogram + protocol mix), `/top-talkers?range=24h|7d|30d&limit=N` (top source/dest IPs by bytes).
+- `src/ion/web/templates/arkime_traffic.html` — dark-theme page with 24h/7d/30d range tabs, Chart.js v4 volume line chart (ingress vs egress), protocol doughnut, and top-talker table (switchable src/dst).
+- `src/ion/web/static/js/chart.umd.min.js` — Chart.js v4.4.4 vendored locally (CSP blocks CDN; all `<script>` tags carry the per-request nonce).
+
+**Modified:**
+- `src/ion/services/arkime_service.py` — two new `ArkimeService` methods: `get_traffic_overview(start_ts, stop_ts)` (calls `/api/sessions?facets=1&length=0` for histogram aggregations) and `get_top_talkers(start_ts, stop_ts, limit)` (calls sessions ordered by `totBytes:desc`, aggregates per-IP).
+- `src/ion/web/server.py` — import + include `arkime_traffic_router`; page route `/arkime-traffic`.
+- `src/ion/web/templates/base.html` — Traffic Analytics link added under the Operations dropdown; dropdown `is-active` guard extended.
+
+**Design notes:**
+- Arkime's `graph.srcDataHisto` / `graph.dstDataHisto` are `[epoch_ms, bytes]` pairs. `length=0` means zero session rows — only aggregated histogram. Analogous to Elasticsearch's `size=0`.
+- If Arkime is not configured, the page renders a banner rather than failing. All three API endpoints return `503` when `ArkimeService.is_configured` is false.
+- Chart.js instances are `.destroy()`-ed before recreation on tab switch (avoids canvas re-use leak).
+- CSP compliance: no inline event handlers; range-tab and talker-direction clicks use `addEventListener` delegation in a nonced `<script>` block.
+
+**Audit impact**: none. 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new security findings: 0C / 0H / 0M / 0L.
 
 ## v0.34.2 — 2026-05-28
 

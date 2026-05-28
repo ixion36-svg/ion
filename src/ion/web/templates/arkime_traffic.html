@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}Arkime Traffic Analytics - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+<!-- Header -->
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-ion-cyan"><use href="#i-activity"/></svg>
+      <span class="label-tiny text-ion-cyan">Network telemetry</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Traffic Analytics</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Arkime ingress/egress volume, protocol distribution, and top talkers.</p>
+  </div>
+  <!-- Range tabs -->
+  <div class="flex items-center gap-1 bg-slate-900/60 border border-slate-700 rounded-lg p-1" id="range-tabs" role="tablist">
+    <button class="atf-tab px-4 py-1.5 rounded-md text-sm font-medium transition-colors atf-tab-active" data-range="24h" role="tab">24h</button>
+    <button class="atf-tab px-4 py-1.5 rounded-md text-sm font-medium transition-colors" data-range="7d" role="tab">7d</button>
+    <button class="atf-tab px-4 py-1.5 rounded-md text-sm font-medium transition-colors" data-range="30d" role="tab">30d</button>
+  </div>
+</section>
+
+<!-- Not-configured banner (hidden by default) -->
+<div id="atf-unconfigured" class="hidden mb-6 rounded-lg border border-amber-500/30 bg-amber-900/20 px-5 py-4 text-amber-300 text-sm">
+  <strong>Arkime not configured.</strong> Set <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_URL</code>, <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_USERNAME</code>, and <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_PASSWORD</code> in your environment to enable traffic analytics.
+</div>
+
+<!-- Stats bar -->
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8" id="atf-stats">
+  <div class="atf-stat-card">
+    <div class="atf-stat-value" id="stat-sessions">—</div>
+    <div class="atf-stat-label">Total Sessions</div>
+  </div>
+  <div class="atf-stat-card">
+    <div class="atf-stat-value" id="stat-bytes">—</div>
+    <div class="atf-stat-label">Total Volume</div>
+  </div>
+  <div class="atf-stat-card">
+    <div class="atf-stat-value text-ion-cyan" id="stat-top-proto">—</div>
+    <div class="atf-stat-label">Top Protocol</div>
+  </div>
+  <div class="atf-stat-card">
+    <div class="atf-stat-value" id="stat-top-src">—</div>
+    <div class="atf-stat-label">Top Source IP</div>
+  </div>
+</div>
+
+<!-- Volume chart -->
+<div class="atf-card mb-6">
+  <div class="atf-card-header">
+    <h2 class="atf-card-title">Traffic Volume</h2>
+    <span class="text-slate-500 text-xs" id="vol-subtitle"></span>
+  </div>
+  <div class="relative" style="height: 260px;">
+    <canvas id="vol-chart"></canvas>
+    <div id="vol-loading" class="atf-overlay">
+      <div class="atf-spinner"></div>
+    </div>
+    <div id="vol-empty" class="atf-overlay hidden text-slate-500 text-sm">No data for this range</div>
+  </div>
+</div>
+
+<!-- Protocol mix + Top talkers -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+
+  <!-- Protocol doughnut -->
+  <div class="atf-card">
+    <div class="atf-card-header">
+      <h2 class="atf-card-title">Protocol Mix</h2>
+    </div>
+    <div class="relative" style="height: 220px;">
+      <canvas id="proto-chart"></canvas>
+      <div id="proto-loading" class="atf-overlay">
+        <div class="atf-spinner"></div>
+      </div>
+      <div id="proto-empty" class="atf-overlay hidden text-slate-500 text-sm">No data</div>
+    </div>
+  </div>
+
+  <!-- Top talkers -->
+  <div class="atf-card lg:col-span-2">
+    <div class="atf-card-header">
+      <h2 class="atf-card-title">Top Talkers</h2>
+      <div class="flex gap-2">
+        <button class="atf-talker-tab atf-talker-active text-xs px-3 py-1 rounded" data-dir="src">By Source</button>
+        <button class="atf-talker-tab text-xs px-3 py-1 rounded" data-dir="dst">By Destination</button>
+      </div>
+    </div>
+    <div id="talkers-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
+    <div id="talkers-empty" class="hidden text-slate-500 text-sm text-center py-8">No data for this range</div>
+    <table class="w-full text-sm" id="talkers-table">
+      <thead>
+        <tr class="text-slate-500 text-left border-b border-slate-800">
+          <th class="pb-2 pr-4 font-medium">IP Address</th>
+          <th class="pb-2 pr-4 font-medium text-right">Volume</th>
+          <th class="pb-2 font-medium text-right">Sessions</th>
+        </tr>
+      </thead>
+      <tbody id="talkers-body"></tbody>
+    </table>
+  </div>
+
+</div>
+
+</div><!-- /max-w container -->
+</div><!-- /ion-tw-page -->
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ csp_nonce }}">
+.atf-tab { color: #94a3b8; }
+.atf-tab:hover { color: #e2e8f0; background: rgba(255,255,255,.05); }
+.atf-tab-active { background: #0ea5e9; color: #fff; }
+
+.atf-stat-card {
+  background: var(--bg-secondary, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+}
+.atf-stat-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.2;
+}
+.atf-stat-label {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.atf-card {
+  background: var(--bg-secondary, #1e293b);
+  border: 1px solid var(--border, #334155);
+  border-radius: 0.75rem;
+  padding: 1.25rem 1.5rem;
+  position: relative;
+  overflow: hidden;
+}
+.atf-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.atf-card-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+.atf-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #1e293b);
+  border-radius: 0.75rem;
+  z-index: 5;
+}
+.atf-spinner {
+  width: 28px; height: 28px;
+  border: 3px solid #334155;
+  border-top-color: #0ea5e9;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.atf-talker-tab {
+  background: transparent;
+  border: 1px solid #334155;
+  color: #64748b;
+  transition: all .15s;
+}
+.atf-talker-tab:hover { color: #e2e8f0; border-color: #475569; }
+.atf-talker-active { background: #0f172a; color: #38bdf8; border-color: #38bdf8; }
+
+#talkers-body tr { border-bottom: 1px solid #1e293b; }
+#talkers-body tr:last-child { border-bottom: none; }
+#talkers-body td { padding: 0.5rem 0; color: #cbd5e1; }
+#talkers-body td:not(:first-child) { text-align: right; }
+#talkers-body .ip-cell { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #7dd3fc; }
+#talkers-body .bytes-cell { color: #a78bfa; font-variant-numeric: tabular-nums; }
+</style>
+
+<script nonce="{{ csp_nonce }}" src="/static/js/chart.umd.min.js"></script>
+<script nonce="{{ csp_nonce }}">
+(function () {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let activeRange = '24h';
+  let activeDir   = 'src';
+  let volChart    = null;
+  let protoChart  = null;
+  let talkersData = null;   // cached { by_src, by_dst, range }
+
+  // ── Utility ────────────────────────────────────────────────────────────────
+  function fmtBytes(b) {
+    b = Number(b) || 0;
+    if (b === 0) return '0 B';
+    const units = ['B','KB','MB','GB','TB'];
+    const i = Math.min(Math.floor(Math.log2(b) / 10), units.length - 1);
+    return (b / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0) + ' ' + units[i];
+  }
+
+  function fmtNum(n) {
+    return Number(n).toLocaleString();
+  }
+
+  // Format epoch_ms label based on range
+  function fmtLabel(epochMs, range) {
+    const d = new Date(epochMs);
+    if (range === '24h') {
+      return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+    }
+    if (range === '7d') {
+      return d.toLocaleDateString([], {month:'short', day:'numeric'}) + ' ' +
+             d.toLocaleTimeString([], {hour:'2-digit'});
+    }
+    return d.toLocaleDateString([], {month:'short', day:'numeric'});
+  }
+
+  function showOverlay(id)  { const el = document.getElementById(id); if (el) { el.classList.remove('hidden'); } }
+  function hideOverlay(id)  { const el = document.getElementById(id); if (el) { el.classList.add('hidden'); } }
+
+  // ── Chart helpers ──────────────────────────────────────────────────────────
+  function destroyChart(ref) {
+    if (ref) { try { ref.destroy(); } catch (_) {} }
+    return null;
+  }
+
+  function renderVolumeChart(overview) {
+    volChart = destroyChart(volChart);
+    hideOverlay('vol-loading');
+
+    const srcH = overview.src_histo || [];
+    const dstH = overview.dst_histo || [];
+
+    if (srcH.length === 0 && dstH.length === 0) {
+      showOverlay('vol-empty');
+      return;
+    }
+    hideOverlay('vol-empty');
+
+    // Build unified time axis (merge both histos, deduplicate)
+    const allMs = [...new Set([...srcH.map(p => p[0]), ...dstH.map(p => p[0])])].sort((a,b) => a-b);
+    const srcMap = Object.fromEntries(srcH.map(p => [p[0], p[1]]));
+    const dstMap = Object.fromEntries(dstH.map(p => [p[0], p[1]]));
+    const labels  = allMs.map(ms => fmtLabel(ms, activeRange));
+    const srcData = allMs.map(ms => srcMap[ms] || 0);
+    const dstData = allMs.map(ms => dstMap[ms] || 0);
+
+    document.getElementById('vol-subtitle').textContent =
+      allMs.length + ' data points';
+
+    const ctx = document.getElementById('vol-chart').getContext('2d');
+    volChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Egress (src)',
+            data: srcData,
+            borderColor: '#f472b6',
+            backgroundColor: 'rgba(244,114,182,.08)',
+            borderWidth: 1.5,
+            pointRadius: allMs.length > 60 ? 0 : 2,
+            fill: true,
+            tension: 0.3,
+          },
+          {
+            label: 'Ingress (dst)',
+            data: dstData,
+            borderColor: '#38bdf8',
+            backgroundColor: 'rgba(56,189,248,.08)',
+            borderWidth: 1.5,
+            pointRadius: allMs.length > 60 ? 0 : 2,
+            fill: true,
+            tension: 0.3,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { labels: { color: '#94a3b8', boxWidth: 12, font: { size: 11 } } },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            callbacks: {
+              label: function(ctx) {
+                return ' ' + ctx.dataset.label + ': ' + fmtBytes(ctx.parsed.y);
+              }
+            }
+          },
+        },
+        scales: {
+          x: {
+            type: 'category',
+            ticks: {
+              color: '#475569',
+              font: { size: 10 },
+              maxTicksLimit: 12,
+              maxRotation: 0,
+            },
+            grid: { color: 'rgba(51,65,85,.4)' },
+          },
+          y: {
+            ticks: {
+              color: '#475569',
+              font: { size: 10 },
+              callback: v => fmtBytes(v),
+            },
+            grid: { color: 'rgba(51,65,85,.4)' },
+          },
+        },
+      },
+    });
+  }
+
+  function renderProtoChart(protocols) {
+    protoChart = destroyChart(protoChart);
+    hideOverlay('proto-loading');
+
+    const entries = Object.entries(protocols || {}).sort((a,b) => b[1]-a[1]).slice(0, 8);
+    if (entries.length === 0) {
+      showOverlay('proto-empty');
+      return;
+    }
+    hideOverlay('proto-empty');
+
+    const COLORS = ['#38bdf8','#f472b6','#a78bfa','#34d399','#fb923c','#facc15','#e879f9','#64748b'];
+    const ctx = document.getElementById('proto-chart').getContext('2d');
+    protoChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: entries.map(([k]) => k.toUpperCase()),
+        datasets: [{
+          data: entries.map(([,v]) => v),
+          backgroundColor: COLORS.slice(0, entries.length),
+          borderColor: '#0f172a',
+          borderWidth: 2,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: {
+            position: 'right',
+            labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 }, padding: 6 },
+          },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            borderColor: '#334155',
+            borderWidth: 1,
+            titleColor: '#e2e8f0',
+            bodyColor: '#94a3b8',
+            callbacks: {
+              label: function(ctx) {
+                const total = ctx.dataset.data.reduce((a,b) => a+b, 0);
+                const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+                return ' ' + fmtNum(ctx.parsed) + ' sessions (' + pct + '%)';
+              }
+            }
+          },
+        },
+      },
+    });
+  }
+
+  function renderTalkers() {
+    if (!talkersData) return;
+    const rows = activeDir === 'src' ? (talkersData.by_src || []) : (talkersData.by_dst || []);
+    const tbody = document.getElementById('talkers-body');
+    const empty = document.getElementById('talkers-empty');
+    if (rows.length === 0) {
+      tbody.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+    tbody.innerHTML = rows.map((r, idx) => `
+      <tr>
+        <td class="pr-4">
+          <span class="inline-block w-5 h-5 rounded text-center text-xs leading-5 bg-slate-700 text-slate-400 mr-2">${idx + 1}</span>
+          <span class="ip-cell">${r.ip || '—'}</span>
+        </td>
+        <td class="pr-4 bytes-cell">${fmtBytes(r.bytes)}</td>
+        <td>${fmtNum(r.sessions)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Data fetchers ──────────────────────────────────────────────────────────
+  async function loadOverview(range) {
+    showOverlay('vol-loading');
+    showOverlay('proto-loading');
+    hideOverlay('vol-empty');
+    hideOverlay('proto-empty');
+
+    try {
+      const resp = await fetch('/api/arkime/traffic/overview?range=' + range);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || resp.statusText);
+      }
+      const data = await resp.json();
+
+      // Stats bar
+      document.getElementById('stat-sessions').textContent = fmtNum(data.total_sessions || 0);
+      document.getElementById('stat-bytes').textContent    = fmtBytes(data.total_bytes || 0);
+
+      const protos = data.protocols || {};
+      const topProto = Object.entries(protos).sort((a,b) => b[1]-a[1])[0];
+      document.getElementById('stat-top-proto').textContent = topProto ? topProto[0].toUpperCase() : '—';
+
+      renderVolumeChart(data);
+      renderProtoChart(protos);
+    } catch (e) {
+      hideOverlay('vol-loading');
+      hideOverlay('proto-loading');
+      showOverlay('vol-empty');
+      showOverlay('proto-empty');
+      document.getElementById('vol-empty').textContent = 'Error: ' + e.message;
+      console.error('Traffic overview error:', e);
+    }
+  }
+
+  async function loadTopTalkers(range) {
+    const loadEl = document.getElementById('talkers-loading');
+    if (loadEl) loadEl.style.display = 'flex';
+    talkersData = null;
+
+    try {
+      const resp = await fetch('/api/arkime/traffic/top-talkers?range=' + range);
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+        throw new Error(err.detail || resp.statusText);
+      }
+      talkersData = await resp.json();
+
+      // Top source IP for stats bar
+      const topSrc = (talkersData.by_src || [])[0];
+      document.getElementById('stat-top-src').textContent = topSrc ? topSrc.ip : '—';
+
+      renderTalkers();
+    } catch (e) {
+      console.error('Top talkers error:', e);
+      document.getElementById('talkers-body').innerHTML =
+        '<tr><td colspan="3" class="py-4 text-slate-500 text-center">Error loading top talkers</td></tr>';
+    } finally {
+      if (loadEl) loadEl.style.display = 'none';
+    }
+  }
+
+  async function loadAll(range) {
+    await Promise.all([loadOverview(range), loadTopTalkers(range)]);
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+  async function init() {
+    // Check Arkime is configured
+    try {
+      const st = await fetch('/api/arkime/traffic/status');
+      if (st.ok) {
+        const { configured } = await st.json();
+        if (!configured) {
+          document.getElementById('atf-unconfigured').classList.remove('hidden');
+          hideOverlay('vol-loading');
+          hideOverlay('proto-loading');
+          document.getElementById('talkers-loading').style.display = 'none';
+          return;
+        }
+      }
+    } catch (_) {}
+
+    await loadAll(activeRange);
+  }
+
+  // ── Event binding (CSP-safe — no inline handlers) ──────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    // Range tabs
+    document.getElementById('range-tabs').addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-range]');
+      if (!btn) return;
+      const range = btn.dataset.range;
+      if (range === activeRange) return;
+      activeRange = range;
+      document.querySelectorAll('.atf-tab').forEach(t => t.classList.remove('atf-tab-active'));
+      btn.classList.add('atf-tab-active');
+      loadAll(range);
+    });
+
+    // Talker direction tabs
+    document.getElementById('talkers-table').closest('.atf-card').addEventListener('click', function (e) {
+      const btn = e.target.closest('.atf-talker-tab');
+      if (!btn) return;
+      const dir = btn.dataset.dir;
+      if (dir === activeDir) return;
+      activeDir = dir;
+      document.querySelectorAll('.atf-talker-tab').forEach(t => t.classList.remove('atf-talker-active'));
+      btn.classList.add('atf-talker-active');
+      renderTalkers();
+    });
+
+    init();
+  });
+})();
+</script>
+{% endblock %}

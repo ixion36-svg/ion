@@ -44,6 +44,7 @@ from ion.web.analytics_api import router as analytics_router
 from ion.web.api import limiter
 from ion.web.api import router as api_router
 from ion.web.arkime_api import router as arkime_router
+from ion.web.arkime_traffic_analytics_api import router as arkime_traffic_router
 from ion.web.attack_story_api import router as attack_story_router
 from ion.web.bob_analysis_api import router as bob_analysis_router
 from ion.web.bob_eval_api import router as bob_eval_router
@@ -401,6 +402,7 @@ app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
 # v0.23.1 — on-demand Bob case analysis (replaces auto-comment)
 app.include_router(bob_analysis_router, prefix="/api")
+app.include_router(arkime_traffic_router, prefix="/api")
 app.include_router(case_grouper_router, prefix="")
 app.include_router(webhook_router, prefix="/api")
 app.include_router(daily_standup_router, prefix="/api")
@@ -878,6 +880,12 @@ async def templates_page(request: Request, user: User = Depends(require_page_per
 async def scheduler_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the generic job scheduler page."""
     return templates.TemplateResponse(request=request, name="scheduler.html")
+
+
+@app.get("/arkime-traffic", response_class=HTMLResponse)
+async def arkime_traffic_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the Arkime traffic analytics page."""
+    return templates.TemplateResponse(request=request, name="arkime_traffic.html")
 
 
 @app.get("/templates/new", response_class=HTMLResponse)
