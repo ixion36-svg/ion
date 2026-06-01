@@ -467,8 +467,8 @@ _DEFAULT_LLM_TIMEOUT_S = 300
 # either timed out mid-inference or surrendered with `{}`. These two
 # knobs bound the damage:
 #   ION_INVESTIGATION_MEMORY_ENABLED — kill switch (default true)
-#   ION_INVESTIGATION_MEMORY_MAX_CHARS — hard cap (default 1500)
-_DEFAULT_MEMORY_MAX_CHARS = 1500
+#   ION_INVESTIGATION_MEMORY_MAX_CHARS — hard cap (default 3000)
+_DEFAULT_MEMORY_MAX_CHARS = 3000
 
 
 # ---------------------------------------------------------------------------
@@ -552,7 +552,7 @@ def _build_memory_ctx(memory, alert: dict) -> str:
 
     Returns "" when memory is None, when the env flag is false, when the
     builder raises, or when the output is empty. Otherwise truncates to
-    ``ION_INVESTIGATION_MEMORY_MAX_CHARS`` (default 1500) so large
+    ``ION_INVESTIGATION_MEMORY_MAX_CHARS`` (default 3000) so large
     accumulated histories don't blow past small-model context budgets.
     """
     enabled = os.environ.get("ION_INVESTIGATION_MEMORY_ENABLED", "true").lower()
@@ -2297,13 +2297,12 @@ class InvestigationService:
             memory = None
         memory_ctx_md = _build_memory_ctx(memory, rep_alert)
 
-        # Prompt template match (first alert)
+        # Prompt template match (first alert).
+        # render_system_prompt is called whether or not a template matches —
+        # when tpl is None it still injects KB RAG, gold exemplars, and
+        # skills for the alert, which the raw SYSTEM_PROMPTS fallback misses.
         prompt_template_id: Optional[int] = None
-        try:
-            from ion.services.ollama_service import SYSTEM_PROMPTS
-            system_prompt = SYSTEM_PROMPTS.get("security") or SYSTEM_PROMPTS.get("default") or ""
-        except Exception:
-            system_prompt = ""
+        system_prompt = ""
         try:
             from ion.services.alert_prompt_service import AlertPromptService
             db = factory()
@@ -2312,11 +2311,17 @@ class InvestigationService:
                 tpl = svc.resolve_template_for_alert(rep_alert)
                 if tpl is not None:
                     prompt_template_id = tpl.id
-                    system_prompt = svc.render_system_prompt(tpl, rep_alert)
+                system_prompt = svc.render_system_prompt(tpl, rep_alert)
             finally:
                 db.close()
         except Exception as exc:
             logger.debug("prompt template resolution failed: %s", exc)
+        if not system_prompt:
+            try:
+                from ion.services.ollama_service import SYSTEM_PROMPTS
+                system_prompt = SYSTEM_PROMPTS.get("security") or ""
+            except Exception:
+                system_prompt = ""
 
         # Build cluster prompt
         # v0.19.19: cluster path also wrapped in <input_data> + every

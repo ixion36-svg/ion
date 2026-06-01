@@ -1,13 +1,29 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.34.5 -->
+<!-- ion-doc:version=0.35.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-01 -->
 
 # Changelog
+
+## v0.35.0 — 2026-06-01
+
+**Bob RAG prompt-assembly hardening (Phase 1) — token-budget guard + template-free RAG injection.**
+
+This is the first phase of the Bob/RAG rework. It hardens *how* the system prompt is assembled before any RAG layer is turned on by default (that flip is Phase 2). No new routes, no new permissions, no schema changes.
+
+**The bug it closes (silent context overflow):** `render_system_prompt` appended every available RAG layer — per-rule template guide, KB RAG, gold exemplars, Elastic Agent Skills — then the output contract, with **no token accounting**. The default `llama3.1:8b` model has an 8192-token context. The output contract alone measures ~1,760 tokens and the base persona ~320; once KB + exemplars + skills stack on top, the assembled prompt could silently exceed the context window. Ollama then truncates from the front — which is exactly where the **output contract** lives — so Bob would intermittently drop the JSON envelope and return free text, with no log line explaining why.
+
+**Changes:**
+- **Token-budget guard** (`src/ion/services/alert_prompt_service.py`). New constants `_SYSTEM_PROMPT_TOKEN_BUDGET = 3800` and `_CHARS_PER_TOKEN = 4`, plus `_estimate_tokens()`. The renderer now computes the fixed cost (base + template + output contract) up front, then admits each RAG layer **only if it fits the remaining budget**, decrementing as it goes. Priority order is KB (1) → gold exemplars (2) → skills (3); the lowest-priority layer is dropped first under pressure. Each drop logs at `debug`. **The output contract is always appended last and is never budget-gated** — it is the one thing that must survive.
+- **Template-free RAG injection** (`src/ion/services/investigation_service.py`). The `investigate_case` cluster path previously fell back to the raw `SYSTEM_PROMPTS["security"]` string whenever no `AlertPromptTemplate` matched the alert — meaning KB/exemplar/skills grounding was silently skipped for any unmatched rule. It now calls `svc.render_system_prompt(tpl, rep_alert)` regardless of whether `tpl` is `None`, so RAG layers inject on every investigation; the raw `SYSTEM_PROMPTS` fallback only fires if rendering yields an empty string.
+- **Investigation memory cap raised** `_DEFAULT_MEMORY_MAX_CHARS` 1500 → 3000 (`investigation_service.py`). The prior 1500-char cap truncated multi-event memory context aggressively; doubling it gives Bob more prior-investigation continuity while staying comfortably inside the new token budget.
+- **7 new tests** in `tests/test_v035_rag_token_budget.py` pin the contract: `_estimate_tokens` behaviour, KB dropped when budget tight, skills dropped before exemplars, output contract never dropped, memory cap == 3000, and `investigate_case` calling `render_system_prompt` with alert context when no template matches.
+
+**No new attack surface.** This is internal prompt-assembly logic — adversary-controlled alert content already flowed into the prompt before this change; the guard only bounds *how much* of it (and the trusted RAG layers) survive. Full suite green (834 passed, 2 xpassed). SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. **Net new findings: 0C / 0H / 0M / 0L.**
 
 ## v0.34.5 — 2026-06-01
 

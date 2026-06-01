@@ -22,6 +22,23 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Token budget guard for render_system_prompt.
+#
+# llama3.1:8b has an 8 192-token context window. We target ≤ 3 800 tokens
+# for the system prompt, leaving ~4 000 for the user prompt body and ~4 096
+# for generation.  Estimation: 4 chars ≈ 1 token (conservative for mixed
+# English + code/IOC text).  Layers are dropped in reverse priority when the
+# budget would be exceeded: skills first, then exemplars, then KB context.
+# The base prompt + template guide + output contract are NEVER dropped.
+_SYSTEM_PROMPT_TOKEN_BUDGET = 3_800
+_CHARS_PER_TOKEN = 4
+
+
+def _estimate_tokens(text: str) -> int:
+    return max(1, len(text) // _CHARS_PER_TOKEN)
+
+
+# ---------------------------------------------------------------------------
 # Few-shot gold exemplars — retrieves past, human-agreed closed cases to
 # inject as reference context into Bob's system prompt. Opt-in via
 # ION_FEW_SHOT_EXEMPLARS_ENABLED — default off because a fresh install has
@@ -3600,49 +3617,88 @@ class AlertPromptService:
                 rule_id = AlertPromptRepository._extract_rule_id(alert) or "(unknown)"
                 parts.append(f"\n_Matched alert rule id: `{rule_id}`_\n")
 
-        # v0.10.6: prepend "Knowledge Base Context" when KB RAG is enabled.
-        # Placed BEFORE the gold exemplars so Bob's prompt priority reads:
-        # per-rule playbook → KB topic grounding → prior cases → output
-        # contract. The KB is general investigation background; gold
-        # exemplars are specific past verdicts; the contract is the format.
-        if alert is not None:
-            try:
-                kb_hits = self._get_kb_context_for_alert(alert)
-            except Exception as exc:
-                logger.debug("KB RAG retrieval failed: %s", exc)
-                kb_hits = []
-            if kb_hits:
-                parts.append(_format_kb_context_for_prompt(kb_hits))
+        # Compute the fixed budget consumed by base + template + output
+        # contract BEFORE adding any RAG layers.  RAG layers are injected
+        # in priority order (KB → exemplars → skills) and each is skipped
+        # when the remaining budget would be exhausted.  The output contract
+        # is always appended — a schema-less response is worse than a
+        # less-informed one.
+        fixed_tokens = _estimate_tokens("".join(parts)) + _estimate_tokens(
+            _OUTPUT_CONTRACT
+        )
+        remaining = _SYSTEM_PROMPT_TOKEN_BUDGET - fixed_tokens
 
-        # v0.10.5: "Prior Similar Cases" if few-shot is enabled and we have
-        # an alert + a DB session.
         if alert is not None:
-            try:
-                exemplars = self._get_gold_exemplars_for_alert(alert)
-            except Exception as exc:
-                logger.debug("Gold exemplar retrieval failed: %s", exc)
-                exemplars = []
-            if exemplars:
-                parts.append(_format_exemplars_for_prompt(exemplars))
+            # v0.10.6: KB RAG — topic-level investigation background.
+            # Priority 1 of 3 (injected before exemplars and skills).
+            kb_block = ""
+            if remaining > 0:
+                try:
+                    kb_hits = self._get_kb_context_for_alert(alert)
+                except Exception as exc:
+                    logger.debug("KB RAG retrieval failed: %s", exc)
+                    kb_hits = []
+                if kb_hits:
+                    candidate = _format_kb_context_for_prompt(kb_hits)
+                    cost = _estimate_tokens(candidate)
+                    if cost <= remaining:
+                        kb_block = candidate
+                        remaining -= cost
+                    else:
+                        logger.debug(
+                            "KB RAG dropped: needs %d tokens, only %d remaining",
+                            cost, remaining,
+                        )
+            if kb_block:
+                parts.append(kb_block)
 
-        # v0.13.1: Tier-6 — Elastic Agent Skills consumer.
-        # Loaded SKILL.md folders matched against the alert via keyword /
-        # technique / rule-group; embedding-free. See
-        # ``services/skill_loader.py``.
-        if alert is not None:
-            try:
-                from ion.services.skill_loader import (
-                    format_skills_for_prompt,
-                    select_skills_for_alert,
-                )
-                skills = select_skills_for_alert(alert)
-                skill_block = format_skills_for_prompt(skills)
-                if skill_block:
-                    parts.append(skill_block)
-            except Exception as exc:
-                logger.debug("Skill loader failed: %s", exc)
+            # v0.10.5: Gold exemplars — prior analyst-verified cases.
+            # Priority 2 of 3.
+            exemplar_block = ""
+            if remaining > 0:
+                try:
+                    exemplars = self._get_gold_exemplars_for_alert(alert)
+                except Exception as exc:
+                    logger.debug("Gold exemplar retrieval failed: %s", exc)
+                    exemplars = []
+                if exemplars:
+                    candidate = _format_exemplars_for_prompt(exemplars)
+                    cost = _estimate_tokens(candidate)
+                    if cost <= remaining:
+                        exemplar_block = candidate
+                        remaining -= cost
+                    else:
+                        logger.debug(
+                            "Gold exemplars dropped: needs %d tokens, only %d remaining",
+                            cost, remaining,
+                        )
+            if exemplar_block:
+                parts.append(exemplar_block)
 
-        # Output contract — always appended, with or without a template
+            # v0.13.1: Elastic Agent Skills — keyword/technique matched.
+            # Priority 3 of 3 (embedding-free, always attempted last).
+            if remaining > 0:
+                try:
+                    from ion.services.skill_loader import (
+                        format_skills_for_prompt,
+                        select_skills_for_alert,
+                    )
+                    skills = select_skills_for_alert(alert)
+                    skill_block = format_skills_for_prompt(skills)
+                    if skill_block:
+                        cost = _estimate_tokens(skill_block)
+                        if cost <= remaining:
+                            parts.append(skill_block)
+                            remaining -= cost
+                        else:
+                            logger.debug(
+                                "Skills dropped: needs %d tokens, only %d remaining",
+                                cost, remaining,
+                            )
+                except Exception as exc:
+                    logger.debug("Skill loader failed: %s", exc)
+
+        # Output contract — always appended, never budget-gated.
         parts.append(_OUTPUT_CONTRACT)
         return "".join(parts)
 
