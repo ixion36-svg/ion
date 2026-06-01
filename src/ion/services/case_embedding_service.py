@@ -242,13 +242,14 @@ def stop_case_embedding_loop() -> None:
 
 
 def start_case_embedding_if_enabled(engine=None) -> bool:
-    # Default off — opt in with ION_EMBEDDING_ENABLED=true. Matches
-    # EmbeddingService.is_enabled so the background loop only spins up
-    # when the site has made a conscious choice to run embeddings.
-    enabled_env = os.environ.get("ION_EMBEDDING_ENABLED", "").lower()
+    # Default ON (v0.36.0) — disable with ION_EMBEDDING_ENABLED=false. MUST
+    # match EmbeddingService.is_enabled's default so the loop gate and the
+    # per-call gate agree; otherwise the loop spins up while embed() no-ops
+    # (or vice-versa). Loop work is a cheap no-op when Ollama is unreachable.
+    enabled_env = os.environ.get("ION_EMBEDDING_ENABLED", "true").lower()
     if enabled_env not in ("true", "1", "yes"):
         logger.info(
-            "Case-embedding disabled (opt-in: set ION_EMBEDDING_ENABLED=true)"
+            "Case-embedding disabled (set ION_EMBEDDING_ENABLED=false to opt out)"
         )
         return False
 

@@ -295,10 +295,10 @@ def _write_bob_outputs(
     inv_row = db.get(_Investigation, investigation_id)
     if inv_row is not None:
         inv_row.confidence_int = confidence_int
-        store_reasoning = os.environ.get(
-            "ION_BOB_STORE_REASONING", "false"
-        ).lower() in ("true", "1", "yes")
-        if store_reasoning:
+        # v0.36.0: default ON. Bob's analyst-explanation is persisted on the
+        # Investigation row so memory + few-shot exemplar RAG can draw on it.
+        # Disable with ION_BOB_STORE_REASONING=false (data-minimisation opt-out).
+        if _bob_store_reasoning_enabled():
             inv_row.reasoning_text = (
                 parsed.get("analyst_explanation") or ""
             )[:8000] or None
@@ -469,6 +469,18 @@ _DEFAULT_LLM_TIMEOUT_S = 300
 #   ION_INVESTIGATION_MEMORY_ENABLED — kill switch (default true)
 #   ION_INVESTIGATION_MEMORY_MAX_CHARS — hard cap (default 3000)
 _DEFAULT_MEMORY_MAX_CHARS = 3000
+
+
+def _bob_store_reasoning_enabled() -> bool:
+    """Whether Bob's analyst-explanation text is persisted + surfaced.
+
+    Default ON (v0.36.0); disable with ``ION_BOB_STORE_REASONING=false``.
+    Single source of truth shared by the persistence path here and the
+    eval-API response gate in ``web/bob_eval_api.py`` so the two never drift.
+    """
+    return os.environ.get("ION_BOB_STORE_REASONING", "true").lower() in (
+        "true", "1", "yes",
+    )
 
 
 # ---------------------------------------------------------------------------

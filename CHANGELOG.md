@@ -1,13 +1,36 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.35.0 -->
+<!-- ion-doc:version=0.36.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-01 -->
 
 # Changelog
+
+## v0.36.0 — 2026-06-01
+
+**Bob RAG layers default ON (Phase 2).**
+
+Phase 1 (v0.35.0) hardened *how* the prompt is assembled. Phase 2 turns the RAG layers on by default so a deployment that runs Ollama gets case similarity, KB grounding, gold-exemplar few-shot, and reasoning-backed memory with **zero extra configuration**. No new routes, permissions, or schema.
+
+**Defaults flipped (set `=false` to opt out):**
+- **`ION_EMBEDDING_ENABLED`** — case-similarity embeddings + the embedding backbone for all RAG retrieval.
+- **`ION_KB_RAG_ENABLED`** — top-K Knowledge Base articles injected into Bob's prompt as topic grounding.
+- **`ION_FEW_SHOT_EXEMPLARS_ENABLED`** — prior analyst-verified (`agreement=True`) cases injected as few-shot exemplars.
+- **`ION_BOB_STORE_REASONING`** — Bob's analyst-explanation text persisted on the `Investigation` row and surfaced in the eval API; feeds memory + few-shot exemplar RAG and gives analysts visibility into Bob's reasoning.
+
+**Why this is safe to default on:** every retrieval layer degrades to a cheap, silent no-op when Ollama is unreachable — `EmbeddingService.embed()` returns `None` (never raises), both background embedding loops no-op, and the similarity sidebar / RAG injection simply produce nothing. An air-gapped estate without an LLM host pays only a per-tick no-op; a site that runs Ollama gets the full stack automatically. Fresh installs with no `agreement=True` feedback yet simply inject no exemplars until the analyst-verified corpus grows — the layer self-activates.
+
+**Correctness / hygiene:**
+- The per-call gate (`EmbeddingService.is_enabled`) and the loop-start gate (`start_case_embedding_if_enabled`) now share the same default — a test pins that they agree, since drift would spin up the loop while `embed()` no-ops (or vice-versa). Same coupling pinned for `ION_KB_RAG_ENABLED` across the KB loop and the prompt injector.
+- The `ION_BOB_STORE_REASONING` check, previously duplicated inline in `investigation_service.py` and `bob_eval_api.py`, is now a single source of truth (`_bob_store_reasoning_enabled()`) so persistence and the response-layer emission gate never disagree. Removed a now-dead `import os`.
+- `.env.deploy` rewritten to document the new default-on posture and the per-flag opt-out, including a new `ION_BOB_STORE_REASONING` block with the data-minimisation note.
+
+**13 new/updated tests** (`tests/test_v036_rag_defaults_on.py` — 12 pinning defaults, opt-out, loop-gate side-effect-free disable, and per-call/loop gate agreement; plus updated reasoning-storage tests in `test_bob_eval.py` / `test_bob_confidence.py` to the new default and an added explicit-opt-out test). Full suite green (847 passed, 2 xpassed).
+
+**Net-new surface:** reasoning-text-on-by-default expands data-at-rest (Bob's analyst-explanation now persists by default in a single-tenant, air-gapped DB visible only to authenticated SOC users; opt-out via `ION_BOB_STORE_REASONING=false`, which also withholds it at the response layer for previously-stored rows). Documented in `SECURITY_ASSESSMENT.md` Net-New Surfaces. No new vulnerability. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. **Net new findings: 0C / 0H / 0M / 0L.**
 
 ## v0.35.0 — 2026-06-01
 

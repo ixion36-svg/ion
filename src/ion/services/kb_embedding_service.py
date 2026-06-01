@@ -8,8 +8,9 @@ Runs under advisory lock ``LOCK_KB_EMBEDDING_BG`` (1020). On each tick:
 2. Embed the doc's ``name + rendered_content`` via ``EmbeddingService``.
 3. Upsert the ``KBDocumentEmbedding`` row.
 
-Opt-in via ``ION_KB_RAG_ENABLED=true`` — default off because KB embedding
-is useless without Ollama (same prerequisite as case embedding).
+Default ON (v0.36.0); disable with ``ION_KB_RAG_ENABLED=false``. KB
+embedding is a graceful no-op without Ollama (same prerequisite as case
+embedding) — it self-activates once an Ollama host is reachable.
 
 Air-gapped friendly: only depends on local Ollama + local Postgres.
 """
@@ -264,10 +265,11 @@ def stop_kb_embedding_loop() -> None:
 
 
 def start_kb_embedding_if_enabled(engine=None) -> bool:
-    """KB RAG is gated by ION_KB_RAG_ENABLED — same pattern as case embedding."""
-    enabled_env = os.environ.get("ION_KB_RAG_ENABLED", "").lower()
+    """KB RAG is gated by ION_KB_RAG_ENABLED — default ON (v0.36.0), same
+    pattern as case embedding. Disable with ION_KB_RAG_ENABLED=false."""
+    enabled_env = os.environ.get("ION_KB_RAG_ENABLED", "true").lower()
     if enabled_env not in ("true", "1", "yes"):
-        logger.info("KB embedding disabled (opt-in: set ION_KB_RAG_ENABLED=true)")
+        logger.info("KB embedding disabled (set ION_KB_RAG_ENABLED=false to opt out)")
         return False
 
     try:

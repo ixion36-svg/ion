@@ -294,11 +294,26 @@ class TestThresholdZeroDisablesBreaker:
 class TestReasoningStorage:
     """ION_BOB_STORE_REASONING gates reasoning_text persistence."""
 
-    def test_reasoning_not_stored_by_default(
+    def test_reasoning_stored_by_default(
         self, session, bob_user, alert_triage, monkeypatch
     ):
+        # v0.36.0: ION_BOB_STORE_REASONING defaults ON — unset env stores.
         monkeypatch.setenv("ION_BOB_CONFIDENCE_THRESHOLD", "60")
         monkeypatch.delenv("ION_BOB_STORE_REASONING", raising=False)
+        from ion.models.investigation import Investigation
+        inv = _seed_investigation(session)
+        parsed = _base_parsed(confidence=85)
+        _call_write_bob_outputs(session, "test-alert-001", inv.id, parsed)
+
+        inv_row = session.get(Investigation, inv.id)
+        assert inv_row.reasoning_text is not None
+
+    def test_reasoning_not_stored_when_disabled(
+        self, session, bob_user, alert_triage, monkeypatch
+    ):
+        # Explicit data-minimisation opt-out still suppresses persistence.
+        monkeypatch.setenv("ION_BOB_CONFIDENCE_THRESHOLD", "60")
+        monkeypatch.setenv("ION_BOB_STORE_REASONING", "false")
         from ion.models.investigation import Investigation
         inv = _seed_investigation(session)
         parsed = _base_parsed(confidence=85)

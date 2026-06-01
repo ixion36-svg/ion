@@ -41,19 +41,21 @@ def _estimate_tokens(text: str) -> int:
 # ---------------------------------------------------------------------------
 # Few-shot gold exemplars — retrieves past, human-agreed closed cases to
 # inject as reference context into Bob's system prompt. Opt-in via
-# ION_FEW_SHOT_EXEMPLARS_ENABLED — default off because a fresh install has
-# no AIFeedback rows to filter on.
+# ION_FEW_SHOT_EXEMPLARS_ENABLED — default ON (v0.36.0). A fresh install
+# has no agreement=True AIFeedback rows yet, so _get_gold_exemplars_for_alert
+# simply returns nothing until cases accumulate; the layer self-activates as
+# the analyst-verified corpus grows. Disable with =false.
 # ---------------------------------------------------------------------------
 
 
 def _few_shot_enabled() -> bool:
-    return os.environ.get("ION_FEW_SHOT_EXEMPLARS_ENABLED", "").lower() in (
+    return os.environ.get("ION_FEW_SHOT_EXEMPLARS_ENABLED", "true").lower() in (
         "true", "1", "yes",
     )
 
 
 def _kb_rag_enabled() -> bool:
-    return os.environ.get("ION_KB_RAG_ENABLED", "").lower() in (
+    return os.environ.get("ION_KB_RAG_ENABLED", "true").lower() in (
         "true", "1", "yes",
     )
 

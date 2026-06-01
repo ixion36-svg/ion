@@ -806,9 +806,12 @@ class TestReasoningTextResponseGate:
         db_session.commit()
         return run
 
-    def test_reasoning_text_stripped_when_flag_false(
+    def test_reasoning_text_emitted_by_default(
         self, db_session, admin_user, template, monkeypatch
     ):
+        """v0.36.0: ION_BOB_STORE_REASONING defaults ON, so an unset env
+        emits reasoning_text. The explicit-false strip is covered by
+        test_reasoning_text_stripped_when_flag_explicitly_false below."""
         from ion.web.bob_eval_api import get_run_samples
 
         run = self._seed_run_with_sample(db_session, template, admin_user)
@@ -820,7 +823,7 @@ class TestReasoningTextResponseGate:
         )
         assert resp["total"] == 1
         assert len(resp["samples"]) == 1
-        assert "reasoning_text" not in resp["samples"][0]
+        assert resp["samples"][0]["reasoning_text"].startswith("LEAKY:")
 
     def test_reasoning_text_stripped_when_flag_explicitly_false(
         self, db_session, admin_user, template, monkeypatch

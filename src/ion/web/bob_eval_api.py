@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import logging
 import math
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -157,12 +156,13 @@ def get_run_samples(
     ).scalar() or 0
 
     # L5 (v0.22.1): reasoning_text is only emitted when ION_BOB_STORE_REASONING
-    # is true at request time. Rows persisted while the flag was enabled stay
-    # in the DB if it is later disabled; gating at the response layer ensures
-    # those rows stop leaking without requiring a back-fill purge.
-    store_reasoning = os.environ.get(
-        "ION_BOB_STORE_REASONING", "false"
-    ).lower() in ("true", "1", "yes")
+    # is true at request time. v0.36.0 flips the default ON. Setting it back to
+    # false stops emitting reasoning at the response layer even for rows that
+    # were persisted while it was enabled — no back-fill purge required.
+    # Shared single-source gate (see investigation_service) so persistence and
+    # response-layer emission never disagree on the default.
+    from ion.services.investigation_service import _bob_store_reasoning_enabled
+    store_reasoning = _bob_store_reasoning_enabled()
     sample_dicts = []
     for s in samples:
         d = s.to_dict()

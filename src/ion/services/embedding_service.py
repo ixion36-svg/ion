@@ -57,15 +57,18 @@ class EmbeddingService:
 
     @property
     def is_enabled(self) -> bool:
-        """Default off — opt in with ``ION_EMBEDDING_ENABLED=true``.
+        """Default ON (v0.36.0) — disable with ``ION_EMBEDDING_ENABLED=false``.
 
         Case-similarity embeddings require an Ollama deployment with
-        ``nomic-embed-text`` pulled (~300 MB). Air-gapped sites without a
-        local LLM host should stay at the default (disabled) — the
-        similarity sidebar degrades gracefully with a "no similar cases"
-        hint, and nothing else breaks.
+        ``nomic-embed-text`` pulled (~300 MB). When Ollama is absent the
+        feature degrades gracefully: ``embed()`` returns None on every
+        call, the background loop no-ops, and the similarity sidebar shows
+        a "no similar cases" hint — nothing breaks. Defaulting on means a
+        site that DOES run Ollama gets case similarity + RAG with zero
+        extra configuration; air-gapped sites without an LLM host pay only
+        a cheap, silent no-op per embedding tick.
         """
-        flag = os.environ.get("ION_EMBEDDING_ENABLED", "").lower()
+        flag = os.environ.get("ION_EMBEDDING_ENABLED", "true").lower()
         return flag in ("true", "1", "yes")
 
     def embed(self, text: str) -> Optional[List[float]]:
