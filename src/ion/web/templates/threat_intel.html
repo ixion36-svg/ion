@@ -110,6 +110,13 @@
 /* Unread indicator */
 .ti-unread td { border-left: 3px solid var(--accent); }
 .ti-badge { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 10px; background: var(--danger); color: #fff; font-size: .7rem; font-weight: 700; padding: 0 5px; margin-left: 6px; }
+
+/* Report cards — clickable */
+.ti-report-card { cursor: pointer; transition: border-color .15s; }
+.ti-report-card:hover { border-color: var(--accent); }
+.ti-report-body { margin: 0; font-size: .82rem; line-height: 1.6; color: var(--text-primary); white-space: pre-wrap; max-height: 320px; overflow-y: auto; }
+.ti-ttp[data-click-action] { cursor: pointer; }
+.ti-ttp[data-click-action]:hover { opacity: .8; }
 </style>
 
 <div class="ti-page">
@@ -328,8 +335,22 @@
         </div>
     </div>
     <div class="_ion-s-b26cdbb562" id="ti-drill-backdrop"
- 
+
  data-click-action="tiCloseDrill"></div>
+
+    <!-- Report detail side panel — same layout as ti-drill-panel above -->
+    <div class="_ion-s-f054d745af" id="ti-report-panel">
+        <div class="_ion-s-4aaba5a4dd">
+            <h3 class="_ion-s-a935918594" id="ti-report-panel-title">—</h3>
+            <button class="_ion-s-ee7af9422a"
+data-click-action="tiCloseReport">&times;</button>
+        </div>
+        <div id="ti-report-panel-body">
+            <div class="ti-loading"><span class="ti-spinner"></span>Loading…</div>
+        </div>
+    </div>
+    <div class="_ion-s-b26cdbb562" id="ti-report-backdrop"
+data-click-action="tiCloseReport"></div>
 
     <!-- v0.27.0: Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
@@ -586,6 +607,122 @@
         document.getElementById('ti-drill-backdrop').style.display = 'none';
     };
 
+    // ── Report detail panel ──────────────────────────────────────────────
+    window.tiOpenReport = async function(reportId) {
+        tiCloseDrill();
+        const panel    = document.getElementById('ti-report-panel');
+        const backdrop = document.getElementById('ti-report-backdrop');
+        const title    = document.getElementById('ti-report-panel-title');
+        const body     = document.getElementById('ti-report-panel-body');
+        title.textContent = '—';
+        body.innerHTML = '<div class="ti-loading"><span class="ti-spinner"></span>Loading report…</div>';
+        panel.style.display = 'block';
+        backdrop.style.display = 'block';
+        try {
+            const r = await fetch('/api/threat-landscape/reports/' + encodeURIComponent(reportId));
+            if (!r.ok) {
+                const err = await r.json().catch(() => ({}));
+                throw new Error(err.detail || 'HTTP ' + r.status);
+            }
+            const d = await r.json();
+            title.textContent = d.name || 'Report';
+            const secs = [];
+
+            // Meta row
+            const meta = [];
+            if (d.published) meta.push(new Date(d.published).toLocaleDateString());
+            if (d.types && d.types.length) meta.push(d.types.join(', '));
+            if (d.source) meta.push('Source: ' + escapeHtml(d.source));
+            if (d.confidence != null) meta.push('Confidence: ' + d.confidence + '%');
+            if (meta.length) secs.push('<div class="_ion-s-adac18b9c4 ti-detail-section">' + meta.join(' · ') + '</div>');
+
+            // Labels
+            if (d.labels && d.labels.length) {
+                secs.push('<div class="ti-detail-section">' +
+                    d.labels.map(l => `<span class="ti-tag">${escapeHtml(l.value)}</span>`).join(' ') +
+                '</div>');
+            }
+
+            // Body
+            if (d.body) {
+                secs.push('<div class="ti-detail-section"><h4>Report Content</h4>' +
+                    '<p class="ti-report-body">' + escapeHtml(d.body) + '</p></div>');
+            }
+
+            // Threat actors
+            if (d.related_actors && d.related_actors.length) {
+                secs.push('<div class="ti-detail-section"><h4>Threat Actors</h4>' +
+                    '<ul class="_ion-s-e7184d9d11">' + d.related_actors.map(a =>
+                        '<li class="_ion-s-a24e8f22c9"><span class="_ion-s-d34d5c53e4">' + escapeHtml(a.name) + '</span>' +
+                        (a.aliases && a.aliases.length ? ' <span class="_ion-s-199aeed353">(' + escapeHtml(a.aliases.join(', ')) + ')</span>' : '') +
+                        '</li>'
+                    ).join('') + '</ul></div>');
+            }
+
+            // MITRE ATT&CK
+            if (d.related_ttps && d.related_ttps.length) {
+                secs.push('<div class="ti-detail-section"><h4>MITRE ATT&amp;CK</h4>' +
+                    '<div class="ti-ttp-list">' + d.related_ttps.map(t => {
+                        const label = (t.mitre_id ? escapeHtml(t.mitre_id) + ' — ' : '') + escapeHtml(t.name);
+                        return t.mitre_id
+                            ? `<span class="ti-ttp" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(t.mitre_id)}]'>${label}</span>`
+                            : `<span class="ti-ttp">${label}</span>`;
+                    }).join('') + '</div></div>');
+            }
+
+            // Malware
+            if (d.related_malware && d.related_malware.length) {
+                secs.push('<div class="ti-detail-section"><h4>Malware</h4>' +
+                    '<div class="ti-ttp-list">' +
+                    d.related_malware.map(m => `<span class="ti-tag">${escapeHtml(m.name)}</span>`).join(' ') +
+                    '</div></div>');
+            }
+
+            // Vulnerabilities
+            if (d.related_vulns && d.related_vulns.length) {
+                secs.push('<div class="ti-detail-section"><h4>Vulnerabilities</h4>' +
+                    '<div class="ti-ttp-list">' +
+                    d.related_vulns.map(v => `<span class="ti-ttp">${escapeHtml(v.name)}</span>`).join('') +
+                    '</div></div>');
+            }
+
+            // Target geography / sectors
+            if ((d.related_countries && d.related_countries.length) || (d.related_sectors && d.related_sectors.length)) {
+                secs.push('<div class="ti-detail-section">' +
+                    (d.related_countries && d.related_countries.length
+                        ? '<h4>Target Countries</h4><p>' + escapeHtml(d.related_countries.join(', ')) + '</p>' : '') +
+                    (d.related_sectors && d.related_sectors.length
+                        ? '<h4>Target Sectors</h4><p>' + escapeHtml(d.related_sectors.join(', ')) + '</p>' : '') +
+                '</div>');
+            }
+
+            // Indicators
+            if (d.related_indicators && d.related_indicators.length) {
+                const shown = d.related_indicators.slice(0, 10);
+                secs.push('<div class="ti-detail-section"><h4>Indicators <span class="_ion-s-84bbf7f5de">(' +
+                    shown.length + (d.related_indicators.length > 10 ? '+' : '') + ')</span></h4>' +
+                    '<ul class="_ion-s-e7184d9d11">' + shown.map(i =>
+                        `<li class="_ion-s-67b52d7eff"><code class="_ion-s-fcf3b313f7">${escapeHtml(i.pattern)}</code></li>`
+                    ).join('') + '</ul></div>');
+            }
+
+            body.innerHTML = secs.join('') || '<em class="_ion-s-6e06904f9e">No content available.</em>';
+        } catch(e) {
+            body.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
+        }
+    };
+
+    window.tiCloseReport = function() {
+        document.getElementById('ti-report-panel').style.display = 'none';
+        document.getElementById('ti-report-backdrop').style.display = 'none';
+    };
+
+    window.tiCloseAndDrillTechnique = function(techId) {
+        tiCloseReport();
+        tiCloseDrill();
+        tiDrillTechnique(techId);
+    };
+
     async function loadRecentlyActive() {
         try {
             const r = await fetch(API + '/recently-active?days=30&top_n=8');
@@ -809,7 +946,7 @@
             }
             host.innerHTML = reports.map(rep => {
                 const published = rep.published ? new Date(rep.published).toLocaleDateString() : '-';
-                return `<div class="_ion-s-d2d7bfa40f">
+                return `<div class="_ion-s-d2d7bfa40f ti-report-card" data-click-action="tiOpenReport" data-args='[${JSON.stringify(rep.id)}]'>
                     <div class="_ion-s-176f60fe66">${escapeHtml(rep.name || 'Untitled')}</div>
                     <div class="_ion-s-6912997656">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
                     <div class="_ion-s-adac18b9c4">${escapeHtml(rep.report_type || 'report')} · ${published}</div>

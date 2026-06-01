@@ -1,13 +1,26 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.34.4 -->
+<!-- ion-doc:version=0.34.5 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-05-28 -->
+<!-- ion-doc:date=2026-06-01 -->
 
 # Changelog
+
+## v0.34.5 — 2026-06-01
+
+**Report detail slide-over on Daily Standup and Threat Intel pages.**
+
+Clicking a threat report now opens a slide-over panel with full detail fetched from OpenCTI — no page navigation required.
+
+**New features:**
+- **Daily Standup** — "Reports of Interest" items are now clickable rows (`data-click-action="dsOpenReport"`). Opens a fixed right-side panel (480 px) showing: meta row (date · type · source · confidence), label chips, report body, threat actors with aliases, MITRE ATT&CK TTP badges, malware, target countries/sectors, and up to 10 indicators. Close via `×` button or backdrop click.
+- **Threat Intel** — Report cards on the Reports tab now carry `data-click-action="tiOpenReport"`. Same detail panel as above, styled with the existing `_ion-s-*` scoped classes. TTP badges inside the panel are interactive: clicking one closes the report panel and drills into the MITRE technique panel (`tiCloseAndDrillTechnique`).
+- Backend endpoint `/api/threat-landscape/reports/{id}` (added in v0.34.0) is now surfaced in the UI.
+
+**No new attack surface.** Panel fetches only when the user explicitly clicks; endpoint already existed and was already permission-gated (`observable:read`). 0C/0H/0M/0L.
 
 ## v0.34.4 — 2026-05-28
 
