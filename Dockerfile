@@ -42,13 +42,17 @@ RUN pip install --no-cache-dir --upgrade pip && \
 #
 # Verify post-build:
 #   docker run --rm ixion36/ion:vX.Y.Z cat /app/sbom.spdx.json | head -20
-ARG SYFT_VERSION=1.18.1
-RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates && \
-    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
-      | sh -s -- -b /usr/local/bin "v${SYFT_VERSION}" && \
-    syft /opt/venv -o spdx-json=/build/sbom.spdx.json && \
-    apt-get purge -y curl && apt-get autoremove -y && \
-    rm -rf /var/lib/apt/lists/* /usr/local/bin/syft
+# v0.35.0: syft is sourced from its official Docker Hub image via COPY
+# --from rather than curl-installed from GitHub. The Docker Desktop build
+# VM has intermittent GitHub egress (github.com IPv6 dead-routes, raw
+# .githubusercontent connect timeouts); Docker Hub is reliable. This also
+# removes a build-time GitHub dependency, which suits the air-gapped ethos.
+# The syft binary is a static Go executable, so it runs as-is in the
+# python:3.14-slim builder. Pin the tag to keep SBOM tooling reproducible.
+ARG SYFT_VERSION=1.44.0
+COPY --from=anchore/syft:v1.44.0 /syft /usr/local/bin/syft
+RUN syft /opt/venv -o spdx-json=/build/sbom.spdx.json && \
+    rm -f /usr/local/bin/syft
 
 # ============================================================================
 # Stage 2: Runtime stage - minimal image
