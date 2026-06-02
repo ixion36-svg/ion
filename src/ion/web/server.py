@@ -931,6 +931,52 @@ async def gitlab_page(request: Request, user: User = Depends(require_page_auth))
     return templates.TemplateResponse(request=request, name="gitlab.html")
 
 
+@app.get("/briefings", response_class=HTMLResponse)
+async def briefings_page(
+    request: Request,
+    deck: str = "executive",
+    user: User = Depends(require_page_auth),
+):
+    """Render the in-app ION briefing decks (per-slide PNGs + PDF/PPTX downloads).
+
+    Decks are pre-rendered to images under ``static/briefings/<deck>/`` and
+    served as plain ``<img>`` — keeping the page within ION's strict CSP
+    (``img-src 'self'``; no framing, no inline styles).
+    """
+    if deck not in ("executive", "overview", "secure-by-design"):
+        deck = "executive"
+    slide_dir = BASE_DIR / "static" / "briefings" / deck
+    slides = [
+        f"/static/briefings/{deck}/{p.name}"
+        for p in sorted(slide_dir.glob("slide-*.png"))
+    ]
+    meta = {
+        "executive": {
+            "label": "Executive Brief",
+            "blurb": "A 3-slide brief for leadership — the problem, the value, and the proof.",
+            "pdf": "/static/briefings/ION_Executive_Brief.pdf",
+            "pptx": "/static/briefings/ION_Executive_Brief.pptx",
+        },
+        "overview": {
+            "label": "Full Overview",
+            "blurb": "The complete capability & architecture deck — what ION does, every integration, and how Bob's AI works.",
+            "pdf": "/static/briefings/ION_Overview.pdf",
+            "pptx": "/static/briefings/ION_Overview.pptx",
+        },
+        "secure-by-design": {
+            "label": "Secure by Design",
+            "blurb": "How ION's 20 secure-by-design principles shape every line of code and every release.",
+            "pdf": "/static/briefings/ION_Secure_by_Design.pdf",
+            "pptx": "/static/briefings/ION_Secure_by_Design.pptx",
+        },
+    }
+    return templates.TemplateResponse(
+        request=request,
+        name="briefings.html",
+        context={"deck": deck, "slides": slides, "current": meta[deck]},
+    )
+
+
 # Auth page routes
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
