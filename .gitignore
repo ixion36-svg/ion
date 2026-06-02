@@ -141,3 +141,9 @@ _handoff_v*.md
 _spec_v*.md
 _backlog_v*.md
 _research_*.md
+
+# v0.38.0: pre-built briefing-deck assets ship in the image — keep the PDFs
+!src/ion/web/static/briefings/*.pdf
+# deck build scratch (node deps + intermediate HTML)
+.deck_build/
+.playwright-mcp/

@@ -1,13 +1,29 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.37.0 -->
+<!-- ion-doc:version=0.38.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-01 -->
+<!-- ion-doc:date=2026-06-02 -->
 
 # Changelog
+
+## v0.38.0 — 2026-06-02
+
+**nomic task prefixes (asymmetric retrieval) + in-app briefing decks.**
+
+Two independent changes ship together this release.
+
+**1 — nomic-embed-text task prefixes (Bob RAG):**
+- `EmbeddingService.embed()` now applies `nomic-embed-text`'s task instructions: `search_query:` on the live alert lookup, `search_document:` on stored case + KB vectors. This is the documented-correct usage of the asymmetric model and was previously omitted (everything embedded as raw text). Gated by **`ION_EMBEDDING_TASK_PREFIX`** (default on; set `=false` for a model that doesn't understand the prefixes).
+- The prefix scheme is encoded into a new `EmbeddingService.model_tag` (`nomic-embed-text+tp1`) stored in `model_name`. The case + KB background loops re-embed the whole corpus once under the new regime (the re-embed trigger is `source_text_hash != hash OR model_name != model_tag`). `mode` is validated even when prefixes are off so a typo'd call site fails loudly.
+- **Measured on ION's real KB** (80 MITRE-tagged docs, 43 queries, leave-one-out): prefixes lift **nDCG@10 +57% and MAP +58%** vs no-prefix. A small synthetic probe was inconclusive — the gain shows on the real corpus's long-document distribution, which is the regime the prefixes target. `tests/test_v038_nomic_task_prefixes.py` (9).
+
+**2 — In-app briefing decks (`/briefings`, "About ION" in the user menu):**
+- A new authenticated page presents three ready-to-show decks — **Executive Brief**, **Full Overview**, and **Secure by Design** — as per-slide images with PDF / PowerPoint downloads. Pre-rendered slide PNGs are served as plain `<img>` (`img-src 'self'`), keeping the page within ION's strict CSP — no framing, no inline styles. Deck assets live under `static/briefings/`.
+
+**Net-new surface:** one authenticated, read-only page (`/briefings`, `require_page_auth`) that serves static, pre-built deck images and document downloads — no user input, no new data store, no new external call. nomic prefixing is internal embedding-text logic; adversary-controlled content already flowed into the prompt and the vectors are similarity-only. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. **Net new findings: 0C / 0H / 0M / 0L.**
 
 ## v0.37.0 — 2026-06-02
 
