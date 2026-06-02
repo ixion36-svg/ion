@@ -1,13 +1,19 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.38.0 -->
+<!-- ion-doc:version=0.38.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-02 -->
 
 # Changelog
+
+## v0.38.1 — 2026-06-02
+
+**Security hardening: `/briefings` path-injection (CodeQL py/path-injection).**
+
+The `/briefings` route resolved the slide directory from the caller's `deck` query value. It was already non-exploitable — an allowlist reassigned any non-allowed value to `executive` before use — but CodeQL does not model an `if x not in (...): x = default` allowlist as a sanitiser, and a future refactor could regress it. The deck is now resolved through a fixed lookup table whose values (including the on-disk subdirectory) are constants, so the filesystem path is never built from caller input. Added `tests/integration/test_v038_briefings_path_safe.py` pinning the invariant (valid deck renders; 6 traversal payloads all fall back to `executive` with no `..` in any rendered asset URL). No behaviour change. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. **Net new findings: 0C / 0H / 0M / 0L** (closes one CodeQL false-positive).
 
 ## v0.38.0 — 2026-06-02
 
