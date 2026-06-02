@@ -845,13 +845,17 @@ class ElasticsearchService:
                 network_community_id.get("community_id")
                 or network_community_id.get("id")
             )
+        # v0.39.1: broadened — `source.get("node")` only matched a flat
+        # top-level key, missing the nested form ({"node": {...}} / dotted)
+        # and the common ECS capture-appliance field `observer.hostname`.
         arkime_node = (
-            source.get("node")
+            _f(source, "node")
             or _f(source, "observer.name")
+            or _f(source, "observer.hostname")
             or _f(source, "arkime.node")
         )
         if isinstance(arkime_node, dict):
-            arkime_node = arkime_node.get("name")
+            arkime_node = arkime_node.get("name") or arkime_node.get("hostname")
         # Normalise to strings
         if network_community_id is not None:
             network_community_id = str(network_community_id)

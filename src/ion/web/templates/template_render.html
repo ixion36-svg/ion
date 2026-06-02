@@ -557,11 +557,11 @@ function buildSectionCards(sections) {
         const isHeader = !sec.num;
         const openClass = isHeader ? ' se-open' : '';
         html += '<div class="se-card' + openClass + '" data-idx="' + idx + '">';
-        html += '<div class="se-header" data-click-action="toggleSection" data-args='["$target"]'>';
+        html += `<div class="se-header" data-click-action="toggleSection" data-args='["$target"]'>`;
         html += '<span class="se-num">' + label + '</span>';
         html += '<span class="se-title">' + escapeHtml(sec.title) + '</span>';
         // Edit pencil icon
-        html += '<button type="button" class="se-edit-btn" data-click-action="toggleEdit" data-stop-propagation data-args='["$target"]' title="Edit section">&#9998;</button>';
+        html += `<button type="button" class="se-edit-btn" data-click-action="toggleEdit" data-stop-propagation data-args='["$target"]' title="Edit section">&#9998;</button>`;
         html += '<svg class="se-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
         html += '</div>';
         html += '<div class="se-body">';

@@ -833,7 +833,9 @@ function debouncedFilter(){clearTimeout(filterTimeout);filterTimeout=setTimeout(
 function switchTab(tab){
     document.querySelectorAll('.fr-tab[data-tab]').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
     document.querySelectorAll('.fr-panel').forEach(p=>p.style.display='none');
-    document.getElementById('panel-'+tab).style.display='';
+    // Explicit 'block' (not '') — panels carry the migrated _ion-s-c8be1ccba6
+    // (display:none) class, so clearing the inline style leaves them hidden.
+    document.getElementById('panel-'+tab).style.display='block';
     if(tab==='evidence')populateEvidenceCaseSelect();
     else if(tab==='playbooks')loadPlaybooks();
     else if(tab==='reference')renderReferenceDocs();
@@ -841,7 +843,7 @@ function switchTab(tab){
 function switchDetailTab(tab){
     const tabs=['sections','evidence','timeline','report','annotations'];
     document.querySelectorAll('#cd-body .fr-tab').forEach((b,i)=>b.classList.toggle('active',tabs[i]===tab));
-    tabs.forEach(t=>{const el=document.getElementById('cd-tab-'+t);if(el)el.style.display=t===tab?'':'none'});
+    tabs.forEach(t=>{const el=document.getElementById('cd-tab-'+t);if(el)el.style.display=t===tab?'block':'none'});
     if(tab==='report')loadReportTab();
 }
 
@@ -1121,11 +1123,11 @@ function renderSections(steps) {
                 <div class="section-card-actions">
                     <button class="btn btn-primary _ion-s-e992d6326c" data-click-action="saveSection" data-args='[${s.id}]'>Save</button>
                     ${!s.is_completed
-                        ? '<button class="btn btn-secondary _ion-s-eb4cdd53a8" data-click-action="completeSection" data-args='["+s.id+"]'>Mark Complete</button>'
-                        : '<button class="btn btn-secondary _ion-s-72978b0cd4" data-click-action="reopenSection" data-args='["+s.id+"]'>Reopen</button>'
+                        ? `<button class="btn btn-secondary _ion-s-eb4cdd53a8" data-click-action="completeSection" data-args='[${s.id}]'>Mark Complete</button>`
+                        : `<button class="btn btn-secondary _ion-s-72978b0cd4" data-click-action="reopenSection" data-args='[${s.id}]'>Reopen</button>`
                     }
                     <button class="btn-extract-ioc" data-click-action="showIOCExtractModal" data-args='[${s.id}]'>&#128269; Extract IOCs</button>
-                    ${!s.playbook_step_id ? '<button class="btn btn-secondary _ion-s-c14802f8b6" data-click-action="deleteSection" data-args='["+s.id+"]'>Delete</button>' : ''}
+                    ${!s.playbook_step_id ? `<button class="btn btn-secondary _ion-s-c14802f8b6" data-click-action="deleteSection" data-args='[${s.id}]'>Delete</button>` : ''}
                 </div>
             </div>
         </div>`;

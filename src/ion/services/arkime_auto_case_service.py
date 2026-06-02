@@ -65,7 +65,13 @@ async def _run_pass(engine: Engine) -> None:
     try:
         from ion.models.alert_triage import AlertTriage
         from ion.services.ai_user import get_bob_user_id
-        from ion.services.elasticsearch_service import get_elasticsearch_service
+        # NOTE: the factory lives in connectors.elasticsearch_connector, NOT
+        # elasticsearch_service. Importing it from the latter raised ImportError
+        # on every pass (caught below as "import failed"), so the auto-case loop
+        # silently created nothing from v0.34.0 until v0.39.1. Pinned by test.
+        from ion.services.connectors.elasticsearch_connector import (
+            get_elasticsearch_service,
+        )
         from ion.services.pcap_analysis_service import enqueue_pcap_analysis_for_case
         from ion.storage.database import get_session_factory
     except Exception as exc:
@@ -88,9 +94,26 @@ async def _run_pass(engine: Engine) -> None:
         if a.network_community_id and a.arkime_node
     ]
     if not arkime_alerts:
+        # Diagnostic funnel (v0.39.1): "no auto-cases" was previously silent,
+        # giving no clue whether the cause was zero alerts, missing
+        # community_id, or a missing/unrecognised Arkime node field. Log the
+        # breakdown once per pass when there are alerts but none qualify.
+        if alerts:
+            with_cid = sum(1 for a in alerts if a.network_community_id)
+            with_node = sum(1 for a in alerts if a.arkime_node)
+            logger.info(
+                "arkime_auto_case: %d alert(s) in last %dh — %d with community_id, "
+                "%d with arkime_node, 0 with BOTH → no cases. (Need network.community_id "
+                "AND a node field: `node` / `observer.name` / `arkime.node`.)",
+                len(alerts), _scan_hours(), with_cid, with_node,
+            )
         return
 
     alert_ids = [a.id for a in arkime_alerts]
+    logger.info(
+        "arkime_auto_case: %d of %d alert(s) carry Arkime PCAP linkage",
+        len(arkime_alerts), len(alerts),
+    )
 
     factory = get_session_factory(engine)
     session = factory()
@@ -104,7 +127,15 @@ async def _run_pass(engine: Engine) -> None:
         }
         new_alerts = [a for a in arkime_alerts if a.id not in existing]
         if not new_alerts:
+            logger.info(
+                "arkime_auto_case: all %d Arkime-linked alert(s) already have "
+                "triage/cases — nothing new this pass", len(arkime_alerts),
+            )
             return
+        logger.info(
+            "arkime_auto_case: creating %d new case(s) from Arkime-linked alerts",
+            len(new_alerts),
+        )
 
         bob_id = get_bob_user_id(session)
         if not bob_id:

@@ -739,6 +739,14 @@ def enqueue_pcap_analysis_for_case(
             "community_id": cid,
             "node_hint": flow.get("node_hint"),
             "alert_id": flow.get("alert_id"),
+            # v0.39.1: preserve the IP + timestamp fields so _analyze_one's
+            # IP-fallback path (v0.29.1) survives the dedup. Dropping them here
+            # silently disabled the fallback for the auto-case flow — when
+            # Arkime's community_id index missed, the analysis found no sessions
+            # and posted an empty note.
+            "source_ip": flow.get("source_ip"),
+            "destination_ip": flow.get("destination_ip"),
+            "alert_timestamp": flow.get("alert_timestamp"),
         })
     if not unique:
         return

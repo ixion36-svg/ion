@@ -163,10 +163,13 @@ function updateUserMenu() {
             currentUserData.roles.forEach(r => {
                 opts.push('<option value="' + r + '"' + (activeRole === r ? ' selected' : '') + '>' + r.charAt(0).toUpperCase() + r.slice(1) + '</option>');
             });
+            // v0.39.1: classes + data-change-action instead of inline style/onchange
+            // (CSP style-src-attr / script-src-attr 'none'). This HTML is injected
+            // on every page load, so the violations fired on most navigations.
             focusHtml = `
-                <div class="dropdown-focus" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border-color,#30363d);">
-                    <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">Focus Mode</label>
-                    <select id="focus-mode-select" class="form-input" style="width:100%;padding:4px 8px;font-size:.8rem;" onchange="switchFocusMode(this.value)">
+                <div class="dropdown-focus">
+                    <label class="dropdown-focus-label">Focus Mode</label>
+                    <select id="focus-mode-select" class="form-input dropdown-focus-select" data-change-action="switchFocusMode" data-args='["$value"]'>
                         ${opts.join('')}
                     </select>
                 </div>
@@ -213,9 +216,14 @@ function updateNavForPermissions() {
         if (el) el.style.display = isAdmin ? '' : 'none';
     });
 
-    // User dropdown admin section — visible for admin/engineering roles
+    // User dropdown admin section — visible for admin/engineering roles.
+    // Must set an explicit 'block' (not '') to reveal: the section carries the
+    // migrated `_ion-s-c8be1ccba6` class (`html body .x { display:none }`), whose
+    // selector specificity beats a cleared inline style — only an inline display
+    // value overrides it. Clearing it (='') let the class re-hide Settings/Users
+    // etc. for admins. Mirrors the explicit-'block' contract in toggleUserDropdown.
     const adminDropdown = document.getElementById('user-dropdown-admin');
-    if (adminDropdown) adminDropdown.style.display = (isAdmin || isEngineer) ? '' : 'none';
+    if (adminDropdown) adminDropdown.style.display = (isAdmin || isEngineer) ? 'block' : 'none';
 
     // Forensics link — only visible when user has forensic:read
     const forensicsLink = document.getElementById('nav-forensics-link');

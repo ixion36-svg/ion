@@ -181,6 +181,20 @@
       }
       return;
     }
+    // An element carrying `data-stop-propagation` BETWEEN the click target and
+    // the action element must suppress that action — it mirrors a real
+    // stopPropagation listener on that intermediate element, which would have
+    // halted the bubble before it reached the ancestor's handler. Without this,
+    // e.g. clicking a checkbox inside `<td data-stop-propagation>` still fires
+    // the surrounding `<tr data-click-action>` (the alert row opened on a
+    // checkbox click). The on-the-action-element case is handled at line ~below.
+    var stopper = event.target.closest('[data-stop-propagation]');
+    if (stopper && stopper !== hit.el && hit.el.contains(stopper)) {
+      var pd = event.target.closest('[data-prevent-default]');
+      if (pd && pd !== hit.el && hit.el.contains(pd)) event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     // `data-only-self-click` gates the action on the click being a direct
     // hit on this element (not bubbled from a child). Mirrors the inline
     // `if(event.target===this) ...` modal-backdrop pattern.

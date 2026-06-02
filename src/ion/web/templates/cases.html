@@ -252,6 +252,33 @@
    Cases Page — Kanban Board
    ============================================================================= */
 
+/* v0.39.1 — CSP: these rules replace JS-injected inline style="" attributes,
+   which the strict CSP (style-src-attr 'none') blocks ("Refused to apply
+   inline style"). Keep in sync with the class names in the JS render helpers. */
+.bob-analysis-body {
+    white-space: pre-wrap;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: #cbd5e1;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.2);
+    border-left: 3px solid #6de4ff;
+    border-radius: 4px;
+}
+.bob-action-btn { font-size: 0.75rem; padding: 0.35rem 0.75rem; }
+.bob-action-btn-ghost { background: none; }
+.cpanel-note-translate {
+    margin-left: auto;
+    font-size: 0.65rem;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    padding: 0.1rem 0.45rem;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.donut-arc { transition: stroke-dasharray 0.5s, stroke-dashoffset 0.5s; }
+
 .cases-subtitle {
     color: var(--text-secondary);
     margin-top: 0.25rem;
@@ -2794,8 +2821,7 @@ function renderPanelContent(c) {
                 + '<div class="cpanel-note-header _ion-s-c2e70fe5d0">'
                 +   '<span class="cpanel-note-user"><i class="icon-user _ion-s-04095862d9"></i>' + esc(n.user || 'Unknown') + '</span>'
                 +   '<span>' + fmtDate(n.created_at) + '</span>'
-                +   '<button class="cpanel-note-translate" type="button" data-click-action="translateCaseNote" data-args=\'["' + noteId + '"]\' '
-                +     'style="margin-left:auto;font-size:0.65rem;background:none;border:1px solid rgba(255,255,255,0.1);color:#94a3b8;padding:0.1rem 0.45rem;border-radius:3px;cursor:pointer;">Translate</button>'
+                +   '<button class="cpanel-note-translate" type="button" data-click-action="translateCaseNote" data-args=\'["' + noteId + '"]\'>Translate</button>'
                 + '</div>'
                 + '<div class="cpanel-note-content cpanel-note-markdown" id="' + noteId + '" '
                 +   'data-original-raw="' + esc(raw) + '" data-rendered-html="' + esc(rendered) + '">'
@@ -2857,17 +2883,12 @@ function renderPanelContent(c) {
         +     '<i class="icon-sparkles"></i> Bob\'s analysis'
         +     '<span class="_ion-s-816484d7f1" id="bob-analysis-meta-' + c.id + '"></span>'
         +   '</div>'
-        +   '<div id="bob-analysis-body-' + c.id + '" '
-        +        'style="white-space:pre-wrap;font-size:0.85rem;line-height:1.5;color:#cbd5e1;'
-        +        'padding:0.75rem;background:rgba(0,0,0,0.2);border-left:3px solid #6de4ff;border-radius:4px;">'
+        +   '<div id="bob-analysis-body-' + c.id + '" class="bob-analysis-body">'
         +   '</div>'
         +   '<div class="_ion-s-a0946a50e0">'
-        +     '<button class="btn" data-click-action="saveBobAnalysisAsNote" data-args=\'[' + c.id + ']\' '
-        +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;">Save as note</button>'
-        +     '<button class="btn" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\' '
-        +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;">Re-run</button>'
-        +     '<button class="btn" data-click-action="hideBobAnalysis" data-args=\'[' + c.id + ']\' '
-        +              'style="font-size:0.75rem;padding:0.35rem 0.75rem;background:none;">Dismiss</button>'
+        +     '<button class="btn bob-action-btn" data-click-action="saveBobAnalysisAsNote" data-args=\'[' + c.id + ']\'>Save as note</button>'
+        +     '<button class="btn bob-action-btn" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\'>Re-run</button>'
+        +     '<button class="btn bob-action-btn bob-action-btn-ghost" data-click-action="hideBobAnalysis" data-args=\'[' + c.id + ']\'>Dismiss</button>'
         +   '</div>'
         + '</div>';
 
@@ -3275,7 +3296,10 @@ async function getBobAnalysis(caseId) {
     const panel = document.getElementById('bob-analysis-panel-' + caseId);
     const body = document.getElementById('bob-analysis-body-' + caseId);
     const meta = document.getElementById('bob-analysis-meta-' + caseId);
-    if (panel) panel.style.display = '';
+    // Explicit 'block' (not '') — the panel carries the migrated _ion-s-c8be1ccba6
+    // (display:none) class whose selector specificity beats a cleared inline style,
+    // so clearing it left the panel hidden and the analysis appeared to never load.
+    if (panel) panel.style.display = 'block';
     if (body) body.textContent = 'Generating analysis… (this can take 15–60s)';
     if (meta) meta.textContent = '';
     try {
@@ -3369,7 +3393,10 @@ async function toggleCasePlaybookBrowser(caseId) {
     const panel = document.getElementById('case-playbook-browser-' + caseId);
     if (!panel) return;
 
-    if (panel.style.display !== 'none') {
+    // Only collapse when it's actually shown. The panel starts hidden via the
+    // _ion-s-c8be1ccba6 class (inline display is ''), so testing `!== 'none'`
+    // treated the first click as "hide" and the browser needed two clicks to open.
+    if (panel.style.display === 'block') {
         panel.style.display = 'none';
         return;
     }
@@ -3589,7 +3616,10 @@ function computeAttentionAlerts() {
         return true;
     });
 
-    banner.style.display = '';
+    // Explicit 'flex' (not '') — #attn-banner carries the migrated
+    // _ion-s-c8be1ccba6 (display:none) class; clearing the inline style let the
+    // class re-hide it, so the attention banner never appeared. Banner is flex.
+    banner.style.display = 'flex';
     document.getElementById('attn-count').textContent = unique.length;
 
     const list = document.getElementById('attn-list');
@@ -3646,7 +3676,7 @@ function renderDonutChart(containerId, data, colors, centerLabel) {
             + 'stroke-dasharray="' + dashLen + ' ' + dashGap + '" '
             + 'stroke-dashoffset="' + (-offset) + '" '
             + 'transform="rotate(-90 ' + cx + ' ' + cy + ')" '
-            + 'style="transition: stroke-dasharray 0.5s, stroke-dashoffset 0.5s;"/>';
+            + 'class="donut-arc"/>';
         offset += dashLen;
     });
 

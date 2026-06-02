@@ -5,18 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ION{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
-    <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.28">
-    <link rel="stylesheet" href="/static/css/style.css?v=0.9.80-lightmode">
-    <link rel="stylesheet" href="/static/css/design-system.css?v=0.9.72">
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=0.9.28">
+    <link rel="stylesheet" href="/static/css/lucide.css?v={{ ion_version }}">
+    <link rel="stylesheet" href="/static/css/style.css?v={{ ion_version }}">
+    <link rel="stylesheet" href="/static/css/design-system.css?v={{ ion_version }}">
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
-    <link rel="stylesheet" href="/static/css/tailwind.css?v=0.19.2">
+    <link rel="stylesheet" href="/static/css/tailwind.css?v={{ ion_version }}">
     <!-- v0.31.21: previously-inline `style="..."` attributes migrated to hashed
          CSS classes by tools/migrate_inline_styles.py. Loading this file
          here means the styles apply before paint (no FOUC). Same-origin so
          no nonce needed under `style-src 'self' 'nonce-XXX'`. After this
          landed, `style-src-attr` flipped from `'unsafe-inline'` to `'none'`. -->
-    <link rel="stylesheet" href="/static/css/ion-migrated-styles.css?v=0.33.3">
+    <link rel="stylesheet" href="/static/css/ion-migrated-styles.css?v={{ ion_version }}">
     <!-- v0.31.3: tell HTMX not to inject its indicator <style> block at runtime.
          Inline-injected styles can't carry our per-request CSP nonce, so they'd
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
@@ -29,7 +29,7 @@
          `script-src-attr` drops `'unsafe-inline'`). Templates declare
          `data-click-action="foo"` and the helper dispatches. See
          static/js/event-delegation.js for the supported attributes. -->
-    <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v=0.31.19"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v={{ ion_version }}"></script>
     <!-- v0.31.20: page-specific data-click-action wrappers needed to retire
          the last few multi-statement inline handlers. Living here in base.html
          so every page has them in scope. Kept tiny so the global namespace
@@ -311,6 +311,12 @@
     /* legacy text decoration reset for header anchors */
     .ion-tw a { text-decoration: none; }
 
+    /* v0.39.1 — focus-mode selector in the user dropdown. Replaces inline
+       style="" attributes in app.js updateUserMenu() (CSP style-src-attr 'none'). */
+    .dropdown-focus { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-color, #30363d); }
+    .dropdown-focus-label { font-size: .75rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
+    .dropdown-focus-select { width: 100%; padding: 4px 8px; font-size: .8rem; }
+
     /* Light mode overrides for Tailwind pages */
     [data-theme="light"] .ion-tw-page {
       --tw-bg-opacity: 1;
@@ -546,10 +552,10 @@
         } catch (e) { console.warn('marked custom renderer failed:', e); }
       }
     </script>
-    <script nonce="{{ csp_nonce }}" src="/static/js/app.js?v=0.9.28"></script>
-    <script nonce="{{ csp_nonce }}" src="/static/js/ai-chat.js?v=0.9.28"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/app.js?v={{ ion_version }}"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/ai-chat.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/quill.js"></script>
-    <script nonce="{{ csp_nonce }}" src="/static/js/notepad.js?v=0.9.28"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/notepad.js?v={{ ion_version }}"></script>
     {% block scripts %}{% endblock %}
 
 <!-- Keyboard shortcuts overlay -->
