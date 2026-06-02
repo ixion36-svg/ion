@@ -3472,7 +3472,7 @@ class AlertPromptService:
         if not text:
             return []
 
-        vec = svc.embed(text)
+        vec = svc.embed(text, mode="query")
         if vec is None:
             return []
 
@@ -3554,7 +3554,7 @@ class AlertPromptService:
         if not text:
             return []
 
-        vec = svc.embed(text)
+        vec = svc.embed(text, mode="query")
         if vec is None:
             return []
 

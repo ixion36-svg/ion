@@ -172,11 +172,11 @@ def run_case_embedding_once(session: Session) -> Dict[str, Any]:
             continue
         hsh = _hash(source)
         row = existing.get(case.id)
-        if row is not None and row.source_text_hash == hsh and row.model_name == svc.model:
+        if row is not None and row.source_text_hash == hsh and row.model_name == svc.model_tag:
             skipped += 1
             continue
 
-        vec = svc.embed(source)
+        vec = svc.embed(source, mode="document")
         if vec is None:
             failed += 1
             # Ollama unreachable or model missing — back off for this tick,
@@ -191,14 +191,14 @@ def run_case_embedding_once(session: Session) -> Dict[str, Any]:
                 CaseEmbedding(
                     case_id=case.id,
                     embedding=vec,
-                    model_name=svc.model,
+                    model_name=svc.model_tag,
                     embedded_at=now,
                     source_text_hash=hsh,
                 )
             )
         else:
             row.embedding = vec
-            row.model_name = svc.model
+            row.model_name = svc.model_tag
             row.embedded_at = now
             row.source_text_hash = hsh
         embedded += 1

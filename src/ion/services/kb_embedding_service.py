@@ -172,12 +172,12 @@ def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
         if (
             row is not None
             and row.source_text_hash == hsh
-            and row.model_name == svc.model
+            and row.model_name == svc.model_tag
         ):
             skipped += 1
             continue
 
-        vec = svc.embed(source)
+        vec = svc.embed(source, mode="document")
         if vec is None:
             failed += 1
             if failed >= 3:
@@ -190,14 +190,14 @@ def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
                 KBDocumentEmbedding(
                     document_id=doc.id,
                     embedding=vec,
-                    model_name=svc.model,
+                    model_name=svc.model_tag,
                     embedded_at=now,
                     source_text_hash=hsh,
                 )
             )
         else:
             row.embedding = vec
-            row.model_name = svc.model
+            row.model_name = svc.model_tag
             row.embedded_at = now
             row.source_text_hash = hsh
         embedded += 1
