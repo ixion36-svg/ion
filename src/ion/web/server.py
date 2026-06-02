@@ -943,37 +943,47 @@ async def briefings_page(
     served as plain ``<img>`` — keeping the page within ION's strict CSP
     (``img-src 'self'``; no framing, no inline styles).
     """
-    if deck not in ("executive", "overview", "secure-by-design"):
-        deck = "executive"
-    slide_dir = BASE_DIR / "static" / "briefings" / deck
-    slides = [
-        f"/static/briefings/{deck}/{p.name}"
-        for p in sorted(slide_dir.glob("slide-*.png"))
-    ]
-    meta = {
+    # Map the (untrusted) ``deck`` query value through a fixed lookup table.
+    # Every field used downstream — including the on-disk subdirectory — comes
+    # from a constant in this dict, never from the raw input, so the filesystem
+    # path cannot be influenced by the caller (defends path traversal; also
+    # clears CodeQL py/path-injection, which doesn't model an `if not in: =`
+    # allowlist as a sanitiser).
+    decks = {
         "executive": {
+            "dir": "executive",
             "label": "Executive Brief",
             "blurb": "A 3-slide brief for leadership — the problem, the value, and the proof.",
             "pdf": "/static/briefings/ION_Executive_Brief.pdf",
             "pptx": "/static/briefings/ION_Executive_Brief.pptx",
         },
         "overview": {
+            "dir": "overview",
             "label": "Full Overview",
             "blurb": "The complete capability & architecture deck — what ION does, every integration, and how Bob's AI works.",
             "pdf": "/static/briefings/ION_Overview.pdf",
             "pptx": "/static/briefings/ION_Overview.pptx",
         },
         "secure-by-design": {
+            "dir": "secure-by-design",
             "label": "Secure by Design",
             "blurb": "How ION's 20 secure-by-design principles shape every line of code and every release.",
             "pdf": "/static/briefings/ION_Secure_by_Design.pdf",
             "pptx": "/static/briefings/ION_Secure_by_Design.pptx",
         },
     }
+    deck = deck if deck in decks else "executive"
+    current = decks[deck]
+    sub = current["dir"]  # constant from the lookup table — not caller-controlled
+    slide_dir = BASE_DIR / "static" / "briefings" / sub
+    slides = [
+        f"/static/briefings/{sub}/{p.name}"
+        for p in sorted(slide_dir.glob("slide-*.png"))
+    ]
     return templates.TemplateResponse(
         request=request,
         name="briefings.html",
-        context={"deck": deck, "slides": slides, "current": meta[deck]},
+        context={"deck": deck, "slides": slides, "current": current},
     )
 
 
