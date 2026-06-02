@@ -36,6 +36,54 @@ DEFAULT_MODEL = "nomic-embed-text"
 DEFAULT_DIM = 768
 
 
+def _clip(value: object, max_chars: int) -> str:
+    """Trim a value to ``max_chars`` for inclusion in an embedding blob.
+
+    nomic-embed-text truncates input at its context window (~2048 tokens)
+    *silently from the end* — so an unbounded field (a long AI summary, say)
+    can push later sections out of the vector entirely. Per-section clipping
+    keeps every section represented. Non-str values are stringified first.
+    """
+    s = value if isinstance(value, str) else str(value)
+    s = s.strip()
+    return s[:max_chars] if max_chars and len(s) > max_chars else s
+
+
+def format_core_embedding_sections(
+    *,
+    title: object = None,
+    description: object = None,
+    hosts: object = None,
+    users: object = None,
+    rules: object = None,
+    description_cap: int = 1000,
+) -> list[str]:
+    """Canonical core sections for the RAG embedding text.
+
+    Both the alert query vector (``alert_prompt_service._alert_text_for_
+    embedding``) and the stored case vector (``case_embedding_service.
+    _case_source_text``) emit these five sections, in this order, so an
+    alert vector stays directly comparable to case vectors. Centralised
+    here so the two builders cannot silently drift out of alignment.
+
+    Values are pre-extracted/pre-joined by each caller (their source shapes
+    differ — dict keys vs ORM list attrs); this owns only the label set,
+    order, and the description cap. Falsy values are skipped.
+    """
+    parts: list[str] = []
+    if title:
+        parts.append(f"Title: {title}")
+    if description:
+        parts.append(f"Description: {_clip(description, description_cap)}")
+    if hosts:
+        parts.append(f"Hosts: {hosts}")
+    if users:
+        parts.append(f"Users: {users}")
+    if rules:
+        parts.append(f"Rules: {rules}")
+    return parts
+
+
 class EmbeddingService:
     """Ollama embedding client."""
 

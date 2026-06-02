@@ -58,35 +58,60 @@ def _case_source_text(session: Session, case: AlertCase) -> str:
     (title, description, notes) or a new investigation summary lands, the
     hash will change and the background loop re-embeds.
     """
-    parts: list[str] = []
-    if case.title:
-        parts.append(f"Title: {case.title}")
-    if case.description:
-        parts.append(f"Description: {case.description}")
-    if case.affected_hosts:
-        parts.append("Hosts: " + ", ".join(str(h) for h in case.affected_hosts))
-    if case.affected_users:
-        parts.append("Users: " + ", ".join(str(u) for u in case.affected_users))
-    if case.triggered_rules:
-        parts.append("Rules: " + ", ".join(str(r) for r in case.triggered_rules))
-    if case.evidence_summary:
-        parts.append(f"Evidence: {case.evidence_summary}")
+    from ion.services.embedding_service import (
+        _clip,
+        format_core_embedding_sections,
+    )
 
-    # Bob's most recent investigation summary for any alert in this case
-    # adds strong signal — two cases with similar Bob-analyses are likely
+    hosts = (
+        ", ".join(str(h) for h in case.affected_hosts)
+        if case.affected_hosts else None
+    )
+    users = (
+        ", ".join(str(u) for u in case.affected_users)
+        if case.affected_users else None
+    )
+    rules = (
+        ", ".join(str(r) for r in case.triggered_rules)
+        if case.triggered_rules else None
+    )
+    # Shared core sections — same labels/order as the alert query vector
+    # (see embedding_service.format_core_embedding_sections) so the two
+    # cannot drift out of alignment.
+    parts = format_core_embedding_sections(
+        title=case.title,
+        description=case.description,
+        hosts=hosts,
+        users=users,
+        rules=rules,
+    )
+    if case.evidence_summary:
+        parts.append(f"Evidence: {_clip(case.evidence_summary, 1200)}")
+
+    # Bob's most recent DECISIVE investigation summary for any alert in this
+    # case adds strong signal — two cases with similar Bob-analyses are likely
     # similar in substance even when titles differ.
+    #
+    # v0.37.0: filter to a decisive verdict (not NULL, not "inconclusive").
+    # An inconclusive run's summary is boilerplate ("insufficient evidence to
+    # determine …") that is near-identical across unrelated alerts — embedding
+    # it pulls dissimilar cases together and dilutes the vector. ``verdict`` is
+    # a plain String column, so the ORM ``!=`` filter coerces correctly (this
+    # is NOT a SQLEnum(native_enum=False) column — no NAME-vs-value gotcha).
     if case.source_alert_ids:
         last_inv = (
             session.execute(
                 select(Investigation)
                 .where(Investigation.alert_id_ref.in_(list(case.source_alert_ids)))
                 .where(Investigation.summary_text.isnot(None))
+                .where(Investigation.verdict.isnot(None))
+                .where(Investigation.verdict != "inconclusive")
                 .order_by(Investigation.id.desc())
                 .limit(1)
             ).scalar_one_or_none()
         )
         if last_inv and last_inv.summary_text:
-            parts.append(f"AI summary: {last_inv.summary_text}")
+            parts.append(f"AI summary: {_clip(last_inv.summary_text, 1500)}")
     return "\n".join(parts)
 
 

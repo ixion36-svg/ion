@@ -1,13 +1,34 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.36.0 -->
+<!-- ion-doc:version=0.37.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-01 -->
 
 # Changelog
+
+## v0.37.0 — 2026-06-02
+
+**Bob RAG embedding-text quality (Phase 2b).**
+
+Improves *what* the RAG vectors carry, on both sides of the similarity lookup. Builds on Phase 2's default-on flags. No new routes, permissions, or schema.
+
+**Query vector — richer alert representation** (`alert_prompt_service._alert_text_for_embedding`):
+- After the aligned core (Title / Description / Hosts / Users / Rules), the alert query vector now appends three higher-signal sections when present: **Reason** (Elastic `kibana.alert.reason`, resolved from flat / dotted / nested shapes), **MITRE** (auto-tagged technique IDs), and **Enrichment** — a compact TI-verdict digest (`_enrichment_digest`) over the `{kind: {indicator: context}}` enrichment dict.
+- Both `investigate_case` paths (single + cluster) now pass a merged `{**alert, "mitre_tags": …, "enrichment": …}` copy to `render_system_prompt`, so the query vector actually realises the new signal. The original alert dict is left untouched — `alert_summary` and PII tokenisation are unaffected.
+
+**Corpus vector — decisive summaries only** (`case_embedding_service._case_source_text`):
+- Bob's AI summary is embedded into a case vector **only when the investigation reached a decisive verdict** (not NULL, not `inconclusive`). Inconclusive boilerplate ("insufficient evidence to determine …") is near-identical across unrelated alerts; embedding it pulled dissimilar cases together. `verdict` is a plain `String` column, so the ORM `!=` filter coerces correctly (not the `SQLEnum(native_enum=False)` NAME-vs-value gotcha).
+
+**Robustness + maintainability:**
+- **Per-section length caps** (`embedding_service._clip`): `nomic-embed-text` truncates input at its ~2048-token context *silently from the end*, which could drop a case's AI summary (the last section). Each variable-length field is now clipped — reason ≤600, description ≤1000, evidence ≤1200, AI summary ≤1500, enrichment digest ≤400 — so every section stays represented.
+- **Shared core-section serializer** (`embedding_service.format_core_embedding_sections`): the alert and case builders previously kept their core sections aligned *by hand*; a future edit to one would silently degrade similarity. Both now route the core through one helper, so they cannot drift.
+
+**16 new tests** (`tests/test_v037_embedding_text_quality.py`): query-vector enrichment sections (present / absent / nested reason / non-list MITRE / ordering), `_enrichment_digest` (verdict summary / bounded / non-dict), the decisive-verdict case filter (decisive included, inconclusive + null excluded, decisive preferred over newer inconclusive), and the caps + shared formatter. Full suite green (863 passed, 2 xpassed).
+
+**Note on stored vectors:** changing `_case_source_text` changes each case's `source_text_hash`, so the background loop re-embeds every case once on the next run (batched, graceful). Alert query vectors are computed fresh per lookup. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. **Net new findings: 0C / 0H / 0M / 0L.**
 
 ## v0.36.0 — 2026-06-01
 

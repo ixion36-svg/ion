@@ -60,36 +60,80 @@ def _kb_rag_enabled() -> bool:
     )
 
 
+def _enrichment_digest(enrichment: object, *, max_chars: int = 400) -> str:
+    """Compact one-line digest of TI enrichment verdicts for the query vector.
+
+    Enrichment shape (per ``investigation_service``) is
+    ``{kind: {indicator: context}}`` with ``kind`` in ip/domain/url/hash.
+    We emit ``kind: indicator (context…); …`` with each context clipped and
+    the whole digest capped at ``max_chars`` so one verbose enrichment field
+    cannot dominate the embedding. Non-dict / empty → "".
+    """
+    if not isinstance(enrichment, dict):
+        return ""
+    bits: list[str] = []
+    for kind, hits in enrichment.items():
+        if not isinstance(hits, dict) or not hits:
+            continue
+        inds = []
+        for ind, ctx in hits.items():
+            ctx_str = ctx if isinstance(ctx, str) else str(ctx)
+            inds.append(f"{ind} ({ctx_str[:60]})" if ctx_str else str(ind))
+        if inds:
+            bits.append(f"{kind}: " + ", ".join(inds))
+    return "; ".join(bits)[:max_chars]
+
+
 def _alert_text_for_embedding(alert: dict) -> str:
     """Serialise an alert to text for embedding.
 
-    Aligned with ``case_embedding_service._case_source_text`` so an alert
-    vector is directly comparable to case vectors (same section order +
-    separators). Pulls from the shapes the investigation pipeline actually
-    produces: ``alert_signature``, ``rule_name``, ``host``, ``user_name``,
-    ``rule_id`` (or nested ``rule.id``).
+    The first five sections (Title, Description, Hosts, Users, Rules) are
+    aligned with ``case_embedding_service._case_source_text`` so an alert
+    vector is directly comparable to case vectors on the shared core. Pulls
+    from the shapes the investigation pipeline actually produces:
+    ``alert_signature``, ``rule_name``, ``host``, ``user_name``, ``rule_id``
+    (or nested ``rule.id``).
+
+    v0.37.0 appends three higher-signal sections AFTER the aligned core —
+    the Elastic ``reason`` sentence, auto-tagged MITRE techniques, and a
+    compact TI-enrichment verdict digest — when the caller has attached
+    them. These have no dedicated case-side section but match the prose in
+    a case's evidence / decisive AI summary, so they sharpen retrieval
+    without disturbing core alignment.
     """
-    parts: list[str] = []
+    from ion.services.embedding_service import (
+        _clip,
+        format_core_embedding_sections,
+    )
+
     title = (
         alert.get("alert_signature")
         or alert.get("rule_name")
         or (alert.get("rule") or {}).get("name")
         or alert.get("title")
     )
-    if title:
-        parts.append(f"Title: {title}")
     desc = alert.get("description") or alert.get("message")
-    if desc:
-        parts.append(f"Description: {desc}")
     host = alert.get("host") or alert.get("host_name")
-    if host:
-        parts.append(f"Hosts: {host}")
     user = alert.get("user_name") or alert.get("user")
-    if user:
-        parts.append(f"Users: {user}")
     rule_id = alert.get("rule_id") or (alert.get("rule") or {}).get("id")
-    if rule_id:
-        parts.append(f"Rules: {rule_id}")
+    parts = format_core_embedding_sections(
+        title=title, description=desc, hosts=host, users=user, rules=rule_id
+    )
+
+    # --- v0.37.0 enrichment sections (appended after the aligned core) ---
+    reason = (
+        alert.get("alert_reason")
+        or alert.get("kibana.alert.reason")
+        or ((alert.get("kibana") or {}).get("alert") or {}).get("reason")
+    )
+    if reason:
+        parts.append(f"Reason: {_clip(reason, 600)}")
+    mitre = alert.get("mitre_tags")
+    if isinstance(mitre, (list, tuple)) and mitre:
+        parts.append("MITRE: " + ", ".join(str(t) for t in mitre))
+    enr = _enrichment_digest(alert.get("enrichment"))
+    if enr:
+        parts.append(f"Enrichment: {enr}")
     return "\n".join(parts)
 
 

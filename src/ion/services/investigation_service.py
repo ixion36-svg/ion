@@ -1992,7 +1992,12 @@ class InvestigationService:
                 except Exception as exc:
                     logger.debug("resolve_template_for_alert failed: %s", exc)
                     template = None
-                system_prompt = svc.render_system_prompt(template, alert)
+                # v0.37.0: surface MITRE tags + TI enrichment to render's RAG
+                # query vector (similar-case / KB lookup embeds this alert).
+                # Merge into a copy so the original `alert` stays clean for the
+                # downstream alert_summary build and PII tokenisation.
+                _rag_alert = {**alert, "mitre_tags": mitre_tags, "enrichment": enrichment}
+                system_prompt = svc.render_system_prompt(template, _rag_alert)
                 if template is not None:
                     prompt_template_id = template.id
             finally:
@@ -2323,7 +2328,11 @@ class InvestigationService:
                 tpl = svc.resolve_template_for_alert(rep_alert)
                 if tpl is not None:
                     prompt_template_id = tpl.id
-                system_prompt = svc.render_system_prompt(tpl, rep_alert)
+                # v0.37.0: surface the cluster's union MITRE tags + enrichment
+                # to render's RAG query vector (merged copy; rep_alert stays
+                # clean for memory/summary use elsewhere in this path).
+                _rag_alert = {**rep_alert, "mitre_tags": mitre_tags, "enrichment": enrichment}
+                system_prompt = svc.render_system_prompt(tpl, _rag_alert)
             finally:
                 db.close()
         except Exception as exc:
