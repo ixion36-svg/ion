@@ -1,13 +1,29 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.38.1 -->
+<!-- ion-doc:version=0.39.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-02 -->
 
 # Changelog
+
+## v0.39.0 — 2026-06-02
+
+**PCAP triage depth + consistency: verdict→severity, JA4+, TLS certs, RITA beaconing, OS fingerprint, MITRE ATT&CK.**
+
+A focused upgrade to the PCAP analyzer (manual page + Arkime auto-analysis) so network evidence triages more consistently and lands in the same taxonomy as the rest of ION. Every new analyzer runs behind the existing fail-safe `try/except` block in `parse_pcap`, so a parser bug can degrade output but can never crash the analysis or the auto-case loop.
+
+- **Verdict → case severity (two-way auto):** the PCAP verdict now drives `AlertCase.severity` (may raise *or* lower it), derived deterministically from the highest finding severity plus a cumulative-score floor. Applied once per case after all flows analyse, with an attributed decision Note. `pcap_analysis_service.pcap_case_severity()`. 7 tests.
+- **JA4 / JA4S (FoxIO JA4+):** TLS ClientHello/ServerHello fingerprints that are robust to field reordering (unlike JA3). GREASE-aware; TLS version taken from `supported_versions`; SNI/ALPN flags. Hashing validated against the FoxIO reference worked examples. Extensible `_KNOWN_BAD_JA4` map + a known-malware finding. 5 tests. *(JA4H deferred — its authoritative algorithm could not be retrieved to verify interoperability.)*
+- **TLS certificate analysis:** the leaf X.509 is carved from the reassembled server handshake (walking the TLS record layer to reassemble handshake bytes across records/segments) and parsed via `cryptography`. Flags self-signed, long-validity, and known-malicious C2 certs (Cobalt Strike default serial/CN → critical). 5 tests.
+- **RITA-style beaconing + multi-signal DGA:** per-connection scoring on the dispersion + skew of both inter-arrival intervals and payload sizes (MADM + Bowley); a score-based finding catches regular beacons the simple CV check misses, without double-reporting the tight ones. DGA detection gains digit-ratio / vowel-scarcity / consonant-run signals on top of entropy (benign high-entropy CDN names stay below threshold). 
+- **Passive OS fingerprint + per-host profile:** p0f-style OS family inference from the TCP SYN (TTL rounded to nearest initial 64/128/255, window, options) and a per-host rollup (OS, client/server role, fingerprints, SNIs, beacon + finding counts).
+- **MITRE ATT&CK mapping:** each finding category maps to validated ATT&CK technique IDs (every ID checked against `data/attack_techniques.json` at load — unknown IDs are dropped, never surfaced), with title-level refinements (known-malware fingerprint / Cobalt Strike cert → encrypted-C2 techniques). Techniques show per-finding and as a deduped rollup in the report, and the case-level union is echoed on the severity decision Note.
+- **UI/Note parity:** the manual PCAP page gains JA4/JA4S, TLS Certs, Hosts (OS + profile), and Beaconing tabs plus inline ATT&CK tags on findings, so it surfaces the same analyzer details as the auto-analysis case Notes. (Also fixed a latent render bug where the auto-analysis findings block looked for a non-existent `message` key and dumped the raw dict.)
+
+24 new tests; full suite green (914 passed). Internal analyzer + render logic only — no new routes, permissions, schema, or external calls (the `cryptography` X.509 parse is imported lazily and fully sandboxed in a `try/except`). SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. **Net new findings: 0C / 0H / 0M / 0L.**
 
 ## v0.38.1 — 2026-06-02
 
