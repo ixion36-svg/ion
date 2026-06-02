@@ -1,13 +1,36 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.0 -->
+<!-- ion-doc:version=0.39.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-02 -->
 
 # Changelog
+
+## v0.39.1 — 2026-06-02
+
+**Bug-fix release: PCAP auto-case loop restored + a frontend regression sweep.**
+
+**PCAP auto-case creation (broken since v0.34.0):** the Arkime auto-case background loop created **zero** cases the entire time the feature has existed. `arkime_auto_case_service._run_pass` imported `get_elasticsearch_service` from `ion.services.elasticsearch_service`, but the factory was refactored into `ion.services.connectors.elasticsearch_connector` — the resulting `ImportError` was swallowed by the pass's `try/except` ("import failed") so the loop silently returned every cycle. Fixed the import; verified end-to-end against a live Elasticsearch (inserted an alert with `network.community_id` + `node` → `[Auto]` case created, PCAP analysis enqueued, IP-fallback exercised, note posted). Supporting fixes found in the same recheck:
+- **Diagnostic funnel logging** — a no-case pass now logs the breakdown (`N alerts, A with community_id, B with arkime_node, 0 with BOTH`) instead of returning silently, so misconfiguration is debuggable from the logs.
+- **Broadened `arkime_node` extraction** — `_parse_alert` matched only a flat top-level `node` key; now also matches the nested form, `observer.name`, and `observer.hostname`.
+- **IP-fallback fields preserved** — `enqueue_pcap_analysis_for_case` dropped `source_ip`/`destination_ip`/`alert_timestamp` during dedup, disabling `_analyze_one`'s IP+time Arkime fallback (used when the `community_id` index misses); the analysis then posted empty notes. Now preserved end-to-end. 8 new tests.
+
+**Frontend regression sweep — fallout from the v0.31.18 string-concat migration, the v0.31.21 inline-style→class migration, and the event-delegation refactor.**
+
+A cluster of UI regressions traced to three earlier infrastructure changes: (a) the mass `onclick`→`data-args` migration left several JS string literals with a stray inner single-quote (`data-args='[…]'` inside a `'…'` string), a **SyntaxError that broke the entire inline script of the page** — those pages just showed "Loading"; (b) inline `style="display:none"` became the high-specificity class `_ion-s-c8be1ccba6` (`html body .x { display:none }`), so reveal code that cleared the inline style (`el.style.display = ''`) no longer un-hid anything; and (c) the single delegated click handler didn't honour `data-stop-propagation` on an element *between* the click target and the action element. Found the syntax-error class exhaustively by node-checking every template's inline JS (all clean now) and confirmed no JS-injected inline `style=`/`on*=` remain anywhere. Verified live (admin login; cases, forensics, templates, documents pages; synthetic dispatcher test) against the 0.39.1 image.
+
+- **Page-breaking SyntaxErrors fixed** ("Unexpected string" → page stuck on "Loading"): the Forensics section-card action buttons, the **Templates** and **Documents** folder breadcrumb, and the **template renderer** section header/edit buttons each had a `data-args='…'` attribute embedded in a single-quoted JS string that closed the string early. All converted to backtick template literals. A full node-check of every template's inline JS now passes.
+- **Forensics tabs work again** — both `switchTab` and `switchDetailTab` revealed panels with `style.display = ''`; the migrated `display:none` class then re-hid them. Now explicit `'block'`. (The page was doubly broken: the SyntaxError above also killed the handlers.)
+- **User menu admin section restored** — Settings/Users/Integrations/GitLab/Audit Logs/Service Accounts/AI Scorecard/Stories/Course authoring were hidden for admin/engineer users (`app.js` set `display = ''`). Now explicit `'block'`.
+- **CSP "Refused to apply inline style" on most navigations** — `app.js updateUserMenu()` (runs on every page) injected the multi-role Focus-Mode selector with inline `style="…"` attributes **and** an inline `onchange=` handler. Now CSS classes (`base.html`) + `data-change-action`.
+- **Alert checkbox no longer opens the alert** — clicking a row checkbox bubbled to the row's `data-click-action="showAlertDetail"` because the dispatcher ignored the `data-stop-propagation` on the intervening `<td>`. `event-delegation.js` now suppresses an ancestor action when a `data-stop-propagation` element sits between the target and the action element (a general fix for any clickable row/card with interactive children).
+- **Cases page** — Bob's-analysis panel reveals on click (was hidden → looked like the request "timed out"); the "needs attention" banner shows again; the playbook browser opens on the first click (was two); and six JS-injected `style="…"` attributes (Bob analysis body + buttons, note Translate button, donut-chart arcs) became CSS classes, clearing the `style-src-attr 'none'` CSP console errors.
+- **Static cache-busting tied to the app version** — `base.html` referenced `app.js?v=0.9.28` and nine other frozen `?v=` query strings, so with `max-age=86400` browsers served stale JS/CSS across releases (these very fixes wouldn't have reached clients). All ten now use `?v={{ ion_version }}`, matching the documented intent in `server.py` — every release now busts the cache automatically.
+
+Frontend-only (Jinja templates + static JS); no Python, routes, permissions, schema, or external calls changed. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. **Net new findings: 0C / 0H / 0M / 0L** (restores broken pages + removes CSP console noise; CSP was already enforced and is unchanged).
 
 ## v0.39.0 — 2026-06-02
 
