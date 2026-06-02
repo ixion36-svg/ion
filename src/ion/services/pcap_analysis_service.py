@@ -35,6 +35,120 @@ _ICON = "[network]"
 
 
 # ──────────────────────────────────────────────────────────────────────────
+# Verdict → case severity (v0.39.0)
+# ──────────────────────────────────────────────────────────────────────────
+#
+# The packet-level analysis produces a deterministic verdict (findings +
+# score). We map that to a case severity so the network evidence actually
+# drives triage instead of only landing as a Note. Policy: **two-way auto** —
+# the PCAP verdict may raise OR lower the case severity (operator choice at
+# v0.39.0). Driven by the highest-severity finding; the cumulative verdict
+# score escalates a pile of lower-severity findings at the boundary.
+
+_CASE_SEVERITY_BY_RANK = ["low", "medium", "high", "critical"]
+_FINDING_RANK = {"info": 0, "low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
+def severity_rank(severity: Optional[str]) -> int:
+    """Rank a severity string (low/medium/high/critical) → 0..3; unknown → 0."""
+    return _FINDING_RANK.get((severity or "").lower(), 0)
+
+
+def pcap_case_severity(pcap_result: Optional[Any]) -> Optional[str]:
+    """Derive a case severity from a parsed ``PcapResult``.
+
+    Returns ``low|medium|high|critical``, or ``None`` when there is nothing
+    to go on (no result, or a result with no findings *and* no verdict) so
+    the caller can leave the case severity untouched. Deterministic: the same
+    capture always yields the same severity.
+
+    Rule: take the highest finding severity, then apply a score floor — a
+    large cumulative score (many mediums) escalates one tier, matching the
+    ``_compute_verdict`` "Needs Investigation" threshold (score ≥ 50).
+    """
+    if pcap_result is None:
+        return None
+    findings = getattr(pcap_result, "findings", None) or []
+    verdict = getattr(pcap_result, "verdict", None) or {}
+    if not findings:
+        # Explicit benign verdict with zero findings → a calm "low"; nothing
+        # at all (parse failed / empty) → None so the caller holds.
+        return "low" if verdict.get("label") else None
+    rank = max(
+        severity_rank(f.get("severity") if isinstance(f, dict) else None)
+        for f in findings
+    )
+    score = verdict.get("score") or 0
+    if score >= 100 and rank < 2:
+        rank = 2  # escalate to high
+    elif score >= 50 and rank < 1:
+        rank = 1  # escalate to medium
+    return _CASE_SEVERITY_BY_RANK[rank]
+
+
+def _apply_case_severity(
+    case_id: int,
+    severity: str,
+    reasons: List[str],
+    techniques: Optional[List[Dict[str, Any]]] = None,
+) -> None:
+    """Set ``AlertCase.severity`` (two-way) and post a short attribution note.
+
+    Runs in the background thread; owns its own session. No-op when the case
+    already carries that severity, so re-runs don't churn the timeline.
+
+    ``techniques`` is the deduped MITRE ATT&CK rollup across the case's flows
+    ([{id, name}, ...]); when present it's echoed on the decision note so the
+    case-level technique summary is one scannable line.
+    """
+    try:
+        from ion.core.config import get_config
+        from ion.models.alert_triage import AlertCase
+        from ion.storage.database import get_engine, get_session_factory
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("pcap_analysis: cannot import deps for severity update: %s", exc)
+        return
+
+    config = get_config()
+    factory = get_session_factory(get_engine(config.db_path))
+    session: Session = factory()
+    try:
+        case = session.get(AlertCase, case_id)
+        if case is None:
+            return
+        old = (case.severity or "").lower() or None
+        if old == severity:
+            return
+        case.severity = severity
+        session.commit()
+        logger.info(
+            "pcap_analysis: case %s severity %s → %s (PCAP verdict)",
+            case_id, old or "unset", severity,
+        )
+        direction = (
+            "raised" if severity_rank(severity) > severity_rank(old) else "lowered"
+        )
+        bullet = "\n".join(f"  - {r}" for r in reasons[:4]) if reasons else ""
+        mitre_line = ""
+        if techniques:
+            ids = ", ".join(f"`{t['id']}`" for t in techniques[:12])
+            mitre_line = f"\n\nMITRE ATT&CK: {ids}"
+        note = (
+            f"### {_ICON} Triage — case severity {direction} to **{severity}**\n\n"
+            f"Set by Bob from packet-level PCAP analysis"
+            + (f" (was `{old}`)." if old else ".")
+            + (f"\n\nDriving evidence:\n{bullet}" if bullet else "")
+            + mitre_line
+        )
+        _post_case_note(case_id, note)
+    except Exception as exc:
+        session.rollback()
+        logger.warning("pcap_analysis: severity update failed for case %s: %s", case_id, exc)
+    finally:
+        session.close()
+
+
+# ──────────────────────────────────────────────────────────────────────────
 # Markdown rendering
 # ──────────────────────────────────────────────────────────────────────────
 
@@ -177,13 +291,61 @@ def _render_pcap_markdown(
         parts.append(_top_list(pcap_result.http_requests, "host"))
         parts.append("")
 
+    # v0.39.0 enhanced analyzers — TLS certs, OS fingerprints, RITA beacons
+    tls_certs = getattr(pcap_result, "tls_certificates", None) or []
+    if tls_certs:
+        parts.append("**TLS certificates:**")
+        for c in tls_certs[:5]:
+            flags = []
+            if c.get("self_signed"):
+                flags.append("self-signed")
+            if c.get("validity_days"):
+                flags.append(f"{c['validity_days'] // 365}y validity")
+            flag_str = f" _({', '.join(flags)})_" if flags else ""
+            parts.append(
+                f"- `{c.get('server_ip', '?')}` — {c.get('subject', '?')} "
+                f"(issuer {c.get('issuer', '?')}){flag_str}"
+            )
+        parts.append("")
+
+    os_fps = getattr(pcap_result, "os_fingerprints", None) or []
+    if os_fps:
+        parts.append("**Passive OS fingerprints:**")
+        for o in os_fps[:8]:
+            parts.append(f"- `{o.get('ip')}` → **{o.get('os')}** ({o.get('evidence')})")
+        parts.append("")
+
+    beacons = [b for b in (getattr(pcap_result, "beacons", None) or []) if b.get("score", 0) >= 0.85]
+    if beacons:
+        parts.append("**Beaconing candidates (RITA-style score):**")
+        for b in beacons[:5]:
+            parts.append(
+                f"- `{b.get('src')}` → `{b.get('dst')}:{b.get('port')}` — "
+                f"score **{b.get('score')}**, {b.get('connections')} conns every ~{b.get('interval_s')}s"
+            )
+        parts.append("")
+
     # Findings + verdict
     if pcap_result.findings:
         parts.append("**Findings:**")
         for f in pcap_result.findings[:8]:
-            sev = f.get("severity", "info") if isinstance(f, dict) else "info"
-            msg = f.get("message", str(f)) if isinstance(f, dict) else str(f)
-            parts.append(f"- **{sev}**: {msg}")
+            if isinstance(f, dict):
+                sev = f.get("severity", "info")
+                msg = f.get("title") or f.get("message") or f.get("detail") or str(f)
+                mitre = f.get("mitre") or []
+                mitre_str = f"  _[{', '.join(mitre)}]_" if mitre else ""
+            else:
+                sev, msg, mitre_str = "info", str(f), ""
+            parts.append(f"- **{sev}**: {msg}{mitre_str}")
+        parts.append("")
+
+    # v0.39.0 — MITRE ATT&CK technique rollup
+    techniques = getattr(pcap_result, "mitre_techniques", None) or []
+    if techniques:
+        parts.append("**MITRE ATT&CK techniques observed:**")
+        for t in techniques:
+            name = f" — {t['name']}" if t.get("name") else ""
+            parts.append(f"- `{t['id']}`{name}")
         parts.append("")
 
     if pcap_result.verdict:
@@ -466,6 +628,12 @@ async def _runner(
     notes in a predictable order and Arkime doesn't get hammered with
     parallel PCAP-assembly requests.
     """
+    # Track the strongest PCAP-derived severity across all flows in this
+    # case; apply it once at the end (a case spanning several flows takes the
+    # highest). v0.39.0.
+    best_severity: Optional[str] = None
+    best_reasons: List[str] = []
+    case_techniques: Dict[str, Dict[str, Any]] = {}  # id → {id, name} union across flows
     for flow in flows:
         cid = flow.get("community_id") or ""
         if not cid:
@@ -500,8 +668,24 @@ async def _runner(
             # to the case so they participate in enrichment / watchlist /
             # correlation. Best-effort — never blocks the Note write.
             _link_pcap_observables(case_id, r["pcap_result"])
+            # v0.39.0: let the verdict drive case severity (two-way auto).
+            sev = pcap_case_severity(r["pcap_result"])
+            if sev and severity_rank(sev) > severity_rank(best_severity):
+                best_severity = sev
+                verdict = getattr(r["pcap_result"], "verdict", None) or {}
+                best_reasons = list(verdict.get("reasons") or [])
+            # v0.39.0: accumulate the MITRE technique union across all flows.
+            for t in (getattr(r["pcap_result"], "mitre_techniques", None) or []):
+                if t.get("id"):
+                    case_techniques.setdefault(t["id"], {"id": t["id"], "name": t.get("name", "")})
         except Exception as exc:
             logger.warning("pcap_analysis: %s failed: %s", cid, exc)
+
+    # Apply the aggregate severity once (after every flow's note is posted so
+    # the timeline reads analysis-then-decision).
+    if best_severity:
+        techniques = [case_techniques[k] for k in sorted(case_techniques)]
+        _apply_case_severity(case_id, best_severity, best_reasons, techniques)
 
 
 def enqueue_pcap_analysis_for_case(

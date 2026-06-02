@@ -201,6 +201,10 @@
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="creds" id="tab-creds">Credentials <span id="creds-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="ja3s" id="tab-ja3s">JA3S <span id="ja3s-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="hassh" id="tab-hassh">HASSH <span id="hassh-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="ja4" id="tab-ja4">JA4/JA4S <span id="ja4-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="certs" id="tab-certs">TLS Certs <span id="certs-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="hosts" id="tab-hosts">Hosts <span id="hosts-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="beacons" id="tab-beacons">Beaconing <span id="beacons-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="smb" id="tab-smb">SMB <span id="smb-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="kerberos" id="tab-kerberos">Kerberos <span id="kerberos-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="httpfiles" id="tab-httpfiles">HTTP Files <span id="httpfiles-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
@@ -224,6 +228,10 @@
         <div class="pcap-panel" id="panel-creds"></div>
         <div class="pcap-panel" id="panel-ja3s"></div>
         <div class="pcap-panel" id="panel-hassh"></div>
+        <div class="pcap-panel" id="panel-ja4"></div>
+        <div class="pcap-panel" id="panel-certs"></div>
+        <div class="pcap-panel" id="panel-hosts"></div>
+        <div class="pcap-panel" id="panel-beacons"></div>
         <div class="pcap-panel" id="panel-smb"></div>
         <div class="pcap-panel" id="panel-kerberos"></div>
         <div class="pcap-panel" id="panel-httpfiles"></div>
@@ -385,6 +393,10 @@
         renderCredentials(d);
         renderJA3S(d);
         renderHASSH(d);
+        renderJA4(d);
+        renderCerts(d);
+        renderHosts(d);
+        renderBeacons(d);
         renderSMB(d);
         renderKerberos(d);
         renderHTTPFiles(d);
@@ -689,6 +701,120 @@
         </tr>`).join('')}</tbody></table>`;
     }
 
+    // ── JA4 / JA4S Fingerprints (FoxIO JA4+) ──
+    function renderJA4(d) {
+        const cli = d.ja4_fingerprints || [];
+        const srv = d.ja4s_fingerprints || [];
+        const tab = document.getElementById('tab-ja4');
+        const badge = document.getElementById('ja4-count-badge');
+        const total = cli.length + srv.length;
+        if (!total) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        const badCount = cli.filter(f => f.known_malware).length;
+        badge.style.display = 'inline';
+        badge.textContent = total;
+        badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+
+        let html = `<h3>JA4 / JA4S TLS Fingerprints (${total})</h3>
+        <p class="_ion-s-0648c015b2">FoxIO JA4+ fingerprints. JA4 (client) and JA4S (server) are robust to TLS field reordering, unlike JA3. Known-malware matches are highlighted.</p>`;
+        if (cli.length) {
+            html += `<h4 class="_ion-s-87ccc4da73">JA4 Client (${cli.length})</h4>
+            <table class="pcap-table"><thead><tr><th>JA4</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
+            ${cli.map(f => `<tr class="_ion-s-a89f389da6">
+                <td><code class="_ion-s-dbd68c1058">${esc(f.ja4)}</code></td>
+                <td>${esc(f.sni || '-')}</td>
+                <td>${esc(f.src_ip)}</td>
+                <td>${esc(f.dst_ip)}${f.dst_port ? ':' + f.dst_port : ''}</td>
+                <td>${f.known_malware ? `<span class="_ion-s-09ef8b0d06">${esc(f.known_malware)}</span>` : '<span class="_ion-s-ce14cb276b">No match</span>'}</td>
+            </tr>`).join('')}
+            </tbody></table>`;
+        }
+        if (srv.length) {
+            html += `<h4 class="_ion-s-87ccc4da73">JA4S Server (${srv.length})</h4>
+            <table class="pcap-table"><thead><tr><th>JA4S</th><th>Server</th><th>Client</th><th>Port</th></tr></thead><tbody>
+            ${srv.map(f => `<tr class="_ion-s-a89f389da6">
+                <td><code class="_ion-s-dbd68c1058">${esc(f.ja4s)}</code></td>
+                <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port || '-'}</td>
+            </tr>`).join('')}
+            </tbody></table>`;
+        }
+        document.getElementById('panel-ja4').innerHTML = html;
+    }
+
+    // ── TLS Certificates ──
+    function renderCerts(d) {
+        const certs = d.tls_certificates || [];
+        const tab = document.getElementById('tab-certs');
+        const badge = document.getElementById('certs-count-badge');
+        if (!certs.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        const flagged = certs.filter(c => c.self_signed).length;
+        badge.style.display = 'inline';
+        badge.textContent = certs.length;
+        badge.style.cssText = `display:inline;background:${flagged ? 'var(--sev-medium)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        document.getElementById('panel-certs').innerHTML = `<h3>TLS Certificates (${certs.length})</h3>
+        <p class="_ion-s-0648c015b2">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
+        <table class="pcap-table"><thead><tr><th>Server</th><th>Subject</th><th>Issuer</th><th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead><tbody>
+        ${certs.map(c => `<tr class="_ion-s-a89f389da6">
+            <td>${esc(c.server_ip || '-')}</td>
+            <td class="_ion-s-72126da263">${esc(c.subject || '-')}</td>
+            <td class="_ion-s-72126da263">${esc(c.issuer || '-')}</td>
+            <td>${c.self_signed ? '<span class="_ion-s-09ef8b0d06">yes</span>' : '<span class="_ion-s-ce14cb276b">no</span>'}</td>
+            <td>${c.validity_days != null ? Math.round(c.validity_days / 365) + 'y' : '-'}</td>
+            <td><code class="_ion-s-dbd68c1058">${esc(c.serial || '-')}</code></td>
+        </tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    // ── Host Profiles (OS fingerprint + role rollup) ──
+    function renderHosts(d) {
+        const hosts = d.host_profiles || [];
+        const tab = document.getElementById('tab-hosts');
+        const badge = document.getElementById('hosts-count-badge');
+        if (!hosts.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.display = 'inline';
+        badge.textContent = hosts.length;
+        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        document.getElementById('panel-hosts').innerHTML = `<h3>Host Profiles (${hosts.length})</h3>
+        <p class="_ion-s-0648c015b2">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
+        <table class="pcap-table"><thead><tr><th>Host</th><th>OS</th><th>Role</th><th>Sent</th><th>Received</th><th>SNIs</th><th>Beacons</th><th>Findings</th></tr></thead><tbody>
+        ${hosts.map(h => `<tr class="_ion-s-a89f389da6">
+            <td><strong>${esc(h.ip)}</strong></td>
+            <td>${esc(h.os || '-')}${h.os_evidence ? ` <span class="_ion-s-f63147b2ed">(${esc(h.os_evidence)})</span>` : ''}</td>
+            <td>${(h.role || []).map(r => esc(r)).join(', ')}</td>
+            <td class="_ion-s-54c2afb7ba">${fmtBytes(h.sent || 0)}</td>
+            <td class="_ion-s-54c2afb7ba">${fmtBytes(h.received || 0)}</td>
+            <td class="_ion-s-f63147b2ed">${(h.snis || []).slice(0, 4).map(s => esc(s)).join(', ') || '-'}</td>
+            <td class="_ion-s-54c2afb7ba">${h.beacons || 0}</td>
+            <td class="_ion-s-54c2afb7ba">${h.findings || 0}</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+    }
+
+    // ── Beaconing (RITA-style scoring) ──
+    function renderBeacons(d) {
+        const beacons = (d.beacons || []).filter(b => (b.score || 0) >= 0.85);
+        const tab = document.getElementById('tab-beacons');
+        const badge = document.getElementById('beacons-count-badge');
+        if (!beacons.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        const strong = beacons.filter(b => b.score >= 0.9).length;
+        badge.style.display = 'inline';
+        badge.textContent = beacons.length;
+        badge.style.cssText = `display:inline;background:${strong ? 'var(--sev-high)' : 'var(--sev-medium)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
+        document.getElementById('panel-beacons').innerHTML = `<h3>Beaconing Candidates (${beacons.length})</h3>
+        <p class="_ion-s-0648c015b2">RITA-style scoring of connection regularity (interval + payload-size consistency). A near-1.0 score is metronome-regular traffic — a hallmark of automated C2.</p>
+        <table class="pcap-table"><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Score</th><th>Connections</th><th>Interval</th></tr></thead><tbody>
+        ${beacons.map(b => `<tr class="_ion-s-616924856b">
+            <td>${esc(b.src)}</td><td>${esc(b.dst)}</td><td>${b.port}</td>
+            <td><strong>${b.score}</strong></td>
+            <td class="_ion-s-54c2afb7ba">${b.connections}</td>
+            <td class="_ion-s-54c2afb7ba">~${b.interval_s}s</td>
+        </tr>`).join('')}
+        </tbody></table>`;
+    }
+
     // ── SMB Transfers ──
     function renderSMB(d) {
         const items = d.smb_transfers || [];
@@ -838,7 +964,18 @@
         const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         items.sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
         let html = `<h3 class="_ion-s-7b85582290">${items.length} Finding(s)</h3>`;
+        // MITRE ATT&CK rollup across all findings (matches the auto-analysis case note)
+        const techniques = d.mitre_techniques || [];
+        if (techniques.length) {
+            html += `<p class="_ion-s-0648c015b2"><strong>MITRE ATT&CK:</strong> ` +
+                techniques.map(t => `<code class="_ion-s-dbd68c1058">${esc(t.id)}</code>${t.name ? ' ' + esc(t.name) : ''}`).join(' &middot; ') +
+                `</p>`;
+        }
         for (const f of items) {
+            const mitre = (f.mitre || []);
+            const mitreLine = mitre.length
+                ? `<div class="finding-detail"><strong>ATT&CK:</strong> ${mitre.map(m => esc(m)).join(', ')}</div>`
+                : '';
             html += `<div class="finding-card ${esc(f.severity)}">
                 <div class="finding-header">
                     <span class="finding-sev ${esc(f.severity)}">${esc(f.severity)}</span>
@@ -846,6 +983,7 @@
                 </div>
                 <div class="finding-title">${esc(f.title)}</div>
                 <div class="finding-detail">${esc(f.detail)}</div>
+                ${mitreLine}
             </div>`;
         }
         document.getElementById('panel-findings').innerHTML = html;

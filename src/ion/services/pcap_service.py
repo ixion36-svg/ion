@@ -20,6 +20,7 @@ class Finding:
     severity: str  # low, medium, high, critical
     title: str
     detail: str
+    mitre: list = field(default_factory=list)  # v0.39.0: mapped ATT&CK technique IDs
 
 
 @dataclass
@@ -149,6 +150,8 @@ class PcapResult:
     extracted_files: list = field(default_factory=list)
     ja3_fingerprints: list = field(default_factory=list)
     ja3s_fingerprints: list = field(default_factory=list)
+    ja4_fingerprints: list = field(default_factory=list)
+    ja4s_fingerprints: list = field(default_factory=list)
     hassh_fingerprints: list = field(default_factory=list)
     credential_captures: list = field(default_factory=list)
     smb_transfers: list = field(default_factory=list)
@@ -157,6 +160,12 @@ class PcapResult:
     arp_anomalies: list = field(default_factory=list)
     base64_payloads: list = field(default_factory=list)
     network_graph: dict = field(default_factory=dict)
+    # v0.39.0 enhanced analyzers
+    tls_certificates: list = field(default_factory=list)
+    os_fingerprints: list = field(default_factory=list)
+    beacons: list = field(default_factory=list)
+    host_profiles: list = field(default_factory=list)
+    mitre_techniques: list = field(default_factory=list)  # deduped ATT&CK rollup
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -183,6 +192,105 @@ SUSPICIOUS_PORTS = {
 }
 
 CLEARTEXT_PORTS = {21, 23, 80, 110, 143, 161, 25, 587}
+
+
+# ---------------------------------------------------------------------------
+# MITRE ATT&CK mapping (v0.39.0)
+#
+# Each PCAP finding category maps to one or more ATT&CK technique IDs so network
+# evidence lands in the same taxonomy as the rest of ION's triage. The mapping
+# is intentionally conservative (network-observable techniques only) and every
+# ID is validated against `data/attack_techniques.json` at load time — an
+# unknown ID is dropped rather than surfaced, so a catalogue refresh can never
+# leave a dangling technique reference. Title-level refinements (e.g. a
+# known-malware fingerprint) layer extra techniques on top of the category map.
+# ---------------------------------------------------------------------------
+
+_FINDING_MITRE: dict[str, list[str]] = {
+    "Command & Control": ["T1071", "T1571"],
+    "DGA Detection": ["T1568.002"],
+    "DNS Tunneling": ["T1071.004", "T1572"],
+    "DNS Anomaly": ["T1071.004"],
+    "Data Exfiltration": ["T1048", "T1030"],
+    "Cleartext Protocol": ["T1040"],
+    "Credential Exposure": ["T1040"],
+    "credential_capture": ["T1040"],
+    "Suspicious Port": ["T1571"],
+    "Reconnaissance": ["T1046"],
+    "Network Anomaly": ["T1095"],
+    "Suspicious User-Agent": ["T1071.001"],
+    "TLS Certificate": ["T1573"],
+    "tls_fingerprint": ["T1573", "T1071.001"],
+    "file_extraction": ["T1105"],
+    "Malware Signature": ["T1105"],
+    "Suspicious File Transfer": ["T1105"],
+    "Shellcode Detection": ["T1055", "T1027"],
+    "PowerShell Abuse": ["T1059.001"],
+    "ARP Spoofing": ["T1557.002"],
+}
+
+_ATTACK_CATALOGUE: Optional[dict] = None
+
+
+def _load_attack_catalogue() -> dict:
+    """Lazily load the ATT&CK technique catalogue (id → {name, tactic_ids}); {} on failure."""
+    global _ATTACK_CATALOGUE
+    if _ATTACK_CATALOGUE is None:
+        try:
+            import json
+            from pathlib import Path
+            path = Path(__file__).resolve().parents[1] / "data" / "attack_techniques.json"
+            with open(path, encoding="utf-8") as fh:
+                _ATTACK_CATALOGUE = {
+                    t["id"]: {"name": t.get("name", ""), "tactic_ids": t.get("tactic_ids", [])}
+                    for t in json.load(fh)
+                }
+        except Exception:
+            _ATTACK_CATALOGUE = {}
+    return _ATTACK_CATALOGUE
+
+
+def _attach_mitre(findings: list[Finding]) -> None:
+    """Populate each finding's ``mitre`` list from the category map + title refinements.
+
+    Mutates findings in place. Only catalogue-valid technique IDs are kept.
+    """
+    catalogue = _load_attack_catalogue()
+    for f in findings:
+        ids = list(_FINDING_MITRE.get(f.category, []))
+        # Title-level refinements: known-malware fingerprints / C2 certs imply an
+        # encrypted C2 channel over a standard web protocol on top of the base map.
+        title_l = f.title.lower()
+        if "known-malware" in title_l or "cobalt strike" in title_l:
+            ids += ["T1071.001", "T1573.002"]
+        # Keep only catalogue-valid IDs (drop silently if the catalogue lacks one),
+        # preserving order and de-duplicating.
+        seen: set[str] = set()
+        valid: list[str] = []
+        for tid in ids:
+            if tid in seen:
+                continue
+            if not catalogue or tid in catalogue:
+                seen.add(tid)
+                valid.append(tid)
+        f.mitre = valid
+
+
+def _build_mitre_summary(findings: list[Finding]) -> list[dict]:
+    """Deduped ATT&CK rollup across all findings → [{id, name, tactic_ids}], sorted by ID."""
+    catalogue = _load_attack_catalogue()
+    ids: set[str] = set()
+    for f in findings:
+        ids.update(getattr(f, "mitre", []) or [])
+    out = []
+    for tid in sorted(ids):
+        info = catalogue.get(tid, {})
+        out.append({
+            "id": tid,
+            "name": info.get("name", ""),
+            "tactic_ids": info.get("tactic_ids", []),
+        })
+    return out
 
 
 def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
@@ -221,6 +329,8 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     timestamps = []
     packet_count = 0
     arp_table: dict[str, set[str]] = {}  # MAC → set of IPs (for ARP spoofing detection)
+    syn_sigs: dict[str, dict] = {}  # src_ip → first SYN signature (p0f-style OS fingerprint)
+    conn_sizes: dict[tuple, list] = {}  # (src, dst, dport) → payload sizes (RITA data-consistency)
 
     for ts, raw in reader:
         packet_count += 1
@@ -265,6 +375,21 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             if tcp.flags & dpkt.tcp.TH_SYN and not (tcp.flags & dpkt.tcp.TH_ACK):
                 key = (src_ip, dst_ip, tcp.dport)
                 conn_times.setdefault(key, []).append(ts)
+                # OS fingerprint: first SYN signature per source host (p0f-style)
+                if src_ip not in syn_sigs:
+                    try:
+                        syn_sigs[src_ip] = _syn_signature(ip_pkt, tcp)
+                    except Exception:
+                        pass
+
+            # RITA-style data-size consistency: payload sizes per connection tuple (bounded)
+            if tcp.data:
+                fk = (src_ip, dst_ip, tcp.dport)
+                if fk in conn_sizes:
+                    if len(conn_sizes[fk]) < 5000:
+                        conn_sizes[fk].append(len(tcp.data))
+                elif len(conn_sizes) < 20000:
+                    conn_sizes[fk] = [len(tcp.data)]
 
             _parse_tcp_payload(tcp, src_ip, dst_ip, dns_counter, http_counter,
                                tls_sni_counter, payload_sigs, suspicious_uas, cleartext_creds)
@@ -356,14 +481,27 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
         result.extracted_files = [f.to_dict() for f in _extract_files_from_streams(streams)]
         result.ja3_fingerprints = [j.to_dict() for j in _compute_ja3(tls_hellos)]
         result.ja3s_fingerprints = [j.to_dict() for j in _compute_ja3s(tls_server_hellos)]
+        result.ja4_fingerprints = _compute_ja4(tls_hellos)
+        result.ja4s_fingerprints = _compute_ja4s(tls_server_hellos)
         result.hassh_fingerprints = [h.to_dict() for h in _compute_hassh(ssh_pkts)]
         result.credential_captures = [c.to_dict() for c in _extract_credentials(streams)]
         result.smb_transfers = [s.to_dict() for s in _detect_smb(streams)]
         result.kerberos_tickets = _detect_kerberos(streams)
         result.http_files = _extract_http_files(streams)
         result.base64_payloads = _detect_base64_payloads(streams)
+        result.tls_certificates = _extract_tls_certificates(streams)
     except Exception:
         pass  # Non-fatal
+
+    # v0.39.0 — OS fingerprints + RITA-style beacon scoring (each independently fail-safe)
+    try:
+        result.os_fingerprints = _compute_os_fingerprints(syn_sigs)
+    except Exception:
+        result.os_fingerprints = []
+    try:
+        result.beacons = _compute_beacon_scores(conn_times, conn_sizes)
+    except Exception:
+        result.beacons = []
 
     # Build network graph from conversations
     try:
@@ -408,6 +546,14 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             title=f"{len(bad)} known-malware JA3 fingerprint(s) detected",
             detail=", ".join(f'{j["ja3_hash"][:12]}... ({j["known_malware"]})' for j in bad[:3]),
         ))
+    if any(j.get("known_malware") for j in result.ja4_fingerprints):
+        bad = [j for j in result.ja4_fingerprints if j.get("known_malware")]
+        findings.append(Finding(
+            category="tls_fingerprint",
+            severity="high",
+            title=f"{len(bad)} known-malware JA4 fingerprint(s) detected",
+            detail=", ".join(f'{j["ja4"]} ({j["known_malware"]})' for j in bad[:3]),
+        ))
     if result.credential_captures:
         findings.append(Finding(
             category="credential_capture",
@@ -415,9 +561,31 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             title=f"{len(result.credential_captures)} credential(s) captured from traffic",
             detail=", ".join(f'{c.get("protocol")}:{c.get("username","")}' for c in result.credential_captures[:5]),
         ))
+    # v0.39.0 — TLS certificate + RITA beacon findings (additive, fail-safe)
+    try:
+        findings.extend(_tls_cert_findings(result.tls_certificates))
+    except Exception:
+        pass
+    try:
+        findings.extend(_beacon_score_findings(result.beacons))
+    except Exception:
+        pass
+
+    # v0.39.0 — map findings to MITRE ATT&CK techniques (fail-safe)
+    try:
+        _attach_mitre(findings)
+        result.mitre_techniques = _build_mitre_summary(findings)
+    except Exception:
+        result.mitre_techniques = []
 
     result.findings = [asdict(f) for f in findings]
     result.verdict = _compute_verdict(findings)
+
+    # Per-host rollup (display-only; depends on result.findings being populated)
+    try:
+        result.host_profiles = _build_host_profiles(result)
+    except Exception:
+        result.host_profiles = []
 
     return result
 
@@ -600,6 +768,12 @@ _KNOWN_BAD_JA3: dict[str, str] = {
     "e35df3e00ca4ef31d42b34bebaa2f86e": "SocGholish",
 }
 
+# Known-malware JA4 client fingerprints. Intentionally operator-extensible
+# and shipped empty: ION is air-gapped, so it can't auto-pull a JA4 threat
+# feed, and hardcoding unverified hashes would create false positives. Add
+# vetted JA4 → label entries here (e.g. from abuse.ch/ThreatFox JA4 exports).
+_KNOWN_BAD_JA4: dict[str, str] = {}
+
 
 def _compute_ja3(tls_hellos: list[dict]) -> list[JA3Fingerprint]:
     """Compute JA3 fingerprints from collected TLS ClientHello messages."""
@@ -746,6 +920,646 @@ def _parse_client_hello_ja3(data: bytes) -> tuple[str, str]:
     ja3_hash = hashlib.md5(ja3_str.encode(), usedforsecurity=False).hexdigest()
 
     return ja3_str, ja3_hash
+
+
+# ---------------------------------------------------------------------------
+# 2b. JA4 / JA4S TLS fingerprinting (FoxIO JA4+ — successor to JA3)
+# ---------------------------------------------------------------------------
+#
+# JA4 is resistant to the TLS-extension randomisation that defeats JA3
+# (Chrome/modern malware shuffle extension order), because it *sorts* the
+# cipher and extension lists before hashing and adds ALPN. Computed from the
+# same ClientHello/ServerHello bytes JA3 already collects. Hashing validated
+# against the FoxIO reference worked examples (sha256, lowercase 4-char hex,
+# truncated to 12). JA4H (HTTP) is intentionally not implemented here — its
+# authoritative algorithm wasn't available to verify, and shipping a
+# non-interoperable fingerprint would defeat the purpose.
+
+_JA4_TLS_VERSION = {
+    0x0304: "13", 0x0303: "12", 0x0302: "11", 0x0301: "10", 0x0300: "s3",
+    0xfeff: "d1", 0xfefd: "d2", 0xfefc: "d3",
+}
+
+
+def _is_grease(v: int) -> bool:
+    return (v & 0x0f0f) == 0x0a0a
+
+
+def _ja4_alpn(first_value: str) -> str:
+    """First+last alphanumeric char of the first ALPN value, per spec."""
+    if not first_value:
+        return "00"
+    a0, a1 = first_value[0], first_value[-1]
+    return (a0 + a1) if (a0.isalnum() and a1.isalnum()) else "99"
+
+
+def _parse_client_hello_ja4(data: bytes) -> str:
+    """Compute the JA4 (TLS client) fingerprint, or '' on parse failure."""
+    if len(data) < 44 or data[0] != 0x16 or data[5] != 0x01:
+        return ""
+    try:
+        legacy_version = struct.unpack("!H", data[9:11])[0]
+        offset = 43  # 11 (header) + 32 (random)
+        sid_len = data[offset]
+        offset += 1 + sid_len
+        if offset + 2 > len(data):
+            return ""
+        cipher_len = struct.unpack("!H", data[offset:offset + 2])[0]
+        offset += 2
+        ciphers = []
+        for i in range(0, cipher_len, 2):
+            if offset + i + 2 > len(data):
+                break
+            c = struct.unpack("!H", data[offset + i:offset + i + 2])[0]
+            if not _is_grease(c):
+                ciphers.append(c)
+        offset += cipher_len
+        if offset >= len(data):
+            return ""
+        comp_len = data[offset]
+        offset += 1 + comp_len
+
+        extensions: list[int] = []
+        sig_algs: list[int] = []
+        sni_present = False
+        alpn_first = ""
+        supported_versions: list[int] = []
+        if offset + 2 <= len(data):
+            ext_total = struct.unpack("!H", data[offset:offset + 2])[0]
+            offset += 2
+            ext_end = min(offset + ext_total, len(data))
+            while offset + 4 <= ext_end:
+                etype = struct.unpack("!H", data[offset:offset + 2])[0]
+                elen = struct.unpack("!H", data[offset + 2:offset + 4])[0]
+                offset += 4
+                edata = data[offset:offset + elen]
+                offset += elen
+                if _is_grease(etype):
+                    continue
+                extensions.append(etype)
+                if etype == 0x0000:
+                    sni_present = True
+                elif etype == 0x000d and len(edata) >= 2:  # signature_algorithms
+                    sa_len = struct.unpack("!H", edata[0:2])[0]
+                    for j in range(2, min(2 + sa_len, len(edata)), 2):
+                        if j + 2 <= len(edata):
+                            sig_algs.append(struct.unpack("!H", edata[j:j + 2])[0])
+                elif etype == 0x0010 and len(edata) >= 3:  # ALPN
+                    fl = edata[2]
+                    val = edata[3:3 + fl]
+                    if val:
+                        alpn_first = val.decode("ascii", "ignore")
+                elif etype == 0x002b and len(edata) >= 1:  # supported_versions
+                    sv_len = edata[0]
+                    for j in range(1, min(1 + sv_len, len(edata)), 2):
+                        if j + 2 <= len(edata):
+                            v = struct.unpack("!H", edata[j:j + 2])[0]
+                            if not _is_grease(v):
+                                supported_versions.append(v)
+
+        ver = max(supported_versions) if supported_versions else legacy_version
+        ver2 = _JA4_TLS_VERSION.get(ver, "00")
+        sni_c = "d" if sni_present else "i"
+        cc = "{:02d}".format(min(len(ciphers), 99))
+        ec = "{:02d}".format(min(len(extensions), 99))
+        alpn = _ja4_alpn(alpn_first)
+        ja4_a = f"t{ver2}{sni_c}{cc}{ec}{alpn}"
+
+        cipher_hex = sorted("{:04x}".format(c) for c in ciphers)
+        ja4_b = hashlib.sha256(",".join(cipher_hex).encode()).hexdigest()[:12] if cipher_hex else "000000000000"
+
+        # ja4_c: extensions sorted (excl SNI 0x0000 + ALPN 0x0010), then
+        # signature algorithms in original packet order, separated by "_".
+        ext_for_c = sorted("{:04x}".format(e) for e in extensions if e not in (0x0000, 0x0010))
+        sig_hex = ["{:04x}".format(s) for s in sig_algs]
+        ja4_c = hashlib.sha256((",".join(ext_for_c) + "_" + ",".join(sig_hex)).encode()).hexdigest()[:12]
+        return f"{ja4_a}_{ja4_b}_{ja4_c}"
+    except Exception:
+        return ""
+
+
+def _parse_server_hello_ja4s(data: bytes) -> str:
+    """Compute the JA4S (TLS server) fingerprint, or '' on parse failure."""
+    if len(data) < 44 or data[0] != 0x16 or data[5] != 0x02:
+        return ""
+    try:
+        legacy_version = struct.unpack("!H", data[9:11])[0]
+        offset = 43
+        sid_len = data[offset]
+        offset += 1 + sid_len
+        if offset + 3 > len(data):
+            return ""
+        chosen_cipher = struct.unpack("!H", data[offset:offset + 2])[0]
+        offset += 2
+        offset += 1  # compression method
+        extensions: list[int] = []
+        alpn_first = ""
+        supported_versions: list[int] = []
+        if offset + 2 <= len(data):
+            ext_total = struct.unpack("!H", data[offset:offset + 2])[0]
+            offset += 2
+            ext_end = min(offset + ext_total, len(data))
+            while offset + 4 <= ext_end:
+                etype = struct.unpack("!H", data[offset:offset + 2])[0]
+                elen = struct.unpack("!H", data[offset + 2:offset + 4])[0]
+                offset += 4
+                edata = data[offset:offset + elen]
+                offset += elen
+                if _is_grease(etype):
+                    continue
+                extensions.append(etype)
+                if etype == 0x0010 and len(edata) >= 3:
+                    fl = edata[2]
+                    val = edata[3:3 + fl]
+                    if val:
+                        alpn_first = val.decode("ascii", "ignore")
+                elif etype == 0x002b and len(edata) >= 2:
+                    v = struct.unpack("!H", edata[0:2])[0]
+                    if not _is_grease(v):
+                        supported_versions.append(v)
+        ver = max(supported_versions) if supported_versions else legacy_version
+        ver2 = _JA4_TLS_VERSION.get(ver, "00")
+        ec = "{:02d}".format(min(len(extensions), 99))
+        alpn = _ja4_alpn(alpn_first)
+        ja4s_a = f"t{ver2}{ec}{alpn}"
+        cipher = "{:04x}".format(chosen_cipher)
+        # JA4S extension hash uses server order (not sorted).
+        ext_hex = ["{:04x}".format(e) for e in extensions]
+        ja4s_c = hashlib.sha256(",".join(ext_hex).encode()).hexdigest()[:12] if ext_hex else "000000000000"
+        return f"{ja4s_a}_{cipher}_{ja4s_c}"
+    except Exception:
+        return ""
+
+
+def _compute_ja4(tls_hellos: list[dict]) -> list[dict]:
+    """JA4 client fingerprints from collected ClientHello messages (deduped)."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for hello in tls_hellos:
+        ja4 = _parse_client_hello_ja4(hello["data"])
+        if not ja4:
+            continue
+        key = f'{hello["src_ip"]}:{hello["dst_ip"]}:{ja4}'
+        if key in seen:
+            continue
+        seen.add(key)
+        sni = ""
+        try:
+            sni = _extract_tls_sni(hello["data"]) or ""
+        except Exception:
+            pass
+        out.append({
+            "ja4": ja4, "src_ip": hello["src_ip"], "dst_ip": hello["dst_ip"],
+            "dst_port": hello.get("dst_port"), "sni": sni,
+            "known_malware": _KNOWN_BAD_JA4.get(ja4, ""),
+        })
+    return out
+
+
+def _compute_ja4s(tls_server_hellos: list[dict]) -> list[dict]:
+    """JA4S server fingerprints from collected ServerHello messages (deduped)."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    for hello in tls_server_hellos:
+        ja4s = _parse_server_hello_ja4s(hello["data"])
+        if not ja4s:
+            continue
+        key = f'{hello["src_ip"]}:{hello["dst_ip"]}:{ja4s}'
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append({
+            "ja4s": ja4s, "src_ip": hello["src_ip"], "dst_ip": hello["dst_ip"],
+            "src_port": hello.get("src_port"),
+        })
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 2c. TLS certificate analysis (v0.39.0)
+#
+# The TLS Certificate handshake message (type 0x0b) is normally larger than one
+# TCP segment, so it fragments across both TCP segments AND TLS records. We walk
+# the *reassembled* server→client stream's record layer, concatenate handshake
+# bytes across records, locate the Certificate message, carve the leaf DER, and
+# parse it with `cryptography` (a project dependency, imported lazily so a build
+# without it degrades gracefully rather than failing import).
+# ---------------------------------------------------------------------------
+
+# Cobalt Strike's default HTTPS beacon ships a self-signed cert with this exact
+# serial / CN — a high-confidence C2 tell. Lowercased hex serial → label.
+_KNOWN_BAD_CERT_SERIALS = {
+    "8bb00ee": "Cobalt Strike default certificate",
+}
+_KNOWN_BAD_CERT_CN = {
+    "major cobalt strike": "Cobalt Strike default certificate",
+}
+
+
+def _collect_handshake_bytes(data: bytes) -> bytes:
+    """Concatenate the bodies of all TLS handshake records (type 0x16) in a stream.
+
+    Handshake messages can span multiple TLS records, so we reassemble the
+    handshake byte-stream independently of record framing.
+    """
+    out = bytearray()
+    off = 0
+    n = len(data)
+    while off + 5 <= n:
+        rec_type = data[off]
+        rec_len = int.from_bytes(data[off + 3:off + 5], "big")
+        if rec_len == 0 or rec_len > 0x4000 + 2048:  # max TLS record + slack
+            break
+        body = data[off + 5:off + 5 + rec_len]
+        if len(body) < rec_len:
+            out.extend(body)  # truncated final record — keep what we have
+            break
+        if rec_type == 0x16:  # handshake
+            out.extend(body)
+        elif rec_type not in (0x14, 0x16):  # ChangeCipherSpec(0x14) is interleaved; anything else = encrypted
+            break
+        off += 5 + rec_len
+    return bytes(out)
+
+
+def _find_handshake_msg(hs: bytes, msg_type: int) -> bytes:
+    """Locate a handshake message of the given type in a handshake byte-stream."""
+    p = 0
+    n = len(hs)
+    while p + 4 <= n:
+        mtype = hs[p]
+        mlen = int.from_bytes(hs[p + 1:p + 4], "big")
+        if mtype == msg_type:
+            return hs[p:p + 4 + mlen]
+        p += 4 + mlen
+    return b""
+
+
+def _first_cert_der(cert_msg: bytes) -> bytes:
+    """Extract the leaf (first) certificate DER from a Certificate handshake message."""
+    body = cert_msg[4:]  # strip 1-byte type + 3-byte length
+
+    def _try(b: bytes) -> bytes:
+        # certificate_list: total_len(3) + [cert_len(3) + cert_der]...
+        if len(b) < 6:
+            return b""
+        total = int.from_bytes(b[:3], "big")
+        clen = int.from_bytes(b[3:6], "big")
+        if 0 < clen <= len(b) - 6 and clen <= total:
+            return b[6:6 + clen]
+        return b""
+
+    der = _try(body)
+    if der:
+        return der
+    # TLS 1.3 Certificate prepends a certificate_request_context (1-byte length + context)
+    if body:
+        ctx_len = body[0]
+        return _try(body[1 + ctx_len:])
+    return b""
+
+
+def _parse_x509(der: bytes) -> Optional[dict]:
+    """Parse a DER certificate into a summary dict (None if cryptography is unavailable/parse fails)."""
+    try:
+        from cryptography import x509
+    except Exception:
+        return None
+    try:
+        cert = x509.load_der_x509_certificate(der)
+    except Exception:
+        return None
+
+    def _name(n) -> str:
+        try:
+            return n.rfc4514_string()
+        except Exception:
+            return str(n)
+
+    try:
+        not_before = cert.not_valid_before_utc
+        not_after = cert.not_valid_after_utc
+    except AttributeError:  # cryptography < 42
+        not_before = cert.not_valid_before.replace(tzinfo=timezone.utc)
+        not_after = cert.not_valid_after.replace(tzinfo=timezone.utc)
+
+    sans: list[str] = []
+    try:
+        ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        sans = ext.value.get_values_for_type(x509.DNSName)
+    except Exception:
+        pass
+
+    subject = _name(cert.subject)
+    issuer = _name(cert.issuer)
+    validity_days = max(0, (not_after - not_before).days)
+    return {
+        "subject": subject,
+        "issuer": issuer,
+        "self_signed": subject == issuer,
+        "not_before": not_before.isoformat(),
+        "not_after": not_after.isoformat(),
+        "validity_days": validity_days,
+        "serial": format(cert.serial_number, "x"),
+        "sans": sans[:10],
+        "sig_algorithm": getattr(getattr(cert, "signature_algorithm_oid", None), "_name", ""),
+    }
+
+
+def _extract_tls_certificates(streams: dict) -> list[dict]:
+    """Carve and parse the leaf X.509 certificate from each TLS server stream (deduped by serial)."""
+    certs: list[dict] = []
+    seen: set[str] = set()
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        data = bytes(payload)
+        if len(data) < 16 or data[0] != 0x16:
+            continue
+        try:
+            hs = _collect_handshake_bytes(data)
+            cert_msg = _find_handshake_msg(hs, 0x0b)
+            if not cert_msg:
+                continue
+            der = _first_cert_der(cert_msg)
+            if not der:
+                continue
+            info = _parse_x509(der)
+        except Exception:
+            continue
+        if not info:
+            continue
+        if info["serial"] in seen:
+            continue
+        seen.add(info["serial"])
+        info["server_ip"] = src_ip
+        info["server_port"] = sport
+        info["client_ip"] = dst_ip
+        certs.append(info)
+    return certs
+
+
+def _tls_cert_findings(certs: list[dict]) -> list[Finding]:
+    """Findings from parsed TLS certificates: known-bad C2 certs, self-signed, expired, long validity."""
+    findings: list[Finding] = []
+    self_signed = 0
+    for c in certs:
+        serial = (c.get("serial") or "").lower()
+        subject_cn = (c.get("subject") or "").lower()
+        issuer_cn = (c.get("issuer") or "").lower()
+        label = _KNOWN_BAD_CERT_SERIALS.get(serial, "")
+        if not label:
+            for cn, lbl in _KNOWN_BAD_CERT_CN.items():
+                if cn in subject_cn or cn in issuer_cn:
+                    label = lbl
+                    break
+        if label:
+            findings.append(Finding(
+                category="TLS Certificate",
+                severity="critical",
+                title=f"Known-malicious TLS certificate: {label}",
+                detail=f"Server {c.get('server_ip')} presented a certificate matching {label} "
+                       f"(serial {serial}, subject {c.get('subject')}). Strong C2 indicator.",
+            ))
+            continue  # don't also flag it as merely self-signed
+        if c.get("self_signed"):
+            self_signed += 1
+        # Suspiciously long validity (>5 years) is common for C2 / self-signed infra
+        if c.get("validity_days", 0) > 365 * 5 and c.get("self_signed"):
+            findings.append(Finding(
+                category="TLS Certificate",
+                severity="low",
+                title=f"Self-signed certificate with {c['validity_days'] // 365}-year validity",
+                detail=f"Server {c.get('server_ip')} ({c.get('subject')}) uses a long-lived self-signed cert.",
+            ))
+    if self_signed:
+        findings.append(Finding(
+            category="TLS Certificate",
+            severity="medium",
+            title=f"{self_signed} self-signed TLS certificate(s) observed",
+            detail="Self-signed certificates on observed TLS servers can indicate internal services "
+                   "or attacker-controlled C2 infrastructure not backed by a public CA.",
+        ))
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# 2d. p0f-style passive OS fingerprinting (v0.39.0)
+# ---------------------------------------------------------------------------
+
+def _syn_signature(ip_pkt, tcp) -> dict:
+    """Capture the OS-discriminating fields of a TCP SYN packet."""
+    ttl = getattr(ip_pkt, "ttl", None)
+    if ttl is None:
+        ttl = getattr(ip_pkt, "hlim", 0)  # IPv6 hop limit
+    mss = None
+    wscale = None
+    sack = False
+    tsval = False
+    opt_order: list[int] = []
+    try:
+        for otype, odata in dpkt.tcp.parse_opts(tcp.opts):
+            opt_order.append(otype)
+            if otype == dpkt.tcp.TCP_OPT_MSS and len(odata) == 2:
+                mss = struct.unpack("!H", odata)[0]
+            elif otype == dpkt.tcp.TCP_OPT_WSCALE and len(odata) >= 1:
+                wscale = odata[0]
+            elif otype == dpkt.tcp.TCP_OPT_SACKOK:
+                sack = True
+            elif otype == dpkt.tcp.TCP_OPT_TIMESTAMP:
+                tsval = True
+    except Exception:
+        pass
+    df = bool(getattr(ip_pkt, "df", 0))  # IP.df property (IP.off is deprecated in dpkt)
+    return {
+        "ttl": ttl, "window": getattr(tcp, "win", 0), "mss": mss,
+        "wscale": wscale, "sack": sack, "tsval": tsval,
+        "opt_order": opt_order, "df": df,
+    }
+
+
+def _guess_os(sig: dict) -> tuple[str, str]:
+    """Map a SYN signature to an OS family guess + short evidence string."""
+    ttl = sig.get("ttl") or 0
+    win = sig.get("window") or 0
+    wscale = sig.get("wscale")
+    # Round observed TTL up to the nearest common initial TTL (hops only decrease it).
+    init = next((t for t in (64, 128, 255) if ttl <= t), 0) if ttl else 0
+    if init == 128:
+        return "Windows", f"initial TTL≈128 (obs {ttl}), win={win}"
+    if init == 64:
+        if win == 65535 and wscale == 6:
+            return "macOS / iOS", f"initial TTL≈64 (obs {ttl}), win=65535, wscale=6"
+        ev = f"initial TTL≈64 (obs {ttl}), win={win}"
+        if wscale is not None:
+            ev += f", wscale={wscale}"
+        return "Linux / Unix", ev
+    if init == 255:
+        return "Network device / BSD / Solaris", f"initial TTL≈255 (obs {ttl})"
+    return "Unknown", f"TTL={ttl}, win={win}"
+
+
+def _compute_os_fingerprints(syn_sigs: dict) -> list[dict]:
+    """Produce a passive OS guess per source host from captured SYN signatures."""
+    out: list[dict] = []
+    for ip, sig in syn_sigs.items():
+        os_name, evidence = _guess_os(sig)
+        out.append({
+            "ip": ip, "os": os_name, "evidence": evidence,
+            "ttl": sig.get("ttl"), "window": sig.get("window"), "mss": sig.get("mss"),
+        })
+    out.sort(key=lambda o: o["ip"])
+    return out
+
+
+# ---------------------------------------------------------------------------
+# 2e. RITA-style beacon scoring (v0.39.0)
+#
+# Beyond the simple coefficient-of-variation check in `_detect_beaconing`, this
+# scores each connection tuple on the *dispersion* and *skew* of both its
+# inter-arrival intervals and its payload sizes — the four signals RITA combines.
+# A near-1.0 score means metronome-regular, uniform-sized connections: the
+# hallmark of automated C2 even when individual intervals are long.
+# ---------------------------------------------------------------------------
+
+def _madm_score(values: list) -> float:
+    """1.0 = zero dispersion (all equal); → 0 as the median absolute deviation grows."""
+    if len(values) < 2:
+        return 0.0
+    s = sorted(values)
+    median = s[len(s) // 2]
+    if median == 0:
+        return 0.0
+    devs = sorted(abs(v - median) for v in values)
+    madm = devs[len(devs) // 2]
+    return max(0.0, 1.0 - (madm / median))
+
+
+def _bowley_skew(values: list) -> float:
+    """Quartile (Bowley) skewness in [-1, 1]; 0 = symmetric."""
+    s = sorted(values)
+    n = len(s)
+    if n < 4:
+        return 0.0
+    q1 = s[n // 4]
+    q2 = s[n // 2]
+    q3 = s[(3 * n) // 4]
+    denom = q3 - q1
+    if denom == 0:
+        return 0.0
+    return (q1 + q3 - 2 * q2) / denom
+
+
+def _compute_beacon_scores(conn_times: dict, conn_sizes: dict) -> list[dict]:
+    """Score each connection tuple for beaconing using interval + size regularity."""
+    out: list[dict] = []
+    for (src, dst, port), times in conn_times.items():
+        if len(times) < 5:
+            continue
+        ts = sorted(times)
+        intervals = [ts[i + 1] - ts[i] for i in range(len(ts) - 1)]
+        if not intervals:
+            continue
+        mean_int = sum(intervals) / len(intervals)
+        variance = sum((x - mean_int) ** 2 for x in intervals) / len(intervals)
+        cv = (variance ** 0.5 / mean_int) if mean_int > 0 else float("inf")
+        i_score = (_madm_score(intervals) + (1.0 - abs(_bowley_skew(intervals)))) / 2
+
+        sizes = conn_sizes.get((src, dst, port), [])
+        if len(sizes) >= 3:
+            s_score = (_madm_score(sizes) + (1.0 - abs(_bowley_skew(sizes)))) / 2
+            score = round((i_score * 0.6) + (s_score * 0.4), 3)
+        else:
+            s_score = None
+            score = round(i_score, 3)
+
+        out.append({
+            "src": src, "dst": dst, "port": port,
+            "connections": len(times),
+            "interval_s": round(mean_int, 1),
+            "cv": round(cv, 3) if cv != float("inf") else None,
+            "interval_score": round(i_score, 3),
+            "size_score": round(s_score, 3) if s_score is not None else None,
+            "score": score,
+        })
+    out.sort(key=lambda b: b["score"], reverse=True)
+    return out
+
+
+def _beacon_score_findings(beacons: list[dict]) -> list[Finding]:
+    """Emit a finding for high-scoring beacons the simple CV detector would miss.
+
+    `_detect_beaconing` already fires for very tight cadence (CV < 0.15); here we
+    catch beacons whose *combined* interval+size regularity is high even though
+    their raw interval CV is looser — without double-reporting the tight ones.
+    """
+    findings: list[Finding] = []
+    for b in beacons:
+        cv = b.get("cv")
+        if b["score"] >= 0.9 and b["connections"] >= 6 and b["interval_s"] >= 1 \
+                and (cv is None or cv >= 0.15):
+            size_note = (f", size-regularity={b['size_score']}" if b.get("size_score") is not None else "")
+            findings.append(Finding(
+                category="Command & Control",
+                severity="high",
+                title=f"Beaconing (regularity score {b['score']}): {b['src']} -> {b['dst']}:{b['port']}",
+                detail=f"{b['connections']} connections every ~{b['interval_s']}s with high combined "
+                       f"interval+size regularity (score {b['score']}{size_note}). RITA-style scoring "
+                       f"flags this as likely automated C2 even though the raw interval variance is moderate.",
+            ))
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# 2f. Per-host profile rollup (v0.39.0, display-only)
+# ---------------------------------------------------------------------------
+
+def _build_host_profiles(result: PcapResult) -> list[dict]:
+    """Aggregate per-IP intelligence (OS, role, fingerprints, SNIs, beacons, findings)."""
+    profiles: dict[str, dict] = {}
+
+    def prof(ip: str) -> dict:
+        return profiles.setdefault(ip, {
+            "ip": ip, "os": "", "os_evidence": "", "role": set(),
+            "sent": 0, "received": 0, "ja4": [], "ja4s": [],
+            "snis": set(), "beacons": 0, "findings": 0,
+        })
+
+    for b in result.data_transfer.get("by_ip", []):
+        p = prof(b["ip"])
+        p["sent"] = b.get("sent", 0)
+        p["received"] = b.get("received", 0)
+    for o in result.os_fingerprints:
+        p = prof(o["ip"])
+        p["os"] = o["os"]
+        p["os_evidence"] = o["evidence"]
+    for j in result.ja4_fingerprints:
+        p = prof(j["src_ip"])
+        p["role"].add("client")
+        if j["ja4"] not in p["ja4"]:
+            p["ja4"].append(j["ja4"])
+        if j.get("sni"):
+            p["snis"].add(j["sni"])
+    for j in result.ja4s_fingerprints:
+        p = prof(j["src_ip"])
+        p["role"].add("server")
+        if j["ja4s"] not in p["ja4s"]:
+            p["ja4s"].append(j["ja4s"])
+    for b in result.beacons:
+        prof(b["src"])["beacons"] += 1
+
+    # Count findings whose text mentions each host
+    for f in result.findings:
+        text = f.get("title", "") + " " + f.get("detail", "")
+        for ip in profiles:
+            if ip and ip in text:
+                profiles[ip]["findings"] += 1
+
+    out = []
+    for p in profiles.values():
+        p["role"] = sorted(p["role"]) or ["client"]
+        p["snis"] = sorted(p["snis"])[:10]
+        out.append(p)
+    out.sort(key=lambda p: p["sent"] + p["received"], reverse=True)
+    return out[:30]
 
 
 # ---------------------------------------------------------------------------
@@ -1933,9 +2747,47 @@ def _detect_port_scan(conn_times: dict) -> list[Finding]:
     return findings
 
 
+def _dga_score(sld: str) -> float:
+    """Combined DGA likelihood in [0, 1] from entropy, digit ratio, vowel ratio, consonant runs.
+
+    Entropy alone over-flags long-but-pronounceable CDN/ad-tech subdomains; folding in
+    digit density, vowel scarcity, and consonant-run length sharpens DGA recall while
+    keeping benign high-entropy names below threshold.
+    """
+    if not sld:
+        return 0.0
+    s = sld.lower()
+    length = len(s)
+    entropy = _shannon_entropy(s)
+    digits = sum(c.isdigit() for c in s)
+    vowels = sum(c in "aeiou" for c in s)
+    digit_ratio = digits / length
+    vowel_ratio = vowels / length if length else 0.0
+    run = best = 0
+    for c in s:
+        if c.isalpha() and c not in "aeiou":
+            run += 1
+            best = max(best, run)
+        else:
+            run = 0
+    score = 0.0
+    if entropy > 3.5:
+        score += 0.4
+    elif entropy > 3.0:
+        score += 0.2
+    if digit_ratio > 0.3:
+        score += 0.2
+    if vowel_ratio < 0.25 and length >= 7:
+        score += 0.2
+    if best >= 5:
+        score += 0.2
+    return min(score, 1.0)
+
+
 def _detect_dga(dns_counter: collections.Counter) -> list[Finding]:
     findings = []
     high_entropy_domains = []
+    dga_hits = []  # (query, entropy, score) for combined-score-qualified domains
     for query in dns_counter:
         parts = query.split(".")
         if len(parts) >= 2:
@@ -1944,8 +2796,22 @@ def _detect_dga(dns_counter: collections.Counter) -> list[Finding]:
                 entropy = _shannon_entropy(sld)
                 if entropy > 3.5:
                     high_entropy_domains.append((query, round(entropy, 2)))
+                if _dga_score(sld) >= 0.7:
+                    dga_hits.append((query, round(entropy, 2)))
 
-    if len(high_entropy_domains) > 3:
+    # A cluster of multi-signal DGA hits is high-confidence — prefer it over the
+    # entropy-only aggregate so digit-heavy / vowel-poor DGA (low raw entropy) is caught.
+    if len(dga_hits) > 3:
+        examples = dga_hits[:5]
+        findings.append(Finding(
+            category="DGA Detection",
+            severity="high",
+            title=f"Possible DGA: {len(dga_hits)} algorithmically-generated domains",
+            detail=f"Multiple DNS queries score high on combined randomness signals (entropy, digit ratio, "
+                   f"vowel scarcity, consonant runs), suggesting Domain Generation Algorithm activity. "
+                   f"Examples: {', '.join(f'{d} (H={e})' for d, e in examples)}",
+        ))
+    elif len(high_entropy_domains) > 3:
         examples = high_entropy_domains[:5]
         findings.append(Finding(
             category="DGA Detection",
