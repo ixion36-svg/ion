@@ -333,6 +333,14 @@
     }
   }
 
+  // The Keycloak button carries data-click-action="loginWithKeycloak", but
+  // that only fires via the delegated dispatcher in event-delegation.js, which
+  // is loaded through base.html — and this login page is standalone (no
+  // base.html, see note at top). Wire the click directly here, the same way
+  // the login form's submit is wired above. CSP (script-src-attr 'none')
+  // forbids an inline onclick=, so a direct listener is the correct fix.
+  document.getElementById('keycloak-btn').addEventListener('click', loginWithKeycloak);
+
   checkForError();
   checkOIDCConfig();
 </script>

@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.1 -->
+<!-- ion-doc:version=0.39.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-02 -->
+<!-- ion-doc:date=2026-06-03 -->
 
 # Changelog
+
+## v0.39.2 — 2026-06-03
+
+**Bug-fix release: Keycloak SSO login button restored.**
+
+The "Continue with Keycloak" button on the login page did nothing when clicked. Root cause was fallout from the v0.31.x inline-handler → event-delegation migration: that mechanical pass rewrote `onclick="loginWithKeycloak()"` into `data-click-action="loginWithKeycloak"` across **every** template — but the declarative `data-click-action` attribute is only honoured by the delegated dispatcher in `static/js/event-delegation.js`, which is loaded via `base.html`. The login page is deliberately standalone (it does not extend `base.html`, to keep the pre-auth surface minimal), so the dispatcher was never present and the button had no click handler at all. The button still rendered and revealed correctly (its `display:none` migrated class is overridden by the inline `style.display='block'` from `checkOIDCConfig()`), which is why it looked live but was inert. The username/password form was unaffected because it is wired with a direct `addEventListener('submit', …)`, not delegation.
+
+- **Fix** (`templates/login.html`): wire the Keycloak button with a direct `addEventListener('click', loginWithKeycloak)`, matching how the login form's submit is already wired on the same standalone page. CSP `script-src-attr 'none'` (v0.31.20) correctly forbids an inline `onclick=`, so a direct listener is the right fix, not a reverted inline handler. A comment documents why this page must not use the delegated pattern.
+- Swept all templates for the same defect: `login.html` was the only standalone page (no `base.html`) carrying a `data-click-action`; `base.html` loads the dispatcher itself and `_components.html` only renders inside a base.html page, so neither is affected.
+- The `/api/auth/oidc/config` endpoint and the OIDC callback were already correct (state CSRF cookie, redirect_uri build) — no backend change.
+
+Template + static JS only — no Python, routes, permissions, schema, or external calls changed. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.39.1 — 2026-06-02
 
