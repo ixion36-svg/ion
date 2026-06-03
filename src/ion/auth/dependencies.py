@@ -17,6 +17,16 @@ logger = logging.getLogger(__name__)
 # Cookie name for session token
 SESSION_COOKIE_NAME = "ion_session"
 
+# F4: endpoints a must_change_password user may still reach so they can change
+# their password (plus the static assets needed to render the change form).
+# Everything else is blocked when ION_ENFORCE_PASSWORD_CHANGE is on. Prefix match.
+_PWD_CHANGE_ALLOWED_PREFIXES = (
+    "/api/auth/change-password",
+    "/api/auth/me",
+    "/api/auth/logout",
+    "/static/",
+)
+
 
 def get_db_session() -> Generator[Session, None, None]:
     """FastAPI dependency for database session with proper cleanup."""
@@ -58,12 +68,15 @@ def get_session_token(
 
 
 def get_current_user(
+    request: Request,
     session_token: Optional[str] = Depends(get_session_token),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
     """Get current authenticated user.
 
-    Raises HTTPException 401 if not authenticated.
+    Raises HTTPException 401 if not authenticated. When
+    ION_ENFORCE_PASSWORD_CHANGE is on, also raises 403 for a user flagged
+    must_change_password on any endpoint outside the password-change allowlist.
     """
     if not session_token:
         raise HTTPException(
@@ -79,6 +92,19 @@ def get_current_user(
             detail="Invalid or expired session",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    # F4 (opt-in ION_ENFORCE_PASSWORD_CHANGE): a must_change_password user may
+    # only reach the password-change endpoints. Without this the flag is
+    # advisory (frontend-only) and a default-credential session could call any
+    # API. In ION's deployment the only local account is admin (others are
+    # OIDC), so this primarily protects the admin account.
+    if getattr(user, "must_change_password", False) and get_config().enforce_password_change:
+        path = request.url.path
+        if not any(path.startswith(p) for p in _PWD_CHANGE_ALLOWED_PREFIXES):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Password change required before continuing",
+            )
 
     return user
 

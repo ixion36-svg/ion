@@ -6,7 +6,7 @@ from typing import Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from ion.auth.password import password_hasher
+from ion.auth.password import password_hasher, validate_password_policy
 from ion.core.config import get_config
 from ion.models.user import Permission, Role, User
 from ion.storage.auth_repository import AuditLogRepository, SessionRepository
@@ -300,6 +300,22 @@ class AuthService:
             )
             return False, "Current password is incorrect"
 
+        # F6 (opt-in ION_PASSWORD_MIN_LENGTH): enforce password policy on the
+        # new password. No-op when the policy is disabled (default).
+        policy_error = validate_password_policy(
+            new_password, get_config().password_min_length
+        )
+        if policy_error:
+            self.audit_repo.create(
+                user_id=user.id,
+                action="password_change_failed",
+                resource_type="user",
+                resource_id=user.id,
+                details={"reason": "Password policy violation"},
+                ip_address=ip_address,
+            )
+            return False, policy_error
+
         new_hash = password_hasher.hash(new_password)
         self.user_repo.update_password(user, new_hash)
 
@@ -405,6 +421,12 @@ class AuthService:
         # Check for existing email
         if self.user_repo.get_by_email(email):
             return None, "Email already exists"
+
+        # F6 (opt-in ION_PASSWORD_MIN_LENGTH): enforce password policy. No-op
+        # when disabled (default), so existing seeding/tests are unaffected.
+        policy_error = validate_password_policy(password, get_config().password_min_length)
+        if policy_error:
+            return None, policy_error
 
         # Create user
         password_hash = password_hasher.hash(password)

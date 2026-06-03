@@ -43,6 +43,8 @@ class Config:
     account_lockout_enabled: bool = False  # Lock accounts after repeated failed logins
     ip_blocking_enabled: bool = False  # Auto-block IPs on attack detection (opt-in; needs ION_TRUSTED_PROXIES behind a proxy)
     webhook_require_signature: bool = False  # Reject inbound webhooks with no HMAC secret configured (opt-in)
+    enforce_password_change: bool = False  # Block must_change_password users from APIs until they change it (opt-in)
+    password_min_length: int = 0  # Minimum password length on set/change; 0 = policy disabled (opt-in)
 
     # GitLab integration
     gitlab_enabled: bool = True
@@ -262,6 +264,8 @@ class Config:
             account_lockout_enabled=data.get("account_lockout_enabled", False),
             ip_blocking_enabled=data.get("ip_blocking_enabled", False),
             webhook_require_signature=data.get("webhook_require_signature", False),
+            enforce_password_change=data.get("enforce_password_change", False),
+            password_min_length=data.get("password_min_length", 0),
             # GitLab integration
             gitlab_enabled=data.get("gitlab_enabled", True),
             gitlab_url=data.get("gitlab_url", ""),
@@ -431,6 +435,8 @@ class Config:
                     "account_lockout_enabled": self.account_lockout_enabled,
                     "ip_blocking_enabled": self.ip_blocking_enabled,
                     "webhook_require_signature": self.webhook_require_signature,
+                    "enforce_password_change": self.enforce_password_change,
+                    "password_min_length": self.password_min_length,
                     # GitLab integration
                     "gitlab_enabled": self.gitlab_enabled,
                     "gitlab_url": self.gitlab_url,
@@ -628,6 +634,13 @@ def get_config() -> Config:
             _config.ip_blocking_enabled = _get_env_bool("ION_IP_BLOCKING_ENABLED")
         if os.environ.get("ION_WEBHOOK_REQUIRE_SIGNATURE"):
             _config.webhook_require_signature = _get_env_bool("ION_WEBHOOK_REQUIRE_SIGNATURE")
+        if os.environ.get("ION_ENFORCE_PASSWORD_CHANGE"):
+            _config.enforce_password_change = _get_env_bool("ION_ENFORCE_PASSWORD_CHANGE")
+        if os.environ.get("ION_PASSWORD_MIN_LENGTH"):
+            try:
+                _config.password_min_length = int(os.environ["ION_PASSWORD_MIN_LENGTH"])
+            except ValueError:
+                pass  # keep default (disabled) on a non-integer value
         if os.environ.get("ION_OIDC_ENABLED"):
             _config.oidc_enabled = _get_env_bool("ION_OIDC_ENABLED", True)
         if os.environ.get("ION_OIDC_KEYCLOAK_URL"):

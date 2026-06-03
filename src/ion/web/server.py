@@ -426,11 +426,23 @@ def _validate_startup_config():
     if not db_url:
         warnings.append("ION_DATABASE_URL not set — falling back to SQLite (not recommended for production)")
 
-    # Admin password
+    # Admin password — in ION's deployment `admin` is the ONLY local account
+    # (all other users authenticate via Keycloak/OIDC), so this single .env
+    # value is the entire local-credential attack surface. Never echo it.
     admin_pw = os.environ.get("ION_ADMIN_PASSWORD", "changeme")
-    if admin_pw in ("changeme", "password", "admin"):
-        # Do not echo the actual password value into logs
-        warnings.append("ION_ADMIN_PASSWORD is set to a weak default — change it for production")
+    from ion.auth.password import _COMMON_WEAK, validate_password_policy
+
+    _min_len_env = os.environ.get("ION_PASSWORD_MIN_LENGTH", "")
+    try:
+        _min_len = int(_min_len_env) if _min_len_env else 0
+    except ValueError:
+        _min_len = 0
+    if admin_pw.lower() in _COMMON_WEAK or admin_pw in ("changeme", "password", "admin"):
+        warnings.append("ION_ADMIN_PASSWORD is weak/common — set a strong unique value (admin is the only local account)")
+    elif _min_len:
+        _pol_err = validate_password_policy(admin_pw, _min_len)
+        if _pol_err:
+            warnings.append(f"ION_ADMIN_PASSWORD does not meet ION_PASSWORD_MIN_LENGTH={_min_len} ({_pol_err})")
 
     # Elasticsearch
     if os.environ.get("ION_ELASTICSEARCH_ENABLED", "").lower() == "true":

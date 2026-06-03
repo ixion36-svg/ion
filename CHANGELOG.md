@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.3 -->
+<!-- ion-doc:version=0.39.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-03 -->
 
 # Changelog
+
+## v0.39.4 — 2026-06-03
+
+**External-pentest hardening, part 2: password controls — OPT-IN (default off).**
+
+Follows v0.39.3. In ION's deployment `admin` is the only local account (all other users authenticate via Keycloak/OIDC) and its password comes from `ION_ADMIN_PASSWORD` in `.env`, so these controls primarily harden the admin credential. As with v0.39.3, everything ships disabled by default.
+
+- **F4 — `ION_ENFORCE_PASSWORD_CHANGE` (default off).** Previously the `must_change_password` flag was advisory: surfaced to the frontend (which redirects to the change-password page) but never enforced server-side, so a session for a default-credential account could call any API without ever changing the password. When enabled, `get_current_user` blocks a `must_change_password` user from every endpoint except the password-change allowlist (`/api/auth/change-password`, `/api/auth/me`, `/api/auth/logout`, `/static/`) with a 403 until they comply.
+- **F6 — `ION_PASSWORD_MIN_LENGTH` (default 0 = disabled).** A password policy validator (`auth/password.py:validate_password_policy`) enforced in `AuthService.change_password` and `create_user`: minimum length plus a small denylist of common passwords. `0` disables it entirely (no behaviour change; existing seeding/tests unaffected); set e.g. `12` to enable. Only governs passwords set via the app — in practice the admin password change.
+- **Boot-time admin-password check.** `_validate_startup_config()` now warns (never blocks boot) if `ION_ADMIN_PASSWORD` is weak/common (broadened denylist), and — when `ION_PASSWORD_MIN_LENGTH` is set — if the seed admin password is shorter than the policy. The actual value is never logged. `.env.deploy` gains an "Admin account" note: admin is the only local account; set a strong unique value.
+
+New config flags `enforce_password_change` + `password_min_length` (default `False` / `0`). 10 new tests in `tests/test_v039_4_password_hardening.py`. `get_current_user` gains a `request: Request` parameter (FastAPI injects it; call sites unchanged). No new routes, permissions, or schema. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.39.3 — 2026-06-03
 
