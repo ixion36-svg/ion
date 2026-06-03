@@ -260,6 +260,11 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "geolocation=(), microphone=(), camera=(), payment=()"
         )
 
+        # Replace the default "Server: uvicorn" disclosure with a generic value
+        # (v0.39.3) — denies an external scanner a free server/version
+        # fingerprint. Purely cosmetic; no functional impact.
+        response.headers["Server"] = "ION"
+
         return response
 
 

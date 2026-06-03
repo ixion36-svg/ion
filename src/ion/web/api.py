@@ -36,6 +36,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session, selectinload
 
+from ion.core.client_ip import get_client_ip as _trusted_client_ip
 from ion.core.config import (
     get_config,
     get_dfir_iris_config,
@@ -64,8 +65,19 @@ _rate_limit_enabled = _os.environ.get("ION_RATE_LIMIT_ENABLED", "true").lower() 
 _auto_playbook_enabled = _os.environ.get(
     "ION_AUTO_PLAYBOOK_ENABLED", "false"
 ).lower() in ("true", "1", "yes")
+def _rate_limit_key(request) -> str:
+    """Rate-limit bucket key: the trusted-proxy-aware client IP (v0.39.3).
+
+    slowapi's default get_remote_address keys on the TCP peer, which behind a
+    shared ingress is the proxy IP — collapsing every user into one bucket.
+    Keying on the canonical client IP fixes that; set ION_TRUSTED_PROXIES so it
+    resolves the real client rather than the ingress. Falls back to the peer.
+    """
+    return _trusted_client_ip(request) or get_remote_address(request)
+
+
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_rate_limit_key,
     default_limits=["120/minute"],
     enabled=_rate_limit_enabled,
 )

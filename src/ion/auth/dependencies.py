@@ -7,6 +7,7 @@ from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from ion.auth.service import AuthService
+from ion.core.client_ip import get_client_ip  # noqa: F401  (re-exported; many call sites import it from here)
 from ion.core.config import get_config, get_oidc_config
 from ion.models.user import User
 from ion.storage.database import get_engine, get_session_factory
@@ -315,16 +316,8 @@ class PermissionChecker:
         return user
 
 
-def get_client_ip(request: Request) -> Optional[str]:
-    """Extract client IP address from request."""
-    # Check X-Forwarded-For header (common with proxies)
-    forwarded_for = request.headers.get("X-Forwarded-For")
-    if forwarded_for:
-        # Take the first IP in the chain
-        return forwarded_for.split(",")[0].strip()
-
-    # Fall back to direct client
-    if request.client:
-        return request.client.host
-
-    return None
+# get_client_ip is centralised in ion.core.client_ip (v0.39.3) and imported at
+# the top of this module, then re-exported for the call sites that historically
+# imported it from ion.auth.dependencies. The previous local implementation
+# blindly trusted the first X-Forwarded-For value (spoofable); the shared one
+# honours forwarded headers only from peers in ION_TRUSTED_PROXIES.

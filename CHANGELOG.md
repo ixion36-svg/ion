@@ -1,13 +1,27 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.2 -->
+<!-- ion-doc:version=0.39.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-03 -->
 
 # Changelog
+
+## v0.39.3 — 2026-06-03
+
+**External-pentest hardening — new defensive controls, all OPT-IN (default off).**
+
+Prep for an external penetration test on the Guardedglass platform, where ION sits behind a *shared* ingress rather than its own air-gap perimeter (assume-breach). Every new control ships **disabled by default** — a v0.39.3 image changes no runtime behaviour until an operator opts in via env var, so controls can be enabled deliberately on the staging replica, verified, then promoted, and rolled back by flipping one variable. New `.env.deploy` "Security hardening" section documents each with guidance.
+
+- **F1/F2 — Unified, trusted-proxy-aware client-IP derivation.** ION had two divergent `get_client_ip` implementations: the security middleware correctly honoured `X-Forwarded-For` only from peers in `ION_TRUSTED_PROXIES`, while the auth layer (`auth/dependencies.py`) blindly trusted the first XFF value — spoofable, and it fed audit logging. Both now use a single canonical module, `ion/core/client_ip.py`. The login rate-limiter (slowapi) also moves off `get_remote_address` (which keyed on the TCP peer = the proxy IP behind a shared ingress, collapsing all users into one bucket) onto the canonical client IP. **Safe by default:** with `ION_TRUSTED_PROXIES` unset, ION trusts no forwarded headers and uses the TCP peer (same as the security middleware already did). Set `ION_TRUSTED_PROXIES=<ingress CIDRs>` behind Guardedglass so ION sees the real client and ignores spoofed XFF.
+- **F3 — `ION_WEBHOOK_REQUIRE_SIGNATURE` (default off).** The inbound webhook receiver (`/api/integrations/webhooks/receive/{token}`) treated the HMAC signature as optional, so a webhook configured without a secret was injectable with the token alone. When enabled, a webhook whose token has no secret is rejected (`invalid_signature`). Off by default to preserve existing secret-less integrations until operators set secrets.
+- **F5 — `ION_IP_BLOCKING_ENABLED` (default off).** The SecurityMonitoringMiddleware's auto-block paths had been commented out ("disabled for testing"); detections were logged but never enforced. Re-implemented behind an opt-in flag, with a hard backstop: ION **never** blocks a trusted-proxy or localhost IP — behind a shared ingress with no `ION_TRUSTED_PROXIES` set, every client resolves to the ingress IP and a block would take down all users. Enable only after setting `ION_TRUSTED_PROXIES`. Detections are logged regardless of the flag.
+- **F7 — Generic `Server` header.** The default `Server: uvicorn` disclosure is replaced with `Server: ION` — denies an external scanner a free server/version fingerprint. Cosmetic; no functional impact (always on).
+- **Section A deploy guidance.** `.env.deploy` documents the above plus the pre-existing `ION_ACCOUNT_LOCKOUT_ENABLED` (per-account brute-force lockout, also default off and recommended-on for the test), `ION_BASE_URL`, `ION_COOKIE_SECURE`, and `ION_DEBUG_MODE`.
+
+New module `ion/core/client_ip.py`; new config flags `ip_blocking_enabled` + `webhook_require_signature` (both default `False`). 10 new tests in `tests/test_v039_3_hardening.py`. No new routes, permissions, or schema. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new findings: 0C / 0H / 0M / 0L (this release *adds* controls; the gaps it addresses were defence-in-depth items bounded by the prior air-gap deployment model).
 
 ## v0.39.2 — 2026-06-03
 

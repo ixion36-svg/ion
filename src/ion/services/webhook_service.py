@@ -359,6 +359,34 @@ class WebhookService:
                     "status": "disabled",
                 }
 
+            # Opt-in (ION_WEBHOOK_REQUIRE_SIGNATURE, default off): refuse tokens
+            # that carry no HMAC secret, so knowledge of the token alone is not
+            # sufficient to inject a webhook. Left off by default to preserve
+            # existing secret-less integrations until operators opt in.
+            from ion.core.config import get_config
+
+            if get_config().webhook_require_signature and not webhook.secret:
+                log_entry = IntegrationEvent(
+                    event_type=IntegrationEventType.WEBHOOK,
+                    integration_type=webhook.source_type,
+                    webhook_id=webhook.id,
+                    webhook_event_type=event_type,
+                    payload=payload,
+                    headers=dict(headers),
+                    source_ip=source_ip,
+                    status=WebhookStatus.INVALID_SIGNATURE,
+                    error_message="Webhook secret required but not configured",
+                    response_time_ms=(time.perf_counter() - start_time) * 1000,
+                )
+                session.add(log_entry)
+                session.flush()
+
+                return {
+                    "success": False,
+                    "error": "Webhook signature required",
+                    "status": "invalid_signature",
+                }
+
             # Verify signature if webhook has a secret
             if webhook.secret and raw_payload:
                 if not self.verify_signature(webhook, raw_payload, signature or ""):

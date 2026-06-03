@@ -41,6 +41,8 @@ class Config:
     cookie_secure: bool = False  # Set to True when using HTTPS in production
     debug_mode: bool = False  # Enable API docs and detailed errors (disable in production)
     account_lockout_enabled: bool = False  # Lock accounts after repeated failed logins
+    ip_blocking_enabled: bool = False  # Auto-block IPs on attack detection (opt-in; needs ION_TRUSTED_PROXIES behind a proxy)
+    webhook_require_signature: bool = False  # Reject inbound webhooks with no HMAC secret configured (opt-in)
 
     # GitLab integration
     gitlab_enabled: bool = True
@@ -258,6 +260,8 @@ class Config:
             cookie_secure=data.get("cookie_secure", False),
             debug_mode=data.get("debug_mode", False),
             account_lockout_enabled=data.get("account_lockout_enabled", False),
+            ip_blocking_enabled=data.get("ip_blocking_enabled", False),
+            webhook_require_signature=data.get("webhook_require_signature", False),
             # GitLab integration
             gitlab_enabled=data.get("gitlab_enabled", True),
             gitlab_url=data.get("gitlab_url", ""),
@@ -425,6 +429,8 @@ class Config:
                     "cookie_secure": self.cookie_secure,
                     "debug_mode": self.debug_mode,
                     "account_lockout_enabled": self.account_lockout_enabled,
+                    "ip_blocking_enabled": self.ip_blocking_enabled,
+                    "webhook_require_signature": self.webhook_require_signature,
                     # GitLab integration
                     "gitlab_enabled": self.gitlab_enabled,
                     "gitlab_url": self.gitlab_url,
@@ -618,6 +624,10 @@ def get_config() -> Config:
             _config.debug_mode = _get_env_bool("ION_DEBUG_MODE")
         if os.environ.get("ION_ACCOUNT_LOCKOUT_ENABLED"):
             _config.account_lockout_enabled = _get_env_bool("ION_ACCOUNT_LOCKOUT_ENABLED")
+        if os.environ.get("ION_IP_BLOCKING_ENABLED"):
+            _config.ip_blocking_enabled = _get_env_bool("ION_IP_BLOCKING_ENABLED")
+        if os.environ.get("ION_WEBHOOK_REQUIRE_SIGNATURE"):
+            _config.webhook_require_signature = _get_env_bool("ION_WEBHOOK_REQUIRE_SIGNATURE")
         if os.environ.get("ION_OIDC_ENABLED"):
             _config.oidc_enabled = _get_env_bool("ION_OIDC_ENABLED", True)
         if os.environ.get("ION_OIDC_KEYCLOAK_URL"):

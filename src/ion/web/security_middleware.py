@@ -1,12 +1,14 @@
 """Security monitoring middleware for FastAPI."""
 
-import ipaddress
-import os
-from typing import Callable, List, Union
+from typing import Callable
 
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from ion.core.client_ip import get_client_ip
+from ion.core.client_ip import is_trusted_proxy as _is_trusted_proxy
+from ion.core.client_ip import peer_ip as _peer_ip
 from ion.core.config import get_config
 from ion.core.logging import get_structured_logger
 from ion.services.security_service import (
@@ -18,72 +20,9 @@ from ion.storage.database import get_engine, get_session_factory
 logger = get_structured_logger(__name__)
 
 
-_IPNet = Union[ipaddress.IPv4Network, ipaddress.IPv6Network]
-
-
-def _parse_trusted_proxies() -> List[_IPNet]:
-    """Parse ION_TRUSTED_PROXIES env var (comma-separated CIDRs/IPs)."""
-    raw = os.environ.get("ION_TRUSTED_PROXIES", "")
-    nets: List[_IPNet] = []
-    for s in raw.split(","):
-        s = s.strip()
-        if not s:
-            continue
-        try:
-            nets.append(ipaddress.ip_network(s, strict=False))
-        except ValueError:
-            logger.warning("Ignoring invalid CIDR in ION_TRUSTED_PROXIES: %s", s)
-    return nets
-
-
-_TRUSTED_PROXIES = _parse_trusted_proxies()
-
-
-def _peer_ip(request: Request) -> str:
-    """Actual TCP peer IP — never spoofable via headers."""
-    return request.client.host if request.client else "unknown"
-
-
-def _is_trusted_proxy(ip: str) -> bool:
-    """Is the given IP a configured trusted reverse proxy?"""
-    if not _TRUSTED_PROXIES:
-        return False
-    try:
-        addr = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-    return any(addr in net for net in _TRUSTED_PROXIES)
-
-
-def get_client_ip(request: Request) -> str:
-    """Extract client IP from request.
-
-    Honors X-Forwarded-For / X-Real-IP ONLY when the immediate TCP peer is
-    in ION_TRUSTED_PROXIES (CIDR allowlist). Otherwise returns the peer IP
-    directly, since forwarded headers from untrusted clients are attacker-
-    controlled (any external client can send `X-Forwarded-For: 127.0.0.1`).
-
-    For trusted peers, walks XFF right-to-left and returns the first
-    non-trusted entry — i.e. the original client behind any chain of
-    trusted proxies.
-    """
-    peer = _peer_ip(request)
-
-    # Untrusted peer: ignore any forwarded headers.
-    if not _is_trusted_proxy(peer):
-        return peer
-
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        for entry in reversed([s.strip() for s in forwarded.split(",")]):
-            if entry and not _is_trusted_proxy(entry):
-                return entry
-
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip
-
-    return peer
+# _peer_ip / _is_trusted_proxy / get_client_ip now live in ion.core.client_ip
+# (imported above) — a single trusted-proxy-aware source of truth shared with
+# the auth layer, audit logging, and the login rate-limiter (v0.39.3).
 
 
 class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
@@ -123,10 +62,18 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, enabled: bool = True):
         super().__init__(app)
         self.enabled = enabled
+        # IP auto-blocking is opt-in (ION_IP_BLOCKING_ENABLED, default off).
+        # Attack detections are ALWAYS logged; blocking only acts when this is
+        # on. Behind a shared ingress, also set ION_TRUSTED_PROXIES so client_ip
+        # resolves to the real client — otherwise a block would hit the ingress
+        # IP and take down every user (the dispatch guards refuse to block a
+        # trusted proxy / localhost as a backstop).
+        self.blocking_enabled = False
 
         # Initialize database connection
         try:
             config = get_config()
+            self.blocking_enabled = bool(getattr(config, "ip_blocking_enabled", False))
             self.engine = get_engine(config.db_path)
             self.session_factory = get_session_factory(self.engine)
         except Exception as e:
@@ -164,17 +111,26 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
         try:
             security_service = SecurityDetectionService(session)
 
-            # IP blocking disabled for testing — detections still logged
-            # if security_service.is_ip_blocked(client_ip) and not self._is_excluded_path(request.url.path):
-            #     logger.security_event(
-            #         action="blocked_ip_request",
-            #         outcome="blocked",
-            #         details={"ip": client_ip, "path": request.url.path},
-            #     )
-            #     return JSONResponse(
-            #         status_code=403,
-            #         content={"detail": "Access denied"},
-            #     )
+            # IP auto-blocking (opt-in via ION_IP_BLOCKING_ENABLED). Never block
+            # a trusted proxy or localhost: behind a shared ingress with no
+            # ION_TRUSTED_PROXIES set, client_ip resolves to the ingress and a
+            # block would take down every user. Detections are logged regardless.
+            if (
+                self.blocking_enabled
+                and not _is_trusted_proxy(client_ip)
+                and not self._is_trusted_ip(client_ip)
+                and not self._is_excluded_path(request.url.path)
+                and security_service.is_ip_blocked(client_ip)
+            ):
+                logger.security_event(
+                    action="blocked_ip_request",
+                    outcome="blocked",
+                    details={"ip": client_ip, "path": request.url.path},
+                )
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Access denied"},
+                )
 
             # Skip attack detection for excluded paths (security dashboard, static files, etc.)
             if self._is_excluded_path(request.url.path):
@@ -205,7 +161,6 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
             detections = security_service.analyze_request(ctx)
 
             # Record and handle detections
-            should_block = False
             for detection in detections:
                 # Capture raw data for forensics
                 raw_data = {
@@ -231,22 +186,21 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
                     },
                 )
 
-                # Blocking disabled for testing — detections still logged
-                # if detection.should_block:
-                #     should_block = True
-                #     security_service.block_ip(
-                #         ip_address=client_ip,
-                #         reason=f"Automatic block: {detection.title}",
-                #         duration_minutes=60,
-                #         security_event_id=event.id,
-                #     )
-                #     session.commit()
-
-            # if should_block:
-            #     return JSONResponse(
-            #         status_code=403,
-            #         content={"detail": "Request blocked due to security policy"},
-            #     )
+                # Auto-block on high-confidence detections (opt-in; same trusted
+                # proxy / localhost backstop as the is_ip_blocked guard above).
+                if (
+                    self.blocking_enabled
+                    and getattr(detection, "should_block", False)
+                    and not _is_trusted_proxy(client_ip)
+                    and not self._is_trusted_ip(client_ip)
+                ):
+                    security_service.block_ip(
+                        ip_address=client_ip,
+                        reason=f"Automatic block: {detection.title}",
+                        duration_minutes=60,
+                        security_event_id=event.id,
+                    )
+                    session.commit()
 
             # Continue with request
             response = await call_next(request)
