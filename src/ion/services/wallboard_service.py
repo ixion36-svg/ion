@@ -25,6 +25,7 @@ wallboard renders an "unavailable" tile for that panel.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import threading
 import time
@@ -117,9 +118,18 @@ def _collect_alerts(session: Session) -> Dict[str, Any]:
         ) or 0)
         histogram_24h.append({"hour": bucket_start.isoformat(), "count": count})
 
+    # v0.39.6: prior 24h (24–48h ago) so the wall can show a momentum delta.
+    cutoff_48h = datetime.utcnow() - timedelta(hours=48)
+    prev_24h_total = int(session.scalar(
+        select(func.count()).select_from(AlertTriage)
+        .where(AlertTriage.created_at >= cutoff_48h)
+        .where(AlertTriage.created_at < cutoff_24h)
+    ) or 0)
+
     return {
         "by_status": by_status,
         "last_24h_total": last_24h_total,
+        "prev_24h_total": prev_24h_total,
         "verdict_distribution_7d": verdict_distribution,
         "histogram_24h": histogram_24h,
     }
@@ -155,6 +165,20 @@ def _collect_cases(session: Session) -> Dict[str, Any]:
     closures_24h = {str(k): int(v) for k, v in rows if k}
     closures_24h_total = sum(closures_24h.values())
 
+    # v0.39.6: open critical/high counts drive the wall's attention state, and
+    # the prior-24h closure count gives a momentum delta. Severity keys are
+    # lowercase strings; tolerate title-case defensively.
+    def _sev(name: str) -> int:
+        return int(open_by_severity.get(name, 0) or open_by_severity.get(name.title(), 0))
+    open_critical = _sev("critical")
+    open_high = _sev("high")
+    cutoff_48h = datetime.utcnow() - timedelta(hours=48)
+    closures_prev_24h_total = int(session.scalar(
+        select(func.count()).select_from(AlertCase)
+        .where(AlertCase.closed_at >= cutoff_48h)
+        .where(AlertCase.closed_at < cutoff_24h)
+    ) or 0)
+
     # 7-day daily histogram of closures for the sparkline.
     history_7d: List[Dict[str, Any]] = []
     now = datetime.utcnow()
@@ -171,8 +195,11 @@ def _collect_cases(session: Session) -> Dict[str, Any]:
     return {
         "by_status": by_status,
         "open_by_severity": open_by_severity,
+        "open_critical": open_critical,
+        "open_high": open_high,
         "closures_24h": closures_24h,
         "closures_24h_total": closures_24h_total,
+        "closures_prev_24h_total": closures_prev_24h_total,
         "closures_history_7d": history_7d,
     }
 
@@ -190,6 +217,14 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
 
     investigations_total = int(session.scalar(
         select(func.count()).select_from(Investigation)
+    ) or 0)
+
+    # v0.39.6: prior 24h for a momentum delta on the wall.
+    cutoff_48h = datetime.utcnow() - timedelta(hours=48)
+    investigations_prev_24h = int(session.scalar(
+        select(func.count()).select_from(Investigation)
+        .where(Investigation.created_at >= cutoff_48h)
+        .where(Investigation.created_at < cutoff_24h)
     ) or 0)
 
     cutoff_7d = datetime.utcnow() - timedelta(days=7)
@@ -228,6 +263,7 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
 
     return {
         "investigations_24h": investigations_24h,
+        "investigations_prev_24h": investigations_prev_24h,
         "investigations_total": investigations_total,
         "feedback_7d_total": feedback_7d_total,
         "agreement_pct": agreement_pct,
@@ -436,7 +472,37 @@ _LEAKAGE_LINE_PATTERNS = [
         re.IGNORECASE,
     ),
     re.compile(r"^\s*(?:```|~~~)"),  # code fences
+    # v0.39.6: echoed <placeholder> templates from the OUTPUT shape.
+    re.compile(
+        r"<[^>\n]*?(?:sentence|bullet|trend|observation|plain[\s-]?english|actionable)[^>\n]*?>",
+        re.IGNORECASE,
+    ),
+    # v0.39.6: echoed RULES text.
+    re.compile(
+        r"\b(?:under \d+ words|words total|no preamble|nothing (?:before|after)|"
+        r"exactly this shape|do not (?:write|say|repeat|address|reference|use)|"
+        r"lead with the|plain[\s-]?english sentences?)\b",
+        re.IGNORECASE,
+    ),
 ]
+
+
+def _dedup_sentences(text: str) -> str:
+    """Drop repeated sentences within each line (case/whitespace-insensitive)."""
+    out_lines: List[str] = []
+    for line in text.split("\n"):
+        parts = re.split(r"(?<=[.!?])\s+", line)
+        seen: set = set()
+        kept: List[str] = []
+        for p in parts:
+            norm = re.sub(r"[^a-z0-9]+", " ", p.lower()).strip()
+            if norm and norm in seen:
+                continue
+            if norm:
+                seen.add(norm)
+            kept.append(p)
+        out_lines.append(" ".join(kept))
+    return "\n".join(out_lines)
 
 
 def _sanitize_landscape_text(text: str) -> str:
@@ -453,24 +519,43 @@ def _sanitize_landscape_text(text: str) -> str:
     text = re.sub(r"\*([^*\n]+)\*", r"\1", text)
     text = re.sub(r"_([^_\n]+)_", r"\1", text)
 
-    cleaned: list[str] = []
+    cleaned: List[str] = []
+    seen_lines: set = set()
     for line in text.split("\n"):
         if any(p.search(line) for p in _LEAKAGE_LINE_PATTERNS):
             continue
+        # v0.39.6: drop duplicate lines (case/space/punct-insensitive) — the
+        # model sometimes repeats a bullet or sentence verbatim.
+        norm = re.sub(r"[^a-z0-9]+", " ", line.lower()).strip()
+        if norm and norm in seen_lines:
+            continue
+        if norm:
+            seen_lines.add(norm)
         cleaned.append(line)
 
     out = "\n".join(cleaned).strip()
     # Collapse triple+ blank lines.
     out = re.sub(r"\n{3,}", "\n\n", out).strip()
 
-    # Hard word-cap as a backstop — the prompt says <90 but models drift.
+    # v0.39.6: sentence-level dedup (intra-line repetition) + a tighter word-cap
+    # so the wall blurb stays genuinely glanceable.
+    out = _dedup_sentences(out)
     words = out.split()
-    if len(words) > 110:
-        out = " ".join(words[:110]).rstrip(",;:.") + "…"
+    if len(words) > 85:
+        out = " ".join(words[:85]).rstrip(",;:.") + "…"
     return out
 
 
-def _generate_landscape_text(prompt: str, *, timeout: float = 15.0) -> Optional[str]:
+def _wallboard_llm_timeout() -> float:
+    """LLM call timeout for the wall summary. Bump on slow/CPU model hosts so
+    the summary doesn't silently degrade to stats-only (ION_WALLBOARD_OLLAMA_TIMEOUT)."""
+    try:
+        return float(os.environ.get("ION_WALLBOARD_OLLAMA_TIMEOUT", "15"))
+    except ValueError:
+        return 15.0
+
+
+def _generate_landscape_text(prompt: str, *, timeout: Optional[float] = None) -> Optional[str]:
     """Synchronous Ollama call. Returns None if Ollama is unreachable.
 
     Uses the bare /api/generate endpoint with a tight timeout so the
@@ -478,6 +563,8 @@ def _generate_landscape_text(prompt: str, *, timeout: float = 15.0) -> Optional[
     5-min cache TTL means this is called at most once per TTL.
     """
     import os
+    if timeout is None:
+        timeout = _wallboard_llm_timeout()
     try:
         import httpx  # type: ignore
     except Exception:
@@ -507,7 +594,21 @@ def _generate_landscape_text(prompt: str, *, timeout: float = 15.0) -> Optional[
                     "model": model,
                     "prompt": prompt,
                     "stream": False,
-                    "options": {"temperature": 0.4, "num_predict": 220},
+                    "options": {
+                        # v0.39.6: tighten the wall summary.
+                        # - lower temp + top_p → less drift/rambling.
+                        # - repeat_penalty/repeat_last_n → stop the model looping
+                        #   the same sentence or bullet (the "repeats itself" bug).
+                        # - shorter num_predict → a genuinely tight blurb.
+                        # - stop sequences abort generation the instant the model
+                        #   echoes an instruction header (the leakage bug).
+                        "temperature": 0.3,
+                        "top_p": 0.9,
+                        "num_predict": 140,
+                        "repeat_penalty": 1.3,
+                        "repeat_last_n": 256,
+                        "stop": ["STATS", "TASK", "OUTPUT", "RULES", "Note:", "```", "<2 ", "<one "],
+                    },
                 },
             )
             r.raise_for_status()
@@ -640,13 +741,69 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+# v0.39.6: unattended-wall attention thresholds. Env-overridable so an estate
+# can tune what flips the wall amber. Critical is event-driven (any open
+# critical case), not threshold-driven.
+def _warn_backlog_threshold() -> int:
+    try:
+        return int(os.environ.get("ION_WALLBOARD_WARN_BACKLOG", "25"))
+    except ValueError:
+        return 25
+
+
+def _compute_attention(alerts: Dict[str, Any], cases: Dict[str, Any]) -> Dict[str, Any]:
+    """Derive the wall's overall state so it can *shout* when something's wrong.
+
+    critical → any open critical-severity case (drop-everything signal).
+    warning  → any open high-severity case, or the open-alert backlog exceeds
+               ION_WALLBOARD_WARN_BACKLOG.
+    ok       → otherwise.
+    """
+    open_alert_backlog = int((alerts.get("by_status") or {}).get("open", 0) or 0)
+    open_critical = int(cases.get("open_critical", 0) or 0)
+    open_high = int(cases.get("open_high", 0) or 0)
+    warn_backlog = _warn_backlog_threshold()
+
+    if open_critical > 0:
+        level = "critical"
+        headline = (
+            f"{open_critical} critical case{'s' if open_critical != 1 else ''} open"
+            " — immediate attention"
+        )
+    elif open_high > 0 or open_alert_backlog >= warn_backlog:
+        level = "warning"
+        parts: List[str] = []
+        if open_high:
+            parts.append(f"{open_high} high-severity case{'s' if open_high != 1 else ''} open")
+        if open_alert_backlog >= warn_backlog:
+            parts.append(f"{open_alert_backlog} alerts in backlog")
+        headline = " · ".join(parts) or "elevated activity"
+    else:
+        level = "ok"
+        headline = "All clear — no critical or high-severity cases open"
+
+    return {
+        "level": level,
+        "open_critical": open_critical,
+        "open_high": open_high,
+        "open_alert_backlog": open_alert_backlog,
+        "warn_backlog_threshold": warn_backlog,
+        "headline": headline,
+    }
+
+
 def _gather(session: Session) -> Dict[str, Any]:
     """Build a single snapshot. Each panel is in its own try/except."""
     health = _safe("service_health", lambda: _collect_service_health(session), default={})
+    alerts = _safe("alerts", lambda: _collect_alerts(session), default={"by_status": {}, "last_24h_total": 0})
+    cases = _safe("cases", lambda: _collect_cases(session), default={"by_status": {}, "open_by_severity": {}, "closures_24h_total": 0})
+    attention = _safe("attention", lambda: _compute_attention(alerts, cases),
+                      default={"level": "ok", "headline": "", "open_critical": 0})
     return {
         "captured_at":      _utc_now_iso(),
-        "alerts":           _safe("alerts", lambda: _collect_alerts(session), default={"by_status": {}, "last_24h_total": 0}),
-        "cases":            _safe("cases", lambda: _collect_cases(session), default={"by_status": {}, "open_by_severity": {}, "closures_24h_total": 0}),
+        "attention":        attention,
+        "alerts":           alerts,
+        "cases":            cases,
         "bob":              _safe("bob", lambda: _collect_bob(session), default={"investigations_24h": 0, "agreement_pct": None}),
         "rules":            _safe("rules", lambda: _collect_rules(session), default={"total_rules": 0, "enabled_rules": 0, "severity": {}, "tide_unavailable": True}),
         "topology":         _safe("topology", lambda: _collect_topology(health), default={"nodes": [], "counts": {}}),

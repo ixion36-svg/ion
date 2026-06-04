@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.5 -->
+<!-- ion-doc:version=0.39.6 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-04 -->
 
 # Changelog
+
+## v0.39.6 — 2026-06-04
+
+**Wallboard enhancements for unattended wall displays.**
+
+The `/wallboard` SOC display gains glanceability + momentum, plus a tighter AI summary:
+
+- **Attention state.** A new full-width banner reads the estate's overall state at a glance — green ("all clear") / amber (open high-severity cases or an alert backlog over `ION_WALLBOARD_WARN_BACKLOG`, default 25) / red + pulsing (any open critical-severity case). The Cases panel mirrors the same state with a coloured glow, so the eye is pulled to *where* the issue is. State is computed server-side so every connected screen agrees instantly.
+- **Trend deltas.** The Alerts, Cases, and Bob KPIs now show a ↑/↓ delta versus the prior 24h (direction-aware colouring — green is always "good" regardless of the metric). Each collector gained one bounded prior-period count; no new tables.
+- **Tighter AI threat-landscape summary.** The LLM-written summary no longer leaks instruction text or repeats itself: generation gains `repeat_penalty` + stop-sequences + a shorter token cap, and the post-processing sanitiser now also drops echoed instruction/template lines and de-duplicates repeated lines and sentences. New `ION_WALLBOARD_OLLAMA_TIMEOUT` (default 15s) so a slow model host doesn't silently degrade the summary to stats-only.
+
+New env vars `ION_WALLBOARD_WARN_BACKLOG` + `ION_WALLBOARD_OLLAMA_TIMEOUT`. 11 new tests. CSP-safe (animations in the nonced `<style>` block; no inline styles). No new routes, permissions, or schema. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.39.5 — 2026-06-04
 

@@ -22,6 +22,15 @@
     }
     /* Hide scrollbars on the wall display */
     ::-webkit-scrollbar { display: none; }
+    /* v0.39.6: attention banner + panel-emphasis states (unattended wall) */
+    #wb-attention { transition: background-color .4s ease, border-color .4s ease; }
+    .wb-att-dot { width: 12px; height: 12px; border-radius: 9999px; flex: none; }
+    .wb-att-ok       { background: rgba(16,185,129,0.10); border-color: rgba(16,185,129,0.30); }
+    .wb-att-warning  { background: rgba(251,191,36,0.13); border-color: rgba(251,191,36,0.45); }
+    .wb-att-critical { background: rgba(244,63,94,0.18);  border-color: rgba(244,63,94,0.65); animation: wb-att-flash 1.3s ease-in-out infinite; }
+    @keyframes wb-att-flash { 0%,100% { background: rgba(244,63,94,0.16); } 50% { background: rgba(244,63,94,0.36); } }
+    .wb-panel-warning  { border-color: rgba(251,191,36,0.50) !important; box-shadow: 0 0 0 1px rgba(251,191,36,0.25), 0 0 26px rgba(251,191,36,0.08); }
+    .wb-panel-critical { border-color: rgba(244,63,94,0.65) !important; box-shadow: 0 0 0 1px rgba(244,63,94,0.35), 0 0 30px rgba(244,63,94,0.12); }
   </style>
 </head>
 <body class="ion-tw font-sans text-slate-200 wb-grid-bg overflow-hidden">
@@ -58,6 +67,13 @@
       </div>
     </header>
 
+    <!-- ═══════════ ATTENTION BANNER (v0.39.6) — shouts when the estate needs attention ═══════════ -->
+    <div id="wb-attention" class="wb-att-ok rounded-[12px] border px-6 py-3 flex items-center gap-4">
+      <span id="wb-att-dot" class="wb-att-dot bg-ion-lime"></span>
+      <span id="wb-att-headline" class="font-sans font-semibold text-[18px] tracking-tight text-white leading-none">Monitoring…</span>
+      <span id="wb-att-sub" class="label-tiny text-slate-400 ml-auto tabular-nums">—</span>
+    </div>
+
     <!-- ═══════════════════ 6-PANEL GRID ═══════════════════ -->
     <main class="flex-1 grid grid-cols-3 grid-rows-2 gap-4 min-h-0">
 
@@ -91,7 +107,7 @@
       </section>
 
       <!-- ┌─── PANEL 2: CASES ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
+      <section id="wb-panel-cases" class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
         <div class="flex items-baseline justify-between mb-3">
           <span class="label-tiny text-slate-500">Cases</span>
           <span id="wb-cases-stamp" class="label-tiny text-slate-600">open right now</span>
@@ -409,7 +425,8 @@ function renderAlerts(a) {
   $('wb-alerts-status').innerHTML =
     `<span class="text-ion-coral font-semibold">${fmtN(open)}</span> open · ` +
     `<span class="text-ion-amber font-semibold">${fmtN(ack)}</span> ack · ` +
-    `<span class="text-slate-300">${fmtN(closed)}</span> closed`;
+    `<span class="text-slate-300">${fmtN(closed)}</span> closed &nbsp;·&nbsp; ` +
+    deltaHtml(a.last_24h_total, a.prev_24h_total, true);
 
   drawSparkline('wb-alerts-spark', 'wb-alerts-spark-fill', 'wb-alerts-spark-line', a.histogram_24h || []);
 
@@ -449,7 +466,8 @@ function renderCases(c) {
   const ack  = (c.by_status && (c.by_status.ACKNOWLEDGED || c.by_status.acknowledged)) || 0;
   $('wb-cases-open').textContent = fmtN(open + ack);
   $('wb-cases-closures').innerHTML =
-    `<span class="text-ion-lime font-semibold">${fmtN(c.closures_24h_total || 0)}</span> closures in last 24h`;
+    `<span class="text-ion-lime font-semibold">${fmtN(c.closures_24h_total || 0)}</span> closures in last 24h &nbsp;·&nbsp; ` +
+    deltaHtml(c.closures_24h_total, c.closures_prev_24h_total, false);
 
   drawSparkline('wb-cases-spark', 'wb-cases-spark-fill', 'wb-cases-spark-line', c.closures_history_7d || []);
 
@@ -488,7 +506,8 @@ function renderBob(b) {
   $('wb-bob-investigations-24h').textContent = fmtN(b.investigations_24h || 0);
   $('wb-bob-total').innerHTML =
     `<span class="text-slate-300 tabular-nums">${fmtN(b.investigations_total || 0)}</span> investigations · ` +
-    `<span class="text-slate-300 tabular-nums">${fmtN(b.feedback_7d_total || 0)}</span> feedback rows`;
+    `<span class="text-slate-300 tabular-nums">${fmtN(b.feedback_7d_total || 0)}</span> feedback rows &nbsp;·&nbsp; ` +
+    deltaHtml(b.investigations_24h, b.investigations_prev_24h, false);
 
   drawSparkline('wb-bob-spark', 'wb-bob-spark-fill', 'wb-bob-spark-line', b.history_7d || []);
 
@@ -607,6 +626,41 @@ function renderThreatLandscape(t) {
 // carries `ticker` for the rest of the app's ticker UI; we just don't
 // render it on the wallboard.
 
+// ── Attention banner + trend deltas (v0.39.6) ────────────────
+// Compact ▲/▼ delta vs the prior 24h. goodDown=true means a falling number
+// is the good direction (e.g. fewer alerts) → coloured lime when it drops.
+function deltaHtml(curr, prev, goodDown) {
+  const d = (curr || 0) - (prev || 0);
+  if (d === 0) return '<span class="text-slate-500 tabular-nums">±0 vs prev 24h</span>';
+  const up = d > 0;
+  const good = goodDown ? !up : up;
+  const cls = good ? 'text-ion-lime' : 'text-ion-coral';
+  return `<span class="${cls} font-semibold tabular-nums">${up ? '▲' : '▼'} ${Math.abs(d)}</span>` +
+         `<span class="text-slate-600"> vs prev 24h</span>`;
+}
+
+function renderAttention(a) {
+  a = a || {};
+  const el = $('wb-attention'); if (!el) return;
+  const lvl = a.level || 'ok';
+  el.className = 'rounded-[12px] border px-6 py-3 flex items-center gap-4 wb-att-' + lvl;
+  const dot = $('wb-att-dot');
+  if (dot) dot.className = 'wb-att-dot ' +
+    (lvl === 'critical' ? 'bg-ion-coral wb-pulse-down' : lvl === 'warning' ? 'bg-ion-amber' : 'bg-ion-lime');
+  $('wb-att-headline').textContent = a.headline || (lvl === 'ok' ? 'All clear' : '');
+  const sub = $('wb-att-sub');
+  if (sub) sub.textContent = lvl === 'ok'
+    ? 'monitoring · all systems'
+    : `${a.open_critical || 0} critical · ${a.open_high || 0} high · ${a.open_alert_backlog || 0} alerts open`;
+  // Mirror severity state onto the Cases panel so the eye is drawn there.
+  const cp = document.getElementById('wb-panel-cases');
+  if (cp) {
+    cp.classList.remove('wb-panel-warning', 'wb-panel-critical');
+    if ((a.open_critical || 0) > 0) cp.classList.add('wb-panel-critical');
+    else if ((a.open_high || 0) > 0) cp.classList.add('wb-panel-warning');
+  }
+}
+
 // ── Refresh loop ─────────────────────────────────────────────
 async function refresh() {
   try {
@@ -616,6 +670,7 @@ async function refresh() {
       return;
     }
     const s = await r.json();
+    renderAttention(s.attention || {});
     renderTopology(s.topology || {});  // also updates the header summary
     renderAlerts(s.alerts || {});
     renderCases(s.cases || {});
