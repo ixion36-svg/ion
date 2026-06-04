@@ -325,11 +325,32 @@ def _write_bob_outputs(
 
     if triage is not None:
         if above_threshold:
-            # Happy path: write verdict when non-inconclusive + medium+ confidence.
-            if verdict and verdict != "inconclusive" and conf in ("medium", "high"):
+            # Happy path: write verdict when it is a VALID CaseClosureReason,
+            # non-inconclusive, at medium+ confidence.
+            # v0.39.5: the enum-membership check is defence-in-depth against
+            # prompt injection. Bob's analysis prompt already frames alert content
+            # as hostile (<input_data> tags + sanitiser + instruction defence), but
+            # if adversary-controlled alert content ever hijacks Bob into emitting
+            # an arbitrary verdict string, it must never be persisted as a
+            # suggestion — only the closed enum of closure reasons is storable.
+            from ion.models.alert_triage import CaseClosureReason
+            _valid_verdicts = {r.value for r in CaseClosureReason}
+            if (
+                verdict
+                and verdict != "inconclusive"
+                and verdict in _valid_verdicts
+                and conf in ("medium", "high")
+            ):
                 triage.suggested_verdict = verdict
                 triage.suggested_verdict_confidence = conf
                 triage.suggested_verdict_confidence_int = confidence_int
+            elif verdict and verdict != "inconclusive" and verdict not in _valid_verdicts:
+                logger.warning(
+                    "Bob emitted a non-enum verdict %r for alert %s — not persisted "
+                    "(possible prompt injection in alert content); review "
+                    "investigations.raw_response.",
+                    verdict, alert_id,
+                )
         else:
             # Circuit breaker fired — do NOT write suggested_verdict.
             triage.bob_escalation_badge = "low_confidence_triage"

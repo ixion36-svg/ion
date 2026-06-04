@@ -1,13 +1,22 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.4 -->
+<!-- ion-doc:version=0.39.5 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-03 -->
+<!-- ion-doc:date=2026-06-04 -->
 
 # Changelog
+
+## v0.39.5 — 2026-06-04
+
+**Hardening + robustness.**
+
+- **AI analysis output validation (defence-in-depth).** Added strict enum validation at the boundary where the AI analyst's suggested case verdict is persisted, so only well-formed closure reasons can ever be stored. Complements the existing input-handling on the analysis pipeline.
+- **Admin database-maintenance robustness.** Hardened two authenticated admin database operations (backup and cleanup) so they report status accurately on completion, and tightened input validation on their parameters.
+
+6 new regression tests. No new routes, permissions, or schema. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.39.4 — 2026-06-03
 

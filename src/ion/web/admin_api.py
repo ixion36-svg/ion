@@ -1031,20 +1031,23 @@ async def create_database_backup(request: Request, current_user: User = Depends(
     try:
         shutil.copy2(config.db_path, backup_path)
 
-        # Log the backup
-        from ion.storage.database import get_engine, get_session
-        engine = get_engine(config.db_path)
-        with next(get_session(engine)) as db:
+        # Best-effort activity log (v0.39.5). The backup file is already written
+        # at this point, so the audit-log write must never be able to fail the
+        # operation: use the IntegrationLogService API and swallow any error.
+        try:
+            from ion.models.integration import IntegrationType
             from ion.services.integration_log_service import IntegrationLogService
-            log_service = IntegrationLogService(db)
-            log_service.log_event(
-                integration_type="system",
+            IntegrationLogService().log_info(
+                integration_type=IntegrationType.CUSTOM,
                 action="database_backup",
                 message=f"Database backup created: {backup_filename}",
-                level="info",
                 user_id=current_user.id,
             )
-            db.commit()
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Backup file written but activity-log entry failed", exc_info=True
+            )
 
         return {
             "status": "success",
@@ -1161,8 +1164,11 @@ async def cleanup_old_data(
 
     from ion.storage.database import get_engine, get_session
 
-    if days_to_keep < 1:
-        raise HTTPException(400, "days_to_keep must be at least 1")
+    # v0.39.5: bound days_to_keep so the timedelta(days=...) computation below
+    # stays well within range. 36500 days (~100 years) is far beyond any real
+    # retention window.
+    if days_to_keep < 1 or days_to_keep > 36500:
+        raise HTTPException(400, "days_to_keep must be between 1 and 36500")
 
     config = get_config()
     engine = get_engine(config.db_path)
@@ -1215,19 +1221,25 @@ async def cleanup_old_data(
 
             db.commit()
 
-            # Log the cleanup
-            from ion.services.integration_log_service import IntegrationLogService
-            log_service = IntegrationLogService(db)
-            total_deleted = sum(deleted_counts.values())
-            log_service.log_event(
-                integration_type="system",
-                action="database_cleanup",
-                message=f"Cleaned up {total_deleted} old records (keeping {days_to_keep} days)",
-                level="info",
-                user_id=current_user.id,
-                details=deleted_counts,
-            )
-            db.commit()
+            # Best-effort activity log (v0.39.5). The cleanup is already
+            # committed by this point, so the audit-log write must never be able
+            # to fail the operation.
+            try:
+                from ion.models.integration import IntegrationType
+                from ion.services.integration_log_service import IntegrationLogService
+                total_deleted = sum(deleted_counts.values())
+                IntegrationLogService().log_info(
+                    integration_type=IntegrationType.CUSTOM,
+                    action="database_cleanup",
+                    message=f"Cleaned up {total_deleted} old records (keeping {days_to_keep} days)",
+                    details=deleted_counts,
+                    user_id=current_user.id,
+                )
+            except Exception:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "Cleanup completed but activity-log entry failed", exc_info=True
+                )
 
         return {
             "status": "success",
