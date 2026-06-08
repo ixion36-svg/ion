@@ -527,6 +527,26 @@ def test_ledger_append_chain_verifies():
     assert r2["is_valid"] is True and r2["seq_count"] == 1, r2
 
 
+def test_opencti_enrich_returns_503_when_disabled(monkeypatch):
+    # #13: availability failures must use a non-2xx status (not 200) while
+    # preserving the body shape the frontends read.
+    import asyncio
+
+    from fastapi.responses import JSONResponse
+
+    from ion.web import api
+
+    monkeypatch.setattr(api, "get_opencti_config", lambda: {"enabled": False})
+
+    batch = asyncio.run(api.enrich_batch(
+        api.OpenCTIEnrichBatchRequest(observables=[]), current_user=None))
+    assert isinstance(batch, JSONResponse) and batch.status_code == 503
+
+    single = asyncio.run(api.enrich_observable(
+        api.OpenCTIEnrichRequest(type="ipv4-addr", value="1.2.3.4"), current_user=None))
+    assert isinstance(single, JSONResponse) and single.status_code == 503
+
+
 def test_ledger_detects_tampering():
     # Mutating a stored payload must break verification (tamper-evidence).
     from ion.services import case_ledger_service as cls

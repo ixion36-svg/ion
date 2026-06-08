@@ -30,7 +30,7 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -3793,7 +3793,9 @@ async def diagnostic_alert_fields(
     """
     service = get_elasticsearch_service()
     if not service.is_configured:
-        return {"error": "Elasticsearch not configured"}
+        return JSONResponse(
+            status_code=503, content={"error": "Elasticsearch not configured"}
+        )
 
     try:
         result = await service._request(
@@ -3806,7 +3808,9 @@ async def diagnostic_alert_fields(
             },
         )
     except Exception as e:
-        return {"error": safe_error(e, "diagnostic")}
+        return JSONResponse(
+            status_code=502, content={"error": safe_error(e, "diagnostic")}
+        )
 
     alerts = []
     for hit in result.get("hits", {}).get("hits", []):
@@ -7794,17 +7798,19 @@ async def enrich_batch(
     """
     config = get_opencti_config()
     if not config.get("enabled"):
-        return {
-            "results": [],
-            "error": "OpenCTI integration is not enabled",
-        }
+        # 503 (not 200) so clients can distinguish availability failure from a
+        # successful empty result; body shape preserved for existing frontends.
+        return JSONResponse(
+            status_code=503,
+            content={"results": [], "error": "OpenCTI integration is not enabled"},
+        )
 
     service = get_opencti_service()
     if not service.is_configured:
-        return {
-            "results": [],
-            "error": "OpenCTI is not configured",
-        }
+        return JSONResponse(
+            status_code=503,
+            content={"results": [], "error": "OpenCTI is not configured"},
+        )
 
     results = await service.enrich_batch(request_data.observables)
     return {
@@ -7825,21 +7831,28 @@ async def enrich_observable(
     """
     config = get_opencti_config()
     if not config.get("enabled"):
-        return {
-            "found": False,
-            "type": request_data.type,
-            "value": request_data.value,
-            "error": "OpenCTI integration is not enabled",
-        }
+        # 503 (not 200); body keeps the `error` key the frontends read.
+        return JSONResponse(
+            status_code=503,
+            content={
+                "found": False,
+                "type": request_data.type,
+                "value": request_data.value,
+                "error": "OpenCTI integration is not enabled",
+            },
+        )
 
     service = get_opencti_service()
     if not service.is_configured:
-        return {
-            "found": False,
-            "type": request_data.type,
-            "value": request_data.value,
-            "error": "OpenCTI is not configured",
-        }
+        return JSONResponse(
+            status_code=503,
+            content={
+                "found": False,
+                "type": request_data.type,
+                "value": request_data.value,
+                "error": "OpenCTI is not configured",
+            },
+        )
 
     result = await service.enrich_observable(request_data.type, request_data.value)
     return result
