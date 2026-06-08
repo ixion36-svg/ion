@@ -1,13 +1,36 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.6 -->
+<!-- ion-doc:version=0.39.7 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-04 -->
+<!-- ion-doc:date=2026-06-08 -->
 
 # Changelog
+
+## v0.39.7 — 2026-06-08
+
+**Code-review hardening + maintainability batch.** A multi-pass review of the codebase surfaced a set of correctness, security, and structural items; this release fixes them with full regression coverage.
+
+Security & correctness:
+
+- **Closed a SQL-injection path** in the TIDE detection-data integration: a user-supplied system identifier reaching the detection backend is now escaped consistently with the rest of that module.
+- **OIDC trust hardening.** When TLS verification of the Keycloak link is disabled (still the default for air-gapped/self-signed estates — unchanged), ION now logs a loud, once-only warning so the posture is never silent. OIDC user matching now prefers the immutable Keycloak subject and refuses to re-bind a local account that already belongs to a different subject (account-takeover hardening).
+- **Fixed a crash** in cluster-level AI investigation (a return-value arity mismatch) that aborted every case-level investigation and left orphaned "running" rows; guarded by a contract test.
+- **Wallboard accuracy.** The analyst↔AI agreement metric now de-duplicates the feedback ledger and excludes still-pending items, so the displayed agreement rate and feedback count are correct.
+- **PCAP network graph restored** — it had silently produced an empty graph for every capture.
+- **Tamper-evident ledger hardening** (backward-compatible; existing chains unaffected): delimiter-safety on the hash pre-image, rejection of non-round-trip-stable payload values, and a savepoint-based retry on the SQLite write race.
+- **Integration endpoints now return a proper 5xx** (not HTTP 200) when an integration is unconfigured/disabled, with the response body unchanged for existing clients.
+- Smaller items: disabled service-account login no longer 500s, `X-Real-IP` is validated before use, Arkime node values are encoded into the upstream request, the TLS-certificate PCAP extractor is capped against hostile inputs, and the admin password-reset path enforces the (opt-in) password policy.
+
+Maintainability:
+
+- Collapsed five duplicate request-session dependency definitions into one canonical source; the CyAB page handlers now use it via dependency injection.
+- Introduced a shared Jinja template factory so all router template environments are configured identically (fixing missing cache-busting + compiled-template caching in several routers).
+- Began splitting the large `web/api.py` module: the self-contained GitLab integration moved to its own router (paths unchanged).
+
+24 new regression tests. No new routes, permissions, or schema. SECURE_BY_DESIGN audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new findings: 0C / 0H / 0M / 0L (this release *closes* review findings).
 
 ## v0.39.6 — 2026-06-04
 
