@@ -142,6 +142,10 @@ _spec_v*.md
 _backlog_v*.md
 _research_*.md
 
+# Customer-scoped pentest engagement docs (Guardedglass) — local reference
+# only; never part of the shipped image or public repo (mirrors docs/impex/).
+docs/guardedglass/
+
 # v0.38.0: pre-built briefing-deck assets ship in the image — keep the PDFs
 !src/ion/web/static/briefings/*.pdf
 # deck build scratch (node deps + intermediate HTML)
