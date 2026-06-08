@@ -28,13 +28,14 @@ import os
 
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from sqlalchemy.orm import Session
 from starlette.middleware.base import BaseHTTPMiddleware
 
 import ion
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.config import get_config as get_app_config
 from ion.core.logging import get_logger, setup_logging
-from ion.storage.database import init_db
+from ion.storage.database import get_db_session, init_db
 from ion.web.admin_api import router as admin_router
 from ion.web.ai_api import router as ai_router
 from ion.web.alert_pattern_api import router as alert_pattern_router
@@ -1194,6 +1195,7 @@ async def cyab_scoping_page(request: Request):
 async def cyab_overview_page(
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """CyAB Overview landing — KPIs + in-progress + needs-attention.
 
@@ -1203,89 +1205,75 @@ async def cyab_overview_page(
     """
     from sqlalchemy import select
 
-    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
     from ion.services import cyab_doc_checklist_service
-    from ion.storage.database import get_engine, get_session_factory
     from ion.web.cyab_api import dashboard_metrics
 
-    config = get_config()
-    Session = get_session_factory(get_engine(config.db_path))
-    session = Session()
-    try:
-        # Reuse the existing /api/cyab/dashboard endpoint internally rather
-        # than duplicating the math. Call the function directly to avoid
-        # the HTTP round-trip.
-        kpis = await dashboard_metrics(session=session)
+    # Reuse the existing /api/cyab/dashboard endpoint internally rather
+    # than duplicating the math. Call the function directly to avoid
+    # the HTTP round-trip.
+    kpis = await dashboard_metrics(session=session)
 
-        # In-progress = 5 most-recently-updated systems
-        in_progress = session.execute(
-            select(CyabSystem).order_by(CyabSystem.updated_at.desc()).limit(5)
-        ).scalars().all()
+    # In-progress = 5 most-recently-updated systems
+    in_progress = session.execute(
+        select(CyabSystem).order_by(CyabSystem.updated_at.desc()).limit(5)
+    ).scalars().all()
 
-        # Needs-attention = systems with any critical checklist item not done.
-        # Stale-data check (last_event_at > 24h) is a Sub-plan C live signal;
-        # for Sub-plan B we approximate using the doc-checklist
-        # critical-missing flag.
-        all_systems = session.execute(select(CyabSystem)).scalars().all()
-        needs_attention = []
-        for s in all_systems:
-            summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
-            crit_missing = summary.get("critical_missing") or []
-            if crit_missing:
-                needs_attention.append(type("Row", (), {
-                    "id": s.id, "name": s.name,
-                    "reason": f"{len(crit_missing)} critical doc(s) missing",
-                })())
+    # Needs-attention = systems with any critical checklist item not done.
+    # Stale-data check (last_event_at > 24h) is a Sub-plan C live signal;
+    # for Sub-plan B we approximate using the doc-checklist
+    # critical-missing flag.
+    all_systems = session.execute(select(CyabSystem)).scalars().all()
+    needs_attention = []
+    for s in all_systems:
+        summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
+        crit_missing = summary.get("critical_missing") or []
+        if crit_missing:
+            needs_attention.append(type("Row", (), {
+                "id": s.id, "name": s.name,
+                "reason": f"{len(crit_missing)} critical doc(s) missing",
+            })())
 
-        return templates.TemplateResponse(
-            request=request,
-            name="cyab/overview.html",
-            context={
-                "kpis": kpis,
-                "in_progress": in_progress,
-                "needs_attention": needs_attention[:10],
-                "active_tab": "overview",
-                "user": user,
-            },
-        )
-    finally:
-        session.close()
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/overview.html",
+        context={
+            "kpis": kpis,
+            "in_progress": in_progress,
+            "needs_attention": needs_attention[:10],
+            "active_tab": "overview",
+            "user": user,
+        },
+    )
 
 
 @app.get("/cyab/systems", response_class=HTMLResponse)
 async def cyab_systems_list_page(
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Portfolio list — table loads via HTMX from /cyab/systems/_table."""
-    from ion.core.config import get_config
     from ion.services.cyab_subprofile_service import (
         list_pillars,
         list_subprofiles_for_pillar,
     )
-    from ion.storage.database import get_engine, get_session_factory
 
-    Session = get_session_factory(get_engine(get_config().db_path))
-    session = Session()
-    try:
-        pillars = list_pillars(session)
-        # Flatten sub-profiles across all pillars for the global filter.
-        subprofiles = []
-        for p in pillars:
-            subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
-        return templates.TemplateResponse(
-            request=request,
-            name="cyab/systems_list.html",
-            context={
-                "active_tab": "systems",
-                "user": user,
-                "pillars": pillars,
-                "subprofiles": subprofiles,
-            },
-        )
-    finally:
-        session.close()
+    pillars = list_pillars(session)
+    # Flatten sub-profiles across all pillars for the global filter.
+    subprofiles = []
+    for p in pillars:
+        subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/systems_list.html",
+        context={
+            "active_tab": "systems",
+            "user": user,
+            "pillars": pillars,
+            "subprofiles": subprofiles,
+        },
+    )
 
 
 @app.get("/cyab/systems/_table", response_class=HTMLResponse)
@@ -1299,6 +1287,7 @@ async def cyab_systems_table_partial(
     missing: str = "",
     stale: int = 0,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """HTMX partial — filtered + searched portfolio table.
 
@@ -1307,64 +1296,58 @@ async def cyab_systems_table_partial(
     """
     from sqlalchemy import select
 
-    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
     from ion.services import cyab_doc_checklist_service
-    from ion.storage.database import get_engine, get_session_factory
 
-    Session = get_session_factory(get_engine(get_config().db_path))
-    session = Session()
-    try:
-        stmt = select(CyabSystem)
-        if q:
-            like = f"%{q}%"
-            stmt = stmt.where(
-                (CyabSystem.name.ilike(like))
-                | (CyabSystem.soc_analyst_owner.ilike(like))
-            )
-        if status:
-            stmt = stmt.where(CyabSystem.status == status)
-        if owner:
-            stmt = stmt.where(CyabSystem.soc_analyst_owner.ilike(f"%{owner}%"))
-        # pillar / subprofile filters work on the data-source level — for
-        # simplicity in this sub-plan filter post-fetch (Sub-plan C will
-        # join CyabDataSource.subprofile_id → pillar).
-
-        systems = session.execute(
-            stmt.order_by(CyabSystem.updated_at.desc().nulls_last())
-        ).scalars().all()
-
-        rows = []
-        for s in systems:
-            summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
-            crit = summary.get("critical_missing") or []
-            if missing and missing not in crit:
-                continue
-            rows.append(type("Row", (), {
-                "id": s.id,
-                "name": s.name,
-                "pillar": None,        # joined in via subprofile in Sub-plan C
-                "subprofile": None,
-                "owner": s.soc_analyst_owner,
-                "progress": summary,
-                "critical_missing": len(crit),
-                "updated_at": s.updated_at,
-                "status": s.status,
-            })())
-
-        return templates.TemplateResponse(
-            request=request,
-            name="cyab/_systems_table.html",
-            context={"rows": rows},
+    stmt = select(CyabSystem)
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(
+            (CyabSystem.name.ilike(like))
+            | (CyabSystem.soc_analyst_owner.ilike(like))
         )
-    finally:
-        session.close()
+    if status:
+        stmt = stmt.where(CyabSystem.status == status)
+    if owner:
+        stmt = stmt.where(CyabSystem.soc_analyst_owner.ilike(f"%{owner}%"))
+    # pillar / subprofile filters work on the data-source level — for
+    # simplicity in this sub-plan filter post-fetch (Sub-plan C will
+    # join CyabDataSource.subprofile_id → pillar).
+
+    systems = session.execute(
+        stmt.order_by(CyabSystem.updated_at.desc().nulls_last())
+    ).scalars().all()
+
+    rows = []
+    for s in systems:
+        summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
+        crit = summary.get("critical_missing") or []
+        if missing and missing not in crit:
+            continue
+        rows.append(type("Row", (), {
+            "id": s.id,
+            "name": s.name,
+            "pillar": None,        # joined in via subprofile in Sub-plan C
+            "subprofile": None,
+            "owner": s.soc_analyst_owner,
+            "progress": summary,
+            "critical_missing": len(crit),
+            "updated_at": s.updated_at,
+            "status": s.status,
+        })())
+
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/_systems_table.html",
+        context={"rows": rows},
+    )
 
 
 @app.post("/api/cyab/systems/bulk")
 async def cyab_systems_bulk(
     payload: dict,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """{action, system_ids} — mark-reviewed | export-csv | rerun-health.
 
@@ -1378,97 +1361,90 @@ async def cyab_systems_bulk(
     from fastapi.responses import Response
     from sqlalchemy import select
 
-    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
-    from ion.storage.database import get_engine, get_session_factory
 
     action = payload.get("action")
     ids = payload.get("system_ids") or []
-    Session = get_session_factory(get_engine(get_config().db_path))
-    session = Session()
-    try:
-        rows = session.execute(
-            select(CyabSystem).where(CyabSystem.id.in_(ids))
-        ).scalars().all()
+    rows = session.execute(
+        select(CyabSystem).where(CyabSystem.id.in_(ids))
+    ).scalars().all()
 
-        if action == "mark-reviewed":
-            today = date.today()
-            for s in rows:
-                s.last_reviewed_date = today
-            session.commit()
-            return {"affected": len(rows)}
+    if action == "mark-reviewed":
+        today = date.today()
+        for s in rows:
+            s.last_reviewed_date = today
+        session.commit()
+        return {"affected": len(rows)}
 
-        if action == "export-csv":
-            buf = io.StringIO()
-            w = csv.writer(buf)
-            w.writerow(["id", "name", "department", "owner", "status", "readiness"])
-            for s in rows:
-                w.writerow([
-                    s.id, s.name, s.department, s.soc_analyst_owner or "",
-                    s.status, s.readiness_score,
-                ])
-            return Response(
-                content=buf.getvalue(),
-                media_type="text/csv",
-                headers={"content-disposition": "attachment; filename=cyab-systems.csv"},
+    if action == "export-csv":
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["id", "name", "department", "owner", "status", "readiness"])
+        for s in rows:
+            w.writerow([
+                s.id, s.name, s.department, s.soc_analyst_owner or "",
+                s.status, s.readiness_score,
+            ])
+        return Response(
+            content=buf.getvalue(),
+            media_type="text/csv",
+            headers={"content-disposition": "attachment; filename=cyab-systems.csv"},
+        )
+
+    if action == "rerun-health":
+        # Stub — Sub-plan C wires the live data-health service into a job.
+        return JSONResponse(
+            status_code=202,
+            content={
+                "affected": len(rows),
+                "note": "queued (stub)",
+            },
+        )
+
+    # v0.19.7: bulk delete. Reuses _delete_system_row from
+    # cyab_api (migrated from cyab_studio_api in v0.20.0) so the
+    # data_sources / snapshots cascade is identical to the
+    # single-row endpoint.
+    # v0.19.16: privilege gate. The enclosing endpoint is
+    # require_page_permission("alert:read") because the read-ish
+    # actions (mark-reviewed/export-csv/rerun-health) are fine for
+    # any analyst. delete-selected is destructive and must match
+    # the gate the per-row DELETE /api/cyab/systems/{id} endpoint
+    # enforces — which is case:close, not case:update. (Fixed: these
+    # had drifted apart, letting case:update-only users bulk-delete
+    # systems they could not delete one at a time.)
+    # v0.19.16: also catches IntegrityError per-row so a single
+    # FK-violation doesn't poison the shared session for the rest
+    # of the user's selection.
+    if action == "delete-selected":
+        if not user.has_permission("case:close"):
+            raise HTTPException(
+                status_code=403,
+                detail="case:close permission required for bulk delete",
             )
+        from sqlalchemy.exc import IntegrityError
 
-        if action == "rerun-health":
-            # Stub — Sub-plan C wires the live data-health service into a job.
-            return JSONResponse(
-                status_code=202,
-                content={
-                    "affected": len(rows),
-                    "note": "queued (stub)",
-                },
-            )
-
-        # v0.19.7: bulk delete. Reuses _delete_system_row from
-        # cyab_api (migrated from cyab_studio_api in v0.20.0) so the
-        # data_sources / snapshots cascade is identical to the
-        # single-row endpoint.
-        # v0.19.16: privilege gate. The enclosing endpoint is
-        # require_page_permission("alert:read") because the read-ish
-        # actions (mark-reviewed/export-csv/rerun-health) are fine for
-        # any analyst. delete-selected is destructive and must match
-        # the gate the per-row DELETE /api/cyab/systems/{id} endpoint
-        # enforces — which is case:close, not case:update. (Fixed: these
-        # had drifted apart, letting case:update-only users bulk-delete
-        # systems they could not delete one at a time.)
-        # v0.19.16: also catches IntegrityError per-row so a single
-        # FK-violation doesn't poison the shared session for the rest
-        # of the user's selection.
-        if action == "delete-selected":
-            if not user.has_permission("case:close"):
-                raise HTTPException(
-                    status_code=403,
-                    detail="case:close permission required for bulk delete",
+        from ion.web.cyab_api import _delete_system_row
+        deleted = 0
+        failed: list[int] = []
+        for s in rows:
+            try:
+                if _delete_system_row(session, s.id):
+                    deleted += 1
+            except IntegrityError as exc:
+                session.rollback()
+                failed.append(s.id)
+                logger.warning(
+                    "bulk delete: FK violation deleting CyAB system %s: %s",
+                    s.id, str(exc)[:120],
                 )
-            from sqlalchemy.exc import IntegrityError
+                continue
+        out: dict = {"affected": deleted}
+        if failed:
+            out["failed_ids"] = failed
+        return out
 
-            from ion.web.cyab_api import _delete_system_row
-            deleted = 0
-            failed: list[int] = []
-            for s in rows:
-                try:
-                    if _delete_system_row(session, s.id):
-                        deleted += 1
-                except IntegrityError as exc:
-                    session.rollback()
-                    failed.append(s.id)
-                    logger.warning(
-                        "bulk delete: FK violation deleting CyAB system %s: %s",
-                        s.id, str(exc)[:120],
-                    )
-                    continue
-            out: dict = {"affected": deleted}
-            if failed:
-                out["failed_ids"] = failed
-            return out
-
-        raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
-    finally:
-        session.close()
+    raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
 
 
 
@@ -1477,33 +1453,25 @@ async def cyab_system_detail_page(
     system_id: int,
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Per-system CyAB page (replaces /cyab/studio for a given system)."""
-    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
     from ion.services import cyab_doc_checklist_service
-    from ion.storage.database import get_engine, get_session_factory
 
-    config = get_config()
-    engine = get_engine(config.db_path)
-    Session = get_session_factory(engine)
-    session = Session()
-    try:
-        system = session.get(CyabSystem, system_id)
-        if not system:
-            raise HTTPException(status_code=404, detail="System not found")
+    system = session.get(CyabSystem, system_id)
+    if not system:
+        raise HTTPException(status_code=404, detail="System not found")
 
-        # Lazy-seed checklist on first access (idempotent)
-        cyab_doc_checklist_service.seed_for_system(session, system_id)
-        progress = cyab_doc_checklist_service.coverage_summary(session, system_id)
+    # Lazy-seed checklist on first access (idempotent)
+    cyab_doc_checklist_service.seed_for_system(session, system_id)
+    progress = cyab_doc_checklist_service.coverage_summary(session, system_id)
 
-        return templates.TemplateResponse(
-            request=request,
-            name="cyab/system_detail.html",
-            context={"system": system, "user": user, "progress": progress},
-        )
-    finally:
-        session.close()
+    return templates.TemplateResponse(
+        request=request,
+        name="cyab/system_detail.html",
+        context={"system": system, "user": user, "progress": progress},
+    )
 
 
 _CYAB_TABS = {
@@ -1523,6 +1491,7 @@ async def cyab_system_tab(
     tab_name: str,
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """HTMX endpoint returning a single tab's content (no page chrome)."""
     if tab_name not in _CYAB_TABS:
@@ -1530,135 +1499,126 @@ async def cyab_system_tab(
 
     label, template_name = _CYAB_TABS[tab_name]
 
-    from ion.core.config import get_config
     from ion.models.cyab import CyabSystem
-    from ion.storage.database import get_engine, get_session_factory
 
-    config = get_config()
-    engine = get_engine(config.db_path)
-    Session = get_session_factory(engine)
-    session = Session()
+    system = session.get(CyabSystem, system_id)
+    if not system:
+        raise HTTPException(status_code=404, detail="System not found")
+
+    ctx = {"system": system, "user": user, "tab_name": tab_name, "tab_label": label}
+
+    if tab_name == "overview":
+        from ion.services import cyab_doc_checklist_service
+        cyab_doc_checklist_service.seed_for_system(session, system_id)  # idempotent
+        ctx["checklist"] = cyab_doc_checklist_service.list_for_system(session, system_id)
+        ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
+    elif tab_name == "intake":
+        from ion.services.cyab_assessment_service import load_answers
+        from ion.services.cyab_subprofile_service import (
+            get_subprofile_full,
+            system_coverage,
+        )
+        # The sub-profile tag lives on data sources (see
+        # CyabDataSource.subprofile_id). For the per-system intake
+        # view, pick the first tagged source's sub-profile as the
+        # primary one. Future: per-source intake tabs.
+        sub_id = next(
+            (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
+            None,
+        )
+        ctx["subprofile"] = (
+            get_subprofile_full(session, sub_id) if sub_id else None
+        )
+        ctx["coverage"] = system_coverage(session, system_id)
+        ctx["answers"] = load_answers(session, system_id) or {}
+    elif tab_name == "sources":
+        import json as _json
+
+        from sqlalchemy import select
+
+        from ion.models.cyab import CyabDataSource
+        sources = session.execute(
+            select(CyabDataSource)
+            .where(CyabDataSource.system_id == system_id)
+            .order_by(CyabDataSource.name)
+        ).scalars().all()
+        # field_mapping is JSON-as-text on the model; parse once per
+        # source so the template can iterate without a custom filter.
+        mappings = {}
+        for ds in sources:
+            if ds.field_mapping:
+                try:
+                    parsed = _json.loads(ds.field_mapping)
+                    if isinstance(parsed, dict):
+                        mappings[ds.id] = parsed
+                except (ValueError, TypeError):
+                    pass
+        ctx["sources"] = sources
+        ctx["source_mappings"] = mappings
+    elif tab_name == "data-health":
+        from ion.services import cyab_data_health_service as dh
+        ctx["ingestion"] = dh.ingestion_freshness(session, system_id)
+        ctx["mapping"] = dh.field_mapping_completeness(session, system_id)
+        ctx["coverage"] = dh.coverage_rollup(session, system_id)
+        ctx["reconciliation"] = dh.reconciliation_panel(session, system_id)
+    elif tab_name == "signoff":
+        from ion.services import cyab_doc_checklist_service
+        ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
+        # Existing sign-off history lives on CyabSystem itself
+        # (sign_dept_*/sign_soc_* — populated by the existing
+        # POST /api/cyab/systems/{id}/onboarding-pack/sign
+        # endpoint). The CyabSnapshot model has no ``kind`` or
+        # ``signed_by`` columns, so the de-duped history is read
+        # directly from the canonical fields on the system row.
+        signoffs = []
+        if system.sign_dept_name and system.sign_dept_date:
+            signoffs.append({
+                "role": "Department",
+                "signed_by": system.sign_dept_name,
+                "signed_on": system.sign_dept_date,
+            })
+        if system.sign_soc_name and system.sign_soc_date:
+            signoffs.append({
+                "role": "SOC",
+                "signed_by": system.sign_soc_name,
+                "signed_on": system.sign_soc_date,
+            })
+        # Newest first (the two are typically same-day; tie-break by role)
+        signoffs.sort(key=lambda x: (x["signed_on"], x["role"]), reverse=True)
+        ctx["signoffs"] = signoffs
+    elif tab_name in ("detection", "audit-use-cases"):
+        from ion.services.cyab_subprofile_service import get_subprofile_full
+        # Per Task 5 finding, subprofile_id lives on CyabDataSource (not
+        # CyabSystem). Resolve the system's primary sub-profile from the
+        # first tagged data source.
+        sub_id = next(
+            (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
+            None,
+        )
+        sub = get_subprofile_full(session, sub_id) if sub_id else None
+        cat = (sub or {}).get("catalogue") if sub else {}
+        key = "detection_use_cases" if tab_name == "detection" else "audit_use_cases"
+        ctx["use_cases"] = (cat or {}).get(key, []) if cat else []
+        ctx["subprofile"] = sub
+        # Per-source status (existing studio JS cycles via the existing
+        # use-case-status endpoint, keyed by source id + uc id).
+        from sqlalchemy import select
+
+        from ion.models.cyab import CyabDataSource
+        ctx["sources"] = session.execute(
+            select(CyabDataSource).where(CyabDataSource.system_id == system_id)
+        ).scalars().all()
+
+    # Fall back to the placeholder template if the tab template doesn't exist yet.
+    from jinja2 import TemplateNotFound
     try:
-        system = session.get(CyabSystem, system_id)
-        if not system:
-            raise HTTPException(status_code=404, detail="System not found")
-
-        ctx = {"system": system, "user": user, "tab_name": tab_name, "tab_label": label}
-
-        if tab_name == "overview":
-            from ion.services import cyab_doc_checklist_service
-            cyab_doc_checklist_service.seed_for_system(session, system_id)  # idempotent
-            ctx["checklist"] = cyab_doc_checklist_service.list_for_system(session, system_id)
-            ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
-        elif tab_name == "intake":
-            from ion.services.cyab_assessment_service import load_answers
-            from ion.services.cyab_subprofile_service import (
-                get_subprofile_full,
-                system_coverage,
-            )
-            # The sub-profile tag lives on data sources (see
-            # CyabDataSource.subprofile_id). For the per-system intake
-            # view, pick the first tagged source's sub-profile as the
-            # primary one. Future: per-source intake tabs.
-            sub_id = next(
-                (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
-                None,
-            )
-            ctx["subprofile"] = (
-                get_subprofile_full(session, sub_id) if sub_id else None
-            )
-            ctx["coverage"] = system_coverage(session, system_id)
-            ctx["answers"] = load_answers(session, system_id) or {}
-        elif tab_name == "sources":
-            import json as _json
-
-            from sqlalchemy import select
-
-            from ion.models.cyab import CyabDataSource
-            sources = session.execute(
-                select(CyabDataSource)
-                .where(CyabDataSource.system_id == system_id)
-                .order_by(CyabDataSource.name)
-            ).scalars().all()
-            # field_mapping is JSON-as-text on the model; parse once per
-            # source so the template can iterate without a custom filter.
-            mappings = {}
-            for ds in sources:
-                if ds.field_mapping:
-                    try:
-                        parsed = _json.loads(ds.field_mapping)
-                        if isinstance(parsed, dict):
-                            mappings[ds.id] = parsed
-                    except (ValueError, TypeError):
-                        pass
-            ctx["sources"] = sources
-            ctx["source_mappings"] = mappings
-        elif tab_name == "data-health":
-            from ion.services import cyab_data_health_service as dh
-            ctx["ingestion"] = dh.ingestion_freshness(session, system_id)
-            ctx["mapping"] = dh.field_mapping_completeness(session, system_id)
-            ctx["coverage"] = dh.coverage_rollup(session, system_id)
-            ctx["reconciliation"] = dh.reconciliation_panel(session, system_id)
-        elif tab_name == "signoff":
-            from ion.services import cyab_doc_checklist_service
-            ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
-            # Existing sign-off history lives on CyabSystem itself
-            # (sign_dept_*/sign_soc_* — populated by the existing
-            # POST /api/cyab/systems/{id}/onboarding-pack/sign
-            # endpoint). The CyabSnapshot model has no ``kind`` or
-            # ``signed_by`` columns, so the de-duped history is read
-            # directly from the canonical fields on the system row.
-            signoffs = []
-            if system.sign_dept_name and system.sign_dept_date:
-                signoffs.append({
-                    "role": "Department",
-                    "signed_by": system.sign_dept_name,
-                    "signed_on": system.sign_dept_date,
-                })
-            if system.sign_soc_name and system.sign_soc_date:
-                signoffs.append({
-                    "role": "SOC",
-                    "signed_by": system.sign_soc_name,
-                    "signed_on": system.sign_soc_date,
-                })
-            # Newest first (the two are typically same-day; tie-break by role)
-            signoffs.sort(key=lambda x: (x["signed_on"], x["role"]), reverse=True)
-            ctx["signoffs"] = signoffs
-        elif tab_name in ("detection", "audit-use-cases"):
-            from ion.services.cyab_subprofile_service import get_subprofile_full
-            # Per Task 5 finding, subprofile_id lives on CyabDataSource (not
-            # CyabSystem). Resolve the system's primary sub-profile from the
-            # first tagged data source.
-            sub_id = next(
-                (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
-                None,
-            )
-            sub = get_subprofile_full(session, sub_id) if sub_id else None
-            cat = (sub or {}).get("catalogue") if sub else {}
-            key = "detection_use_cases" if tab_name == "detection" else "audit_use_cases"
-            ctx["use_cases"] = (cat or {}).get(key, []) if cat else []
-            ctx["subprofile"] = sub
-            # Per-source status (existing studio JS cycles via the existing
-            # use-case-status endpoint, keyed by source id + uc id).
-            from sqlalchemy import select
-
-            from ion.models.cyab import CyabDataSource
-            ctx["sources"] = session.execute(
-                select(CyabDataSource).where(CyabDataSource.system_id == system_id)
-            ).scalars().all()
-
-        # Fall back to the placeholder template if the tab template doesn't exist yet.
-        from jinja2 import TemplateNotFound
-        try:
-            return templates.TemplateResponse(request=request, name=template_name, context=ctx)
-        except TemplateNotFound:
-            return templates.TemplateResponse(
-                request=request,
-                name="cyab/tabs/_placeholder.html",
-                context={"tab_name": tab_name, "tab_label": label},
-            )
-    finally:
-        session.close()
+        return templates.TemplateResponse(request=request, name=template_name, context=ctx)
+    except TemplateNotFound:
+        return templates.TemplateResponse(
+            request=request,
+            name="cyab/tabs/_placeholder.html",
+            context={"tab_name": tab_name, "tab_label": label},
+        )
 
 
 @app.get("/cyab/coverage", response_class=HTMLResponse)
@@ -1698,6 +1658,7 @@ async def cyab_coverage_page(
 async def cyab_audit_page(
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Compliance audit trail.
 
@@ -1706,28 +1667,21 @@ async def cyab_audit_page(
     helper directly (rather than HTTP-calling our own /api endpoint) so
     the request stays in-process — same pattern as /cyab/coverage.
     """
-    from ion.core.config import get_config
-    from ion.storage.database import get_engine, get_session_factory
     from ion.web.cyab_api import audit_feed
 
-    Session = get_session_factory(get_engine(get_config().db_path))
-    session = Session()
+    sid_raw = request.query_params.get("system_id") or ""
     try:
-        sid_raw = request.query_params.get("system_id") or ""
-        try:
-            sid = int(sid_raw) if sid_raw else None
-        except ValueError:
-            sid = None
-        feed = await audit_feed(
-            system_id=sid,
-            user=request.query_params.get("user") or None,
-            action_type=request.query_params.get("action_type") or None,
-            since=request.query_params.get("since") or None,
-            until=request.query_params.get("until") or None,
-            session=session,
-        )
-    finally:
-        session.close()
+        sid = int(sid_raw) if sid_raw else None
+    except ValueError:
+        sid = None
+    feed = await audit_feed(
+        system_id=sid,
+        user=request.query_params.get("user") or None,
+        action_type=request.query_params.get("action_type") or None,
+        since=request.query_params.get("since") or None,
+        until=request.query_params.get("until") or None,
+        session=session,
+    )
 
     return templates.TemplateResponse(
         request=request,
@@ -1758,6 +1712,7 @@ async def cyab_onboard_page(
     wid: str | None = None,
     step: int = 1,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """4-step wizard. Without ``wid``, starts a new session and 302s with
     the wid baked in so refresh/back work.
@@ -1766,74 +1721,66 @@ async def cyab_onboard_page(
     /api/cyab/onboard/{wid}/step/{n} advances state and returns an
     HTMX-replaceable partial.
     """
-    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
     from ion.services.cyab_subprofile_service import (
         list_pillars,
         list_subprofiles_for_pillar,
     )
-    from ion.storage.database import get_engine, get_session_factory
 
-    config = get_config()
-    Session = get_session_factory(get_engine(config.db_path))
-    session = Session()
-    try:
-        if not wid:
-            new_wid = cyab_wizard_service.start_wizard(
-                session, user_id=getattr(user, "id", None)
-            )
-            return RedirectResponse(
-                url=f"/cyab/onboard?wid={new_wid}&step=1", status_code=302
-            )
-
-        try:
-            state = cyab_wizard_service.load_state(session, wid)
-        except LookupError:
-            raise HTTPException(status_code=404, detail="Wizard session not found")
-
-        # Aggregate sub-profiles across all pillars (the catalogue helper
-        # is per-pillar; the wizard form needs a flat list for the
-        # combined dropdown).
-        pillars = list_pillars(session)
-        subprofiles: list = []
-        for p in pillars:
-            subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
-
-        ctx = {
-            "wid": wid,
-            "step": step,
-            "state": state,
-            "pillars": pillars,
-            "subprofiles": subprofiles,
-            "active_tab": "onboard",
-            "user": user,
-        }
-
-        # Step 4 needs the seeded checklist so a refresh on ?step=4 works.
-        if step == 4 and state.get("system_id"):
-            from ion.services import cyab_doc_checklist_service
-            cyab_doc_checklist_service.seed_for_system(
-                session, state["system_id"]
-            )
-            ctx["checklist"] = cyab_doc_checklist_service.list_for_system(
-                session, state["system_id"]
-            )
-
-        # Step 2 needs the live counter pre-rendered with the current
-        # answer set so a hard refresh shows the right numbers (HTMX
-        # then takes over for subsequent updates). Same engine as the
-        # /cyab/scoping page — shared backend per the spec.
-        if step == 2:
-            from ion.services import cyab_scoping_engine
-            ctx["scoping_initial"] = cyab_scoping_engine.score_answers(
-                state.get("intake", {}) or {}
-            )
-
-        return templates.TemplateResponse(
-            request=request, name="cyab/onboard.html", context=ctx
+    if not wid:
+        new_wid = cyab_wizard_service.start_wizard(
+            session, user_id=getattr(user, "id", None)
         )
-    finally:
-        session.close()
+        return RedirectResponse(
+            url=f"/cyab/onboard?wid={new_wid}&step=1", status_code=302
+        )
+
+    try:
+        state = cyab_wizard_service.load_state(session, wid)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Wizard session not found")
+
+    # Aggregate sub-profiles across all pillars (the catalogue helper
+    # is per-pillar; the wizard form needs a flat list for the
+    # combined dropdown).
+    pillars = list_pillars(session)
+    subprofiles: list = []
+    for p in pillars:
+        subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
+
+    ctx = {
+        "wid": wid,
+        "step": step,
+        "state": state,
+        "pillars": pillars,
+        "subprofiles": subprofiles,
+        "active_tab": "onboard",
+        "user": user,
+    }
+
+    # Step 4 needs the seeded checklist so a refresh on ?step=4 works.
+    if step == 4 and state.get("system_id"):
+        from ion.services import cyab_doc_checklist_service
+        cyab_doc_checklist_service.seed_for_system(
+            session, state["system_id"]
+        )
+        ctx["checklist"] = cyab_doc_checklist_service.list_for_system(
+            session, state["system_id"]
+        )
+
+    # Step 2 needs the live counter pre-rendered with the current
+    # answer set so a hard refresh shows the right numbers (HTMX
+    # then takes over for subsequent updates). Same engine as the
+    # /cyab/scoping page — shared backend per the spec.
+    if step == 2:
+        from ion.services import cyab_scoping_engine
+        ctx["scoping_initial"] = cyab_scoping_engine.score_answers(
+            state.get("intake", {}) or {}
+        )
+
+    return templates.TemplateResponse(
+        request=request, name="cyab/onboard.html", context=ctx
+    )
 
 
 @app.post("/api/cyab/onboard/{wid}/step/1", response_class=HTMLResponse)
@@ -1848,54 +1795,47 @@ async def cyab_onboard_step_1(
     owner: str = Form(""),
     containment_authority: str = Form(""),
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Step 1 — Identity. Persists fields and creates the backing
     CyabSystem row via ``cyab_wizard_service.save_identity``. Returns
     the Step 2 partial for HTMX clients, or a 303 redirect for plain
     browsers."""
-    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
-    from ion.storage.database import get_engine, get_session_factory
 
-    config = get_config()
-    Session = get_session_factory(get_engine(config.db_path))
-    session = Session()
     try:
-        try:
-            state = cyab_wizard_service.save_identity(
-                session,
-                wid,
-                identity={
-                    "name": name,
-                    "hostname": hostname,
-                    "pillar": pillar,
-                    "subprofile_id": subprofile_id,
-                    "owner": owner,
-                    "department": department,
-                    "containment_authority": containment_authority,
-                },
-            )
-        except LookupError:
-            raise HTTPException(status_code=404, detail="Wizard session not found")
-
-        # Render Step 2 partial inline (HTMX swap), or 303 for non-HTMX clients.
-        if request.headers.get("hx-request") == "true":
-            from jinja2 import TemplateNotFound
-            try:
-                return templates.TemplateResponse(
-                    request=request,
-                    name="cyab/_wizard_step_2_intake.html",
-                    context={"wid": wid, "step": 2, "state": state},
-                )
-            except TemplateNotFound:
-                # Step 2 partial lands in Task 4 — fall through to redirect
-                # so HTMX clients still progress in the meantime.
-                pass
-        return RedirectResponse(
-            url=f"/cyab/onboard?wid={wid}&step=2", status_code=303
+        state = cyab_wizard_service.save_identity(
+            session,
+            wid,
+            identity={
+                "name": name,
+                "hostname": hostname,
+                "pillar": pillar,
+                "subprofile_id": subprofile_id,
+                "owner": owner,
+                "department": department,
+                "containment_authority": containment_authority,
+            },
         )
-    finally:
-        session.close()
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Wizard session not found")
+
+    # Render Step 2 partial inline (HTMX swap), or 303 for non-HTMX clients.
+    if request.headers.get("hx-request") == "true":
+        from jinja2 import TemplateNotFound
+        try:
+            return templates.TemplateResponse(
+                request=request,
+                name="cyab/_wizard_step_2_intake.html",
+                context={"wid": wid, "step": 2, "state": state},
+            )
+        except TemplateNotFound:
+            # Step 2 partial lands in Task 4 — fall through to redirect
+            # so HTMX clients still progress in the meantime.
+            pass
+    return RedirectResponse(
+        url=f"/cyab/onboard?wid={wid}&step=2", status_code=303
+    )
 
 
 @app.post("/api/cyab/onboard/{wid}/step/2", response_class=HTMLResponse)
@@ -1903,17 +1843,16 @@ async def cyab_onboard_step_2(
     wid: str,
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Step 2 — Intake. Persists the snapshot of answers in the wizard
     blob (real autosave goes via the Studio answers endpoint). Returns
     Step 3 partial for HTMX or 303 redirects to the Step 3 URL."""
-    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
     from ion.services.cyab_subprofile_service import (
         list_pillars,
         list_subprofiles_for_pillar,
     )
-    from ion.storage.database import get_engine, get_session_factory
 
     form = await request.form()
     answers = {
@@ -1921,33 +1860,28 @@ async def cyab_onboard_step_2(
         for k, v in form.items() if k.startswith("answers[")
     }
 
-    Session = get_session_factory(get_engine(get_config().db_path))
-    session = Session()
     try:
-        try:
-            cyab_wizard_service.save_intake(session, wid, answers=answers)
-        except LookupError:
-            raise HTTPException(status_code=404, detail="Wizard session not found")
+        cyab_wizard_service.save_intake(session, wid, answers=answers)
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Wizard session not found")
 
-        if request.headers.get("hx-request") == "true":
-            state = cyab_wizard_service.load_state(session, wid)
-            # Aggregate sub-profiles across all pillars (same shape the
-            # GET handler builds) so the Step 3 partial dropdown renders.
-            subprofiles: list = []
-            for p in list_pillars(session):
-                subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
-            return templates.TemplateResponse(
-                request=request, name="cyab/_wizard_step_3_source.html",
-                context={
-                    "wid": wid, "step": 3, "state": state,
-                    "subprofiles": subprofiles,
-                },
-            )
-        return RedirectResponse(
-            url=f"/cyab/onboard?wid={wid}&step=3", status_code=303
+    if request.headers.get("hx-request") == "true":
+        state = cyab_wizard_service.load_state(session, wid)
+        # Aggregate sub-profiles across all pillars (same shape the
+        # GET handler builds) so the Step 3 partial dropdown renders.
+        subprofiles: list = []
+        for p in list_pillars(session):
+            subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
+        return templates.TemplateResponse(
+            request=request, name="cyab/_wizard_step_3_source.html",
+            context={
+                "wid": wid, "step": 3, "state": state,
+                "subprofiles": subprofiles,
+            },
         )
-    finally:
-        session.close()
+    return RedirectResponse(
+        url=f"/cyab/onboard?wid={wid}&step=3", status_code=303
+    )
 
 
 @app.post("/api/cyab/onboard/{wid}/step/3", response_class=HTMLResponse)
@@ -1958,48 +1892,42 @@ async def cyab_onboard_step_3(
     data_source_type: str = Form(""),
     subprofile_id: str = Form(""),
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Step 3 — First data source. Persists a CyabDataSource on the
     backing system, lazy-seeds the doc checklist so Step 4 has rows to
     render, and either returns the Step 4 partial (HTMX) or redirects."""
-    from ion.core.config import get_config
     from ion.services import cyab_doc_checklist_service, cyab_wizard_service
-    from ion.storage.database import get_engine, get_session_factory
 
-    Session = get_session_factory(get_engine(get_config().db_path))
-    session = Session()
     try:
-        try:
-            state = cyab_wizard_service.save_source(
-                session, wid,
-                source={
-                    "name": name,
-                    "data_source_type": data_source_type or None,
-                    "subprofile_id": subprofile_id or None,
-                },
-            )
-        except LookupError:
-            raise HTTPException(status_code=404, detail="Wizard session not found")
-
-        # Lazy-seed the checklist now so Step 4 has rows to render.
-        cyab_doc_checklist_service.seed_for_system(session, state["system_id"])
-        checklist = cyab_doc_checklist_service.list_for_system(
-            session, state["system_id"]
+        state = cyab_wizard_service.save_source(
+            session, wid,
+            source={
+                "name": name,
+                "data_source_type": data_source_type or None,
+                "subprofile_id": subprofile_id or None,
+            },
         )
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Wizard session not found")
 
-        if request.headers.get("hx-request") == "true":
-            return templates.TemplateResponse(
-                request=request, name="cyab/_wizard_step_4_docs.html",
-                context={
-                    "wid": wid, "step": 4, "state": state,
-                    "checklist": checklist,
-                },
-            )
-        return RedirectResponse(
-            url=f"/cyab/onboard?wid={wid}&step=4", status_code=303
+    # Lazy-seed the checklist now so Step 4 has rows to render.
+    cyab_doc_checklist_service.seed_for_system(session, state["system_id"])
+    checklist = cyab_doc_checklist_service.list_for_system(
+        session, state["system_id"]
+    )
+
+    if request.headers.get("hx-request") == "true":
+        return templates.TemplateResponse(
+            request=request, name="cyab/_wizard_step_4_docs.html",
+            context={
+                "wid": wid, "step": 4, "state": state,
+                "checklist": checklist,
+            },
         )
-    finally:
-        session.close()
+    return RedirectResponse(
+        url=f"/cyab/onboard?wid={wid}&step=4", status_code=303
+    )
 
 
 @app.post("/api/cyab/onboard/{wid}/finish")
@@ -2007,12 +1935,11 @@ async def cyab_onboard_finish(
     wid: str,
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
+    session: Session = Depends(get_db_session),
 ):
     """Apply doc-placeholder overrides, mark wizard complete, redirect to
     the per-system page."""
-    from ion.core.config import get_config
     from ion.services import cyab_wizard_service
-    from ion.storage.database import get_engine, get_session_factory
 
     form = await request.form()
     # Parse docs[<kind>][<field>] = value
@@ -2029,20 +1956,15 @@ async def cyab_onboard_finish(
         field = field.rstrip("]")
         overrides.setdefault(kind, {})[field] = v
 
-    Session = get_session_factory(get_engine(get_config().db_path))
-    session = Session()
     try:
-        try:
-            sys_id = cyab_wizard_service.finish(
-                session, wid, doc_overrides=overrides
-            )
-        except LookupError:
-            raise HTTPException(status_code=404, detail="Wizard session not found")
-        return RedirectResponse(
-            url=f"/cyab/systems/{sys_id}", status_code=303
+        sys_id = cyab_wizard_service.finish(
+            session, wid, doc_overrides=overrides
         )
-    finally:
-        session.close()
+    except LookupError:
+        raise HTTPException(status_code=404, detail="Wizard session not found")
+    return RedirectResponse(
+        url=f"/cyab/systems/{sys_id}", status_code=303
+    )
 
 
 @app.get("/discover", response_class=HTMLResponse)
