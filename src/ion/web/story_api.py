@@ -16,12 +16,10 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -38,15 +36,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["stories"])
 
-from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
-_TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-_templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
-_templates.env.globals["csp_nonce"] = _CspNonceProxy()
-try:
-    import ion as _ion_pkg
-    _templates.env.globals["ion_version"] = _ion_pkg.__version__
-except Exception:
-    _templates.env.globals.setdefault("ion_version", "")
+from ion.web.templating import make_templates  # noqa: E402
+
+_templates = make_templates()
 
 
 # ── Schemas ──────────────────────────────────────────────────────────────

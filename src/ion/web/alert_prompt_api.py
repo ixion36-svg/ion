@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -26,18 +24,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["alert-prompts"])
 
-# Templates dir — resolve relative to this file so we share server.py's dir.
-# We also mirror the ion_version global that server.py sets so {{ ion_version }}
-# in base.html renders correctly.
-from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
-_TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
-_templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
-_templates.env.globals["csp_nonce"] = _CspNonceProxy()
-try:
-    import ion as _ion_pkg
-    _templates.env.globals["ion_version"] = _ion_pkg.__version__
-except Exception:  # pragma: no cover — defensive: never block startup on this
-    _templates.env.globals.setdefault("ion_version", "")
+# Fully-configured Jinja env from the shared factory (bytecode cache +
+# ion_version + csp_nonce), matching server.py.
+from ion.web.templating import make_templates  # noqa: E402
+
+_templates = make_templates()
 
 # Permission fallback: the spec asks for "playbooks:manage" but the ION
 # permission inventory uses per-verb names. Fall back to playbook:create OR

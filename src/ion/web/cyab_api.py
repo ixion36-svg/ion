@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -37,11 +36,11 @@ from ion.web.api import get_db_session
 
 router = APIRouter()
 
-# Reuse the same templates dir — importing server.templates would loop.
-from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
-_TEMPLATES_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=_TEMPLATES_DIR)
-templates.env.globals["csp_nonce"] = _CspNonceProxy()
+# Fully-configured Jinja env (bytecode cache + ion_version + csp_nonce) from the
+# shared factory; importing server.templates directly would create a loop.
+from ion.web.templating import make_templates  # noqa: E402
+
+templates = make_templates()
 
 
 # ---------------------------------------------------------------------------

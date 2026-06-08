@@ -16,12 +16,10 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -42,13 +40,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["investigation-memory"])
 
-# Shared Jinja env — resolve against the same templates/ dir the rest of
-# the app uses. Importing server.templates would create a circular import,
-# so we re-instantiate against the same directory.
-from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
-_TEMPLATES_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=_TEMPLATES_DIR)
-templates.env.globals["csp_nonce"] = _CspNonceProxy()
+# Shared Jinja env from the factory (bytecode cache + ion_version + csp_nonce);
+# importing server.templates would create a circular import.
+from ion.web.templating import make_templates  # noqa: E402
+
+templates = make_templates()
 
 
 # =========================================================================

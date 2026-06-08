@@ -12,12 +12,10 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_page_auth, require_permission
@@ -34,11 +32,11 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["case-grouper"])
 
-# Reuse the same templates dir — importing server.templates would loop.
-from ion.web._csp_nonce import _CSPNonceProxy as _CspNonceProxy  # noqa: E402
-_TEMPLATES_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=_TEMPLATES_DIR)
-templates.env.globals["csp_nonce"] = _CspNonceProxy()
+# Fully-configured Jinja env from the shared factory (bytecode cache +
+# ion_version + csp_nonce); importing server.templates would loop.
+from ion.web.templating import make_templates  # noqa: E402
+
+templates = make_templates()
 
 
 def _resolve_interval_s() -> int:
