@@ -1,7 +1,7 @@
 """FastAPI dependencies for authentication and authorization."""
 
 import logging
-from typing import Callable, Generator, List, Optional
+from typing import Callable, List, Optional
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
@@ -10,7 +10,7 @@ from ion.auth.service import AuthService
 from ion.core.client_ip import get_client_ip  # noqa: F401  (re-exported; many call sites import it from here)
 from ion.core.config import get_config, get_oidc_config
 from ion.models.user import User
-from ion.storage.database import get_engine, get_session_factory
+from ion.storage.database import get_db_session  # noqa: F401  (re-exported; routers import it from here)
 
 logger = logging.getLogger(__name__)
 
@@ -26,18 +26,6 @@ _PWD_CHANGE_ALLOWED_PREFIXES = (
     "/api/auth/logout",
     "/static/",
 )
-
-
-def get_db_session() -> Generator[Session, None, None]:
-    """FastAPI dependency for database session with proper cleanup."""
-    config = get_config()
-    engine = get_engine(config.db_path)
-    factory = get_session_factory(engine)
-    session = factory()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 def get_auth_service(session: Session = Depends(get_db_session)) -> AuthService:

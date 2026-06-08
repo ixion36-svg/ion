@@ -268,6 +268,24 @@ def get_session(engine: Optional[Engine] = None) -> Generator[Session, None, Non
         session.close()
 
 
+def get_db_session() -> Generator[Session, None, None]:
+    """Canonical FastAPI request-scoped DB-session dependency.
+
+    Import this everywhere (``Depends(get_db_session)``) instead of re-defining
+    it per router — the previous per-module copies had already drifted in
+    signature and cleanup. Unlike :func:`get_session`, it does NOT auto-commit:
+    handlers commit explicitly, so a read-only path can never trigger an
+    unintended write on the way out.
+    """
+    engine = get_engine(get_config().db_path)
+    factory = get_session_factory(engine)
+    session = factory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
 def _run_migrations(engine: Engine) -> None:
     """Add missing columns to existing tables. Idempotent."""
     insp = inspect(engine)

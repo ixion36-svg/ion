@@ -14,7 +14,7 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import quote as url_quote
 
 import httpx
@@ -105,7 +105,7 @@ from ion.services.render_service import RenderService
 from ion.services.template_service import TemplateService
 from ion.services.version_service import VersionService
 from ion.storage.auth_repository import AuditLogRepository
-from ion.storage.database import get_engine, get_session_factory
+from ion.storage.database import get_db_session
 from ion.storage.document_repository import DocumentRepository
 from ion.storage.user_repository import RoleRepository, UserRepository
 
@@ -243,16 +243,10 @@ class Services:
     session: Session
 
 
-def get_db_session() -> Generator[Session, None, None]:
-    """FastAPI dependency for database session with proper cleanup."""
-    config = get_config()
-    engine = get_engine(config.db_path)
-    factory = get_session_factory(engine)
-    session = factory()
-    try:
-        yield session
-    finally:
-        session.close()
+# get_db_session is the canonical request-scoped session dependency defined in
+# ion.storage.database; it is imported above and re-exported here so the ~45
+# routers that do `from ion.web.api import get_db_session` keep working from a
+# single source of truth.
 
 
 def get_services(session: Session = Depends(get_db_session)) -> Services:
@@ -1170,13 +1164,17 @@ async def reset_user_password(
         raise HTTPException(status_code=404, detail="User not found")
 
     auth_service = AuthService(session)
-    auth_service.reset_password(
-        user=user,
-        new_password=password_reset.new_password,
-        must_change=password_reset.must_change,
-        admin_user_id=current_user.id,
-        ip_address=get_client_ip(request),
-    )
+    try:
+        auth_service.reset_password(
+            user=user,
+            new_password=password_reset.new_password,
+            must_change=password_reset.must_change,
+            admin_user_id=current_user.id,
+            ip_address=get_client_ip(request),
+        )
+    except ValueError as exc:
+        # Password-policy violation (opt-in F6) — surface as a 400 rather than 500.
+        raise HTTPException(status_code=400, detail=str(exc))
 
     session.commit()
 

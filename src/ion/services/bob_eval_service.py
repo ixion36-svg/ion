@@ -35,9 +35,13 @@ from ion.storage.database import (
 
 logger = logging.getLogger(__name__)
 
-# Two-int pg_advisory_xact_lock namespace for per-run locks.
-# "BPEH" = Bob Prompt Eval Harness (4 ASCII bytes as int32).
-_BPEH_NS = 0x42504548
+# Two-int advisory-lock namespaces for the eval harness.
+# "BPEH" = Bob Prompt Eval Harness (4 ASCII bytes as int32). The per-template
+# serialisation lock and the per-run re-entry lock MUST use DISTINCT namespaces
+# so their keys (template_id vs eval_run_id, drawn from different PK sequences)
+# cannot alias onto the same (ns, key) pair.
+_BPEH_NS = 0x42504548          # per-template serialisation lock
+_BPEH_RUN_NS = 0x42504552      # per-run re-entry lock ("BPER")
 
 _MAX_SAMPLE_SIZE = 200
 
@@ -238,18 +242,6 @@ def _acquire_try_advisory_lock(session: Session, lock_id: int) -> bool:
     return bool(result.scalar())
 
 
-def _acquire_xact_lock(session: Session, ns: int, key: int) -> None:
-    """Per-run transactional advisory lock (two-int form). No-op on SQLite."""
-    if session.bind is None:
-        return
-    if session.bind.dialect.name != "postgresql":
-        return
-    session.execute(
-        text("SELECT pg_advisory_xact_lock(:ns, :key)"),
-        {"ns": ns, "key": key},
-    )
-
-
 def _release_advisory_lock(session: Session, lock_id: int) -> None:
     """Release a session-scoped advisory lock. No-op on SQLite."""
     if session.bind is None:
@@ -261,11 +253,41 @@ def _release_advisory_lock(session: Session, lock_id: int) -> None:
     )
 
 
+def _try_lock_on(conn, ns: int, key: int) -> bool:
+    """Acquire a session-scoped two-int advisory lock on a specific connection.
+
+    Returns True if granted, False if already held elsewhere. Session-scoped
+    (not xact-scoped) so it survives the COMMITs that ``_execute_eval`` issues
+    before the Ollama loop; held until explicitly released or the connection is
+    closed. Must be taken on a DEDICATED connection — the ORM session returns
+    its connection to the pool on commit, which would silently drop the lock.
+    """
+    return bool(
+        conn.execute(
+            text("SELECT pg_try_advisory_lock(:ns, :key)"), {"ns": ns, "key": key}
+        ).scalar()
+    )
+
+
+def _release_locks_on(conn) -> None:
+    """Release ALL session-scoped advisory locks held on this connection.
+
+    Returning a connection to the pool does NOT drop session-level advisory
+    locks (the physical connection stays alive and may be reused), so they must
+    be unlocked explicitly before the connection is closed.
+    """
+    try:
+        conn.execute(text("SELECT pg_advisory_unlock_all()"))
+    except Exception:
+        logger.debug("pg_advisory_unlock_all failed during cleanup", exc_info=True)
+
+
 def _run_eval_sync(eval_run_id: int) -> None:
     """Core evaluation loop. Runs in a background thread."""
     engine = get_engine()
     factory = get_session_factory(engine)
     session = factory()
+    lock_conn = None  # dedicated connection holding the serialisation locks
 
     try:
         run = session.get(BobEvalRun, eval_run_id)
@@ -286,15 +308,30 @@ def _run_eval_sync(eval_run_id: int) -> None:
         # Release immediately — we only needed to know the loop wasn't running.
         _release_advisory_lock(session, LOCK_INVESTIGATION_BG)
 
-        # --- Fix 7: per-template concurrency lock — serialise same-template runs ---
-        # Use template_id (or 0 for "all templates") as the lock key so two
-        # simultaneous POST runs for the same template wait rather than both
-        # spawning up to 200 Ollama calls concurrently.
-        template_lock_key = run.template_id if run.template_id is not None else 0
-        _acquire_xact_lock(session, _BPEH_NS, template_lock_key)
-
-        # --- Per-run transactional lock to prevent re-entry of the same run ---
-        _acquire_xact_lock(session, _BPEH_NS, eval_run_id)
+        # --- Fix 7: per-template + per-run serialisation -------------------
+        # Serialise same-template runs (key = template_id, or 0 for "all
+        # templates") so two simultaneous POSTs don't each spawn up to 200
+        # Ollama calls, plus a per-run lock to prevent re-entry of one run.
+        #
+        # These locks MUST outlive the COMMITs that _execute_eval issues before
+        # the Ollama loop, so they are session-scoped (not pg_advisory_xact_lock,
+        # which releases on the next COMMIT) and held on a DEDICATED connection
+        # (the ORM session returns its connection to the pool on commit, which
+        # would silently drop the lock). Non-blocking: if another worker already
+        # holds the lock, skip rather than double-spend the Ollama budget.
+        if session.bind is not None and session.bind.dialect.name == "postgresql":
+            lock_conn = engine.connect()
+            template_lock_key = run.template_id if run.template_id is not None else 0
+            if not _try_lock_on(lock_conn, _BPEH_NS, template_lock_key):
+                run.status = "skipped"
+                run.error_message = "another eval for this template is already running"
+                session.commit()
+                return
+            if not _try_lock_on(lock_conn, _BPEH_RUN_NS, eval_run_id):
+                run.status = "skipped"
+                run.error_message = "this eval run is already executing"
+                session.commit()
+                return
 
         _execute_eval(run, session)
 
@@ -309,6 +346,14 @@ def _run_eval_sync(eval_run_id: int) -> None:
         except Exception:
             pass
     finally:
+        # Release the serialisation locks BEFORE closing — returning the
+        # connection to the pool does not drop session-scoped advisory locks.
+        if lock_conn is not None:
+            _release_locks_on(lock_conn)
+            try:
+                lock_conn.close()
+            except Exception:
+                pass
         try:
             session.close()
         except Exception:

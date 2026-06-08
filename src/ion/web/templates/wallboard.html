@@ -514,7 +514,7 @@ function renderBob(b) {
   const pct = b.agreement_pct != null ? b.agreement_pct : 0;
   $('wb-bob-agreement-fill').style.width = pct + '%';
   $('wb-bob-agreement-num').textContent = b.agreement_pct != null
-    ? `${b.agreement_count || 0} / ${b.feedback_7d_total || 0} (${pct}%)`
+    ? `${b.agreement_count || 0} / ${b.agreement_total || 0} (${pct}%)`
     : '— / —';
 }
 

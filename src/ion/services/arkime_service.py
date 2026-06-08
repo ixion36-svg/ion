@@ -34,6 +34,7 @@ import os
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 import httpx
 
@@ -313,7 +314,10 @@ class ArkimeService:
             raise ArkimeError("Arkime is not configured")
         expression = f'(ip.src == {ip} || ip.dst == {ip})'
         if node:
-            expression += f' && node == "{node}"'
+            # node originates from an ES alert document; escape quote/backslash
+            # so a crafted value can't break out of the quoted Arkime term.
+            safe_node = str(node).replace("\\", "\\\\").replace('"', '\\"')
+            expression += f' && node == "{safe_node}"'
 
         # Resolve effective window. Precedence: explicit window_minutes →
         # legacy hours (×60) → env default → 30min.
@@ -757,7 +761,9 @@ class ArkimeService:
         if not session_id.startswith("3@"):
             session_id = f"3@{session_id}"
 
-        url = f"{self.url}/api/session/{node}/{session_id}/pcap"
+        # URL-encode the node path segment — it comes from alert data and must
+        # not be able to inject extra path segments or query into the request.
+        url = f"{self.url}/api/session/{quote(str(node), safe='')}/{session_id}/pcap"
         headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
         logger.info("Arkime PCAP GET %s", url)
         try:

@@ -1266,12 +1266,21 @@ def _parse_x509(der: bytes) -> Optional[dict]:
     }
 
 
+# Bounds for untrusted-PCAP TLS parsing: a leaf cert handshake fits easily in
+# 64 KB, so scanning the full (up to 10 MB) stream just hands an attacker free
+# CPU. Cap both the per-stream scan window and the total certs processed.
+_MAX_TLS_CERTS = 50
+_TLS_HANDSHAKE_SCAN_BYTES = 64 * 1024
+
+
 def _extract_tls_certificates(streams: dict) -> list[dict]:
     """Carve and parse the leaf X.509 certificate from each TLS server stream (deduped by serial)."""
     certs: list[dict] = []
     seen: set[str] = set()
     for (src_ip, sport, dst_ip, dport), payload in streams.items():
-        data = bytes(payload)
+        if len(certs) >= _MAX_TLS_CERTS:
+            break
+        data = bytes(payload[:_TLS_HANDSHAKE_SCAN_BYTES])
         if len(data) < 16 or data[0] != 0x16:
             continue
         try:
@@ -1703,17 +1712,19 @@ def _build_network_graph(result: PcapResult) -> dict:
                 findings_ips.add(part)
 
     for conv in conversations:
-        src = conv.get("src", "")
-        dst = conv.get("dst", "")
-        if not src or not dst:
+        # Conversations are emitted as {"pair": "<ip_a> <-> <ip_b>", "bytes": n}
+        # (see parse_pcap; the key is tuple(sorted([src_ip, dst_ip])) — bare
+        # IPs, no ports). Parse the pair rather than reading non-existent
+        # src/dst/proto/packets keys, which left the graph permanently empty.
+        pair = conv.get("pair", "")
+        if " <-> " not in pair:
+            continue
+        src_ip, dst_ip = (p.strip() for p in pair.split(" <-> ", 1))
+        if not src_ip or not dst_ip:
             continue
 
-        # Parse "ip:port" format
-        src_ip = src.rsplit(":", 1)[0] if ":" in src else src
-        dst_ip = dst.rsplit(":", 1)[0] if ":" in dst else dst
-
-        is_private_src = _is_private(src_ip) if src_ip else False
-        is_private_dst = _is_private(dst_ip) if dst_ip else False
+        is_private_src = _is_private(src_ip)
+        is_private_dst = _is_private(dst_ip)
 
         for ip, is_priv in [(src_ip, is_private_src), (dst_ip, is_private_dst)]:
             if ip and ip not in nodes:
@@ -1733,20 +1744,21 @@ def _build_network_graph(result: PcapResult) -> dict:
         edge_key = f"{src_ip}-{dst_ip}"
         if edge_key not in edge_set:
             edge_set.add(edge_key)
-            proto = conv.get("proto", "")
-            packet_count = conv.get("packets", 0)
+            # Only byte volume is tracked per conversation (no proto/packet
+            # counts), so derive the label and edge width from bytes.
             byte_count = conv.get("bytes", 0)
-            label = proto
             if byte_count > 1024 * 1024:
-                label += f" ({byte_count // (1024*1024)}MB)"
+                label = f"{byte_count // (1024*1024)}MB"
             elif byte_count > 1024:
-                label += f" ({byte_count // 1024}KB)"
+                label = f"{byte_count // 1024}KB"
+            else:
+                label = f"{byte_count}B"
             edges.append({
                 "from": src_ip,
                 "to": dst_ip,
                 "label": label,
-                "title": f"{src} → {dst}: {packet_count} pkts, {byte_count} bytes",
-                "width": min(max(1, packet_count // 10), 6),
+                "title": f"{src_ip} <-> {dst_ip}: {byte_count} bytes",
+                "width": min(max(1, byte_count // (64 * 1024)), 6),
                 "color": {"color": "#484f58"},
                 "arrows": {"to": {"enabled": True, "scaleFactor": 0.5}},
             })

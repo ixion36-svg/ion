@@ -2451,7 +2451,7 @@ class InvestigationService:
 
         # LLM call
         try:
-            parsed, model_used, eval_count, llm_ms = await self._call_llm(
+            parsed, model_used, eval_count, llm_ms, _raw_content = await self._call_llm(
                 system_prompt=system_prompt,
                 user_body=user_prompt,
                 anon_map=None,

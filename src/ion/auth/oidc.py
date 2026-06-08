@@ -318,12 +318,28 @@ class OIDCUserSync:
         Raises:
             ValueError: If user creation fails and auto_create is disabled
         """
-        # Try to find existing user by email (primary identifier)
-        user = self.user_repo.get_by_email(token_data.email)
+        # Identity resolution order matters for security. Match on the
+        # IMMUTABLE Keycloak subject first; only fall back to email/username
+        # when no subject match exists, and never let an incoming token rebind
+        # an account that already belongs to a different subject.
+        #
+        # 1) Immutable subject — the authoritative identity anchor.
+        user = self.user_repo.get_by_keycloak_sub(token_data.sub)
 
+        # 2) Email fallback. Email is NOT a trustworthy identity anchor on its
+        #    own (it can be reassigned in the IdP), so refuse to rebind a local
+        #    account that is already bound to a DIFFERENT Keycloak subject —
+        #    that would be account takeover. Accounts with no subject yet
+        #    (never federated) remain bindable, so realms that do not emit an
+        #    email_verified claim keep working exactly as before.
+        if user is None and token_data.email:
+            candidate = self.user_repo.get_by_email(token_data.email)
+            user = self._guard_rebind(candidate, token_data)
+
+        # 3) Username — same rebind guard.
         if user is None and token_data.preferred_username:
-            # Fall back to username lookup
-            user = self.user_repo.get_by_username(token_data.preferred_username)
+            candidate = self.user_repo.get_by_username(token_data.preferred_username)
+            user = self._guard_rebind(candidate, token_data)
 
         if user is None:
             # User doesn't exist in ION
@@ -348,6 +364,34 @@ class OIDCUserSync:
         self._sync_roles(user, token_data.roles)
 
         return user
+
+    def _guard_rebind(
+        self, candidate: Optional[User], token_data: OIDCTokenData
+    ) -> Optional[User]:
+        """Return ``candidate`` unless it is already bound to a different subject.
+
+        Email/username are not trustworthy identity anchors: an attacker who can
+        set their own Keycloak email/username to a victim's value would otherwise
+        be bound to the victim's existing ION account. If the matched local
+        account already carries a ``keycloak_sub`` that differs from the incoming
+        token's subject, refuse the match (the caller then falls through to user
+        creation, giving the attacker their OWN account, not the victim's).
+
+        A candidate with no ``keycloak_sub`` yet (never federated) is still
+        bindable, preserving today's behaviour for realms without verified email.
+        """
+        if candidate is None:
+            return None
+        existing_sub = getattr(candidate, "keycloak_sub", None)
+        if existing_sub and token_data.sub and existing_sub != token_data.sub:
+            logger.warning(
+                "OIDC sync refused to rebind local user '%s' (matched by "
+                "email/username) — it is already bound to a different Keycloak "
+                "subject. Incoming sub=%s, stored sub=%s.",
+                candidate.username, token_data.sub, existing_sub,
+            )
+            return None
+        return candidate
 
     def _create_user(self, token_data: OIDCTokenData) -> User:
         """Create a new ION user from OIDC token data."""

@@ -1431,16 +1431,18 @@ async def cyab_systems_bulk(
         # require_page_permission("alert:read") because the read-ish
         # actions (mark-reviewed/export-csv/rerun-health) are fine for
         # any analyst. delete-selected is destructive and must match
-        # the case:update gate the per-row DELETE /api/cyab/systems/{id}
-        # endpoint already enforces.
+        # the gate the per-row DELETE /api/cyab/systems/{id} endpoint
+        # enforces — which is case:close, not case:update. (Fixed: these
+        # had drifted apart, letting case:update-only users bulk-delete
+        # systems they could not delete one at a time.)
         # v0.19.16: also catches IntegrityError per-row so a single
         # FK-violation doesn't poison the shared session for the rest
         # of the user's selection.
         if action == "delete-selected":
-            if not user.has_permission("case:update"):
+            if not user.has_permission("case:close"):
                 raise HTTPException(
                     status_code=403,
-                    detail="case:update permission required for bulk delete",
+                    detail="case:close permission required for bulk delete",
                 )
             from sqlalchemy.exc import IntegrityError
 

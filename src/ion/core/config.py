@@ -1,10 +1,17 @@
 """Configuration management for ION."""
 
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
+
+# Warn-once guard so the OIDC TLS-verification-disabled banner is logged a
+# single time at first use rather than on every get_oidc_config() call.
+_oidc_tls_warned = False
 
 
 @dataclass
@@ -977,6 +984,26 @@ def get_oidc_config():
     from ion.auth.oidc_config import OIDCConfig
 
     config = get_config()
+
+    # Security visibility: OIDC token trust ultimately rests on the JWKS we
+    # fetch from Keycloak. With TLS verification off, an on-path attacker can
+    # serve a forged JWKS and mint tokens accepted as any user. The default is
+    # left off for air-gapped/self-signed deployments, but the insecure state
+    # must never be silent — log a loud, once-only warning so operators can see
+    # it in `docker logs ion` and opt back in via ION_OIDC_VERIFY_SSL=true /
+    # ION_CA_BUNDLE. (Code-review finding #1.)
+    global _oidc_tls_warned
+    if config.oidc_enabled and not config.oidc_verify_ssl and not _oidc_tls_warned:
+        _oidc_tls_warned = True
+        logger.warning(
+            "OIDC TLS verification is DISABLED (ION_OIDC_VERIFY_SSL=false). "
+            "Keycloak JWKS/token-exchange traffic is not certificate-verified; "
+            "an on-path attacker could forge the signing keys and impersonate "
+            "any user. Set ION_OIDC_VERIFY_SSL=true (and ION_CA_BUNDLE for "
+            "self-signed certs) in any environment where the link to Keycloak "
+            "is not fully trusted."
+        )
+
     return OIDCConfig(
         enabled=config.oidc_enabled,
         keycloak_url=config.oidc_keycloak_url,

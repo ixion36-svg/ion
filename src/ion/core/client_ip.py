@@ -89,6 +89,13 @@ def get_client_ip(request: Request) -> Optional[str]:
 
     real_ip = request.headers.get("X-Real-IP")
     if real_ip:
-        return real_ip
+        # Validate before trusting: a malformed X-Real-IP would otherwise land
+        # in source_ip audit fields and rate-limit / IP-block bucket keys. Fall
+        # through to the trusted peer if it isn't a well-formed address.
+        try:
+            ipaddress.ip_address(real_ip)
+            return real_ip
+        except ValueError:
+            pass
 
     return peer

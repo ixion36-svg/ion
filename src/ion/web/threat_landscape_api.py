@@ -6,22 +6,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.core.config import get_config
 from ion.core.safe_errors import safe_error
 from ion.models.user import User
 from ion.services.ollama_service import OllamaError, get_ollama_service
 from ion.services.opencti_service import OpenCTIError, get_opencti_service
-from ion.storage.database import get_engine, get_session_factory
-
-
-def get_db_session():
-    engine = get_engine(get_config().db_path)
-    factory = get_session_factory(engine)
-    session = factory()
-    try:
-        yield session
-    finally:
-        session.close()
+from ion.storage.database import get_db_session
 
 logger = logging.getLogger(__name__)
 

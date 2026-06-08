@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Generator, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -10,24 +10,13 @@ from sqlalchemy import String, func, or_
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.core.config import get_config
 from ion.core.safe_errors import safe_error
 from ion.models.network_asset import NetworkAsset, NetworkAssetIP
 from ion.models.user import User
-from ion.storage.database import get_engine, get_session_factory
+from ion.storage.database import get_db_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/network-map", tags=["network-map"])
-
-
-def get_db_session() -> Generator[Session, None, None]:
-    engine = get_engine(get_config().db_path)
-    factory = get_session_factory(engine)
-    session = factory()
-    try:
-        yield session
-    finally:
-        session.close()
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────

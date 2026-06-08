@@ -368,8 +368,11 @@ class TideService:
         return result["rows"] if result else []
 
     def get_system_detail(self, system_id: str) -> Optional[dict]:
+        # system_id is a user-controlled path parameter; escape the single-quote
+        # break-out before interpolation (matches get_system_use_case_coverage).
+        safe_id = system_id.replace("'", "''")
         result = self._query(
-            f"SELECT id, name, classification, description FROM systems WHERE id = '{system_id}'"
+            f"SELECT id, name, classification, description FROM systems WHERE id = '{safe_id}'"
         )
         if not result or not result["rows"]:
             return None
@@ -381,7 +384,7 @@ class TideService:
                    dr.mitre_ids, dr.space
             FROM applied_detections ad
             JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}'
-            WHERE ad.system_id = '{system_id}'
+            WHERE ad.system_id = '{safe_id}'
             ORDER BY dr.severity DESC, dr.name
         """)
         system["detections"] = det_result["rows"] if det_result else []
@@ -410,13 +413,15 @@ class TideService:
 
     def get_mitre_coverage(self, system_id: str) -> dict:
         """Get MITRE technique coverage for a system."""
+        # system_id is user-controlled; escape the single-quote break-out.
+        safe_id = system_id.replace("'", "''")
         # Techniques covered by this system's detections
         covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM applied_detections ad
             JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}',
             LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-            WHERE ad.system_id = '{system_id}'
+            WHERE ad.system_id = '{safe_id}'
         """)
         covered_ids = {r["technique_id"] for r in (covered["rows"] if covered else [])}
 
@@ -687,12 +692,17 @@ class TideService:
         playbooks = pb["rows"]
 
         for p in playbooks:
+            # Escape ids before interpolation. These come from prior TIDE query
+            # results (second-order), but a crafted id in the TIDE tenant data
+            # could otherwise alter the follow-up query — same escaping as the
+            # user-facing system_id path.
+            safe_pid = str(p["id"]).replace("'", "''")
             # Get steps
             steps = self._query(f"""
                 SELECT id as step_id, step_number, title, description,
                        technique_id, required_rule, tactic
                 FROM playbook_steps
-                WHERE playbook_id = '{p["id"]}'
+                WHERE playbook_id = '{safe_pid}'
                 ORDER BY step_number
             """)
             step_list = []
@@ -700,16 +710,17 @@ class TideService:
             if steps:
                 for r in steps["rows"]:
                     step_id = r["step_id"]
+                    safe_step = str(step_id).replace("'", "''")
 
                     # Get multi-techniques from step_techniques junction table
-                    st = self._query(f"SELECT technique_id FROM step_techniques WHERE step_id = '{step_id}'")
+                    st = self._query(f"SELECT technique_id FROM step_techniques WHERE step_id = '{safe_step}'")
                     techniques = [row["technique_id"] for row in (st["rows"] if st else [])]
                     # Fallback to legacy single technique_id if junction table empty
                     if not techniques and r.get("technique_id"):
                         techniques = [r["technique_id"]]
 
                     # Get multi-detections from step_detections junction table
-                    sd = self._query(f"SELECT rule_ref, note, source FROM step_detections WHERE step_id = '{step_id}'")
+                    sd = self._query(f"SELECT rule_ref, note, source FROM step_detections WHERE step_id = '{safe_step}'")
                     detections = [{"rule_ref": row["rule_ref"], "note": row.get("note", ""), "source": row.get("source", "")} for row in (sd["rows"] if sd else [])]
                     # Fallback to legacy single required_rule
                     if not detections and r.get("required_rule"):

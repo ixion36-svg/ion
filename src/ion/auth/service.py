@@ -78,22 +78,27 @@ class AuthService:
             self._log_failed_login(username, ip_address, "User not found")
             return None, None, "Invalid username or password"
 
-        if not user.is_active:
-            # Still verify password to prevent timing leak for disabled accounts
-            password_hasher.verify(password, user.password_hash)
-            self._log_failed_login(username, ip_address, "Account disabled")
-            return None, None, "Account is disabled"
-
         if getattr(user, "is_service_account", False):
             # Service accounts (AI analysts, integration bots) have no
             # interactive login path. Their stored password_hash is a
             # sentinel that passlib cannot identify — use the dummy hash
             # instead to keep timing stable without raising.
+            #
+            # This MUST precede the is_active check: a *disabled* service
+            # account would otherwise reach the is_active branch and call
+            # verify() against the unparseable sentinel, raising UnknownHashError
+            # (a 500) instead of returning cleanly.
             password_hasher.verify(password, self._DUMMY_HASH)
             self._log_failed_login(
                 username, ip_address, "Service account login attempt"
             )
             return None, None, "This account cannot be used for interactive login"
+
+        if not user.is_active:
+            # Still verify password to prevent timing leak for disabled accounts
+            password_hasher.verify(password, user.password_hash)
+            self._log_failed_login(username, ip_address, "Account disabled")
+            return None, None, "Account is disabled"
 
         # Account lockout (opt-in via ION_ACCOUNT_LOCKOUT_ENABLED)
         lockout_enabled = get_config().account_lockout_enabled
@@ -345,7 +350,19 @@ class AuthService:
             must_change: Require password change on next login
             admin_user_id: Admin user performing the reset
             ip_address: Client IP address for audit
+
+        Raises:
+            ValueError: if the new password violates the (opt-in) password policy
         """
+        # F6 (opt-in ION_PASSWORD_MIN_LENGTH): enforce the same policy as
+        # change_password / create_user so the admin reset path can't be used to
+        # set a weak/common password while the policy is enabled. No-op by default.
+        policy_error = validate_password_policy(
+            new_password, get_config().password_min_length
+        )
+        if policy_error:
+            raise ValueError(policy_error)
+
         new_hash = password_hasher.hash(new_password)
         user.password_hash = new_hash
         user.must_change_password = must_change

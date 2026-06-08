@@ -27,14 +27,13 @@ Auth:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Generator, List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
-from ion.core.config import get_config
 from ion.core.safe_errors import safe_error
 from ion.models.alert_triage import (
     AlertCase,
@@ -50,18 +49,7 @@ from ion.services.arkime_service import ArkimeError, get_arkime_service
 from ion.services.elasticsearch_service import ElasticsearchService
 from ion.services.observable_service import ObservableService
 from ion.services.opencti_service import get_opencti_service
-from ion.storage.database import get_engine, get_session_factory
-
-
-def get_db_session() -> Generator[Session, None, None]:
-    """FastAPI dependency for a scoped database session (matches api.py)."""
-    engine = get_engine(get_config().db_path)
-    factory = get_session_factory(engine)
-    session = factory()
-    try:
-        yield session
-    finally:
-        session.close()
+from ion.storage.database import get_db_session
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["arkime"])

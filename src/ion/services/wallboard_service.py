@@ -230,22 +230,37 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
     cutoff_7d = datetime.utcnow() - timedelta(days=7)
 
     # Per-week feedback metrics.
-    feedback_7d_total = int(session.scalar(
-        select(func.count()).select_from(AIFeedback)
+    #
+    # The AIFeedback ledger is dual-written: a fire-time "pending" row and a
+    # later case-close row, both keyed (alert_id, alert_prompt_template_id).
+    # Readers MUST dedup with MAX(id) per that key (see CLAUDE.md and
+    # bob_eval_service._fetch_deduped_feedback) or the same logical feedback is
+    # counted twice and the unresolved "pending" sentinel is scored as a
+    # disagreement. Dedup to the latest row per key, then count / score only
+    # within the 7-day window.
+    deduped_ids = (
+        select(func.max(AIFeedback.id))
+        .group_by(AIFeedback.alert_id, AIFeedback.alert_prompt_template_id)
+        .scalar_subquery()
+    )
+    rows = session.execute(
+        select(AIFeedback.human_verdict, AIFeedback.bob_suggested_verdict)
+        .where(AIFeedback.id.in_(deduped_ids))
         .where(AIFeedback.created_at >= cutoff_7d)
-    ) or 0)
+    ).all()
+    feedback_7d_total = len(rows)
 
-    # Fix 5: use correct column names — analyst_verdict→human_verdict,
-    # bob_verdict→bob_suggested_verdict (pre-existing latent bug).
-    agreement_count = 0
-    if feedback_7d_total > 0:
-        rows = session.execute(
-            select(AIFeedback.human_verdict, AIFeedback.bob_suggested_verdict)
-            .where(AIFeedback.created_at >= cutoff_7d)
-        ).all()
-        agreement_count = sum(1 for av, bv in rows if av is not None and bv is not None and av == bv)
+    # Agreement is meaningful only for resolved feedback: exclude the
+    # fire-time "pending" sentinel (human_verdict is NOT NULL, so the sentinel
+    # is the string "pending", never None) from BOTH numerator and denominator.
+    resolved = [
+        (av, bv) for av, bv in rows
+        if av and av != "pending" and bv is not None
+    ]
+    agreement_total = len(resolved)
+    agreement_count = sum(1 for av, bv in resolved if av == bv)
     agreement_pct = (
-        round(agreement_count * 100 / feedback_7d_total) if feedback_7d_total else None
+        round(agreement_count * 100 / agreement_total) if agreement_total else None
     )
 
     # 7-day daily histogram of Bob investigations.
@@ -268,6 +283,7 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
         "feedback_7d_total": feedback_7d_total,
         "agreement_pct": agreement_pct,
         "agreement_count": agreement_count,
+        "agreement_total": agreement_total,
         "history_7d": history_7d,
     }
 

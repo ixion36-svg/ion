@@ -63,6 +63,21 @@ class UserRepository:
         )
         return self.session.execute(stmt).unique().scalar_one_or_none()
 
+    def get_by_keycloak_sub(self, keycloak_sub: str) -> Optional[User]:
+        """Get a user by their immutable Keycloak subject identifier.
+
+        Used as the PRIMARY match key for OIDC sync: ``sub`` is immutable and
+        cannot be reassigned by an attacker, unlike a self-service email.
+        """
+        if not keycloak_sub:
+            return None
+        stmt = (
+            select(User)
+            .options(selectinload(User.roles).selectinload(Role.permissions))
+            .where(User.keycloak_sub == keycloak_sub)
+        )
+        return self.session.execute(stmt).unique().scalar_one_or_none()
+
     def list_all(self, include_inactive: bool = False) -> List[User]:
         """List all users."""
         # v0.9.82: selectinload for M2M — was joinedload, producing a users × roles cartesian.
