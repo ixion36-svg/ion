@@ -23,6 +23,7 @@ import logging
 from typing import Any, Optional
 
 from sqlalchemy import desc, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ion.models.case_evidence import CaseEvidenceLedger
@@ -30,6 +31,36 @@ from ion.models.case_evidence import CaseEvidenceLedger
 logger = logging.getLogger(__name__)
 
 GENESIS_PREV_HASH = "0" * 64
+
+# How many times append() re-reads-and-retries on a UNIQUE(seq) collision.
+# Only reachable on SQLite (no per-case advisory lock); Postgres serialises.
+_MAX_APPEND_ATTEMPTS = 3
+
+
+def _assert_roundtrip_stable(payload: dict[str, Any]) -> None:
+    """Reject payload values whose JSON round-trip is not byte-stable.
+
+    ``verify_chain`` recomputes the hash from the payload after it round-trips
+    through the DB JSON column. ``float`` values are the hazard: a jsonb column
+    may normalise ``1.0`` -> ``1``, so the recomputed canonical bytes would
+    differ and verify_chain would report a *false* content_hash mismatch.
+    Ledger payloads must therefore be composed only of str / int / bool / None /
+    list / dict. (bool is an int subclass and is fine.)
+    """
+    def _check(value: Any) -> None:
+        if isinstance(value, float):
+            raise ValueError(
+                "ledger payload must not contain float values "
+                "(not JSON-round-trip-stable)"
+            )
+        if isinstance(value, dict):
+            for v in value.values():
+                _check(v)
+        elif isinstance(value, (list, tuple)):
+            for v in value:
+                _check(v)
+
+    _check(payload)
 
 
 def canonical_payload(payload: dict[str, Any]) -> str:
@@ -51,7 +82,16 @@ def canonical_payload(payload: dict[str, Any]) -> str:
 
 
 def compute_content_hash(prev_hash: str, action: str, payload: dict[str, Any]) -> str:
-    """Reproducible hash function — used by both append and verify."""
+    """Reproducible hash function — used by both append and verify.
+
+    The pre-image is ``prev_hash | action | canonical_json(payload)`` with a raw
+    ``|`` delimiter. This is unambiguous ONLY because (a) ``prev_hash`` is a
+    fixed-width 64-char hex digest containing no ``|`` (so the first delimiter is
+    pinned), and (b) ``append`` rejects any ``action`` containing ``|`` (so the
+    second delimiter is pinned). With both boundaries fixed, two distinct
+    (action, payload) pairs cannot collide regardless of payload content.
+    Do not relax either invariant without length-prefixing the pre-image.
+    """
     canonical = canonical_payload(payload)
     blob = f"{prev_hash}|{action}|{canonical}".encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
@@ -96,40 +136,60 @@ def append(
     """
     if not action or not isinstance(action, str):
         raise ValueError("action must be a non-empty string")
+    if "|" in action:
+        # The hash pre-image uses '|' as a delimiter; an action containing it
+        # would make the action/payload boundary ambiguous (collision vector).
+        raise ValueError("action must not contain the '|' delimiter")
     if not isinstance(payload, dict):
         raise ValueError("payload must be a dict")
+    _assert_roundtrip_stable(payload)
 
     _per_case_lock(session, alert_case_id)
 
-    # Read the latest row under the case lock. seq is 1-based.
-    last = session.execute(
-        select(CaseEvidenceLedger)
-        .where(CaseEvidenceLedger.alert_case_id == alert_case_id)
-        .order_by(desc(CaseEvidenceLedger.seq))
-        .limit(1)
-    ).scalar_one_or_none()
+    # Read latest seq, compute the hash, and insert under a SAVEPOINT. On
+    # SQLite the per-case lock is a no-op, so two writers can read the same
+    # `last` row and collide on UNIQUE(alert_case_id, seq); the savepoint rolls
+    # back just the failed row (not the caller's outer transaction) and we
+    # re-read + retry. On Postgres the advisory lock makes the race impossible,
+    # so this loop runs exactly once.
+    for attempt in range(_MAX_APPEND_ATTEMPTS):
+        last = session.execute(
+            select(CaseEvidenceLedger)
+            .where(CaseEvidenceLedger.alert_case_id == alert_case_id)
+            .order_by(desc(CaseEvidenceLedger.seq))
+            .limit(1)
+        ).scalar_one_or_none()
 
-    if last is None:
-        seq = 1
-        prev_hash = GENESIS_PREV_HASH
-    else:
-        seq = last.seq + 1
-        prev_hash = last.content_hash
+        if last is None:
+            seq = 1
+            prev_hash = GENESIS_PREV_HASH
+        else:
+            seq = last.seq + 1
+            prev_hash = last.content_hash
 
-    content_hash = compute_content_hash(prev_hash, action, payload)
+        content_hash = compute_content_hash(prev_hash, action, payload)
+        row = CaseEvidenceLedger(
+            alert_case_id=alert_case_id,
+            seq=seq,
+            action=action,
+            actor_id=actor_id,
+            payload=payload,
+            prev_hash=prev_hash,
+            content_hash=content_hash,
+        )
+        try:
+            with session.begin_nested():
+                session.add(row)
+                session.flush()  # surface UNIQUE(alert_case_id, seq) now
+            return row
+        except IntegrityError:
+            if attempt + 1 >= _MAX_APPEND_ATTEMPTS:
+                raise
+            # Savepoint rolled the failed row back; loop re-reads the new seq.
+            continue
 
-    row = CaseEvidenceLedger(
-        alert_case_id=alert_case_id,
-        seq=seq,
-        action=action,
-        actor_id=actor_id,
-        payload=payload,
-        prev_hash=prev_hash,
-        content_hash=content_hash,
-    )
-    session.add(row)
-    session.flush()  # surface UNIQUE(alert_case_id, seq) violations now
-    return row
+    # Unreachable: the loop either returns or re-raises on the final attempt.
+    raise RuntimeError("ledger append exhausted retries")  # pragma: no cover
 
 
 def verify_chain(session: Session, alert_case_id: int) -> dict[str, Any]:

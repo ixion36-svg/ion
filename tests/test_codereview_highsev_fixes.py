@@ -467,6 +467,82 @@ def test_eval_lock_namespaces_are_distinct():
 
 
 # ---------------------------------------------------------------------------
+# 7b. Tamper-evident ledger hardening (findings #6, #7-low, #8-low)
+# ---------------------------------------------------------------------------
+def _ledger_db():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from ion.models.case_evidence import CaseEvidenceLedger
+
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    CaseEvidenceLedger.__table__.create(engine)
+    return sessionmaker(bind=engine)()
+
+
+def test_ledger_rejects_pipe_in_action():
+    # '|' in action would make the hash pre-image boundary ambiguous (#6).
+    from ion.services import case_ledger_service as cls
+
+    session = _ledger_db()
+    with pytest.raises(ValueError):
+        cls.append(session, alert_case_id=1, action="pin|evil", payload={}, actor_id=None)
+
+
+def test_ledger_rejects_float_payload():
+    # Floats are not JSON-round-trip-stable -> would false-fail verify_chain (#7).
+    from ion.services import case_ledger_service as cls
+
+    session = _ledger_db()
+    with pytest.raises(ValueError):
+        cls.append(session, alert_case_id=1, action="pin",
+                   payload={"score": 1.0}, actor_id=None)
+    # Nested floats are caught too.
+    with pytest.raises(ValueError):
+        cls.append(session, alert_case_id=1, action="pin",
+                   payload={"nested": {"vals": [1, 2.5]}}, actor_id=None)
+
+
+def test_ledger_append_chain_verifies():
+    # The savepoint-wrapped insert (#8) must still produce a valid chain.
+    from ion.services import case_ledger_service as cls
+
+    session = _ledger_db()
+    cls.append(session, alert_case_id=1, action="pin",
+               payload={"pin_id": 10, "tags": ["x"]}, actor_id=7)
+    cls.append(session, alert_case_id=1, action="status_change",
+               payload={"from": "open", "to": "closed"}, actor_id=7)
+    # A second case interleaves without affecting case 1's chain.
+    cls.append(session, alert_case_id=2, action="pin", payload={"pin_id": 99}, actor_id=7)
+    session.commit()
+
+    r1 = cls.verify_chain(session, 1)
+    assert r1["is_valid"] is True and r1["seq_count"] == 2, r1
+    r2 = cls.verify_chain(session, 2)
+    assert r2["is_valid"] is True and r2["seq_count"] == 1, r2
+
+
+def test_ledger_detects_tampering():
+    # Mutating a stored payload must break verification (tamper-evidence).
+    from ion.services import case_ledger_service as cls
+
+    session = _ledger_db()
+    row = cls.append(session, alert_case_id=1, action="pin",
+                     payload={"pin_id": 10}, actor_id=7)
+    session.commit()
+    row.payload = {"pin_id": 999}  # tamper
+    session.flush()
+    result = cls.verify_chain(session, 1)
+    assert result["is_valid"] is False
+    assert result["first_break_seq"] == 1
+
+
+# ---------------------------------------------------------------------------
 # 8. Assorted low-severity hardening (findings #2/#3/#5 lows)
 # ---------------------------------------------------------------------------
 class _FakeClient:

@@ -18,6 +18,7 @@ import logging
 from typing import Any, Optional
 
 from sqlalchemy import desc, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ion.models.forensic_workbench import ForensicCaseLedger
@@ -25,6 +26,35 @@ from ion.models.forensic_workbench import ForensicCaseLedger
 logger = logging.getLogger(__name__)
 
 GENESIS_PREV_HASH = "0" * 64
+
+# How many times append() re-reads-and-retries on a UNIQUE(seq) collision.
+# Only reachable on SQLite (no per-case advisory lock); Postgres serialises.
+_MAX_APPEND_ATTEMPTS = 3
+
+
+def _assert_roundtrip_stable(payload: dict[str, Any]) -> None:
+    """Reject payload values whose JSON round-trip is not byte-stable.
+
+    ``verify_chain`` recomputes the hash from the payload after it round-trips
+    through the DB JSON column. ``float`` values are the hazard (jsonb may
+    normalise ``1.0`` -> ``1``), which would make verify_chain report a *false*
+    content_hash mismatch. Ledger payloads must be composed only of
+    str / int / bool / None / list / dict.
+    """
+    def _check(value: Any) -> None:
+        if isinstance(value, float):
+            raise ValueError(
+                "ledger payload must not contain float values "
+                "(not JSON-round-trip-stable)"
+            )
+        if isinstance(value, dict):
+            for v in value.values():
+                _check(v)
+        elif isinstance(value, (list, tuple)):
+            for v in value:
+                _check(v)
+
+    _check(payload)
 
 
 def canonical_payload(payload: dict[str, Any]) -> str:
@@ -39,7 +69,13 @@ def canonical_payload(payload: dict[str, Any]) -> str:
 
 
 def compute_content_hash(prev_hash: str, action: str, payload: dict[str, Any]) -> str:
-    """Reproducible hash — used by both append and verify."""
+    """Reproducible hash — used by both append and verify.
+
+    The pre-image is ``prev_hash | action | canonical_json(payload)``. It is
+    unambiguous only because ``prev_hash`` is fixed-width 64-hex (no ``|``) and
+    ``append`` rejects any ``action`` containing ``|`` — pinning both
+    delimiters. Do not relax either invariant without length-prefixing.
+    """
     canonical = canonical_payload(payload)
     blob = f"{prev_hash}|{action}|{canonical}".encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
@@ -75,39 +111,56 @@ def append(
     """
     if not action or not isinstance(action, str):
         raise ValueError("action must be a non-empty string")
+    if "|" in action:
+        # '|' is the hash pre-image delimiter; an action containing it would
+        # make the action/payload boundary ambiguous (collision vector).
+        raise ValueError("action must not contain the '|' delimiter")
     if not isinstance(payload, dict):
         raise ValueError("payload must be a dict")
+    _assert_roundtrip_stable(payload)
 
     _per_case_lock(session, forensic_case_id)
 
-    last = session.execute(
-        select(ForensicCaseLedger)
-        .where(ForensicCaseLedger.forensic_case_id == forensic_case_id)
-        .order_by(desc(ForensicCaseLedger.seq))
-        .limit(1)
-    ).scalar_one_or_none()
+    # Insert under a SAVEPOINT so a UNIQUE(forensic_case_id, seq) collision —
+    # only reachable on SQLite, where the per-case lock is a no-op — rolls back
+    # just this row (not the caller's outer transaction) and we re-read + retry.
+    # On Postgres the advisory lock makes the race impossible (loop runs once).
+    for attempt in range(_MAX_APPEND_ATTEMPTS):
+        last = session.execute(
+            select(ForensicCaseLedger)
+            .where(ForensicCaseLedger.forensic_case_id == forensic_case_id)
+            .order_by(desc(ForensicCaseLedger.seq))
+            .limit(1)
+        ).scalar_one_or_none()
 
-    if last is None:
-        seq = 1
-        prev_hash = GENESIS_PREV_HASH
-    else:
-        seq = last.seq + 1
-        prev_hash = last.content_hash
+        if last is None:
+            seq = 1
+            prev_hash = GENESIS_PREV_HASH
+        else:
+            seq = last.seq + 1
+            prev_hash = last.content_hash
 
-    content_hash = compute_content_hash(prev_hash, action, payload)
+        content_hash = compute_content_hash(prev_hash, action, payload)
+        row = ForensicCaseLedger(
+            forensic_case_id=forensic_case_id,
+            seq=seq,
+            action=action,
+            actor_id=actor_id,
+            payload=payload,
+            prev_hash=prev_hash,
+            content_hash=content_hash,
+        )
+        try:
+            with session.begin_nested():
+                session.add(row)
+                session.flush()  # surface UNIQUE(forensic_case_id, seq) now
+            return row
+        except IntegrityError:
+            if attempt + 1 >= _MAX_APPEND_ATTEMPTS:
+                raise
+            continue
 
-    row = ForensicCaseLedger(
-        forensic_case_id=forensic_case_id,
-        seq=seq,
-        action=action,
-        actor_id=actor_id,
-        payload=payload,
-        prev_hash=prev_hash,
-        content_hash=content_hash,
-    )
-    session.add(row)
-    session.flush()  # surface UNIQUE(forensic_case_id, seq) violations now
-    return row
+    raise RuntimeError("ledger append exhausted retries")  # pragma: no cover
 
 
 def verify_chain(session: Session, forensic_case_id: int) -> dict[str, Any]:
