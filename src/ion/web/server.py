@@ -70,6 +70,7 @@ from ion.web.entity_timeline_api import router as entity_timeline_router
 from ion.web.executive_report_api import router as executive_report_router
 from ion.web.forensic_workbench_api import router as forensic_workbench_router
 from ion.web.forensics_api import router as forensics_router
+from ion.web.gitlab_api import router as gitlab_router
 from ion.web.incident_cost_api import router as incident_cost_router
 from ion.web.integration_api import router as integration_router
 from ion.web.investigation_api import router as investigation_router
@@ -328,6 +329,7 @@ templates.env.globals["csp_nonce"] = _CSPNonceProxy()
 
 # Include API routes
 app.include_router(api_router, prefix="/api")
+app.include_router(gitlab_router, prefix="/api")  # /api/gitlab/* (split from api.py, #14)
 app.include_router(security_router, prefix="/api/security")
 app.include_router(integration_router, prefix="/api/integrations")
 app.include_router(admin_router, prefix="/api/admin")
