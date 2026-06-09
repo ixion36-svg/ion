@@ -181,6 +181,7 @@ class ObservableService:
         threat_level: Optional[ThreatLevel | str] = None,
         is_whitelisted: Optional[bool] = None,
         is_enriched: Optional[bool] = None,
+        is_ignored: Optional[bool] = None,
         tags: Optional[List[str]] = None,
         limit: int = 50,
         offset: int = 0,
@@ -226,6 +227,9 @@ class ObservableService:
 
         if is_whitelisted is not None:
             q = q.filter(Observable.is_whitelisted == is_whitelisted)
+
+        if is_ignored is not None:
+            q = q.filter(Observable.is_ignored == is_ignored)
 
         if is_enriched is not None:
             # Subquery to find observables with enrichments

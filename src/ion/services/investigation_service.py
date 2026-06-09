@@ -668,13 +668,28 @@ def _normalise_extracted_iocs(raw: Dict[str, Any]) -> Dict[str, List[str]]:
 def _alert_to_text_blob(alert: dict) -> str:
     """Flatten an alert dict into a single text blob for IOC extraction.
 
-    The text IOC extractor works on freeform text; we concatenate the
-    most useful alert fields so hostnames, URLs, and hashes embedded in
-    message/reason fields all get picked up.
+    Emits only field VALUES, never field NAMES. Previously this json.dumps'd the
+    whole alert, so dotted ECS keys like ``host.name`` / ``kibana.alert.rule.name``
+    were fed to the domain regex and mis-extracted as domain IOCs (their last
+    label is a real TLD). Walking values-only structurally prevents that, while
+    still surfacing hostnames/URLs/hashes embedded in message/reason fields.
     """
+    parts: list = []
+
+    def _walk(node) -> None:
+        if isinstance(node, dict):
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, (list, tuple)):
+            for v in node:
+                _walk(v)
+        elif node is not None and not isinstance(node, bool):
+            parts.append(str(node))
+
     try:
-        return json.dumps(alert, default=str, ensure_ascii=False)
-    except (TypeError, ValueError):
+        _walk(alert)
+        return "\n".join(parts)
+    except Exception:
         return str(alert)
 
 
@@ -1189,6 +1204,19 @@ class InvestigationService:
                 if iocs:
                     existing = list(case.observables or [])
                     seen = {(o.get("type"), o.get("value")) for o in existing if isinstance(o, dict)}
+                    # Analyst-ignored observables must not be (re-)surfaced in the
+                    # investigation guide / case observable list. Collect their
+                    # normalized values and skip any match during the merge.
+                    try:
+                        from ion.models.observable import Observable
+                        ignored_values = {
+                            (nv or "").lower()
+                            for (nv,) in db.query(Observable.normalized_value)
+                            .filter(Observable.is_ignored.is_(True))
+                            .all()
+                        }
+                    except Exception:
+                        ignored_values = set()
                     type_map = {
                         "ips": "ip", "ip": "ip",
                         "domains": "domain", "domain": "domain",
@@ -1204,6 +1232,8 @@ class InvestigationService:
                         for v in (vals if isinstance(vals, list) else [vals]):
                             if not isinstance(v, str) or not v:
                                 continue
+                            if v.lower() in ignored_values:
+                                continue  # analyst-suppressed observable
                             key = (obs_type, v)
                             if key in seen:
                                 continue

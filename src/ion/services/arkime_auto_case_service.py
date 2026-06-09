@@ -65,6 +65,7 @@ async def _run_pass(engine: Engine) -> None:
     try:
         from ion.models.alert_triage import AlertTriage
         from ion.services.ai_user import get_bob_user_id
+
         # NOTE: the factory lives in connectors.elasticsearch_connector, NOT
         # elasticsearch_service. Importing it from the latter raised ImportError
         # on every pass (caught below as "import failed"), so the auto-case loop
@@ -192,6 +193,44 @@ def _create_case_for_alert(session, alert, bob_id: int, enqueue_fn) -> None:
     )
     session.add(triage)
     session.commit()
+
+    # Push the case to Kibana AND attach the source alert — mirroring the manual
+    # Arkime-commit path (arkime_api.py) and the case grouper. Without this the
+    # alert was never linked to the Kibana case on auto-create. (The case-close
+    # path updates the alert's workflow_status in ES via a separate mechanism,
+    # which is why closing the case worked while attach-on-create did not.)
+    # Best-effort: a Kibana failure must never break the auto-case loop.
+    try:
+        from ion.services.kibana_sync_helpers import sync_new_case_to_kibana
+        kibana_result = sync_new_case_to_kibana(
+            case_number=case.case_number,
+            title=case.title,
+            description=case.description,
+            severity=case.severity,
+            affected_hosts=None,
+            affected_users=None,
+            evidence_summary=None,
+            observables=None,
+            alert_ids=[alert.id],
+            triggered_rules=None,
+        )
+        if kibana_result:
+            case.kibana_case_id = kibana_result.get("kibana_case_id")
+            case.kibana_case_version = kibana_result.get("kibana_case_version")
+            session.commit()
+            logger.info(
+                "arkime_auto_case: synced %s to Kibana case %s with alert %s attached",
+                case_number, kibana_result.get("kibana_case_id"), alert.id,
+            )
+    except Exception as exc:  # pragma: no cover — defensive
+        logger.warning(
+            "arkime_auto_case: Kibana sync/attach failed for %s: %s",
+            case_number, exc,
+        )
+        try:
+            session.rollback()
+        except Exception:
+            pass
 
     logger.info(
         "arkime_auto_case: created %s for alert %s (community_id=%s node=%s)",

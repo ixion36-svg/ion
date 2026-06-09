@@ -50,6 +50,7 @@ class ObservableResponse(BaseModel):
     pap: str = "amber"
     is_ioc: bool = False
     ignore_similarity: bool = False
+    is_ignored: bool = False
 
     class Config:
         from_attributes = True
@@ -73,6 +74,7 @@ class ObservableUpdate(BaseModel):
     pap: Optional[str] = None  # "red" | "amber" | "green" | "white"
     is_ioc: Optional[bool] = None
     ignore_similarity: Optional[bool] = None
+    is_ignored: Optional[bool] = None
 
 
 class ObservableSearchRequest(BaseModel):
@@ -164,6 +166,7 @@ def _observable_to_response(obs: Observable) -> ObservableResponse:
         pap=getattr(obs, "pap", "amber") or "amber",
         is_ioc=bool(getattr(obs, "is_ioc", False)),
         ignore_similarity=bool(getattr(obs, "ignore_similarity", False)),
+        is_ignored=bool(getattr(obs, "is_ignored", False)),
     )
 
 
@@ -204,6 +207,7 @@ def _observable_to_detail(obs: Observable, session: Session) -> ObservableDetail
         pap=getattr(obs, "pap", "amber") or "amber",
         is_ioc=bool(getattr(obs, "is_ioc", False)),
         ignore_similarity=bool(getattr(obs, "ignore_similarity", False)),
+        is_ignored=bool(getattr(obs, "is_ignored", False)),
     )
 
 
@@ -218,13 +222,27 @@ async def search_observables(
     threat_level: Optional[str] = Query(None, description="Filter by threat level"),
     is_whitelisted: Optional[bool] = Query(None, description="Filter by whitelist status"),
     is_enriched: Optional[bool] = Query(None, description="Filter by enrichment status"),
+    include_ignored: bool = Query(False, description="Include analyst-ignored observables (hidden by default)"),
+    only_ignored: bool = Query(False, description="Show ONLY analyst-ignored observables"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
 ) -> dict:
-    """Search observables with filters."""
+    """Search observables with filters.
+
+    Analyst-ignored observables are hidden by default; pass include_ignored=true
+    to show them alongside everything else, or only_ignored=true to review them.
+    """
     service = ObservableService(session)
+
+    # only_ignored takes precedence; otherwise default-hide ignored rows.
+    if only_ignored:
+        is_ignored_filter: Optional[bool] = True
+    elif include_ignored:
+        is_ignored_filter = None
+    else:
+        is_ignored_filter = False
 
     types = [type] if type else None
     results, total = service.search(
@@ -233,6 +251,7 @@ async def search_observables(
         threat_level=threat_level,
         is_whitelisted=is_whitelisted,
         is_enriched=is_enriched,
+        is_ignored=is_ignored_filter,
         limit=limit,
         offset=offset,
     )
@@ -601,6 +620,8 @@ async def update_observable(
         observable.is_ioc = bool(data.is_ioc)
     if data.ignore_similarity is not None:
         observable.ignore_similarity = bool(data.ignore_similarity)
+    if data.is_ignored is not None:
+        observable.is_ignored = bool(data.is_ignored)
 
     session.commit()
     return _observable_to_detail(observable, session)

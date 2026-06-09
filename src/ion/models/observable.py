@@ -127,6 +127,14 @@ class Observable(Base, TimestampMixin):
     # high-frequency values that appear everywhere (8.8.8.8, 1.1.1.1,
     # corporate DNS resolvers) and would otherwise dominate the panel.
     ignore_similarity: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # Analyst-suppressed observable: a deliberate "ignore" action distinct from
+    # whitelisting (known-benign) or similarity muting. An ignored observable is
+    # withheld from the AI investigation guide and from case observable lists,
+    # and hidden by default in the observables view, but the record is retained
+    # (with its sightings/links) so the decision is auditable and reversible.
+    is_ignored: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="0"
+    )
 
     # Watchlist functionality
     is_watched: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

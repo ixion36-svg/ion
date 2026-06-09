@@ -908,6 +908,9 @@ def _run_migrations(engine: Engine) -> None:
             "pap": "VARCHAR(8) NOT NULL DEFAULT 'amber'",
             "is_ioc": "BOOLEAN NOT NULL DEFAULT FALSE",
             "ignore_similarity": "BOOLEAN NOT NULL DEFAULT FALSE",
+            # v0.39.x: analyst-suppressed observables (hidden from the AI
+            # investigation guide + case observable lists; record retained).
+            "is_ignored": "BOOLEAN NOT NULL DEFAULT FALSE",
         }
         for col_name, col_def in new_cols.items():
             if col_name not in existing:

@@ -73,6 +73,33 @@ _FP_DOMAINS = {
     "localhost.localdomain", "schema.org", "w3.org",
 }
 
+# ECS / SIEM field-name tokens. A dotted field name like ``host.name`` or
+# ``kibana.alert.rule.name`` matches the domain regex because its last label
+# (``name``, ``dev``, ``info``, ``co`` …) is also a real TLD. We reject a domain
+# candidate only when EVERY dot-separated segment is one of these field tokens —
+# that's unambiguously a field path, while a real domain always has at least one
+# non-field label (e.g. ``microsoft`` in microsoft.com, or ``host`` is a field
+# token but ``io`` is not, so host.io is correctly KEPT).
+_ECS_FIELD_TOKENS = frozenset({
+    "host", "name", "hostname", "user", "process", "file", "network", "event",
+    "dataset", "source", "destination", "kibana", "alert", "rule", "agent",
+    "service", "ecs", "data", "stream", "log", "observer", "related", "threat",
+    "tactic", "technique", "subtechnique", "id", "version", "type", "category",
+    "action", "outcome", "module", "provider", "code", "kind", "original",
+    "hash", "domain", "ip", "port", "mac", "full", "short", "address", "group",
+    "parent", "child", "entity", "reference", "framework", "signal", "winlog",
+    "message", "reason", "namespace", "labels", "tags", "severity", "risk",
+    "score", "status", "workflow", "uuid", "title", "description", "url",
+    "registry", "dll", "dns", "tls", "http", "geo", "as", "organization",
+})
+
+
+def _looks_like_field_name(candidate: str) -> bool:
+    """True when every dotted segment is an ECS/SIEM field token (a field path,
+    not a real domain). e.g. host.name, event.dataset, kibana.alert.rule.name."""
+    segments = candidate.split(".")
+    return len(segments) >= 2 and all(s in _ECS_FIELD_TOKENS for s in segments)
+
 
 def _is_valid_ipv4(ip: str) -> bool:
     """Check if an IPv4 string is a real routable or internal address."""
@@ -139,11 +166,12 @@ def extract_iocs(text: str) -> dict:
     for m in _IPV6.finditer(clean):
         ipv6_set.add(m.group().lower())
 
-    # Domains — exclude IPs and FPs
+    # Domains — exclude IPs, known FPs, and dotted field names (host.name,
+    # event.dataset, …) that match the regex because their last label is a TLD.
     domain_set = set()
     for m in _DOMAIN.finditer(clean):
         d = m.group().lower().rstrip(".")
-        if d not in _FP_DOMAINS and not _IPV4.match(d):
+        if d not in _FP_DOMAINS and not _IPV4.match(d) and not _looks_like_field_name(d):
             domain_set.add(d)
 
     # URLs — extract from refanged text to avoid partial matches on defanged brackets
