@@ -2603,7 +2603,9 @@ function renderFlatAlertFields(raw) {
 }
 
 // Toggle (and lazy-load) a linked alert's parsed fields.
-async function toggleAlertFields(event, alertId, fieldsId) {
+// NOTE: event-delegation.js spreads data-args directly as the function args
+// (fn.apply(el, args)) — there is NO leading `event` param here.
+async function toggleAlertFields(alertId, fieldsId) {
     const el = document.getElementById(fieldsId);
     if (!el) return;
     const chev = document.getElementById('chev-' + fieldsId);
