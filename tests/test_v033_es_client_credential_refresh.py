@@ -8,7 +8,7 @@ fingerprint of (headers, auth) and recreates the client on mismatch.
 import pytest
 
 import ion.services.elasticsearch_service as es_mod
-from ion.services.elasticsearch_service import _get_es_client, _creds_fingerprint
+from ion.services.elasticsearch_service import _creds_fingerprint, _get_es_client
 
 
 @pytest.fixture(autouse=True)
@@ -16,16 +16,17 @@ def reset_es_client():
     """Reset module-level client state before and after every test."""
     es_mod._es_client = None
     es_mod._es_client_creds = None
+    es_mod._es_client_loop = None
     yield
     if es_mod._es_client is not None and not es_mod._es_client.is_closed:
         import asyncio
         try:
-            loop = asyncio.get_event_loop()
-            loop.run_until_complete(es_mod._es_client.aclose())
+            asyncio.run(es_mod._es_client.aclose())
         except Exception:
             pass
     es_mod._es_client = None
     es_mod._es_client_creds = None
+    es_mod._es_client_loop = None
 
 
 class TestCredsFingerprint:
@@ -73,6 +74,39 @@ class TestGetEsClientCredentialRefresh:
         fp_after_second = es_mod._es_client_creds
         assert fp_after_first != fp_after_second
         assert fp_after_second == _creds_fingerprint(h2, None)
+
+
+class TestGetEsClientEventLoopBinding:
+    """Regression for 'RuntimeError: Event loop is closed': background services
+    run ES queries via asyncio.run() (a fresh, short-lived loop each cycle).
+    A client bound to a dead loop must NOT be reused on a new loop."""
+    _timeout = __import__("httpx").Timeout(30.0, connect=3.0)
+
+    def test_client_recreated_on_a_different_event_loop(self):
+        import asyncio
+        headers = {"Authorization": "ApiKey key_A", "Content-Type": "application/json"}
+        seen = []
+
+        async def grab():
+            # Same creds each time; do NOT close, so reuse would be by loop only.
+            c = _get_es_client(headers, None, False, self._timeout)
+            seen.append(id(c))
+
+        asyncio.run(grab())   # loop #1 — creates client bound to loop #1
+        asyncio.run(grab())   # loop #2 (fresh) — must rebind, not reuse loop #1's
+        assert seen[0] != seen[1], "client must be recreated on a new event loop"
+
+    def test_same_loop_reuses_client(self):
+        import asyncio
+        headers = {"Authorization": "ApiKey key_A", "Content-Type": "application/json"}
+        seen = []
+
+        async def two_calls():
+            seen.append(id(_get_es_client(headers, None, False, self._timeout)))
+            seen.append(id(_get_es_client(headers, None, False, self._timeout)))
+
+        asyncio.run(two_calls())  # both calls on the same loop -> pooled/reused
+        assert seen[0] == seen[1], "same loop + same creds must reuse the client"
 
     def test_close_clears_creds(self):
         headers = {"Authorization": "ApiKey key_A", "Content-Type": "application/json"}

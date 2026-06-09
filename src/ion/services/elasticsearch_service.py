@@ -20,8 +20,15 @@ from ion.core.config import get_elasticsearch_config, get_ssl_verify
 logger = logging.getLogger(__name__)
 
 # Shared persistent httpx client — avoids per-request connection overhead.
+# Bound to the event loop it was created on: an httpx.AsyncClient cannot be
+# reused across loops. Background services run ES queries via asyncio.run()
+# (a fresh, short-lived loop each cycle), so a single global client shared with
+# the persistent request loop raised "RuntimeError: Event loop is closed" when
+# one loop tried to use/close connections owned by another. We therefore track
+# the binding loop and recreate the client whenever the running loop differs.
 _es_client: Optional[httpx.AsyncClient] = None
 _es_client_creds: Optional[str] = None  # fingerprint of (headers, auth) used at creation
+_es_client_loop: Optional[asyncio.AbstractEventLoop] = None  # loop the client is bound to
 
 
 def _creds_fingerprint(headers: Dict, auth: Optional[tuple]) -> str:
@@ -30,17 +37,39 @@ def _creds_fingerprint(headers: Dict, auth: Optional[tuple]) -> str:
 
 
 def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
-    """Return (and lazily create) the module-level shared async client.
+    """Return (and lazily create) the shared async client for the current loop.
 
-    Recreates the client when credentials change so a runtime credential
-    update (e.g. admin wizard) is picked up without a server restart.
+    Recreates the client when (a) credentials change — so a runtime credential
+    update (e.g. admin wizard) is picked up without a restart — OR (b) the
+    running event loop differs from the one the client was bound to. The loop
+    check is what prevents "Event loop is closed": background services issue ES
+    queries via asyncio.run() on throwaway loops; reusing a client bound to a
+    now-dead loop would fail. The client is captured + used within a single
+    _request call, so a concurrent rebind from another loop is harmless here.
     """
-    global _es_client, _es_client_creds
+    global _es_client, _es_client_creds, _es_client_loop
     fp = _creds_fingerprint(headers, auth)
-    if _es_client is None or _es_client.is_closed or fp != _es_client_creds:
-        if _es_client is not None and not _es_client.is_closed:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None  # sync context (e.g. unit tests) — single shared slot
+    if (
+        _es_client is None
+        or _es_client.is_closed
+        or fp != _es_client_creds
+        or loop is not _es_client_loop
+    ):
+        # Only aclose the previous client if we're on its own loop; closing it
+        # from a different loop would itself raise "Event loop is closed". When
+        # the binding loop differs (or is gone), drop the reference and let that
+        # loop's teardown reclaim its connections.
+        if (
+            _es_client is not None
+            and not _es_client.is_closed
+            and loop is not None
+            and loop is _es_client_loop
+        ):
             try:
-                loop = asyncio.get_running_loop()
                 loop.create_task(_es_client.aclose())
             except RuntimeError:
                 pass
@@ -52,20 +81,24 @@ def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
         )
         _es_client_creds = fp
+        _es_client_loop = loop
     return _es_client
 
 
 def _close_es_client() -> None:
     """Close the shared ES client (call on config change)."""
-    global _es_client, _es_client_creds
+    global _es_client, _es_client_creds, _es_client_loop
     if _es_client is not None and not _es_client.is_closed:
         try:
             loop = asyncio.get_running_loop()
-            loop.create_task(_es_client.aclose())
+            # Only safe to aclose on the client's own loop (see _get_es_client).
+            if loop is _es_client_loop:
+                loop.create_task(_es_client.aclose())
         except RuntimeError:
             pass
     _es_client = None
     _es_client_creds = None
+    _es_client_loop = None
 
 
 def _redact_url(url: str) -> str:
