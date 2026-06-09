@@ -1,13 +1,41 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.7 -->
+<!-- ion-doc:version=0.39.8 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-08 -->
+<!-- ion-doc:date=2026-06-09 -->
 
 # Changelog
+
+## v0.39.8 — 2026-06-09
+
+**PCAP auto-case Kibana attach, observable noise reduction, alert field viewer.**
+
+Fixes and features from testing the deployed build:
+
+- **PCAP/Arkime auto-case now attaches the source alert to the Kibana case on
+  creation** (it previously only linked on close, via a separate mechanism).
+  The auto-case path now mirrors the manual + grouper paths.
+- **IOC extraction no longer treats ECS field names as domains.** Dotted field
+  names like `host.name` / `event.dataset` / `kibana.alert.rule.name` were being
+  surfaced as "domain" observables in the investigation guide; extraction now
+  works on field VALUES only, with a field-token guard as defence-in-depth.
+- **Per-observable "Ignore".** A new `is_ignored` flag (with migration) plus an
+  Ignore action + Hide/Include/Only filter on the Observables page. Ignored
+  observables are suppressed from the investigation guide and case observable
+  lists; the record is retained and the action is reversible.
+- **Linked-alert field viewer.** Each alert in a case's Linked Alerts panel now
+  expands to a flattened `field → value` table (lazy-loaded from the alert's
+  raw `_source`). Curated to triage-relevant ECS namespaces by default, with a
+  "Show all N fields" toggle — so a 500-field Elastic Security alert stays
+  readable.
+
+11 new regression tests (test_v039_8_pcap_observable_fixes.py). No new external
+calls; one additive schema column (observables.is_ignored). SECURE_BY_DESIGN
+audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new
+findings: 0C / 0H / 0M / 0L.
 
 ## v0.39.7 — 2026-06-08
 
