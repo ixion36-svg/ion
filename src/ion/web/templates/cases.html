@@ -1342,6 +1342,17 @@
     color: var(--text-secondary);
     padding: 0.3rem 0;
 }
+.cpanel-alert-showall {
+    margin-top: 0.4rem;
+    background: none;
+    border: none;
+    color: var(--ion-cyan, #6de4ff);
+    font-size: 0.68rem;
+    cursor: pointer;
+    padding: 0.15rem 0;
+}
+.cpanel-alert-showall:hover { text-decoration: underline; }
+.cpanel-alert-fields-all { margin-top: 0.2rem; }
 
 /* ── Kibana Comments ────────────────────────────────────── */
 .cpanel-comment {
@@ -2589,17 +2600,59 @@ function flattenAlertFields(obj, prefix, out) {
     return out;
 }
 
-function renderFlatAlertFields(raw) {
-    const flat = flattenAlertFields(raw);
-    const keys = Object.keys(flat).sort();
-    if (!keys.length) return '<div class="cpanel-alert-fields-empty">No fields</div>';
+// Investigation-relevant ECS namespaces shown by default. A real Elastic
+// Security alert flattens to hundreds of fields (mostly kibana.alert.rule.*,
+// ecs.*, agent.* bookkeeping); this allowlist surfaces the ~20-40 that matter
+// for triage. Everything else hides behind a "Show all" toggle.
+const ALERT_KEY_PREFIXES = [
+    '@timestamp', 'message',
+    'rule.name', 'rule.description',
+    'event.action', 'event.category', 'event.outcome', 'event.severity',
+    'event.kind', 'event.type', 'event.reason',
+    'kibana.alert.severity', 'kibana.alert.workflow_status',
+    'kibana.alert.rule.name', 'kibana.alert.reason', 'kibana.alert.risk_score',
+    'host.name', 'host.hostname', 'host.ip', 'host.os',
+    'user.', 'source.', 'destination.', 'client.', 'server.',
+    'process.', 'file.', 'url.', 'dns.', 'network.', 'tls.', 'http.',
+    'registry.', 'email.', 'threat.', 'observer.', 'related.', 'winlog.event_data.',
+];
+
+function _alertFieldsTable(flat, keys) {
     let h = '<table class="cpanel-alert-fields-table"><tbody>';
     for (const k of keys) {
         h += '<tr><td class="caf-key">' + esc(k) + '</td>'
            + '<td class="caf-val">' + esc(String(flat[k])) + '</td></tr>';
     }
-    h += '</tbody></table>';
+    return h + '</tbody></table>';
+}
+
+function renderFlatAlertFields(raw, fieldsId) {
+    const flat = flattenAlertFields(raw);
+    const allKeys = Object.keys(flat).sort();
+    if (!allKeys.length) return '<div class="cpanel-alert-fields-empty">No fields</div>';
+    const isKey = k => ALERT_KEY_PREFIXES.some(p => k === p || k.startsWith(p));
+    let keyKeys = allKeys.filter(isKey);
+    let otherKeys = allKeys.filter(k => !isKey(k));
+    // Fallback: a non-ECS alert that matches nothing should still show its data.
+    if (!keyKeys.length) { keyKeys = allKeys; otherKeys = []; }
+    let h = _alertFieldsTable(flat, keyKeys);
+    if (otherKeys.length) {
+        const allId = fieldsId + '-all';
+        h += '<button type="button" class="cpanel-alert-showall" '
+           + 'data-click-action="toggleAllAlertFields" data-args=\'["' + allId + '"]\'>'
+           + 'Show all ' + allKeys.length + ' fields (' + otherKeys.length + ' more)</button>';
+        h += '<div class="cpanel-alert-fields-all" id="' + allId + '" hidden>'
+           + _alertFieldsTable(flat, otherKeys) + '</div>';
+    }
     return h;
+}
+
+// Toggle the "all remaining fields" section under a linked alert.
+function toggleAllAlertFields(allId) {
+    const el = document.getElementById(allId);
+    if (!el) return;
+    if (el.hasAttribute('hidden')) el.removeAttribute('hidden');
+    else el.setAttribute('hidden', '');
 }
 
 // Toggle (and lazy-load) a linked alert's parsed fields.
@@ -2625,7 +2678,7 @@ async function toggleAlertFields(alertId, fieldsId) {
             el.innerHTML = '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
             return;
         }
-        el.innerHTML = renderFlatAlertFields(data.raw_data);
+        el.innerHTML = renderFlatAlertFields(data.raw_data, fieldsId);
         el.dataset.loaded = '1';
     } catch (e) {
         el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load fields: '
