@@ -100,6 +100,11 @@
         <option value="true">Enriched Only</option>
         <option value="false">Not Enriched</option>
     </select>
+    <select id="ignored-filter" data-change-action="loadObservables" title="Analyst-ignored observables are hidden by default">
+        <option value="">Hide ignored</option>
+        <option value="include">Include ignored</option>
+        <option value="only">Only ignored</option>
+    </select>
     <button class="btn btn-secondary" data-click-action="clearFilters">Clear</button>
 </div>
 
@@ -699,6 +704,11 @@ sha256,abc123...,c2,</pre>
 .obs-value.whitelisted {
     opacity: 0.6;
     text-decoration: line-through;
+}
+
+.obs-value.ignored {
+    opacity: 0.45;
+    font-style: italic;
 }
 
 .obs-value.watched {
@@ -1339,12 +1349,15 @@ async function loadObservables() {
         const threat = document.getElementById('threat-filter').value;
         const whitelist = document.getElementById('whitelist-filter').value;
         const enriched = document.getElementById('enriched-filter').value;
+        const ignored = document.getElementById('ignored-filter').value;
 
         if (query) params.set('query', query);
         if (type) params.set('type', type);
         if (threat) params.set('threat_level', threat);
         if (whitelist) params.set('is_whitelisted', whitelist);
         if (enriched) params.set('is_enriched', enriched);
+        if (ignored === 'include') params.set('include_ignored', 'true');
+        else if (ignored === 'only') params.set('only_ignored', 'true');
         params.set('limit', pageSize);
         params.set('offset', (currentPage - 1) * pageSize);
 
@@ -1380,7 +1393,7 @@ function renderObservables() {
     tbody.innerHTML = observables.map(obs => `
         <tr class="_ion-s-8410c989c9" data-click-action="showObservableDetail" data-args='[${obs.id}]'>
             <td>
-                <span class="obs-value ${obs.is_whitelisted ? 'whitelisted' : ''} ${obs.is_watched ? 'watched' : ''}" title="${escapeHtml(obs.value)}">
+                <span class="obs-value ${obs.is_whitelisted ? 'whitelisted' : ''} ${obs.is_watched ? 'watched' : ''} ${obs.is_ignored ? 'ignored' : ''}" title="${escapeHtml(obs.value)}">
                     ${obs.is_watched ? '<span class="watched-icon" title="Watched">&#128065;</span>' : ''}
                     ${escapeHtml(obs.value)}
                 </span>
@@ -1405,6 +1418,9 @@ function renderObservables() {
                 </button>
                 <button class="btn btn-sm" data-click-action="showTimeline" data-args='[${obs.id}]' title="View Timeline">
                     <i class="icon-clock"></i>
+                </button>
+                <button class="btn btn-sm ${obs.is_ignored ? 'btn-warning' : ''}" data-click-action="toggleIgnore" data-args='[${obs.id}, ${!obs.is_ignored}]' title="${obs.is_ignored ? 'Restore (un-ignore)' : 'Ignore — suppress from investigation guide & case observable lists'}">
+                    <i class="icon-ban"></i>
                 </button>
             </td>
         </tr>
@@ -1456,6 +1472,7 @@ function clearFilters() {
     document.getElementById('threat-filter').value = '';
     document.getElementById('whitelist-filter').value = '';
     document.getElementById('enriched-filter').value = '';
+    document.getElementById('ignored-filter').value = '';
     currentPage = 1;
     loadObservables();
 }
@@ -1709,6 +1726,25 @@ async function toggleWhitelist(id, whitelist) {
     } catch (error) {
         console.error('Whitelist error:', error);
         showToast('Failed to update whitelist status', 'error');
+    }
+}
+
+async function toggleIgnore(id, ignore) {
+    try {
+        const response = await fetch(`/api/observables/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_ignored: ignore }),
+        });
+        if (!response.ok) throw new Error('Failed to update');
+        showToast(ignore ? 'Observable ignored (suppressed from guide & cases)' : 'Observable restored', 'success');
+        if (currentObservable && currentObservable.id === id) {
+            showObservableDetail(id);
+        }
+        loadObservables();
+    } catch (error) {
+        console.error('Ignore error:', error);
+        showToast('Failed to update ignore status', 'error');
     }
 }
 

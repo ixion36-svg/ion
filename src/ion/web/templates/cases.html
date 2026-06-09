@@ -1307,6 +1307,42 @@
     margin-top: 0.25rem;
 }
 
+/* ── Linked-alert parsed-fields dropdown ────────────────── */
+.cpanel-alert-toggle { cursor: pointer; }
+.cpanel-alert-chevron {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    transition: transform 0.15s ease;
+}
+.cpanel-alert-chevron.expanded { transform: rotate(180deg); }
+.cpanel-alert-fields {
+    margin-top: 0.4rem;
+    max-height: 320px;
+    overflow: auto;
+    border-top: 1px solid var(--border);
+    padding-top: 0.35rem;
+}
+.cpanel-alert-fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.68rem;
+    font-family: var(--font-mono, monospace);
+}
+.cpanel-alert-fields-table td { padding: 1px 0; vertical-align: top; }
+.caf-key {
+    color: var(--text-secondary);
+    white-space: nowrap;
+    padding-right: 0.6rem !important;
+}
+.caf-val { color: var(--text-primary); word-break: break-all; }
+.cpanel-alert-fields-loading,
+.cpanel-alert-fields-empty {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    padding: 0.3rem 0;
+}
+
 /* ── Kibana Comments ────────────────────────────────────── */
 .cpanel-comment {
     padding: 0.6rem 0.75rem;
@@ -2531,6 +2567,70 @@ const statusColors = {
     closed: { bg: 'rgba(107,114,128,.12)', color: '#9ca3af' },
 };
 
+// ── Linked-alert parsed-fields dropdown ──────────────────────────────────
+// Flatten a nested alert _source into dot-path key:value pairs (arrays of
+// scalars are joined; arrays of objects are indexed).
+function flattenAlertFields(obj, prefix, out) {
+    out = out || {};
+    prefix = prefix || '';
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        for (const k of Object.keys(obj)) {
+            flattenAlertFields(obj[k], prefix ? prefix + '.' + k : k, out);
+        }
+    } else if (Array.isArray(obj)) {
+        if (obj.every(x => x === null || typeof x !== 'object')) {
+            if (obj.length) out[prefix] = obj.join(', ');
+        } else {
+            obj.forEach((x, i) => flattenAlertFields(x, prefix + '[' + i + ']', out));
+        }
+    } else if (obj !== null && obj !== undefined && obj !== '') {
+        out[prefix] = obj;
+    }
+    return out;
+}
+
+function renderFlatAlertFields(raw) {
+    const flat = flattenAlertFields(raw);
+    const keys = Object.keys(flat).sort();
+    if (!keys.length) return '<div class="cpanel-alert-fields-empty">No fields</div>';
+    let h = '<table class="cpanel-alert-fields-table"><tbody>';
+    for (const k of keys) {
+        h += '<tr><td class="caf-key">' + esc(k) + '</td>'
+           + '<td class="caf-val">' + esc(String(flat[k])) + '</td></tr>';
+    }
+    h += '</tbody></table>';
+    return h;
+}
+
+// Toggle (and lazy-load) a linked alert's parsed fields.
+async function toggleAlertFields(event, alertId, fieldsId) {
+    const el = document.getElementById(fieldsId);
+    if (!el) return;
+    const chev = document.getElementById('chev-' + fieldsId);
+    if (!el.hasAttribute('hidden')) {
+        el.setAttribute('hidden', '');
+        if (chev) chev.classList.remove('expanded');
+        return;
+    }
+    el.removeAttribute('hidden');
+    if (chev) chev.classList.add('expanded');
+    if (el.dataset.loaded === '1') return;
+    el.innerHTML = '<div class="cpanel-alert-fields-loading">Loading fields…</div>';
+    try {
+        const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw');
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.raw_data) {
+            el.innerHTML = '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
+            return;
+        }
+        el.innerHTML = renderFlatAlertFields(data.raw_data);
+        el.dataset.loaded = '1';
+    } catch (e) {
+        el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load fields: '
+            + esc(String((e && e.message) || e)) + '</div>';
+    }
+}
+
 function renderPanelContent(c) {
     let html = '';
 
@@ -2735,8 +2835,9 @@ function renderPanelContent(c) {
     html += '<div class="cpanel-section" data-tab="alerts">';
     html += '<div class="cpanel-section-title">Linked Alerts (' + alerts.length + ')</div>';
     if (alerts.length) {
-        alerts.forEach(a => {
+        alerts.forEach((a, idx) => {
             const alertId = a.es_alert_id || 'unknown';
+            const fieldsId = 'alert-fields-' + idx;
             // v0.19.3: prefer human-readable rule_name when available;
             // fall back to a 24-char prefix of the opaque ES id for
             // legacy rows where rule_name is null.
@@ -2750,16 +2851,24 @@ function renderPanelContent(c) {
             const obsCount = (a.observables || []).length;
             const mitreCount = (a.mitre_techniques || []).length;
 
+            // Header is a click-to-expand toggle: clicking the alert drops down
+            // its parsed (flattened) fields, lazy-fetched from the alert's raw
+            // _source. Works for one or many linked alerts.
             html += '<div class="cpanel-alert-card">'
-                + '<div class="cpanel-alert-card-header">'
-                +   '<a class="cpanel-alert-id" href="/alerts" title="' + esc(alertId) + '">' + esc(displayName) + '</a>'
+                + '<div class="cpanel-alert-card-header cpanel-alert-toggle" '
+                +   'data-click-action="toggleAlertFields" data-args=\'["' + esc(alertId) + '","' + fieldsId + '"]\' '
+                +   'title="Show parsed fields for ' + esc(alertId) + '">'
+                +   '<span class="cpanel-alert-id">' + esc(displayName) + '</span>'
                 +   '<div class="cpanel-alert-badges">'
                 +     '<span class="cpanel-alert-badge _ion-s-19fdfcbae6">' + esc(st) + '</span>';
             if (pc) {
                 html +=  '<span class="cpanel-alert-badge _ion-s-b2554186e7">' + esc(pr) + '</span>';
             }
-            html +=   '</div>'
+            html +=     '<i class="icon-chevron-down cpanel-alert-chevron" id="chev-' + fieldsId + '"></i>'
+                +   '</div>'
                 + '</div>';
+            // Lazy-loaded flattened-fields dropdown (hidden until expanded).
+            html += '<div class="cpanel-alert-fields" id="' + fieldsId + '" hidden></div>';
             // Alert meta row
             const metaParts = [];
             if (obsCount) metaParts.push(obsCount + ' observable' + (obsCount !== 1 ? 's' : ''));
