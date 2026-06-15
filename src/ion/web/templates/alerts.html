@@ -9249,12 +9249,15 @@ function syntaxHighlightJSON(obj) {
 // Auto-Refresh
 // =========================================================================
 function startAutoRefresh() {
-    if (autoRefreshTimer) clearInterval(autoRefreshTimer);
-    autoRefreshTimer = setInterval(() => {
+    // v0.39.9: SSE-backed live updates (one connection) with a 5-min
+    // setInterval fallback if SSE is unavailable. autoRefreshTimer now holds
+    // the live-updates stop() handle rather than a numeric interval id.
+    if (typeof autoRefreshTimer === 'function') autoRefreshTimer();
+    autoRefreshTimer = ionLiveUpdates('alerts', () => {
         if (autoRefreshEnabled && !currentDetailAlert) {
             loadAlerts();
         }
-    }, 300000); // 5 minutes
+    }, 300000); // fallback cadence (5 minutes) when SSE is unavailable
 }
 
 function toggleAutoRefresh() {

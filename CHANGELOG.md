@@ -1,13 +1,56 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.8 -->
+<!-- ion-doc:version=0.39.9 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-09 -->
 
 # Changelog
+
+## v0.39.9 — 2026-06-09
+
+**Live updates via Server-Sent Events (replaces client-side polling) + ES async-client lifecycle fix.**
+
+- **SSE change-notification channel.** Per-tab `setInterval` pollers on the
+  Alerts, Investigation Queue, Security Dashboard, and Integrations pages are
+  replaced by a single long-lived `EventSource` connection
+  (`GET /api/events/stream?topic=…`). The server computes a cheap per-topic
+  *state signature* from the shared Postgres and emits a `refresh` event only
+  when it changes; the browser then calls its existing JSON-fetch routine, so
+  the data path and its permission checks are untouched.
+  - `investigations` is a **signature topic** (status-count vector + max-id +
+    completed_at + loop-paused flag) — analysts see queue changes near-instantly
+    instead of on a blind 10s poll.
+  - `alerts`, `dashboard`, `integrations` are **interval topics** that collapse
+    the repeating requests onto one connection at their existing cadence.
+  - **Multi-worker correct by design:** the shared DB is the cross-worker source
+    of truth, so each uvicorn worker's stream loop reads it independently — no
+    in-memory bus, no `LISTEN/NOTIFY` listener (works with `ION_WORKERS=4`).
+- **`ionLiveUpdates()` client helper** (`live-updates.js`) wraps `EventSource`
+  with a transparent `setInterval` polling fallback when SSE is unavailable
+  (no `EventSource`, endpoint disabled, or unauthenticated) — behaviour is never
+  worse than before.
+- **Fixed: Elasticsearch async client "Event loop is closed".** The shared
+  `httpx.AsyncClient` was recreated only on credential change / `is_closed`,
+  never on event-loop change. Background sync services run ES queries via
+  `asyncio.run()` (a fresh loop each cycle), so the cached client bound to a
+  dead loop got reused → `RuntimeError`. The client is now bound to its event
+  loop and recreated on mismatch; the old client is `aclose()`d only on its own
+  loop, preserving connection pooling on the request loop.
+
+New env knobs (all optional): `ION_SSE_ENABLED` (default on),
+`ION_SSE_POLL_INTERVAL`, `ION_SSE_HEARTBEAT`,
+`ION_SSE_{ALERTS,DASHBOARD,INTEGRATIONS}_INTERVAL`.
+
+30 new tests (test_v039_9_sse_event_stream.py) + ES event-loop-binding
+regression tests. No new external calls, no new dependencies, no schema change.
+The SSE endpoint reuses ION's existing cookie/Bearer auth (authenticated with a
+short-lived session that closes before streaming, so it never pins a pooled DB
+connection) and is CSP-compatible (`connect-src 'self'`). SECURE_BY_DESIGN
+audit summary unchanged at 19 Met / 1 Mostly Met / 0 Partial / 0 Gap. Net new
+findings: 0C / 0H / 0M / 0L.
 
 ## v0.39.8 — 2026-06-09
 

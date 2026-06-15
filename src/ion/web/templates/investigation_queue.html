@@ -449,7 +449,9 @@
   document.addEventListener('DOMContentLoaded', function() {
     iqLoad();
     iqLoadLoopStatus();
-    refreshTimer = setInterval(function() { iqLoad(); iqLoadLoopStatus(); }, refreshMs);
+    // v0.39.9: SSE live updates — emits only when a job changes state, with a
+    // 10s polling fallback. refreshTimer holds the live-updates stop() handle.
+    refreshTimer = ionLiveUpdates('investigations', function() { iqLoad(); iqLoadLoopStatus(); }, refreshMs);
   });
 })();
 </script>

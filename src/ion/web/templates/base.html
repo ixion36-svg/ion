@@ -30,6 +30,10 @@
          `data-click-action="foo"` and the helper dispatches. See
          static/js/event-delegation.js for the supported attributes. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v={{ ion_version }}"></script>
+    <!-- v0.39.9: SSE-backed live updates (window.ionLiveUpdates) with a
+         setInterval polling fallback. Loaded early so page scripts can call
+         it from their DOMContentLoaded handlers. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/live-updates.js?v={{ ion_version }}"></script>
     <!-- v0.31.20: page-specific data-click-action wrappers needed to retire
          the last few multi-statement inline handlers. Living here in base.html
          so every page has them in scope. Kept tiny so the global namespace
