@@ -279,7 +279,7 @@ def test_fixture_alert_dicts_does_not_touch_elasticsearch(db: Session):
     importing the helper directly and confirming it produces the
     correct dict shape from AlertTriage rows alone.
     """
-    from ion.web.api import _fixture_alert_dicts
+    from ion.web.elasticsearch_api import _fixture_alert_dicts
 
     db.add_all([
         AlertTriage(

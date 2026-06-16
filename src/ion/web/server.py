@@ -63,6 +63,7 @@ from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.dashboard_layout_api import router as dashboard_layout_router
+from ion.web.elasticsearch_api import router as elasticsearch_router
 from ion.web.emulation_api import router as emulation_router
 from ion.web.engineering_analytics_api import router as engineering_analytics_router
 from ion.web.enrichment_api import router as enrichment_router
@@ -332,6 +333,7 @@ templates.env.globals["csp_nonce"] = _CSPNonceProxy()
 # Include API routes
 app.include_router(api_router, prefix="/api")
 app.include_router(gitlab_router, prefix="/api")  # /api/gitlab/* (split from api.py, #14)
+app.include_router(elasticsearch_router, prefix="/api")  # /api/elasticsearch/* (split from api.py, #14 inc.2)
 app.include_router(events_router)  # /api/events/stream — SSE (router has full path)
 app.include_router(mcp_router)    # /api/mcp — MCP Streamable HTTP (router has full path)
 app.include_router(security_router, prefix="/api/security")
