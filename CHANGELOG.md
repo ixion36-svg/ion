@@ -1,13 +1,38 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.39.9 -->
+<!-- ion-doc:version=0.40.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-09 -->
+<!-- ion-doc:date=2026-06-16 -->
 
 # Changelog
+
+## v0.40.0 — 2026-06-16
+
+**MCP (Model Context Protocol) server mode — expose ION's SOC data as AI tools. Off by default.**
+
+- **New endpoint `POST /api/mcp`** speaking MCP Streamable HTTP (JSON-RPC 2.0,
+  protocol revision `2025-03-26`). An MCP-capable assistant can now read ION's
+  alerts, cases, observables, and playbooks as structured tools — useful for
+  air-gapped local-AI triage workflows.
+- **8 tools, read-mostly:** `list_alerts`, `get_alert`, `list_cases`,
+  `get_case`, `search_observables`, `get_observable`, `list_playbooks` (all
+  read-only) and `add_case_note` (the single, append-only, attributed write).
+- **Closed by default.** The endpoint is gated behind `ION_MCP_ENABLED` and is
+  **disabled unless explicitly toggled on** (`ION_MCP_ENABLED=true`). When off,
+  `/api/mcp` returns `404 Not Found` — the surface is not advertised, and the
+  flag is checked *before* authentication so a disabled endpoint does no DB
+  work. This follows ION's opt-in hardening convention (cf. v0.39.3–v0.39.4).
+- **Permission-aware, twice over.** Authentication accepts the `ion_session`
+  cookie or an `Authorization: Bearer` token (validated on a short-lived DB
+  session closed before tool work, as in the SSE endpoint). `tools/list`
+  returns only the tools the caller's ION role permits, and `tools/call`
+  re-checks the per-tool permission before dispatch — so a hidden tool can't be
+  invoked by a hand-crafted request.
+
+New env knob (optional): `ION_MCP_ENABLED` (default **off**).
 
 ## v0.39.9 — 2026-06-09
 

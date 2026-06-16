@@ -83,6 +83,7 @@ from ion.web.labs_api import router as labs_router
 from ion.web.log_source_api import router as log_source_router
 from ion.web.logging_middleware import RequestLoggingMiddleware
 from ion.web.maturity_api import router as maturity_router
+from ion.web.mcp_api import router as mcp_router
 from ion.web.mitre_navigator_api import router as mitre_navigator_router
 from ion.web.network_map_api import router as network_map_router
 from ion.web.notes_api import router as notes_router
@@ -332,6 +333,7 @@ templates.env.globals["csp_nonce"] = _CSPNonceProxy()
 app.include_router(api_router, prefix="/api")
 app.include_router(gitlab_router, prefix="/api")  # /api/gitlab/* (split from api.py, #14)
 app.include_router(events_router)  # /api/events/stream — SSE (router has full path)
+app.include_router(mcp_router)    # /api/mcp — MCP Streamable HTTP (router has full path)
 app.include_router(security_router, prefix="/api/security")
 app.include_router(integration_router, prefix="/api/integrations")
 app.include_router(admin_router, prefix="/api/admin")
