@@ -1,13 +1,46 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.40.0 -->
+<!-- ion-doc:version=0.41.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-16 -->
 
 # Changelog
+
+## v0.41.0 — 2026-06-16
+
+**Staff-schedule (Team Schedule) enhancements + `api.py` god-module split (increments 2–3).**
+
+- **Team Schedule — coverage you can act on.** The Skills & Training page's
+  Team Schedule gains:
+  - a **monthly** capability-coverage rollup (month-average + worst-day)
+    alongside the existing daily/weekly views;
+  - **staffing thresholds + RAG** — leads set a minimum number of people at a
+    proficiency level per capability (gear button); working days that fall
+    short are flagged in an "understaffed days" summary, green when all met;
+  - **"fill the gap"** — click a short-staffed day to see off-duty staff who
+    hold that capability at the required level (who to call in);
+  - **export** — roster CSV (`GET /api/skills/schedule/export.csv`), a
+    client-side capability-gap CSV, and a print/PDF stylesheet.
+  New `CapabilityThreshold` model + `GET/POST /api/skills/coverage/thresholds`.
+- **Direct "Skills & Schedule" nav entry** — the page (and its Team Schedule)
+  was previously only reachable via a sub-tab; it now has its own item in the
+  Knowledge menu.
+- **Fixed a long-standing layout bug** in the Team Schedule grids (staff
+  roster + daily/weekly coverage): a v0.31.21 style→class migration left the
+  grid-column template unapplied, collapsing each grid to one vertical column.
+  Columns are now applied CSP-safely, restoring the horizontal schedule.
+- **About ION — single-slide presenter.** The `/briefings` decks (Executive
+  Brief, Full Overview, Secure by Design) can now be shown full-screen, one
+  slide at a time, with ‹ / › + keyboard navigation and an Esc to exit.
+- **Maintainability — `api.py` split, increments 2 & 3.** The Elasticsearch
+  infrastructure + alert-read surface moved to `web/elasticsearch_api.py` and
+  the investigation-case lifecycle to `web/case_lifecycle_api.py`, mounted at
+  `/api` with all original paths preserved. `api.py` drops from ~8,700 to
+  ~5,900 lines. No route, permission, or behaviour change (the known-false-
+  positive subsystem stays in `api.py`, entangled with alert close).
 
 ## v0.40.0 — 2026-06-16
 
