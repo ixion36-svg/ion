@@ -38,7 +38,7 @@ ION's version string lives in 8 files. Past releases rotted them (`src/ion/__ini
    - `docker-compose.yml` → **both** `ixion36/ion:${ION_VERSION:-X.Y.Z}` occurrences
    - `.env.deploy` → `ION_VERSION=X.Y.Z` (plus header comment if present)
    - `CHANGELOG.md` → new `## vX.Y.Z — YYYY-MM-DD` heading at top + entries
-   - `SECURITY_ASSESSMENT.md` → add column for X.Y.Z to severity table + new "Net-New Surfaces" section if material
+   - `SECURITY_ASSESSMENT.md` → bump `<!-- ion-doc:version=X.Y.Z -->` + `Assessment Date` + `Application Version`, update the compact **current-posture** table's `(vX.Y.Z)` version header (single cell — the values stay 0 unless a finding lands), and add a "Net-New Surfaces" paragraph if material. (The old 70-column per-version trend table was retired at v0.40.0; the checker only anchors on the `ion-doc:version` stamp.)
 
 5. **Re-run the checker** — must now report PASS.
 
