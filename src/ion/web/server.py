@@ -53,6 +53,7 @@ from ion.web.briefing_api import router as briefing_router
 from ion.web.bulk_ops_api import router as bulk_ops_router
 from ion.web.canary_api import router as canary_router
 from ion.web.case_grouper_api import router as case_grouper_router
+from ion.web.case_lifecycle_api import router as case_lifecycle_router
 from ion.web.case_similarity_api import router as case_similarity_router
 from ion.web.change_log_api import router as change_log_router
 from ion.web.comm_template_api import router as comm_template_router
@@ -369,6 +370,7 @@ app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
 app.include_router(attack_story_router, prefix="/api")
 app.include_router(case_similarity_router, prefix="/api")
+app.include_router(case_lifecycle_router, prefix="/api")  # /api/elasticsearch/alerts/cases/* (split from api.py, #14 inc.3)
 app.include_router(triage_suggestion_router, prefix="/api")
 app.include_router(mitre_navigator_router, prefix="/api")
 app.include_router(playbook_analytics_router, prefix="/api")

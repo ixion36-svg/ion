@@ -61,7 +61,7 @@ class TestAutoCaseEsFactoryImport:
 
 class TestExtractCommunityAndNode:
     def test_ecs_nested_form(self):
-        from ion.web.api import _extract_community_and_node
+        from ion.web.case_lifecycle_api import _extract_community_and_node
         cid, node = _extract_community_and_node({
             "network": {"community_id": "1:abc123"},
             "arkime_node": "cap-01",
@@ -70,12 +70,12 @@ class TestExtractCommunityAndNode:
         assert node == "cap-01"
 
     def test_flattened_dotted_key(self):
-        from ion.web.api import _extract_community_and_node
+        from ion.web.case_lifecycle_api import _extract_community_and_node
         cid, _ = _extract_community_and_node({"network.community_id": "1:flat"})
         assert cid == "1:flat"
 
     def test_bare_community_id_key(self):
-        from ion.web.api import _extract_community_and_node
+        from ion.web.case_lifecycle_api import _extract_community_and_node
         cid, _ = _extract_community_and_node({"community_id": "1:bare"})
         assert cid == "1:bare"
 
@@ -86,7 +86,7 @@ class TestExtractCommunityAndNode:
         no nested ``arkime`` dict, the precedence on the original
         expression evaluated to None and the top-level value was lost.
         """
-        from ion.web.api import _extract_community_and_node
+        from ion.web.case_lifecycle_api import _extract_community_and_node
         _, node = _extract_community_and_node({
             "network": {"community_id": "1:n"},
             "arkime_node": "cap-02",
@@ -95,7 +95,7 @@ class TestExtractCommunityAndNode:
         assert node == "cap-02"
 
     def test_node_hint_nested_form(self):
-        from ion.web.api import _extract_community_and_node
+        from ion.web.case_lifecycle_api import _extract_community_and_node
         _, node = _extract_community_and_node({
             "network": {"community_id": "1:n"},
             "arkime": {"node": "cap-03"},
@@ -103,13 +103,13 @@ class TestExtractCommunityAndNode:
         assert node == "cap-03"
 
     def test_no_community_id(self):
-        from ion.web.api import _extract_community_and_node
+        from ion.web.case_lifecycle_api import _extract_community_and_node
         cid, node = _extract_community_and_node({"network": {"src_ip": "10.0.0.1"}})
         assert cid is None
         assert node is None
 
     def test_non_dict_input(self):
-        from ion.web.api import _extract_community_and_node
+        from ion.web.case_lifecycle_api import _extract_community_and_node
         assert _extract_community_and_node(None) == (None, None)
         assert _extract_community_and_node("not a dict") == (None, None)
 
@@ -165,7 +165,7 @@ class TestBuildPcapFlows:
         """When every alert has raw_data in context, no ES round trip fires."""
         import asyncio
 
-        from ion.web import api
+        from ion.web import case_lifecycle_api as api
 
         called = {"es_calls": 0}
 
@@ -196,7 +196,7 @@ class TestBuildPcapFlows:
         """Multi-select case-create gap: contexts without raw_data → ES fetch."""
         import asyncio
 
-        from ion.web import api
+        from ion.web import case_lifecycle_api as api
 
         observed: Dict[str, Any] = {}
 
@@ -236,7 +236,7 @@ class TestBuildPcapFlows:
         """One alert via context, one via ES — both flows surface."""
         import asyncio
 
-        from ion.web import api
+        from ion.web import case_lifecycle_api as api
 
         class FakeES:
             async def get_alerts_by_ids(self, ids):
@@ -268,7 +268,7 @@ class TestBuildPcapFlows:
         """If ES raises, the helper returns whatever flows it already has."""
         import asyncio
 
-        from ion.web import api
+        from ion.web import case_lifecycle_api as api
 
         class BoomES:
             async def get_alerts_by_ids(self, ids):
@@ -291,7 +291,7 @@ class TestBuildPcapFlows:
     def test_alerts_without_community_id_are_dropped(self, monkeypatch):
         import asyncio
 
-        from ion.web import api
+        from ion.web import case_lifecycle_api as api
 
         class FakeES:
             async def get_alerts_by_ids(self, ids):
