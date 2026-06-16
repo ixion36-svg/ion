@@ -2452,6 +2452,36 @@
 .cr-d-tag { font-size:0.65rem; padding:0.15rem 0.5rem; border-radius:999px; background:var(--primary-dim); border:1px solid var(--border); color:var(--text-secondary); }
 .cr-d-prereq-chip { display:inline-block; font-size:0.7rem; padding:0.2rem 0.5rem; border-radius:var(--radius); background:var(--bg-secondary); border:1px solid var(--border); color:var(--primary); cursor:pointer; margin:0.15rem; transition:all 0.2s; }
 .cr-d-prereq-chip:hover { border-color:var(--primary); box-shadow:var(--glow-sm); }
+
+/* v0.41.0 — schedule coverage toolbar, understaffing summary, thresholds, fill-the-gap */
+.soc-cov-spacer { flex:1 1 auto; }
+.soc-cov-export { text-decoration:none; }
+#soc-understaffed { margin-top:0.75rem; }
+.us-card { border:1px solid var(--border); border-radius:var(--radius); padding:0.7rem 0.9rem; font-size:0.8rem; }
+.us-hint { color:var(--text-secondary); background:var(--bg-secondary); }
+.us-ok { color:#22c55e; background:rgba(34,197,94,.10); border-color:rgba(34,197,94,.35); }
+.us-warn { color:var(--text-secondary); background:rgba(234,179,8,.08); border-color:rgba(234,179,8,.40); }
+.us-title { font-weight:700; color:#eab308; margin-bottom:0.5rem; }
+.us-row { display:flex; gap:0.6rem; align-items:flex-start; padding:0.35rem 0; border-top:1px solid var(--border); flex-wrap:wrap; }
+.us-row:first-of-type { border-top:none; }
+.us-cap { min-width:200px; font-weight:600; color:var(--text-bright); }
+.us-need { font-weight:400; font-size:0.7rem; color:var(--text-secondary); }
+.us-days { display:flex; flex-wrap:wrap; gap:0.25rem; }
+.us-day { font-size:0.7rem; padding:0.1rem 0.4rem; border-radius:var(--radius); background:rgba(239,68,68,.12); color:#ef4444; border:1px solid rgba(239,68,68,.35); cursor:pointer; }
+.us-day:hover { background:rgba(239,68,68,.22); }
+.us-more { font-size:0.7rem; color:var(--text-secondary); align-self:center; }
+.thr-grid { display:flex; flex-direction:column; gap:0.35rem; margin:0.6rem 0; }
+.thr-row { display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap; }
+.thr-cap { min-width:200px; font-size:0.8rem; color:var(--text-bright); }
+.thr-fld { font-size:0.72rem; color:var(--text-secondary); display:flex; align-items:center; gap:0.3rem; }
+.thr-fld input { width:54px; padding:0.2rem 0.35rem; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius); color:var(--text-bright); }
+.thr-actions { margin-top:0.6rem; text-align:right; }
+@media print {
+  body * { visibility:hidden; }
+  #tab-schedule, #tab-schedule * { visibility:visible; }
+  #tab-schedule { position:absolute; left:0; top:0; width:100%; }
+  .soc-cov-toggle, .sched-controls .sched-nav-btn { display:none; }
+}
 </style>
 
 <section class="mb-8 rise d-1">
@@ -2968,6 +2998,12 @@
             <div class="soc-cov-toggle">
                 <button class="sched-nav-btn soc-cov-view-btn active" data-view="day" data-click-action="switchCovView" data-args='["day"]'>Daily</button>
                 <button class="sched-nav-btn soc-cov-view-btn" data-view="week" data-click-action="switchCovView" data-args='["week"]'>Weekly</button>
+                <button class="sched-nav-btn soc-cov-view-btn" data-view="month" data-click-action="switchCovView" data-args='["month"]'>Monthly</button>
+                <span class="soc-cov-spacer _ion-s-covspacer"></span>
+                <button class="sched-nav-btn" data-click-action="openThresholdConfig" title="Set minimum-staffing targets per capability">&#9881; Thresholds</button>
+                <a class="sched-nav-btn soc-cov-export" id="sched-export-csv" href="#" download>&#8681; Roster CSV</a>
+                <button class="sched-nav-btn" data-click-action="exportGapsCsv" title="Download capability-gap report (current view)">&#8681; Gaps CSV</button>
+                <button class="sched-nav-btn" data-click-action="printSchedule" title="Print / save as PDF">&#128424; Print</button>
             </div>
         </div>
         <div class="soc-cov-legend">
@@ -2980,7 +3016,13 @@
         <div class="sched-grid-wrap">
             <div id="soc-cov-grid"></div>
         </div>
+        <!-- Threshold-driven understaffing summary (RAG) -->
+        <div id="soc-understaffed"></div>
     </div>
+
+    <!-- Modal roots for threshold config + fill-the-gap (rendered by JS) -->
+    <div id="threshold-config-root"></div>
+    <div id="fill-gap-root"></div>
 </div>
 
 <!-- Tab 5b: Role Match — pick a role, take an Elastic-focused questionnaire,
@@ -7310,6 +7352,17 @@ function schedNavMonth(delta) {
 }
 
 let socCovView = 'day';
+let covThresholds = {};  // capName -> { min_staff, min_level, notes }
+
+async function loadCovThresholds() {
+    try {
+        const resp = await fetch('/api/skills/coverage/thresholds');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        covThresholds = {};
+        (data.thresholds || []).forEach(t => { covThresholds[t.capability_key] = t; });
+    } catch (e) { /* thresholds optional */ }
+}
 
 async function initSchedule() {
     // Also need team skills data for capability coverage
@@ -7319,7 +7372,8 @@ async function initSchedule() {
             if (resp.ok) teamData = await resp.json();
         } catch (e) { /* skip capability grid */ }
     }
-    if (schedData) { renderScheduleGrid(); renderCapCoverageGrid(); renderScheduleSummary(); return; }
+    await loadCovThresholds();
+    if (schedData) { renderScheduleGrid(); renderCapCoverageGrid(); renderScheduleSummary(); renderUnderstaffed(); return; }
     await loadScheduleData();
 }
 
@@ -7343,6 +7397,9 @@ async function loadScheduleData() {
         });
         renderScheduleGrid();
         renderCapCoverageGrid();
+        renderUnderstaffed();
+        const csvLink = document.getElementById('sched-export-csv');
+        if (csvLink) csvLink.href = `/api/skills/schedule/export.csv?month=${monthStr}`;
     } catch (e) {
         console.warn('Schedule load failed:', e);
     }
@@ -7826,6 +7883,7 @@ function switchCovView(view) {
     socCovView = view;
     document.querySelectorAll('.soc-cov-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     renderCapCoverageGrid();
+    renderUnderstaffed();
 }
 
 // For a given date string, return list of working member user_ids
@@ -7894,6 +7952,10 @@ function renderCapCoverageGrid() {
 
     if (socCovView === 'week') {
         renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLabels);
+        return;
+    }
+    if (socCovView === 'month') {
+        renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelLabels);
         return;
     }
 
@@ -8001,6 +8063,227 @@ function renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLa
     html += '</div>';
     container.innerHTML = html;
 }
+
+// =========================================================================
+// Monthly capability rollup + threshold-driven understaffing (v0.41.0)
+// =========================================================================
+
+// Average proficiency a single member has in a capability (0 if unassessed).
+function memberCapAvg(member, capName) {
+    const capDef = SOC_CAPABILITIES[capName];
+    const catSkills = capDef && SKILLS_MATRIX[capDef.cat];
+    if (!catSkills || !member || !member.skills) return 0;
+    const vals = Object.keys(catSkills).map(k => member.skills[k] || 0).filter(v => v > 0);
+    if (!vals.length) return 0;
+    return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+// Working members at/above a proficiency level for a capability.
+function staffAtLevel(capName, workingIds, minLevel) {
+    if (!teamData || !teamData.members) return [];
+    return teamData.members
+        .filter(m => workingIds.includes(m.user_id) && memberCapAvg(m, capName) >= minLevel)
+        .map(m => m.display_name || m.username);
+}
+
+// Weekday date strings for the displayed month.
+function monthWorkingDates() {
+    const y = schedMonth.getFullYear();
+    const m = schedMonth.getMonth();
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+    const out = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dow = new Date(y, m, d).getDay();
+        if (dow === 0 || dow === 6) continue;  // weekdays only
+        out.push(`${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+    }
+    return out;
+}
+
+function renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelLabels) {
+    const dates = monthWorkingDates();
+    const monthName = schedMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    let html = `<div class="sched-grid _ion-s-d9f6ddb9f2 _ion-s-covmonthgrid">`;
+    html += `<div class="sg-cell sg-header sc-cap-name _ion-s-c28bd948da">Capability</div>`;
+    html += `<div class="sg-cell sc-week-header">${esc(monthName)} (avg)</div>`;
+    html += `<div class="sg-cell sc-week-header">Worst day</div>`;
+
+    capNames.forEach(capName => {
+        const icon = SOC_CAPABILITIES[capName].icon;
+        let total = 0, n = 0, worst = 5;
+        dates.forEach(ds => {
+            const sc = computeCapScores(getWorkingMembers(ds))[capName] || { level: 0 };
+            total += sc.level; n++;
+            if (sc.level < worst) worst = sc.level;
+        });
+        const avgLvl = n > 0 ? total / n : 0;
+        const avgRounded = Math.round(avgLvl);
+        const worstLvl = n > 0 ? worst : 0;
+        html += `<div class="sg-cell sc-cap-name">${icon} ${esc(capName)}</div>`;
+        html += `<div class="sg-cell sc-cov-${avgRounded} _ion-s-5b9186f299" title="${esc(capName)}: month-average coverage"><span class="sc-level-label">${levelLabels[avgRounded]}</span><span class="_ion-s-d7176cb4c5">${avgLvl.toFixed(1)}</span></div>`;
+        html += `<div class="sg-cell sc-cov-${worstLvl} _ion-s-5b9186f299" title="Lowest single-day coverage this month"><span class="sc-level-label">${levelLabels[worstLvl]}</span></div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Threshold-driven RAG summary: which capabilities miss their minimum
+// staffing on which days this month.
+function renderUnderstaffed() {
+    const root = document.getElementById('soc-understaffed');
+    if (!root) return;
+    const capsWithThresholds = Object.keys(covThresholds);
+    if (capsWithThresholds.length === 0) {
+        root.innerHTML = `<div class="us-card us-hint">No staffing thresholds set &mdash; click <strong>&#9881; Thresholds</strong> to define minimum capability coverage and surface understaffed days.</div>`;
+        return;
+    }
+    const dates = monthWorkingDates();
+    const breaches = {};  // capName -> [{date, have, need}]
+    capsWithThresholds.forEach(cap => {
+        const thr = covThresholds[cap];
+        if (!SOC_CAPABILITIES[cap]) return;
+        dates.forEach(ds => {
+            const have = staffAtLevel(cap, getWorkingMembers(ds), thr.min_level).length;
+            if (have < thr.min_staff) {
+                (breaches[cap] = breaches[cap] || []).push({ date: ds, have, need: thr.min_staff });
+            }
+        });
+    });
+    const breachedCaps = Object.keys(breaches);
+    const monthName = schedMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    if (breachedCaps.length === 0) {
+        root.innerHTML = `<div class="us-card us-ok">&#10004; All ${capsWithThresholds.length} capability threshold(s) met on every working day in ${esc(monthName)}.</div>`;
+        return;
+    }
+    let html = `<div class="us-card us-warn"><div class="us-title">&#9888; Understaffed days &mdash; ${esc(monthName)}</div>`;
+    breachedCaps.forEach(cap => {
+        const thr = covThresholds[cap];
+        const days = breaches[cap];
+        html += `<div class="us-row"><div class="us-cap">${SOC_CAPABILITIES[cap].icon} ${esc(cap)} <span class="us-need">need ${thr.min_staff}@L${thr.min_level}</span></div><div class="us-days">`;
+        days.slice(0, 12).forEach(b => {
+            const dd = b.date.slice(8);
+            html += `<button class="us-day" data-click-action="openFillGap" data-args='["${esc(cap)}","${b.date}"]' title="${b.have}/${b.need} on ${b.date} — click to find cover">${dd}</button>`;
+        });
+        if (days.length > 12) html += `<span class="us-more">+${days.length - 12} more</span>`;
+        html += `</div></div>`;
+    });
+    html += `</div>`;
+    root.innerHTML = html;
+}
+
+// "Fill the gap" — off-duty staff who hold the capability on a given day.
+function openFillGap(capName, dateStr) {
+    const thr = covThresholds[capName] || { min_level: 3, min_staff: 1 };
+    const workingIds = getWorkingMembers(dateStr);
+    const candidates = (teamData && teamData.members ? teamData.members : [])
+        .filter(m => !workingIds.includes(m.user_id))
+        .map(m => ({ name: m.display_name || m.username, avg: memberCapAvg(m, capName) }))
+        .filter(c => c.avg >= thr.min_level)
+        .sort((a, b) => b.avg - a.avg);
+    const dayLabel = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    let html = `<div class="day-roster-backdrop" data-click-action="closeFillGap" data-args='["$event"]'>
+        <div class="day-roster" data-stop-propagation>
+            <button class="day-roster-close" data-click-action="closeFillGap">&times;</button>
+            <div class="day-roster-title">Cover for ${esc(capName)}</div>
+            <div class="day-roster-sub">${esc(dayLabel)} &mdash; off-duty staff at L${thr.min_level}+ proficiency</div>`;
+    if (candidates.length === 0) {
+        html += `<div class="dr-gap-card"><div class="dr-gap-title">No off-duty cover available</div><div class="dr-gap-list">Nobody off-duty meets L${thr.min_level}+ in ${esc(capName)}. Consider cross-training or adjusting the threshold.</div></div>`;
+    } else {
+        html += `<div class="dr-section-title">Available to call in (${candidates.length})</div>`;
+        candidates.forEach(c => {
+            const lvl = c.avg >= 4.5 ? 5 : c.avg >= 3.5 ? 4 : c.avg >= 2.5 ? 3 : 2;
+            html += `<div class="dr-member-card"><div><div class="dr-member-name">${esc(c.name)}</div></div><div class="dr-member-caps"><span class="dr-cap-badge ${['','awareness','awareness','basic','advanced','expert'][lvl] || 'intermediate'}">avg ${c.avg.toFixed(1)}</span></div></div>`;
+        });
+    }
+    html += `</div></div>`;
+    document.getElementById('fill-gap-root').innerHTML = html;
+}
+function closeFillGap(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('fill-gap-root').innerHTML = '';
+}
+
+// Threshold configuration modal.
+function openThresholdConfig() {
+    const caps = Object.keys(SOC_CAPABILITIES);
+    let html = `<div class="day-roster-backdrop" data-click-action="closeThresholdConfig" data-args='["$event"]'>
+        <div class="day-roster" data-stop-propagation>
+            <button class="day-roster-close" data-click-action="closeThresholdConfig">&times;</button>
+            <div class="day-roster-title">&#9881; Capability staffing thresholds</div>
+            <div class="day-roster-sub">Minimum people on duty at a proficiency level for each capability. Set staff to 0 to stop tracking.</div>
+            <div class="thr-grid">`;
+    caps.forEach((cap, i) => {
+        const t = covThresholds[cap] || { min_staff: 0, min_level: 3 };
+        html += `<div class="thr-row" data-cap="${esc(cap)}">
+            <div class="thr-cap">${SOC_CAPABILITIES[cap].icon} ${esc(cap)}</div>
+            <label class="thr-fld">min staff <input type="number" min="0" max="50" value="${t.min_staff}" id="thr-staff-${i}"></label>
+            <label class="thr-fld">at level <input type="number" min="1" max="5" value="${t.min_level}" id="thr-level-${i}"></label>
+        </div>`;
+    });
+    html += `</div>
+            <div class="thr-actions"><button class="btn btn-primary" data-click-action="saveThresholds">Save thresholds</button></div>
+        </div></div>`;
+    document.getElementById('threshold-config-root').innerHTML = html;
+}
+function closeThresholdConfig(event) {
+    if (event && event.target !== event.currentTarget) return;
+    document.getElementById('threshold-config-root').innerHTML = '';
+}
+async function saveThresholds() {
+    const caps = Object.keys(SOC_CAPABILITIES);
+    const thresholds = caps.map((cap, i) => {
+        const staffEl = document.getElementById(`thr-staff-${i}`);
+        const lvlEl = document.getElementById(`thr-level-${i}`);
+        return {
+            capability_key: cap,
+            min_staff: Math.max(0, parseInt(staffEl ? staffEl.value : '0', 10) || 0),
+            min_level: Math.min(5, Math.max(1, parseInt(lvlEl ? lvlEl.value : '3', 10) || 3)),
+        };
+    });
+    try {
+        const resp = await fetch('/api/skills/coverage/thresholds', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ thresholds }),
+        });
+        if (!resp.ok) { alert('Failed to save thresholds.'); return; }
+    } catch (e) { alert('Failed to save thresholds.'); return; }
+    document.getElementById('threshold-config-root').innerHTML = '';
+    await loadCovThresholds();
+    renderCapCoverageGrid();
+    renderUnderstaffed();
+}
+
+// Export: client-side capability-gap CSV for the current month; print for PDF.
+function exportGapsCsv() {
+    const dates = monthWorkingDates();
+    const capNames = Object.keys(SOC_CAPABILITIES);
+    const rows = [['date', 'capability', 'coverage_level', 'staff_at_3plus', 'threshold_staff', 'threshold_level', 'meets']];
+    dates.forEach(ds => {
+        const scores = computeCapScores(getWorkingMembers(ds));
+        capNames.forEach(cap => {
+            const sc = scores[cap] || { level: 0, cover: 0 };
+            const thr = covThresholds[cap];
+            let meets = '';
+            if (thr) {
+                const have = staffAtLevel(cap, getWorkingMembers(ds), thr.min_level).length;
+                meets = have >= thr.min_staff ? 'yes' : 'no';
+            }
+            rows.push([ds, cap, sc.level, sc.cover, thr ? thr.min_staff : '', thr ? thr.min_level : '', meets]);
+        });
+    });
+    const csv = rows.map(r => r.map(v => {
+        const s = String(v);
+        return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    }).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `ion-capability-gaps-${schedMonthStr()}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+}
+function printSchedule() { window.print(); }
 
 // =========================================================================
 // Permission-based tab visibility

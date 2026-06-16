@@ -13,6 +13,7 @@ from ion.auth.dependencies import get_db_session, require_permission
 from ion.models.skills import (
     AssessmentReviewCycle,
     AssessmentSnapshot,
+    CapabilityThreshold,
     KnowledgeArticle,
     SkillAssessment,
     SOCCMMAssessment,
@@ -628,6 +629,141 @@ def delete_schedule_entry(
         session.delete(row)
         session.commit()
     return {"status": "ok"}
+
+
+# =============================================================================
+# Capability staffing thresholds + roster export (v0.41.0)
+# =============================================================================
+
+
+class ThresholdItem(BaseModel):
+    capability_key: str
+    min_staff: int = Field(ge=0, le=50, default=1)
+    min_level: int = Field(ge=1, le=5, default=3)
+    notes: Optional[str] = None
+
+
+class ThresholdBulkSave(BaseModel):
+    thresholds: List[ThresholdItem]
+
+
+@router.get("/coverage/thresholds")
+def get_coverage_thresholds(
+    current_user: User = Depends(require_permission("security:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Return per-capability minimum-staffing thresholds for RAG gap analysis."""
+    rows = session.query(CapabilityThreshold).all()
+    return {
+        "thresholds": [
+            {
+                "capability_key": r.capability_key,
+                "min_staff": r.min_staff,
+                "min_level": r.min_level,
+                "notes": r.notes,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.post("/coverage/thresholds")
+def save_coverage_thresholds(
+    payload: ThresholdBulkSave,
+    current_user: User = Depends(require_permission("security:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Bulk upsert capability thresholds (lead+). A min_staff of 0 deletes the
+    threshold (capability no longer tracked for gaps)."""
+    saved = 0
+    for item in payload.thresholds:
+        key = (item.capability_key or "").strip()
+        if not key:
+            continue
+        existing = (
+            session.query(CapabilityThreshold)
+            .filter(CapabilityThreshold.capability_key == key)
+            .first()
+        )
+        if item.min_staff == 0:
+            if existing:
+                session.delete(existing)
+            continue
+        if existing:
+            existing.min_staff = item.min_staff
+            existing.min_level = item.min_level
+            existing.notes = item.notes
+        else:
+            session.add(
+                CapabilityThreshold(
+                    capability_key=key,
+                    min_staff=item.min_staff,
+                    min_level=item.min_level,
+                    notes=item.notes,
+                )
+            )
+        saved += 1
+    session.commit()
+    return {"status": "ok", "saved": saved}
+
+
+@router.get("/schedule/export.csv")
+def export_schedule_csv(
+    month: str = Query(..., description="Month in YYYY-MM format"),
+    current_user: User = Depends(require_permission("security:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Export the month's team roster as CSV (long format, one row per entry).
+
+    Air-gap friendly handover artefact. Capability-gap export is produced
+    client-side from the already-computed coverage data.
+    """
+    import csv
+    import io
+
+    from fastapi import Response
+
+    try:
+        year, mon = (int(p) for p in month.split("-"))
+        start = date(year, mon, 1)
+        end = date(year + 1, 1, 1) if mon == 12 else date(year, mon + 1, 1)
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid month format, use YYYY-MM")
+
+    rows = (
+        session.query(TeamScheduleEntry)
+        .filter(TeamScheduleEntry.date >= start, TeamScheduleEntry.date < end)
+        .order_by(TeamScheduleEntry.date, TeamScheduleEntry.user_id)
+        .all()
+    )
+    # Resolve usernames in one pass.
+    user_ids = {r.user_id for r in rows}
+    users = {
+        u.id: u
+        for u in session.query(User).filter(User.id.in_(user_ids)).all()
+    } if user_ids else {}
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["date", "user_id", "username", "display_name", "status", "shift", "notes"])
+    for r in rows:
+        u = users.get(r.user_id)
+        writer.writerow([
+            str(r.date),
+            r.user_id,
+            u.username if u else "",
+            (u.display_name or u.username) if u else "",
+            r.status,
+            r.shift or "",
+            (r.notes or "").replace("\n", " "),
+        ])
+
+    filename = f"ion-roster-{month}.csv"
+    return Response(
+        content=buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # =============================================================================

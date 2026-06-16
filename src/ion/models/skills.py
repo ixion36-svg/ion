@@ -101,6 +101,27 @@ class TeamScheduleEntry(Base, TimestampMixin):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
+class CapabilityThreshold(Base, TimestampMixin):
+    """Minimum staffing target for a SOC capability, used by the Team Schedule
+    coverage/gap analysis to flag understaffed days (RAG status).
+
+    ``capability_key`` matches a SOC_CAPABILITIES name (e.g. "Incident Response").
+    A working day is "met" for this capability when at least ``min_staff`` people
+    on duty assess at or above ``min_level`` proficiency in it.
+    """
+
+    __tablename__ = "capability_thresholds"
+    __table_args__ = (
+        UniqueConstraint("capability_key", name="uq_cap_threshold"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    capability_key: Mapped[str] = mapped_column(String(100), nullable=False)
+    min_staff: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    min_level: Mapped[int] = mapped_column(Integer, nullable=False, default=3)  # 1-5
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
 class TeamCertification(Base, TimestampMixin):
     """Team member certification / qualification record (SOC-CMM Training & Education)."""
 
