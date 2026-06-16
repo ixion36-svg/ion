@@ -7373,7 +7373,7 @@ async function initSchedule() {
         } catch (e) { /* skip capability grid */ }
     }
     await loadCovThresholds();
-    if (schedData) { renderScheduleGrid(); renderCapCoverageGrid(); renderScheduleSummary(); renderUnderstaffed(); return; }
+    if (schedData) { renderScheduleGrid(); renderCapCoverageGrid(); fixGridCols(); renderScheduleSummary(); renderUnderstaffed(); return; }
     await loadScheduleData();
 }
 
@@ -7397,6 +7397,7 @@ async function loadScheduleData() {
         });
         renderScheduleGrid();
         renderCapCoverageGrid();
+        fixGridCols();
         renderUnderstaffed();
         const csvLink = document.getElementById('sched-export-csv');
         if (csvLink) csvLink.href = `/api/skills/schedule/export.csv?month=${monthStr}`;
@@ -7519,9 +7520,9 @@ function renderScheduleGrid() {
     const today = new Date();
     const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 
-    let gridCss = `grid-template-columns: minmax(130px,160px) repeat(${daysInMonth}, minmax(32px, 1fr));`;
+    let gridCols = `minmax(130px,160px) repeat(${daysInMonth}, minmax(32px, 1fr))`;
 
-    let html = `<div class="sched-grid _ion-s-d9f6ddb9f2">`;
+    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
 
     // Header row: Name + day numbers with day-of-week
     html += `<div class="sg-cell sg-header sg-name _ion-s-07e09bd50b">Team Member</div>`;
@@ -7689,6 +7690,8 @@ async function saveSchedModal(userId, dateStr) {
             schedData[key] = { user_id: userId, date: dateStr, status, shift, notes: notes || null };
             renderScheduleGrid();
             renderCapCoverageGrid();
+            fixGridCols();
+            renderUnderstaffed();
         }
     } catch (e) { console.warn('Schedule save failed:', e); }
 }
@@ -7700,6 +7703,8 @@ async function clearSchedEntry(userId, dateStr) {
         if (schedData) delete schedData[`${userId}-${dateStr}`];
         renderScheduleGrid();
         renderCapCoverageGrid();
+        fixGridCols();
+        renderUnderstaffed();
     } catch (e) { console.warn('Schedule delete failed:', e); }
 }
 
@@ -7879,10 +7884,21 @@ function closeMemberPopover(event) {
 // SOC Capability Coverage Grid (schedule × skills crossref)
 // =========================================================================
 
+// Apply dynamic grid columns via JS (the v0.31.21 style->class migration left
+// the ._ion-s-d9f6ddb9f2 rule with a literal "${gridCss}" so the column
+// template was never applied — grids collapsed to one vertical column). Columns
+// now ride on a CSP-safe data-grid-cols attribute and are applied here.
+function fixGridCols() {
+    document.querySelectorAll('#sched-grid .sched-grid[data-grid-cols], #soc-cov-grid .sched-grid[data-grid-cols]').forEach(g => {
+        g.style.gridTemplateColumns = g.getAttribute('data-grid-cols');
+    });
+}
+
 function switchCovView(view) {
     socCovView = view;
     document.querySelectorAll('.soc-cov-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     renderCapCoverageGrid();
+    fixGridCols();
     renderUnderstaffed();
 }
 
@@ -7960,8 +7976,8 @@ function renderCapCoverageGrid() {
     }
 
     // Daily view
-    let gridCss = `grid-template-columns: minmax(140px,170px) repeat(${daysInMonth}, minmax(28px, 1fr));`;
-    let html = `<div class="sched-grid _ion-s-d9f6ddb9f2">`;
+    let gridCols = `minmax(140px,170px) repeat(${daysInMonth}, minmax(28px, 1fr))`;
+    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
 
     // Header
     html += `<div class="sg-cell sg-header sc-cap-name _ion-s-c28bd948da">Capability</div>`;
@@ -8014,8 +8030,8 @@ function renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLa
     }
 
     const numWeeks = weeks.length;
-    let gridCss = `grid-template-columns: minmax(140px,170px) repeat(${numWeeks}, minmax(80px, 1fr));`;
-    let html = `<div class="sched-grid _ion-s-d9f6ddb9f2">`;
+    let gridCols = `minmax(140px,170px) repeat(${numWeeks}, minmax(80px, 1fr))`;
+    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
 
     // Header
     html += `<div class="sg-cell sg-header sc-cap-name _ion-s-c28bd948da">Capability</div>`;
@@ -8103,7 +8119,8 @@ function monthWorkingDates() {
 function renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelLabels) {
     const dates = monthWorkingDates();
     const monthName = schedMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-    let html = `<div class="sched-grid _ion-s-d9f6ddb9f2 _ion-s-covmonthgrid">`;
+    const gridCols = `minmax(140px,200px) minmax(90px,1fr) minmax(90px,1fr)`;
+    let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
     html += `<div class="sg-cell sg-header sc-cap-name _ion-s-c28bd948da">Capability</div>`;
     html += `<div class="sg-cell sc-week-header">${esc(monthName)} (avg)</div>`;
     html += `<div class="sg-cell sc-week-header">Worst day</div>`;
@@ -8251,6 +8268,7 @@ async function saveThresholds() {
     document.getElementById('threshold-config-root').innerHTML = '';
     await loadCovThresholds();
     renderCapCoverageGrid();
+    fixGridCols();
     renderUnderstaffed();
 }
 
