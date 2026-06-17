@@ -1,13 +1,39 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.41.0 -->
+<!-- ion-doc:version=0.42.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-16 -->
+<!-- ion-doc:date=2026-06-17 -->
 
 # Changelog
+
+## v0.42.0 — 2026-06-17
+
+**Analyst-facing UX: source-driven alert filter, per-alert extracted values, and an AI-assisted closure note.**
+
+- **Alerts — "All Systems" filter now reflects the alerts you're looking at.**
+  The system filter on `/alerts` is populated from the `source_system` values
+  on the alerts loaded into the table, rather than the CyAB/TIDE system
+  registry. Systems that actually appear in your alerts are always selectable;
+  the list no longer depends on a data source being registered in CyAB or a
+  reachable TIDE. Labels still show the friendly CyAB/TIDE name when known and
+  fall back to the raw namespace otherwise, and the list stays stable while a
+  filter is applied.
+- **Cases — linked-alert dropdown surfaces all extracted values.** Expanding a
+  linked alert in the case panel now lists the observables ION extracted from
+  *that* alert in a dedicated "Extracted values" block, above the raw fields.
+  This shows indicators that the case-level Observables tab can omit when it
+  de-duplicates the same value across alerts, so nothing extracted goes
+  unseen.
+- **Cases — AI rewrite for closure notes.** The Close Case dialog gains an
+  "AI rewrite" button that polishes the analyst's draft closing comment into a
+  clear, defensible rationale for the selected closure reason (local Ollama;
+  facts and the verdict are preserved, never invented). An empty draft yields a
+  short skeleton to fill in. The result is editable and revertible before the
+  case is closed. New `POST /api/ai/closure/rewrite`; degrades gracefully when
+  AI is unavailable.
 
 ## v0.41.0 — 2026-06-16
 
