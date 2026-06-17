@@ -3745,7 +3745,6 @@ function showNotification(message, type = 'info') {
 // Initialization
 // =========================================================================
 document.addEventListener('DOMContentLoaded', function() {
-    loadSystemFilterOptions();
     loadAlerts();
     loadCases();
     startAutoRefresh();
@@ -3830,6 +3829,7 @@ async function loadAlerts() {
 
         allAlerts = incomingAlerts;
         arkimeEnabled = !!data.arkime_enabled;
+        populateSystemFilterFromAlerts(incomingAlerts);
         applyFilters();
         renderThreatBanner();
         renderAnalytics();
@@ -7229,26 +7229,41 @@ function applySorting() {
 // Render the system attribution badge for an alert. Prefers the CyAB system
 // name (linked to /cyab#id) and falls back to the raw namespace. Tooltip
 // surfaces the TIDE system name when it differs.
-// Populate the system filter dropdown from CyAB-registered systems.
-async function loadSystemFilterOptions() {
+// Populate the system filter dropdown from the alerts actually loaded into
+// the table — i.e. distinct `source_system` (data_stream.namespace) values —
+// rather than the CyAB/TIDE registry. Accumulates into a module-level map so
+// the option list doesn't collapse to a single entry while a system filter is
+// active (the table only returns that one system in that case), and so options
+// survive across time-range/severity reloads.
+// value = raw namespace (what the backend `system=` filter matches on);
+// label = the resolved CyAB/TIDE name when present, else the raw namespace.
+const _knownSystems = new Map();  // namespace -> display label
+
+function populateSystemFilterFromAlerts(alerts) {
     const sel = document.getElementById('alert-system-filter');
     if (!sel) return;
-    try {
-        const r = await fetch('/api/elasticsearch/alerts/systems');
-        if (!r.ok) return;
-        const d = await r.json();
-        const current = sel.value;
-        sel.innerHTML = '<option value="">All Systems</option>';
-        for (const s of (d.systems || [])) {
-            const opt = document.createElement('option');
-            opt.value = s.namespace;
-            opt.textContent = s.display_name;
-            sel.appendChild(opt);
+    let changed = false;
+    for (const a of (alerts || [])) {
+        const ns = a.source_system;
+        if (!ns) continue;
+        const label = a.cyab_system_name || a.tide_system_name || ns;
+        if (_knownSystems.get(ns) !== label) {
+            _knownSystems.set(ns, label);
+            changed = true;
         }
-        if (current) sel.value = current;
-    } catch (e) {
-        console.warn('Failed to load system filter:', e);
     }
+    if (!changed && sel.options.length > 1) return;
+    const current = sel.value;
+    const entries = [..._knownSystems.entries()]
+        .sort((a, b) => a[1].toLowerCase().localeCompare(b[1].toLowerCase()));
+    sel.innerHTML = '<option value="">All Systems</option>';
+    for (const [ns, label] of entries) {
+        const opt = document.createElement('option');
+        opt.value = ns;
+        opt.textContent = label;
+        sel.appendChild(opt);
+    }
+    if (current) sel.value = current;
 }
 
 function renderSystemBadge(a) {

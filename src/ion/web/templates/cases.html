@@ -236,7 +236,14 @@
                 </select>
             </div>
             <div class="form-group">
-                <label>Closure Notes</label>
+                <div class="closure-notes-label-row">
+                    <label>Closure Notes</label>
+                    <button type="button" class="closure-ai-btn" id="closure-ai-rewrite"
+                            data-click-action="rewriteClosureNotes"
+                            title="Use AI to tighten your closing comment into a clear, defensible rationale">
+                        <i class="icon-sparkles"></i> AI rewrite
+                    </button>
+                </div>
                 <textarea id="closure-notes" class="form-control" rows="3" placeholder="Closure details..."></textarea>
             </div>
         </div>
@@ -1353,6 +1360,19 @@
 }
 .cpanel-alert-showall:hover { text-decoration: underline; }
 .cpanel-alert-fields-all { margin-top: 0.2rem; }
+.cpanel-alert-extracted {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.45rem;
+    border-bottom: 1px dashed var(--border);
+}
+.cpanel-alert-extracted-title {
+    font-size: 0.64rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ion-cyan, #6de4ff);
+    margin-bottom: 0.25rem;
+}
+.cpanel-alert-extracted .caf-key { color: var(--text-primary); }
 
 /* ── Kibana Comments ────────────────────────────────────── */
 .cpanel-comment {
@@ -1467,6 +1487,29 @@
 .cases-modal-body { padding: 1.25rem; }
 
 .cases-modal-body .form-group { margin-bottom: 0.75rem; }
+
+.closure-notes-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+.closure-ai-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    background: none;
+    border: 1px solid var(--ion-cyan, #6de4ff);
+    color: var(--ion-cyan, #6de4ff);
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.72rem;
+    padding: 0.15rem 0.5rem;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+.closure-ai-btn:hover { background: rgba(109,228,255,.12); }
+.closure-ai-btn:disabled { opacity: 0.55; cursor: progress; }
+.closure-ai-btn i { font-size: 0.8rem; }
 
 .cases-modal-body label {
     display: block;
@@ -2390,6 +2433,7 @@ function onDrop(e, targetStatus) {
         document.getElementById('closure-modal-title').textContent = 'Close Case';
         document.getElementById('closure-reason').value = '';
         document.getElementById('closure-notes').value = '';
+        resetClosureAiButton();
         document.getElementById('closure-modal-overlay').style.display = 'flex';
         dragCaseId = null;
         return;
@@ -2456,6 +2500,72 @@ async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
     } catch (e) {
         showToast('Failed to update case: ' + e.message, 'error');
         return false;
+    }
+}
+
+// Reset the AI-rewrite button to its idle state whenever the closure modal
+// opens, so a stale "Revert" label / cached draft from a prior close doesn't
+// leak into a fresh one.
+function resetClosureAiButton() {
+    const btn = document.getElementById('closure-ai-rewrite');
+    if (!btn) return;
+    delete btn.dataset.original;
+    delete btn.dataset.rewritten;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="icon-sparkles"></i> AI rewrite';
+}
+
+// AI-polish the analyst's draft closing comment. Sends the current draft +
+// selected closure reason (+ case title for context) to the LLM and replaces
+// the textarea with the tightened version. The original draft is preserved on
+// the button's dataset so a second click can revert.
+async function rewriteClosureNotes() {
+    const btn = document.getElementById('closure-ai-rewrite');
+    const ta = document.getElementById('closure-notes');
+    if (!ta || !btn) return;
+
+    // Toggle back to the pre-rewrite draft if we already rewrote once.
+    if (btn.dataset.original !== undefined && ta.value === (btn.dataset.rewritten || '')) {
+        ta.value = btn.dataset.original;
+        delete btn.dataset.original;
+        delete btn.dataset.rewritten;
+        btn.innerHTML = '<i class="icon-sparkles"></i> AI rewrite';
+        return;
+    }
+
+    const reason = document.getElementById('closure-reason').value;
+    const draft = ta.value.trim();
+    const caseId = pendingClosure ? pendingClosure.caseId : null;
+    const theCase = caseId ? allCases.find(c => c.id === caseId) : null;
+
+    const orig = ta.value;
+    btn.disabled = true;
+    const prevLabel = btn.innerHTML;
+    btn.innerHTML = '<i class="icon-sparkles"></i> Rewriting…';
+    try {
+        const resp = await fetch('/api/ai/closure/rewrite', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                draft: draft,
+                reason: reason,
+                case_title: theCase ? (theCase.title || '') : '',
+            }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
+        const rewritten = (data.content || '').trim();
+        if (!rewritten) throw new Error('Empty response from AI');
+        ta.value = rewritten;
+        btn.dataset.original = orig;
+        btn.dataset.rewritten = rewritten;
+        btn.innerHTML = '<i class="icon-rotate-ccw"></i> Revert';
+        showToast('Closing comment rewritten — review before confirming', 'success');
+    } catch (e) {
+        btn.innerHTML = prevLabel;
+        showToast('AI rewrite failed: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
     }
 }
 
@@ -2579,6 +2689,12 @@ const statusColors = {
 };
 
 // ── Linked-alert parsed-fields dropdown ──────────────────────────────────
+// Observables ION extracted from each linked alert, keyed by the dropdown's
+// fieldsId. Populated when the panel renders so the lazy-loaded fields dropdown
+// can surface ALL extracted values for that alert — including any the dedup'd
+// case-level Observables tab dropped (same value+type seen on another alert).
+const _alertObsByFieldsId = {};
+
 // Flatten a nested alert _source into dot-path key:value pairs (arrays of
 // scalars are joined; arrays of objects are indexed).
 function flattenAlertFields(obj, prefix, out) {
@@ -2626,16 +2742,35 @@ function _alertFieldsTable(flat, keys) {
     return h + '</tbody></table>';
 }
 
+// Render the "Extracted values" block for a linked alert's fields dropdown —
+// every observable ION pulled from this alert (type + value), independent of
+// the case-level Observables tab (which dedups across alerts).
+function _extractedValuesBlock(fieldsId) {
+    const obs = _alertObsByFieldsId[fieldsId] || [];
+    if (!obs.length) return '';
+    let h = '<div class="cpanel-alert-extracted">'
+          + '<div class="cpanel-alert-extracted-title">Extracted values (' + obs.length + ')</div>'
+          + '<table class="cpanel-alert-fields-table"><tbody>';
+    for (const o of obs) {
+        const type = o.type || 'unknown';
+        const value = o.value || '';
+        h += '<tr><td class="caf-key">' + esc(type) + '</td>'
+           + '<td class="caf-val">' + esc(String(value)) + '</td></tr>';
+    }
+    return h + '</tbody></table></div>';
+}
+
 function renderFlatAlertFields(raw, fieldsId) {
+    const extracted = _extractedValuesBlock(fieldsId);
     const flat = flattenAlertFields(raw);
     const allKeys = Object.keys(flat).sort();
-    if (!allKeys.length) return '<div class="cpanel-alert-fields-empty">No fields</div>';
+    if (!allKeys.length) return extracted || '<div class="cpanel-alert-fields-empty">No fields</div>';
     const isKey = k => ALERT_KEY_PREFIXES.some(p => k === p || k.startsWith(p));
     let keyKeys = allKeys.filter(isKey);
     let otherKeys = allKeys.filter(k => !isKey(k));
     // Fallback: a non-ECS alert that matches nothing should still show its data.
     if (!keyKeys.length) { keyKeys = allKeys; otherKeys = []; }
-    let h = _alertFieldsTable(flat, keyKeys);
+    let h = extracted + _alertFieldsTable(flat, keyKeys);
     if (otherKeys.length) {
         const allId = fieldsId + '-all';
         h += '<button type="button" class="cpanel-alert-showall" '
@@ -2675,13 +2810,17 @@ async function toggleAlertFields(alertId, fieldsId) {
         const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw');
         const data = await r.json().catch(() => ({}));
         if (!r.ok || !data.raw_data) {
-            el.innerHTML = '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
+            // Still surface the extracted values even when raw _source is gone.
+            el.innerHTML = _extractedValuesBlock(fieldsId)
+                || '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
+            el.dataset.loaded = '1';
             return;
         }
         el.innerHTML = renderFlatAlertFields(data.raw_data, fieldsId);
         el.dataset.loaded = '1';
     } catch (e) {
-        el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load fields: '
+        el.innerHTML = _extractedValuesBlock(fieldsId)
+            + '<div class="cpanel-alert-fields-empty">Failed to load fields: '
             + esc(String((e && e.message) || e)) + '</div>';
     }
 }
@@ -2893,6 +3032,10 @@ function renderPanelContent(c) {
         alerts.forEach((a, idx) => {
             const alertId = a.es_alert_id || 'unknown';
             const fieldsId = 'alert-fields-' + idx;
+            // Stash this alert's extracted observables so the fields dropdown
+            // can list them alongside the raw fields (item: not all extracted
+            // values surface in the dedup'd case Observables tab).
+            _alertObsByFieldsId[fieldsId] = a.observables || [];
             // v0.19.3: prefer human-readable rule_name when available;
             // fall back to a 24-char prefix of the opaque ES id for
             // legacy rows where rule_name is null.
@@ -3356,6 +3499,7 @@ async function panelUpdateField(caseId, field, value) {
         document.getElementById('closure-modal-title').textContent = 'Close Case';
         document.getElementById('closure-reason').value = '';
         document.getElementById('closure-notes').value = '';
+        resetClosureAiButton();
         document.getElementById('closure-modal-overlay').style.display = 'flex';
         return;
     }

@@ -666,6 +666,76 @@ EVIDENCE: A narrative summary of the evidence collected, including observables, 
         raise HTTPException(status_code=503, detail=safe_error(e))
 
 
+@router.post("/closure/rewrite")
+async def closure_rewrite(
+    request_data: dict,
+    current_user: User = Depends(get_current_user),
+):
+    """Polish an analyst's draft case-closure comment into a clear rationale.
+
+    Takes the analyst's draft notes plus the selected closure reason (and an
+    optional case title for context) and returns a tightened, professional
+    closing comment. When the draft is empty it produces a sensible starting
+    point keyed off the closure reason so the analyst has something to refine.
+    """
+    service = get_ollama_service()
+
+    if not await service.is_available():
+        raise HTTPException(status_code=503, detail="AI service not available")
+
+    draft = (request_data.get("draft") or "").strip()
+    reason = (request_data.get("reason") or "").strip()
+    case_title = (request_data.get("case_title") or "").strip()
+
+    reason_label = reason.replace("_", " ") if reason else "unspecified"
+    context_lines = [f"Closure reason: {reason_label}"]
+    if case_title:
+        context_lines.append(f"Case title: {case_title}")
+    context_block = "\n".join(context_lines)
+
+    if draft:
+        task = (
+            "Rewrite the analyst's draft closing comment below into a clear, "
+            "concise, professional rationale that explains WHY the case is being "
+            "closed under this reason. Preserve every fact, observable, hostname, "
+            "IP, username and decision the analyst included — do not invent new "
+            "details or alter the verdict. Fix grammar, tighten wording, and make "
+            "it read like a defensible SOC closure note."
+            f"\n\nDraft closing comment:\n\"\"\"\n{draft}\n\"\"\""
+        )
+    else:
+        task = (
+            "The analyst has not written a closing comment yet. Draft a short, "
+            "professional skeleton closure note appropriate for this closure "
+            "reason that the analyst can fill in. Use neutral placeholders like "
+            "[observable] or [finding] where specific evidence is needed rather "
+            "than inventing facts."
+        )
+
+    prompt = (
+        "You are assisting a SOC analyst writing the closing comment for a "
+        "security investigation case.\n\n"
+        f"{context_block}\n\n{task}\n\n"
+        "Respond with ONLY the rewritten closing comment as plain text — no "
+        "preamble, no markdown headings, no quotation marks around the whole "
+        "response."
+    )
+
+    try:
+        result = await service.chat(
+            messages=[{"role": "user", "content": prompt}],
+            context_type="analyst",
+            temperature=0.3,
+            user_id=current_user.id,
+        )
+        return {
+            "content": (result["content"] or "").strip(),
+            "model": result["model"],
+        }
+    except OllamaError as e:
+        raise HTTPException(status_code=503, detail=safe_error(e))
+
+
 @router.post("/generate/query")
 async def generate_query(
     request: dict,
