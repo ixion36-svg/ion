@@ -204,8 +204,18 @@ from ion.models.user import (
 from ion.models.version import TemplateVersion
 from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeverity, VulnStatus
 
+# v0.43.0: daily-work tracking — manual work-log entries + admin task taxonomy.
+from ion.models.worklog import (  # noqa: F401
+    DEFAULT_TASK_TYPES,
+    WorkLogEntry,
+    WorkTaskType,
+    seed_default_task_types,
+)
+
 __all__ = [
     "Base",
+    "WorkTaskType",
+    "WorkLogEntry",
     "Template",
     "Tag",
     "Variable",
