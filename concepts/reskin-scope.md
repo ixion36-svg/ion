@@ -28,6 +28,40 @@ done. Each wave is its own release.
 
 ---
 
+## Reality check (measured during Wave 1 — IMPORTANT)
+
+Inspecting real pages while building the feature changed the picture. ION has
+**two styling lineages**, not one:
+
+1. **Tailwind-modern pages** — e.g. `dashboard_v2.html`, `soc_health.html`
+   headers, and `base.html`'s nav use Tailwind utilities + ION design tokens
+   (`bg-ion-cyan`, `text-slate-*`, `ion-tw`). These already look clean and
+   on-brand. They do **not** need re-skinning.
+2. **Token-based bespoke pages** — e.g. `soc_health.html`'s scorecard uses a
+   `<style>` block built on ION variables (`var(--bg-secondary)`,
+   `var(--sev-*)`, `var(--radius-lg)`). Already visually consistent with ION.
+
+Also: a large share of `_ion-s-*` classes are **CSP-mandated hashed classes for
+dynamic values** (JS-computed bar widths, ring colours) — these are the correct
+pattern under `style-src-attr 'none'`, **not** stylistic debt to remove.
+
+**Consequence:** a blanket "migrate all 70 templates to ion-*" is partly
+counterproductive — it would churn already-fine pages and risk regressions for
+little visual gain. The genuinely high-value consolidation is the **heavy
+legacy pages** that carry the bulk of bespoke `_ion-s-*` and busiest markup:
+
+> `alerts` (222), `training` (206), `pcap` (147), `forensics` (130),
+> `threat_intel` (118), `cases` (115), `detection_engineering` (109),
+> `analytics` (55), `observables` (36), `discover` (31), `playbooks` (29).
+
+Recommended re-frame: **Phase 0 (done) + the ~11 heavy pages above** is the real
+program (each XL/L, multi-release). Everything else: migrate opportunistically
+only where a page is genuinely inconsistent — not as a mandated sweep. The
+wave tables below stand as the full inventory, but treat the heavy-page list as
+the priority and skip pages already on ION tokens.
+
+---
+
 ## Complexity rubric
 
 | Tier | Criteria | Per-template effort* |
