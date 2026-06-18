@@ -41,7 +41,7 @@
             </div>
         </div>
         <div class="table-container">
-            <table class="data-table" id="playbooks-table">
+            <table class="ion-table data-table" id="playbooks-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -66,7 +66,7 @@
         <div class="section-header">
             <h2>Playbook Executions</h2>
             <div class="filter-controls">
-                <select id="exec-status-filter" class="form-control _ion-s-2f8e8ab1f2" data-change-action="loadExecutions">
+                <select id="exec-status-filter" class="ion-select _ion-s-2f8e8ab1f2" data-change-action="loadExecutions">
                     <option value="">All Statuses</option>
                     <option value="in_progress" selected>In Progress</option>
                     <option value="pending">Pending</option>
@@ -76,7 +76,7 @@
             </div>
         </div>
         <div class="table-container">
-            <table class="data-table" id="executions-table">
+            <table class="ion-table data-table" id="executions-table">
                 <thead>
                     <tr>
                         <th>Playbook</th>
@@ -119,16 +119,16 @@
                     <div class="form-row">
                         <div class="form-group _ion-s-c2d2e263dc">
                             <label for="playbook-name">Name *</label>
-                            <input type="text" id="playbook-name" class="form-control" required>
+                            <input type="text" id="playbook-name" class="ion-input" required>
                         </div>
                         <div class="form-group _ion-s-ee3d55bf99">
                             <label for="playbook-priority">Priority</label>
-                            <input type="number" id="playbook-priority" class="form-control" value="0" min="0">
+                            <input type="number" id="playbook-priority" class="ion-input" value="0" min="0">
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="playbook-description">Description</label>
-                        <textarea id="playbook-description" class="form-control" rows="2"></textarea>
+                        <textarea id="playbook-description" class="ion-textarea" rows="2"></textarea>
                     </div>
                     <div class="form-group">
                         <label class="checkbox-label">
@@ -145,7 +145,7 @@
 
                     <div class="form-group">
                         <label for="trigger-rule-patterns">Rule Name Patterns (regex, one per line)</label>
-                        <textarea id="trigger-rule-patterns" class="form-control" rows="2" placeholder=".*Brute.*Force.*&#10;.*Suspicious.*Login.*"></textarea>
+                        <textarea id="trigger-rule-patterns" class="ion-textarea" rows="2" placeholder=".*Brute.*Force.*&#10;.*Suspicious.*Login.*"></textarea>
                     </div>
 
                     <div class="form-group">
@@ -161,11 +161,11 @@
                     <div class="form-row">
                         <div class="form-group _ion-s-ee3d55bf99">
                             <label for="trigger-mitre-techniques">MITRE Techniques (comma-separated)</label>
-                            <input type="text" id="trigger-mitre-techniques" class="form-control" placeholder="T1078, T1110">
+                            <input type="text" id="trigger-mitre-techniques" class="ion-input" placeholder="T1078, T1110">
                         </div>
                         <div class="form-group _ion-s-ee3d55bf99">
                             <label for="trigger-mitre-tactics">MITRE Tactics (comma-separated)</label>
-                            <input type="text" id="trigger-mitre-tactics" class="form-control" placeholder="initial-access, persistence">
+                            <input type="text" id="trigger-mitre-tactics" class="ion-input" placeholder="initial-access, persistence">
                         </div>
                     </div>
                 </div>
@@ -179,8 +179,8 @@
             </form>
         </div>
         <div class="modal-footer">
-            <button class="btn" data-click-action="closePlaybookModal">Cancel</button>
-            <button class="btn btn-primary" data-click-action="savePlaybook">Save Playbook</button>
+            <button class="ion-btn" data-click-action="closePlaybookModal">Cancel</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="savePlaybook">Save Playbook</button>
         </div>
     </div>
 </div>
@@ -196,7 +196,7 @@
             <!-- Populated by JS -->
         </div>
         <div class="modal-footer">
-            <button class="btn" data-click-action="closeViewModal">Close</button>
+            <button class="ion-btn" data-click-action="closeViewModal">Close</button>
         </div>
     </div>
 </div>

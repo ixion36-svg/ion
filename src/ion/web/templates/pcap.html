@@ -5,9 +5,6 @@
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <style nonce="{{ csp_nonce }}">
 .pcap-page { max-width: 1400px; margin: 0 auto; }
-.pcap-header { margin-bottom: 24px; }
-.pcap-header h1 { font-size: 1.5rem; margin: 0 0 4px; }
-.pcap-header p { color: var(--text-secondary); font-size: .85rem; margin: 0; }
 
 /* Upload zone */
 .pcap-upload-zone {
@@ -145,13 +142,15 @@
 </style>
 
 <div class="pcap-page">
-    <section class="mb-8 rise d-1">
-      <div class="flex items-center gap-3 mb-4">
-        <svg class="w-4 h-4 text-ion-lime"><use href="#i-network"/></svg>
-        <span class="label-tiny text-ion-lime">Packet forensics</span>
+    <section class="ion-page-header mb-8 rise d-1">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3 mb-4">
+          <svg class="w-4 h-4 text-ion-lime"><use href="#i-network"/></svg>
+          <span class="label-tiny text-ion-lime">Packet forensics</span>
+        </div>
+        <h1 class="ion-ph-title">PCAP Analyzer</h1>
+        <p class="ion-ph-sub">Upload captures, extract files and hunt protocol anomalies — automated heuristic analysis with investigation verdict.</p>
       </div>
-      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">PCAP Analyzer</h1>
-      <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Upload captures, extract files and hunt protocol anomalies — automated heuristic analysis with investigation verdict.</p>
     </section>
 
     <!-- Upload Zone -->
@@ -171,7 +170,7 @@
     <!-- Results -->
     <div class="pcap-results" id="pcap-results">
         <div class="pcap-reset">
-            <button class="btn btn-secondary" data-click-action="resetAnalysis"><i class="icon-rotate-ccw"></i> Analyze Another File</button>
+            <button class="ion-btn" data-click-action="resetAnalysis"><i class="icon-rotate-ccw"></i> Analyze Another File</button>
         </div>
 
         <!-- Verdict Banner -->

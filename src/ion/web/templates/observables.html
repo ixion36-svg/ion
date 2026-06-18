@@ -105,13 +105,13 @@
         <option value="include">Include ignored</option>
         <option value="only">Only ignored</option>
     </select>
-    <button class="btn btn-secondary" data-click-action="clearFilters">Clear</button>
+    <button class="ion-btn" data-click-action="clearFilters">Clear</button>
 </div>
 
 <!-- Results Table -->
-<div class="card">
+<div class="ion-card">
     <div class="card-body">
-        <table class="data-table" id="observables-table">
+        <table class="ion-table" id="observables-table">
             <thead>
                 <tr>
                     <th>Value</th>
@@ -143,7 +143,7 @@
             <!-- Populated by JS -->
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-click-action="closeDetailModal">Close</button>
+            <button class="ion-btn" data-click-action="closeDetailModal">Close</button>
         </div>
     </div>
 </div>
@@ -159,8 +159,8 @@
             <div class="graph-controls">
                 <label>Min Co-occurrence: <input type="number" id="graph-min-cooccur" value="2" min="1" max="50" data-change-action="loadGraph"></label>
                 <label>Max Nodes: <input type="number" id="graph-max-nodes" value="50" min="10" max="200" data-change-action="loadGraph"></label>
-                <button class="btn btn-sm btn-secondary" data-click-action="loadGraph">Refresh</button>
-                <button class="btn btn-sm btn-secondary" data-click-action="resetGraphView">Reset View</button>
+                <button class="ion-btn" data-click-action="loadGraph">Refresh</button>
+                <button class="ion-btn" data-click-action="resetGraphView">Reset View</button>
             </div>
             <div class="graph-legend">
                 <span class="legend-item"><span class="legend-dot _ion-s-868f8b60c1"></span> IP</span>
@@ -187,7 +187,7 @@
         <div class="modal-body">
             <div class="patterns-controls">
                 <label>Min Occurrences: <input type="number" id="pattern-min-occur" value="3" min="2" max="50" data-change-action="loadPatterns"></label>
-                <button class="btn btn-sm btn-secondary" data-click-action="loadPatterns">Refresh</button>
+                <button class="ion-btn" data-click-action="loadPatterns">Refresh</button>
             </div>
             <p class="patterns-desc">Patterns are groups of observables that frequently appear together in alerts.</p>
             <div id="patterns-list" class="patterns-list">
@@ -213,8 +213,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-click-action="closeMigrateModal">Cancel</button>
-            <button class="btn btn-primary" id="migrate-btn" data-click-action="runMigration">Run Migration</button>
+            <button class="ion-btn" data-click-action="closeMigrateModal">Cancel</button>
+            <button class="ion-btn ion-btn-primary" id="migrate-btn" data-click-action="runMigration">Run Migration</button>
         </div>
     </div>
 </div>
@@ -240,7 +240,7 @@ domain,evil.com,,
 sha256,abc123...,c2,</pre>
                 <div class="form-group">
                     <label>Default Type (if not in CSV):</label>
-                    <select id="import-default-type">
+                    <select id="import-default-type" class="ion-select">
                         <option value="">-- Select --</option>
                         <option value="ipv4">IPv4</option>
                         <option value="domain">Domain</option>
@@ -259,7 +259,7 @@ sha256,abc123...,c2,</pre>
                 </div>
                 <div class="form-group">
                     <label>Additional Tags (comma-separated):</label>
-                    <input type="text" id="import-tags" placeholder="e.g., imported, threat-intel">
+                    <input type="text" id="import-tags" class="ion-input" placeholder="e.g., imported, threat-intel">
                 </div>
                 <div class="form-group">
                     <label><input type="checkbox" id="import-auto-enrich"> Auto-enrich imported observables</label>
@@ -274,7 +274,7 @@ sha256,abc123...,c2,</pre>
                 </div>
                 <div class="form-group">
                     <label>Additional Tags (comma-separated):</label>
-                    <input type="text" id="import-stix-tags" placeholder="e.g., stix-import, threat-intel">
+                    <input type="text" id="import-stix-tags" class="ion-input" placeholder="e.g., stix-import, threat-intel">
                 </div>
             </div>
 
@@ -284,8 +284,8 @@ sha256,abc123...,c2,</pre>
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-secondary" data-click-action="closeImportModal">Cancel</button>
-            <button class="btn btn-primary" id="import-btn" data-click-action="runImport">Import</button>
+            <button class="ion-btn" data-click-action="closeImportModal">Cancel</button>
+            <button class="ion-btn ion-btn-primary" id="import-btn" data-click-action="runImport">Import</button>
         </div>
     </div>
 </div>
@@ -299,7 +299,7 @@ sha256,abc123...,c2,</pre>
         </div>
         <div class="modal-body">
             <p>Observables on the watchlist will trigger alerts when seen in new alerts.</p>
-            <table class="data-table" id="watchlist-table">
+            <table class="ion-table" id="watchlist-table">
                 <thead>
                     <tr>
                         <th>Value</th>
@@ -333,7 +333,7 @@ sha256,abc123...,c2,</pre>
                     <option value="false">Unread Only</option>
                     <option value="true">Read Only</option>
                 </select>
-                <button class="btn btn-sm btn-secondary" data-click-action="markAllAlertsRead">Mark All Read</button>
+                <button class="ion-btn" data-click-action="markAllAlertsRead">Mark All Read</button>
             </div>
             <div id="watchlist-alerts-list" class="watchlist-alerts-list">
                 <div class="loading">Loading alerts...</div>

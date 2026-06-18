@@ -135,8 +135,8 @@
     <div class="ti-search-bar _ion-s-8b9688e6e0">
         <input type="text" class="ti-search-input" id="ti-global-search"
                placeholder="Search across actors, campaigns, IOCs, cases (e.g. APT28, evil.com, 10.0.0.1)…">
-        <button class="ti-btn" data-click-action="tiUnifiedSearch">Search</button>
-        <button class="ti-btn-outline _ion-s-c8be1ccba6" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
+        <button class="ion-btn ion-btn-primary" data-click-action="tiUnifiedSearch">Search</button>
+        <button class="ion-btn ion-btn-ghost _ion-s-c8be1ccba6" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
     </div>
     <div class="_ion-s-30ded21efa" id="ti-global-search-results"></div>
 
@@ -256,7 +256,7 @@
     <div class="ti-panel" id="panel-actors">
         <div class="ti-search-bar">
             <input type="text" class="ti-search-input" id="actor-search" placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
-            <button class="ti-btn" id="actor-search-btn" data-click-action="searchActors">Search</button>
+            <button class="ion-btn ion-btn-primary" id="actor-search-btn" data-click-action="searchActors">Search</button>
         </div>
         <div id="actor-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for threat actors.</div>
@@ -267,7 +267,7 @@
     <div class="ti-panel" id="panel-campaigns">
         <div class="ti-search-bar">
             <input type="text" class="ti-search-input" id="campaign-search" placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
-            <button class="ti-btn" id="campaign-search-btn" data-click-action="searchCampaigns">Search</button>
+            <button class="ion-btn ion-btn-primary" id="campaign-search-btn" data-click-action="searchCampaigns">Search</button>
         </div>
         <div id="campaign-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for campaigns.</div>
@@ -284,7 +284,7 @@
 
         <h3 class="_ion-s-2714558e5b">
             Match Alerts
-            <button class="ti-btn-outline ti-btn-sm _ion-s-7f90823361" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
+            <button class="ion-btn ion-btn-ghost ti-btn-sm _ion-s-7f90823361" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
         </h3>
         <table class="ti-table" id="matches-table">
             <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
@@ -301,7 +301,7 @@
                 <option value="75" selected>Score ≥ 75</option>
                 <option value="90">Score ≥ 90</option>
             </select>
-            <button class="ti-btn" data-click-action="tiLoadIOCFeed">Refresh</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="tiLoadIOCFeed">Refresh</button>
         </div>
         <table class="ti-table" id="ioc-table">
             <thead><tr><th>Score</th><th>Type</th><th>Value</th><th>Labels</th><th>Source</th><th title="Local sightings over the last 12 months">Sightings</th><th>Actions</th></tr></thead>
@@ -313,7 +313,7 @@
     <div class="ti-panel" id="panel-reports">
         <div class="ti-search-bar">
             <input type="text" class="ti-search-input" id="ti-report-filter" placeholder="Filter reports by title…">
-            <button class="ti-btn" data-click-action="tiLoadReports">Refresh</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="tiLoadReports">Refresh</button>
         </div>
         <div id="ti-reports-list">
             <div class="ti-empty">Click Refresh to load latest threat reports from OpenCTI.</div>
@@ -362,7 +362,7 @@ data-click-action="tiCloseReport"></div>
                 <option value="72">Last 3 days</option>
                 <option value="168">Last 7 days</option>
             </select>
-            <button class="ti-btn" data-click-action="tiLoadStories">Refresh</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="tiLoadStories">Refresh</button>
         </div>
         <div id="ti-stories-list">
             <div class="ti-empty">Click Refresh to correlate recent alerts into attack stories.</div>

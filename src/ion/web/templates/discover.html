@@ -31,17 +31,17 @@
             <div class="form-row">
                 <div class="form-group _ion-s-c2d2e263dc">
                     <label for="search-index">Index Pattern</label>
-                    <input type="text" id="search-index" class="form-control" value="*,-.*" placeholder="e.g., logs-*, filebeat-*">
+                    <input type="text" id="search-index" class="ion-input" value="*,-.*" placeholder="e.g., logs-*, filebeat-*">
                 </div>
                 <div class="form-group _ion-s-ee3d55bf99">
                     <label for="search-time-field">Time Field</label>
-                    <input type="text" id="search-time-field" class="form-control" value="@timestamp">
+                    <input type="text" id="search-time-field" class="ion-input" value="@timestamp">
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group _ion-s-ee3d55bf99">
                     <label for="search-time-from">From</label>
-                    <select id="search-time-from" class="form-control">
+                    <select id="search-time-from" class="ion-select">
                         <option value="now-15m">Last 15 minutes</option>
                         <option value="now-1h">Last 1 hour</option>
                         <option value="now-4h">Last 4 hours</option>
@@ -53,7 +53,7 @@
                 </div>
                 <div class="form-group _ion-s-ee3d55bf99">
                     <label for="search-size">Results</label>
-                    <select id="search-size" class="form-control">
+                    <select id="search-size" class="ion-select">
                         <option value="25">25</option>
                         <option value="50">50</option>
                         <option value="100" selected>100</option>
@@ -65,20 +65,20 @@
             <div class="form-group">
                 <label for="search-query">Query (Lucene/KQL syntax)</label>
                 <div class="_ion-s-d3ecd376d1">
-                    <input type="text" id="search-query" class="form-control _ion-s-7623f05545" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
-                    <button class="btn btn-sm _ion-s-9c71bc0492" data-click-action="openNlQueryModal" title="Generate query with AI">
+                    <input type="text" id="search-query" class="ion-input _ion-s-7623f05545" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
+                    <button class="ion-btn _ion-s-9c71bc0492" data-click-action="openNlQueryModal" title="Generate query with AI">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1v4a4 4 0 0 1-8 0v-4H7a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/></svg>
                         AI
                     </button>
                 </div>
             </div>
             <div class="form-actions">
-                <button class="btn btn-primary" data-click-action="executeDiscoverSearch">Search</button>
-                <button class="btn" data-click-action="getHistogram">Show Histogram</button>
-                <button class="btn" data-click-action="exportSearchResults">Export CSV</button>
+                <button class="ion-btn ion-btn-primary" data-click-action="executeDiscoverSearch">Search</button>
+                <button class="ion-btn" data-click-action="getHistogram">Show Histogram</button>
+                <button class="ion-btn" data-click-action="exportSearchResults">Export CSV</button>
                 <div class="saved-searches-actions">
-                    <button class="btn" data-click-action="openSaveSearchModal">Save Search</button>
-                    <button class="btn" data-click-action="toggleSavedSearchesPanel">Saved Searches</button>
+                    <button class="ion-btn" data-click-action="openSaveSearchModal">Save Search</button>
+                    <button class="ion-btn" data-click-action="toggleSavedSearchesPanel">Saved Searches</button>
                 </div>
             </div>
         </div>
@@ -88,7 +88,7 @@
     <div class="tools-panel section-panel saved-searches-panel _ion-s-f2892a2e8a" id="saved-searches-panel">
         <div class="panel-header">
             <h3>Saved Searches</h3>
-            <button class="btn btn-sm" data-click-action="loadSavedSearches">Refresh</button>
+            <button class="ion-btn" data-click-action="loadSavedSearches">Refresh</button>
         </div>
         <div class="saved-searches-container">
             <div class="saved-searches-section" id="saved-searches-favorites">
@@ -116,11 +116,11 @@
             <div class="modal-body">
                 <div class="form-group">
                     <label for="save-search-name">Name</label>
-                    <input type="text" id="save-search-name" class="form-control" placeholder="Enter a name for this search">
+                    <input type="text" id="save-search-name" class="ion-input" placeholder="Enter a name for this search">
                 </div>
                 <div class="form-group">
                     <label for="save-search-description">Description (optional)</label>
-                    <textarea id="save-search-description" class="form-control" rows="2" placeholder="Describe what this search does"></textarea>
+                    <textarea id="save-search-description" class="ion-textarea" rows="2" placeholder="Describe what this search does"></textarea>
                 </div>
                 <div class="form-group">
                     <label class="checkbox-label">
@@ -130,8 +130,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn" data-click-action="closeSaveSearchModal">Cancel</button>
-                <button class="btn btn-primary" data-click-action="saveSearch">Save</button>
+                <button class="ion-btn" data-click-action="closeSaveSearchModal">Cancel</button>
+                <button class="ion-btn ion-btn-primary" data-click-action="saveSearch">Save</button>
             </div>
         </div>
     </div>
@@ -140,7 +140,7 @@
     <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="histogram-panel">
         <div class="panel-header">
             <h3>Event Timeline</h3>
-            <span id="histogram-total" class="badge"></span>
+            <span id="histogram-total" class="ion-badge ion-c-cyan"></span>
         </div>
         <div class="histogram-container" id="histogram-container"></div>
     </div>
@@ -149,7 +149,7 @@
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Results</h3>
-            <span id="search-result-count" class="badge">0 hits</span>
+            <span id="search-result-count" class="ion-badge ion-c-cyan">0 hits</span>
         </div>
         <div class="search-results-container">
             <table class="data-table" id="search-results-table">
@@ -178,7 +178,7 @@
                     <input type="checkbox" id="include-system-indices" data-change-action="loadIndices">
                     Include system indices
                 </label>
-                <button class="btn btn-sm" data-click-action="loadIndices">Refresh</button>
+                <button class="ion-btn" data-click-action="loadIndices">Refresh</button>
             </div>
         </div>
         <div class="indices-container">
@@ -203,7 +203,7 @@
     <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="mappings-panel">
         <div class="panel-header">
             <h3>Field Mappings: <span id="mappings-index-name"></span></h3>
-            <span id="mappings-field-count" class="badge"></span>
+            <span id="mappings-field-count" class="ion-badge ion-c-cyan"></span>
         </div>
         <div class="mappings-container">
             <table class="data-table" id="mappings-table">
@@ -252,11 +252,11 @@
             <div class="form-row">
                 <div class="form-group _ion-s-c2d2e263dc">
                     <label for="ioc-value">IOC Value</label>
-                    <input type="text" id="ioc-value" class="form-control" placeholder="Enter IP, hash, domain, URL, or email...">
+                    <input type="text" id="ioc-value" class="ion-input" placeholder="Enter IP, hash, domain, URL, or email...">
                 </div>
                 <div class="form-group _ion-s-ee3d55bf99">
                     <label for="ioc-type">Type (auto-detected)</label>
-                    <select id="ioc-type" class="form-control">
+                    <select id="ioc-type" class="ion-select">
                         <option value="">Auto-detect</option>
                         <option value="ip">IP Address</option>
                         <option value="hash">Hash (MD5/SHA1/SHA256)</option>
@@ -269,7 +269,7 @@
             <div class="form-row">
                 <div class="form-group _ion-s-ee3d55bf99">
                     <label for="ioc-time-from">Time Range</label>
-                    <select id="ioc-time-from" class="form-control">
+                    <select id="ioc-time-from" class="ion-select">
                         <option value="now-24h">Last 24 hours</option>
                         <option value="now-7d">Last 7 days</option>
                         <option value="now-30d" selected>Last 30 days</option>
@@ -279,12 +279,12 @@
                 </div>
                 <div class="form-group _ion-s-ee3d55bf99">
                     <label for="ioc-index">Index Pattern</label>
-                    <input type="text" id="ioc-index" class="form-control" value="*,-.*">
+                    <input type="text" id="ioc-index" class="ion-input" value="*,-.*">
                 </div>
             </div>
             <div class="form-actions">
-                <button class="btn btn-primary" data-click-action="executeIOCHunt">Hunt</button>
-                <button class="btn" data-click-action="clearIOCHunt">Clear</button>
+                <button class="ion-btn ion-btn-primary" data-click-action="executeIOCHunt">Hunt</button>
+                <button class="ion-btn" data-click-action="clearIOCHunt">Clear</button>
             </div>
         </div>
     </div>
@@ -297,11 +297,11 @@
         <div class="bulk-ioc-form">
             <div class="form-group">
                 <label for="bulk-iocs">IOC Values (one per line)</label>
-                <textarea id="bulk-iocs" class="form-control" rows="5" placeholder="185.220.101.32&#10;evil.com&#10;d41d8cd98f00b204e9800998ecf8427e"></textarea>
+                <textarea id="bulk-iocs" class="ion-textarea" rows="5" placeholder="185.220.101.32&#10;evil.com&#10;d41d8cd98f00b204e9800998ecf8427e"></textarea>
             </div>
             <div class="form-actions">
-                <button class="btn btn-primary" data-click-action="executeBulkIOCHunt">Hunt All</button>
-                <button class="btn" data-clear-target="bulk-iocs">Clear</button>
+                <button class="ion-btn ion-btn-primary" data-click-action="executeBulkIOCHunt">Hunt All</button>
+                <button class="ion-btn" data-clear-target="bulk-iocs">Clear</button>
             </div>
         </div>
     </div>
@@ -310,7 +310,7 @@
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Hunt Results</h3>
-            <span id="ioc-hunt-result-count" class="badge"></span>
+            <span id="ioc-hunt-result-count" class="ion-badge ion-c-cyan"></span>
         </div>
 
         <!-- Single IOC Results -->
@@ -425,14 +425,6 @@
     text-align: center;
     color: var(--text-secondary);
     padding: 2rem;
-}
-
-.badge {
-    background: var(--accent-color);
-    color: var(--bg-primary);
-    padding: 0.25rem 0.5rem;
-    border-radius: 4px;
-    font-size: 0.8rem;
 }
 
 .health-green { color: var(--success); }

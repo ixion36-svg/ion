@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Query builder, saved searches and scheduled reports.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" data-click-action="loadDashboard">Refresh</button>
-        <button class="btn btn-primary" data-click-action="runAllJobs">Run All Jobs</button>
+        <button class="ion-btn" data-click-action="loadDashboard">Refresh</button>
+        <button class="ion-btn ion-btn-primary" data-click-action="runAllJobs">Run All Jobs</button>
     </div>
 </section>
 
@@ -136,7 +136,7 @@
                 <option value="168" selected>Last 7 Days</option>
                 <option value="720">Last 30 Days</option>
             </select>
-            <button class="btn btn-secondary btn-sm" data-click-action="loadSystemAnalyticsTab">Refresh</button>
+            <button class="ion-btn" data-click-action="loadSystemAnalyticsTab">Refresh</button>
             <span class="_ion-s-1b20421adc" id="sys-summary-text"></span>
         </div>
         <!-- System stats bar -->
@@ -1239,9 +1239,8 @@ async function runJob(jobType) {
 }
 
 async function runAllJobs() {
-    const btn = document.querySelector('.header-actions .btn-primary');
-    btn.disabled = true;
-    btn.textContent = 'Running...';
+    const btn = document.querySelector('[data-click-action="runAllJobs"]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Running...'; }
     try {
         const types = jobsList.filter(j => j.enabled).map(j => j.job_type);
         for (const type of types) {
@@ -1252,8 +1251,7 @@ async function runAllJobs() {
     } catch (e) {
         showToast('Some jobs failed', true);
     } finally {
-        btn.disabled = false;
-        btn.textContent = 'Run All Jobs';
+        if (btn) { btn.disabled = false; btn.textContent = 'Run All Jobs'; }
     }
 }
 
