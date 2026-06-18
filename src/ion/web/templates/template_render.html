@@ -8,8 +8,8 @@
 <section class="flex items-end justify-between flex-wrap gap-6 mb-8 rise d-1">
     <h1>Render: <span id="template-name">Loading...</span></h1>
     <div class="flex items-center gap-2 flex-wrap">
-        <button type="button" id="settings-btn" class="btn btn-secondary" title="User Preferences">Settings</button>
-        <a href="/templates/{{ template_id }}" class="btn btn-secondary">Back to Template</a>
+        <button type="button" id="settings-btn" class="ion-btn" title="User Preferences">Settings</button>
+        <a href="/templates/{{ template_id }}" class="ion-btn">Back to Template</a>
     </div>
 </section>
 
@@ -30,8 +30,8 @@
                 <div class="_ion-s-6c510461f1">
                     <h3 class="_ion-s-1da9facb4d">Document Sections</h3>
                     <div class="_ion-s-33344b8d5b">
-                        <button type="button" class="btn btn-sm" id="expand-all-btn" title="Expand all sections">Expand All</button>
-                        <button type="button" class="btn btn-sm" id="collapse-all-btn" title="Collapse all sections">Collapse All</button>
+                        <button type="button" class="ion-btn btn-sm" id="expand-all-btn" title="Expand all sections">Expand All</button>
+                        <button type="button" class="ion-btn btn-sm" id="collapse-all-btn" title="Collapse all sections">Collapse All</button>
                     </div>
                 </div>
                 <p class="muted _ion-s-989f425c4c">Click any section to expand it. Use the Edit tab to modify content before saving.</p>
@@ -42,14 +42,14 @@
         <div id="json-tab" class="tab-content _ion-s-f2892a2e8a">
             <h3>Input Data (JSON)</h3>
             <div class="form-group">
-                <textarea id="data-input" rows="15" placeholder='{"name": "John", "company": "Acme"}'>{}</textarea>
+                <textarea id="data-input" rows="15" placeholder='{"name": "John", "company": "Acme"}' class="ion-textarea">{}</textarea>
             </div>
         </div>
 
         <div class="form-actions">
-            <button type="button" id="autofill-btn" class="btn">Auto-fill Defaults</button>
-            <button type="button" id="preview-btn" class="btn btn-primary">Preview</button>
-            <button type="button" id="render-btn" class="btn btn-success">Save as Document</button>
+            <button type="button" id="autofill-btn" class="ion-btn">Auto-fill Defaults</button>
+            <button type="button" id="preview-btn" class="ion-btn ion-btn-primary">Preview</button>
+            <button type="button" id="render-btn" class="ion-btn btn-success">Save as Document</button>
         </div>
     </div>
 
@@ -72,15 +72,15 @@
             <p class="muted _ion-s-f267e3ca68">These values will be auto-filled in author/preparer fields.</p>
             <div class="form-group">
                 <label for="pref-author">Your Name / Author</label>
-                <input type="text" id="pref-author" placeholder="e.g., John Smith">
+                <input type="text" id="pref-author" placeholder="e.g., John Smith" class="ion-input">
             </div>
             <div class="form-group">
                 <label for="pref-organization">Organization</label>
-                <input type="text" id="pref-organization" placeholder="e.g., Cyber Division">
+                <input type="text" id="pref-organization" placeholder="e.g., Cyber Division" class="ion-input">
             </div>
             <div class="form-group">
                 <label for="pref-classification">Default Classification</label>
-                <select id="pref-classification">
+                <select id="pref-classification" class="ion-select">
                     <option value="">-- Select --</option>
                     <option value="UNCLASSIFIED">UNCLASSIFIED</option>
                     <option value="FOUO">FOR OFFICIAL USE ONLY</option>
@@ -91,8 +91,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-primary" data-click-action="savePreferences">Save Preferences</button>
-            <button class="btn" data-click-action="closeSettingsModal">Cancel</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="savePreferences">Save Preferences</button>
+            <button class="ion-btn" data-click-action="closeSettingsModal">Cancel</button>
         </div>
     </div>
 </div>

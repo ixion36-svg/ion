@@ -20,9 +20,9 @@
   </button>
 </section>
 
-<div class="card">
+<div class="ion-card">
     <div class="card-header">
-        <h2>Users</h2>
+        <h2 class="ion-card-title">Users</h2>
         <div class="flex items-center gap-2 flex-wrap">
             <label class="checkbox-label">
                 <input type="checkbox" id="include-inactive" data-change-action="loadUsers">
@@ -31,7 +31,7 @@
         </div>
     </div>
     <div class="card-body">
-        <table class="data-table" id="users-table">
+        <table class="ion-table" id="users-table">
             <thead>
                 <tr>
                     <th>Username</th>
@@ -62,27 +62,27 @@
         <form id="create-user-form" data-submit-action="createUser" data-args='["$event"]'>
             <div class="form-group">
                 <label for="new-username">Username</label>
-                <input type="text" id="new-username" required pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, underscores, and hyphens only">
+                <input class="ion-input" type="text" id="new-username" required pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, underscores, and hyphens only">
             </div>
             <div class="form-group">
                 <label for="new-email">Email</label>
-                <input type="email" id="new-email" required>
+                <input class="ion-input" type="email" id="new-email" required>
             </div>
             <div class="form-group">
                 <label for="new-password">Password</label>
-                <input type="password" id="new-password" required minlength="8">
+                <input class="ion-input" type="password" id="new-password" required minlength="8">
             </div>
             <div class="form-group">
                 <label for="new-display-name">Display Name</label>
-                <input type="text" id="new-display-name">
+                <input class="ion-input" type="text" id="new-display-name">
             </div>
             <div class="form-group">
                 <label>Roles</label>
                 <div id="new-user-roles" class="checkbox-group"></div>
             </div>
             <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" data-click-action="closeModal" data-args='["create-user-modal"]'>Cancel</button>
-                <button type="submit" class="btn btn-primary">Create User</button>
+                <button type="button" class="ion-btn" data-click-action="closeModal" data-args='["create-user-modal"]'>Cancel</button>
+                <button type="submit" class="ion-btn ion-btn-primary">Create User</button>
             </div>
         </form>
     </div>
@@ -99,15 +99,15 @@
             <input type="hidden" id="edit-user-id">
             <div class="form-group">
                 <label for="edit-username">Username</label>
-                <input type="text" id="edit-username" required pattern="[a-zA-Z0-9_-]+">
+                <input class="ion-input" type="text" id="edit-username" required pattern="[a-zA-Z0-9_-]+">
             </div>
             <div class="form-group">
                 <label for="edit-email">Email</label>
-                <input type="email" id="edit-email" required>
+                <input class="ion-input" type="email" id="edit-email" required>
             </div>
             <div class="form-group">
                 <label for="edit-display-name">Display Name</label>
-                <input type="text" id="edit-display-name">
+                <input class="ion-input" type="text" id="edit-display-name">
             </div>
             <div class="form-group">
                 <label>Status</label>
@@ -118,27 +118,27 @@
             </div>
             <div class="form-group">
                 <label for="edit-gitlab-username">GitLab Username</label>
-                <input type="text" id="edit-gitlab-username" placeholder="GitLab username for issue filtering">
+                <input class="ion-input" type="text" id="edit-gitlab-username" placeholder="GitLab username for issue filtering">
             </div>
             <div class="form-group">
                 <label for="edit-elastic-username">Elastic Username</label>
-                <input type="text" id="edit-elastic-username" placeholder="Kibana/ES username (if different from ION)">
+                <input class="ion-input" type="text" id="edit-elastic-username" placeholder="Kibana/ES username (if different from ION)">
             </div>
             <div class="form-group">
                 <label for="edit-elastic-uid">Elastic UID</label>
-                <input class="_ion-s-383082bf69" type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana" readonly>
+                <input class="ion-input _ion-s-383082bf69" type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana" readonly>
             </div>
             <div class="form-group">
                 <label for="edit-keycloak-sub">Keycloak Subject ID</label>
-                <input class="_ion-s-383082bf69" type="text" id="edit-keycloak-sub" placeholder="Auto-set on OIDC login" readonly>
+                <input class="ion-input _ion-s-383082bf69" type="text" id="edit-keycloak-sub" placeholder="Auto-set on OIDC login" readonly>
             </div>
             <div class="form-group">
                 <label>Roles</label>
                 <div id="edit-user-roles" class="checkbox-group"></div>
             </div>
             <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" data-click-action="closeModal" data-args='["edit-user-modal"]'>Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Changes</button>
+                <button type="button" class="ion-btn" data-click-action="closeModal" data-args='["edit-user-modal"]'>Cancel</button>
+                <button type="submit" class="ion-btn ion-btn-primary">Save Changes</button>
             </div>
         </form>
     </div>
@@ -156,7 +156,7 @@
             <p>Resetting password for: <strong id="reset-username"></strong></p>
             <div class="form-group">
                 <label for="reset-new-password">New Password</label>
-                <input type="password" id="reset-new-password" required minlength="8">
+                <input class="ion-input" type="password" id="reset-new-password" required minlength="8">
             </div>
             <div class="form-group">
                 <label class="checkbox-label">
@@ -165,8 +165,8 @@
                 </label>
             </div>
             <div class="modal-actions">
-                <button type="button" class="btn btn-secondary" data-click-action="closeModal" data-args='["reset-password-modal"]'>Cancel</button>
-                <button type="submit" class="btn btn-primary">Reset Password</button>
+                <button type="button" class="ion-btn" data-click-action="closeModal" data-args='["reset-password-modal"]'>Cancel</button>
+                <button type="submit" class="ion-btn ion-btn-primary">Reset Password</button>
             </div>
         </form>
     </div>
@@ -328,9 +328,9 @@ async function loadUsers() {
                 <td><span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
                 <td class="actions">
-                    <button class="btn btn-sm" data-click-action="showEditUserModal" data-args='[${user.id}]'>Edit</button>
-                    <button class="btn btn-sm" data-click-action="showResetPasswordModal" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Reset Password</button>
-                    <button class="btn btn-sm btn-danger" data-click-action="deleteUser" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Delete</button>
+                    <button class="ion-btn btn-sm" data-click-action="showEditUserModal" data-args='[${user.id}]'>Edit</button>
+                    <button class="ion-btn btn-sm" data-click-action="showResetPasswordModal" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Reset Password</button>
+                    <button class="ion-btn ion-btn-danger btn-sm" data-click-action="deleteUser" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Delete</button>
                 </td>
             </tr>
         `).join('');

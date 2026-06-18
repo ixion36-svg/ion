@@ -8,16 +8,16 @@
 <section class="flex items-end justify-between flex-wrap gap-6 mb-8 rise d-1">
     <h1 id="template-name">Loading...</h1>
     <div class="flex items-center gap-2 flex-wrap">
-        <a href="/templates/{{ template_id }}/render" class="btn btn-primary">Render</a>
-        <a href="/templates/{{ template_id }}/edit" class="btn">Edit</a>
+        <a href="/templates/{{ template_id }}/render" class="ion-btn ion-btn-primary">Render</a>
+        <a href="/templates/{{ template_id }}/edit" class="ion-btn">Edit</a>
     </div>
 </section>
 
 <div class="template-details">
     <div class="meta-bar">
-        <span class="badge" id="template-format">-</span>
+        <span class="ion-badge ion-c-cyan" id="template-format">-</span>
         <span class="_ion-s-6b99de8b69" id="template-doctype-badge"></span>
-        <span class="badge badge-version" id="template-version">v1</span>
+        <span class="ion-badge ion-c-muted badge-version" id="template-version">v1</span>
         <span id="template-updated">Updated: -</span>
     </div>
 
@@ -37,13 +37,13 @@
         </div>
         <!-- Section cards view (shown when template has sections) -->
         <div id="sections-view" class="section _ion-s-c8be1ccba6">
-            <h3>Sections <span class="badge" id="section-count-badge">0</span></h3>
+            <h3>Sections <span class="ion-badge ion-c-cyan" id="section-count-badge">0</span></h3>
             <div id="section-cards-container"></div>
         </div>
         <!-- Raw content view (shown for legacy templates) -->
         <div id="raw-content-view" class="section">
             <h3>Template Content</h3>
-            <pre id="template-content" class="code-block">Loading...</pre>
+            <pre id="template-content" class="code-block ion-mono">Loading...</pre>
         </div>
     </div>
 
@@ -76,15 +76,15 @@
                 <button type="button" class="version-tab-btn" data-vtab="diff">Diff</button>
             </div>
             <div id="version-content-tab" class="version-tab-content">
-                <pre id="version-content" class="code-block"></pre>
+                <pre id="version-content" class="code-block ion-mono"></pre>
             </div>
             <div id="version-diff-tab" class="version-tab-content _ion-s-f2892a2e8a">
                 <pre id="version-diff" class="code-block diff-view"></pre>
             </div>
         </div>
         <div class="modal-footer">
-            <button id="rollback-btn" class="btn btn-warning">Rollback to This Version</button>
-            <button class="btn" data-click-action="closeVersionModal">Close</button>
+            <button id="rollback-btn" class="ion-btn btn-warning">Rollback to This Version</button>
+            <button class="ion-btn" data-click-action="closeVersionModal">Close</button>
         </div>
     </div>
 </div>

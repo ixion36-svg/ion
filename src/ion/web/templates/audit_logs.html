@@ -16,9 +16,9 @@
 </div>
 </section>
 
-<div class="card">
+<div class="ion-card">
     <div class="card-header">
-        <h2>Activity Log</h2>
+        <h2 class="ion-card-title">Activity Log</h2>
         <div class="flex items-center gap-2 flex-wrap">
             <select id="filter-action" data-change-action="loadLogs">
                 <option value="">All Actions</option>
@@ -38,11 +38,11 @@
                 <option value="template">Template</option>
                 <option value="document">Document</option>
             </select>
-            <button class="btn btn-secondary" data-click-action="loadLogs">Refresh</button>
+            <button class="ion-btn" data-click-action="loadLogs">Refresh</button>
         </div>
     </div>
     <div class="card-body">
-        <table class="data-table" id="logs-table">
+        <table class="ion-table" id="logs-table">
             <thead>
                 <tr>
                     <th>Timestamp</th>
@@ -58,9 +58,9 @@
             </tbody>
         </table>
         <div class="pagination" id="pagination">
-            <button class="btn btn-sm" id="prev-page" data-click-action="prevPage" disabled>Previous</button>
+            <button class="ion-btn btn-sm" id="prev-page" data-click-action="prevPage" disabled>Previous</button>
             <span id="page-info">Page 1</span>
-            <button class="btn btn-sm" id="next-page" data-click-action="nextPage">Next</button>
+            <button class="ion-btn btn-sm" id="next-page" data-click-action="nextPage">Next</button>
         </div>
     </div>
 </div>

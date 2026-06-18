@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Changelog and deployment history.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button id="checkpoint-btn" class="btn btn-primary">Create Checkpoint</button>
-        <a href="/templates/{{ template_id }}" class="btn">Back to Template</a>
+        <button id="checkpoint-btn" class="ion-btn ion-btn-primary">Create Checkpoint</button>
+        <a href="/templates/{{ template_id }}" class="ion-btn">Back to Template</a>
     </div>
 </section>
 
@@ -41,8 +41,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button id="rollback-btn" class="btn btn-danger">Rollback to This Version</button>
-            <button class="btn" data-click-action="closeModal">Close</button>
+            <button id="rollback-btn" class="ion-btn ion-btn-danger">Rollback to This Version</button>
+            <button class="ion-btn" data-click-action="closeModal">Close</button>
         </div>
     </div>
 </div>
@@ -91,9 +91,9 @@ async function loadVersions() {
             html += '<span>' + formatDate(v.created_at) + '</span>';
             html += '</div>';
             html += '<div class="version-actions">';
-            html += `<button class="btn btn-sm" data-click-action="viewVersion" data-args='[${v.version_number}]'>View</button>`;
+            html += `<button class="ion-btn btn-sm" data-click-action="viewVersion" data-args='[${v.version_number}]'>View</button>`;
             if (v.version_number > 1) {
-                html += `<button class="btn btn-sm" data-click-action="showDiff" data-args='[${v.version_number - 1}, ${v.version_number}]'>Diff</button>`;
+                html += `<button class="ion-btn btn-sm" data-click-action="showDiff" data-args='[${v.version_number - 1}, ${v.version_number}]'>Diff</button>`;
             }
             html += '</div>';
             html += '</div>';
