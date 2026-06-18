@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% block title %}My Day · ION{% endblock %}
+
+{% block content %}
+<div class="dw-wrap">
+  <div class="ion-page-header">
+    <div>
+      <p class="ion-ph-title" id="dw-title">My Day</p>
+      <p class="ion-ph-sub" id="dw-sub">Loading…</p>
+    </div>
+    <div class="ion-toggle" id="dw-toggle">
+      <button type="button" class="on" data-view="me">My Day</button>
+      <button type="button" data-view="team">Team Day</button>
+    </div>
+  </div>
+
+  <!-- ── My Day ── -->
+  <section id="dw-view-me" class="dw-view">
+    <div class="ion-metrics-grid dw-metrics" id="dw-metrics"></div>
+
+    <div class="dw-split">
+      <div>
+        <div class="dw-quick" id="dw-presets">
+          <span class="dw-quick-label">Quick add</span>
+        </div>
+        <div class="dw-composer">
+          <span class="dw-composer-plus" aria-hidden="true">＋</span>
+          <input class="ion-input dw-composer-input" id="dw-text"
+                 placeholder="Or log something custom — add detail, pick a type…" maxlength="2000" />
+          <select class="ion-select dw-composer-type" id="dw-type"></select>
+          <button type="button" class="ion-btn ion-btn-primary" id="dw-add">Add</button>
+        </div>
+
+        <div class="dw-section-label">Activity timeline</div>
+        <div class="ion-timeline" id="dw-timeline">
+          <div class="ion-timeline-rail"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="ion-card">
+          <p class="ion-card-title"><span aria-hidden="true">↪</span> Shift handover</p>
+          <p class="ion-muted dw-hint">Compile today's work into a paste-ready note for the next shift.</p>
+          <button type="button" class="ion-btn ion-btn-primary dw-btn-full" id="dw-handover-btn">Generate handover</button>
+          <pre class="dw-handover-out" id="dw-handover-out">Click “Generate handover” to draft from today’s timeline…</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Team Day ── -->
+  <section id="dw-view-team" class="dw-view dw-hidden">
+    <div class="dw-board-head">
+      <div>Analyst</div><div>Working now</div><div>Today</div><div class="dw-ta-right">Active</div>
+    </div>
+    <div id="dw-board"></div>
+    <p class="ion-muted dw-team-note" id="dw-team-note">Loading team…</p>
+  </section>
+</div>
+
+<style nonce="{{ csp_nonce }}">
+  .dw-wrap { padding: 1.25rem 1.5rem 3rem; }
+  .dw-metrics { margin: 1rem 0 1.25rem; }
+  .dw-split { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+  @media (max-width: 880px) { .dw-split { grid-template-columns: 1fr; } }
+  .dw-quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 11px; }
+  .dw-quick-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 3px; }
+  .dw-composer { display: flex; gap: 8px; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 9px; margin-bottom: 16px; }
+  .dw-composer-plus { color: var(--primary); font-size: 16px; }
+  .dw-composer-input { border: none; background: none; padding: 4px 2px; }
+  .dw-composer-input:focus { border: none; }
+  .dw-composer-type { width: auto; }
+  .dw-section-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 11px 2px; }
+  .dw-hint { margin: 0 0 11px; font-size: 12px; }
+  .dw-btn-full { width: 100%; justify-content: center; }
+  .dw-handover-out { margin-top: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px; font-family: var(--font-mono, monospace); font-size: 11.5px; line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap; min-height: 60px; }
+  .dw-view.dw-hidden { display: none; }
+  .dw-board-head, .dw-row { display: grid; grid-template-columns: 1.5fr 2fr 1.3fr 0.7fr; gap: 10px; align-items: center; }
+  .dw-board-head { padding: 0 13px 8px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+  .dw-row { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 13px; margin-bottom: 7px; }
+  .dw-ta-right { text-align: right; }
+  .dw-team-note { font-size: 12px; margin: 14px 2px 0; }
+  .dw-empty { color: var(--text-muted); font-size: 13px; padding: 12px 2px; }
+  /* value-colour modifiers (no inline styles under CSP style-src-attr 'none') */
+  .dw-v-cyan { color: var(--primary); }
+  .dw-v-green { color: var(--success); }
+  .dw-src { font-size: 10px; color: #475569; margin-left: 6px; }
+  /* timeline dot colours */
+  .dw-dot-red { background: var(--danger); }
+  .dw-dot-green { background: var(--success); }
+  .dw-dot-amber { background: var(--warning); }
+  .dw-dot-cyan { background: var(--primary); }
+  .dw-dot-purple { background: #9a8cff; }
+  .dw-dot-blue { background: var(--neon-blue, #60a5fa); }
+  .dw-dot-muted { background: var(--text-muted); }
+  /* team row cells */
+  .dw-who { display: flex; align-items: center; gap: 9px; }
+  .dw-who-name { color: var(--text-bright); font-size: 13px; }
+  .dw-who-sub { font-size: 11px; }
+  .dw-now { font-size: 12px; }
+  .dw-now-empty { color: var(--text-muted); }
+  .dw-cnt { font-size: 12px; color: var(--text-secondary); }
+  .dw-num-cyan { color: var(--primary); }
+  .dw-num-green { color: var(--success); }
+  .dw-last { font-size: 11px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  "use strict";
+  // auto-event type → ion colour key (manual types come from the taxonomy)
+  var AUTO_COLORS = { triaged: "red", closed: "green", playbook: "amber", note: "purple", shift: "muted" };
+  var typeColor = {};   // slug -> colour key
+  var typeLabel = {};   // slug -> display label
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[<>&"]/g, function (c) { return ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]; }); }
+  function colorKey(t) { return typeColor[t] || AUTO_COLORS[t] || "muted"; }
+
+  function api(path, opts) {
+    return fetch("/api/worklog" + path, opts || {}).then(function (r) {
+      if (r.status === 403) { var e = new Error("forbidden"); e.code = 403; throw e; }
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  }
+
+  // ---- task types (quick-add chips + composer select) ----
+  function loadTaskTypes() {
+    return api("/task-types").then(function (d) {
+      var presets = document.getElementById("dw-presets");
+      var sel = document.getElementById("dw-type");
+      (d.task_types || []).forEach(function (t) {
+        typeColor[t.key] = t.color; typeLabel[t.key] = t.label;
+        var b = document.createElement("button");
+        b.type = "button"; b.className = "ion-chip ion-c-" + (t.color || "muted");
+        b.innerHTML = (t.glyph ? '<span aria-hidden="true">' + esc(t.glyph) + "</span>" : "") + esc(t.label);
+        b.addEventListener("click", function () { addEntry(t.key, t.label); });
+        presets.appendChild(b);
+        var o = document.createElement("option");
+        o.value = t.key; o.textContent = t.label; sel.appendChild(o);
+      });
+    });
+  }
+
+  // ---- my day ----
+  var lastItems = [];
+  function loadDay() {
+    return api("/day").then(function (d) {
+      document.getElementById("dw-sub").textContent =
+        (d.user ? d.user.name : "") + " · " + d.date;
+      renderMetrics(d.summary);
+      lastItems = d.items || [];
+      renderTimeline(lastItems);
+    });
+  }
+
+  function renderMetrics(s) {
+    s = s || {};
+    var cards = [
+      ["Active span", s.active_span || "—", ""],
+      ["Triaged", s.triaged || 0, "dw-v-cyan"],
+      ["Cases touched", s.cases_touched || 0, ""],
+      ["Closed", s.closed || 0, "dw-v-green"],
+      ["Logged", s.logged || 0, ""],
+    ];
+    document.getElementById("dw-metrics").innerHTML = cards.map(function (c) {
+      return '<div class="ion-metric"><div class="ion-metric-label">' + c[0] +
+        '</div><div class="ion-metric-value ' + c[2] + '">' + esc(c[1]) + "</div></div>";
+    }).join("");
+  }
+
+  function renderTimeline(items) {
+    var el = document.getElementById("dw-timeline");
+    el.innerHTML = '<div class="ion-timeline-rail"></div>';
+    if (!items.length) { el.innerHTML += '<div class="dw-empty">No activity logged yet today.</div>'; return; }
+    items.forEach(function (i) {
+      var ck = colorKey(i.type);
+      var label = typeLabel[i.type] || i.type;
+      var d = document.createElement("div");
+      d.className = "ion-ev";
+      d.innerHTML =
+        '<div class="ion-ev-time">' + esc(i.time) + "</div>" +
+        '<div class="ion-ev-dot dw-dot-' + ck + '"></div>' +
+        '<div><span class="ion-badge ion-c-' + ck + '">' + esc(label) + "</span>" +
+        esc(i.text) + ' <span class="dw-src">' + esc(i.source) + "</span></div>";
+      el.appendChild(d);
+    });
+  }
+
+  function addEntry(taskType, fallbackText) {
+    var inp = document.getElementById("dw-text");
+    var text = inp.value.trim() || fallbackText;
+    if (!text) return;
+    api("/entry", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task_type: taskType, text: text }),
+    }).then(function () { inp.value = ""; return loadDay(); })
+      .catch(function (e) { if (window.showToast) showToast("Log failed: " + e.message, "error"); });
+  }
+
+  function generateHandover() {
+    var closed = lastItems.filter(function (i) { return i.type === "closed"; });
+    var lines = ["SHIFT HANDOVER — " + (document.getElementById("dw-sub").textContent || ""), ""];
+    lines.push("Closed today: " + closed.length + " case(s).");
+    lines.push("");
+    lines.push("Activity:");
+    lastItems.slice(0, 12).forEach(function (i) { lines.push("  • " + i.time + "  [" + i.type + "] " + i.text); });
+    document.getElementById("dw-handover-out").textContent = lines.join("\n");
+  }
+
+  // ---- team day ----
+  var teamLoaded = false;
+  function loadTeam() {
+    if (teamLoaded) return;
+    api("/team").then(function (d) {
+      teamLoaded = true;
+      var board = document.getElementById("dw-board");
+      var note = document.getElementById("dw-team-note");
+      var team = d.team || [];
+      if (!team.length) { board.innerHTML = '<div class="dw-empty">No analyst activity recorded today.</div>'; note.textContent = ""; return; }
+      board.innerHTML = team.map(function (p) {
+        var c = p.counts || {};
+        var now = p.now ? esc(p.now) : '<span class="dw-now-empty">— no active case</span>';
+        return '<div class="dw-row"><div class="dw-who">' +
+          '<span class="ion-avatar ion-c-purple">' + esc(p.initials || "?") + "</span>" +
+          '<div><div class="dw-who-name">' + esc(p.name) + "</div>" +
+          '<div class="dw-who-sub ion-muted">' + (c.total || 0) + " items today</div></div></div>" +
+          '<div class="dw-now">' + now + "</div>" +
+          '<div class="dw-cnt"><span class="dw-num-cyan">' + (c.triaged || 0) +
+          '</span> triaged · <span class="dw-num-green">' + (c.closed || 0) + "</span> closed</div>" +
+          '<div class="dw-ta-right dw-last">' + esc(p.last_active || "—") + "</div></div>";
+      }).join("");
+      note.textContent = "Flags are supportive — last-active and load help the lead balance work and feed the handover.";
+    }).catch(function (e) {
+      var note = document.getElementById("dw-team-note");
+      if (e.code === 403) { note.textContent = "Team view requires lead access (security:read)."; document.getElementById("dw-board").innerHTML = ""; }
+      else note.textContent = "Could not load team view: " + e.message;
+    });
+  }
+
+  // ---- view toggle ----
+  function setView(v) {
+    var me = v === "me";
+    document.getElementById("dw-view-me").classList.toggle("dw-hidden", !me);
+    document.getElementById("dw-view-team").classList.toggle("dw-hidden", me);
+    document.getElementById("dw-title").textContent = me ? "My Day" : "Team — Today";
+    document.querySelectorAll("#dw-toggle button").forEach(function (b) {
+      b.classList.toggle("on", b.getAttribute("data-view") === v);
+    });
+    if (!me) loadTeam();
+  }
+
+  function init() {
+    document.querySelectorAll("#dw-toggle button").forEach(function (b) {
+      b.addEventListener("click", function () { setView(b.getAttribute("data-view")); });
+    });
+    document.getElementById("dw-add").addEventListener("click", function () {
+      addEntry(document.getElementById("dw-type").value, null);
+    });
+    document.getElementById("dw-text").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") addEntry(document.getElementById("dw-type").value, null);
+    });
+    document.getElementById("dw-handover-btn").addEventListener("click", generateHandover);
+    loadTaskTypes().then(loadDay).catch(function (e) {
+      document.getElementById("dw-sub").textContent = "Failed to load: " + e.message;
+    });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+</script>
+{% endblock %}

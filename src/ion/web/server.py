@@ -125,6 +125,7 @@ from ion.web.vulnerability_api import router as vulnerability_router
 from ion.web.wallboard_api import router as wallboard_router
 from ion.web.webhook_api import router as webhook_router
 from ion.web.workbench_api import router as workbench_router
+from ion.web.worklog_api import router as worklog_router
 
 es_config = get_elasticsearch_config()
 if es_config.get("url"):
@@ -345,6 +346,7 @@ app.include_router(observable_router, prefix="/api")
 app.include_router(ai_router)
 app.include_router(kibana_router, prefix="/api/kibana")
 app.include_router(skills_router, prefix="/api/skills")
+app.include_router(worklog_router, prefix="/api/worklog")
 # Role-match router has its own /skills/role-match prefix in the router itself
 app.include_router(role_skills_router, prefix="/api")
 app.include_router(notes_router, prefix="/api/notes")
@@ -2017,6 +2019,12 @@ async def chat_page(request: Request, user: User = Depends(require_page_permissi
 async def training_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the training pathways page."""
     return templates.TemplateResponse(request=request, name="training.html")
+
+
+@app.get("/daily-work", response_class=HTMLResponse)
+async def daily_work_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
+    """Render the daily-work tracking page (My Day / Team Day)."""
+    return templates.TemplateResponse(request=request, name="daily_work.html")
 
 
 @app.get("/notes", response_class=HTMLResponse)
