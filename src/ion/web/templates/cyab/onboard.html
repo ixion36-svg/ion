@@ -5,8 +5,8 @@
   {% include "cyab/_section_nav.html" %}
 
   <header class="mb-4">
-    <h1 class="text-[24px] text-white font-semibold">Onboard a system</h1>
-    <p class="text-slate-400 text-[12.5px]">
+    <h1 class="ion-ph-title">Onboard a system</h1>
+    <p class="ion-ph-sub">
       4 steps. You can exit at any point and resume from this same URL — nothing blocks.
     </p>
   </header>
@@ -21,7 +21,7 @@
     {% endfor %}
   </ol>
 
-  <section id="wizard-step-content" class="bg-slate-900/40 border border-slate-800 rounded p-4">
+  <section id="wizard-step-content" class="ion-card">
     {% if step == 1 %}{% include "cyab/_wizard_step_1_identity.html" %}{% endif %}
     {% if step == 2 %}{% include "cyab/_wizard_step_2_intake.html" ignore missing %}{% endif %}
     {% if step == 3 %}{% include "cyab/_wizard_step_3_source.html" ignore missing %}{% endif %}

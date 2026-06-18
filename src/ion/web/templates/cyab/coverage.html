@@ -11,8 +11,8 @@
       <span class="mx-2">·</span>
       <span class="text-white">Coverage</span>
     </nav>
-    <h1 class="text-[28px] font-semibold text-white">Fleet data-health matrix</h1>
-    <p class="text-slate-400 text-[12.5px]">
+    <h1 class="ion-ph-title">Fleet data-health matrix</h1>
+    <p class="ion-ph-sub">
       Every system × every signal. Click any cell to drill into the relevant tab on the per-system page.
     </p>
   </header>
@@ -20,17 +20,17 @@
   {# Aggregates strip — three pills computed against the unfiltered fleet
      so the strip stays stable as the user filters rows. #}
   <div class="grid grid-cols-3 gap-3 mb-4">
-    <div class="bg-slate-900/40 border border-slate-800 rounded p-3">
-      <div class="text-emerald-300 text-[24px] font-semibold">{{ matrix.aggregates.pct_systems_healthy }}%</div>
-      <div class="text-slate-400 text-[11px]">systems healthy</div>
+    <div class="ion-metric">
+      <div class="ion-metric-value text-emerald-300">{{ matrix.aggregates.pct_systems_healthy }}%</div>
+      <div class="ion-metric-label">systems healthy</div>
     </div>
-    <div class="bg-slate-900/40 border border-slate-800 rounded p-3">
-      <div class="text-rose-300 text-[24px] font-semibold">{{ matrix.aggregates.pct_critical_missing }}%</div>
-      <div class="text-slate-400 text-[11px]">critical-missing items</div>
+    <div class="ion-metric">
+      <div class="ion-metric-value text-rose-300">{{ matrix.aggregates.pct_critical_missing }}%</div>
+      <div class="ion-metric-label">critical-missing items</div>
     </div>
-    <div class="bg-slate-900/40 border border-slate-800 rounded p-3">
-      <div class="text-amber-300 text-[24px] font-semibold">{{ matrix.aggregates.pct_stale_ingestion }}%</div>
-      <div class="text-slate-400 text-[11px]">stale-ingestion systems</div>
+    <div class="ion-metric">
+      <div class="ion-metric-value text-amber-300">{{ matrix.aggregates.pct_stale_ingestion }}%</div>
+      <div class="ion-metric-label">stale-ingestion systems</div>
     </div>
   </div>
 
@@ -38,19 +38,17 @@
   <form method="get" action="/cyab/coverage" class="flex items-end gap-3 mb-4">
     <label class="flex flex-col gap-1 text-[11px] text-slate-400">
       Pillar
-      <input name="pillar" value="{{ filters.pillar }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
+      <input name="pillar" value="{{ filters.pillar }}" class="ion-input">
     </label>
     <label class="flex flex-col gap-1 text-[11px] text-slate-400">
       Owner
-      <input name="owner" value="{{ filters.owner }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
+      <input name="owner" value="{{ filters.owner }}" class="ion-input">
     </label>
     <label class="flex items-center gap-2 text-[12px] text-slate-300 mb-1">
       <input type="checkbox" name="any_red" value="1" {% if filters.any_red %}checked{% endif %}>
       Any red
     </label>
-    <button type="submit" class="px-3 py-1 bg-cyan-700 text-white text-[12px] rounded">
+    <button type="submit" class="ion-btn ion-btn-primary">
       Apply
     </button>
   </form>

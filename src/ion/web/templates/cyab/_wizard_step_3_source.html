@@ -1,5 +1,5 @@
 <header class="mb-4">
-  <h2 class="text-white text-[16px] font-semibold">First data source</h2>
+  <h2 class="ion-card-title text-[16px]">First data source</h2>
   <p class="text-slate-400 text-[12px]">
     One source to start. Add more later from the Sources tab.
   </p>
@@ -16,12 +16,12 @@
     <span class="text-slate-400">Source name <span class="text-rose-400">*</span></span>
     <input name="name" type="text" required
            value="{{ state.source.name or state.identity.hostname or '' }}"
-           class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+           class="ion-input">
   </label>
 
   <label class="flex flex-col gap-1">
     <span class="text-slate-400">Source type</span>
-    <select name="data_source_type" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="data_source_type" class="ion-select">
       {% for opt in ['windows-evtx', 'generic-syslog', 'linux-auditd', 'aws-cloudtrail',
                      'office365', 'okta', 'azure-ad', 'edr-generic'] %}
         <option value="{{ opt }}" {% if state.source.data_source_type == opt %}selected{% endif %}>{{ opt }}</option>
@@ -31,7 +31,7 @@
 
   <label class="col-span-2 flex flex-col gap-1">
     <span class="text-slate-400">Sub-profile</span>
-    <select name="subprofile_id" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="subprofile_id" class="ion-select">
       <option value="">— pick a sub-profile —</option>
       {% for s in (subprofiles or []) %}
         <option value="{{ s.id }}"
@@ -46,7 +46,7 @@
     <a href="/cyab/onboard?wid={{ wid }}&step=2" class="text-slate-500 text-[11px]">← Back</a>
     <div class="flex gap-2">
       <a href="/cyab/systems" class="text-slate-500 text-[11px] py-1">Save & exit</a>
-      <button type="submit" class="px-4 py-1.5 bg-cyan-700 text-white text-[12.5px] rounded">
+      <button type="submit" class="ion-btn ion-btn-primary">
         Continue → Doc placeholders
       </button>
     </div>

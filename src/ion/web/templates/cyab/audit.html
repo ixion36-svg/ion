@@ -11,8 +11,8 @@
       <span class="mx-2">·</span>
       <span class="text-white">Audit trail</span>
     </nav>
-    <h1 class="text-[28px] font-semibold text-white">Audit trail</h1>
-    <p class="text-slate-400 text-[12.5px]">
+    <h1 class="ion-ph-title">Audit trail</h1>
+    <p class="ion-ph-sub">
       Sign-offs, checklist updates, containment-authority changes, and system lifecycle events.
     </p>
   </header>
@@ -21,18 +21,15 @@
   <form method="get" action="/cyab/audit" class="grid grid-cols-6 gap-2 mb-4 text-[12px]">
     <label class="flex flex-col gap-1">
       <span class="text-slate-400 text-[10.5px]">System ID</span>
-      <input name="system_id" value="{{ filters.system_id }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+      <input name="system_id" value="{{ filters.system_id }}" class="ion-input">
     </label>
     <label class="flex flex-col gap-1">
       <span class="text-slate-400 text-[10.5px]">User</span>
-      <input name="user" value="{{ filters.user }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+      <input name="user" value="{{ filters.user }}" class="ion-input">
     </label>
     <label class="flex flex-col gap-1">
       <span class="text-slate-400 text-[10.5px]">Action</span>
-      <select name="action_type"
-              class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+      <select name="action_type" class="ion-select">
         <option value="">— any —</option>
         {% for opt in ['create', 'signoff', 'checklist_update', 'containment_change', 'archive', 'snapshot'] %}
           <option value="{{ opt }}" {% if filters.action_type == opt %}selected{% endif %}>{{ opt }}</option>
@@ -41,16 +38,13 @@
     </label>
     <label class="flex flex-col gap-1">
       <span class="text-slate-400 text-[10.5px]">Since</span>
-      <input type="date" name="since" value="{{ filters.since }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+      <input type="date" name="since" value="{{ filters.since }}" class="ion-input">
     </label>
     <label class="flex flex-col gap-1">
       <span class="text-slate-400 text-[10.5px]">Until</span>
-      <input type="date" name="until" value="{{ filters.until }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+      <input type="date" name="until" value="{{ filters.until }}" class="ion-input">
     </label>
-    <button type="submit"
-            class="self-end px-3 py-1 bg-cyan-700 text-white rounded">
+    <button type="submit" class="ion-btn ion-btn-primary self-end">
       Apply
     </button>
   </form>

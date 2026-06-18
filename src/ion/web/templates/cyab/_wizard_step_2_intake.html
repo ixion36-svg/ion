@@ -9,7 +9,7 @@
    reused verbatim so the two surfaces stay byte-identical. #}
 
 <header class="mb-4">
-  <h2 class="text-white text-[16px] font-semibold">Intake</h2>
+  <h2 class="ion-card-title text-[16px]">Intake</h2>
   <p class="text-slate-400 text-[12px]">Sub-profile-driven questions. Auto-saves as you type.</p>
 </header>
 
@@ -49,7 +49,7 @@
           <label class="block text-[12.5px]">
             <span class="text-slate-300">{{ q.text }}</span>
             <input type="text" name="answers[{{ q.id }}]" value="{{ state.intake.get(q.id, '') }}"
-                   class="w-full mt-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded"
+                   class="ion-input mt-1"
                    hx-post="/api/cyab/systems/{{ state.system_id }}/answers"
                    hx-trigger="change delay:600ms"
                    hx-vals='js:{ answers: { "{{ q.id }}": this.value } }'
@@ -62,7 +62,7 @@
         <a href="/cyab/onboard?wid={{ wid }}&step=1" class="text-slate-500 text-[11px]">← Back</a>
         <div class="flex gap-2">
           <a href="/cyab/systems" class="text-slate-500 text-[11px] py-1">Save & exit</a>
-          <button type="submit" class="px-4 py-1.5 bg-cyan-700 text-white text-[12.5px] rounded">
+          <button type="submit" class="ion-btn ion-btn-primary">
             Continue → Source
           </button>
         </div>
@@ -72,7 +72,7 @@
 
   <aside class="col-span-1">
     <div id="wizard-counter"
-         class="sticky top-4 bg-slate-900/40 border border-slate-800 rounded p-4">
+         class="sticky top-4 ion-card">
       {# Initial render: zero state from the server. The wizard page
          handler may pre-populate `scoping_initial` from any answers
          already saved against this session. #}

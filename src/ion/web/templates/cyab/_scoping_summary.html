@@ -5,17 +5,17 @@
   <p class="text-slate-300 text-[12.5px] mb-3">{{ summary_text }}</p>
 
   <div class="grid grid-cols-3 gap-3 mb-4">
-    <div class="bg-slate-900/40 border border-slate-800 rounded p-2">
+    <div class="ion-metric">
       <div class="text-cyan-300 text-[20px] font-semibold">{{ scores.use_case_count }}</div>
-      <div class="text-slate-500 text-[10.5px]">detection &amp; audit use cases</div>
+      <div class="ion-metric-label">detection &amp; audit use cases</div>
     </div>
-    <div class="bg-slate-900/40 border border-slate-800 rounded p-2">
+    <div class="ion-metric">
       <div class="text-amber-300 text-[20px] font-semibold">{{ scores.threat_actor_matches }}</div>
-      <div class="text-slate-500 text-[10.5px]">threat-actor profiles</div>
+      <div class="ion-metric-label">threat-actor profiles</div>
     </div>
-    <div class="bg-slate-900/40 border border-slate-800 rounded p-2">
+    <div class="ion-metric">
       <div class="text-emerald-300 text-[20px] font-semibold">{{ scores.mitre_coverage_pct }}%</div>
-      <div class="text-slate-500 text-[10.5px]">MITRE Initial Access coverage</div>
+      <div class="ion-metric-label">MITRE Initial Access coverage</div>
     </div>
   </div>
 
@@ -28,7 +28,7 @@
       {% for uc in scores.recommended_use_cases %}
         <li class="flex justify-between text-slate-300">
           <span>{{ uc.name }}</span>
-          <span class="text-slate-500 font-mono">{{ uc.score }}</span>
+          <span class="ion-mono">{{ uc.score }}</span>
         </li>
       {% endfor %}
     </ul>
@@ -57,15 +57,14 @@
           hx-swap="none"
           hx-on::after-request="if (event.detail.successful) { window.location = event.detail.xhr.getResponseHeader('Location') || event.detail.xhr.responseURL; }"
           class="inline">
-      <button type="submit" class="px-3 py-1.5 bg-slate-700 text-white text-[12px] rounded">
+      <button type="submit" class="ion-btn">
         Download PDF
       </button>
     </form>
     <form hx-post="/api/cyab/scoping/convert"
           hx-include="#scoping-form"
           class="inline">
-      <button type="submit"
-              class="px-3 py-1.5 bg-cyan-700 text-white text-[12px] rounded">
+      <button type="submit" class="ion-btn ion-btn-primary">
         Convert to system &rarr;
       </button>
     </form>

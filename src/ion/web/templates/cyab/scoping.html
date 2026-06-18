@@ -10,8 +10,8 @@
       <span class="mx-2">·</span>
       <span class="text-white">Scoping</span>
     </nav>
-    <h1 class="text-[28px] font-semibold text-white">Stack-to-coverage scoping</h1>
-    <p class="text-slate-400 text-[12.5px] mt-1">
+    <h1 class="ion-ph-title">Stack-to-coverage scoping</h1>
+    <p class="ion-ph-sub">
       Answer a few questions about the technology stack to see how many
       detection rules, audit checks, and threat-actor profiles would apply.
       No system is created — for a real onboarding, use the wizard.
@@ -28,13 +28,12 @@
           hx-swap="innerHTML"
           hx-trigger="change">
       {% for q in questions %}
-        <fieldset class="scoping-question bg-slate-900/40 border border-slate-800 rounded p-3"
+        <fieldset class="scoping-question ion-card"
                   data-question-id="{{ q.id }}"
                   data-category="{{ q.category }}">
           <legend class="text-slate-200 text-[12.5px] mb-2">{{ q.text }}</legend>
           {% if q.type == "choice" %}
-            <select name="{{ q.id }}"
-                    class="w-full px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
+            <select name="{{ q.id }}" class="ion-select">
               <option value="">— select —</option>
               {% for opt in q.options %}
                 <option value="{{ opt.value }}">{{ opt.label }}</option>
@@ -50,8 +49,7 @@
               {% endfor %}
             </div>
           {% else %}
-            <input type="text" name="{{ q.id }}"
-                   class="w-full px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
+            <input type="text" name="{{ q.id }}" class="ion-input">
           {% endif %}
         </fieldset>
       {% endfor %}
@@ -62,7 +60,7 @@
                 hx-target="#scoping-summary"
                 hx-include="#scoping-form"
                 hx-swap="innerHTML"
-                class="px-3 py-1.5 bg-cyan-700 text-white text-[12px] rounded">
+                class="ion-btn ion-btn-primary">
           See summary
         </button>
         <a href="#" id="scoping-pdf-link"
@@ -75,7 +73,7 @@
     {# Right 1/3 — sticky live counter #}
     <aside class="col-span-1">
       <div id="scoping-counter"
-           class="sticky top-4 bg-slate-900/40 border border-slate-800 rounded p-4">
+           class="sticky top-4 ion-card">
         {% include "cyab/_scoping_counter.html" %}
       </div>
     </aside>

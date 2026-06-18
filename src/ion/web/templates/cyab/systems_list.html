@@ -4,10 +4,11 @@
 <div class="cyab-systems-list">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="flex items-baseline justify-between mb-4">
-    <h1 class="text-[24px] text-white font-semibold">Systems</h1>
-    <a href="/cyab/onboard"
-       class="px-3 py-1.5 bg-cyan-700 text-white text-[12.5px] rounded">+ Onboard</a>
+  <header class="ion-page-header mb-4">
+    <div>
+      <h1 class="ion-ph-title">Systems</h1>
+    </div>
+    <a href="/cyab/onboard" class="ion-btn ion-btn-primary">+ Onboard</a>
   </header>
 
   {# Hidden column-header reference so the page shell advertises the table
@@ -24,24 +25,23 @@
         hx-trigger="change, keyup[target.tagName=='INPUT'] delay:300ms"
         hx-swap="innerHTML">
     <input name="q" placeholder="Search name / hostname / owner"
-           class="flex-1 px-2 py-1 bg-slate-900 border border-slate-700 rounded">
-    <select name="pillar" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+           class="ion-input flex-1">
+    <select name="pillar" class="ion-select w-auto">
       <option value="">all pillars</option>
       {% for p in pillars %}<option value="{{ p.id }}">{{ p.label }}</option>{% endfor %}
     </select>
-    <select name="subprofile" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="subprofile" class="ion-select w-auto">
       <option value="">all sub-profiles</option>
       {% for s in subprofiles %}<option value="{{ s.id }}">{{ s.label }}</option>{% endfor %}
     </select>
-    <select name="status" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="status" class="ion-select w-auto">
       <option value="">any status</option>
       <option value="DRAFT">DRAFT</option>
       <option value="ACTIVE">ACTIVE</option>
       <option value="RETIRED">RETIRED</option>
     </select>
-    <input name="owner" placeholder="owner"
-           class="w-32 px-2 py-1 bg-slate-900 border border-slate-700 rounded">
-    <select name="missing" class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <input name="owner" placeholder="owner" class="ion-input w-32">
+    <select name="missing" class="ion-select w-auto">
       <option value="">missing: any</option>
       <option value="HLD">missing HLD</option>
       <option value="NETWORK_TOPOLOGY">missing topology</option>

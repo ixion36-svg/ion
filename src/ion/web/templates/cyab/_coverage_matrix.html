@@ -16,20 +16,20 @@
   "unknown": "text-slate-600",
 } %}
 
-<table class="w-full text-[12px] border-collapse">
+<table class="ion-table">
   <thead>
-    <tr class="text-slate-500 text-[10.5px] uppercase tracking-wider">
-      <th class="text-left py-2 pr-3">System</th>
-      <th class="text-left pr-3">Owner</th>
+    <tr>
+      <th>System</th>
+      <th>Owner</th>
       {% for dim in matrix.dimensions %}
-        <th class="text-center px-1">{{ dim_labels[dim] }}</th>
+        <th class="text-center">{{ dim_labels[dim] }}</th>
       {% endfor %}
     </tr>
   </thead>
   <tbody>
     {% for row in matrix.rows %}
-      <tr class="border-t border-slate-800 hover:bg-slate-900/40">
-        <td class="py-2 pr-3 text-cyan-300 font-mono">
+      <tr>
+        <td class="ion-mono">
           <a href="/cyab/systems/{{ row.system_id }}" class="hover:underline">{{ row.name }}</a>
         </td>
         <td class="text-slate-400">{{ row.owner or '—' }}</td>

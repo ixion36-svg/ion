@@ -4,16 +4,16 @@
 <div class="cyab-overview">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="flex items-baseline justify-between mb-4">
-    <h1 class="text-[24px] text-white font-semibold">CyAB Overview</h1>
+  <header class="ion-page-header mb-4">
+    <div>
+      <h1 class="ion-ph-title">CyAB Overview</h1>
+    </div>
     <div class="flex gap-2">
-      <a href="/cyab/onboard"
-         class="px-3 py-1.5 bg-cyan-700 text-white text-[12.5px] rounded">+ Onboard</a>
-      <a href="/cyab/systems"
-         class="px-3 py-1.5 bg-slate-800 text-slate-200 text-[12.5px] rounded">View systems</a>
+      <a href="/cyab/onboard" class="ion-btn ion-btn-primary">+ Onboard</a>
+      <a href="/cyab/systems" class="ion-btn">View systems</a>
       <button hx-post="/api/cyab/coverage/rollup-now"
               hx-swap="none"
-              class="px-3 py-1.5 bg-slate-800 text-slate-200 text-[12.5px] rounded">
+              class="ion-btn">
         Run coverage rollup
       </button>
     </div>
@@ -22,30 +22,30 @@
   {# === KPI strip === #}
   {% set onb_pct = (kpis.sal_compliance_pass / kpis.total_systems * 100) | round(0) | int if kpis.total_systems else 0 %}
   {% set crit_pct = (needs_attention | length) / kpis.total_systems * 100 if kpis.total_systems else 0 %}
-  <section class="kpi-strip grid grid-cols-4 gap-3 mb-6">
-    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
-      <div class="text-slate-500 text-[10px] uppercase tracking-wider">Total systems</div>
-      <div class="text-cyan-300 text-[24px] font-semibold">{{ kpis.total_systems }}</div>
+  <section class="kpi-strip ion-metrics-grid mb-6">
+    <div class="kpi-card ion-metric">
+      <div class="ion-metric-label">Total systems</div>
+      <div class="ion-metric-value text-cyan-300">{{ kpis.total_systems }}</div>
     </div>
-    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
-      <div class="text-slate-500 text-[10px] uppercase tracking-wider">% onboarded</div>
-      <div class="text-emerald-300 text-[24px] font-semibold">{{ onb_pct }}%</div>
+    <div class="kpi-card ion-metric">
+      <div class="ion-metric-label">% onboarded</div>
+      <div class="ion-metric-value text-emerald-300">{{ onb_pct }}%</div>
     </div>
-    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
-      <div class="text-slate-500 text-[10px] uppercase tracking-wider">% critical-missing</div>
-      <div class="text-rose-400 text-[24px] font-semibold">{{ crit_pct | round(0) | int }}%</div>
+    <div class="kpi-card ion-metric">
+      <div class="ion-metric-label">% critical-missing</div>
+      <div class="ion-metric-value text-rose-400">{{ crit_pct | round(0) | int }}%</div>
     </div>
-    <div class="kpi-card bg-slate-900/60 border border-slate-800 rounded p-3">
-      <div class="text-slate-500 text-[10px] uppercase tracking-wider">Sign-offs this week</div>
-      <div class="text-amber-300 text-[24px] font-semibold">{{ kpis.signoffs_this_week }}</div>
+    <div class="kpi-card ion-metric">
+      <div class="ion-metric-label">Sign-offs this week</div>
+      <div class="ion-metric-value text-amber-300">{{ kpis.signoffs_this_week }}</div>
     </div>
   </section>
 
   <div class="grid grid-cols-2 gap-4">
     {# === In progress feed === #}
-    <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+    <section class="ion-card">
       <header class="flex items-baseline justify-between mb-2">
-        <h3 class="text-slate-300 text-[12.5px]">In progress</h3>
+        <h3 class="ion-card-title">In progress</h3>
         <span class="text-slate-500 text-[10.5px]">5 most recent</span>
       </header>
       {% if not in_progress %}
@@ -63,9 +63,9 @@
     </section>
 
     {# === Needs attention feed === #}
-    <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
+    <section class="ion-card">
       <header class="flex items-baseline justify-between mb-2">
-        <h3 class="text-rose-400 text-[12.5px]">Needs attention</h3>
+        <h3 class="ion-card-title text-rose-400">Needs attention</h3>
         <span class="text-slate-500 text-[10.5px]">critical-missing or stale data</span>
       </header>
       {% if not needs_attention %}

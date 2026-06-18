@@ -4,39 +4,39 @@
     No events match the current filters.
   </p>
 {% else %}
-<table class="w-full text-[12px] border-collapse">
+<table class="ion-table">
   <thead>
-    <tr class="text-slate-500 text-[10.5px] uppercase tracking-wider">
-      <th class="text-left py-2 pr-3">When</th>
-      <th class="text-left pr-3">Who</th>
-      <th class="text-left pr-3">Action</th>
-      <th class="text-left pr-3">What</th>
-      <th class="text-left pr-3">System</th>
-      <th class="text-left">Links</th>
+    <tr>
+      <th>When</th>
+      <th>Who</th>
+      <th>Action</th>
+      <th>What</th>
+      <th>System</th>
+      <th>Links</th>
     </tr>
   </thead>
   <tbody>
     {% for ev in feed.events %}
-      <tr class="border-t border-slate-800 hover:bg-slate-900/40">
-        <td class="py-1.5 pr-3 text-slate-400 font-mono text-[11px]">
+      <tr>
+        <td class="ion-mono text-[11px]">
           {{ ev.when[:19].replace('T', ' ') }}
         </td>
-        <td class="pr-3 text-slate-300">{{ ev.who }}</td>
-        <td class="pr-3">
+        <td class="text-slate-300">{{ ev.who }}</td>
+        <td>
           {% set badge_class = {
-            'create':             'bg-cyan-900/40 text-cyan-300',
-            'signoff':            'bg-emerald-900/40 text-emerald-300',
-            'snapshot':           'bg-slate-800 text-slate-300',
-            'checklist_update':   'bg-slate-800 text-slate-300',
-            'containment_change': 'bg-amber-900/40 text-amber-300',
-            'archive':            'bg-rose-900/40 text-rose-300',
-          }.get(ev.action_type, 'bg-slate-800 text-slate-400') %}
-          <span class="{{ badge_class }} px-2 py-0.5 rounded text-[10.5px] font-mono">
+            'create':             'ion-c-cyan',
+            'signoff':            'ion-c-green',
+            'snapshot':           'ion-c-muted',
+            'checklist_update':   'ion-c-muted',
+            'containment_change': 'ion-c-amber',
+            'archive':            'ion-c-red',
+          }.get(ev.action_type, 'ion-c-muted') %}
+          <span class="ion-badge {{ badge_class }} font-mono">
             {{ ev.action_type }}
           </span>
         </td>
-        <td class="pr-3 text-slate-300">{{ ev.what }}</td>
-        <td class="pr-3 text-cyan-400">
+        <td class="text-slate-300">{{ ev.what }}</td>
+        <td class="text-cyan-400">
           {% if ev.system_id %}
             <a href="/cyab/systems/{{ ev.system_id }}" class="hover:underline">
               {{ ev.system_name or '#' ~ ev.system_id }}

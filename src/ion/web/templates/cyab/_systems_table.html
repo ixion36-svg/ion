@@ -14,35 +14,34 @@
   <div class="flex items-center gap-2 mb-2 text-[11.5px]">
     <span class="text-slate-500">{{ rows | length }} systems</span>
     <span class="flex-1"></span>
-    <select name="action" id="cyab-systems-bulk-action"
-            class="px-2 py-1 bg-slate-900 border border-slate-700 rounded">
+    <select name="action" id="cyab-systems-bulk-action" class="ion-select w-auto">
       <option value="mark-reviewed">Mark reviewed</option>
       <option value="export-csv">Export CSV</option>
       <option value="rerun-health">Re-run health checks</option>
       <option value="delete-selected" class="text-rose-300">Delete selected</option>
     </select>
-    <button type="submit" class="px-2 py-1 bg-slate-800 text-slate-200 rounded">Apply</button>
+    <button type="submit" class="ion-btn">Apply</button>
   </div>
 
-  <table class="systems-table w-full text-[12px]">
-    <thead class="text-slate-500 text-[10.5px] uppercase">
+  <table class="systems-table ion-table">
+    <thead>
       <tr>
-        <th class="text-left py-1"><input type="checkbox" id="select-all"></th>
-        <th class="text-left">Name</th>
-        <th class="text-left">Pillar</th>
-        <th class="text-left">Sub-profile</th>
-        <th class="text-left">Owner</th>
-        <th class="text-left">Progress</th>
-        <th class="text-left">Critical-missing</th>
-        <th class="text-left">Last edited</th>
-        <th class="text-left">Status</th>
+        <th><input type="checkbox" id="select-all"></th>
+        <th>Name</th>
+        <th>Pillar</th>
+        <th>Sub-profile</th>
+        <th>Owner</th>
+        <th>Progress</th>
+        <th>Critical-missing</th>
+        <th>Last edited</th>
+        <th>Status</th>
         <th class="text-right">Actions</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-slate-800">
+    <tbody>
       {% for r in rows %}
-        <tr class="hover:bg-slate-800/30" data-system-id="{{ r.id }}">
-          <td class="py-1.5"><input type="checkbox" name="system_ids" value="{{ r.id }}"></td>
+        <tr data-system-id="{{ r.id }}">
+          <td><input type="checkbox" name="system_ids" value="{{ r.id }}"></td>
           <td><a href="/cyab/systems/{{ r.id }}" class="text-cyan-400 hover:underline">{{ r.name }}</a></td>
           <td class="text-slate-400">{{ r.pillar or '—' }}</td>
           <td class="text-slate-400">{{ r.subprofile or '—' }}</td>
@@ -67,16 +66,16 @@
             {{ r.updated_at.strftime('%Y-%m-%d %H:%M') if r.updated_at else '—' }}
           </td>
           <td>
-            <span class="px-1.5 py-0.5 text-[10.5px] rounded
-                         {% if r.status == 'ACTIVE' %}bg-emerald-900/40 text-emerald-300
-                         {% elif r.status == 'DRAFT' %}bg-slate-800 text-slate-300
-                         {% else %}bg-slate-800 text-slate-500{% endif %}">
+            <span class="ion-badge
+                         {% if r.status == 'ACTIVE' %}ion-c-green
+                         {% elif r.status == 'DRAFT' %}ion-c-muted
+                         {% else %}ion-c-muted{% endif %}">
               {{ r.status }}
             </span>
           </td>
           <td class="text-right">
             <button type="button"
-                    class="cyab-system-del px-1.5 py-0.5 text-[10.5px] rounded text-rose-300 hover:text-white hover:bg-rose-900/40 transition"
+                    class="cyab-system-del ion-btn ion-btn-ghost text-rose-300 hover:text-white hover:bg-rose-900/40"
                     data-system-id="{{ r.id }}"
                     data-system-name="{{ r.name }}"
                     title="Delete this system permanently">Delete</button>
