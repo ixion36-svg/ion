@@ -15,8 +15,8 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Open issues, merge requests and assigned work.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn _ion-s-f2892a2e8a" data-click-action="showConfigModal" id="config-btn">Configure</button>
-        <button class="btn btn-primary _ion-s-f2892a2e8a" data-click-action="showCreateIssueModal" id="new-issue-btn">New Issue</button>
+        <button class="ion-btn _ion-s-f2892a2e8a" data-click-action="showConfigModal" id="config-btn">Configure</button>
+        <button class="ion-btn ion-btn-primary _ion-s-f2892a2e8a" data-click-action="showCreateIssueModal" id="new-issue-btn">New Issue</button>
     </div>
 </section>
 
@@ -29,27 +29,27 @@
 <div id="not-configured" class="empty-state _ion-s-f2892a2e8a">
     <h2>GitLab Not Configured</h2>
     <p>Connect to GitLab to create, track, and manage issues directly from ION.</p>
-    <button class="btn btn-primary" data-click-action="showConfigModal">Configure GitLab</button>
+    <button class="ion-btn ion-btn-primary" data-click-action="showConfigModal">Configure GitLab</button>
 </div>
 
 <!-- Issues Section -->
 <div class="_ion-s-f2892a2e8a" id="issues-section">
     <!-- Toolbar -->
     <div class="toolbar">
-        <input type="text" id="search-input" placeholder="Search issues..." class="search-input">
-        <select id="scope-filter" class="filter-select" data-change-action="loadIssues">
+        <input type="text" id="search-input" placeholder="Search issues..." class="ion-input gl-search">
+        <select id="scope-filter" class="ion-select gl-filter" data-change-action="loadIssues">
             <option value="my">My Issues</option>
             <option value="all">All Issues</option>
         </select>
-        <select id="state-filter" class="filter-select" data-change-action="loadIssues">
+        <select id="state-filter" class="ion-select gl-filter" data-change-action="loadIssues">
             <option value="all">All States</option>
             <option value="opened">Open</option>
             <option value="closed">Closed</option>
         </select>
-        <select id="label-filter" class="filter-select" data-change-action="loadIssues">
+        <select id="label-filter" class="ion-select gl-filter" data-change-action="loadIssues">
             <option value="">All Labels</option>
         </select>
-        <button class="btn" data-click-action="loadIssues">Refresh</button>
+        <button class="ion-btn" data-click-action="loadIssues">Refresh</button>
     </div>
 
     <!-- Issues List -->
@@ -68,23 +68,23 @@
         <div class="modal-body">
             <div class="form-group">
                 <label for="gitlab-url">GitLab URL</label>
-                <input type="text" id="gitlab-url" class="form-control" placeholder="https://gitlab.example.com or http://localhost:8929">
+                <input type="text" id="gitlab-url" class="ion-input" placeholder="https://gitlab.example.com or http://localhost:8929">
                 <small>The URL of your GitLab instance</small>
             </div>
             <div class="form-group">
                 <label for="gitlab-token">Personal Access Token</label>
-                <input type="password" id="gitlab-token" class="form-control" placeholder="glpat-xxxxxxxxxxxx">
+                <input type="password" id="gitlab-token" class="ion-input" placeholder="glpat-xxxxxxxxxxxx">
                 <small>Token with 'api' scope. <a href="https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html" target="_blank">Learn more</a></small>
             </div>
             <div class="form-group">
                 <label for="gitlab-project">Project ID or Path</label>
-                <input type="text" id="gitlab-project" class="form-control" placeholder="group/project or 123">
+                <input type="text" id="gitlab-project" class="ion-input" placeholder="group/project or 123">
                 <small>Project path (e.g., "mygroup/myproject") or numeric ID</small>
             </div>
             <div class="modal-actions">
-                <button class="btn" data-click-action="closeConfigModal">Cancel</button>
-                <button class="btn btn-danger _ion-s-f2892a2e8a" data-click-action="disableGitLab" id="disable-gitlab-btn">Disable</button>
-                <button class="btn btn-primary" data-click-action="saveConfig">Save & Test</button>
+                <button class="ion-btn" data-click-action="closeConfigModal">Cancel</button>
+                <button class="ion-btn ion-btn-danger _ion-s-f2892a2e8a" data-click-action="disableGitLab" id="disable-gitlab-btn">Disable</button>
+                <button class="ion-btn ion-btn-primary" data-click-action="saveConfig">Save & Test</button>
             </div>
         </div>
     </div>
@@ -100,22 +100,22 @@
         <div class="modal-body">
             <div class="form-group">
                 <label for="issue-title">Title *</label>
-                <input type="text" id="issue-title" class="form-control" placeholder="Issue title">
+                <input type="text" id="issue-title" class="ion-input" placeholder="Issue title">
             </div>
             <div class="form-group">
                 <label for="issue-description">Description</label>
-                <textarea id="issue-description" class="form-control" rows="8" placeholder="Markdown supported"></textarea>
+                <textarea id="issue-description" class="ion-textarea" rows="8" placeholder="Markdown supported"></textarea>
             </div>
             <div class="form-row">
                 <div class="form-group">
                     <label for="issue-labels">Labels</label>
-                    <select id="issue-labels" class="form-control" multiple size="4">
+                    <select id="issue-labels" class="ion-select" multiple size="4">
                     </select>
                     <small>Hold Ctrl/Cmd to select multiple</small>
                 </div>
                 <div class="form-group">
                     <label for="issue-assignee">Assignee</label>
-                    <select id="issue-assignee" class="form-control">
+                    <select id="issue-assignee" class="ion-select">
                         <option value="">Unassigned</option>
                     </select>
                 </div>
@@ -123,18 +123,18 @@
             <div class="form-row">
                 <div class="form-group">
                     <label for="issue-milestone">Milestone</label>
-                    <select id="issue-milestone" class="form-control">
+                    <select id="issue-milestone" class="ion-select">
                         <option value="">No Milestone</option>
                     </select>
                 </div>
                 <div class="form-group">
                     <label for="issue-due-date">Due Date</label>
-                    <input type="date" id="issue-due-date" class="form-control">
+                    <input type="date" id="issue-due-date" class="ion-input">
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn" data-click-action="closeCreateIssueModal">Cancel</button>
-                <button class="btn btn-primary" data-click-action="createIssue">Create Issue</button>
+                <button class="ion-btn" data-click-action="closeCreateIssueModal">Cancel</button>
+                <button class="ion-btn ion-btn-primary" data-click-action="createIssue">Create Issue</button>
             </div>
         </div>
     </div>
@@ -158,8 +158,8 @@
                         <div id="issue-comments-list" class="comments-list"></div>
 
                         <div class="add-comment">
-                            <textarea id="new-comment" class="form-control" rows="3" placeholder="Add a comment..."></textarea>
-                            <button class="btn btn-primary" data-click-action="addComment">Add Comment</button>
+                            <textarea id="new-comment" class="ion-textarea" rows="3" placeholder="Add a comment..."></textarea>
+                            <button class="ion-btn ion-btn-primary" data-click-action="addComment">Add Comment</button>
                         </div>
                     </div>
                 </div>
@@ -167,7 +167,7 @@
                     <div class="sidebar-section">
                         <h4>Status</h4>
                         <span id="issue-detail-state" class="issue-state"></span>
-                        <button id="toggle-state-btn" class="btn btn-sm" data-click-action="toggleIssueState"></button>
+                        <button id="toggle-state-btn" class="ion-btn btn-sm" data-click-action="toggleIssueState"></button>
                     </div>
                     <div class="sidebar-section">
                         <h4>Labels</h4>
@@ -186,7 +186,7 @@
                         <div id="issue-detail-due-date"></div>
                     </div>
                     <div class="sidebar-section">
-                        <a id="issue-gitlab-link" href="#" target="_blank" class="btn btn-outline">View in GitLab</a>
+                        <a id="issue-gitlab-link" href="#" target="_blank" class="ion-btn ion-btn-ghost">View in GitLab</a>
                     </div>
                 </div>
             </div>
@@ -429,17 +429,6 @@
     gap: 0.25rem;
 }
 
-.btn-outline {
-    border: 1px solid var(--primary-color);
-    color: var(--primary-color);
-    background: transparent;
-}
-
-.btn-outline:hover {
-    background: var(--primary-color);
-    color: white;
-}
-
 .btn-sm {
     padding: 0.25rem 0.5rem;
     font-size: 0.85rem;
@@ -451,19 +440,8 @@
     margin-bottom: 1rem;
 }
 
-.search-input {
-    flex: 1;
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-}
-
-.filter-select {
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    min-width: 150px;
-}
+.gl-search { flex: 1; }
+.gl-filter { min-width: 150px; }
 </style>
 
 <script nonce="{{ csp_nonce }}">

@@ -35,7 +35,7 @@
     <h2>Evaluation Runs</h2>
   </div>
   <div class="overflow-x-auto">
-    <table class="data-table w-full" id="runs-table">
+    <table class="ion-table w-full" id="runs-table">
       <thead>
         <tr>
           <th>#</th>
@@ -80,7 +80,7 @@
           <td class="font-mono text-xs">{{ run.tp_count }} / {{ run.fp_count }} / {{ run.fn_count }}</td>
           <td>{{ run.abstention_count }}</td>
           <td>
-            <span class="badge {% if run.status == 'completed' %}badge-green{% elif run.status == 'failed' %}badge-red{% else %}badge-yellow{% endif %}">
+            <span class="ion-badge {% if run.status == 'completed' %}ion-c-green{% elif run.status == 'failed' %}ion-c-red{% else %}ion-c-amber{% endif %}">
               {{ run.status }}
             </span>
           </td>
@@ -107,7 +107,7 @@
     <button data-click-action="closeSamples" class="btn btn-ghost btn-sm">Close</button>
   </div>
   <div class="overflow-x-auto">
-    <table class="data-table w-full" id="samples-table">
+    <table class="ion-table w-full" id="samples-table">
       <thead>
         <tr>
           <th>Feedback ID</th>
@@ -134,7 +134,7 @@
     <form id="run-form" data-submit-action="submitRun" data-args='["$event"]'>
       <div class="mb-4">
         <label class="block text-sm text-slate-300 mb-1">Template</label>
-        <select id="run-template-id" name="template_id" class="form-control w-full">
+        <select id="run-template-id" name="template_id" class="ion-select">
           <option value="">All templates</option>
           {% for tmpl in templates_list %}
           <option value="{{ tmpl.id }}">{{ tmpl.name }}</option>
@@ -150,7 +150,7 @@
           value="50"
           min="1"
           max="{{ max_sample_size }}"
-          class="form-control w-full"
+          class="ion-input"
         />
       </div>
       <div class="flex justify-end gap-3">

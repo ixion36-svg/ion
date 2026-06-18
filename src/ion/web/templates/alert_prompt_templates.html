@@ -34,11 +34,11 @@
                 <input type="checkbox" id="filter-enabled-only" data-change-action="loadPrompts">
                 Enabled only
             </label>
-            <button class="btn" data-click-action="showResolveModal">Test match</button>
+            <button class="ion-btn" data-click-action="showResolveModal">Test match</button>
         </div>
     </div>
     <div class="table-container">
-        <table class="data-table" id="prompts-table">
+        <table class="ion-table" id="prompts-table">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -75,16 +75,16 @@
                     <div class="form-row">
                         <div class="form-group _ion-s-c2d2e263dc">
                             <label for="prompt-name">Name *</label>
-                            <input type="text" id="prompt-name" class="form-control" required>
+                            <input type="text" id="prompt-name" class="ion-input" required>
                         </div>
                         <div class="form-group _ion-s-ee3d55bf99">
                             <label for="prompt-priority">Priority (lower = higher)</label>
-                            <input type="number" id="prompt-priority" class="form-control" value="100" min="0">
+                            <input type="number" id="prompt-priority" class="ion-input" value="100" min="0">
                         </div>
                     </div>
                     <div class="form-group">
                         <label for="prompt-description">Description</label>
-                        <textarea id="prompt-description" class="form-control" rows="2"></textarea>
+                        <textarea id="prompt-description" class="ion-textarea" rows="2"></textarea>
                     </div>
                     <div class="checkbox-group">
                         <label class="checkbox-label">
@@ -99,24 +99,24 @@
                     <p class="form-help">At least one matcher should be populated. Match order: exact rule ID &rarr; regex pattern &rarr; MITRE technique (parent&rarr;sub tolerant) &rarr; MITRE tactic &rarr; rule.groups overlap.</p>
                     <div class="form-group">
                         <label for="prompt-rule-ids">Exact Rule IDs (one per line)</label>
-                        <textarea id="prompt-rule-ids" class="form-control" rows="3" placeholder="1100&#10;5710"></textarea>
+                        <textarea id="prompt-rule-ids" class="ion-textarea" rows="3" placeholder="1100&#10;5710"></textarea>
                     </div>
                     <div class="form-group">
                         <label for="prompt-rule-groups">Rule Groups (one per line)</label>
-                        <textarea id="prompt-rule-groups" class="form-control" rows="3" placeholder="sysmon_event_1&#10;authentication_failed"></textarea>
+                        <textarea id="prompt-rule-groups" class="ion-textarea" rows="3" placeholder="sysmon_event_1&#10;authentication_failed"></textarea>
                     </div>
                     <div class="form-group">
                         <label for="prompt-rule-pattern">Rule ID Regex</label>
-                        <input type="text" id="prompt-rule-pattern" class="form-control" placeholder="^sysmon_event_\d+$">
+                        <input type="text" id="prompt-rule-pattern" class="ion-input" placeholder="^sysmon_event_\d+$">
                     </div>
                     <div class="form-group">
                         <label for="prompt-mitre-techniques">MITRE ATT&amp;CK Techniques (one per line)</label>
-                        <textarea id="prompt-mitre-techniques" class="form-control" rows="3" placeholder="T1059&#10;T1059.001&#10;T1110.003"></textarea>
+                        <textarea id="prompt-mitre-techniques" class="ion-textarea" rows="3" placeholder="T1059&#10;T1059.001&#10;T1110.003"></textarea>
                         <p class="form-help">Parent technique (<code>T1059</code>) matches alerts tagged with any sub-technique (<code>T1059.001</code>), and vice-versa.</p>
                     </div>
                     <div class="form-group">
                         <label for="prompt-mitre-tactics">MITRE ATT&amp;CK Tactics (one per line)</label>
-                        <textarea id="prompt-mitre-tactics" class="form-control" rows="2" placeholder="TA0002&#10;execution"></textarea>
+                        <textarea id="prompt-mitre-tactics" class="ion-textarea" rows="2" placeholder="TA0002&#10;execution"></textarea>
                         <p class="form-help">Accepts tactic IDs (<code>TA0002</code>) or lowercase names (<code>execution</code>). Case-insensitive.</p>
                     </div>
                 </div>
@@ -125,16 +125,16 @@
                     <h4>Prompt Content</h4>
                     <div class="form-group">
                         <label for="prompt-text">System Prompt Addition *</label>
-                        <textarea id="prompt-text" class="form-control" rows="8" required placeholder="You are investigating ..."></textarea>
+                        <textarea id="prompt-text" class="ion-textarea" rows="8" required placeholder="You are investigating ..."></textarea>
                     </div>
                     <div class="form-group">
                         <label for="prompt-checklist">Investigation Checklist</label>
-                        <textarea id="prompt-checklist" class="form-control" rows="6" placeholder="- What is the parent process?&#10;- ..."></textarea>
+                        <textarea id="prompt-checklist" class="ion-textarea" rows="6" placeholder="- What is the parent process?&#10;- ..."></textarea>
                     </div>
                     <div class="form-row">
                         <div class="form-group _ion-s-ee3d55bf99">
                             <label for="prompt-severity">Severity Hint</label>
-                            <select id="prompt-severity" class="form-control">
+                            <select id="prompt-severity" class="ion-select">
                                 <option value="">(none)</option>
                                 <option value="low">low</option>
                                 <option value="medium">medium</option>
@@ -144,7 +144,7 @@
                         </div>
                         <div class="form-group _ion-s-c2d2e263dc">
                             <label for="prompt-outputs">Expected Output Fields (one per line)</label>
-                            <textarea id="prompt-outputs" class="form-control" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
+                            <textarea id="prompt-outputs" class="ion-textarea" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
                         </div>
                     </div>
                     <!-- v0.22.1 (L6): row hidden for users without system:settings; -->
@@ -152,7 +152,7 @@
                     <div class="form-row _ion-s-c8be1ccba6" id="prompt-confidence-threshold-row">
                         <div class="form-group _ion-s-ee3d55bf99">
                             <label for="prompt-confidence-threshold">Confidence Threshold Override (0-100)</label>
-                            <input type="number" id="prompt-confidence-threshold" class="form-control" min="0" max="100" placeholder="e.g. 70 — leave blank to use global default">
+                            <input type="number" id="prompt-confidence-threshold" class="ion-input" min="0" max="100" placeholder="e.g. 70 — leave blank to use global default">
                             <p class="form-help">When set, Bob must reach this confidence score to write a verdict for alerts matched by this template. Overrides ION_BOB_CONFIDENCE_THRESHOLD (default 60).</p>
                         </div>
                     </div>
@@ -160,8 +160,8 @@
             </form>
         </div>
         <div class="modal-footer">
-            <button class="btn" data-click-action="closeModal">Cancel</button>
-            <button class="btn btn-primary" data-click-action="saveTemplate">Save</button>
+            <button class="ion-btn" data-click-action="closeModal">Cancel</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="saveTemplate">Save</button>
         </div>
     </div>
 </div>
@@ -177,7 +177,7 @@
             <p class="form-help">Paste an alert JSON (or a minimal <code>{"rule": {"id": "...", "groups": [...]}}</code>) and see which template would be selected.</p>
             <div class="form-group">
                 <label for="resolve-input">Alert JSON</label>
-                <textarea id="resolve-input" class="form-control" rows="10">{
+                <textarea id="resolve-input" class="ion-textarea" rows="10">{
   "rule": {
     "id": "1100",
     "groups": ["sysmon_event_1"]
@@ -190,8 +190,8 @@
             </div>
         </div>
         <div class="modal-footer">
-            <button class="btn" data-click-action="closeResolveModal">Close</button>
-            <button class="btn btn-primary" data-click-action="runResolve">Resolve</button>
+            <button class="ion-btn" data-click-action="closeResolveModal">Close</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="runResolve">Resolve</button>
         </div>
     </div>
 </div>
@@ -201,20 +201,14 @@
 .section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
 .filter-controls { display:flex; gap:1rem; align-items:center; }
 .table-container { overflow-x:auto; }
-.data-table { width:100%; border-collapse:collapse; }
-.data-table th, .data-table td { padding: 0.65rem 0.75rem; text-align:left; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-.data-table th { background: var(--bg-tertiary); font-weight:600; }
-.data-table tr:hover { background: var(--bg-hover); }
 .loading { text-align:center; color: var(--text-secondary); padding: 2rem; }
 
-.status-badge { padding: 0.2rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight:500; }
-.status-enabled { background: rgba(40,167,69,0.12); color: var(--success, #28a745); }
-.status-disabled { background: rgba(158,158,158,0.12); color: #9e9e9e; }
 .sev-critical { color:#ff5252; font-weight:600; }
 .sev-high { color:#ff9800; }
 .sev-medium { color:#ffc107; }
 .sev-low { color:#8bc34a; }
-.chip { display:inline-block; background: var(--bg-tertiary); padding: 0.15rem 0.4rem; border-radius:4px; font-size:0.72rem; margin: 0 0.2rem 0.2rem 0; font-family: var(--font-mono, monospace); }
+/* Inter-chip spacing; tint/shape/mono now come from .ion-pill .ion-c-muted .ion-mono */
+.chip { margin: 0 0.2rem 0.2rem 0; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index: 1000; }
 .modal-dialog { background: var(--bg-primary); border-radius: var(--radius-lg, 8px); width:100%; max-width: 640px; max-height: 92vh; overflow-y:auto; box-shadow: 0 2px 12px rgba(0,0,0,0.35); }
@@ -230,15 +224,11 @@
 .form-row { display:flex; gap: 1rem; }
 .form-group { margin-bottom: 0.75rem; flex: 1; }
 .form-group label { display:block; margin-bottom: 0.2rem; font-size: 0.82rem; color: var(--text-secondary); }
-.form-control { width:100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; }
-textarea.form-control { font-family: var(--font-mono, monospace); font-size: 0.85rem; }
+/* Line-list / JSON textareas keep the monospace treatment over the kit base. */
+textarea.ion-textarea { font-family: var(--font-mono, monospace); font-size: 0.85rem; }
 .form-help { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.75rem; }
 .checkbox-label { display:flex; align-items:center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
 .checkbox-group { display:flex; gap: 1rem; flex-wrap: wrap; }
-.btn { padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; font-size: 0.85rem; }
-.btn:hover { filter: brightness(1.1); }
-.btn-primary { background: var(--ion-cyan, #6de4ff); color: #000; border-color: transparent; font-weight: 600; }
-.btn-danger { background: rgba(220,53,69,0.15); color: #ff6b6b; border-color: rgba(220,53,69,0.3); }
 </style>
 
 <script nonce="{{ csp_nonce }}">
@@ -314,16 +304,16 @@ function renderPrompts(items) {
         return;
     }
     body.innerHTML = items.map(t => {
-        const ruleIds = (t.rule_ids || []).map(r => `<span class="chip">${esc(r)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
-        const ruleGroups = (t.rule_groups || []).map(g => `<span class="chip">${esc(g)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
+        const ruleIds = (t.rule_ids || []).map(r => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(r)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
+        const ruleGroups = (t.rule_groups || []).map(g => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(g)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
         const pattern = t.rule_id_pattern ? `<code>${esc(t.rule_id_pattern)}</code>` : '<span class="_ion-s-0e42856cf0">—</span>';
         const sevClass = t.severity_hint ? `sev-${t.severity_hint}` : '';
         const sev = t.severity_hint ? `<span class="${sevClass}">${esc(t.severity_hint)}</span>` : '<span class="_ion-s-0e42856cf0">—</span>';
         const statusBadge = t.enabled
-            ? `<span class="status-badge status-enabled">Enabled</span>`
-            : `<span class="status-badge status-disabled">Disabled</span>`;
-        const techChips = (t.mitre_techniques || []).map(x => `<span class="chip">${esc(x)}</span>`).join('');
-        const tacticChips = (t.mitre_tactics || []).map(x => `<span class="chip">${esc(x)}</span>`).join('');
+            ? `<span class="ion-badge ion-c-green">Enabled</span>`
+            : `<span class="ion-badge ion-c-muted">Disabled</span>`;
+        const techChips = (t.mitre_techniques || []).map(x => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(x)}</span>`).join('');
+        const tacticChips = (t.mitre_tactics || []).map(x => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(x)}</span>`).join('');
         const mitreLine = (techChips || tacticChips)
             ? `<div class="_ion-s-6def4d2d95"><span class="_ion-s-0e42856cf0">MITRE:</span> ${techChips}${tacticChips}</div>`
             : '';
@@ -338,8 +328,8 @@ function renderPrompts(items) {
                 <td>${renderScorecard(t.id)}</td>
                 <td>${statusBadge}</td>
                 <td>
-                    <button class="btn" data-click-action="editTemplate" data-args='[${t.id}]'>Edit</button>
-                    <button class="btn btn-danger" data-click-action="deleteTemplate" data-args='[${t.id}]'>Delete</button>
+                    <button class="ion-btn" data-click-action="editTemplate" data-args='[${t.id}]'>Edit</button>
+                    <button class="ion-btn ion-btn-danger" data-click-action="deleteTemplate" data-args='[${t.id}]'>Delete</button>
                 </td>
             </tr>`;
     }).join('');

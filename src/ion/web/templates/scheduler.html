@@ -35,23 +35,23 @@
       <div class="sch-row">
         <div class="sch-field">
           <label>Name *</label>
-          <input id="sch-name" type="text" required maxlength="200" placeholder="Daily IOC sync">
+          <input id="sch-name" class="ion-input" type="text" required maxlength="200" placeholder="Daily IOC sync">
         </div>
         <div class="sch-field">
           <label>Handler *</label>
-          <select id="sch-handler" required></select>
+          <select id="sch-handler" class="ion-select" required></select>
         </div>
       </div>
 
       <div class="sch-row">
         <div class="sch-field">
           <label>Cron expression *</label>
-          <input id="sch-cron" type="text" required maxlength="120" placeholder="*/5 * * * *">
+          <input id="sch-cron" class="ion-input" type="text" required maxlength="120" placeholder="*/5 * * * *">
           <small class="sch-hint">5-field crontab (min hour dom mon dow). Example: <code>0 3 * * *</code> = 3am daily.</small>
         </div>
         <div class="sch-field">
           <label>Enabled</label>
-          <select id="sch-enabled">
+          <select id="sch-enabled" class="ion-select">
             <option value="true">Yes</option>
             <option value="false">No</option>
           </select>
@@ -60,12 +60,12 @@
 
       <div class="sch-field">
         <label>Description</label>
-        <textarea id="sch-desc" rows="2" placeholder="What does this job do?"></textarea>
+        <textarea id="sch-desc" class="ion-textarea" rows="2" placeholder="What does this job do?"></textarea>
       </div>
 
       <div class="sch-field">
         <label>Params (JSON)</label>
-        <textarea id="sch-params" rows="4" placeholder='{"foo": "bar"}'></textarea>
+        <textarea id="sch-params" class="ion-textarea" rows="4" placeholder='{"foo": "bar"}'></textarea>
         <small class="sch-hint">Passed to the handler as a dict. Leave blank for {}.</small>
       </div>
 
@@ -134,9 +134,7 @@
 .sch-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
 .sch-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
 .sch-field label{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
-.sch-field input,.sch-field select,.sch-field textarea{background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);padding:8px 10px;border-radius:var(--radius);font:inherit;font-size:.85rem}
 .sch-field textarea{font-family:'JetBrains Mono',monospace;font-size:.78rem}
-.sch-field input:focus,.sch-field select:focus,.sch-field textarea:focus{outline:none;border-color:var(--primary)}
 .sch-hint{color:var(--text-secondary);font-size:.7rem;margin-top:2px}
 .sch-hint code{background:var(--bg-tertiary);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace}
 .sch-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}

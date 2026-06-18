@@ -8,31 +8,14 @@
     .social-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .social-header h1 { font-size: 1.5rem; color: var(--text-primary); margin: 0; }
 
-    /* Compose card */
+    /* Compose card (surface from .ion-card; page-unique spacing + shadow below) */
     .social-compose {
-        background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg);
         padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.15);
     }
     .social-compose-row { display: flex; gap: 12px; margin-bottom: 12px; }
-    .social-compose-row input, .social-compose-row select {
-        padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
-        background: var(--bg-secondary); color: var(--text-primary); font-size: 0.9rem;
-    }
     .social-compose-row input { flex: 1; }
-    .social-compose textarea {
-        width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius);
-        background: var(--bg-secondary); color: var(--text-primary); font-size: 0.9rem;
-        resize: vertical; min-height: 80px; font-family: inherit;
-    }
-    .social-compose textarea:focus, .social-compose-row input:focus {
-        outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-dim);
-    }
+    .social-compose textarea { resize: vertical; min-height: 80px; }
     .social-compose-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
-    .social-compose-footer .btn-primary {
-        padding: 10px 24px; background: var(--primary); color: var(--bg-deep); border: none;
-        border-radius: var(--radius); font-weight: 600; cursor: pointer; font-size: 0.9rem;
-    }
-    .social-compose-footer .btn-primary:hover { box-shadow: 0 2px 8px rgba(0,0,0,.15); }
 
     /* Filters */
     .social-filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
@@ -154,19 +137,19 @@
     </section>
 
     <!-- Compose -->
-    <div class="social-compose">
+    <div class="social-compose ion-card">
         <div class="social-compose-row">
-            <input type="text" id="social-title" placeholder="Post title...">
-            <select id="social-category">
+            <input type="text" id="social-title" class="ion-input" placeholder="Post title...">
+            <select id="social-category" class="ion-select">
                 <option value="general">General</option>
                 <option value="announcement">Announcement</option>
                 <option value="good_work">Good Work</option>
                 <option value="certification">Certification</option>
             </select>
         </div>
-        <textarea id="social-body" placeholder="Share an update, shoutout, or announcement... (supports markdown)"></textarea>
+        <textarea id="social-body" class="ion-textarea" placeholder="Share an update, shoutout, or announcement... (supports markdown)"></textarea>
         <div class="social-compose-footer">
-            <button class="btn-primary" data-click-action="createSocialPost">Post</button>
+            <button class="ion-btn ion-btn-primary" data-click-action="createSocialPost">Post</button>
         </div>
     </div>
 
