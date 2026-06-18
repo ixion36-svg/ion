@@ -22,7 +22,7 @@
         <h2>Proposals</h2>
         <div class="filter-controls">
             <label>Status:
-                <select id="filter-status" class="form-control" data-change-action="loadProposals">
+                <select id="filter-status" class="ion-select sh-filter-select" data-change-action="loadProposals">
                     <option value="pending" selected>Pending</option>
                     <option value="accepted">Accepted</option>
                     <option value="rejected">Rejected</option>
@@ -33,7 +33,7 @@
         </div>
     </div>
     <div class="table-container">
-        <table class="data-table" id="proposals-table">
+        <table class="ion-table" id="proposals-table">
             <thead>
                 <tr>
                     <th>#</th>
@@ -56,21 +56,9 @@
 .section { background: var(--bg-secondary); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
 .section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
 .filter-controls { display:flex; gap:1rem; align-items:center; }
+.sh-filter-select { width:auto; }
 .table-container { overflow-x:auto; }
-.data-table { width:100%; border-collapse:collapse; }
-.data-table th, .data-table td { padding: 0.65rem 0.75rem; text-align:left; border-bottom: 1px solid var(--border); font-size: 0.9rem; vertical-align: top; }
-.data-table th { background: var(--bg-tertiary); font-weight:600; }
-.data-table tr:hover { background: var(--bg-hover); }
 .loading { text-align:center; color: var(--text-secondary); padding: 2rem; }
-.btn { padding: 0.35rem 0.7rem; border-radius: 4px; font-size: 0.8rem; cursor: pointer; border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text); }
-.btn:hover { background: var(--bg-hover); }
-.btn-accept { border-color: #28a745; color: #28a745; }
-.btn-reject { border-color: #dc3545; color: #dc3545; }
-.form-control { padding: 0.4rem 0.6rem; background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 4px; color: var(--text); }
-.status-pending { color: #ffc107; }
-.status-accepted { color: #28a745; }
-.status-rejected { color: #dc3545; }
-.status-duplicate { color: #9e9e9e; }
 </style>
 
 <script nonce="{{ csp_nonce }}">
@@ -98,23 +86,24 @@ async function loadProposals() {
     }
     body.innerHTML = items.map(p => {
         const actions = p.status === 'pending'
-            ? `<button class="btn btn-accept" data-click-action="review" data-args='[${p.id}, "accept"]'>Accept</button>
-               <button class="btn btn-reject" data-click-action="review" data-args='[${p.id}, "reject"]'>Reject</button>
-               <button class="btn" data-click-action="review" data-args='[${p.id}, "duplicate"]'>Duplicate</button>`
-            : `<span class="_ion-s-0e42856cf0">—</span>`;
+            ? `<button class="ion-btn ion-btn-primary" data-click-action="review" data-args='[${p.id}, "accept"]'>Accept</button>
+               <button class="ion-btn ion-btn-danger" data-click-action="review" data-args='[${p.id}, "reject"]'>Reject</button>
+               <button class="ion-btn ion-btn-ghost" data-click-action="review" data-args='[${p.id}, "duplicate"]'>Duplicate</button>`
+            : `<span class="ion-muted">—</span>`;
         const reviewed = p.reviewed_at
             ? `${esc(p.reviewed_by_username || '?')}<br><small>${fmtDate(p.reviewed_at)}</small>`
-            : '<span class="_ion-s-0e42856cf0">—</span>';
+            : '<span class="ion-muted">—</span>';
         const ruleLine = p.rule_id
-            ? `<code>${esc(p.rule_id)}</code>`
+            ? `<span class="ion-mono">${esc(p.rule_id)}</span>`
             : (p.alert_id ? `<small>alert ${esc(p.alert_id)}</small>` : '—');
+        const statusColor = { pending: 'ion-c-amber', accepted: 'ion-c-green', rejected: 'ion-c-red', duplicate: 'ion-c-muted' }[p.status] || 'ion-c-muted';
         return `
             <tr>
                 <td>${p.id}</td>
-                <td>${ruleLine}<br><small class="_ion-s-0e42856cf0">${fmtDate(p.created_at)}</small></td>
+                <td>${ruleLine}<br><small class="ion-muted">${fmtDate(p.created_at)}</small></td>
                 <td>${esc(p.suggested_change)}</td>
                 <td>${esc(p.rationale || '')}</td>
-                <td><span class="status-${esc(p.status)}">${esc(p.status)}</span></td>
+                <td><span class="ion-pill ${statusColor}">${esc(p.status)}</span></td>
                 <td>${reviewed}</td>
                 <td>${actions}</td>
             </tr>`;

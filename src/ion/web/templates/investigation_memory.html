@@ -7,20 +7,20 @@
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
   <!-- Header -->
-  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <section class="ion-page-header flex-wrap gap-6 mb-8 rise d-1">
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-3 mb-4">
         <span class="h-1.5 w-1.5 rounded-full bg-ion-lime pulse-cyan"></span>
         <span class="label-tiny text-ion-lime">Autonomous SOC memory</span>
       </div>
-      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Investigation Memory</h1>
-      <p class="mt-3 text-[13px] text-slate-400 max-w-2xl">Past investigations, IOC sighting history, and known false-positive signatures used to rehydrate context on repeat alerts.</p>
+      <h1 class="ion-ph-title font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Investigation Memory</h1>
+      <p class="ion-ph-sub mt-3 text-[13px] max-w-2xl">Past investigations, IOC sighting history, and known false-positive signatures used to rehydrate context on repeat alerts.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button data-click-action="imRefresh" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <button data-click-action="imRefresh" class="ion-btn">
         <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
       </button>
-      <button data-click-action="imShowFpModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+      <button data-click-action="imShowFpModal" class="ion-btn ion-btn-primary">
         <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>New FP signature
       </button>
     </div>
@@ -38,11 +38,11 @@
     <div class="flex flex-wrap items-end gap-2 mb-4">
       <div class="flex-1 min-w-[200px]">
         <label class="label-tiny block mb-1 text-slate-500">Signature</label>
-        <input type="text" id="im-filter-signature" class="h-9 w-full rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" placeholder="e.g. Suspicious PowerShell" data-input-action="imDebouncedLoadInv">
+        <input type="text" id="im-filter-signature" class="ion-input" placeholder="e.g. Suspicious PowerShell" data-input-action="imDebouncedLoadInv">
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Verdict</label>
-        <select id="im-filter-verdict" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
+        <select id="im-filter-verdict" class="ion-select" data-change-action="imLoadInvestigations">
           <option value="">All</option>
           <option value="true_positive">True positive</option>
           <option value="false_positive">False positive</option>
@@ -52,7 +52,7 @@
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Status</label>
-        <select id="im-filter-status" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
+        <select id="im-filter-status" class="ion-select" data-change-action="imLoadInvestigations">
           <option value="">All</option>
           <option value="pending">Pending</option>
           <option value="running">Running</option>
@@ -62,31 +62,31 @@
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Host</label>
-        <input type="text" id="im-filter-host" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-input-action="imDebouncedLoadInv">
+        <input type="text" id="im-filter-host" class="ion-input" data-input-action="imDebouncedLoadInv">
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">From</label>
-        <input type="date" id="im-filter-from" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
+        <input type="date" id="im-filter-from" class="ion-input" data-change-action="imLoadInvestigations">
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">To</label>
-        <input type="date" id="im-filter-to" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadInvestigations">
+        <input type="date" id="im-filter-to" class="ion-input" data-change-action="imLoadInvestigations">
       </div>
-      <button class="h-9 px-3 rounded-md bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10 text-[12px] font-semibold" data-click-action="imClearInvFilters">Clear</button>
+      <button class="ion-btn" data-click-action="imClearInvFilters">Clear</button>
     </div>
 
     <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
-      <table class="data-table w-full">
+      <table class="ion-table data-table w-full">
         <thead>
-          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
-            <th class="px-4 py-3 text-left">When</th>
-            <th class="px-4 py-3 text-left">Signature</th>
-            <th class="px-4 py-3 text-left">Host</th>
-            <th class="px-4 py-3 text-left">User</th>
-            <th class="px-4 py-3 text-left">Status</th>
-            <th class="px-4 py-3 text-left">Verdict</th>
-            <th class="px-4 py-3 text-left">Severity</th>
-            <th class="px-4 py-3 text-left">Duration</th>
+          <tr>
+            <th>When</th>
+            <th>Signature</th>
+            <th>Host</th>
+            <th>User</th>
+            <th>Status</th>
+            <th>Verdict</th>
+            <th>Severity</th>
+            <th>Duration</th>
           </tr>
         </thead>
         <tbody id="im-inv-tbody">
@@ -101,7 +101,7 @@
     <div class="flex flex-wrap items-end gap-2 mb-4">
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Type</label>
-        <select id="im-ioc-type" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadIocs">
+        <select id="im-ioc-type" class="ion-select" data-change-action="imLoadIocs">
           <option value="">All types</option>
           <option value="ip">IP</option>
           <option value="domain">Domain</option>
@@ -115,7 +115,7 @@
       </div>
       <div>
         <label class="label-tiny block mb-1 text-slate-500">Flag</label>
-        <select id="im-ioc-bad" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white" data-change-action="imLoadIocs">
+        <select id="im-ioc-bad" class="ion-select" data-change-action="imLoadIocs">
           <option value="">All</option>
           <option value="true">Known bad</option>
           <option value="false">Not known bad</option>
@@ -124,16 +124,16 @@
     </div>
 
     <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
-      <table class="data-table w-full">
+      <table class="ion-table data-table w-full">
         <thead>
-          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
-            <th class="px-4 py-3 text-left">Type</th>
-            <th class="px-4 py-3 text-left">Value</th>
-            <th class="px-4 py-3 text-left">Seen</th>
-            <th class="px-4 py-3 text-left">First</th>
-            <th class="px-4 py-3 text-left">Last</th>
-            <th class="px-4 py-3 text-left">Flags</th>
-            <th class="px-4 py-3 text-left">Last inv</th>
+          <tr>
+            <th>Type</th>
+            <th>Value</th>
+            <th>Seen</th>
+            <th>First</th>
+            <th>Last</th>
+            <th>Flags</th>
+            <th>Last inv</th>
           </tr>
         </thead>
         <tbody id="im-iocs-tbody">
@@ -146,19 +146,19 @@
   <!-- =============== False Positives Tab =============== -->
   <section id="im-pane-fps" class="im-pane hidden">
     <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
-      <table class="data-table w-full">
+      <table class="ion-table data-table w-full">
         <thead>
-          <tr class="text-[11px] uppercase tracking-wider text-slate-500">
-            <th class="px-4 py-3 text-left">Enabled</th>
-            <th class="px-4 py-3 text-left">Rule</th>
-            <th class="px-4 py-3 text-left">Signature</th>
-            <th class="px-4 py-3 text-left">Host pattern</th>
-            <th class="px-4 py-3 text-left">User pattern</th>
-            <th class="px-4 py-3 text-left">Confidence</th>
-            <th class="px-4 py-3 text-left">Hits</th>
-            <th class="px-4 py-3 text-left">Last match</th>
-            <th class="px-4 py-3 text-left">Reason</th>
-            <th class="px-4 py-3 text-left">Actions</th>
+          <tr>
+            <th>Enabled</th>
+            <th>Rule</th>
+            <th>Signature</th>
+            <th>Host pattern</th>
+            <th>User pattern</th>
+            <th>Confidence</th>
+            <th>Hits</th>
+            <th>Last match</th>
+            <th>Reason</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="im-fps-tbody">
@@ -195,25 +195,25 @@
     <div class="modal-body">
       <form id="im-fp-form" data-submit-action="imSubmitFp" data-args='["$event"]' class="flex flex-col gap-3">
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">Rule ID
-          <input name="rule_id" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+          <input name="rule_id" class="ion-input">
         </label>
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">Rule name
-          <input name="rule_name" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+          <input name="rule_name" class="ion-input">
         </label>
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">Alert signature
-          <input name="alert_signature" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+          <input name="alert_signature" class="ion-input">
         </label>
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">Host pattern (fnmatch, e.g. <code>DEV-*</code>)
-          <input name="host_pattern" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+          <input name="host_pattern" class="ion-input">
         </label>
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">User pattern (fnmatch)
-          <input name="user_pattern" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+          <input name="user_pattern" class="ion-input">
         </label>
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">Reason <span class="text-ion-coral">*</span>
-          <textarea name="reason" required rows="3" class="rounded-md bg-ink-900 border border-white/10 px-3 py-2 text-[12px] text-white"></textarea>
+          <textarea name="reason" required rows="3" class="ion-textarea"></textarea>
         </label>
         <label class="flex flex-col gap-1 text-[12px] text-slate-300">Confidence (0-100)
-          <input name="confidence" type="number" min="0" max="100" value="80" class="h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[12px] text-white">
+          <input name="confidence" type="number" min="0" max="100" value="80" class="ion-input">
         </label>
         <p class="text-[11px] text-slate-500">At least one of Rule ID / Rule name / Alert signature is required.</p>
       </form>

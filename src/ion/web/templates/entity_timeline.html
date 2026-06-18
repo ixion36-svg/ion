@@ -5,17 +5,17 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<section class="ion-page-header flex-wrap gap-6 mb-8 rise d-1">
 <div class="flex-1 min-w-0">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-cyan"><use href="#i-activity"/></svg>
     <span class="label-tiny text-ion-cyan">Timeline reconstruction</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Entity Timeline</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Reconstruct activity for a host, user, or IOC across sources.</p>
+  <h1 class="ion-ph-title font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Entity Timeline</h1>
+  <p class="ion-ph-sub mt-3 max-w-2xl text-[15px]">Reconstruct activity for a host, user, or IOC across sources.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="et-hours" class="et-select">
+        <select id="et-hours" class="ion-select et-select">
             <option value="24">Last 24h</option>
             <option value="168" selected>Last 7 days</option>
             <option value="720">Last 30 days</option>
@@ -24,8 +24,8 @@
 </section>
 
 <div class="et-search-bar">
-    <input type="text" id="et-query" class="et-input" placeholder="Enter IP, hostname, username, domain, or hash..." data-enter-key-action="etSearch">
-    <select id="et-type" class="et-select">
+    <input type="text" id="et-query" class="ion-input et-input" placeholder="Enter IP, hostname, username, domain, or hash..." data-enter-key-action="etSearch">
+    <select id="et-type" class="ion-select et-select">
         <option value="auto">Auto-detect</option>
         <option value="ip">IP Address</option>
         <option value="host">Hostname</option>
@@ -34,7 +34,7 @@
         <option value="hash">Hash</option>
         <option value="email">Email</option>
     </select>
-    <button class="btn btn-primary" data-click-action="etSearch">Search</button>
+    <button class="ion-btn ion-btn-primary" data-click-action="etSearch">Search</button>
 </div>
 
 <div id="et-content">
