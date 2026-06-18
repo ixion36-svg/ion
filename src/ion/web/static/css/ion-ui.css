@@ -1,0 +1,93 @@
+/* ============================================================================
+   ION UI Kit — consolidated component layer  (full re-skin · Phase 0)
+   ----------------------------------------------------------------------------
+   Canonical components for the ION re-skin, built ENTIRELY on the tokens in
+   style.css (--bg-*, --primary, --success, --text-*, --border, --radius…).
+   Additive: a page is unaffected until it adopts ion-* classes. As pages
+   migrate they drop their bespoke <style> blocks and _ion-s-* one-offs in
+   favour of these. Reference + showcase: concepts/ion-ui-kit.html.
+   Migration plan + per-template checklist: concepts/reskin-scope.md.
+   ========================================================================== */
+
+/* ── colour helpers (badge/pill/chip tints) ─────────────────────────────── */
+.ion-c-cyan   { background: rgba(109,228,255,.12); color: var(--primary); }
+.ion-c-green  { background: rgba(134,240,160,.12); color: var(--success); }
+.ion-c-amber  { background: rgba(248,179,58,.12);  color: var(--warning); }
+.ion-c-red    { background: rgba(255,108,108,.12); color: var(--danger); }
+.ion-c-purple { background: rgba(154,140,255,.14); color: #c4baff; }
+.ion-c-blue   { background: rgba(96,165,250,.14);  color: var(--neon-blue); }
+.ion-c-muted  { background: rgba(255,255,255,.05); color: var(--text-secondary); }
+
+/* ── typography helpers ─────────────────────────────────────────────────── */
+.ion-mono     { font-family: var(--font-mono, ui-monospace, monospace); color: var(--primary); }
+.ion-muted    { color: var(--text-muted); }
+
+/* ── page header ────────────────────────────────────────────────────────── */
+.ion-page-header { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.ion-ph-title { font-size: 21px; font-weight: 500; color: var(--text-bright); margin: 0; }
+.ion-ph-sub   { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+/* ── buttons ────────────────────────────────────────────────────────────── */
+.ion-btn { font-family: inherit; font-size: 13px; padding: 7px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: border-color .12s ease, background .12s ease; }
+.ion-btn:hover { border-color: var(--border-bright); }
+.ion-btn:active { transform: scale(.985); }
+.ion-btn-primary { background: var(--primary-dim, rgba(109,228,255,.12)); border-color: var(--border-bright); color: var(--primary); }
+.ion-btn-primary:hover { background: rgba(109,228,255,.22); }
+.ion-btn-danger { background: rgba(255,108,108,.12); border-color: rgba(255,108,108,.35); color: var(--danger); }
+.ion-btn-ghost { background: none; border-color: transparent; color: var(--text-secondary); }
+.ion-btn-ghost:hover { background: var(--bg-secondary); border-color: var(--border); }
+.ion-btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+/* ── badges, pills, severity ────────────────────────────────────────────── */
+.ion-badge { font-size: 11px; padding: 2px 8px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px; }
+.ion-pill  { font-size: 11px; padding: 3px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
+.ion-sev { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.ion-sev-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.ion-sev-critical .ion-sev-dot, .ion-sev-dot.is-critical { background: var(--sev-critical); }
+.ion-sev-high     .ion-sev-dot, .ion-sev-dot.is-high     { background: var(--sev-high); }
+.ion-sev-medium   .ion-sev-dot, .ion-sev-dot.is-medium   { background: var(--sev-medium); }
+.ion-sev-low      .ion-sev-dot, .ion-sev-dot.is-low      { background: var(--sev-low, #3fb950); }
+.ion-sev-info     .ion-sev-dot, .ion-sev-dot.is-info     { background: var(--sev-info, var(--info)); }
+
+/* ── quick-add chips ────────────────────────────────────────────────────── */
+.ion-chip { border: 1px solid var(--border); border-radius: 999px; font-family: inherit; font-size: 12px; padding: 4px 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.ion-chip:hover { border-color: var(--border-bright); }
+
+/* ── form controls ──────────────────────────────────────────────────────── */
+.ion-input, .ion-select, .ion-textarea { width: 100%; font-family: inherit; font-size: 13px; color: var(--text-primary); background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; outline: none; }
+.ion-input:focus, .ion-select:focus, .ion-textarea:focus { border-color: var(--border-bright); }
+.ion-input::placeholder, .ion-textarea::placeholder { color: var(--text-muted); }
+
+/* ── metric card (muted, borderless) ────────────────────────────────────── */
+.ion-metric { background: var(--bg-secondary); border-radius: var(--radius); padding: 11px 13px; }
+.ion-metric-label { font-size: 11px; color: var(--text-muted); }
+.ion-metric-value { font-size: 23px; font-weight: 500; color: var(--text-bright); font-variant-numeric: tabular-nums; margin-top: 1px; }
+.ion-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+
+/* ── raised card (bordered) ─────────────────────────────────────────────── */
+.ion-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; }
+.ion-card-title { font-size: 13px; font-weight: 500; color: var(--text-bright); margin: 0 0 4px; display: flex; align-items: center; gap: 7px; }
+
+/* ── tabs / toggle ──────────────────────────────────────────────────────── */
+.ion-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.ion-toggle button { background: none; border: none; color: var(--text-secondary); font-family: inherit; font-size: 13px; padding: 7px 16px; cursor: pointer; }
+.ion-toggle button.on { background: var(--primary-dim, rgba(109,228,255,.14)); color: var(--primary); }
+
+/* ── list row ───────────────────────────────────────────────────────────── */
+.ion-row { display: flex; align-items: center; gap: 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 13px; }
+.ion-row--warn  { border-color: rgba(248,179,58,.30); }
+.ion-row--block { border-color: rgba(255,108,108,.30); }
+.ion-avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 500; flex: none; }
+
+/* ── timeline ───────────────────────────────────────────────────────────── */
+.ion-timeline { position: relative; padding-left: 60px; }
+.ion-timeline-rail { position: absolute; left: 52px; top: 4px; bottom: 4px; width: 1px; background: var(--border); }
+.ion-ev { position: relative; margin-bottom: 13px; }
+.ion-ev-time { position: absolute; left: -60px; width: 40px; text-align: right; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono, ui-monospace, monospace); top: 1px; }
+.ion-ev-dot { position: absolute; left: -12px; top: 3px; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px var(--bg-primary); }
+
+/* ── table ──────────────────────────────────────────────────────────────── */
+.ion-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ion-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 500; padding: 0 12px 9px; }
+.ion-table td { padding: 10px 12px; border-top: 1px solid var(--border); }
+.ion-table tbody tr:hover td { background: var(--bg-secondary); }

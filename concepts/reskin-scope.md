@@ -47,9 +47,9 @@ depends on release cadence — don't read units as a fixed schedule.
 
 | Task | Status |
 |---|---|
-| Lock component vocabulary in `ion-ui-kit.html` | ◑ built |
-| Port `ion-*` layer into `static/css/ion-ui.css` (or fold into `design-system.css`) | ☐ |
-| Wire stylesheet into `base.html` (additive; touches no page markup) | ☐ |
+| Lock component vocabulary in `ion-ui-kit.html` | ✅ |
+| Port `ion-*` layer into `static/css/ion-ui.css` (on ION's real tokens) | ✅ |
+| Wire stylesheet into `base.html` (additive; touches no page markup) | ✅ verified — Cases renders unchanged, 0 console errors |
 | Optional: add an in-app `/styleguide` page (dev-only) as living reference | ☐ |
 
 Foundation is **additive** — it changes no existing page until that page opts in.
