@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ION UI Kit — Phase 0 component foundation (styleguide)</title>
+<!--
+  PHASE 0 of the ION full re-skin. Canonical component vocabulary derived from
+  the daily-work prototype, built on ION's REAL tokens (style.css :root).
+  This is the reference the template migration waves draw from.
+  Class prefix `ion-` = the consolidated component layer. On integration these
+  land in src/ion/web/static/css/ (design-system.css or a new ion-ui.css), and
+  templates migrate to them, retiring their bespoke _ion-s-* migrated styles.
+  Standalone/no-backend so the look can be locked before touching real pages.
+-->
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg-deep:#07080c; --bg-primary:#0a0c12; --bg-secondary:#11141c;
+    --bg-tertiary:#171b24; --bg-card:#0d1017; --bg-elevated:#1e232e;
+    --cyan:#6de4ff; --blue:#60a5fa; --purple:#9a8cff; --pink:#ec4899;
+    --green:#86f0a0; --amber:#f8b33a; --red:#ff6c6c;
+    --text-primary:#cbd5e1; --text-secondary:#94a3b8; --text-muted:#64748b; --text-bright:#fff;
+    --border:rgba(255,255,255,0.08); --border-bright:rgba(109,228,255,0.35);
+    --radius:8px; --radius-lg:14px;
+    --sev-critical:#f85149; --sev-high:#f0883e; --sev-medium:#d29922; --sev-low:#3fb950; --sev-info:#58a6ff;
+    --font-sans:"Geist",ui-sans-serif,system-ui,sans-serif;
+    --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg-primary); color:var(--text-primary); font-family:var(--font-sans); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .page { max-width:1000px; margin:0 auto; padding:28px 24px 80px; }
+
+  /* ── styleguide scaffolding (not part of the kit) ── */
+  .sg-h { font-size:24px; font-weight:600; color:var(--text-bright); margin:0 0 2px; }
+  .sg-sub { font-size:13px; color:var(--text-muted); margin:0 0 28px; }
+  .sg-sec { margin:0 0 30px; }
+  .sg-lbl { font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--cyan); margin:0 0 12px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+  .sg-grid { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  .sg-note { font-size:12px; color:var(--text-muted); margin-top:8px; }
+
+  /* ════════════ ION COMPONENT LAYER (the canonical kit) ════════════ */
+
+  /* tokens preview */
+  .ion-swatch { width:96px; }
+  .ion-swatch .chip-c { height:44px; border-radius:var(--radius); border:1px solid var(--border); }
+  .ion-swatch .nm { font-size:11px; color:var(--text-secondary); margin-top:5px; }
+  .ion-swatch .hx { font-size:10px; color:var(--text-muted); font-family:var(--font-mono); }
+
+  /* typography */
+  .ion-t-h1 { font-size:21px; font-weight:500; color:var(--text-bright); margin:0; }
+  .ion-t-h2 { font-size:16px; font-weight:500; color:var(--text-bright); margin:0; }
+  .ion-t-body { font-size:14px; color:var(--text-primary); margin:0; }
+  .ion-t-muted { font-size:12px; color:var(--text-muted); margin:0; }
+  .ion-mono { font-family:var(--font-mono); color:var(--cyan); }
+
+  /* buttons */
+  .ion-btn { font-family:inherit; font-size:13px; padding:7px 14px; border-radius:var(--radius); border:1px solid var(--border); background:var(--bg-tertiary); color:var(--text-primary); cursor:pointer; display:inline-flex; align-items:center; gap:7px; }
+  .ion-btn:hover { border-color:var(--border-bright); }
+  .ion-btn-primary { background:rgba(109,228,255,0.14); border-color:var(--border-bright); color:var(--cyan); }
+  .ion-btn-primary:hover { background:rgba(109,228,255,0.22); }
+  .ion-btn-danger { background:rgba(255,108,108,0.12); border-color:rgba(255,108,108,0.35); color:var(--red); }
+  .ion-btn-ghost { background:none; border-color:transparent; color:var(--text-secondary); }
+  .ion-btn-ghost:hover { background:var(--bg-secondary); border-color:var(--border); }
+
+  /* badges + pills */
+  .ion-badge { font-size:11px; padding:2px 8px; border-radius:5px; display:inline-flex; align-items:center; gap:5px; }
+  .ion-pill { font-size:11px; padding:3px 10px; border-radius:999px; display:inline-flex; align-items:center; gap:5px; }
+  .b-cyan { background:rgba(109,228,255,0.12); color:var(--cyan); }
+  .b-green { background:rgba(134,240,160,0.12); color:var(--green); }
+  .b-amber { background:rgba(248,179,58,0.12); color:var(--amber); }
+  .b-red { background:rgba(255,108,108,0.12); color:var(--red); }
+  .b-purple { background:rgba(154,140,255,0.14); color:#c4baff; }
+  .b-blue { background:rgba(96,165,250,0.14); color:var(--blue); }
+  .b-muted { background:rgba(255,255,255,0.05); color:var(--text-secondary); }
+
+  /* severity dots */
+  .ion-sev { display:inline-flex; align-items:center; gap:6px; font-size:12px; }
+  .ion-sev .d { width:8px; height:8px; border-radius:50%; }
+
+  /* chips (quick-add tasks) */
+  .ion-chip { border:1px solid var(--border); border-radius:999px; font-family:inherit; font-size:12px; padding:4px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+  .ion-chip:hover { border-color:var(--border-bright); }
+
+  /* form controls */
+  .ion-input, .ion-select, .ion-textarea { width:100%; font-family:inherit; font-size:13px; color:var(--text-primary); background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:8px 10px; outline:none; }
+  .ion-input:focus, .ion-select:focus, .ion-textarea:focus { border-color:var(--border-bright); }
+  .ion-input::placeholder { color:var(--text-muted); }
+
+  /* metric card (muted, no border) */
+  .ion-metric { background:var(--bg-secondary); border-radius:var(--radius); padding:11px 13px; min-width:120px; }
+  .ion-metric .lbl { font-size:11px; color:var(--text-muted); }
+  .ion-metric .val { font-size:23px; font-weight:500; color:var(--text-bright); font-variant-numeric:tabular-nums; margin-top:1px; }
+
+  /* raised card (bordered) */
+  .ion-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:14px 16px; }
+  .ion-card-title { font-size:13px; font-weight:500; color:var(--text-bright); margin:0 0 4px; display:flex; align-items:center; gap:7px; }
+
+  /* page header */
+  .ion-page-header { display:flex; align-items:flex-end; justify-content:space-between; padding-bottom:14px; border-bottom:1px solid var(--border); }
+  .ion-page-header .h { font-size:21px; font-weight:500; color:var(--text-bright); margin:0; }
+  .ion-page-header .s { font-size:12px; color:var(--text-muted); margin-top:3px; }
+
+  /* tabs / toggle */
+  .ion-toggle { display:inline-flex; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+  .ion-toggle button { background:none; border:none; color:var(--text-secondary); font-family:inherit; font-size:13px; padding:7px 16px; cursor:pointer; }
+  .ion-toggle button.on { background:rgba(109,228,255,0.14); color:var(--cyan); }
+
+  /* list row */
+  .ion-row { display:flex; align-items:center; gap:12px; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius); padding:11px 13px; }
+  .ion-row.warn { border-color:rgba(248,179,58,0.3); }
+  .ion-row.block { border-color:rgba(255,108,108,0.3); }
+  .ion-avatar { width:28px; height:28px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:500; flex:none; }
+
+  /* timeline */
+  .ion-timeline { position:relative; padding-left:60px; }
+  .ion-timeline .rail { position:absolute; left:52px; top:4px; bottom:4px; width:1px; background:var(--border); }
+  .ion-ev { position:relative; margin-bottom:13px; }
+  .ion-ev .t { position:absolute; left:-60px; width:40px; text-align:right; font-size:11px; color:var(--text-muted); font-family:var(--font-mono); top:1px; }
+  .ion-ev .dot { position:absolute; left:-12px; top:3px; width:9px; height:9px; border-radius:50%; box-shadow:0 0 0 3px var(--bg-primary); }
+
+  /* table */
+  .ion-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .ion-table th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-muted); font-weight:500; padding:0 12px 9px; }
+  .ion-table td { padding:10px 12px; border-top:1px solid var(--border); }
+  .ion-table tr:hover td { background:var(--bg-secondary); }
+
+  /* nav header */
+  .ion-nav { display:flex; align-items:center; gap:20px; padding:11px 16px; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); }
+  .ion-nav .mark { display:flex; align-items:center; gap:9px; font-weight:600; color:var(--cyan); }
+  .ion-nav .mark .glyph { width:22px; height:22px; border-radius:6px; background:rgba(109,228,255,0.14); display:grid; place-items:center; }
+  .ion-nav .items { display:flex; gap:16px; font-size:13px; color:var(--text-secondary); }
+  .ion-nav .items .active { color:var(--text-bright); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1 class="sg-h">ION UI Kit</h1>
+  <p class="sg-sub">Phase 0 — canonical component foundation for the full re-skin · built on ION's existing tokens</p>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Surfaces &amp; accents</div>
+    <div class="sg-grid">
+      <div class="ion-swatch"><div class="chip-c" style="background:#0a0c12"></div><div class="nm">primary</div><div class="hx">#0a0c12</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#11141c"></div><div class="nm">secondary</div><div class="hx">#11141c</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#0d1017"></div><div class="nm">card</div><div class="hx">#0d1017</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#171b24"></div><div class="nm">tertiary</div><div class="hx">#171b24</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#6de4ff"></div><div class="nm">cyan</div><div class="hx">#6de4ff</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#86f0a0"></div><div class="nm">green</div><div class="hx">#86f0a0</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#f8b33a"></div><div class="nm">amber</div><div class="hx">#f8b33a</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#ff6c6c"></div><div class="nm">red</div><div class="hx">#ff6c6c</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#9a8cff"></div><div class="nm">purple</div><div class="hx">#9a8cff</div></div>
+      <div class="ion-swatch"><div class="chip-c" style="background:#60a5fa"></div><div class="nm">blue</div><div class="hx">#60a5fa</div></div>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Typography</div>
+    <p class="ion-t-h1">Page heading — 21 / 500</p>
+    <p class="ion-t-h2" style="margin-top:8px">Section heading — 16 / 500</p>
+    <p class="ion-t-body" style="margin-top:8px">Body text — 14 / 400. Case <span class="ion-mono">DEMO-0002</span> uses the mono accent for IDs and timestamps.</p>
+    <p class="ion-t-muted" style="margin-top:6px">Muted caption — 12 / 400</p>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Buttons</div>
+    <div class="sg-grid">
+      <button class="ion-btn ion-btn-primary">Primary action</button>
+      <button class="ion-btn">Secondary</button>
+      <button class="ion-btn ion-btn-ghost">Ghost</button>
+      <button class="ion-btn ion-btn-danger">Destructive</button>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Badges, pills &amp; severity</div>
+    <div class="sg-grid" style="margin-bottom:10px">
+      <span class="ion-badge b-cyan">triaged</span>
+      <span class="ion-badge b-green">closed</span>
+      <span class="ion-badge b-amber">playbook</span>
+      <span class="ion-badge b-purple">training</span>
+      <span class="ion-badge b-blue">meeting</span>
+      <span class="ion-badge b-red">IR</span>
+    </div>
+    <div class="sg-grid" style="margin-bottom:10px">
+      <span class="ion-pill b-green"><i style="font-size:7px">●</i>Active</span>
+      <span class="ion-pill b-amber"><i style="font-size:9px">○</i>Free for pickup</span>
+      <span class="ion-pill b-red"><i style="font-size:9px">⚑</i>Needs a hand</span>
+      <span class="ion-pill b-muted"><i style="font-size:9px">⏸</i>On break</span>
+    </div>
+    <div class="sg-grid">
+      <span class="ion-sev"><span class="d" style="background:var(--sev-critical)"></span>Critical</span>
+      <span class="ion-sev"><span class="d" style="background:var(--sev-high)"></span>High</span>
+      <span class="ion-sev"><span class="d" style="background:var(--sev-medium)"></span>Medium</span>
+      <span class="ion-sev"><span class="d" style="background:var(--sev-low)"></span>Low</span>
+      <span class="ion-sev"><span class="d" style="background:var(--sev-info)"></span>Info</span>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Quick-add chips</div>
+    <div class="sg-grid">
+      <button class="ion-chip b-blue"><span>◷</span>Meeting</button>
+      <button class="ion-chip b-purple"><span>✦</span>Training</button>
+      <button class="ion-chip b-red"><span>⚑</span>IR engagement</button>
+      <button class="ion-chip b-cyan"><span>⌖</span>Threat hunt</button>
+      <button class="ion-chip b-blue"><span>✎</span>Documentation</button>
+      <button class="ion-chip b-muted"><span>☕</span>Break</button>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Form controls</div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:560px;">
+      <input class="ion-input" placeholder="Text input…" />
+      <select class="ion-select"><option>Select option</option><option>Another</option></select>
+      <textarea class="ion-textarea" rows="2" placeholder="Textarea…" style="grid-column:1 / -1"></textarea>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Metric cards</div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px;">
+      <div class="ion-metric"><div class="lbl">Active time</div><div class="val">5h 12m</div></div>
+      <div class="ion-metric"><div class="lbl">Alerts triaged</div><div class="val" style="color:var(--cyan)">23</div></div>
+      <div class="ion-metric"><div class="lbl">Cases closed</div><div class="val" style="color:var(--green)">2</div></div>
+      <div class="ion-metric"><div class="lbl">Open</div><div class="val">14</div></div>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Page header + tabs</div>
+    <div class="ion-page-header">
+      <div><p class="h">Team — Today</p><p class="s">Tue 17 Jun 2026 · Day shift · 5 on shift</p></div>
+      <div class="ion-toggle"><button>My Day</button><button class="on">Team Day</button></div>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Raised card</div>
+    <div class="ion-card" style="max-width:340px">
+      <p class="ion-card-title"><span>↪</span> Shift handover</p>
+      <p class="ion-t-muted" style="margin-bottom:11px">Compile today's work into a paste-ready note.</p>
+      <button class="ion-btn ion-btn-primary" style="width:100%; justify-content:center">Generate handover</button>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">List row</div>
+    <div style="display:flex; flex-direction:column; gap:7px;">
+      <div class="ion-row">
+        <span class="ion-avatar" style="background:rgba(154,140,255,0.18); color:#c4baff">JD</span>
+        <div style="flex:1"><div style="color:var(--text-bright)">J. Doe <span class="ion-t-muted">· L2 Analyst</span></div><div class="ion-t-muted"><span class="ion-mono">DEMO-0002</span> Suspicious PowerShell</div></div>
+        <span class="ion-pill b-green"><i style="font-size:7px">●</i>Active</span>
+      </div>
+      <div class="ion-row block">
+        <span class="ion-avatar" style="background:rgba(134,240,160,0.18); color:#9af0b3">RT</span>
+        <div style="flex:1"><div style="color:var(--text-bright)">R. Torres <span class="ion-t-muted">· L2 Analyst</span></div><div class="ion-t-muted"><span class="ion-mono">DEMO-0011</span> <span style="color:var(--red)">awaiting IR escalation</span></div></div>
+        <span class="ion-pill b-red"><i style="font-size:9px">⚑</i>Needs a hand</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Timeline</div>
+    <div class="ion-timeline">
+      <div class="rail"></div>
+      <div class="ion-ev"><div class="t">14:32</div><div class="dot" style="background:var(--red)"></div><div><span class="ion-badge b-red">triaged</span> Escalated <span class="ion-mono">DEMO-0002</span> — Suspicious PowerShell</div></div>
+      <div class="ion-ev"><div class="t">12:05</div><div class="dot" style="background:var(--green)"></div><div><span class="ion-badge b-green">closed</span> Closed <span class="ion-mono">DEMO-0001</span> as false positive</div></div>
+      <div class="ion-ev"><div class="t">10:00</div><div class="dot" style="background:var(--blue)"></div><div><span class="ion-badge b-blue">meeting</span> Daily stand-up</div></div>
+    </div>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Table</div>
+    <table class="ion-table">
+      <thead><tr><th>Case</th><th>Severity</th><th>Owner</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td><span class="ion-mono">DEMO-0002</span></td><td><span class="ion-sev"><span class="d" style="background:var(--sev-high)"></span>High</span></td><td>J. Doe</td><td><span class="ion-badge b-cyan">open</span></td></tr>
+        <tr><td><span class="ion-mono">DEMO-0007</span></td><td><span class="ion-sev"><span class="d" style="background:var(--sev-critical)"></span>Critical</span></td><td>S. Khan</td><td><span class="ion-badge b-amber">investigating</span></td></tr>
+        <tr><td><span class="ion-mono">DEMO-0001</span></td><td><span class="ion-sev"><span class="d" style="background:var(--sev-low)"></span>Low</span></td><td>J. Doe</td><td><span class="ion-badge b-green">closed</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sg-sec">
+    <div class="sg-lbl">Nav header</div>
+    <div class="ion-nav">
+      <div class="mark"><span class="glyph">▦</span>ION</div>
+      <div class="items"><span>Dashboard</span><span>Alerts</span><span class="active">Cases</span><span>Operations</span><span>Knowledge</span></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
