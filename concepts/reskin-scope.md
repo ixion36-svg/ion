@@ -270,3 +270,60 @@ new look on the busiest pages early; the long tail migrates steadily.
 - **CSP** — all styling stays in stylesheets / nonced blocks; no inline
   `style=` or `onclick=`. Dynamic values go through `data-*` + JS (the existing
   ION pattern).
+
+---
+
+## Completion log — off-brand → ION-token re-skin (2026-06-23)
+
+The migration was re-scoped to its highest-value, lowest-risk axis after
+measurement showed most "unmigrated" pages were *already on ION tokens* (the
+`_ion-s-*` count is mostly CSP-mandated layout, not stylistic debt). The real
+debt was **hardcoded non-token hex** — Tailwind defaults, Material light-mode
+colours, GitHub-cyan, and a bespoke navy-purple theme — drifting off-brand.
+
+**Method (verified, never big-bang):** parallel subagents, disjoint files,
+**colour-only swaps scoped to `<style>` blocks** (never JS/Chart.js/canvas hex —
+those need literal values), no selector/class/structure changes, CSP unchanged.
+Each batch: `git diff` shows equal +/− (pure value swaps), zero new inline
+`style=`, live curl (307 = rendered), then Playwright visual + console-error
+spot-checks.
+
+**28 templates re-skinned across 4 commits** (`e04ba29`, `9373ee6`, `f791119`,
+`c030bc1`):
+- **Genuinely off-brand pages** (full tokenisation): `cyber_range` (navy-purple
+  theme dropped), `daily_standup`, `investigation_memory`, `investigation_queue`,
+  `course_detail`, `my_courses`, `arkime_traffic` (incl. Chart.js/jsVectorMap
+  palettes via literal token-hex), `data_flow`, `security_dashboard` (light-mode
+  chips → dark token tints), `documents`, `log_sources`, `scheduler`, `users`,
+  `canaries`, `briefing`, `lesson`.
+- **Heavy/giant `<style>` blocks** (CSS-only, JS markup untouched): `training`
+  (~120 hex), `cases`, `alerts`, `detection_engineering`, `forensics`,
+  `observables` (bright/dark IOC-badge pairs → token + rgba tint), `topology`
+  (generic UI greys tokenised), plus tails in `integrations`, `playbooks`,
+  `settings`, `alert_prompt_templates`, `admin_courses`.
+- **Visually verified on :8099** (logged in): cyber_range, arkime_traffic,
+  security_dashboard, training, observables — all render on-brand, 0 console errors.
+
+**Intentionally LEFT (classified exceptions, not debt):**
+- `cyab/_scoping_pack_pdf` — PDF template; rendering engine needs self-contained
+  literal styles.
+- `topology` / `integrations` vendor swatches — per-service **brand-identity**
+  colours (Elastic `#00bfb3`, GitLab `#fc6d26`, OpenCTI, TIDE, Ollama, DFIR-IRIS)
+  that label nodes; recolouring would erase their identity.
+- `data_flow` — skeuomorphic **Windows Event Viewer** mock (intentionally a
+  light third-party-OS dialog; a teaching asset).
+- `guide` — `@media print` light/white-paper colours.
+- `base.html` — remaining hex are `[data-theme="light"]` contrast overrides +
+  literals that already equal ION token values; shared chrome, highest blast
+  radius, no genuine drift → left.
+- `daily_standup_slides`, `login`, `wallboard` — **standalone** decks/pages with
+  their own self-contained `:root` palette; not part of the token sweep.
+
+**Still future work (NOT done — needs dedicated effort):** the *structural*
+`ion-*` component migration of the JS-rendered giants (`alerts`, `training`,
+`cases`, `settings`, `chat`, `tools`) — replacing bespoke JS-built markup +
+JS-coupled classes with the shared kit. That requires co-migrating page `<style>`
+blocks and re-pointing dozens of JS selectors / re-rendering innerHTML; it is
+high-risk multi-session work with no safe static surface, and was deliberately
+not attempted as a bounded sweep. The colour re-skin above makes these pages
+on-brand in the meantime.
