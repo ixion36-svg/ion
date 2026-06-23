@@ -644,18 +644,18 @@ sha256,abc123...,c2,</pre>
 }
 
 .obs-type-badge.ipv4,
-.obs-type-badge.ipv6 { background: #5f1e1e; color: #f07d7d; }
-.obs-type-badge.domain { background: #3a1e5f; color: #a87df0; }
-.obs-type-badge.hostname { background: #1e3a5f; color: #7db8f0; }
-.obs-type-badge.url { background: #1e5f2e; color: #7df098; }
-.obs-type-badge.email { background: #5f4a1e; color: #f0c87d; }
+.obs-type-badge.ipv6 { background: rgba(255,108,108,.14); color: var(--danger); }
+.obs-type-badge.domain { background: rgba(154,140,255,.16); color: var(--neon-purple); }
+.obs-type-badge.hostname { background: rgba(96,165,250,.14); color: var(--neon-blue); }
+.obs-type-badge.url { background: rgba(134,240,160,.14); color: var(--success); }
+.obs-type-badge.email { background: rgba(248,179,58,.14); color: var(--warning); }
 .obs-type-badge.sha256,
 .obs-type-badge.sha1,
-.obs-type-badge.md5 { background: #3a3a3a; color: #b0b0b0; }
-.obs-type-badge.filename { background: #4a3a1e; color: #f0d87d; }
-.obs-type-badge.user_account { background: #1e5f5f; color: #7df0f0; }
-.obs-type-badge.mac { background: #4a1e5f; color: #c87df0; }
-.obs-type-badge.cve { background: #5f1e4a; color: #f07dc8; }
+.obs-type-badge.md5 { background: rgba(139,148,158,.14); color: var(--text-secondary); }
+.obs-type-badge.filename { background: rgba(248,179,58,.14); color: var(--warning); }
+.obs-type-badge.user_account { background: rgba(109,228,255,.14); color: var(--primary); }
+.obs-type-badge.mac { background: rgba(154,140,255,.16); color: var(--neon-purple); }
+.obs-type-badge.cve { background: rgba(236,72,153,.16); color: var(--neon-pink); }
 
 /* Threat Level Badges */
 .threat-badge {
@@ -672,7 +672,7 @@ sha256,abc123...,c2,</pre>
 .threat-badge.medium { background: rgba(234, 179, 8, 0.12); color: var(--warning); }
 .threat-badge.low { background: rgba(59, 130, 246, 0.12); color: var(--info); }
 .threat-badge.benign { background: rgba(34, 197, 94, 0.12); color: var(--success); }
-.threat-badge.unknown { background: rgba(156, 163, 175, 0.12); color: #9ca3af; }
+.threat-badge.unknown { background: rgba(156, 163, 175, 0.12); color: var(--text-secondary); }
 
 /* Enrichment indicator */
 .enriched-indicator {
@@ -1053,7 +1053,7 @@ sha256,abc123...,c2,</pre>
     flex: 1;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    background: #1a1a2e;
+    background: var(--bg-secondary);
     min-height: 400px;
     box-shadow: 0 2px 8px rgba(0,0,0,.15);
 }
@@ -1183,10 +1183,10 @@ sha256,abc123...,c2,</pre>
 }
 .context-badge.ctx-source { background: rgba(59, 130, 246, 0.12); color: #60a5fa; }
 .context-badge.ctx-dest   { background: rgba(249, 115, 22, 0.12); color: var(--neon-orange); }
-.context-badge.ctx-subject { background: rgba(168, 85, 247, 0.12); color: #c084fc; }
+.context-badge.ctx-subject { background: rgba(168, 85, 247, 0.12); color: var(--neon-purple); }
 .context-badge.ctx-target { background: rgba(239, 68, 68, 0.12); color: var(--danger); }
 .context-badge.ctx-host   { background: rgba(34, 197, 94, 0.12); color: var(--success); }
-.context-badge.ctx-generic { background: rgba(156, 163, 175, 0.12); color: #9ca3af; }
+.context-badge.ctx-generic { background: rgba(156, 163, 175, 0.12); color: var(--text-secondary); }
 </style>
 
 <script nonce="{{ csp_nonce }}">

@@ -745,9 +745,9 @@
     font-weight: 600;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    color: #ffb74d;
-    background: rgba(255, 183, 77, 0.12);
-    border: 1px solid rgba(255, 183, 77, 0.4);
+    color: var(--sev-high);
+    background: rgba(248, 179, 58, 0.12);
+    border: 1px solid rgba(248, 179, 58, 0.4);
     border-radius: 3px;
     vertical-align: middle;
 }
@@ -1038,7 +1038,7 @@
 
 /* Threat Banner (reuse from security_dashboard) */
 .security-banner {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
@@ -1236,7 +1236,7 @@
     background:
         radial-gradient(ellipse at 30% 25%, rgba(109, 228, 255, 0.04) 0%, transparent 55%),
         radial-gradient(ellipse at 70% 75%, rgba(154, 140, 255, 0.04) 0%, transparent 55%),
-        #060912;
+        var(--bg-primary);
     aspect-ratio: 16 / 9;
     width: 100%;
     line-height: 0;
@@ -1251,7 +1251,7 @@
     position: absolute;
     background: rgba(10,20,40,0.92);
     border: 1px solid rgba(100,180,255,0.3);
-    color: #e0e8f0;
+    color: var(--text-primary);
     padding: 6px 10px;
     border-radius: 5px;
     font-size: 0.75rem;
@@ -1390,10 +1390,10 @@
     font-weight: 600;
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
-.ad-sys-sev-pill.crit { background: rgba(244,67,54,0.15); color: #f44336; }
-.ad-sys-sev-pill.high { background: rgba(255,152,0,0.15); color: #ff9800; }
-.ad-sys-sev-pill.med  { background: rgba(255,193,7,0.15); color: var(--warning); }
-.ad-sys-sev-pill.low  { background: rgba(76,175,80,0.15); color: #4caf50; }
+.ad-sys-sev-pill.crit { background: rgba(255,108,108,0.15); color: var(--danger); }
+.ad-sys-sev-pill.high { background: rgba(248,179,58,0.15); color: var(--sev-high); }
+.ad-sys-sev-pill.med  { background: rgba(210,153,34,0.15); color: var(--warning); }
+.ad-sys-sev-pill.low  { background: rgba(134,240,160,0.15); color: var(--success); }
 
 .ad-sys-tide {
     margin-top: 0.5rem;
@@ -1927,8 +1927,8 @@ kbd {
 
 /* Raw data JSON view */
 .raw-data-container {
-    background: #1e293b;
-    color: #e2e8f0;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
     padding: 1rem;
     border-radius: var(--radius);
     font-family: 'Consolas', 'Monaco', monospace;
@@ -1940,10 +1940,10 @@ kbd {
     word-break: break-all;
 }
 
-.json-key { color: #7dd3fc; }
-.json-string { color: #86efac; }
+.json-key { color: var(--primary); }
+.json-string { color: var(--success); }
 .json-number { color: var(--warning); }
-.json-boolean { color: #c084fc; }
+.json-boolean { color: var(--neon-purple); }
 .json-null { color: #94a3b8; }
 
 /* Modal large for alert detail */
@@ -2074,21 +2074,21 @@ kbd {
     text-align: center;
 }
 
-.observable-badge.hostname     { background: #1e3a5f; color: #7db8f0; }
+.observable-badge.hostname     { background: rgba(96,165,250,.12); color: var(--neon-blue); }
 .observable-badge.source_ip    { background: rgba(255,108,108,.12); color: var(--danger); }
-.observable-badge.destination_ip { background: #5f3a1e; color: #f0a87d; }
-.observable-badge.url          { background: #1e5f2e; color: #7df098; }
-.observable-badge.domain       { background: #3a1e5f; color: #a87df0; }
-.observable-badge.user_account { background: #1e5f5f; color: #7df0f0; }
+.observable-badge.destination_ip { background: rgba(248,179,58,.12); color: var(--sev-high); }
+.observable-badge.url          { background: rgba(134,240,160,.12); color: var(--success); }
+.observable-badge.domain       { background: rgba(154,140,255,.12); color: var(--neon-purple); }
+.observable-badge.user_account { background: rgba(109,228,255,.12); color: var(--primary); }
 .observable-badge.ipv4,
 .observable-badge.ipv6         { background: rgba(255,108,108,.12); color: var(--danger); }
-.observable-badge.email        { background: #5f4a1e; color: #f0c87d; }
+.observable-badge.email        { background: rgba(210,153,34,.12); color: var(--warning); }
 .observable-badge.sha256,
 .observable-badge.sha1,
-.observable-badge.md5          { background: #3a3a3a; color: #b0b0b0; }
-.observable-badge.filename     { background: #4a3a1e; color: #f0d87d; }
-.observable-badge.mac          { background: #4a1e5f; color: #c87df0; }
-.observable-badge.cve          { background: #5f1e4a; color: #f07dc8; }
+.observable-badge.md5          { background: rgba(139,148,158,.12); color: var(--text-secondary); }
+.observable-badge.filename     { background: rgba(210,153,34,.12); color: var(--warning); }
+.observable-badge.mac          { background: rgba(154,140,255,.12); color: var(--neon-purple); }
+.observable-badge.cve          { background: rgba(244,114,182,.12); color: var(--neon-pink); }
 
 .observable-row {
     display: flex;
@@ -2354,7 +2354,7 @@ kbd {
 .mitre-heatmap-cell.heat-0 { background: var(--bg-secondary); color: var(--text-muted); }
 .mitre-heatmap-cell.heat-1 { background: rgba(255, 193, 7, 0.25); color: var(--warning); }
 .mitre-heatmap-cell.heat-2 { background: rgba(255, 152, 0, 0.35); color: var(--neon-orange); }
-.mitre-heatmap-cell.heat-3 { background: rgba(255, 87, 34, 0.45); color: #ff5722; }
+.mitre-heatmap-cell.heat-3 { background: rgba(255, 87, 34, 0.45); color: var(--sev-high); }
 .mitre-heatmap-cell.heat-4 { background: rgba(244, 67, 54, 0.55); color: var(--danger); }
 .mitre-heatmap-cell.heat-5 { background: rgba(211, 47, 47, 0.7); color: #fff; }
 
@@ -3021,7 +3021,7 @@ kbd {
     font-size: 0.8125rem; font-weight: 600; cursor: pointer;
     transition: background 0.15s, opacity 0.15s;
 }
-.ai-assist-btn:hover { background: #2563eb; }
+.ai-assist-btn:hover { background: var(--neon-blue); }
 .ai-assist-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .ai-micro-btn {
@@ -3057,7 +3057,7 @@ kbd {
 }
 .ai-model-tag {
     display: inline-block; padding: 0.0625rem 0.375rem; border-radius: 3px;
-    background: rgba(59,130,246,0.12); color: #93c5fd; font-size: 0.6875rem; font-weight: 500;
+    background: rgba(59,130,246,0.12); color: var(--neon-blue); font-size: 0.6875rem; font-weight: 500;
 }
 .ai-loading {
     display: flex; align-items: center; gap: 0.5rem;
@@ -3072,7 +3072,7 @@ kbd {
 .ai-error {
     padding: 0.5rem 0.75rem; background: rgba(239,68,68,0.1);
     border: 1px solid rgba(239,68,68,0.3); border-radius: var(--radius);
-    color: #f87171; font-size: 0.8125rem; margin-top: 0.5rem;
+    color: var(--danger); font-size: 0.8125rem; margin-top: 0.5rem;
 }
 .ai-generate-row {
     display: flex; align-items: center; gap: 0.75rem;
