@@ -337,7 +337,7 @@
 .stat-icon-warning { background: rgba(245,158,11,.15); color: var(--warning); }
 .stat-icon-danger { background: rgba(239,68,68,.15); color: var(--danger); }
 .stat-icon-success { background: rgba(76,175,80,.15); color: var(--success); }
-.stat-icon-purple { background: rgba(139,92,246,.15); color: #8b5cf6; }
+.stat-icon-purple { background: rgba(139,92,246,.15); color: var(--neon-purple); }
 
 .cases-stat-value {
     font-size: 1.5rem;
@@ -424,11 +424,11 @@
 
 .col-open .kanban-col-title { color: var(--info); }
 .col-acknowledged .kanban-col-title { color: var(--warning); }
-.col-closed .kanban-col-title { color: #6b7280; }
+.col-closed .kanban-col-title { color: var(--text-muted); }
 
 .col-open { border-bottom-color: var(--info); }
 .col-acknowledged { border-bottom-color: var(--warning); }
-.col-closed { border-bottom-color: #6b7280; }
+.col-closed { border-bottom-color: var(--text-muted); }
 
 .kanban-col-title {
     font-weight: 600;
@@ -497,7 +497,7 @@
 .kanban-card.sev-critical::before { background: var(--danger); }
 .kanban-card.sev-high::before { background: var(--warning); }
 .kanban-card.sev-medium::before { background: var(--info); }
-.kanban-card.sev-low::before { background: #6b7280; }
+.kanban-card.sev-low::before { background: var(--text-muted); }
 
 .kcard-header {
     display: flex;
@@ -523,7 +523,7 @@
 .kcard-severity.sev-critical { background: rgba(239,68,68,.12); color: var(--danger); }
 .kcard-severity.sev-high { background: rgba(245,158,11,.12); color: var(--warning); }
 .kcard-severity.sev-medium { background: rgba(59,130,246,.12); color: var(--info); }
-.kcard-severity.sev-low { background: rgba(107,114,128,.12); color: #9ca3af; }
+.kcard-severity.sev-low { background: rgba(107,114,128,.12); color: var(--text-secondary); }
 
 .kcard-title {
     font-size: 0.85rem;
@@ -604,18 +604,18 @@
 }
 
 .kcard-closure.reason-true_positive { background: rgba(239,68,68,.12); color: var(--danger); }
-.kcard-closure.reason-false_positive { background: rgba(107,114,128,.12); color: #9ca3af; }
+.kcard-closure.reason-false_positive { background: rgba(107,114,128,.12); color: var(--text-secondary); }
 .kcard-closure.reason-benign_true_positive { background: rgba(245,158,11,.12); color: var(--warning); }
-.kcard-closure.reason-duplicate { background: rgba(139,92,246,.12); color: #8b5cf6; }
-.kcard-closure.reason-insufficient_data { background: rgba(107,114,128,.12); color: #6b7280; }
-.kcard-closure.reason-not_applicable { background: rgba(107,114,128,.12); color: #6b7280; }
+.kcard-closure.reason-duplicate { background: rgba(139,92,246,.12); color: var(--neon-purple); }
+.kcard-closure.reason-insufficient_data { background: rgba(107,114,128,.12); color: var(--text-muted); }
+.kcard-closure.reason-not_applicable { background: rgba(107,114,128,.12); color: var(--text-muted); }
 
 /* ── Case Detail Panel ───────────────────────────────────── */
 /* v0.20.0 Workbench — pinned evidence + tamper-evident ledger */
 .cpanel-pin-btn {
     background: rgba(34,211,238,0.08);
     border: 1px solid rgba(34,211,238,0.25);
-    color: #22d3ee;
+    color: var(--primary);
     font-size: 0.7rem;
     padding: 0.2rem 0.55rem;
     border-radius: 3px;
@@ -629,8 +629,8 @@
     font-weight: 500;
     letter-spacing: 0.02em;
 }
-.wb-verify-ok      { background: rgba(132,204,22,0.12); color: #84cc16; border: 1px solid rgba(132,204,22,0.3); }
-.wb-verify-bad     { background: rgba(239,68,68,0.15);  color: #ef4444; border: 1px solid rgba(239,68,68,0.4); }
+.wb-verify-ok      { background: rgba(132,204,22,0.12); color: var(--success); border: 1px solid rgba(132,204,22,0.3); }
+.wb-verify-bad     { background: rgba(239,68,68,0.15);  color: var(--danger); border: 1px solid rgba(239,68,68,0.4); }
 .wb-verify-unknown { background: rgba(148,163,184,0.12); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
 .workbench-add-row {
     display: flex;
@@ -719,7 +719,7 @@
 .workbench-pin.wb-sev-critical { border-left-color: var(--danger); }
 .workbench-pin.wb-sev-high     { border-left-color: var(--warning); }
 .workbench-pin.wb-sev-medium   { border-left-color: var(--info); }
-.workbench-pin.wb-sev-low      { border-left-color: #6b7280; }
+.workbench-pin.wb-sev-low      { border-left-color: var(--text-muted); }
 .workbench-pin.wb-sev-info     { border-left-color: #94a3b8; }
 .workbench-pin-head {
     display: flex;
@@ -744,7 +744,7 @@
     margin-left: auto;
     background: none;
     border: none;
-    color: #6b7280;
+    color: var(--text-muted);
     cursor: pointer;
     font-size: 1rem;
     line-height: 1;
@@ -1198,8 +1198,8 @@
     font-weight: 600;
     flex-shrink: 0;
 }
-.cpanel-pb-badge.active { background: rgba(76,175,80,.12); color: #4caf50; }
-.cpanel-pb-badge.inactive { background: rgba(33,150,243,.12); color: #2196f3; }
+.cpanel-pb-badge.active { background: rgba(76,175,80,.12); color: var(--success); }
+.cpanel-pb-badge.inactive { background: rgba(33,150,243,.12); color: var(--neon-blue); }
 
 /* ── Observable List (Panel) ─────────────────────────────── */
 .cpanel-obs-list {
@@ -1237,15 +1237,15 @@
 .cpanel-obs-type.obs-type-ip,
 .cpanel-obs-type.obs-type-ipv4,
 .cpanel-obs-type.obs-type-ipv6 { background: rgba(59,130,246,.12); color: var(--info); }
-.cpanel-obs-type.obs-type-domain { background: rgba(139,92,246,.12); color: #8b5cf6; }
+.cpanel-obs-type.obs-type-domain { background: rgba(139,92,246,.12); color: var(--neon-purple); }
 .cpanel-obs-type.obs-type-url { background: rgba(245,158,11,.12); color: var(--warning); }
 .cpanel-obs-type.obs-type-hash,
 .cpanel-obs-type.obs-type-md5,
 .cpanel-obs-type.obs-type-sha1,
 .cpanel-obs-type.obs-type-sha256 { background: rgba(239,68,68,.12); color: var(--danger); }
-.cpanel-obs-type.obs-type-email { background: rgba(6,182,212,.12); color: #06b6d4; }
-.cpanel-obs-type.obs-type-file { background: rgba(236,72,153,.12); color: #ec4899; }
-.cpanel-obs-type.obs-type-unknown { background: rgba(107,114,128,.12); color: #9ca3af; }
+.cpanel-obs-type.obs-type-email { background: rgba(6,182,212,.12); color: var(--primary); }
+.cpanel-obs-type.obs-type-file { background: rgba(236,72,153,.12); color: var(--neon-pink); }
+.cpanel-obs-type.obs-type-unknown { background: rgba(107,114,128,.12); color: var(--text-secondary); }
 
 .cpanel-obs-value {
     flex: 1;
@@ -1270,7 +1270,7 @@
 .cpanel-tag-mitre {
     background: rgba(239,68,68,.08);
     border: 1px solid rgba(239,68,68,.2);
-    color: #f87171;
+    color: var(--danger);
     font-size: 0.7rem;
     font-family: monospace;
 }
@@ -1635,9 +1635,9 @@
 }
 
 .attn-reason-stale { background: rgba(245,158,11,.12); color: var(--warning); }
-.attn-reason-unassigned { background: rgba(139,92,246,.12); color: #8b5cf6; }
+.attn-reason-unassigned { background: rgba(139,92,246,.12); color: var(--neon-purple); }
 .attn-reason-not-picked-up { background: rgba(239,68,68,.12); color: var(--danger); }
-.attn-reason-aged { background: rgba(107,114,128,.12); color: #9ca3af; }
+.attn-reason-aged { background: rgba(107,114,128,.12); color: var(--text-secondary); }
 
 .attn-case-num {
     font-weight: 600;
@@ -1654,12 +1654,12 @@
 }
 
 /* ── Stats Row 2 ────────────────────────────────────────── */
-.cases-stat-card.stat-mttr { border-top-color: #8b5cf6; background: linear-gradient(180deg, rgba(139,92,246,.06) 0%, transparent 60%); }
+.cases-stat-card.stat-mttr { border-top-color: var(--neon-purple); background: linear-gradient(180deg, rgba(139,92,246,.06) 0%, transparent 60%); }
 .cases-stat-card.stat-closure-rate { border-top-color: var(--success); background: linear-gradient(180deg, rgba(76,175,80,.06) 0%, transparent 60%); }
 .cases-stat-card.stat-weekly { border-top-color: var(--info); background: linear-gradient(180deg, rgba(59,130,246,.06) 0%, transparent 60%); }
 .cases-stat-card.stat-unassigned { border-top-color: var(--warning); background: linear-gradient(180deg, rgba(245,158,11,.06) 0%, transparent 60%); }
 
-.stat-mttr .cases-stat-value { color: #8b5cf6; }
+.stat-mttr .cases-stat-value { color: var(--neon-purple); }
 .stat-closure-rate .cases-stat-value { color: var(--success); }
 .stat-weekly .cases-stat-value { color: var(--info); }
 .stat-unassigned .cases-stat-value { color: var(--warning); }
@@ -1765,9 +1765,9 @@
 
 /* ── Analytics Card Accents ─────────────────────────────── */
 .analytics-card-accent-danger { border-top: 2px solid var(--danger); }
-.analytics-card-accent-purple { border-top: 2px solid #8b5cf6; }
+.analytics-card-accent-purple { border-top: 2px solid var(--neon-purple); }
 .analytics-card-accent-info { border-top: 2px solid var(--info); }
-.analytics-card-accent-blue { border-top: 2px solid #3b82f6; }
+.analytics-card-accent-blue { border-top: 2px solid var(--neon-blue); }
 .analytics-card-accent-warning { border-top: 2px solid var(--warning); }
 .analytics-card-accent-success { border-top: 2px solid var(--success); }
 
@@ -1780,7 +1780,7 @@
 
 .cpanel-tag-user {
     background: rgba(139,92,246,.12);
-    color: #8b5cf6;
+    color: var(--neon-purple);
     border: none;
 }
 
@@ -1821,7 +1821,7 @@
 .cpanel-sev-strip.sev-critical .cpanel-sev-icon { color: var(--danger); }
 .cpanel-sev-strip.sev-high .cpanel-sev-icon { color: var(--warning); }
 .cpanel-sev-strip.sev-medium .cpanel-sev-icon { color: var(--info); }
-.cpanel-sev-strip.sev-low .cpanel-sev-icon { color: #6b7280; }
+.cpanel-sev-strip.sev-low .cpanel-sev-icon { color: var(--text-muted); }
 
 .cpanel-sev-text {
     font-size: 0.8rem;
@@ -1832,7 +1832,7 @@
 .cpanel-sev-strip.sev-critical .cpanel-sev-text { color: var(--danger); }
 .cpanel-sev-strip.sev-high .cpanel-sev-text { color: var(--warning); }
 .cpanel-sev-strip.sev-medium .cpanel-sev-text { color: var(--info); }
-.cpanel-sev-strip.sev-low .cpanel-sev-text { color: #9ca3af; }
+.cpanel-sev-strip.sev-low .cpanel-sev-text { color: var(--text-secondary); }
 
 .cpanel-sev-detail {
     font-size: 0.75rem;
