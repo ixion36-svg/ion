@@ -363,7 +363,13 @@
     ];
     events.filter(e=>['note','reading','triaged','closed'].includes(e.type))
           .slice(0,4)
-          .forEach(e => lines.push('  • '+e.t+'  '+e.html.replace(/<[^>]+>/g,'')));
+          .forEach(e => {
+            // Extract plain text via the HTML parser (no script execution / no
+            // resource loads) rather than a single-pass tag-strip regex, which
+            // is unsound against nested tags (e.g. "<scr<script>ipt>").
+            const txt = new DOMParser().parseFromString(e.html, 'text/html').body.textContent || '';
+            lines.push('  • '+e.t+'  '+txt);
+          });
     document.getElementById('handover-out').textContent = lines.join('\n');
   }
 
