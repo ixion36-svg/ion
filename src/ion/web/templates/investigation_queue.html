@@ -64,15 +64,15 @@
     </div>
     <div class="ion-metric">
       <div class="ion-metric-label">Pending</div>
-      <div id="iq-count-pending" class="ion-metric-value text-[#a78bfa]">—</div>
+      <div id="iq-count-pending" class="ion-metric-value iq-val-pending">—</div>
     </div>
     <div class="ion-metric">
       <div class="ion-metric-label">Recent completed</div>
-      <div id="iq-count-completed" class="ion-metric-value text-[#4ade80]">—</div>
+      <div id="iq-count-completed" class="ion-metric-value iq-val-completed">—</div>
     </div>
     <div class="ion-metric">
       <div class="ion-metric-label">Recent failed</div>
-      <div id="iq-count-failed" class="ion-metric-value text-[#f87171]">—</div>
+      <div id="iq-count-failed" class="ion-metric-value iq-val-failed">—</div>
     </div>
   </div>
 
@@ -147,9 +147,9 @@
 </div>
 
 <style nonce="{{ csp_nonce }}">
-  .data-table tbody tr { border-top: 1px solid rgba(255,255,255,0.04); }
-  .data-table tbody tr:hover { background: rgba(255,255,255,0.02); }
-  .data-table td { padding: 0.7rem 1rem; font-size: 12px; color: #cbd5e1; vertical-align: top; }
+  .data-table tbody tr { border-top: 1px solid var(--border); }
+  .data-table tbody tr:hover { background: var(--bg-secondary); }
+  .data-table td { padding: 0.7rem 1rem; font-size: 12px; color: var(--text-primary); vertical-align: top; }
   .iq-pill {
     display: inline-block;
     padding: 2px 8px;
@@ -159,19 +159,22 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
   }
-  .iq-pill-tp       { background: rgba(239,68,68,0.15);  color: #f87171; }
-  .iq-pill-fp       { background: rgba(100,116,139,0.2); color: #94a3b8; }
-  .iq-pill-benign   { background: rgba(34,197,94,0.15);  color: #4ade80; }
-  .iq-pill-inc      { background: rgba(245,158,11,0.15); color: #fbbf24; }
-  .iq-pill-pending  { background: rgba(139,92,246,0.15); color: #a78bfa; }
-  .iq-pill-running  { background: rgba(59,130,246,0.15); color: #60a5fa; }
-  .iq-pill-completed{ background: rgba(34,197,94,0.15);  color: #4ade80; }
-  .iq-pill-failed   { background: rgba(239,68,68,0.15);  color: #f87171; }
-  .iq-pill-sev-low     { background: rgba(148,163,184,0.15); color: #cbd5e1; }
-  .iq-pill-sev-medium  { background: rgba(245,158,11,0.15);  color: #fbbf24; }
-  .iq-pill-sev-high    { background: rgba(249,115,22,0.15);  color: #fb923c; }
-  .iq-pill-sev-critical{ background: rgba(239,68,68,0.2);    color: #f87171; }
-  .iq-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; color: #94a3b8; }
+  .iq-pill-tp       { background: rgba(255,108,108,0.15);  color: var(--danger); }
+  .iq-pill-fp       { background: rgba(100,116,139,0.2);   color: var(--text-secondary); }
+  .iq-pill-benign   { background: rgba(134,240,160,0.15);  color: var(--success); }
+  .iq-pill-inc      { background: rgba(248,179,58,0.15);   color: var(--warning); }
+  .iq-pill-pending  { background: rgba(154,140,255,0.15);  color: var(--neon-purple); }
+  .iq-pill-running  { background: rgba(96,165,250,0.15);   color: var(--neon-blue); }
+  .iq-pill-completed{ background: rgba(134,240,160,0.15);  color: var(--success); }
+  .iq-pill-failed   { background: rgba(255,108,108,0.15);  color: var(--danger); }
+  .iq-pill-sev-low     { background: rgba(148,163,184,0.15); color: var(--text-primary); }
+  .iq-pill-sev-medium  { background: rgba(248,179,58,0.15);  color: var(--warning); }
+  .iq-pill-sev-high    { background: rgba(240,136,62,0.15);  color: var(--sev-high); }
+  .iq-pill-sev-critical{ background: rgba(255,108,108,0.2);   color: var(--danger); }
+  .iq-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11px; color: var(--text-secondary); }
+  .iq-val-pending   { color: var(--neon-purple); }
+  .iq-val-completed { color: var(--success); }
+  .iq-val-failed    { color: var(--danger); }
 </style>
 
 <script nonce="{{ csp_nonce }}">
