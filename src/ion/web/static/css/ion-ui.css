@@ -28,18 +28,34 @@
 .ion-ph-sub   { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
 /* ── buttons ────────────────────────────────────────────────────────────── */
-.ion-btn { font-family: inherit; font-size: 13px; padding: 7px 14px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--bg-tertiary); color: var(--text-primary); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; transition: border-color .12s ease, background .12s ease; }
-.ion-btn:hover { border-color: var(--border-bright); }
-.ion-btn:active { transform: scale(.985); }
-.ion-btn-primary { background: var(--primary-dim, rgba(109,228,255,.12)); border-color: var(--border-bright); color: var(--primary); }
-.ion-btn-primary:hover { background: rgba(109,228,255,.22); }
-.ion-btn-danger { background: rgba(255,108,108,.12); border-color: rgba(255,108,108,.35); color: var(--danger); }
-.ion-btn-ghost { background: none; border-color: transparent; color: var(--text-secondary); }
-.ion-btn-ghost:hover { background: var(--bg-secondary); border-color: var(--border); }
-.ion-btn[disabled] { opacity: .55; cursor: not-allowed; }
+/* Unified kit: ion-* and the legacy .btn family share ONE definition. Values
+   match the app's existing modern look (style.css block ~2947) so there is no
+   visual regression; ion-ui.css loads last, so these win. Legacy class names
+   stay in markup (JS hooks intact) — no template/JS change needed. */
+.ion-btn, .btn { font-family: inherit; font-size: 13px; font-weight: 600; height: 2.25rem; padding: 0 1rem; border-radius: var(--radius); border: 1px solid var(--border); background: rgba(255,255,255,.05); color: var(--text-primary); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; letter-spacing: 0; text-decoration: none; transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.ion-btn:hover, .btn:hover { background: rgba(255,255,255,.08); border-color: var(--border-bright); color: var(--text-bright); }
+.ion-btn:active, .btn:active { transform: scale(.985); }
+.ion-btn-primary, .btn-primary { background: var(--primary); border: none; color: var(--bg-deep); box-shadow: 0 0 0 1px rgba(109,228,255,.25), 0 0 18px -6px rgba(109,228,255,.9); }
+.ion-btn-primary:hover, .btn-primary:hover { background: #8aeaff; color: var(--bg-deep); box-shadow: 0 0 0 1px rgba(109,228,255,.4), 0 0 28px -4px rgba(109,228,255,1); }
+.ion-btn-danger, .btn-danger { background: var(--danger); border: none; color: var(--bg-deep); }
+.ion-btn-danger:hover, .btn-danger:hover { filter: brightness(1.05); box-shadow: 0 0 16px -6px rgba(255,108,108,.8); }
+.ion-btn-ghost, .btn-secondary { background: rgba(255,255,255,.05); border: 1px solid var(--border); color: var(--text-primary); }
+.ion-btn-ghost:hover, .btn-secondary:hover { background: rgba(255,255,255,.08); border-color: var(--primary); color: var(--primary); }
+.btn-success { background: var(--success); border: none; color: var(--bg-deep); font-weight: 600; }
+.btn-success:hover { filter: brightness(1.05); box-shadow: 0 0 16px -6px rgba(134,240,160,.8); }
+.btn-warning { background: var(--warning); border: none; color: var(--bg-deep); font-weight: 600; }
+.btn-warning:hover { filter: brightness(1.05); box-shadow: 0 0 16px -6px rgba(248,179,58,.8); }
+.btn-sm { height: 1.875rem; padding: 0 .75rem; font-size: .75rem; border-radius: .375rem; }
+.btn-xs { height: 1.625rem; padding: 0 .625rem; font-size: .6875rem; }
+.ion-btn[disabled], .btn[disabled], .ion-btn:disabled, .btn:disabled { opacity: .55; cursor: not-allowed; }
 
-/* ── badges, pills, severity ────────────────────────────────────────────── */
-.ion-badge { font-size: 11px; padding: 2px 8px; border-radius: 5px; display: inline-flex; align-items: center; gap: 5px; }
+/* ── badges, pills, severity (ion-* unified with legacy .badge family) ───── */
+.ion-badge, .badge { font-size: 10px; font-weight: 700; padding: .25rem .625rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,.05); color: var(--text-secondary); border: 1px solid var(--border); text-transform: uppercase; letter-spacing: .1em; line-height: 1.4; }
+.badge-primary { background: rgba(109,228,255,.1); color: var(--primary); border-color: rgba(109,228,255,.25); }
+.badge-info    { background: rgba(96,165,250,.1); color: var(--neon-blue); border-color: rgba(96,165,250,.25); }
+.badge-success { background: rgba(134,240,160,.1); color: var(--success); border-color: rgba(134,240,160,.25); }
+.badge-warning { background: rgba(248,179,58,.1); color: var(--warning); border-color: rgba(248,179,58,.25); }
+.badge-danger  { background: rgba(255,108,108,.1); color: var(--danger); border-color: rgba(255,108,108,.25); }
 .ion-pill  { font-size: 11px; padding: 3px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
 .ion-sev { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 .ion-sev-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
@@ -53,10 +69,11 @@
 .ion-chip { border: 1px solid var(--border); border-radius: 999px; font-family: inherit; font-size: 12px; padding: 4px 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
 .ion-chip:hover { border-color: var(--border-bright); }
 
-/* ── form controls ──────────────────────────────────────────────────────── */
-.ion-input, .ion-select, .ion-textarea { width: 100%; font-family: inherit; font-size: 13px; color: var(--text-primary); background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px 10px; outline: none; }
-.ion-input:focus, .ion-select:focus, .ion-textarea:focus { border-color: var(--border-bright); }
-.ion-input::placeholder, .ion-textarea::placeholder { color: var(--text-muted); }
+/* ── form controls (ion-* unified with legacy .form-control) ─────────────── */
+.ion-input, .ion-select, .ion-textarea, .form-control { width: 100%; height: 2.375rem; font-family: inherit; font-size: 13px; color: var(--text-bright); background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 .875rem; outline: none; transition: border-color .15s ease, background .15s ease; }
+.ion-textarea, textarea.form-control { height: auto; min-height: 5rem; padding: .625rem .875rem; line-height: 1.5; }
+.ion-input:focus, .ion-select:focus, .ion-textarea:focus, .form-control:focus { border-color: var(--border-bright); background: rgba(255,255,255,.06); box-shadow: 0 0 0 2px rgba(109,228,255,.1); }
+.ion-input::placeholder, .ion-textarea::placeholder, .form-control::placeholder { color: var(--text-muted); }
 
 /* ── metric card (muted, borderless) ────────────────────────────────────── */
 .ion-metric { background: var(--bg-secondary); border-radius: var(--radius); padding: 11px 13px; }
@@ -86,8 +103,8 @@
 .ion-ev-time { position: absolute; left: -60px; width: 40px; text-align: right; font-size: 11px; color: var(--text-muted); font-family: var(--font-mono, ui-monospace, monospace); top: 1px; }
 .ion-ev-dot { position: absolute; left: -12px; top: 3px; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px var(--bg-primary); }
 
-/* ── table ──────────────────────────────────────────────────────────────── */
-.ion-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.ion-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 500; padding: 0 12px 9px; }
-.ion-table td { padding: 10px 12px; border-top: 1px solid var(--border); }
-.ion-table tbody tr:hover td { background: var(--bg-secondary); }
+/* ── table (ion-* unified with legacy .table / .data-table) ──────────────── */
+.ion-table, .table, .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ion-table th, .table th, .data-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 700; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+.ion-table td, .table td, .data-table td { padding: 10px 12px; border-top: 1px solid var(--border); color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.ion-table tbody tr:hover td, .table tbody tr:hover td, .data-table tbody tr:hover td { background: var(--bg-secondary); }
