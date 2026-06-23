@@ -319,11 +319,38 @@ spot-checks.
 - `daily_standup_slides`, `login`, `wallboard` — **standalone** decks/pages with
   their own self-contained `:root` palette; not part of the token sweep.
 
-**Still future work (NOT done — needs dedicated effort):** the *structural*
-`ion-*` component migration of the JS-rendered giants (`alerts`, `training`,
-`cases`, `settings`, `chat`, `tools`) — replacing bespoke JS-built markup +
-JS-coupled classes with the shared kit. That requires co-migrating page `<style>`
-blocks and re-pointing dozens of JS selectors / re-rendering innerHTML; it is
-high-risk multi-session work with no safe static surface, and was deliberately
-not attempted as a bounded sweep. The colour re-skin above makes these pages
-on-brand in the meantime.
+## Kit unification — single canonical component kit (2026-06-23, commit `a0384da`)
+
+Follow-on after the colour re-skin, at the user's explicit direction ("unify the
+kit everywhere now"). Investigation found ION had **two near-identical modern
+kits**: the live legacy kit (`.btn`/`.card`/`.badge`/`.data-table`/`.form-control`,
+defined in `style.css` ~line 2947, already flat + ION-token-based) and the
+`ion-*` layer in `ion-ui.css`. A third, dead gradient `.btn`/`.card` block
+(`style.css` ~793) is fully overridden and was left as harmless dead code.
+
+**What changed:** `ion-ui.css` now defines each interactive primitive
+(button / input / table / badge) for **both** the `ion-*` and the legacy
+selectors in one rule, using the app's existing modern values. Because
+`ion-ui.css` loads last it wins the cascade, so `ion-*` is the single source of
+truth and the legacy class names are aliases onto it. `ion-btn-primary` was
+aligned to the app's solid-cyan CTA (it had been a dim tint).
+
+**Why this approach:** the legacy classes are **not** JS-selected by class (JS
+only couples to page-specific classes like `.tab-btn`/`.role-card`/`.cpanel-tab-btn`
+and the structural `.modal`), so unifying at the CSS layer needs **zero template
+or JS edits** — markup keeps its class names, all JS hooks stay intact, and the
+blast radius is one file. `[data-theme="light"]` overrides remain more specific
+and are preserved.
+
+**Deliberately NOT merged:** card containers (`.card` roomy `1.75rem` vs compact
+`.ion-card`) — both on ION tokens; force-merging padding would shift layouts for
+no gain. And the page-unique component systems (kanban, case panel, donuts,
+analytics, workbench, career tree) have **no primitives-kit equivalent** and
+correctly keep their bespoke `<style>` — they are not debt.
+
+**Verified live (logged in, cache-busted):** users (buttons/table/badges),
+daily_work (`ion-*` page + primaries), cases (critical + kanban + inputs),
+settings (forms + selects + primary) — all on-brand, 0 console errors, no layout
+breaks. Net result: the app renders through one coherent kit; a literal
+class-name swap (`.btn`→`.ion-btn`) in markup is now cosmetic-only and
+unnecessary.
