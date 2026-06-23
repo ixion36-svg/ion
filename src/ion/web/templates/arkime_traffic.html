@@ -154,35 +154,35 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.atf-tab { color: #94a3b8; }
-.atf-tab:hover { color: #e2e8f0; background: rgba(255,255,255,.05); }
-.atf-tab-active { background: #0ea5e9; color: #fff; }
+.atf-tab { color: var(--text-secondary); }
+.atf-tab:hover { color: var(--text-primary); background: rgba(255,255,255,.05); }
+.atf-tab-active { background: var(--primary); color: var(--bg-deep); }
 
 .atf-stat-card {
-  background: var(--bg-secondary, #1e293b);
-  border: 1px solid var(--border, #334155);
-  border-radius: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 1.25rem 1.5rem;
 }
 .atf-stat-value {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
   font-size: 1.625rem;
   font-weight: 700;
-  color: #f1f5f9;
+  color: var(--text-bright);
   line-height: 1.2;
 }
 .atf-stat-label {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin-top: 0.25rem;
   text-transform: uppercase;
   letter-spacing: .05em;
 }
 
 .atf-card {
-  background: var(--bg-secondary, #1e293b);
-  border: 1px solid var(--border, #334155);
-  border-radius: 0.75rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   padding: 1.25rem 1.5rem;
   position: relative;
   overflow: hidden;
@@ -196,7 +196,7 @@
 .atf-card-title {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #e2e8f0;
+  color: var(--text-primary);
   text-transform: uppercase;
   letter-spacing: .06em;
 }
@@ -207,15 +207,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-secondary, #1e293b);
-  border-radius: 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
   z-index: 5;
 }
 .atf-overlay.hidden { display: none; }
 .atf-spinner {
   width: 28px; height: 28px;
-  border: 3px solid #334155;
-  border-top-color: #0ea5e9;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin .8s linear infinite;
 }
@@ -223,29 +223,29 @@
 
 .atf-talker-tab {
   background: transparent;
-  border: 1px solid #334155;
-  color: #64748b;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
   transition: all .15s;
 }
-.atf-talker-tab:hover { color: #e2e8f0; border-color: #475569; }
-.atf-talker-active { background: #0f172a; color: #38bdf8; border-color: #38bdf8; }
+.atf-talker-tab:hover { color: var(--text-primary); border-color: var(--border-bright); }
+.atf-talker-active { background: var(--bg-primary); color: var(--primary); border-color: var(--border-bright); }
 
-#talkers-body tr { border-bottom: 1px solid #1e293b; }
+#talkers-body tr { border-bottom: 1px solid var(--border); }
 #talkers-body tr:last-child { border-bottom: none; }
-#talkers-body td { padding: 0.5rem 0; color: #cbd5e1; }
+#talkers-body td { padding: 0.5rem 0; color: var(--text-primary); }
 #talkers-body td:not(:first-child) { text-align: right; }
-#talkers-body .ip-cell { font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; color: #7dd3fc; }
-#talkers-body .bytes-cell { color: #a78bfa; font-variant-numeric: tabular-nums; }
+#talkers-body .ip-cell { font-family: var(--font-mono, 'JetBrains Mono', monospace); font-size: 0.8rem; color: var(--primary); }
+#talkers-body .bytes-cell { color: var(--neon-purple); font-variant-numeric: tabular-nums; }
 
-.atf-country-tab { background: transparent; border: 1px solid #334155; color: #64748b; transition: all .15s; }
-.atf-country-tab:hover { color: #e2e8f0; border-color: #475569; }
-.atf-country-active { background: #0f172a; color: #38bdf8; border-color: #38bdf8; }
+.atf-country-tab { background: transparent; border: 1px solid var(--border); color: var(--text-muted); transition: all .15s; }
+.atf-country-tab:hover { color: var(--text-primary); border-color: var(--border-bright); }
+.atf-country-active { background: var(--bg-primary); color: var(--primary); border-color: var(--border-bright); }
 .atf-chart-h-260 { height: 260px; }
 .atf-chart-h-220 { height: 220px; }
 .atf-map-container { height: 420px; }
 #world-map { width: 100%; height: 420px; }
 
-.jvectormap-tip { position: fixed; display: none; background: #0f172a; border: 1px solid #334155; color: #e2e8f0; padding: 5px 10px; font-size: 12px; border-radius: 4px; pointer-events: none; z-index: 200; white-space: nowrap; }
+.jvectormap-tip { position: fixed; display: none; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 5px 10px; font-size: 12px; border-radius: 4px; pointer-events: none; z-index: 200; white-space: nowrap; }
 .jvectormap-tip.active { display: block; }
 .jvectormap-zoomin, .jvectormap-zoomout { display: none; }
 #world-map svg { max-width: 100%; }
@@ -337,8 +337,8 @@
           {
             label: 'Egress (src)',
             data: srcData,
-            borderColor: '#f472b6',
-            backgroundColor: 'rgba(244,114,182,.08)',
+            borderColor: '#ec4899',
+            backgroundColor: 'rgba(236,72,153,.08)',
             borderWidth: 1.5,
             pointRadius: allMs.length > 60 ? 0 : 2,
             fill: true,
@@ -347,8 +347,8 @@
           {
             label: 'Ingress (dst)',
             data: dstData,
-            borderColor: '#38bdf8',
-            backgroundColor: 'rgba(56,189,248,.08)',
+            borderColor: '#60a5fa',
+            backgroundColor: 'rgba(96,165,250,.08)',
             borderWidth: 1.5,
             pointRadius: allMs.length > 60 ? 0 : 2,
             fill: true,
@@ -364,10 +364,10 @@
         plugins: {
           legend: { labels: { color: '#94a3b8', boxWidth: 12, font: { size: 11 } } },
           tooltip: {
-            backgroundColor: '#0f172a',
-            borderColor: '#334155',
+            backgroundColor: '#0a0c12',
+            borderColor: '#171b24',
             borderWidth: 1,
-            titleColor: '#e2e8f0',
+            titleColor: '#cbd5e1',
             bodyColor: '#94a3b8',
             callbacks: {
               label: function(ctx) {
@@ -380,20 +380,20 @@
           x: {
             type: 'category',
             ticks: {
-              color: '#475569',
+              color: '#64748b',
               font: { size: 10 },
               maxTicksLimit: 12,
               maxRotation: 0,
             },
-            grid: { color: 'rgba(51,65,85,.4)' },
+            grid: { color: 'rgba(255,255,255,.06)' },
           },
           y: {
             ticks: {
-              color: '#475569',
+              color: '#64748b',
               font: { size: 10 },
               callback: v => fmtBytes(v),
             },
-            grid: { color: 'rgba(51,65,85,.4)' },
+            grid: { color: 'rgba(255,255,255,.06)' },
           },
         },
       },
@@ -411,7 +411,7 @@
     }
     hideOverlay('proto-empty');
 
-    const COLORS = ['#38bdf8','#f472b6','#a78bfa','#34d399','#fb923c','#facc15','#e879f9','#64748b'];
+    const COLORS = ['#60a5fa','#ec4899','#9a8cff','#86f0a0','#f0883e','#f8b33a','#bc8cff','#64748b'];
     const ctx = document.getElementById('proto-chart').getContext('2d');
     protoChart = new Chart(ctx, {
       type: 'doughnut',
@@ -420,7 +420,7 @@
         datasets: [{
           data: entries.map(([,v]) => v),
           backgroundColor: COLORS.slice(0, entries.length),
-          borderColor: '#0f172a',
+          borderColor: '#0a0c12',
           borderWidth: 2,
           hoverOffset: 6,
         }],
@@ -435,10 +435,10 @@
             labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 }, padding: 6 },
           },
           tooltip: {
-            backgroundColor: '#0f172a',
-            borderColor: '#334155',
+            backgroundColor: '#0a0c12',
+            borderColor: '#171b24',
             borderWidth: 1,
-            titleColor: '#e2e8f0',
+            titleColor: '#cbd5e1',
             bodyColor: '#94a3b8',
             callbacks: {
               label: function(ctx) {
@@ -499,11 +499,11 @@
       zoomButtons: false,
       zoomOnScroll: false,
       regionStyle: {
-        initial: { fill: '#1e293b', stroke: '#0f172a', strokeWidth: 0.5 },
-        hover:   { fill: '#475569', cursor: 'default' },
+        initial: { fill: '#1e232e', stroke: '#0a0c12', strokeWidth: 0.5 },
+        hover:   { fill: '#64748b', cursor: 'default' },
       },
       visualizeData: {
-        scale: ['#164e63', '#0ea5e9'],
+        scale: ['#164e63', '#6de4ff'],
         values: values,
       },
       onRegionTooltipShow: function(e, tooltip, code) {
@@ -610,7 +610,7 @@
     hideOverlay('node-empty');
     var labels = nodes.map(function(n) { return n.node; });
     var bytes  = nodes.map(function(n) { return n.bytes; });
-    var COLORS = ['#0ea5e9','#38bdf8','#7dd3fc','#bae6fd','#e0f2fe'];
+    var COLORS = ['#6de4ff','#60a5fa','#7dd3fc','#bae6fd','#e0f2fe'];
     var ctx = document.getElementById('node-chart').getContext('2d');
     nodeChart = new Chart(ctx, {
       type: 'bar',
@@ -632,10 +632,10 @@
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: '#0f172a',
-            borderColor: '#334155',
+            backgroundColor: '#0a0c12',
+            borderColor: '#171b24',
             borderWidth: 1,
-            titleColor: '#e2e8f0',
+            titleColor: '#cbd5e1',
             bodyColor: '#94a3b8',
             callbacks: {
               label: function(ctx) {
@@ -647,8 +647,8 @@
         },
         scales: {
           x: {
-            ticks: { color: '#475569', font: { size: 10 }, callback: function(v) { return fmtBytes(v); } },
-            grid: { color: 'rgba(51,65,85,.4)' },
+            ticks: { color: '#64748b', font: { size: 10 }, callback: function(v) { return fmtBytes(v); } },
+            grid: { color: 'rgba(255,255,255,.06)' },
           },
           y: { ticks: { color: '#cbd5e1', font: { size: 11 } }, grid: { display: false } },
         },

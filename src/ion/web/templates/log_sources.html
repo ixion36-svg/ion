@@ -110,34 +110,34 @@
 .ls-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
 .ls-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center}
 .ls-stat-val{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
-.ls-stat-val.good{color:var(--mitre-covered,#3fb950)}
-.ls-stat-val.warn{color:var(--sev-medium,#d29922)}
-.ls-stat-val.crit{color:var(--sev-critical,#f85149)}
+.ls-stat-val.good{color:var(--mitre-covered)}
+.ls-stat-val.warn{color:var(--sev-medium)}
+.ls-stat-val.crit{color:var(--sev-critical)}
 .ls-stat-val.muted{color:var(--text-secondary)}
 .ls-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
 
 .ls-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
 .ls-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;border-left:4px solid var(--border);position:relative}
-.ls-card.healthy{border-left-color:var(--mitre-covered,#3fb950)}
-.ls-card.stale{border-left-color:var(--sev-medium,#d29922)}
-.ls-card.silent{border-left-color:var(--sev-critical,#f85149)}
+.ls-card.healthy{border-left-color:var(--mitre-covered)}
+.ls-card.stale{border-left-color:var(--sev-medium)}
+.ls-card.silent{border-left-color:var(--sev-critical)}
 .ls-card.never{border-left-color:var(--text-secondary)}
-.ls-card.error{border-left-color:var(--sev-high,#f0883e)}
+.ls-card.error{border-left-color:var(--sev-high)}
 .ls-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
 .ls-card-name{font-size:.95rem;font-weight:700;color:var(--text-primary);line-height:1.2}
 .ls-card-cat{font-size:.66rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
 .ls-card-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0}
-.ls-card-status.healthy{background:rgba(63,185,80,.15);color:var(--mitre-covered,#3fb950)}
-.ls-card-status.stale{background:rgba(210,153,34,.15);color:var(--sev-medium,#d29922)}
-.ls-card-status.silent{background:rgba(248,81,73,.18);color:var(--sev-critical,#f85149)}
+.ls-card-status.healthy{background:var(--mitre-covered-bg);color:var(--mitre-covered)}
+.ls-card-status.stale{background:var(--sev-medium-bg);color:var(--sev-medium)}
+.ls-card-status.silent{background:var(--sev-critical-bg);color:var(--sev-critical)}
 .ls-card-status.never{background:rgba(99,110,123,.18);color:var(--text-secondary)}
-.ls-card-status.error{background:rgba(240,136,62,.18);color:var(--sev-high,#f0883e)}
+.ls-card-status.error{background:var(--sev-high-bg);color:var(--sev-high)}
 .ls-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;font-size:.72rem;color:var(--text-secondary)}
 .ls-card-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
 .ls-card-actions{margin-top:10px;display:flex;gap:6px;justify-content:flex-end}
 .ls-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:3px 9px;border-radius:var(--radius);cursor:pointer;font-size:.7rem;font-weight:600}
 .ls-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
-.ls-iconbtn.danger:hover{border-color:var(--sev-critical,#f85149);color:var(--sev-critical,#f85149)}
+.ls-iconbtn.danger:hover{border-color:var(--sev-critical);color:var(--sev-critical)}
 
 /* Modal */
 .ls-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
@@ -152,7 +152,7 @@
 .ls-field label{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
 .ls-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
 .ls-banner{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:14px;font-size:.78rem;color:var(--text-secondary)}
-.ls-banner.warn{border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.1)}
+.ls-banner.warn{border-color:var(--sev-medium-dim);background:var(--sev-medium-bg)}
 
 @media (max-width: 768px) {
     .ls-summary { grid-template-columns: repeat(2, 1fr); }

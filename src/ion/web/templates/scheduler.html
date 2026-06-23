@@ -103,26 +103,26 @@
 
 .sch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
 .sch-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;border-left:4px solid var(--border);position:relative}
-.sch-card.ok{border-left-color:var(--mitre-covered,#3fb950)}
-.sch-card.err{border-left-color:var(--sev-critical,#f85149)}
+.sch-card.ok{border-left-color:var(--mitre-covered)}
+.sch-card.err{border-left-color:var(--sev-critical)}
 .sch-card.off{border-left-color:var(--text-secondary);opacity:.7}
-.sch-card.run{border-left-color:var(--sev-medium,#d29922)}
+.sch-card.run{border-left-color:var(--sev-medium)}
 
 .sch-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
 .sch-card-name{font-size:.95rem;font-weight:700;color:var(--text-primary);line-height:1.2}
 .sch-card-handler{font-size:.66rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;font-family:'JetBrains Mono',monospace}
 .sch-card-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0}
-.sch-card-status.ok{background:rgba(63,185,80,.15);color:var(--mitre-covered,#3fb950)}
-.sch-card-status.err{background:rgba(248,81,73,.18);color:var(--sev-critical,#f85149)}
+.sch-card-status.ok{background:var(--mitre-covered-bg);color:var(--mitre-covered)}
+.sch-card-status.err{background:var(--sev-critical-bg);color:var(--sev-critical)}
 .sch-card-status.off{background:rgba(99,110,123,.18);color:var(--text-secondary)}
-.sch-card-status.run{background:rgba(210,153,34,.18);color:var(--sev-medium,#d29922)}
+.sch-card-status.run{background:var(--sev-medium-bg);color:var(--sev-medium)}
 .sch-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;font-size:.72rem;color:var(--text-secondary)}
 .sch-card-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
 .sch-card-cron{grid-column:1/-1;font-family:'JetBrains Mono',monospace;background:var(--bg-tertiary);padding:4px 8px;border-radius:var(--radius);display:inline-block;width:fit-content}
 .sch-card-actions{margin-top:10px;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
 .sch-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:3px 9px;border-radius:var(--radius);cursor:pointer;font-size:.7rem;font-weight:600}
 .sch-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
-.sch-iconbtn.danger:hover{border-color:var(--sev-critical,#f85149);color:var(--sev-critical,#f85149)}
+.sch-iconbtn.danger:hover{border-color:var(--sev-critical);color:var(--sev-critical)}
 
 .sch-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
 .sch-modal-bg.show{display:flex}
@@ -140,12 +140,12 @@
 .sch-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
 
 .sch-exec-row{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;font-size:.78rem}
-.sch-exec-row.ok{border-left:4px solid var(--mitre-covered,#3fb950)}
-.sch-exec-row.err{border-left:4px solid var(--sev-critical,#f85149)}
-.sch-exec-row.run{border-left:4px solid var(--sev-medium,#d29922)}
+.sch-exec-row.ok{border-left:4px solid var(--mitre-covered)}
+.sch-exec-row.err{border-left:4px solid var(--sev-critical)}
+.sch-exec-row.run{border-left:4px solid var(--sev-medium)}
 .sch-exec-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--text-primary);font-weight:600}
 .sch-exec-meta{color:var(--text-secondary);font-family:'JetBrains Mono',monospace;font-size:.72rem}
-.sch-exec-err{color:var(--sev-critical,#f85149);margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:.72rem;white-space:pre-wrap;word-break:break-word}
+.sch-exec-err{color:var(--sev-critical);margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:.72rem;white-space:pre-wrap;word-break:break-word}
 
 @media (max-width: 768px) {
   .sch-grid { grid-template-columns: 1fr; }

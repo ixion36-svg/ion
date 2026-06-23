@@ -98,8 +98,8 @@
 .can-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
 .can-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center}
 .can-stat-val{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
-.can-stat-val.warn{color:var(--sev-medium,#d29922)}
-.can-stat-val.crit{color:var(--sev-critical,#f85149)}
+.can-stat-val.warn{color:var(--sev-medium)}
+.can-stat-val.crit{color:var(--sev-critical)}
 .can-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
 
 .can-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden}
@@ -112,18 +112,18 @@ table.can-table{width:100%;border-collapse:collapse}
 .can-table td{padding:10px 14px;border-bottom:1px solid var(--border);font-size:.85rem;color:var(--text-primary);vertical-align:middle}
 .can-table tr:last-child td{border-bottom:none}
 .can-table tr.fired td{background:rgba(248,81,73,.06)}
-.can-table tr.fired td:first-child{box-shadow:inset 3px 0 0 var(--sev-critical,#f85149)}
+.can-table tr.fired td:first-child{box-shadow:inset 3px 0 0 var(--sev-critical)}
 
 .can-pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary)}
-.can-pill.active{background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--mitre-covered,#3fb950)}
+.can-pill.active{background:rgba(63,185,80,.15);border-color:rgba(63,185,80,.4);color:var(--mitre-covered)}
 .can-pill.inactive{opacity:.6}
-.can-pill.burned{background:rgba(248,81,73,.15);border-color:rgba(248,81,73,.4);color:var(--sev-critical,#f85149)}
+.can-pill.burned{background:rgba(248,81,73,.15);border-color:rgba(248,81,73,.4);color:var(--sev-critical)}
 .can-pill.retired{opacity:.5}
 .can-value{font-family:'JetBrains Mono',monospace;font-size:.75rem;color:var(--text-secondary);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle}
 .can-actions{display:flex;gap:6px;justify-content:flex-end}
 .can-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:4px 10px;border-radius:var(--radius);cursor:pointer;font-size:.72rem;font-weight:600}
 .can-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
-.can-iconbtn.danger:hover{border-color:var(--sev-critical,#f85149);color:var(--sev-critical,#f85149)}
+.can-iconbtn.danger:hover{border-color:var(--sev-critical);color:var(--sev-critical)}
 
 /* Hits feed */
 .can-hit{padding:10px 16px;border-bottom:1px solid var(--border);font-size:.82rem}

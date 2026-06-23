@@ -478,14 +478,14 @@
     color: white;
     margin-left: 0.5rem;
 }
-.doc-type-SOP { background: #3b82f6; }
-.doc-type-SOI { background: #14b8a6; }
-.doc-type-WI { background: #6366f1; }
+.doc-type-SOP { background: var(--neon-blue); }
+.doc-type-SOI { background: var(--primary); }
+.doc-type-WI { background: var(--neon-purple); }
 .doc-type-KB { background: var(--success); }
-.doc-type-RUNBOOK { background: #a855f7; }
+.doc-type-RUNBOOK { background: var(--neon-purple); }
 .doc-type-IRP { background: var(--danger); }
 .doc-type-AAR { background: var(--neon-orange); }
-.doc-type-THREAT_ADVISORY { background: var(--warning); color: #1a1a1a; }
+.doc-type-THREAT_ADVISORY { background: var(--warning); color: var(--bg-deep); }
 .doc-type-DETECTION_RULE { background: var(--info); }
 .toolbar {
     display: flex;
@@ -503,19 +503,19 @@
 .doc-quill-wrap { display: flex; flex-direction: column; min-height: 400px; }
 .doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
 .doc-quill-wrap .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; max-height: 60vh; }
-.doc-quill-wrap .ql-editor { color: var(--text-primary, #f0f6fc); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
-.doc-quill-wrap .ql-editor.ql-blank::before { color: var(--text-secondary, #8b949e); font-style: normal; }
-.doc-quill-wrap .ql-snow .ql-stroke { stroke: var(--text-secondary, #8b949e); }
-.doc-quill-wrap .ql-snow .ql-fill { fill: var(--text-secondary, #8b949e); }
-.doc-quill-wrap .ql-snow .ql-picker-label { color: var(--text-secondary, #8b949e); }
+.doc-quill-wrap .ql-editor { color: var(--text-primary); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
+.doc-quill-wrap .ql-editor.ql-blank::before { color: var(--text-secondary); font-style: normal; }
+.doc-quill-wrap .ql-snow .ql-stroke { stroke: var(--text-secondary); }
+.doc-quill-wrap .ql-snow .ql-fill { fill: var(--text-secondary); }
+.doc-quill-wrap .ql-snow .ql-picker-label { color: var(--text-secondary); }
 .doc-quill-wrap .ql-snow .ql-picker-options { background: var(--bg-primary); border-color: var(--border); }
-.doc-quill-wrap .ql-snow .ql-picker-item { color: var(--text-primary, #f0f6fc); }
-.doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--accent, #00e5ff); }
-.doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--accent, #00e5ff); }
-.doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--text-primary, #f0f6fc); }
+.doc-quill-wrap .ql-snow .ql-picker-item { color: var(--text-primary); }
+.doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--primary); }
+.doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--primary); }
+.doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--text-primary); }
 .doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; }
-.doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--accent, #00e5ff); padding-left: 1rem; color: var(--text-secondary, #8b949e); }
-.doc-quill-wrap .ql-editor a { color: var(--accent, #00e5ff); }
+.doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--primary); padding-left: 1rem; color: var(--text-secondary); }
+.doc-quill-wrap .ql-editor a { color: var(--primary); }
 .doc-quill-wrap .ql-editor code { background: var(--bg-secondary); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
 </style>
 <script nonce="{{ csp_nonce }}">

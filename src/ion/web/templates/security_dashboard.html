@@ -254,14 +254,15 @@
 <style nonce="{{ csp_nonce }}">
 /* Security Dashboard Specific Styles */
 .security-banner {
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+    border: 1px solid var(--border);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
     margin-bottom: 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    color: white;
+    color: var(--text-bright);
 }
 
 .threat-level {
@@ -323,7 +324,7 @@
 
 .stat-card-critical { border-left: 4px solid var(--danger); }
 .stat-card-high { border-left: 4px solid var(--neon-orange); }
-.stat-card-blocked { border-left: 4px solid #9933cc; }
+.stat-card-blocked { border-left: 4px solid var(--neon-purple); }
 
 .stat-icon {
     font-size: 2rem;
@@ -390,7 +391,7 @@
 
 .list-item-count {
     background: var(--primary);
-    color: white;
+    color: var(--bg-deep);
     padding: 0.25rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
@@ -409,11 +410,11 @@
     text-transform: uppercase;
 }
 
-.severity-critical { background: var(--danger); color: white; }
-.severity-high { background: var(--neon-orange); color: white; }
-.severity-medium { background: var(--warning); color: #333; }
-.severity-low { background: var(--success); color: white; }
-.severity-info { background: var(--info); color: white; }
+.severity-critical { background: var(--danger); color: var(--text-bright); }
+.severity-high { background: var(--neon-orange); color: var(--bg-deep); }
+.severity-medium { background: var(--warning); color: var(--bg-deep); }
+.severity-low { background: var(--success); color: var(--bg-deep); }
+.severity-info { background: var(--info); color: var(--bg-deep); }
 
 .status-badge {
     padding: 0.25rem 0.5rem;
@@ -421,12 +422,12 @@
     font-size: 0.75rem;
 }
 
-.status-new { background: #e3f2fd; color: #1976d2; }
-.status-investigating { background: #fff3e0; color: #f57c00; }
-.status-confirmed { background: #ffebee; color: #d32f2f; }
-.status-false-positive { background: #f3e5f5; color: #7b1fa2; }
-.status-mitigated { background: #e8f5e9; color: #388e3c; }
-.status-resolved { background: #e0e0e0; color: #616161; }
+.status-new { background: rgba(96,165,250,.12); color: var(--neon-blue); }
+.status-investigating { background: rgba(248,179,58,.12); color: var(--warning); }
+.status-confirmed { background: rgba(255,108,108,.12); color: var(--danger); }
+.status-false-positive { background: rgba(154,140,255,.12); color: var(--neon-purple); }
+.status-mitigated { background: rgba(134,240,160,.12); color: var(--success); }
+.status-resolved { background: var(--bg-elevated); color: var(--text-muted); }
 
 .event-detail-grid {
     display: grid;
@@ -478,7 +479,7 @@
 .event-payload {
     margin-top: 1rem;
     padding: 1rem;
-    background: #1a1a2e;
+    background: var(--bg-deep);
     border-radius: 4px;
     border-left: 4px solid var(--danger);
 }
@@ -503,18 +504,18 @@
 
 .payload-label {
     font-size: 0.75rem;
-    color: #888;
+    color: var(--text-muted);
     text-transform: uppercase;
     margin-bottom: 0.5rem;
 }
 
 .payload-code {
-    background: #0d0d1a;
+    background: var(--bg-deep);
     padding: 0.75rem;
     border-radius: 4px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 0.8rem;
-    color: #e0e0e0;
+    color: var(--text-primary);
     overflow-x: auto;
     white-space: pre-wrap;
     word-break: break-all;
@@ -524,7 +525,7 @@
 }
 
 .payload-code.highlight-danger {
-    background: #2d1a1a;
+    background: var(--sev-high-bg, rgba(255,108,108,.12));
     border: 1px solid var(--danger);
     color: var(--danger);
 }
@@ -539,7 +540,7 @@
 }
 
 .matched-content code {
-    background: #2d1a1a;
+    background: rgba(255,108,108,.12);
     color: var(--danger);
     padding: 3px 8px;
     border-radius: 3px;

@@ -20,9 +20,9 @@
 .df-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--text-bright); margin: 0; }
 .df-toggle-group { display: flex; align-items: center; gap: 2px; background: var(--bg-secondary); padding: 4px; border-radius: var(--radius-lg); border: 1px solid var(--border); }
 .df-toggle-btn { padding: 8px 16px; border-radius: 8px; font-size: 10px; font-weight: 900; text-transform: uppercase; border: none; cursor: pointer; background: transparent; color: var(--text-secondary); transition: all .2s; display: flex; align-items: center; gap: 6px; }
-.df-toggle-btn.active-legacy { background: var(--danger); color: #fff; box-shadow: 0 4px 12px rgba(239,68,68,.3); }
-.df-toggle-btn.active-modern { background: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,.3); }
-.df-toggle-btn.active-compare { background: var(--info); color: #fff; box-shadow: 0 4px 12px rgba(14,165,233,.3); }
+.df-toggle-btn.active-legacy { background: var(--danger); color: var(--text-bright); box-shadow: 0 4px 12px rgba(239,68,68,.3); }
+.df-toggle-btn.active-modern { background: var(--success); color: var(--text-bright); box-shadow: 0 4px 12px rgba(16,185,129,.3); }
+.df-toggle-btn.active-compare { background: var(--info); color: var(--text-bright); box-shadow: 0 4px 12px rgba(14,165,233,.3); }
 .df-toggle-btn:hover:not(.active-legacy):not(.active-modern):not(.active-compare) { color: var(--text-primary); }
 
 /* Main grid */
@@ -36,8 +36,8 @@
 .df-node { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; }
 .df-node-btn { width: 48px; height: 48px; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: all .2s; background: var(--bg-card); color: var(--text-secondary); }
 .df-node-btn:hover { background: rgba(99,110,123,.3); }
-.df-node-btn.selected-legacy { background: var(--danger); color: #fff; transform: scale(1.1); box-shadow: 0 4px 16px rgba(239,68,68,.4); }
-.df-node-btn.selected-modern { background: var(--success); color: #fff; transform: scale(1.1); box-shadow: 0 4px 16px rgba(16,185,129,.4); }
+.df-node-btn.selected-legacy { background: var(--danger); color: var(--text-bright); transform: scale(1.1); box-shadow: 0 4px 16px rgba(239,68,68,.4); }
+.df-node-btn.selected-modern { background: var(--success); color: var(--text-bright); transform: scale(1.1); box-shadow: 0 4px 16px rgba(16,185,129,.4); }
 .df-node-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-secondary); transition: color .2s; }
 .df-node-label.selected { color: var(--text-bright); }
 
@@ -81,7 +81,7 @@
 .df-kibana-header span { font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; font-style: italic; }
 .df-kibana-toggle { display: flex; background: var(--bg-primary); border-radius: 6px; padding: 2px; border: 1px solid var(--border); }
 .df-kibana-toggle button { padding: 4px 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-secondary); }
-.df-kibana-toggle button.active { background: var(--info); color: #fff; }
+.df-kibana-toggle button.active { background: var(--info); color: var(--text-bright); }
 .df-kibana-body { padding: 16px; }
 
 /* Kibana table */

@@ -182,46 +182,46 @@
 .role-widget { display: block; cursor: pointer; }
 .role-widget-input { display: none; }
 .role-widget-card {
-  border: 2px solid rgba(255,255,255,0.06);
+  border: 2px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
-  background: rgba(15,23,42,0.6);
+  background: var(--bg-card);
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
 }
-.role-widget:hover .role-widget-card { border-color: rgba(255,255,255,0.12); background: rgba(15,23,42,0.8); }
+.role-widget:hover .role-widget-card { border-color: var(--border-bright); background: var(--bg-elevated); }
 .role-widget-input:checked ~ .role-widget-card {
-  border-color: var(--role-color, #6de4ff);
-  background: rgba(15,23,42,0.9);
-  box-shadow: 0 0 16px -4px var(--role-color, #6de4ff);
+  border-color: var(--role-color, var(--primary));
+  background: var(--bg-elevated);
+  box-shadow: 0 0 16px -4px var(--role-color, var(--primary));
 }
 .role-widget-header { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .role-widget-icon { font-size: 16px; }
 .role-widget-tier {
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
-  color: var(--role-color, #6de4ff); font-family: 'JetBrains Mono', monospace;
+  color: var(--role-color, var(--primary)); font-family: 'JetBrains Mono', monospace;
 }
 .role-widget-check {
-  margin-left: auto; font-size: 14px; color: var(--role-color, #6de4ff);
+  margin-left: auto; font-size: 14px; color: var(--role-color, var(--primary));
   opacity: 0; transition: opacity 0.2s;
 }
 .role-widget-input:checked ~ .role-widget-card .role-widget-check { opacity: 1; }
 .role-widget-name {
-  font-size: 13px; font-weight: 600; color: #e2e8f0; text-transform: capitalize;
+  font-size: 13px; font-weight: 600; color: var(--text-primary); text-transform: capitalize;
   margin-bottom: 2px;
 }
-.role-widget-desc { font-size: 11px; color: #64748b; line-height: 1.4; margin-bottom: 8px; }
+.role-widget-desc { font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-bottom: 8px; }
 .role-widget-caps { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
 .role-cap-pill {
   font-size: 9px; padding: 1px 6px; border-radius: 4px;
-  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.08);
-  color: #94a3b8; font-weight: 500;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border);
+  color: var(--text-secondary); font-weight: 500;
 }
 .role-widget-input:checked ~ .role-widget-card .role-cap-pill {
   background: color-mix(in srgb, var(--role-color) 10%, transparent);
   border-color: color-mix(in srgb, var(--role-color) 20%, transparent);
   color: var(--role-color);
 }
-.role-widget-perms { font-size: 10px; color: #475569; font-family: 'JetBrains Mono', monospace; }
+.role-widget-perms { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
 </style>
 <script nonce="{{ csp_nonce }}">
 let availableRoles = [];
