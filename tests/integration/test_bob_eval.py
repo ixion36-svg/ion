@@ -42,6 +42,10 @@ from ion.storage.database import _run_migrations, reset_engine
 def engine(tmp_path):
     db_path = tmp_path / "bob_eval_integration.db"
     eng = create_engine(f"sqlite:///{db_path}")
+    # Register the FULL model registry before create_all so every table exists
+    # regardless of test-collection order (the security middleware queries
+    # security_events on every request — a missing table 500s the whole app).
+    import ion.models  # noqa: F401
     Base.metadata.create_all(eng)
     try:
         _run_migrations(eng)

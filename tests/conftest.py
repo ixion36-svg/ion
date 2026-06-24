@@ -5,7 +5,13 @@ from pathlib import Path
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from ion.models.document import Base
+# Import the FULL model registry (not just one module) so every table is
+# registered on Base.metadata before any test's create_all() runs. Without this,
+# table creation depends on which models a given test happens to import first —
+# a fragile ordering that lets the security middleware's security_events query
+# (run on every request) hit a missing table and 500 in some collection orders.
+import ion.models  # noqa: F401
+from ion.models.base import Base
 from ion.storage.database import reset_engine
 
 
