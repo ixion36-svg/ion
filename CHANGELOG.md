@@ -1,13 +1,44 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.42.0 -->
+<!-- ion-doc:version=0.43.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-17 -->
+<!-- ion-doc:date=2026-06-24 -->
 
 # Changelog
+
+## v0.43.0 — 2026-06-24
+
+**Daily-work tracking (My Day / Team Day) + an app-wide visual consolidation onto a single component kit.**
+
+- **New — daily-work tracking.** A new `/daily-work` page gives each analyst a
+  "My Day" view (a self-tracking timeline that unions auto-derived ION activity
+  — cases opened/closed, investigations, curated audit events — with manually
+  logged entries) and leads a "Team Day" board (per-analyst status / current
+  focus / today's counts / last-active). Manual logging is one click via
+  predefined task chips (Meeting, Training, IR engagement, Threat hunt,
+  Documentation, Pairing, Admin/1:1, Break, Note) plus a free-text composer, and
+  a "Generate handover" action compiles the day into a paste-ready note. Framed
+  for handover & self-tracking, not surveillance.
+  - New models `WorkTaskType` (admin-configurable task taxonomy, lazy-seeded with
+    sensible defaults) and `WorkLogEntry` (user / timestamp / type / text).
+  - New authenticated routes `GET/POST /api/worklog/*`: the personal views are
+    gated by `alert:read` (any analyst sees their own day); the Team Day board is
+    gated by the existing `security:read` lead permission. No new permission is
+    introduced.
+- **Visual — app-wide re-skin onto a single component kit.** 28 pages that had
+  drifted to hardcoded off-brand colours (Tailwind defaults, Material light-mode
+  chips, GitHub-cyan, a bespoke navy-purple theme) were retuned to ION's design
+  tokens, and the legacy `.btn`/`.card`/`.badge`/`.table`/`.form-control` classes
+  were unified onto the canonical `ion-*` component layer in `ion-ui.css` (one
+  source of truth, app-faithful values, no behavioural change). CSS/template
+  only — no markup, JavaScript, route, permission, or schema change; CSP is
+  unchanged. Page-unique layouts (kanban board, case panel, analytics donuts)
+  keep their bespoke styling.
+- New tests: `tests/test_v043_worklog_models.py` + `tests/integration/test_worklog_api.py`.
+  Full suite green (1105 passed). Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.42.0 — 2026-06-17
 
