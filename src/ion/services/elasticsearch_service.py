@@ -134,76 +134,172 @@ def _proc_field(source: dict, *keys: str) -> Any:
     return None
 
 
+def _first(v: Any) -> Any:
+    """ES fields are often single-element arrays — collapse to a scalar."""
+    if isinstance(v, list):
+        return v[0] if v else None
+    return v
+
+
+def _proc_node(src: dict, prefix: str, role: str, is_alert: bool = False) -> Optional[Dict[str, Any]]:
+    """Build one process node from ``src`` at ``{prefix}.*`` (e.g. ``process`` or
+    ``process.parent``). Returns None when no process signal is present."""
+    name = _first(_proc_field(src, f"{prefix}.name"))
+    executable = _first(_proc_field(src, f"{prefix}.executable"))
+    pid = _first(_proc_field(src, f"{prefix}.pid"))
+    entity_id = _first(_proc_field(src, f"{prefix}.entity_id"))
+    parent_entity_id = _first(_proc_field(src, f"{prefix}.parent.entity_id"))
+    command_line = _first(_proc_field(src, f"{prefix}.command_line"))
+    # Alert process: fall back to the doc's top-level user as the owning user.
+    user = _first(_proc_field(src, f"{prefix}.user.name")) or (
+        _first(_proc_field(src, "user.name")) if is_alert else None
+    )
+    if not any([name, executable, pid, entity_id, command_line]):
+        return None
+    if not name and executable:
+        name = str(executable).replace("\\", "/").rsplit("/", 1)[-1]
+    return {
+        "role": role,
+        "is_alert": is_alert,
+        "name": name,
+        "executable": executable,
+        "pid": pid,
+        "entity_id": entity_id,
+        "parent_entity_id": parent_entity_id,
+        "command_line": command_line,
+        "user": user,
+    }
+
+
 def build_process_tree(source: Optional[dict]) -> Dict[str, Any]:
     """Build an *alert-local* process hierarchy from a single ES alert ``_source``.
 
-    ION queries the alerts index only (no raw process-events index), so the
-    chain is bounded by what the alert document itself carries: the alert's own
-    ``process.*``, its ``process.parent.*`` (and ``process.parent.parent.*`` when
+    The fallback path when no process-events index is configured: the chain is
+    bounded by what the alert document itself carries — the alert's own
+    ``process.*``, ``process.parent.*`` (and ``process.parent.parent.*`` when
     present). ``process.Ext.ancestry`` (Elastic Defend's entity-id list) records
-    the TRUE ancestry depth even when the intermediate processes aren't named in
-    the alert — surfaced as ``truncated_ancestors`` so the UI can say "+N earlier
+    the TRUE ancestry depth even when intermediate processes aren't named in the
+    alert — surfaced as ``truncated_ancestors`` so the UI can say "+N earlier
     ancestors (not in alert data)" rather than implying the chain is complete.
-
-    Returns ordered root→leaf ``nodes`` with the alert's own process flagged
-    ``is_alert``. ``available`` is False when the alert has no process context.
     """
     src = source or {}
-
-    def node(prefix: str, role: str, is_alert: bool = False) -> Optional[Dict[str, Any]]:
-        name = _proc_field(src, f"{prefix}.name")
-        executable = _proc_field(src, f"{prefix}.executable")
-        pid = _proc_field(src, f"{prefix}.pid")
-        entity_id = _proc_field(src, f"{prefix}.entity_id")
-        command_line = _proc_field(src, f"{prefix}.command_line")
-        # Alert process only: fall back to top-level user for the owning user.
-        user = _proc_field(src, f"{prefix}.user.name") or (
-            _proc_field(src, "user.name") if is_alert else None
-        )
-        if not any([name, executable, pid, entity_id, command_line]):
-            return None
-        if not name and executable:
-            name = str(executable).replace("\\", "/").rsplit("/", 1)[-1]
-        return {
-            "role": role,
-            "is_alert": is_alert,
-            "name": name,
-            "executable": executable,
-            "pid": pid,
-            "entity_id": entity_id,
-            "command_line": command_line,
-            "user": user,
-        }
-
     ordered = [
         n
         for n in (
-            node("process.parent.parent", "grandparent"),
-            node("process.parent", "parent"),
-            node("process", "alert", is_alert=True),
+            _proc_node(src, "process.parent.parent", "grandparent"),
+            _proc_node(src, "process.parent", "parent"),
+            _proc_node(src, "process", "alert", is_alert=True),
         )
         if n
     ]
     if not ordered:
         return {
-            "available": False,
-            "nodes": [],
-            "ancestry_depth": 0,
-            "truncated_ancestors": 0,
-            "source": "alert-local",
+            "available": False, "nodes": [], "children": [],
+            "ancestry_depth": 0, "truncated_ancestors": 0, "mode": "alert-local",
         }
     for level, n in enumerate(ordered):
         n["level"] = level
-
     ancestry = _proc_field(src, "process.Ext.ancestry")
     ancestry_depth = len(ancestry) if isinstance(ancestry, list) else 0
     named_ancestors = sum(1 for n in ordered if not n["is_alert"])
     return {
         "available": True,
         "nodes": ordered,
+        "children": [],
         "ancestry_depth": ancestry_depth,
         "truncated_ancestors": max(0, ancestry_depth - named_ancestors),
-        "source": "alert-local",
+        "mode": "alert-local",
+    }
+
+
+def assemble_full_process_tree(
+    alert_source: Optional[dict], event_docs: Optional[List[dict]]
+) -> Dict[str, Any]:
+    """Build the *full* process explorer from resolved process-event docs.
+
+    The Kibana-analyzer-style path, used when a process-events index is wired
+    (``ION_ES_PROCESS_EVENTS_INDEX``). ``event_docs`` are the ``_source`` dicts of
+    process events resolved by entity-id; this walks the alert's
+    ``process.Ext.ancestry`` (parent-first) into a NAMED root→leaf chain, flags
+    the alert's own process, and attaches the alert process's direct children
+    (events whose ``process.parent.entity_id`` == the alert process entity-id).
+    Falls back to the alert-local view when there's nothing to resolve.
+    """
+    src = alert_source or {}
+    alert_entity = _first(_proc_field(src, "process.entity_id"))
+    ancestry = _proc_field(src, "process.Ext.ancestry")
+    ancestry = [a for a in ancestry if a] if isinstance(ancestry, list) else []
+
+    # Index resolved events by entity-id; collect direct children of the alert.
+    by_entity: Dict[str, Dict[str, Any]] = {}
+    children: List[Dict[str, Any]] = []
+    for ev in event_docs or []:
+        n = _proc_node(ev, "process", "ancestor")
+        if not n:
+            continue
+        if n["entity_id"]:
+            by_entity[n["entity_id"]] = n
+        if (
+            alert_entity
+            and n.get("parent_entity_id") == alert_entity
+            and n["entity_id"] != alert_entity
+        ):
+            child = dict(n)
+            child["role"] = "child"
+            children.append(child)
+
+    alert_node = _proc_node(src, "process", "alert", is_alert=True)
+
+    ancestors: List[Dict[str, Any]] = []
+    unresolved = 0
+    for aid in ancestry:  # parent-first in ECS
+        resolved = by_entity.get(aid)
+        if resolved:
+            node = dict(resolved)
+            node["role"] = "ancestor"
+            ancestors.append(node)
+        else:
+            unresolved += 1
+    ancestors.reverse()  # → root … parent
+
+    # No ancestry list (non-Defend alert): use the alert doc's own parent chain.
+    if not ancestors and not ancestry:
+        for pfx, role in (("process.parent.parent", "grandparent"), ("process.parent", "parent")):
+            pn = _proc_node(src, pfx, role)
+            if pn:
+                ancestors.append(pn)
+
+    chain = [n for n in ancestors if n]
+    if alert_node:
+        chain.append(alert_node)
+    if not chain:
+        return {
+            "available": False, "nodes": [], "children": [],
+            "ancestry_depth": len(ancestry), "truncated_ancestors": 0, "mode": "events-index",
+        }
+    for level, n in enumerate(chain):
+        n["level"] = level
+
+    # De-dup children by entity-id; seat them one level below the alert process.
+    alert_level = chain[-1]["level"]
+    seen: set = set()
+    kids: List[Dict[str, Any]] = []
+    for c in children:
+        eid = c.get("entity_id")
+        if eid and eid in seen:
+            continue
+        if eid:
+            seen.add(eid)
+        c["level"] = alert_level + 1
+        kids.append(c)
+
+    return {
+        "available": True,
+        "nodes": chain,
+        "children": kids,
+        "ancestry_depth": len(ancestry),
+        "truncated_ancestors": unresolved,
+        "mode": "events-index",
     }
 
 
@@ -352,6 +448,13 @@ class ElasticsearchService:
         self.alert_index = alert_index or config.get("alert_index", ".alerts-security.alerts-*,alerts-*")
         self.case_index = case_index or config.get("case_index", "ion-cases")
         self.kfp_index = config.get("kfp_index", "ion-kfp")
+        # Optional raw process-events index for the full process explorer
+        # (Kibana-analyzer-style ancestry/children resolution). Empty = off, in
+        # which case the explorer degrades to the alert-local tree.
+        self.process_events_index = (
+            config.get("process_events_index")
+            or os.environ.get("ION_ES_PROCESS_EVENTS_INDEX", "")
+        )
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
         # User mapping for alert assignment
         self.user_index = config.get("user_index", "")
@@ -1305,6 +1408,52 @@ class ElasticsearchService:
 
         except ElasticsearchError as e:
             logger.warning("Failed to fetch building blocks for %s: %s", alert_id, e)
+            return []
+
+    async def resolve_process_event_docs(
+        self, entity_ids: List[str], parent_entity_id: Optional[str]
+    ) -> List[Dict[str, Any]]:
+        """Resolve process-event ``_source`` docs from the configured events index.
+
+        Used by the full process explorer to (a) name the ancestry chain by
+        ``process.entity_id`` and (b) find the alert process's direct children by
+        ``process.parent.entity_id``. Returns ``[]`` when no events index is
+        configured or on any query error — the caller then falls back to the
+        alert-local tree.
+        """
+        if not self.process_events_index:
+            return []
+        should: List[Dict[str, Any]] = []
+        ids = [e for e in (entity_ids or []) if e]
+        if ids:
+            should.append({"terms": {"process.entity_id": ids}})
+        if parent_entity_id:
+            should.append({"term": {"process.parent.entity_id": parent_entity_id}})
+        if not should:
+            return []
+        try:
+            result = await self._request(
+                "POST",
+                f"/{self.process_events_index}/_search"
+                "?ignore_unavailable=true&expand_wildcards=open,hidden",
+                json={
+                    "size": 200,
+                    "sort": [{"@timestamp": {"order": "asc"}}],
+                    "_source": [
+                        "process.name", "process.executable", "process.pid",
+                        "process.entity_id", "process.command_line",
+                        "process.parent.entity_id", "process.user.name", "user.name",
+                    ],
+                    "query": {"bool": {"should": should, "minimum_should_match": 1}},
+                },
+            )
+            return [
+                hit.get("_source", {})
+                for hit in result.get("hits", {}).get("hits", [])
+                if hit.get("_source")
+            ]
+        except ElasticsearchError as e:
+            logger.warning("Process-event resolution failed (%s): %s", self.process_events_index, e)
             return []
 
     async def get_related_alerts(

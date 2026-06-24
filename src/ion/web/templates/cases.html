@@ -1393,6 +1393,10 @@
     background: rgba(109, 228, 255, 0.06);
     border-radius: 0 6px 6px 0;
 }
+.cpanel-proc-node.is-child {
+    margin-left: 1.15rem;
+    border-left-style: dashed;
+}
 .cpanel-proc-node-head {
     display: flex;
     align-items: center;
@@ -2900,10 +2904,13 @@ async function toggleAlertFields(alertId, fieldsId) {
 // returned by /api/elasticsearch/alerts/{id}/process-tree. ION queries the
 // alerts index only, so depth is bounded by the alert doc; truncated_ancestors
 // reports how many earlier ancestors exist by entity-id but aren't named here.
-function _procNodeHtml(n, idx) {
-    const cls = n.is_alert ? 'cpanel-proc-node is-alert' : 'cpanel-proc-node';
+function _procNodeHtml(n, idx, isChild) {
+    let cls = 'cpanel-proc-node';
+    if (n.is_alert) cls += ' is-alert';
+    if (isChild || n.role === 'child') cls += ' is-child';
     const roleLabel = n.is_alert ? 'this alert'
-        : (n.role === 'grandparent' ? 'ancestor' : (n.role || 'process'));
+        : (n.role === 'grandparent' ? 'ancestor'
+        : (n.role === 'child' ? 'child' : (n.role || 'process')));
     const meta = [];
     if (n.pid !== null && n.pid !== undefined && n.pid !== '') meta.push('PID ' + esc(String(n.pid)));
     if (n.user) meta.push(esc(String(n.user)));
@@ -2931,6 +2938,11 @@ function renderProcessTree(data) {
            + (tr !== 1 ? 's' : '') + ' (entity IDs only — not in alert data)</div>';
     }
     data.nodes.forEach((n, i) => { h += _procNodeHtml(n, i); });
+    const kids = data.children || [];
+    if (kids.length) {
+        const base = data.nodes.length;
+        kids.forEach((c, j) => { h += _procNodeHtml(c, base + j, true); });
+    }
     return h;
 }
 

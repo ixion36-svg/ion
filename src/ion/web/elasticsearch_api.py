@@ -22,6 +22,9 @@ from ion.models.user import User
 from ion.services.elasticsearch_service import (
     ElasticsearchError,
     ElasticsearchService,
+    _first,
+    _proc_field,
+    assemble_full_process_tree,
     build_process_tree,
 )
 from ion.storage.database import get_db_session
@@ -331,7 +334,23 @@ async def get_alert_process_tree(
     alerts = await service.get_alerts_by_ids([alert_id])
     if not alerts:
         raise HTTPException(status_code=404, detail="Alert not found")
-    return build_process_tree(alerts[0].raw_data)
+    raw = alerts[0].raw_data
+
+    # Full analyzer path: when a process-events index is wired, resolve the named
+    # ancestry chain + direct children by entity-id. Degrade to the alert-local
+    # tree if nothing resolves (no entity-id, no events, or the query errors).
+    if service.process_events_index:
+        alert_entity = _first(_proc_field(raw, "process.entity_id"))
+        ancestry = _proc_field(raw, "process.Ext.ancestry")
+        ancestry = [a for a in ancestry if a] if isinstance(ancestry, list) else []
+        entity_ids = ([alert_entity] if alert_entity else []) + ancestry
+        if entity_ids:
+            docs = await service.resolve_process_event_docs(entity_ids, alert_entity)
+            if docs:
+                tree = assemble_full_process_tree(raw, docs)
+                if tree.get("available"):
+                    return tree
+    return build_process_tree(raw)
 
 @router.get("/elasticsearch/alerts/systems")
 async def get_alert_systems(

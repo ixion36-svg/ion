@@ -79,3 +79,67 @@ def test_nested_source_shape_supported():
 
 def test_none_source_safe():
     assert build_process_tree(None)["available"] is False
+
+
+# ── full events-index analyzer (assemble_full_process_tree) ──────────────────
+from ion.services.elasticsearch_service import assemble_full_process_tree  # noqa: E402
+
+
+def _ev(eid, name, parent=None, pid=None):
+    d = {"process.entity_id": eid, "process.name": name}
+    if parent:
+        d["process.parent.entity_id"] = parent
+    if pid:
+        d["process.pid"] = pid
+    return d
+
+
+def test_full_tree_resolves_named_ancestry_and_children():
+    alert = {
+        "process.entity_id": "P3",
+        "process.name": "powershell.exe",
+        "process.Ext.ancestry": ["P2", "P1"],  # parent-first
+    }
+    events = [
+        _ev("P1", "explorer.exe"),
+        _ev("P2", "cmd.exe", parent="P1"),
+        _ev("P3", "powershell.exe", parent="P2"),
+        _ev("P4", "evil.exe", parent="P3"),   # child of the alert process
+        _ev("P9", "unrelated.exe", parent="PX"),
+    ]
+    tree = assemble_full_process_tree(alert, events)
+    assert tree["available"] is True
+    assert tree["mode"] == "events-index"
+    # root → … → alert, named from the events index
+    assert [n["name"] for n in tree["nodes"]] == ["explorer.exe", "cmd.exe", "powershell.exe"]
+    assert [n["role"] for n in tree["nodes"]] == ["ancestor", "ancestor", "alert"]
+    assert tree["nodes"][-1]["is_alert"] is True
+    assert tree["truncated_ancestors"] == 0
+    # direct child attached one level below the alert process
+    assert [c["name"] for c in tree["children"]] == ["evil.exe"]
+    assert tree["children"][0]["level"] == tree["nodes"][-1]["level"] + 1
+
+
+def test_full_tree_counts_unresolved_ancestors():
+    alert = {
+        "process.entity_id": "P3",
+        "process.name": "rundll32.exe",
+        "process.Ext.ancestry": ["P2", "P1", "P0"],
+    }
+    # only P2 resolves; P1 and P0 are not in the events index
+    events = [_ev("P2", "cmd.exe", parent="P1"), _ev("P3", "rundll32.exe", parent="P2")]
+    tree = assemble_full_process_tree(alert, events)
+    assert [n["name"] for n in tree["nodes"]] == ["cmd.exe", "rundll32.exe"]
+    assert tree["truncated_ancestors"] == 2
+
+
+def test_full_tree_falls_back_to_alert_parent_chain_without_ancestry():
+    alert = {
+        "process.entity_id": "P3",
+        "process.name": "mshta.exe",
+        "process.parent.name": "winword.exe",
+    }
+    tree = assemble_full_process_tree(alert, [])
+    assert [n["role"] for n in tree["nodes"]] == ["parent", "alert"]
+    assert tree["children"] == []
+
