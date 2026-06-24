@@ -1453,7 +1453,13 @@ class ElasticsearchService:
                 if hit.get("_source")
             ]
         except ElasticsearchError as e:
-            logger.warning("Process-event resolution failed (%s): %s", self.process_events_index, e)
+            # Log only the exception TYPE, never the exception body — an ES error
+            # can carry the request URL/auth, and clear-text-logging that would
+            # leak credentials (CodeQL py/clear-text-logging-sensitive-data).
+            logger.warning(
+                "Process-event resolution failed for index %r (%s)",
+                self.process_events_index, type(e).__name__,
+            )
             return []
 
     async def get_related_alerts(
