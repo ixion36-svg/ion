@@ -1361,6 +1361,34 @@
 .cpanel-alert-showall:hover { text-decoration: underline; }
 .cpanel-alert-fields-all { margin-top: 0.2rem; }
 
+/* Rule guide (detection rule description + investigation guide) */
+.cpanel-rule-guide-box { margin-top: 0.35rem; }
+.cpanel-rule-desc {
+    font-size: 0.72rem;
+    color: var(--text-secondary, #94a3b8);
+    line-height: 1.5;
+    padding: 0.45rem 0.6rem;
+    background: var(--bg-secondary, #11141c);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 6px;
+}
+.cpanel-rule-guide-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #64748b);
+    margin: 0.5rem 0 0.25rem;
+}
+.cpanel-rule-guide {
+    font-size: 0.74rem;
+    color: var(--text-primary, #cbd5e1);
+    padding: 0.45rem 0.6rem;
+    background: var(--bg-secondary, #11141c);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-left: 2px solid var(--primary, #6de4ff);
+    border-radius: 0 6px 6px 0;
+}
+
 /* Process explorer (alert-local process hierarchy) */
 .cpanel-proc-toggle {
     margin-top: 0.4rem;
@@ -1425,6 +1453,20 @@
     border-color: rgba(109, 228, 255, 0.35);
 }
 .cpanel-proc-meta { font-size: 0.62rem; color: var(--text-muted, #64748b); }
+.cpanel-proc-actions { margin-left: auto; display: inline-flex; gap: 0.2rem; flex: none; }
+.cpanel-proc-act {
+    background: none;
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 4px;
+    color: var(--text-muted, #64748b);
+    cursor: pointer;
+    padding: 0.1rem 0.3rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+}
+.cpanel-proc-act:hover { color: var(--primary, #6de4ff); border-color: var(--border-bright, rgba(109,228,255,0.35)); }
+.cpanel-proc-act i { width: 0.72rem; height: 0.72rem; }
 .cpanel-proc-cmd {
     font-family: 'JetBrains Mono', ui-monospace, monospace;
     font-size: 0.65rem;
@@ -2899,12 +2941,64 @@ async function toggleAlertFields(alertId, fieldsId) {
     }
 }
 
+// ── Rule guide ──────────────────────────────────────────────────────────────
+// Surfaces the detection rule's description + investigation guide (Kibana rule
+// `note`, markdown) to the analyst — the same context now fed to Bob. The guide
+// is rendered through safeMarkdown (marked + DOMPurify); description is esc()'d.
+function renderRuleGuide(raw) {
+    const flat = (typeof flattenAlertFields === 'function') ? flattenAlertFields(raw) : (raw || {});
+    const desc = flat['kibana.alert.rule.description'] || flat['signal.rule.description']
+        || flat['rule.description'] || '';
+    const guide = flat['kibana.alert.rule.note'] || flat['kibana.alert.rule.parameters.note']
+        || flat['signal.rule.note'] || flat['rule.note'] || '';
+    if (!desc && !guide) {
+        return '<div class="cpanel-alert-fields-empty">No rule description or investigation guide on this alert.</div>';
+    }
+    let h = '';
+    if (desc) h += '<div class="cpanel-rule-desc">' + esc(String(desc)) + '</div>';
+    if (guide) {
+        const md = (typeof safeMarkdown === 'function') ? safeMarkdown(String(guide)) : esc(String(guide));
+        h += '<div class="cpanel-rule-guide-label">Investigation guide</div>'
+           + '<div class="cpanel-note-markdown cpanel-rule-guide">' + md + '</div>';
+    }
+    return h;
+}
+
+async function toggleRuleGuide(alertId, rgId) {
+    const el = document.getElementById(rgId);
+    if (!el) return;
+    if (!el.hasAttribute('hidden')) { el.setAttribute('hidden', ''); return; }
+    el.removeAttribute('hidden');
+    if (el.dataset.loaded === '1') return;
+    el.innerHTML = '<div class="cpanel-alert-fields-loading">Loading rule guide…</div>';
+    try {
+        const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw');
+        if (r.status === 503) {
+            el.innerHTML = '<div class="cpanel-alert-fields-empty">Rule guide needs a live Elasticsearch connection.</div>';
+            el.dataset.loaded = '1';
+            return;
+        }
+        const data = await r.json().catch(() => ({}));
+        el.innerHTML = (data && data.raw_data)
+            ? renderRuleGuide(data.raw_data)
+            : '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
+        el.dataset.loaded = '1';
+    } catch (e) {
+        el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load rule guide: '
+            + esc(String((e && e.message) || e)) + '</div>';
+    }
+}
+
 // ── Process explorer ────────────────────────────────────────────────────────
 // Renders the alert-local process hierarchy (grandparent → parent → THIS ALERT)
 // returned by /api/elasticsearch/alerts/{id}/process-tree. ION queries the
 // alerts index only, so depth is bounded by the alert doc; truncated_ancestors
 // reports how many earlier ancestors exist by entity-id but aren't named here.
-function _procNodeHtml(n, idx, isChild) {
+// Command lines stashed by key so the Copy action never has to round-trip
+// quote-heavy text through a data-* attribute.
+const _procCmdById = {};
+
+function _procNodeHtml(n, idx, isChild, caseId) {
     let cls = 'cpanel-proc-node';
     if (n.is_alert) cls += ' is-alert';
     if (isChild || n.role === 'child') cls += ' is-child';
@@ -2921,13 +3015,31 @@ function _procNodeHtml(n, idx, isChild) {
     h += '<span class="cpanel-proc-name">' + esc(n.name || n.executable || '(unknown)') + '</span>';
     h += '<span class="cpanel-proc-role">' + esc(roleLabel) + '</span>';
     if (meta.length) h += '<span class="cpanel-proc-meta">' + meta.join(' &middot; ') + '</span>';
+    // Node actions: pin the process as case evidence, copy its command line.
+    const acts = [];
+    if (caseId) {
+        const label = n.name || n.executable || 'process';
+        const pinTitle = ('Process: ' + label + (n.pid != null && n.pid !== '' ? ' (PID ' + n.pid + ')' : ''))
+            .replace(/["'\\]/g, '');
+        acts.push('<button type="button" class="cpanel-proc-act" title="Pin as case evidence" '
+            + 'data-click-action="pinProcessToCase" data-args=\'[' + caseId + ',"' + esc(pinTitle) + '"]\'>'
+            + '<i class="icon-bookmark"></i></button>');
+    }
+    if (n.command_line) {
+        const key = 'pc-' + (isChild ? 'c' : 'n') + '-' + idx;
+        _procCmdById[key] = String(n.command_line);
+        acts.push('<button type="button" class="cpanel-proc-act" title="Copy command line" '
+            + 'data-click-action="copyProcCmd" data-args=\'["' + key + '"]\'>'
+            + '<i class="icon-copy"></i></button>');
+    }
+    if (acts.length) h += '<span class="cpanel-proc-actions">' + acts.join('') + '</span>';
     h += '</div>';
     if (n.command_line) h += '<div class="cpanel-proc-cmd">' + esc(String(n.command_line)) + '</div>';
     h += '</div>';
     return h;
 }
 
-function renderProcessTree(data) {
+function renderProcessTree(data, caseId) {
     if (!data || !data.available || !((data.nodes || []).length)) {
         return '<div class="cpanel-alert-fields-empty">No process context on this alert.</div>';
     }
@@ -2937,18 +3049,18 @@ function renderProcessTree(data) {
         h += '<div class="cpanel-proc-trunc">+' + tr + ' earlier ancestor'
            + (tr !== 1 ? 's' : '') + ' (entity IDs only — not in alert data)</div>';
     }
-    data.nodes.forEach((n, i) => { h += _procNodeHtml(n, i); });
+    data.nodes.forEach((n, i) => { h += _procNodeHtml(n, i, false, caseId); });
     const kids = data.children || [];
     if (kids.length) {
         const base = data.nodes.length;
-        kids.forEach((c, j) => { h += _procNodeHtml(c, base + j, true); });
+        kids.forEach((c, j) => { h += _procNodeHtml(c, base + j, true, caseId); });
     }
     return h;
 }
 
 // Toggle (and lazy-load) a linked alert's process tree. No leading event param
 // (event-delegation.js applies data-args directly).
-async function toggleProcessTree(alertId, ptId) {
+async function toggleProcessTree(alertId, ptId, caseId) {
     const el = document.getElementById(ptId);
     if (!el) return;
     if (!el.hasAttribute('hidden')) { el.setAttribute('hidden', ''); return; }
@@ -2963,11 +3075,40 @@ async function toggleProcessTree(alertId, ptId) {
             return;
         }
         const data = await r.json().catch(() => ({}));
-        el.innerHTML = renderProcessTree(data);
+        el.innerHTML = renderProcessTree(data, caseId);
         el.dataset.loaded = '1';
     } catch (e) {
         el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load process tree: '
             + esc(String((e && e.message) || e)) + '</div>';
+    }
+}
+
+// Pin a process node to the case workbench as evidence (reuses the pins API).
+async function pinProcessToCase(caseId, title) {
+    try {
+        const resp = await fetch('/api/alert-cases/' + caseId + '/pins', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_type: 'note', source_ref: '', title: title, severity: null }),
+        });
+        if (!resp.ok) throw new Error('pin failed');
+        if (typeof loadWorkbench === 'function') loadWorkbench(caseId);
+        if (typeof showToast === 'function') showToast('Pinned process as evidence');
+    } catch (e) {
+        if (typeof showToast === 'function') showToast('Pin failed', 'error');
+        else alert('Pin failed');
+    }
+}
+
+// Copy a process node's command line to the clipboard.
+function copyProcCmd(key) {
+    const cmd = _procCmdById[key];
+    if (!cmd) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(cmd).then(
+            () => { if (typeof showToast === 'function') showToast('Command line copied'); },
+            () => { if (typeof showToast === 'function') showToast('Copy failed', 'error'); }
+        );
     }
 }
 
@@ -3213,10 +3354,17 @@ function renderPanelContent(c) {
                 + '</div>';
             // Lazy-loaded flattened-fields dropdown (hidden until expanded).
             html += '<div class="cpanel-alert-fields" id="' + fieldsId + '" hidden></div>';
+            // Rule guide: the detection rule's description + investigation guide
+            // (the same context now fed to Bob), shown to the analyst (lazy-loaded).
+            const rgId = 'rule-guide-' + idx;
+            html += '<button type="button" class="cpanel-proc-toggle" '
+                +   'data-click-action="toggleRuleGuide" data-args=\'["' + esc(alertId) + '","' + rgId + '"]\'>'
+                +   '<i class="icon-book-open"></i> Rule guide</button>';
+            html += '<div class="cpanel-rule-guide-box" id="' + rgId + '" hidden></div>';
             // Process explorer: alert-local process hierarchy (lazy-loaded).
             const ptId = 'proc-tree-' + idx;
             html += '<button type="button" class="cpanel-proc-toggle" '
-                +   'data-click-action="toggleProcessTree" data-args=\'["' + esc(alertId) + '","' + ptId + '"]\'>'
+                +   'data-click-action="toggleProcessTree" data-args=\'["' + esc(alertId) + '","' + ptId + '",' + c.id + ']\'>'
                 +   '<i class="icon-git-branch"></i> Process tree</button>';
             html += '<div class="cpanel-proc-tree" id="' + ptId + '" hidden></div>';
             // Alert meta row
