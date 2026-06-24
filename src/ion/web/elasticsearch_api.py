@@ -19,7 +19,11 @@ from ion.auth.dependencies import get_current_user, require_permission
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.safe_errors import safe_error
 from ion.models.user import User
-from ion.services.elasticsearch_service import ElasticsearchError, ElasticsearchService
+from ion.services.elasticsearch_service import (
+    ElasticsearchError,
+    ElasticsearchService,
+    build_process_tree,
+)
 from ion.storage.database import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -307,6 +311,27 @@ async def get_alert_sequence(
         raise HTTPException(status_code=503, detail="Elasticsearch is not configured")
     blocks = await service.get_building_blocks(alert_id)
     return {"events": blocks, "count": len(blocks)}
+
+@router.get("/elasticsearch/alerts/{alert_id}/process-tree")
+async def get_alert_process_tree(
+    alert_id: str,
+    current_user: User = Depends(require_permission("alert:read")),
+):
+    """Build the alert-local process hierarchy (process explorer) for one alert.
+
+    Returns an ordered root→leaf chain (grandparent → parent → the alert's own
+    process, flagged ``is_alert``) derived from the alert ``_source``, plus an
+    ``ancestry_depth`` / ``truncated_ancestors`` count from
+    ``process.Ext.ancestry`` so the UI can show how many earlier ancestors exist
+    that aren't named in the alert document.
+    """
+    service = get_elasticsearch_service()
+    if not service.is_configured:
+        raise HTTPException(status_code=503, detail="Elasticsearch is not configured")
+    alerts = await service.get_alerts_by_ids([alert_id])
+    if not alerts:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    return build_process_tree(alerts[0].raw_data)
 
 @router.get("/elasticsearch/alerts/systems")
 async def get_alert_systems(

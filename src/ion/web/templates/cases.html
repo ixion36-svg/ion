@@ -1360,6 +1360,76 @@
 }
 .cpanel-alert-showall:hover { text-decoration: underline; }
 .cpanel-alert-fields-all { margin-top: 0.2rem; }
+
+/* Process explorer (alert-local process hierarchy) */
+.cpanel-proc-toggle {
+    margin-top: 0.4rem;
+    background: none;
+    border: none;
+    color: var(--primary, #6de4ff);
+    font-size: 0.68rem;
+    cursor: pointer;
+    padding: 0.15rem 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+.cpanel-proc-toggle:hover { text-decoration: underline; }
+.cpanel-proc-toggle i { width: 0.8rem; height: 0.8rem; }
+.cpanel-proc-tree { margin-top: 0.35rem; padding-left: 0.1rem; }
+.cpanel-proc-trunc {
+    font-size: 0.65rem;
+    color: var(--text-muted, #64748b);
+    font-style: italic;
+    margin-bottom: 0.3rem;
+}
+.cpanel-proc-node {
+    border-left: 2px solid var(--border, rgba(255,255,255,0.08));
+    padding: 0.3rem 0 0.3rem 0.55rem;
+    margin-left: 0.15rem;
+}
+.cpanel-proc-node.is-alert {
+    border-left-color: var(--primary, #6de4ff);
+    background: rgba(109, 228, 255, 0.06);
+    border-radius: 0 6px 6px 0;
+}
+.cpanel-proc-node-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+}
+.cpanel-proc-branch { width: 0.75rem; height: 0.75rem; color: var(--text-muted, #64748b); flex: none; }
+.cpanel-proc-ic { width: 0.8rem; height: 0.8rem; color: var(--text-secondary, #94a3b8); flex: none; }
+.cpanel-proc-name {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.74rem;
+    color: var(--text-primary, #cbd5e1);
+}
+.cpanel-proc-node.is-alert .cpanel-proc-name { color: var(--text-bright, #fff); font-weight: 600; }
+.cpanel-proc-role {
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted, #64748b);
+    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border-radius: 4px;
+    padding: 0 0.3rem;
+}
+.cpanel-proc-node.is-alert .cpanel-proc-role {
+    color: var(--primary, #6de4ff);
+    border-color: rgba(109, 228, 255, 0.35);
+}
+.cpanel-proc-meta { font-size: 0.62rem; color: var(--text-muted, #64748b); }
+.cpanel-proc-cmd {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 0.65rem;
+    color: var(--text-secondary, #94a3b8);
+    margin-top: 0.2rem;
+    word-break: break-all;
+    white-space: pre-wrap;
+    line-height: 1.35;
+}
 .cpanel-alert-extracted {
     margin-bottom: 0.5rem;
     padding-bottom: 0.45rem;
@@ -2825,6 +2895,70 @@ async function toggleAlertFields(alertId, fieldsId) {
     }
 }
 
+// ── Process explorer ────────────────────────────────────────────────────────
+// Renders the alert-local process hierarchy (grandparent → parent → THIS ALERT)
+// returned by /api/elasticsearch/alerts/{id}/process-tree. ION queries the
+// alerts index only, so depth is bounded by the alert doc; truncated_ancestors
+// reports how many earlier ancestors exist by entity-id but aren't named here.
+function _procNodeHtml(n, idx) {
+    const cls = n.is_alert ? 'cpanel-proc-node is-alert' : 'cpanel-proc-node';
+    const roleLabel = n.is_alert ? 'this alert'
+        : (n.role === 'grandparent' ? 'ancestor' : (n.role || 'process'));
+    const meta = [];
+    if (n.pid !== null && n.pid !== undefined && n.pid !== '') meta.push('PID ' + esc(String(n.pid)));
+    if (n.user) meta.push(esc(String(n.user)));
+    let h = '<div class="' + cls + '">';
+    h += '<div class="cpanel-proc-node-head">';
+    if (idx > 0) h += '<i class="icon-corner-down-right cpanel-proc-branch"></i>';
+    h += '<i class="icon-cpu cpanel-proc-ic"></i>';
+    h += '<span class="cpanel-proc-name">' + esc(n.name || n.executable || '(unknown)') + '</span>';
+    h += '<span class="cpanel-proc-role">' + esc(roleLabel) + '</span>';
+    if (meta.length) h += '<span class="cpanel-proc-meta">' + meta.join(' &middot; ') + '</span>';
+    h += '</div>';
+    if (n.command_line) h += '<div class="cpanel-proc-cmd">' + esc(String(n.command_line)) + '</div>';
+    h += '</div>';
+    return h;
+}
+
+function renderProcessTree(data) {
+    if (!data || !data.available || !((data.nodes || []).length)) {
+        return '<div class="cpanel-alert-fields-empty">No process context on this alert.</div>';
+    }
+    let h = '';
+    const tr = data.truncated_ancestors || 0;
+    if (tr > 0) {
+        h += '<div class="cpanel-proc-trunc">+' + tr + ' earlier ancestor'
+           + (tr !== 1 ? 's' : '') + ' (entity IDs only — not in alert data)</div>';
+    }
+    data.nodes.forEach((n, i) => { h += _procNodeHtml(n, i); });
+    return h;
+}
+
+// Toggle (and lazy-load) a linked alert's process tree. No leading event param
+// (event-delegation.js applies data-args directly).
+async function toggleProcessTree(alertId, ptId) {
+    const el = document.getElementById(ptId);
+    if (!el) return;
+    if (!el.hasAttribute('hidden')) { el.setAttribute('hidden', ''); return; }
+    el.removeAttribute('hidden');
+    if (el.dataset.loaded === '1') return;
+    el.innerHTML = '<div class="cpanel-alert-fields-loading">Loading process tree…</div>';
+    try {
+        const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/process-tree');
+        if (r.status === 503) {
+            el.innerHTML = '<div class="cpanel-alert-fields-empty">Process tree needs a live Elasticsearch connection.</div>';
+            el.dataset.loaded = '1';
+            return;
+        }
+        const data = await r.json().catch(() => ({}));
+        el.innerHTML = renderProcessTree(data);
+        el.dataset.loaded = '1';
+    } catch (e) {
+        el.innerHTML = '<div class="cpanel-alert-fields-empty">Failed to load process tree: '
+            + esc(String((e && e.message) || e)) + '</div>';
+    }
+}
+
 function renderPanelContent(c) {
     let html = '';
 
@@ -3067,6 +3201,12 @@ function renderPanelContent(c) {
                 + '</div>';
             // Lazy-loaded flattened-fields dropdown (hidden until expanded).
             html += '<div class="cpanel-alert-fields" id="' + fieldsId + '" hidden></div>';
+            // Process explorer: alert-local process hierarchy (lazy-loaded).
+            const ptId = 'proc-tree-' + idx;
+            html += '<button type="button" class="cpanel-proc-toggle" '
+                +   'data-click-action="toggleProcessTree" data-args=\'["' + esc(alertId) + '","' + ptId + '"]\'>'
+                +   '<i class="icon-git-branch"></i> Process tree</button>';
+            html += '<div class="cpanel-proc-tree" id="' + ptId + '" hidden></div>';
             // Alert meta row
             const metaParts = [];
             if (obsCount) metaParts.push(obsCount + ' observable' + (obsCount !== 1 ? 's' : ''));

@@ -116,6 +116,97 @@ def _redact_url(url: str) -> str:
     return url
 
 
+def _proc_field(source: dict, *keys: str) -> Any:
+    """Read a process field from an ES alert ``_source``, flat-dotted or nested."""
+    for key in keys:
+        if key in source and source[key] not in (None, ""):
+            return source[key]
+    for key in keys:
+        cur: Any = source
+        for part in key.split("."):
+            if isinstance(cur, dict) and part in cur:
+                cur = cur[part]
+            else:
+                cur = None
+                break
+        if cur not in (None, ""):
+            return cur
+    return None
+
+
+def build_process_tree(source: Optional[dict]) -> Dict[str, Any]:
+    """Build an *alert-local* process hierarchy from a single ES alert ``_source``.
+
+    ION queries the alerts index only (no raw process-events index), so the
+    chain is bounded by what the alert document itself carries: the alert's own
+    ``process.*``, its ``process.parent.*`` (and ``process.parent.parent.*`` when
+    present). ``process.Ext.ancestry`` (Elastic Defend's entity-id list) records
+    the TRUE ancestry depth even when the intermediate processes aren't named in
+    the alert — surfaced as ``truncated_ancestors`` so the UI can say "+N earlier
+    ancestors (not in alert data)" rather than implying the chain is complete.
+
+    Returns ordered root→leaf ``nodes`` with the alert's own process flagged
+    ``is_alert``. ``available`` is False when the alert has no process context.
+    """
+    src = source or {}
+
+    def node(prefix: str, role: str, is_alert: bool = False) -> Optional[Dict[str, Any]]:
+        name = _proc_field(src, f"{prefix}.name")
+        executable = _proc_field(src, f"{prefix}.executable")
+        pid = _proc_field(src, f"{prefix}.pid")
+        entity_id = _proc_field(src, f"{prefix}.entity_id")
+        command_line = _proc_field(src, f"{prefix}.command_line")
+        # Alert process only: fall back to top-level user for the owning user.
+        user = _proc_field(src, f"{prefix}.user.name") or (
+            _proc_field(src, "user.name") if is_alert else None
+        )
+        if not any([name, executable, pid, entity_id, command_line]):
+            return None
+        if not name and executable:
+            name = str(executable).replace("\\", "/").rsplit("/", 1)[-1]
+        return {
+            "role": role,
+            "is_alert": is_alert,
+            "name": name,
+            "executable": executable,
+            "pid": pid,
+            "entity_id": entity_id,
+            "command_line": command_line,
+            "user": user,
+        }
+
+    ordered = [
+        n
+        for n in (
+            node("process.parent.parent", "grandparent"),
+            node("process.parent", "parent"),
+            node("process", "alert", is_alert=True),
+        )
+        if n
+    ]
+    if not ordered:
+        return {
+            "available": False,
+            "nodes": [],
+            "ancestry_depth": 0,
+            "truncated_ancestors": 0,
+            "source": "alert-local",
+        }
+    for level, n in enumerate(ordered):
+        n["level"] = level
+
+    ancestry = _proc_field(src, "process.Ext.ancestry")
+    ancestry_depth = len(ancestry) if isinstance(ancestry, list) else 0
+    named_ancestors = sum(1 for n in ordered if not n["is_alert"])
+    return {
+        "available": True,
+        "nodes": ordered,
+        "ancestry_depth": ancestry_depth,
+        "truncated_ancestors": max(0, ancestry_depth - named_ancestors),
+        "source": "alert-local",
+    }
+
+
 @dataclass
 class ElasticsearchAlert:
     """Represents an alert from Elasticsearch."""

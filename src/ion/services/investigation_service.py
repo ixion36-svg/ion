@@ -1517,6 +1517,18 @@ class InvestigationService:
                 "signal.rule.query", "rule.query",
             )),
             ("alert_reason", ("kibana.alert.reason",)),
+            # Detection author's intent — the rule's own prose. Grounds the LLM
+            # on WHAT the rule was built to catch (description) and HOW the
+            # author expects it triaged (investigation guide / Kibana rule note).
+            ("rule_description", (
+                "kibana.alert.rule.description",
+                "signal.rule.description", "rule.description",
+            )),
+            ("rule_investigation_guide", (
+                "kibana.alert.rule.note",
+                "kibana.alert.rule.parameters.note",
+                "signal.rule.note", "rule.note",
+            )),
             # Host / user
             ("host", ("host.name", "host_name", "host")),
             ("host_os", ("host.os.name", "host.os.family")),
@@ -1573,6 +1585,14 @@ class InvestigationService:
             if isinstance(val, (list, dict)) and not val:
                 continue
             out[out_key] = val
+        # Cap the two free-text rule fields — a verbose investigation guide must
+        # not crowd out the alert facts or eat the user-prompt token budget.
+        # Guide cap sits just under the sanitiser's _VALUE_MAX_CHARS (1024) so
+        # the value carries a single clean truncation marker, not two.
+        for _key, _cap in (("rule_description", 600), ("rule_investigation_guide", 1000)):
+            _v = out.get(_key)
+            if isinstance(_v, str) and len(_v) > _cap:
+                out[_key] = _v[:_cap].rstrip() + " …[truncated]"
         return out
 
     def _build_user_prompt_body(
