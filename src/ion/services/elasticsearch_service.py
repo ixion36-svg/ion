@@ -1453,13 +1453,11 @@ class ElasticsearchService:
                 if hit.get("_source")
             ]
         except ElasticsearchError as e:
-            # Log only the exception TYPE, never the exception body — an ES error
-            # can carry the request URL/auth, and clear-text-logging that would
-            # leak credentials (CodeQL py/clear-text-logging-sensitive-data).
-            logger.warning(
-                "Process-event resolution failed for index %r (%s)",
-                self.process_events_index, type(e).__name__,
-            )
+            # Log only the exception TYPE. Neither the exception body (can carry
+            # the request URL/auth) nor self.* config-derived values (CodeQL taints
+            # them from the same config that holds the ES password) may be logged —
+            # py/clear-text-logging-sensitive-data.
+            logger.warning("Process-event resolution failed (%s)", type(e).__name__)
             return []
 
     async def get_related_alerts(
