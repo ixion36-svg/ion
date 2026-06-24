@@ -1669,8 +1669,27 @@ class InvestigationService:
             "# ALERT TO INVESTIGATE\n",
         ]
 
+        # Lift the detection author's prose into its own high-salience section so
+        # the model weights "what the rule looks for / how to triage it" instead
+        # of treating it as just another of ~40 flat alert fields.
+        rule_desc = alert_summary.get("rule_description")
+        rule_guide = alert_summary.get("rule_investigation_guide")
+        summary_rest = {
+            k: v
+            for k, v in alert_summary.items()
+            if k not in ("rule_description", "rule_investigation_guide")
+        }
+
         out.append("## Alert summary")
-        out.append(_fmt_kv(alert_summary))
+        out.append(_fmt_kv(summary_rest))
+
+        if rule_desc or rule_guide:
+            out.append("## Detection rule context")
+            if rule_desc:
+                out.append("**What this rule detects:** " + _safe(rule_desc))
+            if rule_guide:
+                out.append("**Author's investigation guide:**\n" + _safe(rule_guide))
+            out.append("")
 
         out.append("## Enrichment")
         if not enrichment:

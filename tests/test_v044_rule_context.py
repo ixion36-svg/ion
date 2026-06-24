@@ -52,3 +52,32 @@ def test_rule_context_omitted_when_absent():
     s = svc._build_alert_summary({"_id": "a4", "process.name": "cmd.exe"})
     assert "rule_description" not in s
     assert "rule_investigation_guide" not in s
+
+
+def test_detection_rule_context_section_rendered_in_user_prompt():
+    svc = InvestigationService()
+    summary = svc._build_alert_summary(
+        {
+            "_id": "a5",
+            "kibana.alert.rule.description": "Detects LSASS credential dumping.",
+            "kibana.alert.rule.note": "Check lsass.exe access and the parent process.",
+            "process.name": "mimikatz.exe",
+        }
+    )
+    body = svc._build_user_prompt_body(summary, {}, [], "", {})
+    assert "## Detection rule context" in body
+    assert "What this rule detects:" in body
+    assert "Detects LSASS credential dumping." in body
+    assert "Author's investigation guide:" in body
+    assert "Check lsass.exe access" in body
+    # The rule fields appear in the dedicated section, NOT duplicated as flat
+    # alert-summary key/value lines.
+    assert "- rule_description:" not in body
+    assert "- rule_investigation_guide:" not in body
+
+
+def test_no_detection_rule_context_section_when_absent():
+    svc = InvestigationService()
+    summary = svc._build_alert_summary({"_id": "a6", "process.name": "cmd.exe"})
+    body = svc._build_user_prompt_body(summary, {}, [], "", {})
+    assert "## Detection rule context" not in body
