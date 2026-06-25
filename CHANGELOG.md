@@ -1,13 +1,49 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.44.0 -->
+<!-- ion-doc:version=0.44.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.44.1 — 2026-06-25
+
+**Bob's default LLM is now Foundation-Sec-1.1-8B-Instruct, and Ollama's context window is set explicitly.**
+
+- **New default model.** Bob's default Ollama model changes from `llama3.1:8b`
+  to `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF` (Cisco Foundation
+  AI) — a security-domain-tuned, Llama-3.1-8B-based, instruction-following model
+  (~5 GB RAM at Q4, same footprint as the prior default). Chosen after an A/B
+  across Bob's three LLM surfaces (the JSON investigation verdict, case-wide
+  analysis, and closure-note rewrite): the Instruct variant produced clean,
+  schema-correct JSON verdicts and SOC-fluent analysis. The Foundation-Sec
+  **Reasoning** variant was evaluated and **not** adopted — it emits
+  chain-of-thought into free-text surfaces (e.g. the closure rewrite), which the
+  contract there doesn't want. **Operators must pull the model** (or bake it into
+  the offline package): `ollama pull hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF`.
+  Override with `ION_OLLAMA_MODEL` as before; `qwen2.5:7b` / `llama3.2:3b` remain
+  fine lighter alternatives.
+- **Context-window fix (benefits every model).** ION never set Ollama's
+  `num_ctx`, so Ollama capped the context at its ~4096 default — below Bob's
+  ~12K prompt-plus-generation budget — silently front-truncating the system
+  prompt. `num_ctx` is now passed explicitly on every chat/stream/generate call,
+  configurable via **`ION_OLLAMA_NUM_CTX`** (default 16384; raise toward 65536 on
+  RAM-rich hosts to use Foundation-Sec's full 64K window).
+- **Prompt-budget knob.** The system-prompt token budget is now tunable via
+  **`ION_SYSTEM_PROMPT_TOKEN_BUDGET`** (default 3800) so a deployment that raises
+  `num_ctx` can let more RAG context (KB / exemplars / skills) survive.
+- A pipeline audit (prompt assembly, output contract, decoding params, few-shot
+  exemplars, KB RAG, nomic embeddings) found them already well-tuned and
+  model-appropriate; they were left unchanged. The wallboard summary and the
+  admin-UI default model follow the new default; `translation_service` keeps a
+  multilingual fallback (Foundation-Sec is an English security specialist).
+- Docs/scripts swept (README, STACK, SETUP, RUNBOOK, DEPLOYMENT, `.env.*`, and
+  the offline-package builder) to the new model + `num_ctx`. Added
+  `tools/model_ab_test.py` (the A/B harness). No new route, permission, or
+  schema. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.44.0 — 2026-06-25
 
