@@ -1,13 +1,52 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.44.2 -->
+<!-- ion-doc:version=0.45.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.45.0 — 2026-06-25
+
+**Traffic Analytics overhaul: geo + protocol fixes, an IP/subnet exclusion filter, period-over-period trends, an AI traffic review, a realtime IOC monitor, and a network threat-correlation report.**
+
+- **Geographic data now populates.** The country choropleth was empty because
+  the service only read Arkime's `srcGEO`/`dstGEO` fields; some Arkime builds
+  (including this deployment) return country under `country.src`/`country.dst`.
+  A tolerant extractor now handles every shape — flat `srcGEO`, flat
+  `country.src`, nested `country:{src}`, and list values — and requests all
+  aliases.
+- **Protocol mix now populates.** The doughnut depended on a `graph.protocols`
+  facet absent on this Arkime build; it now falls back to a version-independent
+  session-sample aggregation (`protocol` tags → `ipProtocol`).
+- **IP/subnet exclusion filter.** A new lead-managed, shared exclusion list
+  (`TrafficExclusion` + `GET/POST/DELETE /api/arkime/traffic/exclusions`, reads
+  `alert:read`, writes `security:read`, audit-logged) filters every chart at the
+  Arkime query via an `ip != cidr` expression. The internal-to-internal
+  (RFC-1918) toggle is now exposed in the UI.
+- **Period-over-period trends.** The overview returns session/byte % deltas vs
+  the immediately-preceding equal window, shown on the stat cards.
+- **AI traffic review.** `POST /api/arkime/traffic/ai-review` — pick a sensor
+  node + timeframe and Bob (Foundation-Sec) reviews the traffic profile
+  (volume, protocols, top talkers, geographies) and flags anomalies +
+  PCAP-pull recommendations, rendered as markdown.
+- **Realtime IOC monitor (opt-in).** New background loop
+  (`ION_ARKIME_RTMON_ENABLED`, default off) matches live Arkime sessions against
+  ION's IOC IP set (observables flagged is_ioc / watched / high-or-critical, or
+  OpenCTI-malicious) and auto-creates a case + enqueues PCAP analysis **while the
+  full capture is still inside Arkime's retention window** — so analysts grab it
+  before it ages to metadata-only. Dedups per `node:communityId`; new advisory
+  lock `LOCK_ARKIME_RTMON_BG`.
+- **Network threat-correlation report.** `GET /api/network-correlation-report/{json,html}`
+  (`case:read`) stitches network-linked cases → observables → OpenCTI enrichment
+  (threat actors / score / labels) → netmon pipeline into a cross-case rollup
+  (which actors and IOCs span multiple cases), as standalone CSP-safe HTML.
+- New tests `tests/test_v045_traffic_analytics.py`. No change to existing
+  permissions/schema beyond the additive `traffic_exclusions` table. Net new
+  findings: 0C / 0H / 0M / 0L.
 
 ## v0.44.2 — 2026-06-25
 
