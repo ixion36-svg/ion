@@ -98,7 +98,8 @@ ION_OPENCTI_TOKEN=your-opencti-token
 ```bash
 ION_OLLAMA_ENABLED=true
 ION_OLLAMA_URL=http://YOUR_OLLAMA_IP:11434  # NOT 127.0.0.1 (that means the container itself)
-ION_OLLAMA_MODEL=llama3.2:latest
+# Default Bob model — pull first: ollama pull hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF
+ION_OLLAMA_MODEL=hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF
 ```
 
 ### TLS / Internal Certificates
@@ -130,7 +131,7 @@ the Similar-Cases sidebar all quietly return nothing.
 | `ixion36/ion:<VERSION>` | Application |
 | `pgvector/pgvector:<PG_VERSION>` | Postgres **with pgvector** (not plain postgres) |
 | `ollama/ollama:latest` | LLM host |
-| Chat model (e.g. `llama3.1:8b`) | Bob's reasoning |
+| Chat model (default `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF`) | Bob's reasoning |
 | `nomic-embed-text` model | Embeddings — **new in v0.10.4, silently required by case-similarity + KB RAG** |
 | `docker-compose.yml` | Config (pinned to matching ION + PG versions) |
 | `.env` | Credentials + feature flags |
@@ -143,7 +144,7 @@ the Similar-Cases sidebar all quietly return nothing.
 
 # Examples
 ./scripts/build-offline-package.sh 0.10.9
-./scripts/build-offline-package.sh 0.10.9 llama3.1:8b pg17
+./scripts/build-offline-package.sh 0.10.9 hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF pg17
 ./scripts/build-offline-package.sh 0.10.9 qwen2.5:3b pg16
 ```
 

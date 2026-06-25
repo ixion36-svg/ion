@@ -273,20 +273,27 @@ class ModelInfo:
 
 # Recommended models for different use cases
 RECOMMENDED_MODELS = {
-    "testing": {
-        "name": "llama3.2:3b",
-        "description": "Small model for testing (~2GB RAM)",
-        "size": ModelSize.SMALL,
+    "security": {
+        "name": "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF",
+        "description": "ION default for Bob — security-tuned (Cisco Foundation AI), "
+                       "Llama-3.1-8B based, instruction-following; clean JSON verdicts "
+                       "+ SOC-fluent analysis (~5GB RAM)",
+        "size": ModelSize.MEDIUM,
+    },
+    "general": {
+        "name": "qwen2.5:7b",
+        "description": "Capable general-purpose fallback for analysis (~5GB RAM)",
+        "size": ModelSize.MEDIUM,
     },
     "coding": {
         "name": "llama3.1:8b",
         "description": "Best for code generation and review (~5GB RAM)",
         "size": ModelSize.MEDIUM,
     },
-    "general": {
-        "name": "llama3:8b",
-        "description": "Best all-rounder for analysis (~5GB RAM)",
-        "size": ModelSize.MEDIUM,
+    "testing": {
+        "name": "llama3.2:3b",
+        "description": "Small model for testing (~2GB RAM)",
+        "size": ModelSize.SMALL,
     },
     "lightweight": {
         "name": "phi3:mini",
@@ -401,13 +408,15 @@ class OllamaService:
     def __init__(
         self,
         base_url: str = "http://localhost:11434",
-        default_model: str = "llama3.1:8b",
+        default_model: str = "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF",
         timeout: float = 120.0,
         verify_ssl: bool = True,
         enabled: bool = True,
+        num_ctx: int = 16384,
     ):
         self.base_url = base_url.rstrip("/")
         self.default_model = default_model
+        self.num_ctx = num_ctx
         self.timeout = timeout
         self.verify_ssl = verify_ssl
         self.enabled = enabled
@@ -597,6 +606,9 @@ class OllamaService:
             options: Dict[str, Any] = {
                 "temperature": temperature,
                 "num_predict": num_predict,
+                # Explicit context window — without this Ollama caps at ~4096,
+                # silently front-truncating Bob's ~12K prompt+generation budget.
+                "num_ctx": self.num_ctx,
                 "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
             }
             # Determinism knobs — callers that want repeatable output
@@ -722,6 +734,7 @@ class OllamaService:
                     "options": {
                         "temperature": temperature,
                         "num_predict": num_predict,
+                        "num_ctx": self.num_ctx,
                         "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
                     },
                 },
@@ -776,6 +789,7 @@ class OllamaService:
                     "options": {
                         "temperature": temperature,
                         "num_predict": DEFAULT_NUM_PREDICT,
+                        "num_ctx": self.num_ctx,
                         "stop": ["<|eot_id|>", "<|im_end|>", "<|endoftext|>", "<|end|>"],
                     },
                 },
@@ -808,14 +822,15 @@ def get_ollama_service() -> OllamaService:
         config = get_config()
         _ollama_service = OllamaService(
             base_url=getattr(config, 'ollama_url', 'http://localhost:11434'),
-            default_model=getattr(config, 'ollama_model', 'llama3.1:8b'),
+            default_model=getattr(config, 'ollama_model', 'hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF'),
             # v0.17.3: bumped default 120 → 300 to match the investigation
-            # gate. Long prompts on llama3.1:8b regularly need 130-180s;
+            # gate. Long prompts on an 8B model regularly need 130-180s warm;
             # the inner httpx timeout firing first cancelled responses
             # mid-stream. Override via `ollama_timeout` in config.
             timeout=float(getattr(config, 'ollama_timeout', 300)),
             verify_ssl=getattr(config, 'ollama_verify_ssl', True),
             enabled=getattr(config, 'ollama_enabled', True),
+            num_ctx=int(getattr(config, 'ollama_num_ctx', 16384)),
         )
     return _ollama_service
 

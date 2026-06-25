@@ -51,7 +51,7 @@ Set in `~/ION/.env`. Every integration follows the pattern `ION_<NAME>_ENABLED=t
 | TIDE | `ION_TIDE_ENABLED` | `_URL`, `_API_KEY`, `_SPACE`, `_CLIENT_ID`, `_MAX_CONCURRENT`, `_TOTAL_BUDGET_S`, `_VERIFY_SSL` |
 | OpenCTI | `ION_OPENCTI_ENABLED` | `_URL`, `_TOKEN`, `_VERIFY_SSL` |
 | GitLab | `ION_GITLAB_ENABLED` | `_URL`, `_TOKEN`, `_PROJECT_ID`, `_SUDO`, `_VERIFY_SSL` |
-| Ollama | `ION_OLLAMA_ENABLED` | `_URL`, `_MODEL` (default `llama3.1:8b`), `_TIMEOUT`, `_VERIFY_SSL` |
+| Ollama | `ION_OLLAMA_ENABLED` | `_URL`, `_MODEL` (default `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF`), `_TIMEOUT`, `_NUM_CTX` (default 16384), `_VERIFY_SSL` |
 | Arkime | `ION_ARKIME_ENABLED` | `_URL`, `_KEYCLOAK_*` (OAuth2 client_credentials), or `_USERNAME`/`_PASSWORD`, `_API_KEY`, `_VERIFY_SSL` |
 | DFIR-IRIS | `ION_DFIR_IRIS_ENABLED` | `_URL`, `_API_KEY`, `_DEFAULT_CUSTOMER`, `_VERIFY_SSL` |
 | AbuseIPDB | `ION_ABUSEIPDB_ENABLED` | `_API_KEY` |

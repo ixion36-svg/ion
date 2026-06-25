@@ -473,9 +473,9 @@ _FIRST_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 # in the Integration Checklist.
 _DEFAULT_MAX_PER_SWEEP = 50
 _DEFAULT_SWEEP_INTERVAL_S = 900
-# v0.17.3: bumped 120 → 300. Real investigation prompts on llama3.1:8b
+# v0.17.3: bumped 120 → 300. Real investigation prompts on an 8B model
 # (full alert context + observables + history + MITRE chain) routinely
-# take 130-180s; the previous 120s gate was firing in the middle of a
+# take 130-180s warm (longer cold / on CPU); the previous 120s gate was firing in the middle of a
 # legitimate response. Chat prompts are shorter and weren't affected.
 # Override per-deployment via ION_INVESTIGATION_LLM_TIMEOUT_S env or the
 # matching config attribute.

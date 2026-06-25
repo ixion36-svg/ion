@@ -257,7 +257,7 @@ docker compose --profile ai up -d
 |----------|---------|-------------|
 | `ION_OLLAMA_ENABLED` | `true` | Enable Ollama AI features |
 | `ION_OLLAMA_URL` | `http://ollama:11434` | Ollama API URL |
-| `ION_OLLAMA_MODEL` | `llama3.1:8b` | Default model name |
+| `ION_OLLAMA_MODEL` | `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF` | Default Bob model (security-tuned, Llama-3.1-8B based) |
 | `ION_OLLAMA_TIMEOUT` | `120` | Request timeout (seconds) |
 | `ION_OLLAMA_VERIFY_SSL` | `false` | Verify Ollama TLS certificate |
 

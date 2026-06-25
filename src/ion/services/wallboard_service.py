@@ -599,7 +599,7 @@ def _generate_landscape_text(prompt: str, *, timeout: Optional[float] = None) ->
     model = (
         os.environ.get("ION_WALLBOARD_OLLAMA_MODEL")
         or os.environ.get("ION_OLLAMA_MODEL")
-        or "llama3.1:8b"
+        or "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF"
     )
 
     try:

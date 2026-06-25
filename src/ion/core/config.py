@@ -102,7 +102,13 @@ class Config:
     # Ollama AI integration
     ollama_enabled: bool = True
     ollama_url: str = "http://localhost:11434"  # Ollama API URL
-    ollama_model: str = "llama3.1:8b"  # Default model
+    ollama_model: str = "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF"  # Default model (Bob) — security-tuned, Llama-3.1-8B based
+    # Ollama context window (num_ctx) passed on every chat call. Ollama defaults
+    # this to ~4096 unless set — far below Bob's ~12K prompt+generation budget,
+    # so the prompt was being silently front-truncated. 16384 fits the budget
+    # with headroom at modest KV-cache cost; raise toward 65536 on RAM-rich hosts
+    # to exploit Foundation-Sec's 64K window. Env: ION_OLLAMA_NUM_CTX.
+    ollama_num_ctx: int = 16384
     ollama_timeout: int = 300  # Request timeout in seconds (v0.17.3: bumped 120 → 300 for long investigation prompts)
     ollama_verify_ssl: bool = False
 
@@ -182,8 +188,9 @@ class Config:
     investigation_sweep_interval_s: int = 900
     investigation_max_per_sweep: int = 50
     # v0.19.9: was 120; the v0.17.3 fix-pack bumped the module default
-    # in investigation_service to 300 (real prompts on llama3.1:8b take
-    # 130-180s) but missed this config-dataclass copy. Resolution order
+    # in investigation_service to 300 (real prompts on an 8B model take
+    # 130-180s warm — longer cold/CPU) but missed this config-dataclass copy.
+    # Resolution order
     # in _single_llm_call is env -> config -> module-default, so
     # config=120 was overriding the 300 default that v0.17.3 actually
     # shipped. Brought into line.
@@ -314,7 +321,7 @@ class Config:
             # Ollama AI integration
             ollama_enabled=data.get("ollama_enabled", True),
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
-            ollama_model=data.get("ollama_model", "llama3.1:8b"),
+            ollama_model=data.get("ollama_model", "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF"),
             # v0.17.3 upgrade migration: silently bump the historical 120s
             # default to 300s so existing deployments pick up the longer
             # investigation timeout without an operator edit. Anyone who
@@ -747,9 +754,14 @@ def get_config() -> Config:
         if os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL"):
             _config.ollama_url = os.environ.get("ION_OLLAMA_URL") or os.environ.get("OLLAMA_URL", "http://localhost:11434")
         if os.environ.get("ION_OLLAMA_MODEL"):
-            _config.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "llama3.1:8b")
+            _config.ollama_model = os.environ.get("ION_OLLAMA_MODEL", "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF")
         if os.environ.get("ION_OLLAMA_TIMEOUT"):
             _config.ollama_timeout = int(os.environ.get("ION_OLLAMA_TIMEOUT", "300"))
+        if os.environ.get("ION_OLLAMA_NUM_CTX"):
+            try:
+                _config.ollama_num_ctx = int(os.environ.get("ION_OLLAMA_NUM_CTX", "16384"))
+            except ValueError:
+                pass
         if os.environ.get("ION_OLLAMA_VERIFY_SSL"):
             _config.ollama_verify_ssl = _get_env_bool("ION_OLLAMA_VERIFY_SSL", False)
 

@@ -465,7 +465,7 @@ If Ollama is not reachable:
 
 1. Ensure the `ai` profile is active: `docker compose --profile ai up -d`
 2. Or point `ION_OLLAMA_URL` to an external Ollama instance
-3. Pull a model: `docker exec ion-ollama ollama pull llama3.2:latest`
+3. Pull Bob's model: `docker exec ion-ollama ollama pull hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF`
 4. For low-RAM environments (< 8 GB for Ollama), use a smaller model: `ION_OLLAMA_MODEL=qwen2.5:0.5b`
 
 ### High memory usage

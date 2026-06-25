@@ -24,13 +24,21 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Token budget guard for render_system_prompt.
 #
-# llama3.1:8b has an 8 192-token context window. We target ≤ 3 800 tokens
-# for the system prompt, leaving ~4 000 for the user prompt body and ~4 096
-# for generation.  Estimation: 4 chars ≈ 1 token (conservative for mixed
-# English + code/IOC text).  Layers are dropped in reverse priority when the
-# budget would be exceeded: skills first, then exemplars, then KB context.
-# The base prompt + template guide + output contract are NEVER dropped.
-_SYSTEM_PROMPT_TOKEN_BUDGET = 3_800
+# Bob's 8B models (Foundation-Sec / llama3.1 / qwen2.5) expose a large context
+# window, and ION now sets Ollama's num_ctx explicitly (default 16384; see
+# config.ollama_num_ctx / ION_OLLAMA_NUM_CTX) so the window is real, not the
+# silent ~4096 Ollama default. We still default the system-prompt target to
+# ≤ 3 800 tokens (leaving room for the user-prompt body + ~4 096 generation),
+# but it is now tunable via ION_SYSTEM_PROMPT_TOKEN_BUDGET so a deployment that
+# raises num_ctx can let more RAG context (KB / exemplars / skills) survive.
+# Estimation: 4 chars ≈ 1 token (conservative for mixed English + code/IOC text).
+# Layers are dropped in reverse priority when the budget would be exceeded:
+# skills first, then exemplars, then KB context. The base prompt + template
+# guide + output contract are NEVER dropped.
+try:
+    _SYSTEM_PROMPT_TOKEN_BUDGET = max(1_500, int(os.environ.get("ION_SYSTEM_PROMPT_TOKEN_BUDGET", "3800")))
+except ValueError:
+    _SYSTEM_PROMPT_TOKEN_BUDGET = 3_800
 _CHARS_PER_TOKEN = 4
 
 

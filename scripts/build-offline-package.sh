@@ -9,14 +9,14 @@
 #   ./scripts/build-offline-package.sh [ion_version] [chat_model] [pg_version]
 #
 # Examples:
-#   ./scripts/build-offline-package.sh 0.10.9
-#   ./scripts/build-offline-package.sh 0.10.9 llama3.1:8b pg17
+#   ./scripts/build-offline-package.sh 0.44.1
+#   ./scripts/build-offline-package.sh 0.44.1 hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF pg17
 #
 # What this bundles (v0.10.4+ needs these — previous script missed them):
 #   - ixion36/ion:<VERSION>     Application image
 #   - pgvector/pgvector:<PG>    Postgres + pgvector (not plain postgres!)
 #   - ollama/ollama:latest      LLM host
-#   - Chat model                Bob's reasoning (default llama3.1:8b)
+#   - Chat model                Bob's reasoning (default Foundation-Sec-1.1-8B-Instruct)
 #   - nomic-embed-text          Embeddings for case similarity + KB RAG
 #                               (NEW in v0.10.4 — silent-fail without it)
 # =============================================================================
@@ -24,7 +24,7 @@
 set -e
 
 VERSION="${1:-0.22.0}"
-CHAT_MODEL="${2:-llama3.1:8b}"
+CHAT_MODEL="${2:-hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF}"
 PG_VERSION="${3:-pg16}"
 EMBED_MODEL="nomic-embed-text"
 PACKAGE_NAME="ion-offline-${VERSION}"

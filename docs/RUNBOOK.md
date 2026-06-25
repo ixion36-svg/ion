@@ -97,7 +97,7 @@ The alert-to-PCAP workflow uses `ArkimeService.download_pcap_by_community_id(nod
 | Variable | Purpose | Default |
 |----------|---------|---------|
 | `ION_OLLAMA_URL` | Ollama API endpoint | `http://localhost:11434` |
-| `ION_OLLAMA_MODEL` | Model name | `qwen2.5:3b` |
+| `ION_OLLAMA_MODEL` | Model name | `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF` |
 | `ION_OLLAMA_TIMEOUT` | Request timeout (seconds) | `120` |
 
 For dev environments with limited RAM, use `qwen2.5:0.5b`. The admin wizard at `/settings` also lets you change URL/model/timeout at runtime.

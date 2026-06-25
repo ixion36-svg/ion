@@ -164,6 +164,7 @@ class TestOllamaBreakerWiring:
         svc.enabled = True
         svc.verify_ssl = False
         svc.timeout = 30.0
+        svc.num_ctx = 16384
         svc._client = None
         svc._client_loop = None
         svc._queue = MagicMock()
