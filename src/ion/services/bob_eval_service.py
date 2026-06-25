@@ -659,11 +659,21 @@ def _call_ollama_for_sample(
                 temperature=0.2,
                 max_tokens=4096,
                 seed=run_id,
+                # Match the live investigation path: force the JSON envelope so
+                # the replayed verdict is parsed the same way it was at triage.
+                response_format="json",
                 bypass_queue=True,
                 user_id=0,
             )
         )
-        content = result.get("message", {}).get("content", "") if isinstance(result, dict) else str(result)
+        # OllamaService.chat returns the assistant text under top-level "content"
+        # (not nested under "message"). Tolerate the raw-Ollama shape too so a
+        # future change can't silently zero every verdict (the prior
+        # result["message"]["content"] read did exactly that → all abstentions).
+        if isinstance(result, dict):
+            content = result.get("content") or result.get("message", {}).get("content", "") or ""
+        else:
+            content = str(result)
         parsed = _parse_eval_response(content)
         verdict = parsed.get("verdict")
         confidence_int = _safe_int(parsed.get("confidence"))
