@@ -1,13 +1,48 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.43.0 -->
+<!-- ion-doc:version=0.44.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-24 -->
+<!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.44.0 — 2026-06-25
+
+**Analyst quality-of-life: a day calendar for daily-work, richer case-fields handling, case-wide Bob analysis, and a tighter AI closure rewrite.**
+
+- **Daily-work — day calendar with editable timed entries.** `/daily-work` gains
+  a 24-hour **day calendar** view alongside the existing timeline (Calendar /
+  Timeline toggle, plus day navigation: previous / next / today / date picker).
+  Manual entries now carry an **editable time** — add one at a clicked hour, or
+  click an entry to edit its time / type / detail or delete it, via a modal. The
+  single-timestamp schema is unchanged (the log stays un-timesheet-like — no
+  duration tracking); `logged_at` simply becomes the event time the analyst can
+  set. New owner-scoped routes `PATCH`/`DELETE /api/worklog/entry/{id}` (gated
+  `alert:read`; the service scopes every mutation to the caller's own entries
+  before touching a row). No new permission or table.
+- **Cases — linked-alert fields.** The "Show all fields" toggle now flips its
+  label and `aria-expanded` so the click gives visible feedback (it was
+  expanding silently below the fold). A new **"Add fields as evidence note"**
+  action posts an alert's well-known fields plus its extracted observables to the
+  case as a formatted investigation note, via the existing case-notes endpoint.
+- **Cases — Bob analyses the whole case.** The on-demand case analysis now
+  gathers the well-known fields of **every linked alert** (de-duplicating the
+  shared detection-rule prose) and asks Bob for one case-wide verdict, instead of
+  keying off the lead alert only — so multi-alert cases get a genuine overall
+  assessment.
+- **Cases — AI closure rewrite is shorter and cites precedent.** The rewrite is
+  capped to a few short paragraphs (instruction + token ceiling), and — when a
+  case is in context — surfaces comparable closed cases' closure notes to the
+  model as precedent it may reference (best-effort via pgvector; degrades quietly
+  when unavailable).
+- **Config.** The optional full-process-explorer events index is now a
+  first-class setting, `ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX` (off by default),
+  replacing an ad-hoc lookup; documented in `.env.deploy`.
+- New tests: `tests/test_v044_soc_improvements.py` (+ updated closure-rewrite
+  test). Affected-module suites green. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.43.0 — 2026-06-24
 
