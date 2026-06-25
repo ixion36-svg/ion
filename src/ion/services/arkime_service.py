@@ -441,6 +441,8 @@ class ArkimeService:
 
     _COUNTRY_SAMPLE = 500  # sessions fetched for geo / node aggregation
     _TALKER_SAMPLE  = 500  # sessions fetched when filtering private IPs
+    _PROTO_SAMPLE   = 1000  # sessions fetched for protocol-mix fallback
+    _IPPROTO_NAMES = {1: "icmp", 6: "tcp", 17: "udp", 47: "gre", 50: "esp", 58: "ipv6-icmp"}
 
     @staticmethod
     def _is_private_ip(ip: str) -> bool:
@@ -462,10 +464,56 @@ class ArkimeService:
         except ValueError:
             return False
 
+    @staticmethod
+    def build_exclusion_expression(cidrs: List[str]) -> str:
+        """Arkime expression dropping any session that touches an excluded IP/CIDR.
+
+        ``ip != X`` matches sessions where neither src nor dst is X, so ANDing
+        the terms removes all traffic involving the excluded ranges. Invalid
+        entries are skipped; returns '' when nothing valid is supplied (callers
+        then pass no expression). Combine with a caller expression via ``&&``.
+        """
+        import ipaddress
+        terms: List[str] = []
+        for raw in cidrs or []:
+            c = (raw or "").strip()
+            if not c:
+                continue
+            try:
+                ipaddress.ip_network(c, strict=False)
+            except ValueError:
+                continue
+            terms.append(f"ip != {c}")
+        return "(" + " && ".join(terms) + ")" if terms else ""
+
+    @staticmethod
+    def _geo_code(session: Dict[str, Any], side: str) -> str:
+        """ISO country code for a session side ('src' | 'dst').
+
+        Arkime exposes the GeoIP country under several shapes depending on the
+        viewer version / field config: the flat db field ``srcGEO``/``dstGEO``,
+        the expression-style flat key ``country.src``/``country.dst``, or a
+        nested ``{"country": {"src": ...}}`` object. Some builds return a list
+        when a session spans multiple geos. Be tolerant of every shape — the
+        prior code only read ``srcGEO``/``dstGEO`` and silently produced an
+        empty map on deployments that return ``country.src``/``country.dst``.
+        """
+        candidates = [session.get(f"{side}GEO"), session.get(f"country.{side}")]
+        country_obj = session.get("country")
+        if isinstance(country_obj, dict):
+            candidates.append(country_obj.get(side))
+        for c in candidates:
+            if isinstance(c, (list, tuple)):
+                c = c[0] if c else None
+            if c:
+                return str(c).strip().upper()
+        return ""
+
     async def get_traffic_overview(
         self,
         start_ts: int,
         stop_ts: int,
+        expression: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch aggregated traffic histogram + protocol mix from Arkime.
 
@@ -490,6 +538,8 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
         }
+        if expression:
+            params["expression"] = expression
         headers = await self._headers()
         try:
             async with await self._client() as client:
@@ -510,10 +560,17 @@ class ArkimeService:
                 )
             payload = resp.json()
             graph = payload.get("graph") or {}
+            # Protocol mix: the facets `graph.protocols` key is absent on many
+            # Arkime builds (it moved / was never populated for this deployment),
+            # which left the doughnut empty. Fall back to a session-sample
+            # aggregation, which is version-independent.
+            protocols = graph.get("protocols") or graph.get("protocolCnt") or {}
+            if not protocols:
+                protocols = await self._sample_protocol_mix(start_ts, stop_ts, expression)
             return {
                 "src_histo": graph.get("srcDataHisto") or [],
                 "dst_histo": graph.get("dstDataHisto") or [],
-                "protocols": graph.get("protocols") or {},
+                "protocols": protocols,
                 "total_sessions": payload.get("recordsFiltered") or payload.get("total") or 0,
                 "total_bytes": graph.get("totDataBytes") or 0,
             }
@@ -522,12 +579,159 @@ class ArkimeService:
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime traffic overview error: {type(e).__name__}: {e}") from e
 
+    async def find_recent_sessions_for_ips(
+        self,
+        ips: List[str],
+        *,
+        window_minutes: int = 20,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """Sessions in the last ``window_minutes`` that touch any IP in ``ips``
+        (as src OR dst). Used by the realtime IOC monitor to catch known-bad
+        traffic while the full PCAP is still inside Arkime's retention window.
+
+        Caps the IP set to keep the Arkime expression bounded.
+        """
+        import time as _time
+
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        clean = [str(i).strip() for i in (ips or []) if str(i).strip()][:256]
+        if not clean:
+            return []
+        now = int(_time.time())
+        start = now - max(1, window_minutes) * 60
+        params = {
+            "length": str(max(1, min(limit, 1000))),
+            "startTime": str(start),
+            "stopTime": str(now),
+            "order": "firstPacket:desc",
+            "expression": "ip == [" + ",".join(clean) + "]",
+            "fields": "id,node,communityId,srcIp,dstIp,totBytes,firstPacket,ipProtocol,protocol",
+        }
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions", headers=headers, params=params
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime IOC-session query failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            if "json" not in resp.headers.get("content-type", ""):
+                raise ArkimeError("Arkime returned non-JSON — check auth")
+            return resp.json().get("data") or []
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime IOC-session error: {type(e).__name__}: {e}") from e
+
+    async def get_traffic_totals(
+        self, start_ts: int, stop_ts: int, expression: Optional[str] = None
+    ) -> Dict[str, int]:
+        """Just the session + byte totals for a window (facets, no rows) — used
+        for cheap period-over-period trend deltas without the full overview."""
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        params = {
+            "facets": "1", "length": "0",
+            "startTime": str(start_ts), "stopTime": str(stop_ts),
+        }
+        if expression:
+            params["expression"] = expression
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions", headers=headers, params=params
+                )
+            if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
+                return {"total_sessions": 0, "total_bytes": 0}
+            payload = resp.json()
+            graph = payload.get("graph") or {}
+            return {
+                "total_sessions": payload.get("recordsFiltered") or payload.get("total") or 0,
+                "total_bytes": graph.get("totDataBytes") or 0,
+            }
+        except httpx.HTTPError:
+            return {"total_sessions": 0, "total_bytes": 0}
+
+    async def get_node_traffic_profile(
+        self, node: str, start_ts: int, stop_ts: int, expression: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Assemble a compact traffic profile for one capture node + window —
+        the context block the AI traffic-pattern review reasons over. Combines
+        the node filter with any caller expression (e.g. exclusions)."""
+        node_expr = f'node == "{node}"'
+        expr = f"({node_expr}) && {expression}" if expression else node_expr
+        overview = await self.get_traffic_overview(start_ts, stop_ts, expression=expr)
+        talkers = await self.get_top_talkers(
+            start_ts, stop_ts, limit=10, exclude_private_to_private=True, expression=expr
+        )
+        countries = await self.get_top_countries(start_ts, stop_ts, limit=10, expression=expr)
+        return {
+            "node": node,
+            "total_sessions": overview.get("total_sessions", 0),
+            "total_bytes": overview.get("total_bytes", 0),
+            "protocols": overview.get("protocols", {}),
+            "top_src": talkers.get("by_src", [])[:10],
+            "top_dst": talkers.get("by_dst", [])[:10],
+            "src_countries": countries.get("by_src", [])[:10],
+            "dst_countries": countries.get("by_dst", [])[:10],
+        }
+
+    async def _sample_protocol_mix(
+        self, start_ts: int, stop_ts: int, expression: Optional[str] = None
+    ) -> Dict[str, int]:
+        """Protocol-count map from a session sample — fallback when the facets
+        graph carries no protocol breakdown. Counts Arkime ``protocol`` tags
+        (app-layer: http/tls/dns/…), falling back to the L4 ``ipProtocol``."""
+        params = {
+            "length": str(self._PROTO_SAMPLE),
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "order": "totBytes:desc",
+            "fields": "protocol,ipProtocol",
+        }
+        if expression:
+            params["expression"] = expression
+        headers = await self._headers()
+        out: Dict[str, int] = {}
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions", headers=headers, params=params
+                )
+            if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
+                return out
+            for s in (resp.json().get("data") or []):
+                protos = s.get("protocol")
+                if isinstance(protos, str):
+                    protos = [protos]
+                if not protos:
+                    ipp = s.get("ipProtocol")
+                    name = (
+                        self._IPPROTO_NAMES.get(ipp) if isinstance(ipp, int)
+                        else (str(ipp).lower() if ipp else None)
+                    )
+                    protos = [name] if name else []
+                for p in protos:
+                    p = str(p).strip().lower()
+                    if p:
+                        out[p] = out.get(p, 0) + 1
+        except httpx.HTTPError:
+            return out
+        return out
+
     async def get_top_talkers(
         self,
         start_ts: int,
         stop_ts: int,
         limit: int = 10,
         exclude_private_to_private: bool = True,
+        expression: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch top sessions by total bytes for the given time window.
 
@@ -552,6 +756,8 @@ class ArkimeService:
             "order": "totBytes:desc",
             "fields": "srcIp,dstIp,totBytes,packets",
         }
+        if expression:
+            params["expression"] = expression
         headers = await self._headers()
         try:
             async with await self._client() as client:
@@ -610,6 +816,7 @@ class ArkimeService:
         start_ts: int,
         stop_ts: int,
         limit: int = 15,
+        expression: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Fetch top countries by traffic volume for the given time window.
 
@@ -630,8 +837,12 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
-            "fields": "srcGEO,dstGEO,totBytes",
+            # Request every country alias — viewer builds differ on whether they
+            # return srcGEO/dstGEO vs country.src/country.dst (see _geo_code).
+            "fields": "srcGEO,dstGEO,country.src,country.dst,totBytes",
         }
+        if expression:
+            params["expression"] = expression
         headers = await self._headers()
         try:
             async with await self._client() as client:
@@ -656,8 +867,8 @@ class ArkimeService:
             src_map: Dict[str, Dict[str, int]] = {}
             dst_map: Dict[str, Dict[str, int]] = {}
             for s in sessions:
-                src_geo = (s.get("srcGEO") or "").strip().upper()
-                dst_geo = (s.get("dstGEO") or "").strip().upper()
+                src_geo = self._geo_code(s, "src")
+                dst_geo = self._geo_code(s, "dst")
                 b = int(s.get("totBytes") or 0)
                 if src_geo:
                     entry = src_map.setdefault(src_geo, {"bytes": 0, "sessions": 0})
@@ -685,6 +896,7 @@ class ArkimeService:
         self,
         start_ts: int,
         stop_ts: int,
+        expression: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Aggregate traffic volume per Arkime capture node for the time window.
 
@@ -703,6 +915,8 @@ class ArkimeService:
             "order": "totBytes:desc",
             "fields": "node,totBytes",
         }
+        if expression:
+            params["expression"] = expression
         headers = await self._headers()
         try:
             async with await self._client() as client:

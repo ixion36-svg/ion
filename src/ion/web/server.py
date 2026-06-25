@@ -87,6 +87,7 @@ from ion.web.logging_middleware import RequestLoggingMiddleware
 from ion.web.maturity_api import router as maturity_router
 from ion.web.mcp_api import router as mcp_router
 from ion.web.mitre_navigator_api import router as mitre_navigator_router
+from ion.web.network_correlation_report_api import router as network_correlation_report_router
 from ion.web.network_map_api import router as network_map_router
 from ion.web.notes_api import router as notes_router
 from ion.web.observable_api import router as observable_router
@@ -388,6 +389,7 @@ app.include_router(emulation_router, prefix="/api")
 app.include_router(vulnerability_router, prefix="/api")
 app.include_router(maturity_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
+app.include_router(network_correlation_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
 app.include_router(training_sim_router, prefix="/api")
 app.include_router(service_account_router, prefix="/api")
@@ -816,6 +818,21 @@ async def _startup_event():
         _aac_bg(engine)
         logger.info("Arkime auto-case background loop started")
     run_locked(engine, LOCK_ARKIME_AUTO_CASE_BG, "arkime_auto_case_bg_loop", _start_arkime_auto_case,
+               hold_until_close=True)
+
+    # ---------------------------------------------------------------
+    # Realtime Arkime IOC monitor (v0.45.0) — watches live traffic for
+    # known-bad IPs and auto-cases + grabs the PCAP while it's still in
+    # Arkime's full-retention window. Opt-in: ION_ARKIME_RTMON_ENABLED.
+    # ---------------------------------------------------------------
+    from ion.storage.database import LOCK_ARKIME_RTMON_BG
+    def _start_arkime_rtmon():
+        from ion.services.arkime_realtime_monitor_service import (
+            start_background_loop as _rtmon_bg,
+        )
+        _rtmon_bg(engine)
+        logger.info("Arkime realtime IOC monitor background loop started")
+    run_locked(engine, LOCK_ARKIME_RTMON_BG, "arkime_rtmon_bg_loop", _start_arkime_rtmon,
                hold_until_close=True)
 
     # ---------------------------------------------------------------

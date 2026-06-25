@@ -29,15 +29,51 @@
   <strong>Demo mode</strong> — Arkime not configured, showing synthetic data. Set <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_URL</code>, <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_USERNAME</code>, and <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_PASSWORD</code> to connect live traffic.
 </div>
 
+<!-- Controls: filters + exclusions + report -->
+<div class="atf-card mb-6">
+  <div class="flex flex-wrap items-center gap-4">
+    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+      <input type="checkbox" id="excl-private" checked class="accent-cyan-500">
+      Hide internal-to-internal (RFC-1918) traffic
+    </label>
+    <div class="flex items-center gap-2">
+      <input id="excl-input" type="text" placeholder="Exclude IP or CIDR (e.g. 10.0.0.0/8)"
+             class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 w-64" />
+      <button id="excl-add" class="text-xs px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-100">Add filter</button>
+    </div>
+    <div id="excl-chips" class="flex flex-wrap gap-1.5 flex-1"></div>
+    <a href="/api/network-correlation-report/html?days=7" target="_blank" rel="noopener"
+       class="text-xs px-3 py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white">Correlation report ↗</a>
+  </div>
+  <p class="mt-2 text-xs text-slate-500">Exclusions filter every chart below at the Arkime query (lead-managed, shared). Geographic + protocol data now populate from any Arkime field layout.</p>
+</div>
+
+<!-- AI traffic-pattern review -->
+<div class="atf-card mb-6">
+  <div class="atf-card-header">
+    <h2 class="atf-card-title">AI traffic review</h2>
+    <div class="flex items-center gap-2">
+      <select id="ai-node" class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200">
+        <option value="">Select a sensor node…</option>
+      </select>
+      <button id="ai-review-btn" class="text-xs px-3 py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white disabled:opacity-50">Review patterns</button>
+    </div>
+  </div>
+  <p class="text-xs text-slate-500 mb-2">Bob (Foundation-Sec) reviews the selected node's traffic over the current range and flags anomalies + PCAP-pull recommendations.</p>
+  <div id="ai-review-out" class="ion-md text-sm text-slate-300 leading-relaxed">
+    <span class="text-slate-500">Pick a node and click “Review patterns”.</span>
+  </div>
+</div>
+
 <!-- Stats bar -->
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="atf-stats">
   <div class="atf-stat-card">
     <div class="atf-stat-value" id="stat-sessions">—</div>
-    <div class="atf-stat-label">Total Sessions</div>
+    <div class="atf-stat-label">Total Sessions <span id="stat-sessions-delta" class="text-xs"></span></div>
   </div>
   <div class="atf-stat-card">
     <div class="atf-stat-value" id="stat-bytes">—</div>
-    <div class="atf-stat-label">Total Volume</div>
+    <div class="atf-stat-label">Total Volume <span id="stat-bytes-delta" class="text-xs"></span></div>
   </div>
   <div class="atf-stat-card">
     <div class="atf-stat-value text-ion-cyan" id="stat-top-proto">—</div>
@@ -536,6 +572,7 @@
       const topProto = Object.entries(protos).sort((a,b) => b[1]-a[1])[0];
       document.getElementById('stat-top-proto').textContent = topProto ? topProto[0].toUpperCase() : '—';
 
+      renderTrend(data.trend);
       renderVolumeChart(data);
       renderProtoChart(protos);
     } catch (e) {
@@ -554,7 +591,9 @@
     talkersData = null;
 
     try {
-      const resp = await fetch('/api/arkime/traffic/top-talkers?range=' + range);
+      const ep = document.getElementById('excl-private');
+      const xp = ep ? ep.checked : true;
+      const resp = await fetch('/api/arkime/traffic/top-talkers?range=' + range + '&exclude_private=' + xp);
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ detail: resp.statusText }));
         throw new Error(err.detail || resp.statusText);
@@ -668,6 +707,7 @@
       }
       var data = await resp.json();
       renderNodeChart(data.nodes || []);
+      populateNodeSelect(data.nodes || []);
     } catch (e) {
       hideOverlay('node-loading');
       showOverlay('node-empty');
@@ -807,6 +847,88 @@
     await loadAll(activeRange);
   }
 
+  // ── v0.45.0: trend deltas, exclusions, node AI review ──────────────────────
+  function _deltaHtml(pct) {
+    if (pct === null || pct === undefined) return '';
+    var up = pct >= 0;
+    var col = up ? 'text-emerald-400' : 'text-rose-400';
+    return '<span class="' + col + '">' + (up ? '▲' : '▼') + ' ' + Math.abs(pct) + '%</span>';
+  }
+  function renderTrend(trend) {
+    var sd = document.getElementById('stat-sessions-delta');
+    var bd = document.getElementById('stat-bytes-delta');
+    if (!trend) { if (sd) sd.innerHTML = ''; if (bd) bd.innerHTML = ''; return; }
+    if (sd) sd.innerHTML = _deltaHtml(trend.sessions_pct);
+    if (bd) bd.innerHTML = _deltaHtml(trend.bytes_pct);
+  }
+
+  function populateNodeSelect(nodes) {
+    var sel = document.getElementById('ai-node');
+    if (!sel) return;
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">Select a sensor node…</option>';
+    (nodes || []).forEach(function (n) {
+      var o = document.createElement('option');
+      o.value = n.node; o.textContent = n.node;
+      sel.appendChild(o);
+    });
+    if (cur) sel.value = cur;
+  }
+
+  function renderExclChips(items) {
+    var box = document.getElementById('excl-chips');
+    if (!box) return;
+    if (!items || !items.length) { box.innerHTML = '<span class="text-xs text-slate-600">No exclusions</span>'; return; }
+    box.innerHTML = items.map(function (e) {
+      return '<span class="inline-flex items-center gap-1 text-xs bg-slate-800 border border-slate-700 rounded px-2 py-0.5">' +
+        '<span class="font-mono text-slate-300">' + (e.cidr || '') + '</span>' +
+        '<button data-excl-id="' + e.id + '" class="excl-del text-rose-400 hover:text-rose-300">×</button></span>';
+    }).join('');
+  }
+  function loadExclusions() {
+    return fetch('/api/arkime/traffic/exclusions').then(function (r) { return r.ok ? r.json() : { exclusions: [] }; })
+      .then(function (d) { renderExclChips(d.exclusions || []); })
+      .catch(function () {});
+  }
+  function addExclusion() {
+    var inp = document.getElementById('excl-input');
+    var cidr = (inp.value || '').trim();
+    if (!cidr) return;
+    fetch('/api/arkime/traffic/exclusions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cidr: cidr }),
+    }).then(function (r) {
+      if (!r.ok) return r.json().then(function (d) { throw new Error(d.detail || 'failed'); });
+      inp.value = '';
+      return loadExclusions().then(function () { loadAll(activeRange); });
+    }).catch(function (e) { if (window.showToast) showToast('Add filter failed: ' + e.message, 'error'); });
+  }
+  function removeExclusion(id) {
+    fetch('/api/arkime/traffic/exclusions/' + id, { method: 'DELETE' })
+      .then(function () { return loadExclusions().then(function () { loadAll(activeRange); }); })
+      .catch(function () {});
+  }
+
+  function runAiReview() {
+    var node = document.getElementById('ai-node').value;
+    var out = document.getElementById('ai-review-out');
+    var btn = document.getElementById('ai-review-btn');
+    if (!node) { out.innerHTML = '<span class="text-amber-400">Select a node first.</span>'; return; }
+    btn.disabled = true;
+    out.innerHTML = '<span class="text-slate-400">Bob is reviewing ' + node + ' over ' + activeRange + '… (can take 30–90s)</span>';
+    fetch('/api/arkime/traffic/ai-review', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ node: node, range: activeRange }),
+    }).then(function (r) {
+      return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status)); return d; });
+    }).then(function (d) {
+      var md = (typeof safeMarkdown === 'function') ? safeMarkdown(d.analysis || '') : (d.analysis || '');
+      out.innerHTML = md + '<div class="mt-2 text-xs text-slate-500">model: ' + (d.model || 'unknown') + ' · node ' + node + ' · ' + activeRange + '</div>';
+    }).catch(function (e) {
+      out.innerHTML = '<span class="text-rose-400">AI review failed: ' + e.message + '</span>';
+    }).finally(function () { btn.disabled = false; });
+  }
+
   // ── Event binding (CSP-safe — no inline handlers) ──────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     // Range tabs
@@ -844,6 +966,22 @@
       btn.classList.add('atf-country-active');
       renderWorldMap();
     });
+
+    // Exclusion filter + private toggle + AI review (v0.45.0)
+    var addBtn = document.getElementById('excl-add');
+    if (addBtn) addBtn.addEventListener('click', addExclusion);
+    var inp = document.getElementById('excl-input');
+    if (inp) inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') addExclusion(); });
+    var chips = document.getElementById('excl-chips');
+    if (chips) chips.addEventListener('click', function (e) {
+      var b = e.target.closest('.excl-del');
+      if (b) removeExclusion(b.getAttribute('data-excl-id'));
+    });
+    var priv = document.getElementById('excl-private');
+    if (priv) priv.addEventListener('change', function () { loadAll(activeRange); });
+    var aiBtn = document.getElementById('ai-review-btn');
+    if (aiBtn) aiBtn.addEventListener('click', runAiReview);
+    loadExclusions();
 
     init();
   });
