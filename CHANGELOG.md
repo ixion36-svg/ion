@@ -1,13 +1,34 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.44.1 -->
+<!-- ion-doc:version=0.44.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.44.2 — 2026-06-25
+
+**Fix: the bob_eval harness scored every sample as an abstention — it now produces real metrics.**
+
+- **bob_eval was structurally non-functional.** The evaluation harness
+  (`/api/bob-eval`) re-runs Bob against closed-case ground truth and compares
+  the fresh verdict to the analyst's verdict — but it read the model reply from
+  `result["message"]["content"]`, whereas `OllamaService.chat()` returns the
+  text under a top-level `"content"` key. The content was therefore always
+  empty, the parsed verdict always `None`, and every sample fell through to an
+  abstention — so precision / recall / F1 came back null on every run, in every
+  shipped version. Fixed to read `result["content"]` (with a fallback to the raw
+  `message` shape so a future change can't silently re-zero it), and to pass
+  `response_format="json"` on the replay so the verdict is parsed exactly as the
+  live investigation path produces it. 16 bob_eval unit tests green; a local run
+  now yields real TP/FP/FN + P/R/F1 with zero spurious abstentions.
+- Adds `tools/bob_eval_local.py` — a dev utility to seed a small balanced
+  labelled set and run the eval locally (fresh/dev DBs have no closed-case
+  `ai_feedback` ground truth to score against). Not part of the running app.
+- No route, permission, schema, or dependency change. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.44.1 — 2026-06-25
 
