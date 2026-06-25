@@ -218,7 +218,7 @@ def assemble_full_process_tree(
     """Build the *full* process explorer from resolved process-event docs.
 
     The Kibana-analyzer-style path, used when a process-events index is wired
-    (``ION_ES_PROCESS_EVENTS_INDEX``). ``event_docs`` are the ``_source`` dicts of
+    (``ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX``). ``event_docs`` are the ``_source`` dicts of
     process events resolved by entity-id; this walks the alert's
     ``process.Ext.ancestry`` (parent-first) into a NAMED root→leaf chain, flags
     the alert's own process, and attaches the alert process's direct children
@@ -450,11 +450,9 @@ class ElasticsearchService:
         self.kfp_index = config.get("kfp_index", "ion-kfp")
         # Optional raw process-events index for the full process explorer
         # (Kibana-analyzer-style ancestry/children resolution). Empty = off, in
-        # which case the explorer degrades to the alert-local tree.
-        self.process_events_index = (
-            config.get("process_events_index")
-            or os.environ.get("ION_ES_PROCESS_EVENTS_INDEX", "")
-        )
+        # which case the explorer degrades to the alert-local tree. Set via
+        # ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX / config.json / admin wizard.
+        self.process_events_index = config.get("process_events_index", "")
         self.verify_ssl = verify_ssl if verify_ssl is not None else config.get("verify_ssl", True)
         # User mapping for alert assignment
         self.user_index = config.get("user_index", "")

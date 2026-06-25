@@ -88,6 +88,10 @@ class Config:
     elasticsearch_username: str = ""  # Basic auth username
     elasticsearch_password: str = ""  # Basic auth password
     elasticsearch_alert_index: str = ".alerts-security.alerts-production"  # Alert index pattern
+    # Optional raw process-events index (Elastic Defend endpoint events) for the
+    # full process explorer — resolves named ancestry + child processes by
+    # entity-id. Empty = off; the explorer then uses the alert-local tree only.
+    elasticsearch_process_events_index: str = ""
     elasticsearch_case_index: str = "ion-cases"  # Index for synced case documents
     elasticsearch_verify_ssl: bool = False
     # User mapping for alert assignment
@@ -728,6 +732,10 @@ def get_config() -> Config:
             _config.elasticsearch_password = os.environ.get("ION_ELASTICSEARCH_PASSWORD", "")
         if os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX"):
             _config.elasticsearch_alert_index = os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX", "")
+        if os.environ.get("ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX"):
+            _config.elasticsearch_process_events_index = os.environ.get(
+                "ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX", ""
+            )
         if os.environ.get("ION_ELASTICSEARCH_CASE_INDEX"):
             _config.elasticsearch_case_index = os.environ.get("ION_ELASTICSEARCH_CASE_INDEX", "ion-cases")
         if os.environ.get("ION_ELASTICSEARCH_VERIFY_SSL"):
@@ -1082,6 +1090,7 @@ def get_elasticsearch_config() -> dict:
         "username": config.elasticsearch_username,
         "password": config.elasticsearch_password,
         "alert_index": config.elasticsearch_alert_index,
+        "process_events_index": config.elasticsearch_process_events_index,
         "case_index": config.elasticsearch_case_index,
         "verify_ssl": config.elasticsearch_verify_ssl,
         "user_index": config.elasticsearch_user_index,
