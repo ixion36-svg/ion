@@ -881,8 +881,8 @@
     if (!items || !items.length) { box.innerHTML = '<span class="text-xs text-slate-600">No exclusions</span>'; return; }
     box.innerHTML = items.map(function (e) {
       return '<span class="inline-flex items-center gap-1 text-xs bg-slate-800 border border-slate-700 rounded px-2 py-0.5">' +
-        '<span class="font-mono text-slate-300">' + (e.cidr || '') + '</span>' +
-        '<button data-excl-id="' + e.id + '" class="excl-del text-rose-400 hover:text-rose-300">×</button></span>';
+        '<span class="font-mono text-slate-300">' + escHtml(e.cidr || '') + '</span>' +
+        '<button data-excl-id="' + escHtml(e.id) + '" class="excl-del text-rose-400 hover:text-rose-300">×</button></span>';
     }).join('');
   }
   function loadExclusions() {
@@ -909,23 +909,29 @@
       .catch(function () {});
   }
 
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[<>&"']/g, function (c) {
+      return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
   function runAiReview() {
     var node = document.getElementById('ai-node').value;
     var out = document.getElementById('ai-review-out');
     var btn = document.getElementById('ai-review-btn');
     if (!node) { out.innerHTML = '<span class="text-amber-400">Select a node first.</span>'; return; }
     btn.disabled = true;
-    out.innerHTML = '<span class="text-slate-400">Bob is reviewing ' + node + ' over ' + activeRange + '… (can take 30–90s)</span>';
+    out.innerHTML = '<span class="text-slate-400">Bob is reviewing ' + escHtml(node) + ' over ' + escHtml(activeRange) + '… (can take 30–90s)</span>';
     fetch('/api/arkime/traffic/ai-review', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ node: node, range: activeRange }),
     }).then(function (r) {
       return r.json().then(function (d) { if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status)); return d; });
     }).then(function (d) {
-      var md = (typeof safeMarkdown === 'function') ? safeMarkdown(d.analysis || '') : (d.analysis || '');
-      out.innerHTML = md + '<div class="mt-2 text-xs text-slate-500">model: ' + (d.model || 'unknown') + ' · node ' + node + ' · ' + activeRange + '</div>';
+      var md = (typeof safeMarkdown === 'function') ? safeMarkdown(d.analysis || '') : escHtml(d.analysis || '');
+      out.innerHTML = md + '<div class="mt-2 text-xs text-slate-500">model: ' + escHtml(d.model || 'unknown') + ' · node ' + escHtml(node) + ' · ' + escHtml(activeRange) + '</div>';
     }).catch(function (e) {
-      out.innerHTML = '<span class="text-rose-400">AI review failed: ' + e.message + '</span>';
+      out.innerHTML = '<span class="text-rose-400">AI review failed: ' + escHtml(e.message) + '</span>';
     }).finally(function () { btn.disabled = false; });
   }
 
