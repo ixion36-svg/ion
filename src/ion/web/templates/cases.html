@@ -1360,6 +1360,24 @@
 }
 .cpanel-alert-showall:hover { text-decoration: underline; }
 .cpanel-alert-fields-all { margin-top: 0.2rem; }
+.cpanel-alert-evidence {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-top: 0.4rem;
+    margin-left: 0.8rem;
+    background: none;
+    border: 1px solid var(--border-color, #2a3344);
+    border-radius: 4px;
+    color: var(--text-secondary, #9fb3c8);
+    font-size: 0.68rem;
+    cursor: pointer;
+    padding: 0.2rem 0.5rem;
+}
+.cpanel-alert-evidence:hover {
+    color: var(--ion-cyan, #6de4ff);
+    border-color: var(--ion-cyan, #6de4ff);
+}
 
 /* Rule guide (detection rule description + investigation guide) */
 .cpanel-rule-guide-box { margin-top: 0.35rem; }
@@ -2666,6 +2684,7 @@ async function rewriteClosureNotes() {
                 draft: draft,
                 reason: reason,
                 case_title: theCase ? (theCase.title || '') : '',
+                case_id: caseId,
             }),
         });
         const data = await resp.json().catch(() => ({}));
@@ -2810,6 +2829,9 @@ const statusColors = {
 // can surface ALL extracted values for that alert — including any the dedup'd
 // case-level Observables tab dropped (same value+type seen on another alert).
 const _alertObsByFieldsId = {};
+// Maps a dropdown's fieldsId → its owning case id, so "Add fields as evidence
+// note" can post to the right case from inside the lazy-rendered dropdown.
+const _fieldsIdToCaseId = {};
 
 // Flatten a nested alert _source into dot-path key:value pairs (arrays of
 // scalars are joined; arrays of objects are indexed).
@@ -2889,21 +2911,78 @@ function renderFlatAlertFields(raw, fieldsId) {
     let h = extracted + _alertFieldsTable(flat, keyKeys);
     if (otherKeys.length) {
         const allId = fieldsId + '-all';
+        const moreLabel = 'Show all ' + allKeys.length + ' fields (' + otherKeys.length + ' more)';
         h += '<button type="button" class="cpanel-alert-showall" '
-           + 'data-click-action="toggleAllAlertFields" data-args=\'["' + allId + '"]\'>'
-           + 'Show all ' + allKeys.length + ' fields (' + otherKeys.length + ' more)</button>';
+           + 'data-click-action="toggleAllAlertFields" data-args=\'["' + allId + '"]\' '
+           + 'data-more-label="' + esc(moreLabel) + '" data-less-label="Show fewer fields" '
+           + 'aria-expanded="false">' + moreLabel + '</button>';
         h += '<div class="cpanel-alert-fields-all" id="' + allId + '" hidden>'
            + _alertFieldsTable(flat, otherKeys) + '</div>';
     }
+    // Stash the key (well-known) fields so the analyst can pin them to the
+    // case as an evidence note in one click.
+    _alertKeyFieldsByFieldsId[fieldsId] = keyKeys.map(k => ({ key: k, value: String(flat[k]) }));
+    h += '<button type="button" class="cpanel-alert-evidence" '
+       + 'data-click-action="addFieldsAsEvidence" data-args=\'["' + fieldsId + '"]\'>'
+       + '<i class="icon-bookmark"></i> Add fields as evidence note</button>';
     return h;
 }
 
-// Toggle the "all remaining fields" section under a linked alert.
+// Toggle the "all remaining fields" section under a linked alert. `this` is
+// the clicked button (event-delegation calls fn.apply(el, args)), so we flip
+// its label/state to give the click visible feedback.
 function toggleAllAlertFields(allId) {
     const el = document.getElementById(allId);
     if (!el) return;
-    if (el.hasAttribute('hidden')) el.removeAttribute('hidden');
-    else el.setAttribute('hidden', '');
+    const btn = (this && this.classList && this.classList.contains('cpanel-alert-showall')) ? this : null;
+    if (el.hasAttribute('hidden')) {
+        el.removeAttribute('hidden');
+        if (btn) { btn.textContent = btn.dataset.lessLabel || 'Show fewer fields'; btn.setAttribute('aria-expanded', 'true'); }
+    } else {
+        el.setAttribute('hidden', '');
+        if (btn) { btn.textContent = btn.dataset.moreLabel || 'Show all fields'; btn.setAttribute('aria-expanded', 'false'); }
+    }
+}
+
+// Well-known (allowlisted) fields per linked-alert dropdown, captured at
+// render time so "Add fields as evidence note" can post them without re-parsing.
+const _alertKeyFieldsByFieldsId = {};
+
+// Pin the linked alert's well-known fields (+ any extracted observables) to
+// the case as a formatted investigation note. Uses the existing case-notes
+// endpoint (case:update) — no new surface.
+async function addFieldsAsEvidence(fieldsId) {
+    const caseId = _fieldsIdToCaseId[fieldsId];
+    if (!caseId) { showToast('Could not resolve the case for this alert', 'warning'); return; }
+    const fields = _alertKeyFieldsByFieldsId[fieldsId] || [];
+    const obs = _alertObsByFieldsId[fieldsId] || [];
+    if (!fields.length && !obs.length) { showToast('No fields to add', 'warning'); return; }
+    const lines = ['**Alert fields (evidence)**', ''];
+    if (obs.length) {
+        lines.push('_Extracted values:_');
+        for (const o of obs) lines.push('- `' + (o.type || 'unknown') + '` = ' + (o.value || ''));
+        lines.push('');
+    }
+    if (fields.length) {
+        lines.push('_Well-known fields:_');
+        for (const f of fields) lines.push('- **' + f.key + '**: ' + f.value);
+    }
+    const content = lines.join('\n');
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: content }),
+        });
+        if (!resp.ok) {
+            const d = await resp.json().catch(() => ({}));
+            throw new Error(d.detail || ('HTTP ' + resp.status));
+        }
+        showToast('Fields added to the case as an evidence note', 'success');
+        openCaseDetail(caseId); // refresh panel so the new note shows
+    } catch (e) {
+        showToast('Failed to add evidence note: ' + e.message, 'error');
+    }
 }
 
 // Toggle (and lazy-load) a linked alert's parsed fields.
@@ -3323,6 +3402,7 @@ function renderPanelContent(c) {
             // can list them alongside the raw fields (item: not all extracted
             // values surface in the dedup'd case Observables tab).
             _alertObsByFieldsId[fieldsId] = a.observables || [];
+            _fieldsIdToCaseId[fieldsId] = c.id;
             // v0.19.3: prefer human-readable rule_name when available;
             // fall back to a 24-char prefix of the opaque ES id for
             // legacy rows where rule_name is null.

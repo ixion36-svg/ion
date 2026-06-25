@@ -16,6 +16,19 @@
 
   <!-- ── My Day ── -->
   <section id="dw-view-me" class="dw-view">
+    <div class="dw-daybar">
+      <div class="dw-daynav">
+        <button type="button" class="ion-btn dw-nav" id="dw-prev" title="Previous day" aria-label="Previous day">‹</button>
+        <input type="date" class="ion-input dw-datepick" id="dw-date" />
+        <button type="button" class="ion-btn dw-nav" id="dw-next" title="Next day" aria-label="Next day">›</button>
+        <button type="button" class="ion-btn dw-today" id="dw-today">Today</button>
+      </div>
+      <div class="ion-toggle dw-subtoggle" id="dw-modetoggle">
+        <button type="button" class="on" data-mode="calendar">Calendar</button>
+        <button type="button" data-mode="timeline">Timeline</button>
+      </div>
+    </div>
+
     <div class="ion-metrics-grid dw-metrics" id="dw-metrics"></div>
 
     <div class="dw-split">
@@ -27,26 +40,55 @@
           <span class="dw-composer-plus" aria-hidden="true">＋</span>
           <input class="ion-input dw-composer-input" id="dw-text"
                  placeholder="Or log something custom — add detail, pick a type…" maxlength="2000" />
+          <input type="time" class="ion-input dw-composer-time" id="dw-time" title="Time of day for this entry" />
           <select class="ion-select dw-composer-type" id="dw-type"></select>
           <button type="button" class="ion-btn ion-btn-primary" id="dw-add">Add</button>
         </div>
 
-        <div class="dw-section-label">Activity timeline</div>
-        <div class="ion-timeline" id="dw-timeline">
-          <div class="ion-timeline-rail"></div>
+        <!-- Calendar (default) -->
+        <div id="dw-mode-calendar">
+          <div class="dw-section-label">Day calendar — click an hour to add, an entry to edit</div>
+          <div class="dw-calendar" id="dw-calendar"></div>
+        </div>
+
+        <!-- Timeline (alternate) -->
+        <div id="dw-mode-timeline" class="dw-hidden">
+          <div class="dw-section-label">Activity timeline</div>
+          <div class="ion-timeline" id="dw-timeline">
+            <div class="ion-timeline-rail"></div>
+          </div>
         </div>
       </div>
 
       <div>
         <div class="ion-card">
           <p class="ion-card-title"><span aria-hidden="true">↪</span> Shift handover</p>
-          <p class="ion-muted dw-hint">Compile today's work into a paste-ready note for the next shift.</p>
+          <p class="ion-muted dw-hint">Compile this day's work into a paste-ready note for the next shift.</p>
           <button type="button" class="ion-btn ion-btn-primary dw-btn-full" id="dw-handover-btn">Generate handover</button>
-          <pre class="dw-handover-out" id="dw-handover-out">Click “Generate handover” to draft from today’s timeline…</pre>
+          <pre class="dw-handover-out" id="dw-handover-out">Click “Generate handover” to draft from the timeline…</pre>
         </div>
       </div>
     </div>
   </section>
+
+  <!-- ── Edit / add entry modal ── -->
+  <div class="dw-modal-overlay dw-hidden" id="dw-modal">
+    <div class="dw-modal-card" role="dialog" aria-modal="true" aria-labelledby="dw-modal-title">
+      <p class="ion-card-title" id="dw-modal-title">Edit entry</p>
+      <label class="dw-field-label" for="dw-edit-time">Time</label>
+      <input type="time" class="ion-input dw-field" id="dw-edit-time" />
+      <label class="dw-field-label" for="dw-edit-type">Type</label>
+      <select class="ion-select dw-field" id="dw-edit-type"></select>
+      <label class="dw-field-label" for="dw-edit-text">Detail</label>
+      <textarea class="ion-input dw-field" id="dw-edit-text" rows="3" maxlength="2000"></textarea>
+      <div class="dw-modal-actions">
+        <button type="button" class="ion-btn dw-modal-del dw-hidden" id="dw-edit-delete">Delete</button>
+        <span class="dw-modal-spacer"></span>
+        <button type="button" class="ion-btn" id="dw-edit-cancel">Cancel</button>
+        <button type="button" class="ion-btn ion-btn-primary" id="dw-edit-save">Save</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ── Team Day ── -->
   <section id="dw-view-team" class="dw-view dw-hidden">
@@ -103,6 +145,38 @@
   .dw-num-cyan { color: var(--primary); }
   .dw-num-green { color: var(--success); }
   .dw-last { font-size: 11px; color: var(--text-muted); }
+  .dw-hidden { display: none; }
+  /* day bar: date nav + calendar/timeline sub-toggle */
+  .dw-daybar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 2px; }
+  .dw-daynav { display: flex; align-items: center; gap: 6px; }
+  .dw-nav { padding: 4px 11px; font-size: 16px; line-height: 1; }
+  .dw-today { padding: 5px 12px; font-size: 12px; }
+  .dw-datepick { width: auto; padding: 4px 8px; }
+  .dw-subtoggle button { font-size: 12px; }
+  .dw-composer-time { width: auto; flex: 0 0 auto; }
+  /* day calendar */
+  .dw-calendar { border: 1px solid var(--border); border-radius: var(--radius); max-height: 560px; overflow-y: auto; background: var(--bg-card); }
+  .dw-hour { display: grid; grid-template-columns: 56px 1fr; border-bottom: 1px solid var(--border); min-height: 38px; }
+  .dw-hour:last-child { border-bottom: none; }
+  .dw-hour-label { font-size: 11px; color: var(--text-muted); padding: 6px 8px; text-align: right; border-right: 1px solid var(--border); font-family: var(--font-mono, monospace); }
+  .dw-hour-slot { padding: 4px 6px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+  .dw-hour-slot:hover { background: var(--bg-secondary); }
+  .dw-hour-now { box-shadow: inset 2px 0 0 var(--primary); }
+  .dw-cal-item { display: flex; align-items: center; gap: 7px; padding: 3px 6px; border-radius: 5px; background: var(--bg-secondary); border: 1px solid var(--border); font-size: 12.5px; }
+  .dw-cal-item.dw-editable { cursor: pointer; }
+  .dw-cal-item.dw-editable:hover { border-color: var(--primary); }
+  .dw-cal-time { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono, monospace); flex: 0 0 auto; }
+  .dw-cal-text { color: var(--text-secondary); }
+  .dw-cal-auto { margin-left: auto; font-size: 9.5px; color: #475569; text-transform: uppercase; letter-spacing: .04em; flex: 0 0 auto; }
+  .dw-cal-edit { margin-left: auto; font-size: 10px; color: var(--text-muted); flex: 0 0 auto; }
+  /* edit / add modal */
+  .dw-modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 16, 0.66); display: flex; align-items: center; justify-content: center; z-index: 200; }
+  .dw-modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; width: 380px; max-width: 92vw; box-shadow: 0 18px 48px rgba(0,0,0,.5); }
+  .dw-field-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 4px; }
+  .dw-field { width: 100%; }
+  .dw-modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
+  .dw-modal-spacer { flex: 1; }
+  .dw-modal-del { color: var(--danger); border-color: var(--danger); }
 </style>
 {% endblock %}
 
@@ -114,9 +188,17 @@
   var AUTO_COLORS = { triaged: "red", closed: "green", playbook: "amber", note: "purple", shift: "muted" };
   var typeColor = {};   // slug -> colour key
   var typeLabel = {};   // slug -> display label
+  var currentMode = "calendar";   // 'calendar' | 'timeline'
 
   function esc(s) { return String(s == null ? "" : s).replace(/[<>&"]/g, function (c) { return ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]; }); }
   function colorKey(t) { return typeColor[t] || AUTO_COLORS[t] || "muted"; }
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+  function ymd2(dt) { return dt.getFullYear() + "-" + pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate()); }
+  function todayYMD() { return ymd2(new Date()); }
+  function nowHM() { var d = new Date(); return pad2(d.getHours()) + ":" + pad2(d.getMinutes()); }
+  function shiftDate(ymd, delta) { var p = ymd.split("-"); var dt = new Date(+p[0], +p[1] - 1, +p[2]); dt.setDate(dt.getDate() + delta); return ymd2(dt); }
+
+  var selectedDate = todayYMD();   // the day being viewed (YYYY-MM-DD)
 
   function api(path, opts) {
     return fetch("/api/worklog" + path, opts || {}).then(function (r) {
@@ -131,6 +213,7 @@
     return api("/task-types").then(function (d) {
       var presets = document.getElementById("dw-presets");
       var sel = document.getElementById("dw-type");
+      var editSel = document.getElementById("dw-edit-type");
       (d.task_types || []).forEach(function (t) {
         typeColor[t.key] = t.color; typeLabel[t.key] = t.label;
         var b = document.createElement("button");
@@ -140,6 +223,8 @@
         presets.appendChild(b);
         var o = document.createElement("option");
         o.value = t.key; o.textContent = t.label; sel.appendChild(o);
+        var o2 = document.createElement("option");
+        o2.value = t.key; o2.textContent = t.label; editSel.appendChild(o2);
       });
     });
   }
@@ -147,12 +232,13 @@
   // ---- my day ----
   var lastItems = [];
   function loadDay() {
-    return api("/day").then(function (d) {
+    return api("/day?date=" + encodeURIComponent(selectedDate)).then(function (d) {
       document.getElementById("dw-sub").textContent =
         (d.user ? d.user.name : "") + " · " + d.date;
       renderMetrics(d.summary);
       lastItems = d.items || [];
       renderTimeline(lastItems);
+      renderCalendar(lastItems);
     });
   }
 
@@ -193,9 +279,13 @@
     var inp = document.getElementById("dw-text");
     var text = inp.value.trim() || fallbackText;
     if (!text) return;
+    // Place the entry on the viewed day at the composer time (or now, on
+    // today; a neutral 09:00 otherwise) so it lands where the analyst expects.
+    var t = document.getElementById("dw-time").value;
+    if (!t) t = (selectedDate === todayYMD()) ? nowHM() : "09:00";
     api("/entry", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task_type: taskType, text: text }),
+      body: JSON.stringify({ task_type: taskType, text: text, logged_at: selectedDate + "T" + t + ":00" }),
     }).then(function () { inp.value = ""; return loadDay(); })
       .catch(function (e) { if (window.showToast) showToast("Log failed: " + e.message, "error"); });
   }
@@ -210,11 +300,103 @@
     document.getElementById("dw-handover-out").textContent = lines.join("\n");
   }
 
+  // ---- day calendar ----
+  function calItemHtml(i) {
+    var ck = colorKey(i.type);
+    var label = typeLabel[i.type] || i.type;
+    var editable = i.source === "logged" && i.id;
+    var attrs = editable
+      ? ' data-entry-id="' + i.id + '" data-type="' + esc(i.type) + '" data-time="' + esc(i.time) + '" data-text="' + esc(i.text) + '"'
+      : "";
+    return '<div class="dw-cal-item ' + (editable ? "dw-editable" : "") + '"' + attrs + ">" +
+      '<span class="dw-cal-time">' + esc(i.time) + "</span>" +
+      '<span class="ion-badge ion-c-' + ck + '">' + esc(label) + "</span>" +
+      '<span class="dw-cal-text">' + esc(i.text) + "</span>" +
+      (editable ? '<span class="dw-cal-edit">edit ✎</span>'
+                : '<span class="dw-cal-auto">' + esc(i.source) + "</span>") +
+      "</div>";
+  }
+
+  function renderCalendar(items) {
+    var cal = document.getElementById("dw-calendar");
+    var byHour = {};
+    (items || []).forEach(function (i) {
+      var hh = parseInt(String(i.time || "").slice(0, 2), 10);
+      if (isNaN(hh) || hh < 0 || hh > 23) hh = 0;
+      (byHour[hh] = byHour[hh] || []).push(i);
+    });
+    var nowH = (selectedDate === todayYMD()) ? (new Date()).getHours() : -1;
+    var html = "";
+    for (var h = 0; h < 24; h++) {
+      var hourItems = (byHour[h] || []).slice().sort(function (a, b) {
+        return String(a.time || "").localeCompare(String(b.time || ""));
+      });
+      var rows = hourItems.map(calItemHtml).join("");
+      var slotCls = "dw-hour-slot" + (h === nowH ? " dw-hour-now" : "");
+      html += '<div class="dw-hour"><div class="dw-hour-label">' + pad2(h) + ":00</div>" +
+        '<div class="' + slotCls + '" data-hour="' + h + '">' + rows + "</div></div>";
+    }
+    cal.innerHTML = html;
+    // Scroll a sensible working hour into view (08:00 or the first item).
+    var firstH = Object.keys(byHour).map(Number).sort(function (a, b) { return a - b; })[0];
+    var target = cal.querySelector('.dw-hour-slot[data-hour="' + (firstH != null ? firstH : 8) + '"]');
+    if (target && target.parentElement) cal.scrollTop = Math.max(0, target.parentElement.offsetTop - 40);
+  }
+
+  // ---- edit / add entry modal ----
+  var editingId = null;   // entry id when editing; null when adding
+  function openModal(opts) {
+    editingId = opts.id || null;
+    document.getElementById("dw-modal-title").textContent = editingId ? "Edit entry" : "Add entry";
+    document.getElementById("dw-edit-time").value = opts.time || nowHM();
+    document.getElementById("dw-edit-type").value = opts.type || (document.getElementById("dw-edit-type").options[0] || {}).value || "";
+    document.getElementById("dw-edit-text").value = opts.text || "";
+    document.getElementById("dw-edit-delete").classList.toggle("dw-hidden", !editingId);
+    document.getElementById("dw-modal").classList.remove("dw-hidden");
+    document.getElementById("dw-edit-text").focus();
+  }
+  function closeModal() { document.getElementById("dw-modal").classList.add("dw-hidden"); editingId = null; }
+
+  function saveModal() {
+    var time = document.getElementById("dw-edit-time").value || nowHM();
+    var type = document.getElementById("dw-edit-type").value;
+    var text = document.getElementById("dw-edit-text").value.trim();
+    if (!type || !text) { if (window.showToast) showToast("Pick a type and add detail", "warning"); return; }
+    var body = { task_type: type, text: text, logged_at: selectedDate + "T" + time + ":00" };
+    var req = editingId
+      ? api("/entry/" + editingId, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      : api("/entry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    req.then(function () { closeModal(); return loadDay(); })
+      .catch(function (e) { if (window.showToast) showToast("Save failed: " + e.message, "error"); });
+  }
+  function deleteModal() {
+    if (!editingId) return;
+    api("/entry/" + editingId, { method: "DELETE" })
+      .then(function () { closeModal(); return loadDay(); })
+      .catch(function (e) { if (window.showToast) showToast("Delete failed: " + e.message, "error"); });
+  }
+
+  // ---- date nav + mode toggle ----
+  function gotoDate(ymd) {
+    selectedDate = ymd;
+    document.getElementById("dw-date").value = ymd;
+    loadDay().catch(function () {});
+    if (!document.getElementById("dw-view-team").classList.contains("dw-hidden")) { teamLoaded = false; loadTeam(); }
+  }
+  function setMode(m) {
+    currentMode = m;
+    document.getElementById("dw-mode-calendar").classList.toggle("dw-hidden", m !== "calendar");
+    document.getElementById("dw-mode-timeline").classList.toggle("dw-hidden", m !== "timeline");
+    document.querySelectorAll("#dw-modetoggle button").forEach(function (b) {
+      b.classList.toggle("on", b.getAttribute("data-mode") === m);
+    });
+  }
+
   // ---- team day ----
   var teamLoaded = false;
   function loadTeam() {
     if (teamLoaded) return;
-    api("/team").then(function (d) {
+    api("/team?date=" + encodeURIComponent(selectedDate)).then(function (d) {
       teamLoaded = true;
       var board = document.getElementById("dw-board");
       var note = document.getElementById("dw-team-note");
@@ -263,6 +445,40 @@
       if (e.key === "Enter") addEntry(document.getElementById("dw-type").value, null);
     });
     document.getElementById("dw-handover-btn").addEventListener("click", generateHandover);
+
+    // date navigation
+    document.getElementById("dw-date").value = selectedDate;
+    document.getElementById("dw-time").value = nowHM();
+    document.getElementById("dw-prev").addEventListener("click", function () { gotoDate(shiftDate(selectedDate, -1)); });
+    document.getElementById("dw-next").addEventListener("click", function () { gotoDate(shiftDate(selectedDate, 1)); });
+    document.getElementById("dw-today").addEventListener("click", function () { gotoDate(todayYMD()); });
+    document.getElementById("dw-date").addEventListener("change", function (e) { if (e.target.value) gotoDate(e.target.value); });
+
+    // calendar / timeline sub-toggle
+    document.querySelectorAll("#dw-modetoggle button").forEach(function (b) {
+      b.addEventListener("click", function () { setMode(b.getAttribute("data-mode")); });
+    });
+
+    // calendar interactions (delegated): click an entry to edit, an hour to add
+    document.getElementById("dw-calendar").addEventListener("click", function (e) {
+      var item = e.target.closest(".dw-cal-item.dw-editable");
+      if (item) {
+        openModal({ id: item.getAttribute("data-entry-id"), type: item.getAttribute("data-type"),
+                    time: item.getAttribute("data-time"), text: item.getAttribute("data-text") });
+        return;
+      }
+      var slot = e.target.closest(".dw-hour-slot");
+      if (slot) openModal({ time: pad2(parseInt(slot.getAttribute("data-hour"), 10)) + ":00" });
+    });
+
+    // modal buttons
+    document.getElementById("dw-edit-save").addEventListener("click", saveModal);
+    document.getElementById("dw-edit-cancel").addEventListener("click", closeModal);
+    document.getElementById("dw-edit-delete").addEventListener("click", deleteModal);
+    document.getElementById("dw-modal").addEventListener("click", function (e) {
+      if (e.target === this) closeModal();   // click backdrop to dismiss
+    });
+
     loadTaskTypes().then(loadDay).catch(function (e) {
       document.getElementById("dw-sub").textContent = "Failed to load: " + e.message;
     });

@@ -86,6 +86,9 @@ def _manual_items(session: Session, user_id: int, start, end) -> List[Dict[str, 
             out.append({
                 "time": _hm(r.logged_at), "ts": r.logged_at, "type": r.task_type,
                 "text": r.text, "source": "logged", "ref": None,
+                # id present only on manual entries → the UI uses it to gate
+                # edit/delete (auto items are derived and not mutable here).
+                "id": r.id,
             })
     except Exception as e:  # noqa: BLE001
         logger.warning("worklog manual source failed: %s", e)
@@ -202,12 +205,73 @@ def get_day_activity(session: Session, user_id: int, day: date) -> Dict[str, Any
     }
 
 
-def add_entry(session: Session, user_id: int, task_type: str, text: str) -> WorkLogEntry:
-    """Create a manual work-log entry. Caller commits."""
+def _naive(ts: Optional[datetime]) -> Optional[datetime]:
+    """Store/compare as naive wall-clock (the column is naive); drop any tz."""
+    if ts is not None and ts.tzinfo is not None:
+        return ts.replace(tzinfo=None)
+    return ts
+
+
+def add_entry(
+    session: Session,
+    user_id: int,
+    task_type: str,
+    text: str,
+    logged_at: Optional[datetime] = None,
+) -> WorkLogEntry:
+    """Create a manual work-log entry. ``logged_at`` lets the analyst place the
+    activity at a specific time of day (the day-calendar / time picker); when
+    omitted the column server-default (now) applies. Caller commits."""
     entry = WorkLogEntry(user_id=user_id, task_type=task_type, text=text)
+    if logged_at is not None:
+        entry.logged_at = _naive(logged_at)
     session.add(entry)
     session.flush()
     return entry
+
+
+def update_entry(
+    session: Session,
+    user_id: int,
+    entry_id: int,
+    task_type: Optional[str] = None,
+    text: Optional[str] = None,
+    logged_at: Optional[datetime] = None,
+) -> Optional[WorkLogEntry]:
+    """Edit a manual entry's time / type / text. Owner-scoped: the ownership
+    check runs HERE, before any mutation, so an analyst can only edit their own
+    entries (a non-owner / missing id yields ``None``, never a mutation). Only
+    non-None fields are applied. Caller commits."""
+    entry = (
+        session.query(WorkLogEntry)
+        .filter(WorkLogEntry.id == entry_id, WorkLogEntry.user_id == user_id)
+        .first()
+    )
+    if entry is None:
+        return None
+    if task_type is not None:
+        entry.task_type = task_type
+    if text is not None:
+        entry.text = text
+    if logged_at is not None:
+        entry.logged_at = _naive(logged_at)
+    session.flush()
+    return entry
+
+
+def delete_entry(session: Session, user_id: int, entry_id: int) -> bool:
+    """Delete a manual entry. Owner-scoped (check before mutation). Returns True
+    if a row owned by ``user_id`` was deleted, else False. Caller commits."""
+    entry = (
+        session.query(WorkLogEntry)
+        .filter(WorkLogEntry.id == entry_id, WorkLogEntry.user_id == user_id)
+        .first()
+    )
+    if entry is None:
+        return False
+    session.delete(entry)
+    session.flush()
+    return True
 
 
 def get_team_today(session: Session, day: date) -> List[Dict[str, Any]]:

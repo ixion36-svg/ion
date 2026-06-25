@@ -10,8 +10,10 @@ The endpoint gathers five inputs the user asked for:
 2. The rule snapshot for each linked alert (rule_name + severity from
    AlertTriage; raw rule body via ES when available).
 3. Observables on the case.
-4. Raw alert data from ES for the lead alert (best-effort — ES may be
-   unreachable in dev, the prompt tolerates an absent block).
+4. Well-known fields for EVERY linked alert (best-effort — ES may be
+   unreachable in dev, the prompt tolerates an absent block). This is what
+   makes a multi-alert case produce one case-wide analysis rather than a
+   verdict keyed off the lead alert alone.
 5. Similar closed cases via pgvector (cosine distance ≥ 0.5 by default).
 
 Bob's response is returned to the UI verbatim; the endpoint does NOT
@@ -25,7 +27,6 @@ Permission: ``case:read`` — generating an analysis is a read action.
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 from typing import Optional
@@ -126,31 +127,52 @@ def _gather_similar_cases(
         return []
 
 
-async def _gather_raw_alert(alert_id: str) -> Optional[dict]:
-    """Best-effort fetch of the raw ES alert for the lead alert id."""
+# Cap how many alerts' field summaries we inline so a noisy cluster can't
+# blow the prompt budget; the rest are acknowledged as truncated.
+_MAX_ALERTS_IN_PROMPT = 12
+
+
+async def _gather_alert_field_summaries(alert_ids: list[str]) -> list[dict]:
+    """Well-known-field summary for EVERY linked alert (best-effort via ES).
+
+    Returns one dict per alert — ``{es_id, rule_name, fields}`` — where
+    ``fields`` is the investigation service's compact well-known-field map
+    (rule, host, user, process, network, file, plus the detection rule's
+    description / investigation guide). This is what lets a multi-alert case
+    get a genuine case-WIDE analysis instead of one keyed off the lead alert
+    only: even when no per-alert autonomous investigation has run yet, Bob
+    sees the salient fields from each alert in the cluster.
+    """
+    if not alert_ids:
+        return []
     try:
         from ion.services.elasticsearch_service import ElasticsearchService
+        from ion.services.investigation_service import InvestigationService
+
         es = ElasticsearchService()
         if not es.is_configured:
-            return None
-        hits = await es.get_alerts_by_ids([alert_id])
+            return []
+        hits = await es.get_alerts_by_ids(alert_ids[:_MAX_ALERTS_IN_PROMPT])
         if not hits:
-            return None
-        h = hits[0]
-        return {
-            "_id": alert_id,
-            "rule_name": getattr(h, "rule_name", None),
-            "severity": getattr(h, "severity", None),
-            "host": getattr(h, "host_name", None) or getattr(h, "host", None),
-            "user": getattr(h, "user_name", None) or getattr(h, "user", None),
-            "source_ip": getattr(h, "source_ip", None),
-            "dest_ip": getattr(h, "destination_ip", None),
-            "mitre_techniques": getattr(h, "mitre_techniques", None) or [],
-            "fired_at": getattr(h, "fired_at", None),
-        }
+            return []
+        inv = InvestigationService()
+        out: list[dict] = []
+        for h in hits:
+            raw = dict(getattr(h, "raw_data", None) or {})
+            raw.setdefault("_id", getattr(h, "id", None))
+            try:
+                summary = inv._build_alert_summary(raw)
+            except Exception:  # noqa: BLE001 — one bad doc shouldn't sink the set
+                summary = {}
+            out.append({
+                "es_id": getattr(h, "id", None),
+                "rule_name": getattr(h, "rule_name", None),
+                "fields": summary,
+            })
+        return out
     except Exception as exc:
-        logger.debug("Raw alert fetch failed for %s: %s", alert_id, exc)
-        return None
+        logger.debug("Per-alert field summary gather failed: %s", exc)
+        return []
 
 
 # ── Prompt builder ───────────────────────────────────────────────────────
@@ -161,6 +183,10 @@ _SYSTEM_PROMPT = (
     "case analysis for a human L1/L2 analyst who has explicitly clicked "
     "\"Get Bob's Analysis\". The analyst wants a tight, evidence-grounded "
     "verdict they can paste into the case as a note if they agree. "
+    "A case may bundle MANY alerts — reason over ALL of them together: "
+    "treat the alerts as one incident, look for the relationship between "
+    "them (shared host/user/process/timeline, a kill-chain across alerts), "
+    "and give ONE overall verdict for the case rather than per-alert notes. "
     "Cite the SPECIFIC fields, observables, and prior cases you reference. "
     "Do not speculate beyond what the data shows. "
     "Structure your output as markdown with these sections, in order: "
@@ -178,12 +204,65 @@ _SYSTEM_PROMPT = (
 )
 
 
+def _render_alert_fields_section(alert_summaries: list[dict], total_alerts: int) -> list[str]:
+    """Render the per-alert well-known-field block.
+
+    The detection-rule prose (description + investigation guide) is pulled out
+    and shown ONCE — alerts in a cluster usually share a rule, so repeating it
+    per alert would waste the prompt budget — while each alert lists its own
+    salient fields (host/user/process/network/file).
+    """
+    parts: list[str] = ["## Well-known fields across all alerts"]
+    if not alert_summaries:
+        parts.append("_Elasticsearch unavailable or alerts not found._")
+        parts.append("")
+        return parts
+
+    rule_keys = ("rule_description", "rule_investigation_guide")
+    rule_desc = next(
+        (s["fields"].get("rule_description") for s in alert_summaries
+         if s.get("fields", {}).get("rule_description")), None,
+    )
+    rule_guide = next(
+        (s["fields"].get("rule_investigation_guide") for s in alert_summaries
+         if s.get("fields", {}).get("rule_investigation_guide")), None,
+    )
+    if rule_desc or rule_guide:
+        parts.append("### Detection rule context")
+        if rule_desc:
+            parts.append(f"- **What this rule detects:** {rule_desc}")
+        if rule_guide:
+            parts.append(f"- **Author's investigation guide:** {rule_guide}")
+        parts.append("")
+
+    for i, s in enumerate(alert_summaries, 1):
+        fields = s.get("fields", {}) or {}
+        parts.append(f"### Alert {i} — `{s.get('es_id')}` ({s.get('rule_name') or 'unknown rule'})")
+        rendered = False
+        for k, v in fields.items():
+            if k in rule_keys or v in (None, "", [], {}):
+                continue
+            parts.append(f"- {k}: {v}")
+            rendered = True
+        if not rendered:
+            parts.append("_No salient fields parsed._")
+        parts.append("")
+
+    if total_alerts > len(alert_summaries):
+        parts.append(
+            f"_…and {total_alerts - len(alert_summaries)} more alert(s) on "
+            "this case not inlined above._"
+        )
+        parts.append("")
+    return parts
+
+
 def _build_user_prompt(
     case: AlertCase,
     linked_triages: list[AlertTriage],
     investigations: list[dict],
     similar_cases: list[dict],
-    raw_alert: Optional[dict],
+    alert_summaries: list[dict],
 ) -> str:
     """Construct the markdown context block the analyst expects Bob to use."""
     parts: list[str] = []
@@ -232,14 +311,7 @@ def _build_user_prompt(
             parts.append(f"_…and {len(obs) - 20} more._")
     parts.append("")
 
-    parts.append("## Raw lead alert (from Elasticsearch)")
-    if raw_alert is None:
-        parts.append("_Elasticsearch unavailable or alert not found._")
-    else:
-        parts.append("```json")
-        parts.append(json.dumps(raw_alert, indent=2, default=str))
-        parts.append("```")
-    parts.append("")
+    parts.extend(_render_alert_fields_section(alert_summaries, len(linked_triages)))
 
     parts.append(f"## Prior autonomous investigations ({len(investigations)})")
     if not investigations:
@@ -309,10 +381,10 @@ async def generate_bob_analysis(
 
     investigations = _gather_investigations(session, alert_ids)
     similar = _gather_similar_cases(session, case_id)
-    raw_alert = await _gather_raw_alert(alert_ids[0]) if alert_ids else None
+    alert_summaries = await _gather_alert_field_summaries(alert_ids)
 
     user_prompt = _build_user_prompt(
-        case, linked_triages, investigations, similar, raw_alert
+        case, linked_triages, investigations, similar, alert_summaries
     )
 
     try:
@@ -351,7 +423,7 @@ async def generate_bob_analysis(
             "alerts_count": len(linked_triages),
             "observables_count": len(case.observables or []),
             "similar_cases_count": len(similar),
-            "raw_alert_present": raw_alert is not None,
+            "alert_fields_present": len(alert_summaries),
         },
         generated_at=datetime.now(timezone.utc).isoformat(),
     )

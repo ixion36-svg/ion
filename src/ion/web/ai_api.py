@@ -666,6 +666,56 @@ EVIDENCE: A narrative summary of the evidence collected, including observables, 
         raise HTTPException(status_code=503, detail=safe_error(e))
 
 
+def _gather_closure_precedents(case_id: int, limit: int = 3) -> List[dict]:
+    """Closed cases most similar to ``case_id`` that carry a closure note.
+
+    Best-effort via pgvector cosine distance (same store the case-analysis
+    endpoint uses). Returns ``[{case_number, closure_reason, closure_notes}]``
+    with the note clipped, so the rewrite can cite how comparable cases were
+    resolved as precedent without bloating the prompt. Any failure (pgvector
+    unavailable, no embedding for this case) yields an empty list — the
+    rewrite then proceeds with no precedent block.
+    """
+    try:
+        from ion.models.alert_triage import AlertCase
+        from ion.models.case_embedding import CaseEmbedding
+
+        for db in get_session():
+            target = db.query(CaseEmbedding).filter_by(case_id=case_id).first()
+            if target is None:
+                return []
+            distance = CaseEmbedding.embedding.cosine_distance(target.embedding)
+            rows = (
+                db.query(AlertCase, distance.label("distance"))
+                .join(CaseEmbedding, CaseEmbedding.case_id == AlertCase.id)
+                .filter(AlertCase.id != case_id)
+                .filter(AlertCase.closure_reason.isnot(None))
+                .filter(AlertCase.closure_notes.isnot(None))
+                .order_by(distance.asc())
+                .limit(limit * 2)
+                .all()
+            )
+            out: List[dict] = []
+            for case, dist in rows:
+                sim = 1.0 - float(dist)
+                if sim < 0.5:
+                    continue
+                note = (case.closure_notes or "").strip()
+                if not note:
+                    continue
+                out.append({
+                    "case_number": case.case_number,
+                    "closure_reason": case.closure_reason,
+                    "closure_notes": note[:400],
+                })
+                if len(out) >= limit:
+                    break
+            return out
+    except Exception as exc:  # noqa: BLE001 — precedent is best-effort enrichment
+        logger.debug("Closure-precedent lookup failed for case %s: %s", case_id, exc)
+    return []
+
+
 @router.post("/closure/rewrite")
 async def closure_rewrite(
     request_data: dict,
@@ -675,8 +725,11 @@ async def closure_rewrite(
 
     Takes the analyst's draft notes plus the selected closure reason (and an
     optional case title for context) and returns a tightened, professional
-    closing comment. When the draft is empty it produces a sensible starting
-    point keyed off the closure reason so the analyst has something to refine.
+    closing comment, kept to a few short paragraphs. When the draft is empty it
+    produces a sensible starting point keyed off the closure reason. When a
+    ``case_id`` is supplied, comparable closed cases (with their closure notes)
+    are surfaced to the model as precedent so the rationale can reference how
+    similar cases were resolved.
     """
     service = get_ollama_service()
 
@@ -686,12 +739,29 @@ async def closure_rewrite(
     draft = (request_data.get("draft") or "").strip()
     reason = (request_data.get("reason") or "").strip()
     case_title = (request_data.get("case_title") or "").strip()
+    case_id = request_data.get("case_id")
 
     reason_label = reason.replace("_", " ") if reason else "unspecified"
     context_lines = [f"Closure reason: {reason_label}"]
     if case_title:
         context_lines.append(f"Case title: {case_title}")
     context_block = "\n".join(context_lines)
+
+    precedents: List[dict] = []
+    if isinstance(case_id, int) or (isinstance(case_id, str) and case_id.isdigit()):
+        precedents = _gather_closure_precedents(int(case_id))
+    precedent_block = ""
+    if precedents:
+        lines = [
+            "Comparable past closures (for precedent only — do NOT copy their "
+            "specific observables/hosts into this note):",
+        ]
+        for p in precedents:
+            lines.append(
+                f"- {p['case_number']} (closed: "
+                f"{p['closure_reason'].replace('_', ' ')}): {p['closure_notes']}"
+            )
+        precedent_block = "\n".join(lines)
 
     if draft:
         task = (
@@ -712,13 +782,23 @@ async def closure_rewrite(
             "than inventing facts."
         )
 
+    precedent_instr = ""
+    if precedent_block:
+        precedent_instr = (
+            f"\n\n{precedent_block}\n\n"
+            "If the precedent above is relevant, you MAY add ONE short sentence "
+            "noting that comparable cases were closed the same way (cite the case "
+            "number). Ground everything else strictly in THIS case's own facts."
+        )
+
     prompt = (
         "You are assisting a SOC analyst writing the closing comment for a "
         "security investigation case.\n\n"
-        f"{context_block}\n\n{task}\n\n"
-        "Respond with ONLY the rewritten closing comment as plain text — no "
-        "preamble, no markdown headings, no quotation marks around the whole "
-        "response."
+        f"{context_block}\n\n{task}{precedent_instr}\n\n"
+        "Keep the result SHORT: two to three brief paragraphs, four at the "
+        "absolute most (roughly 150 words). Respond with ONLY the rewritten "
+        "closing comment as plain text — no preamble, no markdown headings, no "
+        "quotation marks around the whole response."
     )
 
     try:
@@ -726,11 +806,13 @@ async def closure_rewrite(
             messages=[{"role": "user", "content": prompt}],
             context_type="analyst",
             temperature=0.3,
+            max_tokens=400,
             user_id=current_user.id,
         )
         return {
             "content": (result["content"] or "").strip(),
             "model": result["model"],
+            "precedents_used": len(precedents),
         }
     except OllamaError as e:
         raise HTTPException(status_code=503, detail=safe_error(e))

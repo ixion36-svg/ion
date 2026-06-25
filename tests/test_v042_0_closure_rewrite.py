@@ -24,8 +24,10 @@ class _StubOllama:
     async def is_available(self):
         return self._available
 
-    async def chat(self, messages, context_type=None, temperature=None, user_id=None):
+    async def chat(self, messages, context_type=None, temperature=None,
+                   max_tokens=None, user_id=None):
         self.last_prompt = messages[0]["content"]
+        self.last_max_tokens = max_tokens
         return {"content": "  Polished closing rationale.  ", "model": "stub-model"}
 
 
@@ -65,6 +67,25 @@ def test_rewrite_polishes_draft(client, monkeypatch):
     assert "host pwned, fp, closing" in stub.last_prompt
     assert "false positive" in stub.last_prompt
     assert "Suspicious PowerShell on WS-01" in stub.last_prompt
+    # v0.44.0: output is length-capped (prompt instruction + a token ceiling).
+    assert "paragraph" in stub.last_prompt.lower()
+    assert stub.last_max_tokens == 400
+    # No case_id supplied → no precedents were gathered.
+    assert data["precedents_used"] == 0
+
+
+def test_rewrite_with_case_id_is_graceful_without_pgvector(client, monkeypatch):
+    """Passing case_id must not break when no embedding store is available —
+    the precedent lookup is best-effort and degrades to zero precedents."""
+    stub = _StubOllama()
+    monkeypatch.setattr(ai_api, "get_ollama_service", lambda: stub)
+
+    resp = client.post(
+        "/api/ai/closure/rewrite",
+        json={"draft": "closing as benign", "reason": "benign_true_positive", "case_id": 123},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["precedents_used"] == 0
 
 
 def test_rewrite_empty_draft_requests_skeleton(client, monkeypatch):
