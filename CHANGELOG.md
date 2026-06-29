@@ -1,13 +1,45 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.46.0 -->
+<!-- ion-doc:version=0.47.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.47.0 — 2026-06-29
+
+**Detection Health — a per-rule performance dashboard that closes the IR→detection feedback loop from data ION already collects.**
+
+- **What it shows.** A new `/detection-health` page (Reporting nav) aggregates
+  the `AIFeedback` ledger (Bob's verdict + the human closure verdict) joined to
+  `AlertTriage.rule_name`, and surfaces, **per detection rule**: alert volume,
+  closed count, false-positive rate, true-positive yield, the Bob-vs-analyst
+  disagreement rate, and three flags — **noisy** (FP-rate at/above a threshold),
+  **silent** (fires but has never produced a confirmed true positive), and
+  **decaying** (true-positive rate trending down, recent half vs older half).
+  Rules are listed worst-first.
+- **One-click tuning.** Each rule has a "Propose tuning" action that files a
+  `TuningProposal` against it (a net-new create path — the existing tuning API
+  only reviews Bob-generated proposals). A Bob-disagreement drill-down lists the
+  specific alerts where Bob and the analyst diverged.
+- **Trustworthy aggregation.** Reuses the canonical AIFeedback dedup (`MAX(id)`
+  per `alert_id, alert_prompt_template_id`) so a closed alert is counted once
+  with its real verdict, not its fire-time `pending` row. Rates are suppressed
+  below a minimum sample size to avoid tiny-sample noise; alerts with no
+  `rule_name` snapshot bucket as `(unmapped)`. Thresholds are env-tunable
+  (`ION_DH_LOOKBACK_DAYS` / `_MIN_SAMPLE` / `_NOISY_FP_PCT` / `_DECAY_DELTA_PCT`
+  / `_BENIGN_TP_AS_FP`).
+- **Surface.** New `services/detection_health_service.py` +
+  `web/detection_health_api.py` (`GET /api/detection-health/metrics` and
+  `/rules/{rule}/disagreements` gated `security:read`; `POST .../tuning-proposal`
+  gated `tuning:review`). Added index `ix_ai_feedback_alert_template` for the
+  dedup aggregation. Read-mostly; no new external integration or dependency.
+  Page rendered CSP-safe (every value HTML-escaped). New tests
+  `tests/test_v047_detection_health.py`. (Bob-drafted tuning text per noisy rule
+  is deferred to a future release.)
 
 ## v0.46.0 — 2026-06-29
 
