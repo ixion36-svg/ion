@@ -1946,6 +1946,66 @@ kbd {
 .json-boolean { color: var(--neon-purple); }
 .json-null { color: #94a3b8; }
 
+/* Parsed-fields view (Fields tab) — flattened well-known fields + extracted values */
+.alert-parsed-fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+.alert-parsed-fields-table td {
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+.alert-parsed-fields-table .apf-key {
+    color: var(--text-secondary);
+    font-family: 'Consolas', 'Monaco', monospace;
+    white-space: nowrap;
+    width: 1%;
+    padding-right: 1rem;
+}
+.alert-parsed-fields-table .apf-val {
+    color: var(--text-primary);
+    word-break: break-word;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+.alert-parsed-extracted {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.alert-parsed-extracted-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--primary);
+    padding: 0.4rem 0.5rem;
+    background: var(--bg-secondary);
+}
+.alert-parsed-extracted .alert-parsed-fields-table { margin-bottom: 0; }
+.alert-parsed-showall,
+.alert-parsed-evidence {
+    display: inline-block;
+    margin: 0.25rem 0.5rem 0.25rem 0;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+.alert-parsed-showall:hover,
+.alert-parsed-evidence:hover { border-color: var(--primary); color: var(--primary); }
+.alert-parsed-empty {
+    padding: 1rem;
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+}
+
 /* Modal large for alert detail */
 .modal-large {
     max-width: 900px;
@@ -8839,6 +8899,7 @@ async function showAlertDetail(alertId) {
         <button class="detail-tab-btn" data-tab="comments" data-click-action="switchDetailTab" data-args='["comments", "$target"]'>Comments</button>
         <button class="detail-tab-btn" data-tab="case" data-click-action="switchDetailTab" data-args='["case", "$target"]'>Case</button>
         <button class="detail-tab-btn" data-tab="sequence" data-click-action="switchDetailTab" data-args='["sequence", "$target"]'>Sequence</button>
+        <button class="detail-tab-btn" data-tab="fields" data-click-action="switchDetailTab" data-args='["fields", "$target"]'>Fields</button>
         <button class="detail-tab-btn" data-tab="rawdata" data-click-action="switchDetailTab" data-args='["rawdata", "$target"]'>Raw Data</button>
     </div>
     <div id="detail-tab-related" class="detail-tab-content active">
@@ -8855,6 +8916,9 @@ async function showAlertDetail(alertId) {
     </div>
     <div id="detail-tab-sequence" class="detail-tab-content">
         <div id="sequence-content" class="loading">Click to load sequence events...</div>
+    </div>
+    <div id="detail-tab-fields" class="detail-tab-content">
+        <div id="alert-fields-content"><div class="loading">Click to load parsed fields...</div></div>
     </div>
     <div id="detail-tab-rawdata" class="detail-tab-content">
         <div class="raw-data-container" id="raw-data-content">${alert.raw_data ? syntaxHighlightJSON(alert.raw_data) : '<div class="loading">Click to load raw data...</div>'}</div>
@@ -8965,6 +9029,205 @@ function switchDetailTab(tabId, btn) {
                 })
                 .catch(() => { container.innerHTML = '<div class="error">Failed to load raw data</div>'; });
         }
+    }
+    // Lazy-load the parsed-fields view on first click (same logic as the
+    // /cases linked-alert dropdown: extracted values + well-known fields + show-all).
+    if (tabId === 'fields' && currentDetailAlert) {
+        const container = document.getElementById('alert-fields-content');
+        if (container && container.querySelector('.loading')) {
+            loadAlertParsedFields(currentDetailAlert.id, container);
+        }
+    }
+}
+
+// =========================================================================
+// Parsed-fields view (ported from /cases linked-alert dropdown)
+// Flattens the alert's raw _source into dot-path key:value pairs, surfaces an
+// investigation-relevant allowlist by default, prepends the observables ION
+// extracted for this alert, and hides the long tail behind a "show all" toggle.
+// =========================================================================
+
+// Flatten a nested alert _source into dot-path key:value pairs (arrays of
+// scalars are joined; arrays of objects are indexed).
+function flattenAlertFields(obj, prefix, out) {
+    out = out || {};
+    prefix = prefix || '';
+    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
+        for (const k of Object.keys(obj)) {
+            flattenAlertFields(obj[k], prefix ? prefix + '.' + k : k, out);
+        }
+    } else if (Array.isArray(obj)) {
+        if (obj.every(x => x === null || typeof x !== 'object')) {
+            if (obj.length) out[prefix] = obj.join(', ');
+        } else {
+            obj.forEach((x, i) => flattenAlertFields(x, prefix + '[' + i + ']', out));
+        }
+    } else if (obj !== null && obj !== undefined && obj !== '') {
+        out[prefix] = obj;
+    }
+    return out;
+}
+
+// Investigation-relevant ECS namespaces shown by default. A real Elastic
+// Security alert flattens to hundreds of fields (mostly kibana.alert.rule.*,
+// ecs.*, agent.* bookkeeping); this allowlist surfaces the ~20-40 that matter
+// for triage. Everything else hides behind a "Show all" toggle.
+const ALERT_KEY_PREFIXES = [
+    '@timestamp', 'message',
+    'rule.name', 'rule.description',
+    'event.action', 'event.category', 'event.outcome', 'event.severity',
+    'event.kind', 'event.type', 'event.reason',
+    'kibana.alert.severity', 'kibana.alert.workflow_status',
+    'kibana.alert.rule.name', 'kibana.alert.reason', 'kibana.alert.risk_score',
+    'host.name', 'host.hostname', 'host.ip', 'host.os',
+    'user.', 'source.', 'destination.', 'client.', 'server.',
+    'process.', 'file.', 'url.', 'dns.', 'network.', 'tls.', 'http.',
+    'registry.', 'email.', 'threat.', 'observer.', 'related.', 'winlog.event_data.',
+];
+
+function _alertFieldsTable(flat, keys) {
+    let h = '<table class="alert-parsed-fields-table"><tbody>';
+    for (const k of keys) {
+        h += '<tr><td class="apf-key">' + escapeHtml(k) + '</td>'
+           + '<td class="apf-val">' + escapeHtml(String(flat[k])) + '</td></tr>';
+    }
+    return h + '</tbody></table>';
+}
+
+// The observables ION extracted from this alert (type + value), pulled from
+// the triage cache so the view stays consistent with the triage bar.
+function _alertExtractedObs(alertId) {
+    const cached = triageCache[alertId];
+    return (cached && cached.observables) ? cached.observables : [];
+}
+
+function _alertExtractedValuesBlock(alertId) {
+    const obs = _alertExtractedObs(alertId);
+    if (!obs.length) return '';
+    let h = '<div class="alert-parsed-extracted">'
+          + '<div class="alert-parsed-extracted-title">Extracted values (' + obs.length + ')</div>'
+          + '<table class="alert-parsed-fields-table"><tbody>';
+    for (const o of obs) {
+        const type = o.type || 'unknown';
+        const value = o.value || '';
+        h += '<tr><td class="apf-key">' + escapeHtml(String(type)) + '</td>'
+           + '<td class="apf-val">' + escapeHtml(String(value)) + '</td></tr>';
+    }
+    return h + '</tbody></table></div>';
+}
+
+// Well-known (allowlisted) fields captured at render time so "Add fields as
+// evidence note" can post them without re-parsing.
+let _alertParsedKeyFields = [];
+
+function renderAlertParsedFields(alertId, raw) {
+    const extracted = _alertExtractedValuesBlock(alertId);
+    const flat = flattenAlertFields(raw);
+    const allKeys = Object.keys(flat).sort();
+    if (!allKeys.length) {
+        return extracted || '<div class="alert-parsed-empty">No fields available for this alert.</div>';
+    }
+    const isKey = k => ALERT_KEY_PREFIXES.some(p => k === p || k.startsWith(p));
+    let keyKeys = allKeys.filter(isKey);
+    let otherKeys = allKeys.filter(k => !isKey(k));
+    // Fallback: a non-ECS alert that matches nothing should still show its data.
+    if (!keyKeys.length) { keyKeys = allKeys; otherKeys = []; }
+    _alertParsedKeyFields = keyKeys.map(k => ({ key: k, value: String(flat[k]) }));
+    let h = extracted + _alertFieldsTable(flat, keyKeys);
+    if (otherKeys.length) {
+        const allId = 'alert-parsed-all';
+        const moreLabel = 'Show all ' + allKeys.length + ' fields (' + otherKeys.length + ' more)';
+        h += '<button type="button" class="alert-parsed-showall" '
+           + 'data-click-action="toggleAllAlertFields" data-args=\'["' + allId + '"]\' '
+           + 'data-more-label="' + escapeHtml(moreLabel) + '" data-less-label="Show fewer fields" '
+           + 'aria-expanded="false">' + escapeHtml(moreLabel) + '</button>';
+        h += '<div class="alert-parsed-fields-all" id="' + allId + '" hidden>'
+           + _alertFieldsTable(flat, otherKeys) + '</div>';
+    }
+    // Offer the evidence-note action only when this alert is linked to a case.
+    const caseId = (triageCache[alertId] || {}).case_id;
+    if (caseId) {
+        h += '<button type="button" class="alert-parsed-evidence" '
+           + 'data-click-action="addAlertFieldsAsEvidence" data-args=\'["' + escapeHtml(String(caseId)) + '"]\'>'
+           + '&#128278; Add fields as evidence note</button>';
+    }
+    return h;
+}
+
+// Toggle the "all remaining fields" section. `this` is the clicked button
+// (event-delegation calls fn.apply(el, args)).
+function toggleAllAlertFields(allId) {
+    const el = document.getElementById(allId);
+    if (!el) return;
+    const btn = (this && this.classList && this.classList.contains('alert-parsed-showall')) ? this : null;
+    if (el.hasAttribute('hidden')) {
+        el.removeAttribute('hidden');
+        if (btn) { btn.textContent = btn.dataset.lessLabel || 'Show fewer fields'; btn.setAttribute('aria-expanded', 'true'); }
+    } else {
+        el.setAttribute('hidden', '');
+        if (btn) { btn.textContent = btn.dataset.moreLabel || 'Show all fields'; btn.setAttribute('aria-expanded', 'false'); }
+    }
+}
+
+// Pin the alert's well-known fields (+ extracted observables) to its linked
+// case as a formatted note. Reuses the case-notes endpoint (case:update).
+async function addAlertFieldsAsEvidence(caseId) {
+    if (!caseId) { showToast('This alert is not linked to a case', 'warning'); return; }
+    const alertId = currentDetailAlert ? currentDetailAlert.id : null;
+    const obs = alertId ? _alertExtractedObs(alertId) : [];
+    const fields = _alertParsedKeyFields || [];
+    if (!fields.length && !obs.length) { showToast('No fields to add', 'warning'); return; }
+    const lines = ['**Alert fields (evidence)**', ''];
+    if (obs.length) {
+        lines.push('_Extracted values:_');
+        for (const o of obs) lines.push('- `' + (o.type || 'unknown') + '` = ' + (o.value || ''));
+        lines.push('');
+    }
+    if (fields.length) {
+        lines.push('_Well-known fields:_');
+        for (const f of fields) lines.push('- **' + f.key + '**: ' + f.value);
+    }
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + encodeURIComponent(caseId) + '/notes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content: lines.join('\n') }),
+        });
+        if (!resp.ok) {
+            const d = await resp.json().catch(() => ({}));
+            throw new Error(d.detail || ('HTTP ' + resp.status));
+        }
+        showToast('Fields added to the case as an evidence note', 'success');
+    } catch (e) {
+        showToast('Failed to add evidence note: ' + e.message, 'error');
+    }
+}
+
+// Lazy-load the parsed-fields tab: render from the cached raw _source, fetching
+// it once if the Raw Data tab hasn't already pulled it.
+async function loadAlertParsedFields(alertId, container) {
+    if (currentDetailAlert && currentDetailAlert.raw_data) {
+        container.innerHTML = renderAlertParsedFields(alertId, currentDetailAlert.raw_data);
+        return;
+    }
+    container.innerHTML = '<div class="loading">Loading fields...</div>';
+    try {
+        const r = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/raw`);
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.raw_data) {
+            // Still surface extracted values even when the raw _source is gone.
+            container.innerHTML = _alertExtractedValuesBlock(alertId)
+                || '<div class="alert-parsed-empty">No raw data available for this alert.</div>';
+            return;
+        }
+        if (currentDetailAlert && currentDetailAlert.id === alertId) {
+            currentDetailAlert.raw_data = data.raw_data;
+        }
+        container.innerHTML = renderAlertParsedFields(alertId, data.raw_data);
+    } catch (e) {
+        container.innerHTML = _alertExtractedValuesBlock(alertId)
+            + '<div class="alert-parsed-empty">Failed to load fields: '
+            + escapeHtml(String((e && e.message) || e)) + '</div>';
     }
 }
 
