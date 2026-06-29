@@ -30,6 +30,9 @@ class AIFeedback(Base, TimestampMixin):
         Index("ix_ai_feedback_template", "alert_prompt_template_id"),
         Index("ix_ai_feedback_agreement", "agreement"),
         Index("ix_ai_feedback_created_at", "created_at"),
+        # v0.47.0: supports the detection-health dedup GROUP BY
+        # (MAX(id) per alert_id, template) over the lookback window.
+        Index("ix_ai_feedback_alert_template", "alert_id", "alert_prompt_template_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
