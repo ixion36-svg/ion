@@ -1,13 +1,47 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.45.1 -->
+<!-- ion-doc:version=0.46.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.46.0 — 2026-06-29
+
+**Bob Auto-Investigate — an on-demand agentic investigation that gathers evidence from ION's own data and returns a CITED verdict with a recommended playbook.**
+
+- **What it does.** From an alert detail or a case panel, the analyst clicks
+  "Auto-Investigate". The server deterministically gathers a numbered evidence
+  ledger — related/sibling alerts, observable + OpenCTI enrichment, the alert
+  sequence, prior autonomous investigations, and similar CLOSED cases (with
+  their closure notes) — then Bob runs ONE bounded synthesis call that produces
+  a verdict, findings, key observations, recommended actions, a recommended
+  playbook, and MITRE mapping.
+- **Every finding is cited.** Each finding and key observation must reference
+  the evidence-ledger items (`[E1]`, `[E2]`, …) that support it, and the
+  recommended playbook must be one of the supplied candidates. **Citations are
+  validated server-side** against the real ledger: invalid references are
+  dropped, a finding left with no support is dropped, an out-of-catalogue
+  playbook id is discarded, and a decisive verdict left with zero supporting
+  findings is downgraded to `inconclusive`. Hallucinated citations are
+  therefore structurally detectable, and the UI surfaces a transparency notice
+  when anything was dropped or downgraded.
+- **Architecture.** Deterministic evidence-gather + a single LLM synthesis call
+  (not a free-form tool-calling loop) — the right fit for a local 8B model.
+  Reuses the existing `<input_data>` prompt-injection wrapper, the value
+  sanitiser, and the JSON output parser; the verdict is advisory and the
+  analyst reviews/saves it (the endpoints do not persist or auto-apply).
+- **Surface.** `POST /api/elasticsearch/alerts/{alert_id}/auto-investigate`
+  (`alert:read`) and `POST /api/elasticsearch/alerts/cases/{case_id}/auto-investigate`
+  (`case:read`); 503-graceful when Ollama is unavailable. New
+  `services/auto_investigation_service.py` + `web/auto_investigate_api.py`; UI
+  in `alerts.html` (new tab) and `cases.html` (case-panel button), rendered
+  CSP-safe with every value HTML-escaped. New tests
+  `tests/test_v046_auto_investigate.py`. No new permission, schema, or external
+  dependency.
 
 ## v0.45.1 — 2026-06-29
 
