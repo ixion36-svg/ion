@@ -47,6 +47,7 @@ from ion.web.api import router as api_router
 from ion.web.arkime_api import router as arkime_router
 from ion.web.arkime_traffic_analytics_api import router as arkime_traffic_router
 from ion.web.attack_story_api import router as attack_story_router
+from ion.web.auto_investigate_api import router as auto_investigate_router
 from ion.web.bob_analysis_api import router as bob_analysis_router
 from ion.web.bob_eval_api import router as bob_eval_router
 from ion.web.briefing_api import router as briefing_router
@@ -422,6 +423,8 @@ app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
 # v0.23.1 — on-demand Bob case analysis (replaces auto-comment)
 app.include_router(bob_analysis_router, prefix="/api")
+# v0.46.0 — Bob Auto-Investigate (agentic multi-source investigation)
+app.include_router(auto_investigate_router, prefix="/api")
 app.include_router(arkime_traffic_router, prefix="/api")
 app.include_router(case_grouper_router, prefix="")
 app.include_router(webhook_router, prefix="/api")

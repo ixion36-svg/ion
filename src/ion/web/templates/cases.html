@@ -272,6 +272,33 @@
     border-left: 3px solid #6de4ff;
     border-radius: 4px;
 }
+/* Auto-Investigate report (case panel) */
+.autoinv-report-wrap { padding: 0.5rem 0; }
+.autoinv-report { font-size: 0.85rem; }
+.autoinv-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.autoinv-verdict { font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; font-size: 0.78rem; padding: 0.25rem 0.6rem; border-radius: 4px; }
+.autoinv-v-tp { background: rgba(239,68,68,.16); color: #ef4444; }
+.autoinv-v-fp { background: rgba(107,114,128,.16); color: #9ca3af; }
+.autoinv-v-btp { background: rgba(245,158,11,.16); color: #f59e0b; }
+.autoinv-v-inc { background: rgba(59,130,246,.16); color: #3b82f6; }
+.autoinv-meta { font-size: 0.8rem; color: #9ca3af; }
+.autoinv-validation { background: rgba(245,158,11,.12); border: 1px solid #f59e0b; border-radius: 4px; padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-bottom: 0.6rem; }
+.autoinv-summary { font-weight: 600; margin-bottom: 0.5rem; line-height: 1.5; }
+.autoinv-explain { color: #9ca3af; margin-bottom: 0.75rem; line-height: 1.5; }
+.autoinv-section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: #6de4ff; margin: 0.85rem 0 0.35rem; }
+.autoinv-findings { margin: 0; padding-left: 1.1rem; }
+.autoinv-findings li { margin-bottom: 0.3rem; line-height: 1.45; }
+.autoinv-ref { display: inline-block; font-family: 'Consolas','Monaco',monospace; font-size: 0.7rem; background: rgba(0,0,0,.25); border: 1px solid #334155; border-radius: 4px; padding: 0 0.3rem; color: #6de4ff; }
+.autoinv-obs, .autoinv-ledger { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.autoinv-obs td, .autoinv-ledger td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #334155; vertical-align: top; }
+.autoinv-obs-k, .autoinv-eid { white-space: nowrap; width: 1%; color: #9ca3af; font-family: 'Consolas','Monaco',monospace; }
+.autoinv-sig { color: #9ca3af; font-style: italic; }
+.autoinv-ekind { font-size: 0.7rem; text-transform: uppercase; color: #9ca3af; }
+.autoinv-edetail { color: #9ca3af; font-size: 0.75rem; margin-top: 0.15rem; }
+.autoinv-playbook { background: rgba(0,0,0,.2); border-radius: 4px; padding: 0.5rem 0.6rem; line-height: 1.45; }
+.autoinv-tag { display: inline-block; font-family: 'Consolas','Monaco',monospace; font-size: 0.72rem; background: rgba(0,0,0,.25); border: 1px solid #334155; border-radius: 4px; padding: 0.1rem 0.35rem; margin: 0 0.2rem 0.2rem 0; }
+.autoinv-sources { margin-top: 0.85rem; font-size: 0.72rem; color: #9ca3af; border-top: 1px solid #334155; padding-top: 0.5rem; }
+.autoinv-empty { color: #9ca3af; font-size: 0.8125rem; padding: 0.4rem 0; }
 .bob-action-btn { font-size: 0.75rem; padding: 0.35rem 0.75rem; }
 .bob-action-btn-ghost { background: none; }
 .cpanel-note-translate {
@@ -3579,6 +3606,20 @@ function renderPanelContent(c) {
         +   '</div>'
         + '</div>';
 
+    // v0.46.0 — Auto-Investigate panel (cited multi-source verdict). Empty/hidden
+    // until the analyst clicks "Auto-Investigate".
+    html += '<div id="autoinv-panel-' + c.id + '" class="cpanel-section _ion-s-c8be1ccba6" data-tab="notes">'
+        +   '<div class="cpanel-section-title _ion-s-c2e70fe5d0">'
+        +     '<i class="icon-search"></i> Bob Auto-Investigate'
+        +   '</div>'
+        +   '<div id="autoinv-body-' + c.id + '" class="autoinv-report-wrap"></div>'
+        +   '<div class="_ion-s-a0946a50e0">'
+        +     '<button class="btn bob-action-btn" data-click-action="saveAutoInvestigateAsNote" data-args=\'[' + c.id + ']\'>Save as note</button>'
+        +     '<button class="btn bob-action-btn" data-click-action="runCaseAutoInvestigate" data-args=\'[' + c.id + ']\'>Re-run</button>'
+        +     '<button class="btn bob-action-btn bob-action-btn-ghost" data-click-action="hideAutoInvestigate" data-args=\'[' + c.id + ']\'>Dismiss</button>'
+        +   '</div>'
+        + '</div>';
+
     // Action buttons
     html += '<div class="cpanel-actions">';
     if (c.dfir_iris_case_id) {
@@ -3592,6 +3633,9 @@ function renderPanelContent(c) {
     html += '<button class="btn btn-primary" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\' '
         +       'title="Generate Bob\'s analysis based on investigations, observables, raw alert, and similar cases">'
         +       'Get Bob\'s analysis</button>';
+    html += '<button class="btn btn-primary" data-click-action="runCaseAutoInvestigate" data-args=\'[' + c.id + ']\' '
+        +       'title="Bob gathers evidence (related alerts, enrichment, similar closed cases) and returns a cited verdict + recommended playbook">'
+        +       '&#128269; Auto-Investigate</button>';
     html += '<button class="btn" data-click-action="toggleCasePlaybookBrowser" data-args=\'[' + c.id + ']\'>Start Playbook</button>';
     html += '<a class="btn" href="/api/elasticsearch/alerts/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
     html += '</div>';
@@ -4044,6 +4088,160 @@ async function saveBobAnalysisAsNote(caseId) {
 
 function hideBobAnalysis(caseId) {
     const panel = document.getElementById('bob-analysis-panel-' + caseId);
+    if (panel) panel.style.display = 'none';
+}
+
+// =============================================================================
+// Bob Auto-Investigate (v0.46.0) — cited multi-source verdict for a case.
+// Citations validated server-side; rendered CSP-safe (esc only).
+// =============================================================================
+const _autoinvCache = {};
+const _AUTOINV_VERDICT_CLASS = {
+    true_positive: 'autoinv-v-tp', false_positive: 'autoinv-v-fp',
+    benign_true_positive: 'autoinv-v-btp', inconclusive: 'autoinv-v-inc',
+};
+
+function _autoinvRefBadges(refs) {
+    if (!refs || !refs.length) return '';
+    return ' ' + refs.map(r => '<span class="autoinv-ref">' + esc(String(r)) + '</span>').join(' ');
+}
+
+function renderAutoInvestigateReport(data) {
+    const rep = data.report || {};
+    const ev = data.evidence || [];
+    const counts = data.counts || {};
+    const verdict = String(rep.verdict || 'inconclusive');
+    const vClass = _AUTOINV_VERDICT_CLASS[verdict] || 'autoinv-v-inc';
+    let h = '<div class="autoinv-report">';
+    h += '<div class="autoinv-head">'
+       + '<span class="autoinv-verdict ' + vClass + '">' + esc(verdict.replace(/_/g, ' ')) + '</span>'
+       + '<span class="autoinv-meta">confidence: <strong>' + esc(String(rep.confidence_level || '?')) + '</strong></span>'
+       + '<span class="autoinv-meta">severity: <strong>' + esc(String(rep.severity || '?')) + '</strong></span>'
+       + '</div>';
+    const val = rep.validation || {};
+    if (val.verdict_downgraded || val.dropped_citations || val.invalid_playbook) {
+        const notes = [];
+        if (val.verdict_downgraded) notes.push('verdict downgraded to inconclusive (no cited evidence supported a decisive verdict)');
+        if (val.dropped_citations) notes.push(val.dropped_citations + ' invalid citation(s) dropped');
+        if (val.dropped_findings) notes.push(val.dropped_findings + ' unsupported finding(s) dropped');
+        if (val.invalid_playbook) notes.push('a recommended playbook id was not in the catalogue and was discarded');
+        h += '<div class="autoinv-validation">&#9888; ' + esc(notes.join('; ')) + '</div>';
+    }
+    if (rep.summary) h += '<div class="autoinv-summary">' + esc(String(rep.summary)) + '</div>';
+    if (rep.analyst_explanation) h += '<div class="autoinv-explain">' + esc(String(rep.analyst_explanation)) + '</div>';
+    if ((rep.findings || []).length) {
+        h += '<div class="autoinv-section-title">Findings</div><ul class="autoinv-findings">';
+        for (const f of rep.findings) h += '<li>' + esc(String(f.claim || '')) + _autoinvRefBadges(f.evidence_refs) + '</li>';
+        h += '</ul>';
+    }
+    if ((rep.key_observations || []).length) {
+        h += '<div class="autoinv-section-title">Key observations</div><table class="autoinv-obs"><tbody>';
+        for (const o of rep.key_observations) {
+            h += '<tr><td class="autoinv-obs-k">' + esc(String(o.field || '')) + '</td>'
+               + '<td>' + esc(String(o.value || '')) + ' <span class="autoinv-sig">' + esc(String(o.significance || '')) + '</span>'
+               + _autoinvRefBadges(o.evidence_refs) + '</td></tr>';
+        }
+        h += '</tbody></table>';
+    }
+    if (rep.recommended_playbook && rep.recommended_playbook.name) {
+        const pb = rep.recommended_playbook;
+        h += '<div class="autoinv-section-title">Recommended playbook</div>'
+           + '<div class="autoinv-playbook"><strong>' + esc(String(pb.name)) + '</strong>'
+           + (pb.rationale ? ' — ' + esc(String(pb.rationale)) : '') + '</div>';
+    }
+    if ((rep.recommended_actions || []).length) {
+        h += '<div class="autoinv-section-title">Recommended actions</div><ul class="autoinv-findings">';
+        for (const a of rep.recommended_actions) {
+            const txt = (typeof a === 'string') ? a : (a.action || '');
+            const pri = (typeof a === 'object' && a.priority) ? (esc(String(a.priority)) + ' · ') : '';
+            h += '<li>' + pri + esc(String(txt)) + '</li>';
+        }
+        h += '</ul>';
+    }
+    const mi = rep.mitre || {};
+    const tech = (mi.techniques || []).concat(mi.tactics || []);
+    if (tech.length) {
+        h += '<div class="autoinv-section-title">MITRE ATT&amp;CK</div><div>'
+           + tech.map(t => '<span class="autoinv-tag">' + esc(String(t)) + '</span>').join(' ') + '</div>';
+    }
+    h += '<div class="autoinv-section-title">Evidence ledger (' + ev.length + ')</div>';
+    if (!ev.length) {
+        h += '<div class="autoinv-empty">No corroborating evidence was found — Bob reasoned from the subject alone.</div>';
+    } else {
+        h += '<table class="autoinv-ledger"><tbody>';
+        for (const it of ev) {
+            const d = it.detail || {};
+            const parts = [];
+            for (const k of Object.keys(d)) {
+                if (d[k] === null || d[k] === '' || (Array.isArray(d[k]) && !d[k].length)) continue;
+                parts.push(esc(k) + ': ' + esc(String(Array.isArray(d[k]) ? d[k].join(', ') : d[k])));
+            }
+            h += '<tr><td class="autoinv-eid"><span class="autoinv-ref">' + esc(String(it.id)) + '</span></td>'
+               + '<td><span class="autoinv-ekind">' + esc(String(it.kind)) + '</span> ' + esc(String(it.title))
+               + (parts.length ? '<div class="autoinv-edetail">' + parts.join(' · ') + '</div>' : '') + '</td></tr>';
+        }
+        h += '</tbody></table>';
+    }
+    const srcBits = Object.keys(counts).map(k => counts[k] + ' ' + k.replace(/_/g, ' ')).join(' · ');
+    if (srcBits) h += '<div class="autoinv-sources">Gathered: ' + esc(srcBits) + (data.model ? ' · model: ' + esc(String(data.model)) : '') + '</div>';
+    h += '</div>';
+    return h;
+}
+
+function _autoinvToMarkdown(data) {
+    const rep = data.report || {};
+    const lines = ['**Bob Auto-Investigate**', ''];
+    lines.push('- **Verdict:** ' + (rep.verdict || 'inconclusive') + ' (confidence: ' + (rep.confidence_level || '?') + ', severity: ' + (rep.severity || '?') + ')');
+    if (rep.summary) lines.push('', rep.summary);
+    if (rep.analyst_explanation) lines.push('', rep.analyst_explanation);
+    if ((rep.findings || []).length) {
+        lines.push('', '_Findings:_');
+        for (const f of rep.findings) lines.push('- ' + (f.claim || '') + ' [' + (f.evidence_refs || []).join(', ') + ']');
+    }
+    if (rep.recommended_playbook && rep.recommended_playbook.name) {
+        lines.push('', '_Recommended playbook:_ ' + rep.recommended_playbook.name + (rep.recommended_playbook.rationale ? ' — ' + rep.recommended_playbook.rationale : ''));
+    }
+    return lines.join('\n');
+}
+
+async function runCaseAutoInvestigate(caseId) {
+    const panel = document.getElementById('autoinv-panel-' + caseId);
+    const body = document.getElementById('autoinv-body-' + caseId);
+    if (panel) panel.style.display = 'block';
+    if (body) body.textContent = 'Bob is investigating — gathering evidence and reasoning (15–60s)…';
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/auto-investigate',
+            { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
+        _autoinvCache[caseId] = data;
+        if (body) body.innerHTML = renderAutoInvestigateReport(data);
+        showToast('Auto-Investigate complete', 'success');
+    } catch (e) {
+        if (body) body.textContent = 'Auto-Investigate failed: ' + e.message;
+        showToast('Auto-Investigate failed: ' + e.message, 'error');
+    }
+}
+
+async function saveAutoInvestigateAsNote(caseId) {
+    const data = _autoinvCache[caseId];
+    if (!data) { showToast("Run Auto-Investigate first.", 'warning'); return; }
+    if (!confirm("Save this Auto-Investigate report as a note on the case?")) return;
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes',
+            { method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ content: _autoinvToMarkdown(data) }) });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        showToast('Saved as note', 'success');
+        delete _autoinvCache[caseId];
+        openCaseDetail(caseId);
+    } catch (e) {
+        showToast("Save failed: " + e.message, 'error');
+    }
+}
+
+function hideAutoInvestigate(caseId) {
+    const panel = document.getElementById('autoinv-panel-' + caseId);
     if (panel) panel.style.display = 'none';
 }
 

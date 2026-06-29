@@ -2006,6 +2006,36 @@ kbd {
     color: var(--text-secondary);
 }
 
+/* Bob Auto-Investigate report */
+.autoinv-intro { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 0.75rem; line-height: 1.5; }
+.autoinv-report { font-size: 0.85rem; }
+.autoinv-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
+.autoinv-verdict { font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; font-size: 0.78rem; padding: 0.25rem 0.6rem; border-radius: var(--radius); }
+.autoinv-v-tp { background: rgba(239,68,68,.16); color: var(--danger, #ef4444); }
+.autoinv-v-fp { background: rgba(107,114,128,.16); color: #9ca3af; }
+.autoinv-v-btp { background: rgba(245,158,11,.16); color: var(--warning, #f59e0b); }
+.autoinv-v-inc { background: rgba(59,130,246,.16); color: var(--info, #3b82f6); }
+.autoinv-meta { font-size: 0.8rem; color: var(--text-secondary); }
+.autoinv-validation { background: rgba(245,158,11,.12); border: 1px solid var(--warning, #f59e0b); border-radius: var(--radius); padding: 0.4rem 0.6rem; font-size: 0.78rem; margin-bottom: 0.6rem; color: var(--text-primary); }
+.autoinv-summary { font-weight: 600; margin-bottom: 0.5rem; line-height: 1.5; }
+.autoinv-explain { color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.5; }
+.autoinv-section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--primary); margin: 0.85rem 0 0.35rem; }
+.autoinv-findings, .autoinv-actions { margin: 0; padding-left: 1.1rem; }
+.autoinv-findings li, .autoinv-actions li { margin-bottom: 0.3rem; line-height: 1.45; }
+.autoinv-ref { display: inline-block; font-family: 'Consolas','Monaco',monospace; font-size: 0.7rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 0 0.3rem; color: var(--primary); }
+.autoinv-obs, .autoinv-ledger { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.autoinv-obs td, .autoinv-ledger td { padding: 0.3rem 0.5rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+.autoinv-obs-k, .autoinv-eid { white-space: nowrap; width: 1%; color: var(--text-secondary); font-family: 'Consolas','Monaco',monospace; }
+.autoinv-sig { color: var(--text-secondary); font-style: italic; }
+.autoinv-ekind { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.03em; color: var(--text-secondary); }
+.autoinv-edetail { color: var(--text-secondary); font-size: 0.75rem; margin-top: 0.15rem; }
+.autoinv-playbook { background: var(--bg-secondary); border-radius: var(--radius); padding: 0.5rem 0.6rem; line-height: 1.45; }
+.autoinv-mitre, .autoinv-tag { display: inline-block; }
+.autoinv-tag { font-family: 'Consolas','Monaco',monospace; font-size: 0.72rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 0.1rem 0.35rem; margin: 0 0.2rem 0.2rem 0; }
+.autoinv-sources { margin-top: 0.85rem; font-size: 0.72rem; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 0.5rem; }
+.autoinv-error { color: var(--danger, #ef4444); padding: 0.75rem 0; }
+.autoinv-empty { color: var(--text-secondary); font-size: 0.8125rem; padding: 0.4rem 0; }
+
 /* Modal large for alert detail */
 .modal-large {
     max-width: 900px;
@@ -8899,6 +8929,7 @@ async function showAlertDetail(alertId) {
         <button class="detail-tab-btn" data-tab="comments" data-click-action="switchDetailTab" data-args='["comments", "$target"]'>Comments</button>
         <button class="detail-tab-btn" data-tab="case" data-click-action="switchDetailTab" data-args='["case", "$target"]'>Case</button>
         <button class="detail-tab-btn" data-tab="sequence" data-click-action="switchDetailTab" data-args='["sequence", "$target"]'>Sequence</button>
+        <button class="detail-tab-btn" data-tab="autoinvestigate" data-click-action="switchDetailTab" data-args='["autoinvestigate", "$target"]'>&#128269; Auto-Investigate</button>
         <button class="detail-tab-btn" data-tab="fields" data-click-action="switchDetailTab" data-args='["fields", "$target"]'>Fields</button>
         <button class="detail-tab-btn" data-tab="rawdata" data-click-action="switchDetailTab" data-args='["rawdata", "$target"]'>Raw Data</button>
     </div>
@@ -8916,6 +8947,12 @@ async function showAlertDetail(alertId) {
     </div>
     <div id="detail-tab-sequence" class="detail-tab-content">
         <div id="sequence-content" class="loading">Click to load sequence events...</div>
+    </div>
+    <div id="detail-tab-autoinvestigate" class="detail-tab-content">
+        <div id="autoinv-content">
+            <p class="autoinv-intro">Bob gathers related alerts, observable &amp; threat-intel enrichment, the sequence, and similar closed cases, then produces a cited verdict + recommended playbook. Every finding cites the evidence it rests on.</p>
+            <button type="button" class="btn btn-primary" data-click-action="runAutoInvestigate">&#128269; Run Auto-Investigate</button>
+        </div>
     </div>
     <div id="detail-tab-fields" class="detail-tab-content">
         <div id="alert-fields-content"><div class="loading">Click to load parsed fields...</div></div>
@@ -9229,6 +9266,145 @@ async function loadAlertParsedFields(alertId, container) {
             + '<div class="alert-parsed-empty">Failed to load fields: '
             + escapeHtml(String((e && e.message) || e)) + '</div>';
     }
+}
+
+// =========================================================================
+// Bob Auto-Investigate (v0.46.0) — agentic multi-source investigation.
+// Server gathers a numbered evidence ledger, Bob synthesises a cited verdict,
+// citations are validated server-side. Rendered CSP-safe (escapeHtml only).
+// =========================================================================
+const _AUTOINV_VERDICT_CLASS = {
+    true_positive: 'autoinv-v-tp', false_positive: 'autoinv-v-fp',
+    benign_true_positive: 'autoinv-v-btp', inconclusive: 'autoinv-v-inc',
+};
+
+function _autoinvRefBadges(refs) {
+    if (!refs || !refs.length) return '';
+    return ' ' + refs.map(r => '<span class="autoinv-ref">' + escapeHtml(String(r)) + '</span>').join(' ');
+}
+
+function renderAutoInvestigateReport(data) {
+    const rep = data.report || {};
+    const ev = data.evidence || [];
+    const counts = data.counts || {};
+    const verdict = String(rep.verdict || 'inconclusive');
+    const vClass = _AUTOINV_VERDICT_CLASS[verdict] || 'autoinv-v-inc';
+    let h = '<div class="autoinv-report">';
+
+    // Header: verdict + confidence + severity.
+    h += '<div class="autoinv-head">'
+       + '<span class="autoinv-verdict ' + vClass + '">' + escapeHtml(verdict.replace(/_/g, ' ')) + '</span>'
+       + '<span class="autoinv-meta">confidence: <strong>' + escapeHtml(String(rep.confidence_level || '?')) + '</strong></span>'
+       + '<span class="autoinv-meta">severity: <strong>' + escapeHtml(String(rep.severity || '?')) + '</strong></span>'
+       + '<button type="button" class="btn btn-ghost btn-sm" data-click-action="runAutoInvestigate" title="Re-run">&#8635; Re-run</button>'
+       + '</div>';
+
+    // Transparency notice from server-side citation validation.
+    const val = rep.validation || {};
+    if (val.verdict_downgraded || val.dropped_citations || val.invalid_playbook) {
+        const notes = [];
+        if (val.verdict_downgraded) notes.push('verdict downgraded to inconclusive (no cited evidence supported a decisive verdict)');
+        if (val.dropped_citations) notes.push(val.dropped_citations + ' invalid citation(s) dropped');
+        if (val.dropped_findings) notes.push(val.dropped_findings + ' unsupported finding(s) dropped');
+        if (val.invalid_playbook) notes.push('a recommended playbook id was not in the catalogue and was discarded');
+        h += '<div class="autoinv-validation">&#9888; ' + escapeHtml(notes.join('; ')) + '</div>';
+    }
+
+    if (rep.summary) h += '<div class="autoinv-summary">' + escapeHtml(String(rep.summary)) + '</div>';
+    if (rep.analyst_explanation) h += '<div class="autoinv-explain">' + escapeHtml(String(rep.analyst_explanation)) + '</div>';
+
+    // Findings (each cites evidence).
+    if ((rep.findings || []).length) {
+        h += '<div class="autoinv-section-title">Findings</div><ul class="autoinv-findings">';
+        for (const f of rep.findings) {
+            h += '<li>' + escapeHtml(String(f.claim || '')) + _autoinvRefBadges(f.evidence_refs) + '</li>';
+        }
+        h += '</ul>';
+    }
+
+    // Key observations.
+    if ((rep.key_observations || []).length) {
+        h += '<div class="autoinv-section-title">Key observations</div><table class="autoinv-obs"><tbody>';
+        for (const o of rep.key_observations) {
+            h += '<tr><td class="autoinv-obs-k">' + escapeHtml(String(o.field || '')) + '</td>'
+               + '<td>' + escapeHtml(String(o.value || '')) + ' <span class="autoinv-sig">' + escapeHtml(String(o.significance || '')) + '</span>'
+               + _autoinvRefBadges(o.evidence_refs) + '</td></tr>';
+        }
+        h += '</tbody></table>';
+    }
+
+    // Recommended playbook.
+    if (rep.recommended_playbook && rep.recommended_playbook.name) {
+        const pb = rep.recommended_playbook;
+        h += '<div class="autoinv-section-title">Recommended playbook</div>'
+           + '<div class="autoinv-playbook"><strong>' + escapeHtml(String(pb.name)) + '</strong>'
+           + (pb.rationale ? ' — ' + escapeHtml(String(pb.rationale)) : '') + '</div>';
+    }
+
+    // Recommended actions.
+    if ((rep.recommended_actions || []).length) {
+        h += '<div class="autoinv-section-title">Recommended actions</div><ul class="autoinv-actions">';
+        for (const a of rep.recommended_actions) {
+            const txt = (typeof a === 'string') ? a : (a.action || '');
+            const pri = (typeof a === 'object' && a.priority) ? (escapeHtml(String(a.priority)) + ' · ') : '';
+            h += '<li>' + pri + escapeHtml(String(txt)) + '</li>';
+        }
+        h += '</ul>';
+    }
+
+    // MITRE.
+    const mi = rep.mitre || {};
+    const tech = (mi.techniques || []).concat(mi.tactics || []);
+    if (tech.length) {
+        h += '<div class="autoinv-section-title">MITRE ATT&amp;CK</div><div class="autoinv-mitre">'
+           + tech.map(t => '<span class="autoinv-tag">' + escapeHtml(String(t)) + '</span>').join(' ') + '</div>';
+    }
+
+    // Evidence ledger.
+    h += '<div class="autoinv-section-title">Evidence ledger (' + ev.length + ')</div>';
+    if (!ev.length) {
+        h += '<div class="autoinv-empty">No corroborating evidence was found — Bob reasoned from the subject alone.</div>';
+    } else {
+        h += '<table class="autoinv-ledger"><tbody>';
+        for (const it of ev) {
+            let detail = '';
+            const d = it.detail || {};
+            const parts = [];
+            for (const k of Object.keys(d)) {
+                if (d[k] === null || d[k] === '' || (Array.isArray(d[k]) && !d[k].length)) continue;
+                parts.push(escapeHtml(k) + ': ' + escapeHtml(String(Array.isArray(d[k]) ? d[k].join(', ') : d[k])));
+            }
+            detail = parts.join(' · ');
+            h += '<tr><td class="autoinv-eid"><span class="autoinv-ref">' + escapeHtml(String(it.id)) + '</span></td>'
+               + '<td><span class="autoinv-ekind">' + escapeHtml(String(it.kind)) + '</span> ' + escapeHtml(String(it.title))
+               + (detail ? '<div class="autoinv-edetail">' + detail + '</div>' : '') + '</td></tr>';
+        }
+        h += '</tbody></table>';
+    }
+
+    // Sources footer.
+    const srcBits = Object.keys(counts).map(k => counts[k] + ' ' + k.replace(/_/g, ' ')).join(' · ');
+    if (srcBits) h += '<div class="autoinv-sources">Gathered: ' + escapeHtml(srcBits) + (data.model ? ' · model: ' + escapeHtml(String(data.model)) : '') + '</div>';
+
+    h += '</div>';
+    return h;
+}
+
+function runAutoInvestigate() {
+    if (!currentDetailAlert) return;
+    const c = document.getElementById('autoinv-content');
+    if (!c) return;
+    c.innerHTML = '<div class="loading">Bob is investigating — gathering evidence and reasoning (this can take 15-60s)…</div>';
+    fetch('/api/elasticsearch/alerts/' + encodeURIComponent(currentDetailAlert.id) + '/auto-investigate', { method: 'POST' })
+        .then(async r => {
+            if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.detail || ('HTTP ' + r.status)); }
+            return r.json();
+        })
+        .then(data => { c.innerHTML = renderAutoInvestigateReport(data); })
+        .catch(e => {
+            c.innerHTML = '<div class="autoinv-error">Auto-Investigate failed: ' + escapeHtml(String((e && e.message) || e)) + '</div>'
+                + '<button type="button" class="btn btn-secondary" data-click-action="runAutoInvestigate">Retry</button>';
+        });
 }
 
 // =========================================================================
