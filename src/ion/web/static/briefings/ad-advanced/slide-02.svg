@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .card{fill:#0c1322;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE TERRAIN</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Advanced AD isn't bugs — it's design &amp; misconfig</text>
+  <text x="64" y="142" class="s" font-size="17">L1 attacks abuse <tspan class="t">authentication</tspan>. Advanced abuse targets how AD <tspan class="t">trusts</tspan>, <tspan class="t">delegates</tspan> and <tspan class="t">issues identity</tspan> — mostly via small attribute changes you can hunt for.</text>
+
+  <!-- six category cards -->
+  <g>
+    <rect class="card" x="64" y="180" width="364" height="150" rx="12"/>
+    <text x="86" y="214" class="c" font-size="15" font-weight="800">1 · KERBEROS DELEGATION</text>
+    <text x="86" y="244" class="s" font-size="14.5">Let a service act "on behalf of" a user.</text>
+    <text x="86" y="268" class="s" font-size="14.5">Misconfigured = impersonate anyone.</text>
+    <text x="86" y="306" class="s mono" font-size="12.5">Unconstrained · Constrained · RBCD</text>
+
+    <rect class="card" x="458" y="180" width="364" height="150" rx="12"/>
+    <text x="480" y="214" class="c" font-size="15" font-weight="800">2 · AD CERTIFICATE SERVICES</text>
+    <text x="480" y="244" class="s" font-size="14.5">A bad template lets you request a cert</text>
+    <text x="480" y="268" class="s" font-size="14.5">as <tspan class="t">any</tspan> user — including a DC.</text>
+    <text x="480" y="306" class="s mono" font-size="12.5">ESC1 … ESC8</text>
+
+    <rect class="card" x="852" y="180" width="358" height="150" rx="12"/>
+    <text x="874" y="214" class="c" font-size="15" font-weight="800">3 · COERCION &amp; NTLM RELAY</text>
+    <text x="874" y="244" class="s" font-size="14.5">Force a DC to authenticate to you,</text>
+    <text x="874" y="268" class="s" font-size="14.5">then relay it somewhere dangerous.</text>
+    <text x="874" y="306" class="s mono" font-size="12.5">PetitPotam · PrinterBug · DFSCoerce</text>
+
+    <rect class="card" x="64" y="346" width="364" height="150" rx="12"/>
+    <text x="86" y="380" class="c" font-size="15" font-weight="800">4 · ACL / OBJECT RIGHTS</text>
+    <text x="86" y="410" class="s" font-size="14.5">Dangerous rights over a user/group/OU</text>
+    <text x="86" y="434" class="s" font-size="14.5">become takeover paths.</text>
+    <text x="86" y="472" class="s mono" font-size="12.5">GenericAll · WriteDACL · AddMember</text>
+
+    <rect class="card" x="458" y="346" width="364" height="150" rx="12"/>
+    <text x="480" y="380" class="c" font-size="15" font-weight="800">5 · PERSISTENCE</text>
+    <text x="480" y="410" class="s" font-size="14.5">Survive remediation — forge or hide</text>
+    <text x="480" y="434" class="s" font-size="14.5">identity deep in the directory.</text>
+    <text x="480" y="472" class="s mono" font-size="12.5">DCShadow · Silver · Skeleton · AdminSDHolder</text>
+
+    <rect class="card" x="852" y="346" width="358" height="150" rx="12"/>
+    <text x="874" y="380" class="c" font-size="15" font-weight="800">6 · CRITICAL CVEs</text>
+    <text x="874" y="410" class="s" font-size="14.5">Protocol flaws that skip the chain</text>
+    <text x="874" y="434" class="s" font-size="14.5">straight to DC compromise.</text>
+    <text x="874" y="472" class="s mono" font-size="12.5">Zerologon · NoPac</text>
+  </g>
+
+  <rect x="64" y="520" width="1146" height="100" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="552" class="c" font-size="14" font-weight="800">THE COMMON THREAD</text>
+  <text x="86" y="584" class="t" font-size="17" font-weight="700">Most of these need a <tspan class="c">write to the directory</tspan> — a changed attribute, a new key, a cert request.</text>
+  <text x="86" y="608" class="s" font-size="15">That's the gift: <tspan class="t">directory-change auditing</tspan> turns "advanced &amp; stealthy" into "logged &amp; huntable". Slide 11 ties it together.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">02 / 11</text>
+</svg>

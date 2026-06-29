@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.w{fill:#f5a524}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="b11" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#34d3ee"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="14" font-weight="700" letter-spacing="3">DETECTION &amp; THE L2 PLAYBOOK</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">The write is louder than the attack</text>
+  <text x="64" y="134" class="s" font-size="16.5">Most advanced tradecraft needs a directory change first. Audit those, and the stealthy becomes obvious.</text>
+
+  <!-- high-signal events table -->
+  <rect x="64" y="158" width="640" height="370" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="188" class="c" font-size="14" font-weight="800">HIGH-SIGNAL EVENTS TO WATCH</text>
+  <g font-size="13.5">
+    <text x="86" y="222" class="t mono" font-weight="700">5136</text><text x="170" y="222" class="s">attr change: msDS-AllowedToActOnBehalf…</text>
+    <text x="170" y="244" class="s">· msDS-KeyCredentialLink · …DelegateTo</text>
+    <line x1="86" y1="258" x2="684" y2="258" stroke="#1f2b40"/>
+    <text x="86" y="284" class="t mono" font-weight="700">5136</text><text x="170" y="284" class="s">nTSecurityDescriptor / AdminSDHolder edits</text>
+    <line x1="86" y1="298" x2="684" y2="298" stroke="#1f2b40"/>
+    <text x="86" y="324" class="t mono" font-weight="700">4886/7</text><text x="170" y="324" class="s">AD CS cert requested/issued · Requester ≠ SAN</text>
+    <line x1="86" y1="338" x2="684" y2="338" stroke="#1f2b40"/>
+    <text x="86" y="364" class="t mono" font-weight="700">4742/4781</text><text x="190" y="364" class="s">computer changed / renamed → NoPac</text>
+    <line x1="86" y1="378" x2="684" y2="378" stroke="#1f2b40"/>
+    <text x="86" y="404" class="t mono" font-weight="700">4741</text><text x="170" y="404" class="s">new computer account (MachineAccountQuota)</text>
+    <line x1="86" y1="418" x2="684" y2="418" stroke="#1f2b40"/>
+    <text x="86" y="444" class="t mono" font-weight="700">DC$ out</text><text x="170" y="444" class="s">DC machine acct authenticating to a non-DC</text>
+    <line x1="86" y1="458" x2="684" y2="458" stroke="#1f2b40"/>
+    <text x="86" y="484" class="t mono" font-weight="700">RPC/relay</text><text x="190" y="484" class="s">EFSRPC · MS-RPRN · MS-DFSNM → DC, then NTLM relay</text>
+  </g>
+  <text x="86" y="514" class="w" font-size="12.5">Enable: Directory-Service-Changes, CA auditing, NTLM auditing.</text>
+
+  <!-- L2 playbook -->
+  <text x="730" y="186" class="t" font-size="18" font-weight="700">L2 response — in order</text>
+  <g>
+    <g><circle cx="748" cy="222" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="748" y="227" text-anchor="middle" class="c mono" font-size="12" font-weight="700">1</text>
+    <text x="772" y="227" class="s" font-size="14.5"><tspan class="t" font-weight="700">Confirm intent</tspan> — is there a change ticket for this write/issuance?</text></g>
+    <g><circle cx="748" cy="266" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="748" y="271" text-anchor="middle" class="c mono" font-size="12" font-weight="700">2</text>
+    <text x="772" y="271" class="s" font-size="14.5"><tspan class="t" font-weight="700">Scope it</tspan> — who gained delegation / a cert / a key, and over what?</text></g>
+    <g><circle cx="748" cy="310" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="748" y="315" text-anchor="middle" class="c mono" font-size="12" font-weight="700">3</text>
+    <text x="772" y="315" class="s" font-size="14.5"><tspan class="t" font-weight="700">Contain</tspan> — disable acct · revoke cert · remove attribute ·</text>
+    <text x="772" y="335" class="s" font-size="14.5">rotate <tspan class="t mono" font-size="13">krbtgt</tspan> ×2 if a ticket was forged.</text></g>
+    <g><circle cx="748" cy="372" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="748" y="377" text-anchor="middle" class="c mono" font-size="12" font-weight="700">4</text>
+    <text x="772" y="377" class="s" font-size="14.5"><tspan class="t" font-weight="700">Hunt the precursor</tspan> — the coercion / ACL path that enabled it.</text></g>
+    <g><circle cx="748" cy="416" r="13" fill="#0a1a2a" stroke="#34d3ee"/><text x="748" y="421" text-anchor="middle" class="c mono" font-size="12" font-weight="700">5</text>
+    <text x="772" y="421" class="s" font-size="14.5"><tspan class="c" font-weight="700">Fix the misconfig</tspan> — feed it to detection engineering /</text>
+    <text x="772" y="441" class="s" font-size="14.5">Detection Health so the path closes for good.</text></g>
+  </g>
+  <rect x="730" y="466" width="480" height="62" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="970" y="492" text-anchor="middle" class="c" font-size="14" font-weight="700">In ION: open a case, run Auto-Investigate</text>
+  <text x="970" y="514" text-anchor="middle" class="s" font-size="13.5">for a cited verdict, pivot Arkime for the coercion/relay traffic.</text>
+
+  <rect x="64" y="546" width="1146" height="64" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.6"/>
+  <text x="640" y="574" text-anchor="middle" class="t" font-size="17" font-weight="800">Assume-breach mindset: hunt the misconfiguration before it's abused.</text>
+  <text x="640" y="598" text-anchor="middle" class="c" font-size="15" font-weight="700">A delegation attribute, a key, a cert request — the directory write is the moment you can still win.</text>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">11 / 11</text>
+</svg>

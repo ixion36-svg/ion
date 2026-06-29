@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="a9" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">STAGE 4 · LATERAL MOVEMENT</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Pass-the-Hash &amp; Pass-the-Ticket</text>
+  <text x="64" y="136" class="s" font-size="16.5">You don't always need the password. The <tspan class="t">hash</tspan> (NTLM) or a stolen <tspan class="t">ticket</tspan> (Kerberos) is enough to log in as that user.</text>
+
+  <!-- diagram -->
+  <rect x="64" y="178" width="170" height="74" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="149" y="208" text-anchor="middle" class="t" font-size="14" font-weight="700">Host A</text>
+  <text x="149" y="230" text-anchor="middle" class="s" font-size="11">compromised</text>
+  <text x="149" y="246" text-anchor="middle" class="r mono" font-size="10">steal hash/ticket from memory</text>
+  <line x1="236" y1="215" x2="392" y2="215" stroke="#ef6a6a" stroke-width="2" marker-end="url(#a9)"/>
+  <text x="314" y="205" text-anchor="middle" class="r mono" font-size="11">reuse — no password</text>
+  <rect x="396" y="178" width="150" height="74" rx="10" fill="#0f1828" stroke="#2b4a66" stroke-width="1.5"/>
+  <text x="471" y="208" text-anchor="middle" class="t" font-size="14" font-weight="700">Host B</text>
+  <text x="471" y="230" text-anchor="middle" class="s" font-size="11">"logs in" as victim</text>
+  <line x1="548" y1="215" x2="640" y2="215" stroke="#ef6a6a" stroke-width="2" marker-end="url(#a9)"/>
+  <rect x="644" y="178" width="150" height="74" rx="10" fill="#0f1828" stroke="#2b4a66" stroke-width="1.5"/>
+  <text x="719" y="215" text-anchor="middle" class="s" font-size="13">Host C …</text>
+  <text x="430" y="288" class="s" font-size="13.5">One stolen credential → hop host-to-host. This is how a single foothold becomes a domain-wide problem.</text>
+
+  <!-- two signal cards -->
+  <rect x="64" y="316" width="566" height="150" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="346" class="c" font-size="13.5" font-weight="800">PASS-THE-HASH (NTLM)</text>
+  <text x="86" y="372" class="s" font-size="13.5"><tspan class="t mono" font-size="13">4624</tspan> Logon Type <tspan class="t" font-weight="700">3</tspan> (network), pkg <tspan class="t mono" font-size="12.5">NtLmSsp</tspan></text>
+  <text x="86" y="398" class="s" font-size="13.5">Signature: <tspan class="r mono" font-size="12.5">Key Length = 0</tspan> + null/odd subject fields</text>
+  <text x="86" y="424" class="s" font-size="13.5">Same account → many hosts, fast. MITRE <tspan class="t mono" font-size="12">T1550.002</tspan></text>
+  <text x="86" y="450" class="s" font-size="12.5">NTLM where Kerberos is the norm is itself suspicious.</text>
+
+  <rect x="648" y="316" width="562" height="150" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="670" y="346" class="c" font-size="13.5" font-weight="800">PASS-THE-TICKET (Kerberos)</text>
+  <text x="670" y="372" class="s" font-size="13.5">Ticket <tspan class="t" font-weight="700">used</tspan> on a host with <tspan class="t" font-weight="700">no preceding</tspan> <tspan class="t mono" font-size="12.5">4768/4769</tspan></text>
+  <text x="670" y="398" class="s" font-size="13.5">on the DC — the ticket was injected, not earned.</text>
+  <text x="670" y="424" class="s" font-size="13.5">Logon GUID / account-domain fields blank or odd.</text>
+  <text x="670" y="450" class="s" font-size="13.5">MITRE <tspan class="t mono" font-size="12">T1550.003</tspan>. Often follows credential theft on slide 6/10.</text>
+
+  <!-- escalate -->
+  <rect x="64" y="486" width="1146" height="134" rx="12" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="522" font-size="15" font-weight="800" fill="#f5a524">ESCALATE WHEN…</text>
+  <g class="s" font-size="15.5">
+    <text x="86" y="552">• One account/hash authenticates to <tspan class="t" font-weight="700">many hosts in quick succession</tspan> — classic lateral movement.</text>
+    <text x="86" y="580">• <tspan class="t mono" font-size="14">NtLmSsp</tspan> network logon with <tspan class="t" font-weight="700">Key Length 0</tspan>, or ticket use with <tspan class="t" font-weight="700">no matching DC request</tspan>.</text>
+    <text x="86" y="608">• Admin/service account logging in from a workstation it has never touched. Capture source + target hosts for L2.</text>
+  </g>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">09 / 12</text>
+</svg>

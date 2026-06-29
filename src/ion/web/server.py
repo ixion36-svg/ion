@@ -1,5 +1,6 @@
 """FastAPI web server for ION - Intelligent Operating Network."""
 
+import re
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -1024,14 +1025,34 @@ async def briefings_page(
             "pdf": "/static/briefings/ION_Secure_by_Design.pdf",
             "pptx": "/static/briefings/ION_Secure_by_Design.pptx",
         },
+        # v0.48.0: analyst knowledge-transfer decks (SVG slides, no PDF/PPTX).
+        "ad-attacks": {
+            "dir": "ad-attacks",
+            "label": "AD Attacks (L1)",
+            "blurb": "Knowledge transfer for L1 analysts — how Active Directory attacks and enumeration work, and the signals that give them away.",
+        },
+        "ad-advanced": {
+            "dir": "ad-advanced",
+            "label": "AD Advanced (L2)",
+            "blurb": "Advanced Active Directory tradecraft for L2/L3 — Kerberos delegation, AD CS, coercion & relay, and persistence — with the directory-write signals that expose them.",
+        },
     }
     deck = deck if deck in decks else "executive"
     current = decks[deck]
     sub = current["dir"]  # constant from the lookup table — not caller-controlled
     slide_dir = BASE_DIR / "static" / "briefings" / sub
+    # Slides may be pre-rendered PNGs (image decks) or authored SVGs (vector
+    # decks); both render under the strict CSP as same-origin <img>. Sort by the
+    # numeric slide index so slide-2 precedes slide-10 regardless of zero-padding.
+    slide_paths = list(slide_dir.glob("slide-*.png")) + list(slide_dir.glob("slide-*.svg"))
+
+    def _slide_num(p) -> int:
+        m = re.search(r"slide-0*(\d+)", p.name)
+        return int(m.group(1)) if m else 0
+
     slides = [
         f"/static/briefings/{sub}/{p.name}"
-        for p in sorted(slide_dir.glob("slide-*.png"))
+        for p in sorted(slide_paths, key=_slide_num)
     ]
     return templates.TemplateResponse(
         request=request,

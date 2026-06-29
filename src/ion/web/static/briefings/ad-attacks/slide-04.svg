@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#475c78"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE PLAYBOOK</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">The attack lifecycle</text>
+  <text x="64" y="142" class="s" font-size="17">Attackers move left-to-right. Each stage leaves different tracks — and L1 usually sees stages 1, 2 and 4 in the logs first.</text>
+
+  <!-- 5 stage chain -->
+  <g>
+    <!-- arrows between -->
+    <line x1="248" y1="300" x2="280" y2="300" stroke="#475c78" stroke-width="2.5" marker-end="url(#ar2)"/>
+    <line x1="476" y1="300" x2="508" y2="300" stroke="#475c78" stroke-width="2.5" marker-end="url(#ar2)"/>
+    <line x1="704" y1="300" x2="736" y2="300" stroke="#475c78" stroke-width="2.5" marker-end="url(#ar2)"/>
+    <line x1="932" y1="300" x2="964" y2="300" stroke="#475c78" stroke-width="2.5" marker-end="url(#ar2)"/>
+
+    <!-- stage card template -->
+    <g>
+      <rect x="64" y="196" width="184" height="208" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+      <circle cx="92" cy="226" r="15" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/><text x="92" y="231" text-anchor="middle" class="c mono" font-size="13" font-weight="700">1</text>
+      <text x="118" y="231" class="t" font-size="15" font-weight="700">Recon &amp;</text>
+      <text x="80" y="258" class="t" font-size="15" font-weight="700">Enumerate</text>
+      <text x="80" y="288" class="s" font-size="12.5">Map users, groups,</text>
+      <text x="80" y="306" class="s" font-size="12.5">trusts, paths to DA.</text>
+      <text x="80" y="350" class="c mono" font-size="11">ATT&amp;CK: Discovery</text>
+      <text x="80" y="380" class="s mono" font-size="11">e.g. BloodHound</text>
+    </g>
+    <g>
+      <rect x="292" y="196" width="184" height="208" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+      <circle cx="320" cy="226" r="15" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/><text x="320" y="231" text-anchor="middle" class="c mono" font-size="13" font-weight="700">2</text>
+      <text x="346" y="231" class="t" font-size="15" font-weight="700">Credential</text>
+      <text x="308" y="258" class="t" font-size="15" font-weight="700">Access</text>
+      <text x="308" y="288" class="s" font-size="12.5">Steal / crack creds,</text>
+      <text x="308" y="306" class="s" font-size="12.5">hashes, tickets.</text>
+      <text x="308" y="350" class="c mono" font-size="11">ATT&amp;CK: Cred Access</text>
+      <text x="308" y="380" class="s mono" font-size="11">Kerberoast, spray</text>
+    </g>
+    <g>
+      <rect x="520" y="196" width="184" height="208" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+      <circle cx="548" cy="226" r="15" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/><text x="548" y="231" text-anchor="middle" class="c mono" font-size="13" font-weight="700">3</text>
+      <text x="574" y="231" class="t" font-size="15" font-weight="700">Privilege</text>
+      <text x="536" y="258" class="t" font-size="15" font-weight="700">Escalation</text>
+      <text x="536" y="288" class="s" font-size="12.5">Abuse rights / ACLs</text>
+      <text x="536" y="306" class="s" font-size="12.5">to gain admin.</text>
+      <text x="536" y="350" class="c mono" font-size="11">ATT&amp;CK: Priv Esc</text>
+      <text x="536" y="380" class="s mono" font-size="11">delegation, ACLs</text>
+    </g>
+    <g>
+      <rect x="748" y="196" width="184" height="208" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+      <circle cx="776" cy="226" r="15" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/><text x="776" y="231" text-anchor="middle" class="c mono" font-size="13" font-weight="700">4</text>
+      <text x="802" y="231" class="t" font-size="15" font-weight="700">Lateral</text>
+      <text x="764" y="258" class="t" font-size="15" font-weight="700">Movement</text>
+      <text x="764" y="288" class="s" font-size="12.5">Hop host-to-host</text>
+      <text x="764" y="306" class="s" font-size="12.5">with stolen creds.</text>
+      <text x="764" y="350" class="c mono" font-size="11">ATT&amp;CK: Lateral Mvmt</text>
+      <text x="764" y="380" class="s mono" font-size="11">PtH, PtT</text>
+    </g>
+    <g>
+      <rect x="976" y="196" width="234" height="208" rx="12" fill="#1c0f12" stroke="#ef4444" stroke-width="1.6"/>
+      <circle cx="1004" cy="226" r="15" fill="#2a1116" stroke="#ef4444" stroke-width="1.5"/><text x="1004" y="231" text-anchor="middle" font-size="13" font-weight="700" fill="#ef4444">5</text>
+      <text x="1030" y="231" font-size="15" font-weight="700" fill="#f1f5f9">Domain</text>
+      <text x="992" y="258" font-size="15" font-weight="700" fill="#f1f5f9">Dominance</text>
+      <text x="992" y="288" class="s" font-size="12.5">Own the DC; forge</text>
+      <text x="992" y="306" class="s" font-size="12.5">tickets; persist.</text>
+      <text x="992" y="350" font-size="11" font-family="'JetBrains Mono','Consolas',monospace" fill="#ef8a8a">ATT&amp;CK: Persistence</text>
+      <text x="992" y="380" class="s mono" font-size="11">DCSync, Golden Ticket</text>
+    </g>
+  </g>
+
+  <rect x="64" y="448" width="1146" height="116" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="86" y="486" class="c" font-size="15" font-weight="800">L1 MINDSET</text>
+  <g class="s" font-size="16">
+    <text x="86" y="518">You rarely see the whole chain — you see <tspan class="t" font-weight="700">one event</tspan>. Your job is to recognise which stage it belongs to,</text>
+    <text x="86" y="546">capture the who/where/when, and decide: benign, tune, or <tspan class="t" font-weight="700">escalate</tspan>. The next 6 slides give you the signals per stage.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">04 / 12</text>
+</svg>

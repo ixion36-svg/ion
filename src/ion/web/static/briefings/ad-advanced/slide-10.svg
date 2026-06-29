@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="b10" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">PRIV-ESC &amp; PERSISTENCE</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">ACL abuse &amp; staying in</text>
+  <text x="64" y="136" class="s" font-size="16.5">Rights over the right object become takeover edges — and once in, attackers hide identity deep in the directory to survive cleanup.</text>
+
+  <!-- ACL edges (left) -->
+  <rect x="64" y="170" width="566" height="270" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="86" y="202" class="t" font-size="17" font-weight="700">Dangerous ACLs = BloodHound edges</text>
+  <!-- mini graph -->
+  <circle cx="120" cy="262" r="20" fill="#0f1828" stroke="#2b4a66"/><text x="120" y="266" text-anchor="middle" class="s" font-size="10">you</text>
+  <line x1="140" y1="262" x2="206" y2="262" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b10)"/>
+  <text x="176" y="252" text-anchor="middle" class="r mono" font-size="9.5">GenericAll</text>
+  <circle cx="232" cy="262" r="20" fill="#0f1828" stroke="#2b4a66"/><text x="232" y="266" text-anchor="middle" class="s" font-size="9">group</text>
+  <line x1="252" y1="262" x2="318" y2="262" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b10)"/>
+  <text x="288" y="252" text-anchor="middle" class="r mono" font-size="9.5">WriteDACL</text>
+  <circle cx="346" cy="262" r="22" fill="#2a1116" stroke="#ef4444" stroke-width="2"/><text x="346" y="266" text-anchor="middle" class="r" font-size="10" font-weight="700">DA</text>
+  <g class="s" font-size="13">
+    <text x="86" y="312"><tspan class="t mono" font-size="12">GenericAll · WriteDACL · WriteOwner</tspan></text>
+    <text x="86" y="334"><tspan class="t mono" font-size="12">AddMember · ForceChangePassword</tspan></text>
+    <text x="86" y="356"><tspan class="t mono" font-size="12">AddKeyCredentialLink</tspan> (→ Shadow Cred)</text>
+  </g>
+  <text x="86" y="392" class="s" font-size="13"><tspan class="t" font-weight="700">AdminSDHolder</tspan>: write its ACL → SDProp re-applies it to</text>
+  <text x="86" y="412" class="s" font-size="13">every protected group hourly = quiet, durable backdoor.</text>
+
+  <!-- persistence (right) -->
+  <rect x="648" y="170" width="562" height="270" rx="12" fill="#1c0f12" stroke="#ef4444" stroke-width="1.6"/>
+  <text x="670" y="202" class="t" font-size="17" font-weight="700">Persistence beyond the Golden Ticket</text>
+  <text x="670" y="238" class="r mono" font-size="13.5" font-weight="700">DCShadow</text>
+  <text x="670" y="260" class="s" font-size="13.5">Register a rogue "DC" and push directory changes —</text>
+  <text x="670" y="280" class="s" font-size="13.5">edits arrive via replication, dodging normal change logs.</text>
+  <text x="670" y="312" class="r mono" font-size="13.5" font-weight="700">Silver Ticket</text>
+  <text x="670" y="334" class="s" font-size="13.5">Forge a TGS for <tspan class="t">one</tspan> service using its hash — never</text>
+  <text x="670" y="354" class="s" font-size="13.5">touches the DC, so no 4768/4769 to catch.</text>
+  <text x="670" y="386" class="r mono" font-size="13.5" font-weight="700">GPO abuse · Skeleton Key</text>
+  <text x="670" y="408" class="s" font-size="13.5">Edit a linked GPO → run code fleet-wide; or patch LSASS</text>
+  <text x="670" y="428" class="s" font-size="13.5">so one master password works for every account.</text>
+
+  <!-- signal -->
+  <rect x="64" y="458" width="1146" height="158" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="490" class="c" font-size="14" font-weight="800">WHAT YOU SEE / ESCALATE WHEN…</text>
+  <g class="s" font-size="15">
+    <text x="86" y="522">• <tspan class="t mono" font-size="14">5136</tspan> writing a <tspan class="t" font-weight="700">security descriptor</tspan> (nTSecurityDescriptor) on a privileged object, or any change to <tspan class="t" font-weight="700">AdminSDHolder</tspan>.</text>
+    <text x="86" y="550">• Membership changes to protected groups (<tspan class="t mono" font-size="14">4728 / 4732</tspan>) you can't tie to a change ticket; new linked GPOs editing startup scripts.</text>
+    <text x="86" y="578">• A logon that uses a service ticket with <tspan class="t" font-weight="700">no matching DC request</tspan> (Silver Ticket), or replication from a host that isn't a real DC (DCShadow).</text>
+    <text x="86" y="606">• Tie ACL findings to BloodHound: an unexpected edge into a Tier-0 group is a path waiting to be walked — escalate the path, not just the event.</text>
+  </g>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">10 / 11</text>
+</svg>

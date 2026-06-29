@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="a12" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#34d3ee"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="14" font-weight="700" letter-spacing="3">PUTTING IT TO WORK</text>
+  <text x="62" y="100" class="t" font-size="40" font-weight="800">What you do in ION</text>
+
+  <!-- triage flow (left) -->
+  <text x="64" y="156" class="t" font-size="18" font-weight="700">Triage flow</text>
+  <g>
+    <rect x="64" y="172" width="560" height="48" rx="9" fill="#0c1322" stroke="#26405a" stroke-width="1.3"/>
+    <circle cx="92" cy="196" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="92" y="201" text-anchor="middle" class="c mono" font-size="12" font-weight="700">1</text>
+    <text x="118" y="201" class="s" font-size="14.5"><tspan class="t" font-weight="700">Read the alert</tspan> — who, where, when; note the source host + account.</text>
+    <line x1="344" y1="222" x2="344" y2="234" stroke="#34d3ee" stroke-width="2" marker-end="url(#a12)"/>
+
+    <rect x="64" y="238" width="560" height="48" rx="9" fill="#0c1322" stroke="#26405a" stroke-width="1.3"/>
+    <circle cx="92" cy="262" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="92" y="267" text-anchor="middle" class="c mono" font-size="12" font-weight="700">2</text>
+    <text x="118" y="267" class="s" font-size="14.5"><tspan class="t" font-weight="700">Pull context</tspan> — related alerts, the alert's fields, Arkime PCAP.</text>
+    <line x1="344" y1="288" x2="344" y2="300" stroke="#34d3ee" stroke-width="2" marker-end="url(#a12)"/>
+
+    <rect x="64" y="304" width="560" height="48" rx="9" fill="#0c1322" stroke="#26405a" stroke-width="1.3"/>
+    <circle cx="92" cy="328" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="92" y="333" text-anchor="middle" class="c mono" font-size="12" font-weight="700">3</text>
+    <text x="118" y="333" class="s" font-size="14.5"><tspan class="t" font-weight="700">Ask Bob → Auto-Investigate</tspan> for a cited verdict + next steps.</text>
+    <line x1="344" y1="354" x2="344" y2="366" stroke="#34d3ee" stroke-width="2" marker-end="url(#a12)"/>
+
+    <rect x="64" y="370" width="560" height="48" rx="9" fill="#0c1322" stroke="#26405a" stroke-width="1.3"/>
+    <circle cx="92" cy="394" r="13" fill="#0d233a" stroke="#34d3ee"/><text x="92" y="399" text-anchor="middle" class="c mono" font-size="12" font-weight="700">4</text>
+    <text x="118" y="399" class="s" font-size="14.5"><tspan class="t" font-weight="700">Decide</tspan> — benign · tune (Detection Health) · escalate.</text>
+    <line x1="344" y1="420" x2="344" y2="432" stroke="#34d3ee" stroke-width="2" marker-end="url(#a12)"/>
+
+    <rect x="64" y="436" width="560" height="48" rx="9" fill="#0d233a" stroke="#34d3ee" stroke-width="1.4"/>
+    <circle cx="92" cy="460" r="13" fill="#0a1a2a" stroke="#34d3ee"/><text x="92" y="465" text-anchor="middle" class="c mono" font-size="12" font-weight="700">5</text>
+    <text x="118" y="465" class="t" font-size="14.5"><tspan class="c" font-weight="700">Escalate</tspan> — open/enrich the case, capture evidence, notify L2.</text>
+  </g>
+
+  <!-- glossary (right) -->
+  <rect x="648" y="172" width="562" height="312" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="670" y="202" class="c" font-size="14" font-weight="800">POCKET GLOSSARY</text>
+  <g font-size="14"><g class="s">
+    <text x="670" y="234"><tspan class="t mono" font-weight="700">DC</tspan> / KDC — the server that holds AD &amp; issues tickets</text>
+    <text x="670" y="262"><tspan class="t mono" font-weight="700">TGT</tspan> — master "I'm logged in" pass (krbtgt-signed)</text>
+    <text x="670" y="290"><tspan class="t mono" font-weight="700">TGS</tspan> — a ticket for one specific service</text>
+    <text x="670" y="318"><tspan class="t mono" font-weight="700">SPN</tspan> — the name a service is registered under</text>
+    <text x="670" y="346"><tspan class="t mono" font-weight="700">hash</tspan> — scrambled password; reusable to log in</text>
+    <text x="670" y="374"><tspan class="t mono" font-weight="700">krbtgt</tspan> — the account whose hash signs every TGT</text>
+    <text x="670" y="402"><tspan class="t mono" font-weight="700">DA</tspan> — Domain Admin; the attacker's finish line</text>
+    <text x="670" y="430"><tspan class="t mono" font-weight="700">RC4 (0x17)</tspan> — weak ticket encryption; a red flag</text>
+    <text x="670" y="458"><tspan class="t mono" font-weight="700">Logon Type 3</tspan> — network logon (where PtH shows up)</text>
+  </g></g>
+
+  <!-- closing -->
+  <rect x="64" y="510" width="1146" height="110" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.6"/>
+  <text x="637" y="552" text-anchor="middle" class="t" font-size="20" font-weight="800">You don't need to be an AD expert.</text>
+  <text x="637" y="588" text-anchor="middle" class="c" font-size="18" font-weight="700">Recognise the shape · capture the facts · escalate with confidence.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">12 / 12</text>
+</svg>

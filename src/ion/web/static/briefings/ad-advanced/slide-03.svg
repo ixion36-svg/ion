@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.w{fill:#f5a524}.g{fill:#34d399}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">FOUNDATION FOR SLIDES 4–5</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Kerberos delegation — the three flavours</text>
+  <text x="64" y="136" class="s" font-size="16.5">Delegation lets a service reuse your identity to reach a back-end (web app → database). Useful, and dangerous when too broad.</text>
+
+  <!-- three columns -->
+  <g>
+    <!-- unconstrained -->
+    <rect x="64" y="170" width="364" height="392" rx="12" fill="#1c0f12" stroke="#ef4444" stroke-width="1.6"/>
+    <text x="86" y="204" class="t" font-size="18" font-weight="800">Unconstrained</text>
+    <text x="86" y="228" class="r" font-size="13" font-weight="700">MOST DANGEROUS</text>
+    <text x="86" y="262" class="s" font-size="14.5">The service can impersonate you to</text>
+    <text x="86" y="284" class="s" font-size="14.5"><tspan class="t" font-weight="700">any</tspan> service, anywhere.</text>
+    <text x="86" y="320" class="s" font-size="14.5">It caches your actual <tspan class="t">TGT</tspan> — so</text>
+    <text x="86" y="342" class="s" font-size="14.5">whoever owns that host owns every</text>
+    <text x="86" y="364" class="s" font-size="14.5">TGT that lands on it.</text>
+    <rect x="86" y="392" width="320" height="64" rx="8" fill="#0c1322" stroke="#26405a"/>
+    <text x="102" y="416" class="s" font-size="13">Attack: coerce a <tspan class="t">DC</tspan> to auth to the host</text>
+    <text x="102" y="438" class="s" font-size="13">→ capture the DC's TGT → game over.</text>
+    <text x="86" y="492" class="s mono" font-size="12">flag: TrustedForDelegation</text>
+    <text x="86" y="520" class="c mono" font-size="12">→ slide 4</text>
+
+    <!-- constrained -->
+    <rect x="458" y="170" width="364" height="392" rx="12" fill="#1a1208" stroke="#f5a524" stroke-width="1.6"/>
+    <text x="480" y="204" class="t" font-size="18" font-weight="800">Constrained</text>
+    <text x="480" y="228" class="w" font-size="13" font-weight="700">SCOPED — BUT ABUSABLE</text>
+    <text x="480" y="262" class="s" font-size="14.5">Limited to a defined list of target</text>
+    <text x="480" y="284" class="s" font-size="14.5">services (S4U2Self / S4U2Proxy).</text>
+    <text x="480" y="320" class="s" font-size="14.5">Safer — but "protocol transition"</text>
+    <text x="480" y="342" class="s" font-size="14.5">can let it impersonate users who</text>
+    <text x="480" y="364" class="s" font-size="14.5">never even authenticated.</text>
+    <rect x="480" y="392" width="320" height="64" rx="8" fill="#0c1322" stroke="#26405a"/>
+    <text x="496" y="416" class="s" font-size="13">Watch the allowed-to list — a service</text>
+    <text x="496" y="438" class="s" font-size="13">that can reach the DC's services is gold.</text>
+    <text x="480" y="492" class="s mono" font-size="11.5">attr: msDS-AllowedToDelegateTo</text>
+
+    <!-- RBCD -->
+    <rect x="852" y="170" width="358" height="392" rx="12" fill="#1c0f12" stroke="#ef4444" stroke-width="1.6"/>
+    <text x="874" y="204" class="t" font-size="18" font-weight="800">RBCD</text>
+    <text x="874" y="228" class="r" font-size="13" font-weight="700">ATTACKER-CONFIGURABLE</text>
+    <text x="874" y="262" class="s" font-size="14.5">Resource-Based: the <tspan class="t">target</tspan> says who</text>
+    <text x="874" y="284" class="s" font-size="14.5">may act on its behalf.</text>
+    <text x="874" y="320" class="s" font-size="14.5">If you can <tspan class="t">write one attribute</tspan> on a</text>
+    <text x="874" y="342" class="s" font-size="14.5">computer object, you grant yourself</text>
+    <text x="874" y="364" class="s" font-size="14.5">delegation to it — then impersonate.</text>
+    <rect x="874" y="392" width="318" height="64" rx="8" fill="#0c1322" stroke="#26405a"/>
+    <text x="890" y="416" class="s" font-size="12.5">A favourite because it needs only a</text>
+    <text x="890" y="438" class="s" font-size="12.5">write right, not admin on the box.</text>
+    <text x="874" y="492" class="s mono" font-size="10.5">attr: msDS-AllowedToActOnBehalf…</text>
+    <text x="874" y="520" class="c mono" font-size="12">→ slide 5</text>
+  </g>
+
+  <rect x="64" y="582" width="1146" height="44" rx="9" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="610" text-anchor="middle" class="c" font-size="15" font-weight="700">Rule of thumb: any account/computer trusted for delegation is high-value — treat changes to delegation attributes as alarms.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">03 / 11</text>
+</svg>

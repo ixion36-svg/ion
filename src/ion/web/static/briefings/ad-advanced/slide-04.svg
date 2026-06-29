@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="b4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">DELEGATION · PRIV-ESC → DOMINANCE</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Unconstrained delegation + coercion</text>
+  <text x="64" y="136" class="s" font-size="16.5">If a host is trusted for unconstrained delegation, force the <tspan class="t">Domain Controller</tspan> to log in to it — and steal the DC's own ticket.</text>
+
+  <!-- flow diagram -->
+  <rect x="64" y="186" width="180" height="78" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="154" y="216" text-anchor="middle" class="t" font-size="14" font-weight="700">Attacker owns</text>
+  <text x="154" y="238" text-anchor="middle" class="t" font-size="14" font-weight="700">UNCONSTRAINED host</text>
+  <text x="154" y="256" text-anchor="middle" class="s" font-size="11">caches any TGT sent to it</text>
+
+  <circle cx="640" cy="225" r="52" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="640" y="221" text-anchor="middle" class="c mono" font-size="15" font-weight="700">DC</text>
+  <text x="640" y="240" text-anchor="middle" class="s" font-size="11">DC$ machine acct</text>
+
+  <rect x="1036" y="186" width="180" height="78" rx="10" fill="#2a1116" stroke="#ef4444" stroke-width="1.6"/>
+  <text x="1126" y="216" text-anchor="middle" class="t" font-size="14" font-weight="700">Domain owned</text>
+  <text x="1126" y="238" text-anchor="middle" class="r" font-size="12">DCSync · krbtgt</text>
+
+  <!-- step1: coerce -->
+  <path d="M244 210 C 400 170, 500 170, 588 205" fill="none" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b4)"/>
+  <text x="416" y="168" text-anchor="middle" class="r mono" font-size="12">1 · coerce DC to authenticate (PetitPotam / PrinterBug)</text>
+  <!-- step2: DC sends TGT -->
+  <path d="M588 245 C 500 285, 400 285, 246 250" fill="none" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b4)"/>
+  <text x="416" y="300" text-anchor="middle" class="r mono" font-size="12">2 · DC sends its TGT → cached on the host</text>
+  <!-- step3 -->
+  <line x1="692" y1="225" x2="1032" y2="225" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b4)"/>
+  <text x="862" y="215" text-anchor="middle" class="r mono" font-size="12">3 · extract DC TGT → replicate</text>
+
+  <text x="64" y="356" class="s" font-size="15">The DC's ticket = the keys to the kingdom. Unconstrained delegation is rare and legacy — its <tspan class="t">presence</tspan> alone is a finding.</text>
+  <text x="64" y="384" class="s" font-size="13.5">MITRE: <tspan class="t mono" font-size="12.5">T1187 Forced Authentication · T1558 Kerberos · T1003.006 DCSync</tspan></text>
+
+  <!-- signal card -->
+  <rect x="64" y="410" width="1146" height="118" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="442" class="c" font-size="14" font-weight="800">WHAT YOU SEE IN THE LOGS</text>
+  <g class="s" font-size="15">
+    <text x="86" y="472">• A <tspan class="t" font-weight="700">DC machine account (DC$)</tspan> authenticating <tspan class="t">to a non-DC host</tspan> — DCs don't normally log in to workstations.</text>
+    <text x="86" y="498">• Coercion RPC traffic (EFSRPC / MS-RPRN / MS-DFSNM) to an odd host, then <tspan class="t mono" font-size="13.5">4768/4769</tspan> for DC$ pointed at it.</text>
+    <text x="86" y="524">• Any host flagged <tspan class="t mono" font-size="13.5">TrustedForDelegation</tspan> that isn't a known, justified service — audit it proactively.</text>
+  </g>
+
+  <rect x="64" y="546" width="1146" height="64" rx="10" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="574" font-size="14" font-weight="800" fill="#f5a524">ESCALATE WHEN…</text>
+  <text x="86" y="598" class="s" font-size="15">a <tspan class="t" font-weight="700">DC$ account authenticates outbound to a workstation/server it has no reason to</tspan> — especially right after coercion RPC traffic.</text>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">04 / 11</text>
+</svg>

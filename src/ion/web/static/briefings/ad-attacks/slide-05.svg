@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .node{fill:#0f1828;stroke:#2b4a66;stroke-width:1.5}
+  </style>
+  <marker id="a5" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">STAGE 1 · RECON &amp; ENUMERATE</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Enumeration &amp; BloodHound</text>
+  <text x="64" y="136" class="s" font-size="16.5">Before attacking, they map the domain — every user, group and the shortest path to Domain Admin. AD answers honestly.</text>
+
+  <!-- HOW IT WORKS (left) -->
+  <text x="64" y="186" class="t" font-size="17" font-weight="700">How it works</text>
+  <rect x="64" y="202" width="150" height="64" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="139" y="230" text-anchor="middle" class="t" font-size="14" font-weight="700">Attacker PC</text>
+  <text x="139" y="250" text-anchor="middle" class="s" font-size="11">1 valid login</text>
+  <line x1="216" y1="234" x2="384" y2="234" stroke="#ef6a6a" stroke-width="2" marker-end="url(#a5)"/>
+  <text x="300" y="224" text-anchor="middle" class="r mono" font-size="11">100s of LDAP queries</text>
+  <circle cx="452" cy="234" r="48" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="452" y="230" text-anchor="middle" class="c mono" font-size="14" font-weight="700">DC</text>
+  <text x="452" y="248" text-anchor="middle" class="s" font-size="10">LDAP dir</text>
+  <!-- graph output -->
+  <text x="120" y="300" class="s" font-size="12.5">SharpHound collects → BloodHound graphs the paths:</text>
+  <g class="node"><circle cx="110" cy="346" r="20"/></g><text x="110" y="350" text-anchor="middle" class="s" font-size="10">you</text>
+  <g class="node"><circle cx="240" cy="346" r="20"/></g><text x="240" y="350" text-anchor="middle" class="s" font-size="10">group</text>
+  <g class="node"><circle cx="370" cy="346" r="20"/></g><text x="370" y="350" text-anchor="middle" class="s" font-size="10">admin</text>
+  <circle cx="500" cy="346" r="22" fill="#2a1116" stroke="#ef4444" stroke-width="2"/><text x="500" y="350" text-anchor="middle" class="r" font-size="10" font-weight="700">DA</text>
+  <line x1="130" y1="346" x2="220" y2="346" stroke="#475c78" stroke-width="2" marker-end="url(#a5)"/>
+  <line x1="260" y1="346" x2="350" y2="346" stroke="#475c78" stroke-width="2" marker-end="url(#a5)"/>
+  <line x1="390" y1="346" x2="478" y2="346" stroke="#ef6a6a" stroke-width="2" marker-end="url(#a5)"/>
+  <text x="300" y="388" text-anchor="middle" class="s" font-size="12.5">"shortest path to Domain Admin" — found in one pass</text>
+
+  <text x="64" y="430" class="s" font-size="13.5">Tools you'll hear: <tspan class="t mono" font-size="12.5">BloodHound / SharpHound, PowerView, ldapsearch, "net group", ADExplorer</tspan></text>
+
+  <!-- WHAT YOU SEE (right) -->
+  <rect x="648" y="170" width="562" height="266" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="672" y="204" class="c" font-size="14" font-weight="800">WHAT YOU SEE IN THE LOGS</text>
+  <g>
+    <rect x="672" y="222" width="150" height="30" rx="6" fill="#0d233a" stroke="#34d3ee"/><text x="747" y="242" text-anchor="middle" class="c mono" font-size="13" font-weight="700">Event 4662</text>
+    <text x="836" y="242" class="s" font-size="14">object-access <tspan class="t">burst</tspan> (esp. with decoy accounts)</text>
+  </g>
+  <g class="s" font-size="14.5">
+    <text x="672" y="284">• A <tspan class="t" font-weight="700">non-DC workstation</tspan> firing high-volume LDAP</text>
+    <text x="688" y="306">queries in a short window — classic SharpHound.</text>
+    <text x="672" y="338">• Bulk reads of <tspan class="t">User + Computer + Group</tspan> objects</text>
+    <text x="688" y="360">by one account in minutes.</text>
+    <text x="672" y="392">• Tell-tale combo: <tspan class="t mono" font-size="13">SDFlags=0x5</tspan> + group</text>
+    <text x="688" y="414">enumeration — highly specific to BloodHound.</text>
+  </g>
+
+  <!-- escalate strip -->
+  <rect x="64" y="470" width="1146" height="150" rx="12" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="508" font-size="15" font-weight="800" fill="#f5a524">ESCALATE WHEN…</text>
+  <g class="s" font-size="16">
+    <text x="86" y="542">• One host enumerates <tspan class="t" font-weight="700">hundreds of AD objects in minutes</tspan>, or maps "paths to Domain Admin".</text>
+    <text x="86" y="572">• LDAP recon from a host that has no business doing it (a normal user PC, a kiosk, a server that isn't an admin box).</text>
+    <text x="86" y="602">• 4662 noise is normal in big domains — what matters is the <tspan class="t" font-weight="700">spike, source host, and breadth</tspan>. MITRE: <tspan class="t mono" font-size="14">TA0007 Discovery</tspan>.</text>
+  </g>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">05 / 12</text>
+</svg>

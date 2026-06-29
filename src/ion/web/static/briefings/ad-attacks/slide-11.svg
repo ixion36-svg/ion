@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.w{fill:#f5a524}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="14" font-weight="700" letter-spacing="3">THE CHEAT-SHEET</text>
+  <text x="62" y="100" class="t" font-size="40" font-weight="800">L1 quick reference — event → meaning → action</text>
+
+  <!-- table -->
+  <g>
+    <!-- header -->
+    <rect x="64" y="128" width="1152" height="40" rx="6" fill="#0d233a"/>
+    <text x="84" y="154" class="c mono" font-size="14" font-weight="700">EVENT</text>
+    <text x="250" y="154" class="c" font-size="14" font-weight="700">What it logs</text>
+    <text x="540" y="154" class="c" font-size="14" font-weight="700">Could mean</text>
+    <text x="880" y="154" class="c" font-size="14" font-weight="700">Your move</text>
+
+    <!-- rows -->
+    <g class="s" font-size="14.5">
+      <!-- r1 -->
+      <text x="84" y="200" class="t mono" font-size="14" font-weight="700">4662 ↑</text>
+      <text x="250" y="200">AD object access (burst)</text>
+      <text x="540" y="200">Enumeration / BloodHound</text>
+      <text x="880" y="200" class="w">Check source host + breadth</text>
+      <line x1="64" y1="216" x2="1216" y2="216" stroke="#1f2b40"/>
+      <!-- r2 -->
+      <text x="84" y="248" class="t mono" font-size="13.5" font-weight="700">4662 + repl</text>
+      <text x="250" y="248">Replication rights from non-DC</text>
+      <text x="540" y="248">DCSync (hash theft)</text>
+      <text x="880" y="248" class="r" font-weight="700">ESCALATE NOW</text>
+      <line x1="64" y1="264" x2="1216" y2="264" stroke="#1f2b40"/>
+      <!-- r3 -->
+      <text x="84" y="296" class="t mono" font-size="13.5" font-weight="700">4768 pa=0</text>
+      <text x="250" y="296">TGT req, no pre-auth</text>
+      <text x="540" y="296">AS-REP Roasting</text>
+      <text x="880" y="296" class="w">Investigate the account</text>
+      <line x1="64" y1="312" x2="1216" y2="312" stroke="#1f2b40"/>
+      <!-- r4 -->
+      <text x="84" y="344" class="t mono" font-size="13.5" font-weight="700">4769 RC4↑</text>
+      <text x="250" y="344">Service tickets, enc 0x17</text>
+      <text x="540" y="344">Kerberoasting</text>
+      <text x="880" y="344" class="w">Investigate the burst + SPNs</text>
+      <line x1="64" y1="360" x2="1216" y2="360" stroke="#1f2b40"/>
+      <!-- r5 -->
+      <text x="84" y="392" class="t mono" font-size="13" font-weight="700">4769 no 4768</text>
+      <text x="250" y="392">Ticket used, never issued</text>
+      <text x="540" y="392">Golden / forged ticket</text>
+      <text x="880" y="392" class="r" font-weight="700">ESCALATE NOW</text>
+      <line x1="64" y1="408" x2="1216" y2="408" stroke="#1f2b40"/>
+      <!-- r6 -->
+      <text x="84" y="440" class="t mono" font-size="13" font-weight="700">4624 t3 NTLM</text>
+      <text x="250" y="440">Net logon, Key Length 0</text>
+      <text x="540" y="440">Pass-the-Hash (lateral)</text>
+      <text x="880" y="440" class="w">Trace source→target hosts</text>
+      <line x1="64" y1="456" x2="1216" y2="456" stroke="#1f2b40"/>
+      <!-- r7 -->
+      <text x="84" y="488" class="t mono" font-size="13.5" font-weight="700">4625/4771↑</text>
+      <text x="250" y="488">Failed logons, many accts</text>
+      <text x="540" y="488">Password spraying</text>
+      <text x="880" y="488" class="w">Pivot on source; watch for a hit</text>
+    </g>
+  </g>
+
+  <!-- heuristics -->
+  <rect x="64" y="520" width="1152" height="100" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="550" class="c" font-size="14" font-weight="800">THREE FAST HEURISTICS</text>
+  <g class="s" font-size="15.5">
+    <text x="86" y="580"><tspan class="t" font-weight="700">1. Bulk + fast</tspan> from one source = recon or spraying.   <tspan class="t" font-weight="700">2. RC4 / pre-auth=0</tspan> = someone wants a crackable secret.</text>
+    <text x="86" y="606"><tspan class="t" font-weight="700">3. Replication or tickets from the wrong place</tspan> = domain-dominance — escalate without waiting.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">11 / 12</text>
+</svg>

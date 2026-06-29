@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="a10" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" font-size="13.5" font-weight="700" letter-spacing="3" fill="#ef4444">STAGE 5 · DOMAIN DOMINANCE</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">DCSync &amp; Golden Ticket</text>
+  <text x="64" y="136" class="s" font-size="16.5">The endgame: steal every password hash from the DC, then forge tickets at will. If you see these, it's already serious.</text>
+
+  <!-- DCSync -->
+  <rect x="64" y="166" width="566" height="270" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="86" y="198" class="t" font-size="18" font-weight="700">DCSync — steal the hashes</text>
+  <rect x="86" y="222" width="150" height="60" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="161" y="248" text-anchor="middle" class="t" font-size="13" font-weight="700">Attacker</text>
+  <text x="161" y="268" text-anchor="middle" class="s" font-size="10.5">high privs, NOT a DC</text>
+  <line x1="238" y1="252" x2="360" y2="252" stroke="#ef6a6a" stroke-width="2" marker-end="url(#a10)"/>
+  <text x="300" y="242" text-anchor="middle" class="r mono" font-size="10.5">"replicate to me"</text>
+  <circle cx="420" cy="252" r="42" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="420" y="248" text-anchor="middle" class="c mono" font-size="13" font-weight="700">DC</text>
+  <text x="420" y="266" text-anchor="middle" class="s" font-size="10">replies</text>
+  <text x="478" y="248" class="r" font-size="12.5" font-weight="700">→ every hash</text>
+  <text x="478" y="268" class="s" font-size="12">incl. <tspan class="t mono" font-size="11">krbtgt</tspan></text>
+  <text x="86" y="324" class="s" font-size="13.5">Pretends to be another DC and asks for password</text>
+  <text x="86" y="346" class="s" font-size="13.5">replication. MITRE <tspan class="t mono" font-size="12">T1003.006</tspan>.</text>
+  <rect x="86" y="364" width="522" height="56" rx="8" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="100" y="386" class="c" font-size="12.5" font-weight="800">SIGNAL</text>
+  <text x="100" y="408" class="s" font-size="13"><tspan class="t mono" font-size="12.5">4662</tspan> replication rights (DS-Replication-Get-Changes) from a <tspan class="r" font-weight="700">non-DC</tspan></text>
+
+  <!-- Golden Ticket -->
+  <rect x="648" y="166" width="562" height="270" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="670" y="198" class="t" font-size="18" font-weight="700">Golden Ticket — forge any identity</text>
+  <text x="670" y="232" class="s" font-size="13.5">With the <tspan class="t mono" font-size="12.5">krbtgt</tspan> hash, the attacker mints their own</text>
+  <text x="670" y="254" class="s" font-size="13.5">TGTs — any user, any group (Domain Admin),</text>
+  <text x="670" y="276" class="s" font-size="13.5">valid for years. The DC trusts them blindly.</text>
+  <text x="670" y="306" class="s" font-size="13.5">MITRE <tspan class="t mono" font-size="12">T1558.001</tspan>. This is persistence — they can</text>
+  <text x="670" y="328" class="s" font-size="13.5">come back even after you reset passwords (until</text>
+  <text x="670" y="350" class="s" font-size="13.5"><tspan class="t mono" font-size="12.5">krbtgt</tspan> is rotated <tspan class="t">twice</tspan>).</text>
+  <rect x="670" y="364" width="518" height="56" rx="8" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="684" y="386" class="c" font-size="12.5" font-weight="800">SIGNAL</text>
+  <text x="684" y="408" class="s" font-size="12.5">ticket use (<tspan class="t mono" font-size="11.5">4769</tspan>) with <tspan class="t" font-weight="700">no preceding</tspan> <tspan class="t mono" font-size="11.5">4768</tspan>; lifetime &gt; 10h; RC4</text>
+
+  <!-- escalate -->
+  <rect x="64" y="470" width="1146" height="150" rx="12" fill="#2a1116" stroke="#ef4444" stroke-width="1.8"/>
+  <text x="86" y="508" font-size="15" font-weight="800" fill="#ef6a6a">ESCALATE IMMEDIATELY WHEN…</text>
+  <g class="s" font-size="16">
+    <text x="86" y="542">• <tspan class="t" font-weight="700">Any</tspan> AD replication-rights access (<tspan class="t mono" font-size="14">4662</tspan> DS-Replication-Get-Changes) comes from something that <tspan class="t" font-weight="700">isn't a Domain Controller</tspan>.</text>
+    <text x="86" y="572">• Kerberos tickets used with <tspan class="t" font-weight="700">no matching request</tspan> on the DC, absurd lifetimes, or RC4 where AES is standard.</text>
+    <text x="86" y="602">• These are crown-jewel events — don't sit on them. Open a case, preserve logs, and notify L2/IR. MITRE <tspan class="t mono" font-size="14">TA0006 / TA0003</tspan>.</text>
+  </g>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">10 / 12</text>
+</svg>

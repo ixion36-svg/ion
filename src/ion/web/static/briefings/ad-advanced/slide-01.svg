@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <!-- faint chain motif right -->
+  <g opacity="0.55" fill="none" stroke="#1f2b40" stroke-width="1.5">
+    <line x1="950" y1="250" x2="1070" y2="330"/><line x1="1070" y1="330" x2="950" y2="430"/>
+    <line x1="1070" y1="330" x2="1190" y2="250"/><line x1="1070" y1="330" x2="1190" y2="430"/>
+  </g>
+  <g fill="#0f1729" stroke="#26405a" stroke-width="1.5">
+    <circle cx="950" cy="250" r="24"/><circle cx="950" cy="430" r="24"/><circle cx="1190" cy="250" r="24"/><circle cx="1190" cy="430" r="24"/>
+  </g>
+  <circle cx="1070" cy="330" r="40" fill="#2a1116" stroke="#ef4444" stroke-width="2.5"/>
+  <text x="1070" y="335" text-anchor="middle" font-size="13" font-weight="700" fill="#ef6a6a" class="mono">DA</text>
+
+  <text x="90" y="232" class="c" font-size="15" font-weight="700" letter-spacing="4">KNOWLEDGE TRANSFER · L2 / L3 ANALYST</text>
+  <text x="90" y="296" class="t" font-size="56" font-weight="800">Active Directory</text>
+  <text x="90" y="360" class="c" font-size="56" font-weight="800">Advanced Techniques</text>
+  <rect x="92" y="382" width="150" height="4" fill="#34d3ee"/>
+  <text x="90" y="432" class="s" font-size="20">Delegation · Certificate Services · Coercion &amp; Relay ·</text>
+  <text x="90" y="462" class="s" font-size="20">Persistence — and the directory writes that expose them.</text>
+
+  <rect x="90" y="504" width="300" height="34" rx="6" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="106" y="527" class="c mono" font-size="13.5" font-weight="700">BUILDS ON THE L1 FIELD GUIDE</text>
+  <text x="406" y="527" class="s" font-size="15">Second-order abuse: misconfig &amp; protocol design</text>
+
+  <text x="90" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1190" y="688" class="s mono" font-size="13" text-anchor="end">01 / 11</text>
+</svg>

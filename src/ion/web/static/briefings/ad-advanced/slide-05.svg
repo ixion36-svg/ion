@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="b5" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">DELEGATION · ONE WRITE TO OWN A HOST</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Resource-Based Constrained Delegation</text>
+  <text x="64" y="136" class="s" font-size="16.5">RBCD flips control to the target: write one attribute on a computer object and you can impersonate <tspan class="t">any</tspan> user to it — including admins.</text>
+
+  <!-- flow -->
+  <rect x="64" y="184" width="172" height="76" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="150" y="214" text-anchor="middle" class="t" font-size="14" font-weight="700">Attacker</text>
+  <text x="150" y="236" text-anchor="middle" class="s" font-size="11.5">has WRITE on TARGET$</text>
+  <text x="150" y="252" text-anchor="middle" class="s" font-size="11">+ controls a computer acct</text>
+
+  <line x1="238" y1="222" x2="394" y2="222" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b5)"/>
+  <text x="316" y="210" text-anchor="middle" class="r mono" font-size="11">1 · write attribute</text>
+
+  <rect x="398" y="184" width="220" height="76" rx="10" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="508" y="210" text-anchor="middle" class="t" font-size="13.5" font-weight="700">TARGET$ computer</text>
+  <text x="508" y="232" text-anchor="middle" class="s mono" font-size="10.5">msDS-AllowedToActOn</text>
+  <text x="508" y="248" text-anchor="middle" class="s mono" font-size="10.5">BehalfOfOtherIdentity ← attacker</text>
+
+  <line x1="620" y1="222" x2="760" y2="222" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b5)"/>
+  <text x="690" y="210" text-anchor="middle" class="r mono" font-size="11">2 · S4U2Self+Proxy</text>
+
+  <rect x="764" y="184" width="220" height="76" rx="10" fill="#2a1116" stroke="#ef4444" stroke-width="1.6"/>
+  <text x="874" y="214" text-anchor="middle" class="t" font-size="13.5" font-weight="700">Service ticket</text>
+  <text x="874" y="236" text-anchor="middle" class="r" font-size="12">"as Administrator"</text>
+  <text x="874" y="252" text-anchor="middle" class="s" font-size="11">to TARGET</text>
+
+  <line x1="986" y1="222" x2="1120" y2="222" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b5)"/>
+  <rect x="1040" y="276" width="170" height="0"/>
+  <text x="1100" y="210" text-anchor="middle" class="r mono" font-size="11">3 · full access</text>
+  <circle cx="1150" cy="222" r="30" fill="#0d233a" stroke="#34d3ee" stroke-width="2"/>
+  <text x="1150" y="227" text-anchor="middle" class="t" font-size="12" font-weight="700">TARGET</text>
+
+  <text x="64" y="318" class="s" font-size="15">Why attackers love it: it needs only a <tspan class="t">write right</tspan> (from an ACL path) — not local admin on the box. Pure directory abuse.</text>
+  <text x="64" y="346" class="s" font-size="13.5">MITRE: <tspan class="t mono" font-size="12.5">T1098 Account Manipulation → T1134 Token/Impersonation</tspan>. Often the second hop after an ACL finding (slide 10).</text>
+
+  <!-- signal -->
+  <rect x="64" y="378" width="1146" height="150" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="410" class="c" font-size="14" font-weight="800">WHAT YOU SEE IN THE LOGS</text>
+  <rect x="86" y="426" width="150" height="30" rx="6" fill="#0d233a" stroke="#34d3ee"/><text x="161" y="446" text-anchor="middle" class="c mono" font-size="13" font-weight="700">Event 5136</text>
+  <text x="250" y="446" class="s" font-size="14.5">directory object modified — the key signal</text>
+  <g class="s" font-size="14.5">
+    <text x="86" y="486">• A <tspan class="t mono" font-size="13.5">5136</tspan> writing <tspan class="t" font-weight="700">msDS-AllowedToActOnBehalfOfOtherIdentity</tspan> on a computer object — rare and almost always intentional.</text>
+    <text x="86" y="512">• Often preceded by a <tspan class="t" font-weight="700">new computer account</tspan> (<tspan class="t mono" font-size="13.5">4741</tspan>) the attacker created (default MachineAccountQuota lets any user add 10).</text>
+  </g>
+
+  <rect x="64" y="546" width="1146" height="64" rx="10" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="574" font-size="14" font-weight="800" fill="#f5a524">ESCALATE WHEN…</text>
+  <text x="86" y="598" class="s" font-size="15">you see a <tspan class="t" font-weight="700">5136 on a delegation attribute</tspan> (or a fresh computer account immediately granted delegation). Capture who made the change.</text>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">05 / 11</text>
+</svg>

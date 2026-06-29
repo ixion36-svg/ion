@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="b8" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">CREDENTIAL ACCESS · STEALTHY TAKEOVER</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Shadow Credentials</text>
+  <text x="64" y="136" class="s" font-size="16.5">Don't steal the password — add your <tspan class="t">own key</tspan> to the victim's account, then log in as them with certificate-based Kerberos (PKINIT).</text>
+
+  <!-- flow -->
+  <rect x="64" y="190" width="180" height="78" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="154" y="220" text-anchor="middle" class="t" font-size="14" font-weight="700">Attacker</text>
+  <text x="154" y="242" text-anchor="middle" class="s" font-size="11.5">has write on victim acct</text>
+  <text x="154" y="258" text-anchor="middle" class="s" font-size="11">(from an ACL path)</text>
+
+  <line x1="246" y1="229" x2="402" y2="229" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b8)"/>
+  <text x="324" y="217" text-anchor="middle" class="r mono" font-size="11">1 · add a key</text>
+
+  <rect x="406" y="190" width="250" height="78" rx="10" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="531" y="216" text-anchor="middle" class="t" font-size="13.5" font-weight="700">Victim account</text>
+  <text x="531" y="238" text-anchor="middle" class="s mono" font-size="11">msDS-KeyCredentialLink</text>
+  <text x="531" y="256" text-anchor="middle" class="r" font-size="11">← attacker's public key</text>
+
+  <line x1="658" y1="229" x2="800" y2="229" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b8)"/>
+  <text x="729" y="217" text-anchor="middle" class="r mono" font-size="11">2 · PKINIT</text>
+  <circle cx="858" cy="229" r="40" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="858" y="225" text-anchor="middle" class="c mono" font-size="13" font-weight="700">DC</text>
+  <text x="858" y="243" text-anchor="middle" class="s" font-size="10">KDC</text>
+  <line x1="916" y1="229" x2="1058" y2="229" stroke="#ef6a6a" stroke-width="2" marker-end="url(#b8)"/>
+  <rect x="1062" y="198" width="148" height="62" rx="9" fill="#2a1116" stroke="#ef4444" stroke-width="1.6"/>
+  <text x="1136" y="224" text-anchor="middle" class="t" font-size="13" font-weight="700">TGT as victim</text>
+  <text x="1136" y="244" text-anchor="middle" class="r" font-size="11">full impersonation</text>
+
+  <text x="64" y="318" class="s" font-size="15">The victim's password is never touched, so password-reset doesn't evict the attacker — they hold a valid key until it's removed.</text>
+  <text x="64" y="346" class="s" font-size="13.5">Stealthier than Kerberoasting/SPN tricks, but it <tspan class="t">writes to the directory</tspan> — which is exactly where you catch it.</text>
+  <text x="64" y="374" class="s" font-size="13.5">MITRE: <tspan class="t mono" font-size="12.5">T1098.001 — Additional Cloud/AD Credentials</tspan>.</text>
+
+  <!-- signal -->
+  <rect x="64" y="404" width="1146" height="124" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="86" y="436" class="c" font-size="14" font-weight="800">WHAT YOU SEE IN THE LOGS</text>
+  <rect x="86" y="452" width="150" height="30" rx="6" fill="#0d233a" stroke="#34d3ee"/><text x="161" y="472" text-anchor="middle" class="c mono" font-size="13" font-weight="700">Event 5136</text>
+  <text x="250" y="472" class="s" font-size="14.5">modify of <tspan class="t" font-weight="700">msDS-KeyCredentialLink</tspan> — the signal</text>
+  <g class="s" font-size="14.5">
+    <text x="86" y="508">• A key-credential added to a user/computer that doesn't use Windows Hello / passwordless — almost always malicious.</text>
+  </g>
+
+  <rect x="64" y="546" width="1146" height="64" rx="10" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="574" font-size="14" font-weight="800" fill="#f5a524">ESCALATE WHEN…</text>
+  <text x="86" y="598" class="s" font-size="15"><tspan class="t mono" font-size="14">msDS-KeyCredentialLink</tspan> is modified on an account that shouldn't have device keys — capture who wrote it and which account was targeted.</text>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">08 / 11</text>
+</svg>

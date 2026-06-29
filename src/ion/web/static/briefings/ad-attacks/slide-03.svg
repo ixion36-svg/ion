@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .node{fill:#0f1828;stroke:#2b4a66;stroke-width:1.5}
+  </style>
+  <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#34d3ee"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE MACHINERY</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">How logon works — and why it matters</text>
+  <text x="64" y="142" class="s" font-size="17">Two ways Windows proves who you are. Every attack ahead bends one of these steps.</text>
+
+  <!-- Kerberos flow -->
+  <text x="64" y="196" class="t" font-size="20" font-weight="700">Kerberos <tspan class="s" font-size="15" font-weight="400">— the modern default (tickets, not passwords)</tspan></text>
+
+  <!-- nodes -->
+  <rect class="node" x="80" y="230" width="150" height="74" rx="10"/>
+  <text x="155" y="262" text-anchor="middle" class="t" font-size="15" font-weight="700">User / PC</text>
+  <text x="155" y="284" text-anchor="middle" class="s" font-size="12">wants a service</text>
+
+  <circle cx="640" cy="267" r="60" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="640" y="262" text-anchor="middle" class="c mono" font-size="16" font-weight="700">DC / KDC</text>
+  <text x="640" y="282" text-anchor="middle" class="s" font-size="11">issues tickets</text>
+
+  <rect class="node" x="1050" y="230" width="150" height="74" rx="10"/>
+  <text x="1125" y="262" text-anchor="middle" class="t" font-size="15" font-weight="700">Service</text>
+  <text x="1125" y="284" text-anchor="middle" class="s" font-size="12">file share, SQL…</text>
+
+  <!-- step 1 & 2 arrows to KDC -->
+  <line x1="232" y1="252" x2="576" y2="252" stroke="#34d3ee" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="404" y="242" text-anchor="middle" class="c mono" font-size="12">1 · AS-REQ → get TGT (4768)</text>
+  <line x1="576" y1="288" x2="232" y2="288" stroke="#2b4a66" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="404" y="306" text-anchor="middle" class="s mono" font-size="12">TGT = "I am me" pass</text>
+
+  <line x1="704" y1="252" x2="1048" y2="252" stroke="#34d3ee" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="876" y="242" text-anchor="middle" class="c mono" font-size="12">2 · TGS-REQ → service ticket (4769)</text>
+  <line x1="1048" y1="288" x2="704" y2="288" stroke="#2b4a66" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="876" y="306" text-anchor="middle" class="s mono" font-size="12">TGS = ticket for that service</text>
+
+  <!-- step 3 -->
+  <path d="M155 304 L155 360 L1125 360 L1125 306" fill="none" stroke="#34d3ee" stroke-width="2" marker-end="url(#ar)"/>
+  <text x="640" y="352" text-anchor="middle" class="c mono" font-size="12">3 · present the service ticket → access granted (no password sent)</text>
+
+  <!-- NTLM -->
+  <rect x="64" y="392" width="560" height="150" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="86" y="424" class="t" font-size="18" font-weight="700">NTLM <tspan class="s" font-size="14" font-weight="400">— the older fallback</tspan></text>
+  <g class="s" font-size="15.5">
+    <text x="86" y="456">Challenge/response that proves you know the</text>
+    <text x="86" y="480">password by using its <tspan class="c" font-weight="700">hash</tspan> — the password's</text>
+    <text x="86" y="504">scrambled fingerprint. The hash itself is enough</text>
+    <text x="86" y="528">to log in… which is exactly the problem.</text>
+  </g>
+
+  <!-- key terms -->
+  <rect x="648" y="392" width="562" height="150" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="670" y="424" class="c" font-size="14" font-weight="800">REMEMBER THESE FOUR WORDS</text>
+  <g font-size="15"><g class="s">
+    <text x="670" y="456"><tspan class="t mono" font-weight="700">TGT</tspan>  — your master "I'm logged in" pass</text>
+    <text x="670" y="482"><tspan class="t mono" font-weight="700">TGS</tspan>  — a ticket to one specific service</text>
+    <text x="670" y="508"><tspan class="t mono" font-weight="700">SPN</tspan>  — the name a service is known by</text>
+    <text x="670" y="534"><tspan class="t mono" font-weight="700">hash / ticket</tspan> — proof of identity worth stealing</text>
+  </g></g>
+
+  <rect x="64" y="566" width="1146" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">If a step looks normal but happens at the wrong time, from the wrong host, or in bulk — that's the tell.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">03 / 12</text>
+</svg>

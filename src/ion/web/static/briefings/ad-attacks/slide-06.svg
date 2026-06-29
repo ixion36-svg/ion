@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="a6" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#34d3ee"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">STAGE 2 · CREDENTIAL ACCESS</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Kerberoasting</text>
+  <text x="64" y="136" class="s" font-size="16.5">Any logged-in user can ask the DC for a service's ticket — and that ticket is encrypted with the service account's password hash.</text>
+
+  <!-- diagram -->
+  <text x="64" y="186" class="t" font-size="17" font-weight="700">How it works</text>
+  <rect x="64" y="204" width="150" height="64" rx="10" fill="#0f1828" stroke="#2b4a66" stroke-width="1.5"/>
+  <text x="139" y="232" text-anchor="middle" class="t" font-size="14" font-weight="700">Any user</text>
+  <text x="139" y="252" text-anchor="middle" class="s" font-size="11">no admin needed</text>
+  <line x1="216" y1="236" x2="360" y2="236" stroke="#34d3ee" stroke-width="2" marker-end="url(#a6)"/>
+  <text x="288" y="226" text-anchor="middle" class="c mono" font-size="11">"give me tickets for</text>
+  <text x="288" y="284" text-anchor="middle" class="c mono" font-size="11">many SPNs"</text>
+  <circle cx="430" cy="236" r="46" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="430" y="232" text-anchor="middle" class="c mono" font-size="14" font-weight="700">DC</text>
+  <text x="430" y="250" text-anchor="middle" class="s" font-size="10">issues TGS</text>
+  <line x1="476" y1="236" x2="560" y2="236" stroke="#34d3ee" stroke-width="2" marker-end="url(#a6)"/>
+  <rect x="564" y="206" width="150" height="64" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="639" y="230" text-anchor="middle" class="t" font-size="13" font-weight="700">TGS ticket</text>
+  <text x="639" y="250" text-anchor="middle" class="r" font-size="11">enc. w/ svc hash</text>
+  <path d="M639 272 L639 320 L360 320 L360 300" fill="none" stroke="#ef6a6a" stroke-width="2" marker-end="url(#a6)"/>
+  <text x="500" y="312" text-anchor="middle" class="r mono" font-size="12">crack offline → service account password</text>
+  <text x="64" y="372" class="s" font-size="13.5">Stealthy: asking for a ticket is <tspan class="t">normal</tspan>. The crack happens offline on the attacker's machine — invisible to you.</text>
+  <text x="64" y="404" class="s" font-size="13.5">MITRE: <tspan class="t mono" font-size="12.5">T1558.003 — Kerberoasting</tspan>. Prize: service accounts (often old, over-privileged, weak passwords).</text>
+
+  <!-- signal card -->
+  <rect x="760" y="170" width="450" height="250" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="784" y="204" class="c" font-size="14" font-weight="800">WHAT YOU SEE IN THE LOGS</text>
+  <rect x="784" y="220" width="150" height="30" rx="6" fill="#0d233a" stroke="#34d3ee"/><text x="859" y="240" text-anchor="middle" class="c mono" font-size="13" font-weight="700">Event 4769</text>
+  <text x="946" y="240" class="s" font-size="13.5">service-ticket request</text>
+  <g class="s" font-size="14">
+    <text x="784" y="282">• A <tspan class="t" font-weight="700">burst</tspan> of 4769 from one account, many</text>
+    <text x="800" y="302">different Service Names.</text>
+    <text x="784" y="332">• <tspan class="t" font-weight="700">Ticket Encryption Type</tspan> <tspan class="r mono" font-size="13">0x17 (RC4)</tspan> —</text>
+    <text x="800" y="352">weak &amp; easy to crack; attackers force it.</text>
+    <text x="784" y="382">• Requests for SPNs the account never</text>
+    <text x="800" y="402">normally touches, from an odd host.</text>
+  </g>
+
+  <!-- escalate -->
+  <rect x="64" y="470" width="1146" height="150" rx="12" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="508" font-size="15" font-weight="800" fill="#f5a524">ESCALATE WHEN…</text>
+  <g class="s" font-size="16">
+    <text x="86" y="542">• One account pulls <tspan class="t" font-weight="700">many SPN tickets quickly</tspan>, especially <tspan class="r mono" font-size="14">RC4 / 0x17</tspan> encryption.</text>
+    <text x="86" y="572">• Tickets requested for <tspan class="t" font-weight="700">high-value service accounts</tspan> (SQL, backup, admin services).</text>
+    <text x="86" y="602">• A single 4769 with RC4 is usually noise; a <tspan class="t" font-weight="700">cluster</tspan> across services from one user in minutes is the signal.</text>
+  </g>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">06 / 12</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="a7" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#34d3ee"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">STAGE 2 · CREDENTIAL ACCESS</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">AS-REP Roasting</text>
+  <text x="64" y="136" class="s" font-size="16.5">Some accounts are set to "don't require pre-authentication". The DC will hand out crackable data for them to <tspan class="t">anyone</tspan> who asks.</text>
+
+  <!-- diagram -->
+  <text x="64" y="186" class="t" font-size="17" font-weight="700">How it works</text>
+  <rect x="64" y="204" width="160" height="64" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="144" y="232" text-anchor="middle" class="t" font-size="14" font-weight="700">Attacker</text>
+  <text x="144" y="252" text-anchor="middle" class="s" font-size="11">no creds needed</text>
+  <line x1="226" y1="236" x2="380" y2="236" stroke="#34d3ee" stroke-width="2" marker-end="url(#a7)"/>
+  <text x="303" y="226" text-anchor="middle" class="c mono" font-size="11">AS-REQ for a</text>
+  <text x="303" y="284" text-anchor="middle" class="c mono" font-size="11">"no-preauth" user</text>
+  <circle cx="450" cy="236" r="46" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="450" y="232" text-anchor="middle" class="c mono" font-size="14" font-weight="700">DC</text>
+  <text x="450" y="250" text-anchor="middle" class="s" font-size="10">KDC</text>
+  <line x1="496" y1="236" x2="600" y2="236" stroke="#ef6a6a" stroke-width="2" marker-end="url(#a7)"/>
+  <rect x="604" y="206" width="170" height="64" rx="10" fill="#1c0f12" stroke="#ef4444" stroke-width="1.5"/>
+  <text x="689" y="230" text-anchor="middle" class="t" font-size="13" font-weight="700">AS-REP</text>
+  <text x="689" y="250" text-anchor="middle" class="r" font-size="11">enc. w/ user hash</text>
+  <text x="64" y="320" class="s" font-size="14">Normally pre-auth proves you know the password <tspan class="t">before</tspan> the DC replies. Disable it and the DC replies to a</text>
+  <text x="64" y="342" class="s" font-size="14">stranger with data encrypted in the user's hash → <tspan class="r">crack offline</tspan>. No valid account required to start.</text>
+  <text x="64" y="384" class="s" font-size="13.5">MITRE: <tspan class="t mono" font-size="12.5">T1558.004 — AS-REP Roasting</tspan>. Often hits old or service accounts where pre-auth was turned off for convenience.</text>
+
+  <!-- signal card -->
+  <rect x="824" y="170" width="386" height="232" rx="12" fill="#0c1322" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="848" y="204" class="c" font-size="14" font-weight="800">WHAT YOU SEE</text>
+  <rect x="848" y="220" width="150" height="30" rx="6" fill="#0d233a" stroke="#34d3ee"/><text x="923" y="240" text-anchor="middle" class="c mono" font-size="13" font-weight="700">Event 4768</text>
+  <text x="1010" y="240" class="s" font-size="13">TGT request</text>
+  <g class="s" font-size="13.5">
+    <text x="848" y="284">• <tspan class="t" font-weight="700">Pre-Auth Type =</tspan> <tspan class="r mono" font-size="13">0</tspan> — the</text>
+    <text x="864" y="304">smoking gun for AS-REP roasting.</text>
+    <text x="848" y="334">• Encryption type <tspan class="r mono" font-size="12.5">0x17 / 0x18</tspan>.</text>
+    <text x="848" y="364">• Accounts flagged "Do not require</text>
+    <text x="864" y="384">Kerberos pre-authentication".</text>
+  </g>
+
+  <!-- escalate -->
+  <rect x="64" y="470" width="1146" height="150" rx="12" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="508" font-size="15" font-weight="800" fill="#f5a524">ESCALATE WHEN…</text>
+  <g class="s" font-size="16">
+    <text x="86" y="542">• You see <tspan class="t mono" font-size="14">4768</tspan> with <tspan class="t" font-weight="700">Pre-Authentication Type = 0</tspan> for an account that shouldn't have pre-auth disabled.</text>
+    <text x="86" y="572">• Several such requests in a row, or from an unusual source host / one that just ran enumeration.</text>
+    <text x="86" y="602">• Pair it with slide 11: a no-preauth account is a standing risk — flag it to detection engineering to fix the setting.</text>
+  </g>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">07 / 12</text>
+</svg>

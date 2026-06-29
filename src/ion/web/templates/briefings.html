@@ -26,6 +26,10 @@
          class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'overview' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">Full Overview</a>
       <a href="/briefings?deck=secure-by-design"
          class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'secure-by-design' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">Secure by Design</a>
+      <a href="/briefings?deck=ad-attacks"
+         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'ad-attacks' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">AD Attacks (L1)</a>
+      <a href="/briefings?deck=ad-advanced"
+         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'ad-advanced' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">AD Advanced (L2)</a>
     </div>
     <div class="flex items-center gap-2">
       {% if slides %}
@@ -34,10 +38,12 @@
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         Present</button>
       {% endif %}
+      {% if current.pdf %}
       <a href="{{ current.pdf }}" download
          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm text-slate-100 transition-colors">
         <svg class="w-4 h-4 text-ion-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
         PDF</a>
+      {% endif %}
       {% if current.pptx %}
       <a href="{{ current.pptx }}" download
          class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm text-slate-100 transition-colors">

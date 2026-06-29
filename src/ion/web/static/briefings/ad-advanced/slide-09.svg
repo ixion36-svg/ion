@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#ef6a6a}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style>
+  <marker id="b9" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ef6a6a"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="56" class="c" font-size="13.5" font-weight="700" letter-spacing="3">THE ENGINE BEHIND 4 · 7 · 8</text>
+  <text x="62" y="100" class="t" font-size="38" font-weight="800">Coercion &amp; relay — and two critical CVEs</text>
+  <text x="64" y="136" class="s" font-size="16.5">"Coercion" forces a privileged machine to authenticate to you. "Relay" forwards that auth somewhere it shouldn't go. Together: domain compromise.</text>
+
+  <!-- coercion engine (left) -->
+  <rect x="64" y="170" width="566" height="270" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="86" y="202" class="t" font-size="17" font-weight="700">Coercion → relay</text>
+  <g class="s" font-size="14">
+    <text x="86" y="234"><tspan class="t mono" font-weight="700">PetitPotam</tspan>  → EFSRPC (EfsRpcOpenFileRaw)</text>
+    <text x="86" y="260"><tspan class="t mono" font-weight="700">PrinterBug</tspan>  → MS-RPRN print spooler</text>
+    <text x="86" y="286"><tspan class="t mono" font-weight="700">DFSCoerce</tspan>  → MS-DFSNM</text>
+  </g>
+  <text x="86" y="320" class="s" font-size="13.5">All do one thing: make a DC send NTLM auth to you.</text>
+  <text x="86" y="344" class="s" font-size="13.5">Then relay it to a target that accepts NTLM:</text>
+  <rect x="86" y="360" width="240" height="60" rx="8" fill="#0f1828" stroke="#2b4a66"/>
+  <text x="206" y="384" text-anchor="middle" class="c mono" font-size="12.5">→ LDAP (no signing)</text>
+  <text x="206" y="406" text-anchor="middle" class="s" font-size="12">RBCD / Shadow Cred</text>
+  <rect x="342" y="360" width="266" height="60" rx="8" fill="#0f1828" stroke="#2b4a66"/>
+  <text x="475" y="384" text-anchor="middle" class="c mono" font-size="12.5">→ AD CS web enrol</text>
+  <text x="475" y="406" text-anchor="middle" class="s" font-size="12">ESC8 → DC certificate</text>
+
+  <!-- CVEs (right) -->
+  <rect x="648" y="170" width="562" height="270" rx="12" fill="#1c0f12" stroke="#ef4444" stroke-width="1.6"/>
+  <text x="670" y="202" class="t" font-size="17" font-weight="700">Critical CVEs — skip the chain</text>
+  <text x="670" y="236" class="r mono" font-size="14" font-weight="700">Zerologon — CVE-2020-1472</text>
+  <g class="s" font-size="13.5">
+    <text x="670" y="260">Netlogon crypto flaw → reset the DC's own machine</text>
+    <text x="670" y="280">password to empty → instant Domain Admin.</text>
+  </g>
+  <text x="670" y="316" class="r mono" font-size="14" font-weight="700">NoPac — CVE-2021-42278 / 42287</text>
+  <g class="s" font-size="13.5">
+    <text x="670" y="340">sAMAccountName spoofing: rename a computer to look</text>
+    <text x="670" y="360">like a DC → get tickets as the DC → escalate.</text>
+  </g>
+  <rect x="670" y="378" width="518" height="44" rx="8" fill="#0d233a" stroke="#34d3ee" stroke-width="1.2"/>
+  <text x="684" y="405" class="s" font-size="13">Detection: <tspan class="t mono" font-size="12.5">4742</tspan> computer changed · <tspan class="t mono" font-size="12.5">4781</tspan> account renamed · Netlogon anomalies. <tspan class="t">Patch state matters.</tspan></text>
+
+  <!-- signal strip -->
+  <rect x="64" y="458" width="1146" height="158" rx="12" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+  <text x="86" y="494" font-size="15" font-weight="800" fill="#f5a524">WHAT YOU SEE / ESCALATE WHEN…</text>
+  <g class="s" font-size="15.5">
+    <text x="86" y="528">• <tspan class="t" font-weight="700">Coercion RPC</tspan> (EFSRPC / MS-RPRN / MS-DFSNM) hitting a DC from a non-admin host — especially followed by NTLM relay traffic.</text>
+    <text x="86" y="558">• A <tspan class="t" font-weight="700">DC machine account authenticating outbound</tspan> to an unexpected host (the relay/coercion tell from slide 4).</text>
+    <text x="86" y="588">• A computer object <tspan class="t" font-weight="700">renamed to resemble a DC</tspan> (<tspan class="t mono" font-size="14">4781</tspan>), or Netlogon errors around a single host — possible NoPac / Zerologon. Escalate + check patch level.</text>
+  </g>
+
+  <text x="64" y="690" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — Advanced (L2)</text>
+  <text x="1216" y="690" class="s mono" font-size="13" text-anchor="end">09 / 11</text>
+</svg>

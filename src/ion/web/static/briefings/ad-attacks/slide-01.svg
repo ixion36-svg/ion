@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs>
+    <style>
+      .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    </style>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <!-- faint domain hub motif, right -->
+  <g opacity="0.5" stroke="#1f2b40" stroke-width="1.5" fill="none">
+    <line x1="1010" y1="360" x2="900" y2="220"/><line x1="1010" y1="360" x2="1160" y2="220"/>
+    <line x1="1010" y1="360" x2="860" y2="380"/><line x1="1010" y1="360" x2="1180" y2="380"/>
+    <line x1="1010" y1="360" x2="900" y2="520"/><line x1="1010" y1="360" x2="1160" y2="520"/>
+  </g>
+  <g fill="#0f1729" stroke="#26405a" stroke-width="1.5">
+    <circle cx="900" cy="220" r="26"/><circle cx="1160" cy="220" r="26"/>
+    <circle cx="860" cy="380" r="26"/><circle cx="1180" cy="380" r="26"/>
+    <circle cx="900" cy="520" r="26"/><circle cx="1160" cy="520" r="26"/>
+  </g>
+  <circle cx="1010" cy="360" r="50" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="1010" y="356" text-anchor="middle" class="c mono" font-size="15" font-weight="700">DC</text>
+  <text x="1010" y="374" text-anchor="middle" class="s" font-size="10">domain</text>
+
+  <!-- title block -->
+  <text x="90" y="250" class="c" font-size="15" font-weight="700" letter-spacing="4">KNOWLEDGE TRANSFER · L1 ANALYST</text>
+  <text x="90" y="312" class="t" font-size="58" font-weight="800">Active Directory</text>
+  <text x="90" y="376" class="c" font-size="58" font-weight="800">Attacks &amp; Enumeration</text>
+  <rect x="92" y="398" width="150" height="4" fill="#34d3ee"/>
+  <text x="90" y="448" class="s" font-size="20">A field guide to how attackers map and abuse AD —</text>
+  <text x="90" y="478" class="s" font-size="20">and the everyday signals that give them away.</text>
+
+  <rect x="90" y="520" width="232" height="34" rx="6" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="106" y="543" class="c mono" font-size="14" font-weight="700">FIELD GUIDE · 12 SLIDES</text>
+  <text x="338" y="543" class="s" font-size="15">No AD expertise needed — learn the shapes</text>
+
+  <text x="90" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Active Directory — L1 Field Guide</text>
+  <text x="1190" y="688" class="s mono" font-size="13" text-anchor="end">01 / 12</text>
+</svg>
