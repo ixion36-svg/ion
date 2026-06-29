@@ -1,13 +1,34 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.47.0 -->
+<!-- ion-doc:version=0.48.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.48.0 — 2026-06-29
+
+**Active Directory knowledge-transfer briefing decks for analyst upskilling — two new in-app decks on `/briefings`.**
+
+- **AD Attacks (L1)** — a 12-slide field guide for L1 analysts: AD 101, how
+  Kerberos/NTLM logon works, the attack lifecycle, enumeration & BloodHound,
+  Kerberoasting, AS-REP roasting, password spraying, Pass-the-Hash / Pass-the-Ticket,
+  DCSync & Golden Ticket, an Event-ID → meaning → action cheat-sheet, and the ION
+  triage flow. Every slide carries a diagram and an explicit "escalate when…".
+- **AD Advanced (L2)** — an 11-slide deck for L2/L3: Kerberos delegation
+  (unconstrained/constrained/RBCD), AD CS ESC1 & ESC8, Shadow Credentials,
+  coercion & NTLM relay (PetitPotam/PrinterBug/DFSCoerce) plus Zerologon & NoPac,
+  ACL & persistence abuse (AdminSDHolder/DCShadow/Silver/Skeleton), and an L2
+  detection/response playbook keyed on directory-write audit events.
+- **Pluggable deck route.** The `/briefings` handler now serves `slide-*.png`
+  **or** `slide-*.svg` with numeric slide ordering, and the PDF-download link is
+  guarded so SVG-only decks render. Slides are authored as vector **SVG**, served
+  as same-origin `<img>` under the existing strict CSP (no new dependency, no new
+  route, no schema change). Files: `web/templates/briefings.html`, `web/server.py`,
+  `static/briefings/ad-attacks/*`, `static/briefings/ad-advanced/*`.
 
 ## v0.47.0 — 2026-06-29
 
