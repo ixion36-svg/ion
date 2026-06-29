@@ -1,13 +1,33 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.45.0 -->
+<!-- ion-doc:version=0.45.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.45.1 — 2026-06-29
+
+**Parsed-fields view added to the Alerts page — the same investigation-friendly field breakdown already on the case panel.**
+
+- **"Fields" tab on the alert-detail modal.** The alert detail view now carries
+  a Fields tab (between Sequence and Raw Data) that renders the same parsed-field
+  breakdown the `/cases` linked-alert dropdown provides: the observables ION
+  extracted from the alert ("Extracted values"), an investigation-relevant
+  well-known field allowlist (`host.*`, `user.*`, `process.*`, `kibana.alert.*`,
+  …) surfaced by default, and the long tail of remaining fields behind a
+  "Show all" toggle. The alert's nested `_source` is flattened to dot-paths and
+  the raw document is lazy-loaded once on first open (reusing the Raw Data tab's
+  cache).
+- **Add fields as evidence note.** When the alert is linked to a case, a button
+  posts the well-known fields + extracted observables to that case as a formatted
+  note via the existing case-notes endpoint (`case:update`). The button is hidden
+  for alerts not yet linked to a case.
+- Frontend-only change (one template); no new route, permission, schema, or
+  dependency. Every server/DOM value is HTML-escaped before insertion.
 
 ## v0.45.0 — 2026-06-25
 
