@@ -151,6 +151,14 @@ from ion.models.security import (
     SecurityEventStatus,
     SecurityEventType,
 )
+from ion.models.service_desk import (  # noqa: F401
+    BugReport,
+    BugReportSeverity,
+    BugReportStatus,
+    ChangeRequest,
+    ChangeRequestStatus,
+    ChangeRiskLevel,
+)
 from ion.models.skills import (
     AssessmentReviewCycle,
     AssessmentSnapshot,
@@ -354,4 +362,11 @@ __all__ = [
     "SocialPost",
     "SocialComment",
     "SocialReaction",
+    # Service desk — bug reports + CAB change requests
+    "BugReport",
+    "BugReportSeverity",
+    "BugReportStatus",
+    "ChangeRequest",
+    "ChangeRequestStatus",
+    "ChangeRiskLevel",
 ]

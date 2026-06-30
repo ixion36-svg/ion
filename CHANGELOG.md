@@ -1,13 +1,51 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.48.1 -->
+<!-- ion-doc:version=0.49.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.49.0 — 2026-06-30
+
+**Service-desk + admin features: user bug reporting to GitLab, CAB change requests for version upgrades, and toggle-gated large-document AI analysis. Plus a daily-standup PowerPoint export fix.**
+
+- **Bug reporting → GitLab** (`/bug-reports`, any authenticated user). A bug-report
+  form opens a **linked GitLab issue** (markdown body carrying severity, component,
+  page, the running ION version, and reporter) and tracks it locally. A **Sync**
+  action pulls the issue's open/closed state back into ION (closed → resolved,
+  reopened → open). GitLab being unconfigured or unreachable never blocks
+  submission — the local record is saved and the reason recorded. New
+  `services/service_desk_service.py`, `web/bug_report_api.py`, model `BugReport`.
+- **Change Requests / CAB** (`/change-requests`, gated `system:settings`). A
+  CAB-ready change request for an ION version upgrade capturing the full dataset —
+  current→target version, justification, **what's changing auto-pulled from
+  `CHANGELOG.md`**, risk, impact, affected systems, implementation plan, a
+  pre-filled **backout/rollback plan**, test plan, and maintenance window — with a
+  reviewed status workflow (**Draft → Submitted → Approved/Rejected → Scheduled →
+  Implemented → Closed**, plus Cancelled), each transition stamped with who/when.
+  Creates an optional **linked GitLab issue** and offers a **CAB Markdown export**.
+  New `web/change_request_api.py`, model `ChangeRequest`.
+- **AI Document Analysis** (`/document-analysis`, opt-in via
+  `ION_AI_LARGE_PDF_ENABLED`, default off). Lets the internal model (Bob) read a
+  large PDF/DOCX that won't fit in one prompt: text is extracted locally (pypdf —
+  nothing leaves the environment), chunked, each chunk analysed, then the partials
+  are **hierarchically consolidated** so no single LLM call ever exceeds the
+  context or response budget. Presets for compliance-checklist extraction and
+  summarisation, plus a custom instruction. Runs as a background job with progress
+  polling; one job at a time. New `services/large_doc_service.py`,
+  `web/large_doc_api.py`. Env tunables `ION_AI_LARGE_PDF_{CHUNK_CHARS,REDUCE_CHARS,MAX_CHUNKS}`.
+- **Fix — daily-standup `.pptx` 500 ("failed to download").** The 30-day alert
+  backlog slide did `None >= 30` / `f"{None:,}"` when the backlog check returned
+  present-but-`None` fields (e.g. zero alerts in the window, or a partial
+  Elasticsearch response), raising a `TypeError` that surfaced as a 500. The slide
+  now coerces those values to `0`. File: `web/daily_standup_api.py`.
+- Reuses existing permissions (no role-seed changes): bug reports = any
+  authenticated user; change requests + document analysis = `system:settings` /
+  `ai:chat`. New tests `tests/test_service_desk.py`, `tests/test_large_doc.py`.
 
 ## v0.48.1 — 2026-06-30
 

@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}Bug Reports - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
+      <span class="label-tiny text-ion-iris">Service desk</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Bug Reports</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Report a problem with ION. Each report opens a linked GitLab issue (when GitLab is configured) and tracks its status here.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-header"><h2>Report a bug</h2></div>
+  <div class="bug-form">
+    <div class="bf-row">
+      <label>Title<input id="bf-title" class="ion-input" maxlength="300" placeholder="Short summary of the problem"></label>
+    </div>
+    <div class="bf-grid">
+      <label>Severity
+        <select id="bf-severity" class="ion-select">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </label>
+      <label>Component / page
+        <input id="bf-component" class="ion-input" maxlength="120" placeholder="e.g. /alerts, Daily Standup">
+      </label>
+      <label>URL where it happened
+        <input id="bf-page" class="ion-input" maxlength="500" placeholder="optional">
+      </label>
+    </div>
+    <div class="bf-row">
+      <label>Description<textarea id="bf-desc" class="ion-input" rows="4" placeholder="What went wrong? What did you expect?"></textarea></label>
+    </div>
+    <div class="bf-row">
+      <label>Steps to reproduce<textarea id="bf-steps" class="ion-input" rows="3" placeholder="1. … 2. … (optional)"></textarea></label>
+    </div>
+    <div class="bf-actions">
+      <span id="bf-msg" class="ion-muted"></span>
+      <button class="ion-btn ion-btn-primary" data-click-action="submitBug">Submit bug report</button>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="section-header">
+    <h2>Submitted reports</h2>
+    <div class="filter-controls">
+      <label><input type="checkbox" id="filter-mine" data-change-action="loadBugs"> Only mine</label>
+      <label>Status:
+        <select id="filter-status" class="ion-select sh-filter-select" data-change-action="loadBugs">
+          <option value="all" selected>All</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <div class="table-container">
+    <table class="ion-table" id="bugs-table">
+      <thead>
+        <tr><th>#</th><th>Title</th><th>Severity</th><th>Component</th><th>Status</th><th>GitLab</th><th>Reported by</th><th>Created</th><th>Actions</th></tr>
+      </thead>
+      <tbody id="bugs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</section>
+
+<style nonce="{{ csp_nonce }}">
+.section { background: var(--bg-secondary); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
+.filter-controls { display:flex; gap:1rem; align-items:center; }
+.sh-filter-select { width:auto; }
+.table-container { overflow-x:auto; }
+.loading { text-align:center; color: var(--text-secondary); padding: 2rem; }
+.bug-form label { display:block; font-size:12px; color: var(--text-secondary); margin-bottom:.35rem; }
+.bf-row { margin-bottom: 1rem; }
+.bf-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:1rem; margin-bottom:1rem; }
+@media (max-width: 820px){ .bf-grid { grid-template-columns: 1fr; } }
+.bf-actions { display:flex; justify-content:flex-end; align-items:center; gap:1rem; }
+</style>
+
+<script nonce="{{ csp_nonce }}">
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(iso){ if(!iso) return ''; try { return new Date(iso).toISOString().replace('T',' ').slice(0,16);} catch(e){ return iso; } }
+
+async function submitBug(){
+  const title = document.getElementById('bf-title').value.trim();
+  const desc = document.getElementById('bf-desc').value.trim();
+  const msg = document.getElementById('bf-msg');
+  if(!title || !desc){ msg.textContent = 'Title and description are required.'; return; }
+  msg.textContent = 'Submitting…';
+  const resp = await fetch('/api/bug-reports', {
+    method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      title, description: desc,
+      steps_to_reproduce: document.getElementById('bf-steps').value.trim() || null,
+      component: document.getElementById('bf-component').value.trim() || null,
+      severity: document.getElementById('bf-severity').value,
+      page_url: document.getElementById('bf-page').value.trim() || null,
+    })
+  });
+  if(!resp.ok){ msg.textContent = 'Failed: ' + resp.status; return; }
+  const br = await resp.json();
+  msg.textContent = br.gitlab_issue_iid ? `Filed — GitLab issue #${br.gitlab_issue_iid} created.`
+                                        : `Filed (GitLab issue not created: ${esc(br.gitlab_error || 'n/a')}).`;
+  ['bf-title','bf-desc','bf-steps','bf-component','bf-page'].forEach(id => document.getElementById(id).value = '');
+  loadBugs();
+}
+
+async function loadBugs(){
+  const status = document.getElementById('filter-status').value;
+  const mine = document.getElementById('filter-mine').checked ? '&mine=true' : '';
+  const body = document.getElementById('bugs-body');
+  const resp = await fetch(`/api/bug-reports?status=${encodeURIComponent(status)}${mine}`, { credentials:'same-origin' });
+  if(!resp.ok){ body.innerHTML = `<tr><td colspan="9" class="loading">Failed to load: ${resp.status}</td></tr>`; return; }
+  const items = (await resp.json()).bug_reports || [];
+  if(!items.length){ body.innerHTML = `<tr><td colspan="9" class="loading">No bug reports.</td></tr>`; return; }
+  const sevColor = { low:'ion-c-muted', medium:'ion-c-cyan', high:'ion-c-amber', critical:'ion-c-red' };
+  const stColor = { open:'ion-c-amber', in_progress:'ion-c-cyan', resolved:'ion-c-green', closed:'ion-c-muted' };
+  body.innerHTML = items.map(b => {
+    const gl = b.gitlab_issue_url
+      ? `<a class="ion-link" href="${esc(b.gitlab_issue_url)}" target="_blank" rel="noopener">#${b.gitlab_issue_iid}</a> <small class="ion-muted">${esc(b.gitlab_state || '')}</small>`
+      : `<small class="ion-muted">${esc(b.gitlab_error || '—')}</small>`;
+    const sync = b.gitlab_issue_iid ? `<button class="ion-btn ion-btn-ghost" data-click-action="syncBug" data-args='[${b.id}]'>Sync</button>` : '';
+    return `<tr>
+      <td>${b.id}</td>
+      <td>${esc(b.title)}</td>
+      <td><span class="ion-pill ${sevColor[b.severity]||'ion-c-muted'}">${esc(b.severity)}</span></td>
+      <td>${esc(b.component || '—')}</td>
+      <td><span class="ion-pill ${stColor[b.status]||'ion-c-muted'}">${esc(b.status)}</span></td>
+      <td>${gl}</td>
+      <td>${esc(b.reported_by_username || '—')}</td>
+      <td><small class="ion-muted">${fmtDate(b.created_at)}</small></td>
+      <td>${sync}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function syncBug(id){
+  const resp = await fetch(`/api/bug-reports/${id}/sync`, { method:'POST', credentials:'same-origin' });
+  if(!resp.ok){ alert('Sync failed: ' + resp.status); return; }
+  loadBugs();
+}
+
+document.addEventListener('DOMContentLoaded', loadBugs);
+</script>
+
+</div>
+</div>
+{% endblock %}

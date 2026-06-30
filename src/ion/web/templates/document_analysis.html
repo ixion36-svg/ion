@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}AI Document Analysis - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1200px] w-full px-4 sm:px-6 lg:px-10 py-10 md:py-14">
+
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
+      <span class="label-tiny text-ion-iris">Internal AI · air-gapped</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-[1.05] text-white tracking-[-0.02em]">AI Document Analysis</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Read a large PDF with the internal model (Bob) — the document is chunked and map-reduced so it never overflows the context or response budget. Nothing leaves this environment.</p>
+  </div>
+</section>
+
+<div id="disabled-banner" class="ion-banner dw-hidden">
+  <strong>This feature is turned off.</strong> Enable it by setting <code>ION_AI_LARGE_PDF_ENABLED=true</code> and restarting ION. Turn it back off when you're done.
+</div>
+
+<section class="section">
+  <div class="section-header"><h2>Analyse a document</h2><span id="da-status" class="ion-muted"></span></div>
+  <div class="da-form">
+    <div class="da-grid">
+      <label>Document (PDF, DOCX, TXT, HTML)
+        <input type="file" id="da-file" class="ion-input" accept=".pdf,.docx,.txt,.md,.html,.htm,.eml">
+      </label>
+      <label>Task
+        <select id="da-task" class="ion-select" data-change-action="onTaskChange">
+          <option value="checklist" selected>Extract a compliance checklist</option>
+          <option value="summary">Summarise the document</option>
+          <option value="custom">Custom instruction…</option>
+        </select>
+      </label>
+    </div>
+    <div class="da-row dw-hidden" id="da-custom-wrap">
+      <label>Custom instruction (applied to each chunk, then consolidated)
+        <textarea id="da-custom" class="ion-input" rows="2" placeholder="e.g. Extract every defined term and its definition"></textarea>
+      </label>
+    </div>
+    <div class="da-actions">
+      <span id="da-msg" class="ion-muted"></span>
+      <button class="ion-btn ion-btn-primary" id="da-run" data-click-action="runAnalysis">Run analysis</button>
+    </div>
+  </div>
+</section>
+
+<section class="section dw-hidden" id="da-progress-card">
+  <div class="section-header"><h2>Progress</h2></div>
+  <p id="da-progress" class="ion-muted">Starting…</p>
+  <div class="da-bar"><div id="da-bar-fill" class="da-bar-fill"></div></div>
+</section>
+
+<section class="section dw-hidden" id="da-result-card">
+  <div class="section-header">
+    <h2>Result</h2>
+    <button class="ion-btn ion-btn-ghost" data-click-action="downloadResult">Download .md</button>
+  </div>
+  <p id="da-result-meta" class="ion-muted"></p>
+  <pre id="da-result" class="da-result"></pre>
+</section>
+
+<style nonce="{{ csp_nonce }}">
+.section { background: var(--bg-secondary); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
+.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
+.ion-banner { background: rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.4); color:#fbbf24; border-radius:8px; padding:.9rem 1.1rem; margin-bottom:1.5rem; font-size:13px; }
+.da-form label { display:block; font-size:12px; color: var(--text-secondary); margin-bottom:.35rem; }
+.da-grid { display:grid; grid-template-columns: 2fr 1fr; gap:1rem; margin-bottom:1rem; }
+@media (max-width:820px){ .da-grid { grid-template-columns:1fr; } }
+.da-row { margin-bottom:1rem; }
+.da-actions { display:flex; justify-content:flex-end; align-items:center; gap:1rem; }
+.da-bar { height:8px; background: var(--bg-card, #0f172a); border:1px solid var(--border,#1e293b); border-radius:6px; overflow:hidden; }
+.da-bar-fill { height:100%; width:0%; background: var(--primary, #38bdf8); transition: width .3s; }
+.da-result { white-space:pre-wrap; font-family: var(--font-mono, monospace); font-size:12.5px; line-height:1.6; color: var(--text-secondary); background: var(--bg-card,#0f172a); border:1px solid var(--border,#1e293b); border-radius:8px; padding:1rem; max-height:60vh; overflow:auto; }
+.dw-hidden { display:none; }
+</style>
+
+<script nonce="{{ csp_nonce }}">
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+let _poll = null, _lastResult = '', _lastName = 'analysis';
+
+function onTaskChange(){
+  document.getElementById('da-custom-wrap').classList.toggle('dw-hidden', document.getElementById('da-task').value !== 'custom');
+}
+
+async function refreshStatus(){
+  try {
+    const r = await fetch('/api/document-analysis/status', { credentials:'same-origin' });
+    if(!r.ok) return;
+    const s = await r.json();
+    document.getElementById('disabled-banner').classList.toggle('dw-hidden', s.enabled);
+    document.getElementById('da-run').disabled = !s.enabled || s.running;
+    document.getElementById('da-status').textContent = s.enabled
+      ? `Enabled · chunk ${s.chunk_chars} chars · max ${s.max_chunks} chunks` + (s.running ? ' · a job is running' : '')
+      : 'Disabled';
+  } catch(e){}
+}
+
+async function runAnalysis(){
+  const f = document.getElementById('da-file').files[0];
+  const msg = document.getElementById('da-msg');
+  if(!f){ msg.textContent = 'Choose a file first.'; return; }
+  const fd = new FormData();
+  fd.append('file', f);
+  fd.append('task', document.getElementById('da-task').value);
+  fd.append('custom_prompt', document.getElementById('da-custom').value || '');
+  msg.textContent = 'Uploading…';
+  document.getElementById('da-run').disabled = true;
+  const r = await fetch('/api/document-analysis', { method:'POST', credentials:'same-origin', body: fd });
+  if(!r.ok){ const d = await r.json().catch(()=>({})); msg.textContent = `Failed (${r.status}): ${d.detail || ''}`; document.getElementById('da-run').disabled = false; return; }
+  const { job_id } = await r.json();
+  msg.textContent = '';
+  _lastName = (f.name || 'analysis').replace(/\.[^.]+$/, '');
+  document.getElementById('da-progress-card').classList.remove('dw-hidden');
+  document.getElementById('da-result-card').classList.add('dw-hidden');
+  pollJob(job_id);
+}
+
+function pollJob(jobId){
+  if(_poll) clearInterval(_poll);
+  _poll = setInterval(async () => {
+    const r = await fetch(`/api/document-analysis/jobs/${jobId}`, { credentials:'same-origin' });
+    if(!r.ok){ clearInterval(_poll); document.getElementById('da-progress').textContent = 'Lost the job.'; return; }
+    const j = await r.json();
+    const pct = j.total ? Math.round((j.done / j.total) * 100) : 0;
+    document.getElementById('da-progress').textContent =
+      `${esc(j.phase || 'working')} — ${j.done}/${j.total || '?'} (${j.chars} chars, ${esc(j.kind || '')})`;
+    document.getElementById('da-bar-fill').style.width = pct + '%';
+    if(j.status === 'done' || j.status === 'error'){
+      clearInterval(_poll);
+      document.getElementById('da-run').disabled = false;
+      refreshStatus();
+      if(j.status === 'error'){ document.getElementById('da-progress').textContent = 'Error: ' + esc(j.error || 'failed'); return; }
+      const res = j.result || {};
+      _lastResult = res.result || '';
+      document.getElementById('da-result-meta').textContent =
+        `${res.chunks} chunks · ${res.map_hits} relevant · ${res.reduce_rounds} reduce round(s)` + (res.truncated ? ' · TRUNCATED at max chunks' : '');
+      document.getElementById('da-result').textContent = _lastResult;
+      document.getElementById('da-result-card').classList.remove('dw-hidden');
+      document.getElementById('da-progress-card').classList.add('dw-hidden');
+    }
+  }, 1500);
+}
+
+function downloadResult(){
+  const blob = new Blob([_lastResult], { type:'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${_lastName}-analysis.md`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+document.addEventListener('DOMContentLoaded', () => { onTaskChange(); refreshStatus(); });
+</script>
+
+</div>
+</div>
+{% endblock %}

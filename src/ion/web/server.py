@@ -52,12 +52,14 @@ from ion.web.auto_investigate_api import router as auto_investigate_router
 from ion.web.bob_analysis_api import router as bob_analysis_router
 from ion.web.bob_eval_api import router as bob_eval_router
 from ion.web.briefing_api import router as briefing_router
+from ion.web.bug_report_api import router as bug_report_router
 from ion.web.bulk_ops_api import router as bulk_ops_router
 from ion.web.canary_api import router as canary_router
 from ion.web.case_grouper_api import router as case_grouper_router
 from ion.web.case_lifecycle_api import router as case_lifecycle_router
 from ion.web.case_similarity_api import router as case_similarity_router
 from ion.web.change_log_api import router as change_log_router
+from ion.web.change_request_api import router as change_request_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.compliance_api import router as compliance_router
 from ion.web.course_api import router as course_router
@@ -85,6 +87,7 @@ from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.kibana_api import router as kibana_router
 from ion.web.knowledge_graph_api import router as knowledge_graph_router
 from ion.web.labs_api import router as labs_router
+from ion.web.large_doc_api import router as large_doc_router
 from ion.web.log_source_api import router as log_source_router
 from ion.web.logging_middleware import RequestLoggingMiddleware
 from ion.web.maturity_api import router as maturity_router
@@ -421,6 +424,11 @@ app.include_router(course_router, prefix="")
 # v0.21.0 — Lab fixture launch/complete lifecycle
 app.include_router(labs_router, prefix="")
 app.include_router(tuning_proposal_router, prefix="")
+# Service desk — user bug reports (→ GitLab) + CAB change requests.
+app.include_router(bug_report_router, prefix="")
+app.include_router(change_request_router, prefix="")
+# AI document analysis — large-PDF map-reduce via the internal LLM (toggle-gated).
+app.include_router(large_doc_router, prefix="")
 # v0.26.1: ticker_router removed alongside the service.
 app.include_router(investigation_memory_router)
 app.include_router(scheduler_router, prefix="")

@@ -1437,12 +1437,21 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
         s = prs.slides.add_slide(blank)
         _eyebrow(s, "Section 4 · Alert Backlog (30 days)")
         _title(s, "Alert Backlog")
-        still_open = b.get("still_open_pct", 0)
+        # Coerce None → 0: a successful check with zero alerts can return
+        # total=0 (which passes the `is not None` guard) but leave the rate
+        # and counts as None, and `None >= 30` / `f"{None:,}"` both raise —
+        # that surfaced as a 500 "failed to download". (.get(default) only
+        # fires on a MISSING key, not a present-but-None value.)
+        total = b.get("total") or 0
+        open_ct = b.get("open") or 0
+        ack_ct = b.get("acknowledged") or 0
+        closed_ct = b.get("closed") or 0
+        still_open = b.get("still_open_pct") or 0
         backlog_color = CORAL if still_open >= 30 else AMBER if still_open >= 15 else EMERALD
-        _kpi(s, 0.6, "Total", f"{b.get('total', 0):,}", value_size=48)
-        _kpi(s, 4.0, "Still Open", f"{b.get('open', 0):,}", color=backlog_color, value_size=48)
-        _kpi(s, 7.4, "Acknowledged", f"{b.get('acknowledged', 0):,}", color=AMBER, value_size=48)
-        _kpi(s, 10.4, "Closed", f"{b.get('closed', 0):,}", color=EMERALD, value_size=48)
+        _kpi(s, 0.6, "Total", f"{total:,}", value_size=48)
+        _kpi(s, 4.0, "Still Open", f"{open_ct:,}", color=backlog_color, value_size=48)
+        _kpi(s, 7.4, "Acknowledged", f"{ack_ct:,}", color=AMBER, value_size=48)
+        _kpi(s, 10.4, "Closed", f"{closed_ct:,}", color=EMERALD, value_size=48)
         tf = _box(s, 0.6, 5.0, 12.5, 1.0)
         _line(tf, f"{still_open}% of 30-day alerts still open.", size=20, color=SLATE_500)
 
