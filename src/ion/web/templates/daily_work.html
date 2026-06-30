@@ -171,6 +171,9 @@
   .dw-cal-edit { margin-left: auto; font-size: 10px; color: var(--text-muted); flex: 0 0 auto; }
   /* edit / add modal */
   .dw-modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 16, 0.66); display: flex; align-items: center; justify-content: center; z-index: 200; }
+  /* dw-hidden is defined earlier in source order; without this combined selector
+     the later .dw-modal-overlay display:flex wins and the modal never hides. */
+  .dw-modal-overlay.dw-hidden { display: none; }
   .dw-modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; width: 380px; max-width: 92vw; box-shadow: 0 18px 48px rgba(0,0,0,.5); }
   .dw-field-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 4px; }
   .dw-field { width: 100%; }

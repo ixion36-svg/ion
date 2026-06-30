@@ -1,13 +1,52 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.48.0 -->
+<!-- ion-doc:version=0.48.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.48.1 — 2026-06-30
+
+**Arkime realtime monitor reworked from IOC-IP matching to content & behaviour detection; daily-work calendar modal fix.**
+
+- **Realtime traffic monitor (RTMON) — new detection model.** The opt-in
+  `arkime_realtime_monitor_service` no longer just matches recent sessions
+  against ION's IOC IP set. It now sweeps recent Arkime sessions for
+  *intrinsically* suspicious traffic with a panel of cheap SPI-metadata
+  detectors, then hands each hit to the existing PCAP analyzer (which recovers
+  the actual cleartext password / command payload / RITA beacon score / JA3-JA4
+  fingerprint as deep evidence) while the capture is still inside Arkime's
+  retention window:
+  - **Cleartext credentials** — Arkime's parsed `user` field, or a
+    cleartext-auth protocol (FTP/Telnet/POP3/IMAP/SMTP/SNMP/LDAP).
+  - **Command / C2 channel** — Telnet/IRC, or egress to a shell / known-C2 port
+    (4444, 1337, 512–514 rsh/rexec, 5555/6666/8888/9001/31337…).
+  - **C2 beacon shape** — groups recent *egress* sessions by (src, dst, dstPort)
+    and scores interval+size regularity with the same RITA-style scorer the PCAP
+    pipeline uses; **confirm-first** (a strict score + connection-count gate
+    must pass before a case opens).
+  - **DNS tunneling** — long / high-entropy query names; **confirm-first** by
+    pulling the PCAP and re-running the pipeline's DNS-tunnel/DGA detector
+    (budget-capped per pass).
+  - The legacy **IOC-IP matcher** is preserved behind an opt-in toggle
+    (`ION_ARKIME_RTMON_IOC_ENABLED`, default off).
+  - Each detector is independently toggleable (all default on except IOC) with
+    env-tunable thresholds; new `ArkimeService.find_recent_sessions_by_expression`
+    primitive. No new dependency. Arkime queries are **read-only metadata**;
+    cases stay **advisory** (no auto-response). Detectors do **not** require a
+    pre-existing IOC set, and work whether Arkime captures live or ingests
+    forwarded/imported PCAPs. Files: `services/arkime_realtime_monitor_service.py`,
+    `services/arkime_service.py`, `tests/test_rtmon_content_detectors.py`, `.env.deploy`.
+- **Fix — daily-work "My Day" edit modal stuck permanently open.** A CSS
+  source-order bug: `.dw-modal-overlay { display: flex }` was declared *after*
+  `.dw-hidden { display: none }` with equal specificity, so toggling `dw-hidden`
+  never hid the modal. Added the combined selector
+  `.dw-modal-overlay.dw-hidden { display: none }` (matching the existing
+  `.dw-view.dw-hidden` pattern). File: `web/templates/daily_work.html`.
 
 ## v0.48.0 — 2026-06-29
 

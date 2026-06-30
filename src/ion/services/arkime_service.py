@@ -579,25 +579,39 @@ class ArkimeService:
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime traffic overview error: {type(e).__name__}: {e}") from e
 
-    async def find_recent_sessions_for_ips(
+    # Default SPI fields pulled for realtime-monitor candidate sweeps. Includes
+    # Arkime's aggregate ``user`` field (a cleartext username parsed from any
+    # auth-bearing protocol) and ``dns.host`` (queried names) so the content/
+    # behaviour detectors can score candidates without pulling PCAP.
+    _RTMON_FIELDS = (
+        "id,node,communityId,srcIp,dstIp,srcPort,dstPort,totBytes,packets,"
+        "firstPacket,lastPacket,ipProtocol,protocol,user,dns.host"
+    )
+
+    async def find_recent_sessions_by_expression(
         self,
-        ips: List[str],
+        expression: str,
         *,
         window_minutes: int = 20,
-        limit: int = 200,
+        limit: int = 500,
+        fields: Optional[str] = None,
+        order: str = "firstPacket:desc",
     ) -> List[Dict[str, Any]]:
-        """Sessions in the last ``window_minutes`` that touch any IP in ``ips``
-        (as src OR dst). Used by the realtime IOC monitor to catch known-bad
-        traffic while the full PCAP is still inside Arkime's retention window.
+        """Sessions in the last ``window_minutes`` matching an Arkime expression.
 
-        Caps the IP set to keep the Arkime expression bounded.
+        The generic primitive behind the realtime monitor's content/behaviour
+        detectors: each detector supplies its own Arkime search expression
+        (cleartext-auth protocols, suspicious egress ports, DNS, …) and reads
+        back SPI metadata only — no PCAP cost. Callers do their own per-detector
+        scoring/grouping in Python. Returns ``[]`` (never raises) on an empty
+        expression so a disabled detector is a no-op.
         """
         import time as _time
 
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
-        clean = [str(i).strip() for i in (ips or []) if str(i).strip()][:256]
-        if not clean:
+        expr = (expression or "").strip()
+        if not expr:
             return []
         now = int(_time.time())
         start = now - max(1, window_minutes) * 60
@@ -605,9 +619,9 @@ class ArkimeService:
             "length": str(max(1, min(limit, 1000))),
             "startTime": str(start),
             "stopTime": str(now),
-            "order": "firstPacket:desc",
-            "expression": "ip == [" + ",".join(clean) + "]",
-            "fields": "id,node,communityId,srcIp,dstIp,totBytes,firstPacket,ipProtocol,protocol",
+            "order": order,
+            "expression": expr,
+            "fields": fields or self._RTMON_FIELDS,
         }
         headers = await self._headers()
         try:
@@ -617,7 +631,7 @@ class ArkimeService:
                 )
             if resp.status_code != 200:
                 raise ArkimeError(
-                    f"Arkime IOC-session query failed: HTTP {resp.status_code}",
+                    f"Arkime realtime-monitor query failed: HTTP {resp.status_code}",
                     status_code=resp.status_code,
                 )
             if "json" not in resp.headers.get("content-type", ""):
@@ -626,7 +640,31 @@ class ArkimeService:
         except ArkimeError:
             raise
         except httpx.HTTPError as e:
-            raise ArkimeError(f"Arkime IOC-session error: {type(e).__name__}: {e}") from e
+            raise ArkimeError(f"Arkime realtime-monitor error: {type(e).__name__}: {e}") from e
+
+    async def find_recent_sessions_for_ips(
+        self,
+        ips: List[str],
+        *,
+        window_minutes: int = 20,
+        limit: int = 200,
+    ) -> List[Dict[str, Any]]:
+        """Sessions in the last ``window_minutes`` that touch any IP in ``ips``
+        (as src OR dst). Used by the realtime monitor's legacy IOC-IP detector
+        (opt-in) to catch known-bad traffic while the full PCAP is still inside
+        Arkime's retention window.
+
+        Caps the IP set to keep the Arkime expression bounded; delegates the
+        HTTP call to :meth:`find_recent_sessions_by_expression`.
+        """
+        clean = [str(i).strip() for i in (ips or []) if str(i).strip()][:256]
+        if not clean:
+            return []
+        return await self.find_recent_sessions_by_expression(
+            "ip == [" + ",".join(clean) + "]",
+            window_minutes=window_minutes,
+            limit=limit,
+        )
 
     async def get_traffic_totals(
         self, start_ts: int, stop_ts: int, expression: Optional[str] = None
