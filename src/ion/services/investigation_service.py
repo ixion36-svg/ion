@@ -772,7 +772,18 @@ def _parse_llm_json(content: str) -> Dict[str, Any]:
 
     verdict = str(parsed.get("verdict") or defaults["verdict"]).lower()
     severity = str(parsed.get("severity") or defaults["severity"]).lower()
-    summary = parsed.get("summary") or defaults["summary"]
+    # We parsed a JSON envelope. If its `summary` is empty, fall back to another
+    # narrative field — NOT defaults["summary"], which is the raw model content
+    # (i.e. the whole JSON envelope). Echoing the envelope back produced the
+    # "{"verdict":"","summary":""...}" text seen in the investigation queue when
+    # the model returned an empty/skeleton envelope. (The raw-content fallback is
+    # still correct for the earlier no-JSON-parsed early returns.)
+    summary = (
+        parsed.get("summary")
+        or parsed.get("analyst_explanation")
+        or parsed.get("technical_details")
+        or "The model did not return a summary for this investigation."
+    )
 
     # recommended_actions: old shape = list[str]; new shape = list[dict with
     # priority/action/owner]. Preserve the structured list and flatten to

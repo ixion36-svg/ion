@@ -69,6 +69,46 @@ def test_map_reduce_hierarchical():
     assert res["result"]
 
 
+def test_map_reduce_skips_failed_chunks():
+    # A chunk that raises (e.g. a timeout) is skipped, not fatal — the rest still
+    # produce a result, with a partial-coverage note.
+    calls = {"n": 0}
+
+    async def flaky_chat(messages, system_prompt=None, temperature=0.2, max_tokens=None, bypass_queue=False):
+        u = messages[0]["content"]
+        if u.startswith("DOCUMENT CHUNK"):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise TimeoutError("model cold-loading")  # first chunk times out
+            return {"content": "- [ ] item"}
+        return {"content": "CONSOLIDATED"}
+
+    text = ("A requirement paragraph. " * 20 + "\n\n") * 6
+    res = asyncio.run(lds._map_reduce(text, "checklist", None, flaky_chat,
+                                      chunk_chars=400, reduce_chars=100000, max_chunks=250))
+    assert res["map_failures"] >= 1
+    assert res["map_hits"] >= 1  # the surviving chunks still produced output
+    assert "partial" in res["result"].lower()
+
+
+def test_map_reduce_all_fail_raises():
+    async def dead_chat(messages, **kw):
+        raise TimeoutError("model unavailable")
+    try:
+        asyncio.run(lds._map_reduce("a\n\nb\n\nc", "summary", None, dead_chat,
+                                    chunk_chars=1, reduce_chars=100, max_chunks=250))
+        assert False, "expected RuntimeError when every chunk fails"
+    except RuntimeError as e:
+        assert "timed out" in str(e).lower() or "unavailable" in str(e).lower()
+
+
+def test_reduce_call_falls_back_on_failure():
+    async def reduce_dies(messages, **kw):
+        raise TimeoutError("reduce timeout")
+    out = asyncio.run(lds._reduce_call("PARTIAL-A\n\nPARTIAL-B", "consolidate", reduce_dies))
+    assert "PARTIAL-A" in out and "PARTIAL-B" in out  # content preserved, not lost
+
+
 def test_map_reduce_all_none_is_graceful():
     async def none_chat(messages, **kw):
         return {"content": "NONE"}

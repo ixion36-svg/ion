@@ -1,13 +1,36 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.49.1 -->
+<!-- ion-doc:version=0.49.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.49.2 — 2026-07-01
+
+**Three production fixes: investigation-summary display, large-document analysis resilience, and a KB-embedding crash.**
+
+- **Fix — investigation queue / auto-analysis showed an empty JSON envelope.**
+  When the model returned a JSON envelope with an empty `summary` field,
+  `_parse_llm_json` fell back to `defaults["summary"]` — the *raw* model content,
+  i.e. the whole envelope — so the queue displayed
+  `{"verdict":"","summary":""…}`. It now falls back to `analyst_explanation` →
+  `technical_details` → a clean placeholder, never the raw envelope. The
+  no-JSON-parsed early-return path (freeform prose) is unchanged.
+- **Fix — AI Document Analysis timeout aborted the whole job.** A single Ollama
+  call timing out (typically the first chunk while the model cold-loads on a
+  slow GPU, exceeding `ION_OLLAMA_TIMEOUT`) raised and killed the entire
+  map-reduce. Each chunk is now analysed resiliently: a failed call is logged and
+  skipped, the run continues, and a partial-coverage note is appended; the job
+  only fails if *every* chunk fails. A failed consolidation (reduce) call now
+  falls back to the un-consolidated partials rather than losing the output.
+- **Fix — KB-embedding background loop crashed every cycle** when the top-level
+  "Knowledge Base" collection had been seeded more than once: `_get_kb_root_id`
+  used `.one_or_none()` which raises `MultipleResultsFound`. It now picks the
+  earliest root deterministically and logs a warning about the duplicate.
 
 ## v0.49.1 — 2026-06-30
 

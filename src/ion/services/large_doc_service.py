@@ -165,25 +165,49 @@ async def _map_reduce(
         truncated = True
 
     # ── map ──
+    # Each chunk is analysed independently and resiliently: a single failed call
+    # (e.g. the FIRST chunk timing out while Ollama cold-loads the model on a slow
+    # GPU, or a transient error) is logged and skipped rather than aborting the
+    # whole job. A run only fails if *every* chunk fails.
     partials: List[str] = []
+    failures = 0
     total = len(chunks)
     for i, chunk in enumerate(chunks):
-        out = await chat_fn(
-            messages=[{"role": "user", "content": f"DOCUMENT CHUNK {i + 1} of {total}:\n\n{chunk}\n\n---\n{instr['map']}"}],
-            system_prompt=_ANALYSIS_SYSTEM,
-            temperature=0.2,
-            max_tokens=1024,
-        )
-        body = (out or {}).get("content") or ""
-        body = body.strip()
-        if body and body.upper() != "NONE":
-            partials.append(body)
+        try:
+            out = await chat_fn(
+                messages=[{"role": "user", "content": f"DOCUMENT CHUNK {i + 1} of {total}:\n\n{chunk}\n\n---\n{instr['map']}"}],
+                system_prompt=_ANALYSIS_SYSTEM,
+                temperature=0.2,
+                max_tokens=1024,
+            )
+            body = ((out or {}).get("content") or "").strip()
+            if body and body.upper() != "NONE":
+                partials.append(body)
+        except Exception as exc:  # noqa: BLE001
+            failures += 1
+            logger.warning("large-doc: map chunk %d/%d failed (skipped): %s", i + 1, total, exc)
         if progress:
             progress("map", i + 1, total)
 
+    if failures == total:
+        raise RuntimeError(
+            f"All {total} chunk(s) failed — the model timed out or is unavailable. "
+            f"On a slow GPU the model can exceed ION_OLLAMA_TIMEOUT while cold-loading; "
+            f"raise it (or pre-load the model) and retry."
+        )
+
+    coverage_note = ""
+    if failures:
+        coverage_note = (
+            f"\n\n---\n_Note: {failures} of {total} document chunk(s) could not be "
+            f"analysed (model timeout/error) and were skipped — coverage is partial. "
+            f"Re-run for full coverage._"
+        )
+
     if not partials:
-        return {"result": "_The model found nothing matching the requested task in this document._",
-                "chunks": total, "map_hits": 0, "reduce_rounds": 0, "truncated": truncated}
+        return {"result": "_The model found nothing matching the requested task in this document._" + coverage_note,
+                "chunks": total, "map_hits": 0, "reduce_rounds": 0, "truncated": truncated,
+                "map_failures": failures}
 
     # ── reduce (hierarchical) ──
     reduce_rounds = 0
@@ -193,8 +217,8 @@ async def _map_reduce(
         if len(combined) <= reduce_chars or len(level) == 1:
             final = await _reduce_call(combined, instr["reduce_instruction"], chat_fn)
             reduce_rounds += 1
-            return {"result": final.strip(), "chunks": total, "map_hits": len(partials),
-                    "reduce_rounds": reduce_rounds, "truncated": truncated}
+            return {"result": final.strip() + coverage_note, "chunks": total, "map_hits": len(partials),
+                    "reduce_rounds": reduce_rounds, "truncated": truncated, "map_failures": failures}
         # Batch the partials into groups that each fit the reduce budget, reduce
         # each group, then recurse on the (smaller) set of group results.
         reduce_rounds += 1
@@ -209,13 +233,21 @@ async def _map_reduce(
 
 
 async def _reduce_call(combined: str, reduce_instruction: str, chat_fn) -> str:
-    out = await chat_fn(
-        messages=[{"role": "user", "content": f"{reduce_instruction}\n\n---\n{combined}"}],
-        system_prompt=_ANALYSIS_SYSTEM,
-        temperature=0.2,
-        max_tokens=4096,
-    )
-    return (out or {}).get("content") or ""
+    # Resilient: if consolidation fails (timeout/error), fall back to the raw
+    # combined partials so the analyst still gets the extracted content rather
+    # than losing the whole job.
+    try:
+        out = await chat_fn(
+            messages=[{"role": "user", "content": f"{reduce_instruction}\n\n---\n{combined}"}],
+            system_prompt=_ANALYSIS_SYSTEM,
+            temperature=0.2,
+            max_tokens=4096,
+        )
+        text = (out or {}).get("content") or ""
+        return text if text.strip() else combined
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("large-doc: reduce call failed, returning un-consolidated partials: %s", exc)
+        return combined
 
 
 def _batch_by_chars(items: List[str], budget: int) -> List[List[str]]:

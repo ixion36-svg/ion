@@ -79,15 +79,29 @@ def _hash(text: str) -> str:
 
 def _get_kb_root_id(session: Session) -> Optional[int]:
     """Return the id of the top-level "Knowledge Base" collection, or None
-    if it hasn't been seeded yet (fresh deploys). Cached after first hit.
+    if it hasn't been seeded yet (fresh deploys).
+
+    Tolerant of a duplicated root: if more than one top-level collection is
+    named "Knowledge Base" (e.g. seeded twice across deploys), pick the earliest
+    deterministically rather than raising ``MultipleResultsFound`` — that
+    exception was crashing the KB-embedding background tick on every cycle.
     """
-    row = (
-        session.query(Collection)
+    rows = (
+        session.query(Collection.id)
         .filter(Collection.name == "Knowledge Base")
         .filter(Collection.parent_id.is_(None))
-        .one_or_none()
+        .order_by(Collection.id.asc())
+        .all()
     )
-    return row.id if row else None
+    if not rows:
+        return None
+    if len(rows) > 1:
+        logger.warning(
+            "kb_embedding: %d top-level 'Knowledge Base' collections found; "
+            "using the earliest (id=%s). Consider de-duplicating.",
+            len(rows), rows[0][0],
+        )
+    return rows[0][0]
 
 
 def _descendant_collection_ids(session: Session, root_id: int) -> set[int]:
