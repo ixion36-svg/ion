@@ -8,10 +8,12 @@ import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
 
-from ion.auth.dependencies import require_page_auth, require_permission
+from ion.auth.dependencies import get_current_user, require_page_auth, require_permission
 from ion.models.user import User
 from ion.services import large_doc_service as lds
+from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +27,8 @@ _PERM = "ai:chat"
 
 
 @router.get("/api/document-analysis/status", dependencies=[Depends(require_permission(_PERM))])
-def analysis_status():
-    return lds.status()
+def analysis_status(session: Session = Depends(get_db_session)):
+    return lds.status(session)
 
 
 @router.post("/api/document-analysis", dependencies=[Depends(require_permission(_PERM))])
@@ -34,6 +36,8 @@ async def start_document_analysis(
     file: UploadFile = File(...),
     task: str = Form("checklist"),
     custom_prompt: str = Form(""),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
 ):
     if not lds.is_enabled():
         raise HTTPException(
@@ -44,7 +48,9 @@ async def start_document_analysis(
     if not content:
         raise HTTPException(status_code=400, detail="Empty file")
     try:
-        job_id = lds.start_analysis(file.filename or "document", content, task, custom_prompt or None)
+        job_id = lds.start_analysis(
+            session, current_user.id, file.filename or "document", content, task, custom_prompt or None
+        )
     except ValueError as exc:
         code = 409 if "already running" in str(exc).lower() else 400
         raise HTTPException(status_code=code, detail=str(exc))
@@ -52,8 +58,8 @@ async def start_document_analysis(
 
 
 @router.get("/api/document-analysis/jobs/{job_id}", dependencies=[Depends(require_permission(_PERM))])
-def get_analysis_job(job_id: str):
-    job = lds.get_job(job_id)
+def get_analysis_job(job_id: str, session: Session = Depends(get_db_session)):
+    job = lds.get_job(session, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job

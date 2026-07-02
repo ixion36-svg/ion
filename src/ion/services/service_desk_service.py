@@ -265,12 +265,16 @@ async def create_change_request(
     create_gitlab: bool = True,
 ) -> ChangeRequest:
     current = _ion_version()
+    ctype = (data.get("change_type") or "ION version upgrade").strip()[:80]
+    tv = (data.get("target_version") or "").strip()[:40] or None
+    is_upgrade = ctype == "ION version upgrade"
+    default_title = f"Upgrade ION to {tv or '?'}" if is_upgrade else ctype
     cr = ChangeRequest(
         reference=next_cr_reference(session),
-        title=(data.get("title") or "").strip()[:300] or f"Upgrade ION to {data.get('target_version') or '?'}",
-        change_type=(data.get("change_type") or "ION version upgrade").strip()[:80],
+        title=(data.get("title") or "").strip()[:300] or default_title,
+        change_type=ctype,
         current_version=current,
-        target_version=(data.get("target_version") or "").strip()[:40] or None,
+        target_version=tv,
         justification=(data.get("justification") or "").strip() or None,
         changes=(data.get("changes") or "").strip() or None,
         risk_level=(data.get("risk_level") or "medium"),
@@ -284,8 +288,9 @@ async def create_change_request(
         status=ChangeRequestStatus.DRAFT,
         requested_by_id=user_id,
     )
-    # Auto-fill the "what's changing" section from the changelog delta if blank.
-    if not cr.changes and cr.target_version:
+    # Auto-fill the "what's changing" section from the changelog delta if blank
+    # (only meaningful for an ION version upgrade).
+    if is_upgrade and not cr.changes and cr.target_version:
         delta = changelog_between(current, cr.target_version)
         if delta:
             cr.changes = delta[:20000]

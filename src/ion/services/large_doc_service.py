@@ -14,8 +14,9 @@ budget. This service map-reduces instead:
 So no single LLM call ever exceeds the window, regardless of document size.
 
 OPT-IN: gated by ``ION_AI_LARGE_PDF_ENABLED`` (default off) — turn it on to run
-a job, off again when finished. Work runs in a background thread; the page polls
-an in-memory job registry. A single job runs at a time (protects the GPU).
+a job, off again when finished. Work runs in a background thread and job state is
+persisted to the DB (``DocAnalysisJob``) so the page's poll is answered correctly
+by any uvicorn worker. A single job runs at a time (protects the GPU).
 
 Env:
 * ``ION_AI_LARGE_PDF_ENABLED``       (default ``false``)
@@ -102,35 +103,30 @@ def is_enabled() -> bool:
     return _enabled()
 
 
-def status() -> Dict[str, Any]:
+def _running_exists(session) -> bool:
+    from ion.models.service_desk import DocAnalysisJob
+    return session.query(DocAnalysisJob).filter(DocAnalysisJob.status == "running").first() is not None
+
+
+def status(session) -> Dict[str, Any]:
     return {
         "enabled": _enabled(),
         "chunk_chars": _chunk_chars(),
         "max_chunks": _max_chunks(),
         "presets": ["checklist", "summary", "custom"],
-        "running": any(j["status"] == "running" for j in _JOBS.values()),
+        "running": _running_exists(session),
     }
 
 
-# ── in-memory job registry ───────────────────────────────────────────────────
-_JOBS: Dict[str, Dict[str, Any]] = {}
-_JOBS_LOCK = threading.Lock()
+# ── DB-backed job store (multi-worker safe — the poll may land on any worker) ─
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def get_job(job_id: str) -> Optional[Dict[str, Any]]:
-    with _JOBS_LOCK:
-        j = _JOBS.get(job_id)
-        return dict(j) if j else None
-
-
-def _set(job_id: str, **kw) -> None:
-    with _JOBS_LOCK:
-        if job_id in _JOBS:
-            _JOBS[job_id].update(kw)
+def get_job(session, job_id: str) -> Optional[Dict[str, Any]]:
+    from ion.models.service_desk import DocAnalysisJob
+    job = session.get(DocAnalysisJob, job_id)
+    return job.to_dict() if job else None
 
 
 def _resolve_instructions(task: str, custom_prompt: Optional[str]) -> Dict[str, str]:
@@ -237,49 +233,80 @@ def _batch_by_chars(items: List[str], budget: int) -> List[List[str]]:
     return batches
 
 
-# ── job orchestration ────────────────────────────────────────────────────────
-def start_analysis(filename: str, content: bytes, task: str, custom_prompt: Optional[str]) -> str:
-    """Extract text, then run the map-reduce in a background thread. Returns a
-    job id. Raises ValueError on extraction problems / when a job is running."""
+# ── job orchestration (DB-backed so any uvicorn worker can serve the poll) ────
+def start_analysis(session, user_id: Optional[int], filename: str, content: bytes,
+                   task: str, custom_prompt: Optional[str]) -> str:
+    """Extract text, persist a job row, then run the map-reduce in a background
+    thread. Returns the job id. Raises ValueError on extraction problems / when a
+    job is already running."""
+    from ion.models.service_desk import DocAnalysisJob
     from ion.services.translation_service import extract_text_from_upload
 
-    with _JOBS_LOCK:
-        if any(j["status"] == "running" for j in _JOBS.values()):
-            raise ValueError("Another document analysis is already running — wait for it to finish.")
+    if _running_exists(session):
+        raise ValueError("Another document analysis is already running — wait for it to finish.")
 
     text, kind = extract_text_from_upload(filename, content)
     if not text.strip():
         raise ValueError("No extractable text found in the document.")
 
     job_id = uuid.uuid4().hex
-    with _JOBS_LOCK:
-        _JOBS[job_id] = {
-            "id": job_id, "status": "running", "phase": "map", "done": 0, "total": 0,
-            "filename": filename, "kind": kind, "task": task, "chars": len(text),
-            "result": None, "error": None, "created_at": _now_iso(), "finished_at": None,
-        }
+    session.add(DocAnalysisJob(
+        id=job_id, status="running", phase="map", done=0, total=0,
+        chars=len(text), filename=(filename or "")[:300], kind=kind,
+        task=task, created_by_id=user_id,
+    ))
+    session.commit()
+
+    threading.Thread(
+        target=_worker, args=(job_id, text, task, custom_prompt),
+        daemon=True, name=f"large-doc-{job_id[:8]}",
+    ).start()
+    return job_id
+
+
+def _worker(job_id: str, text: str, task: str, custom_prompt: Optional[str]) -> None:
+    """Runs in a background thread with its OWN DB session (never share the
+    request session across threads)."""
+    import asyncio
+
+    from ion.models.service_desk import DocAnalysisJob
+    from ion.storage.database import get_engine, get_session_factory
+
+    session = get_session_factory(get_engine())()
+
+    def _update(**kw) -> None:
+        job = session.get(DocAnalysisJob, job_id)
+        if not job:
+            return
+        for k, v in kw.items():
+            setattr(job, k, v)
+        session.commit()
 
     def _progress(phase: str, done: int, total: int) -> None:
-        _set(job_id, phase=phase, done=done, total=total)
+        _update(phase=phase, done=done, total=total)
 
-    def _worker() -> None:
-        import asyncio
+    try:
+        from ion.services.ollama_service import get_ollama_service
+        svc = get_ollama_service()
+
+        async def _chat(**kw):
+            return await svc.chat(bypass_queue=True, **kw)
+
+        result = asyncio.run(_map_reduce(
+            text, task, custom_prompt, _chat,
+            chunk_chars=_chunk_chars(), reduce_chars=_reduce_chars(),
+            max_chunks=_max_chunks(), progress=_progress,
+        ))
+        _update(
+            status="done", result_md=result["result"], chunks=result["chunks"],
+            map_hits=result["map_hits"], reduce_rounds=result["reduce_rounds"],
+            truncated=result["truncated"], finished_at=_now(),
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("large-doc analysis failed: %s", exc)
         try:
-            from ion.services.ollama_service import get_ollama_service
-            svc = get_ollama_service()
-
-            async def _chat(**kw):
-                return await svc.chat(bypass_queue=True, **kw)
-
-            result = asyncio.run(_map_reduce(
-                text, task, custom_prompt, _chat,
-                chunk_chars=_chunk_chars(), reduce_chars=_reduce_chars(),
-                max_chunks=_max_chunks(), progress=_progress,
-            ))
-            _set(job_id, status="done", result=result, finished_at=_now_iso())
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("large-doc analysis failed: %s", exc)
-            _set(job_id, status="error", error=f"{type(exc).__name__}: {exc}"[:500], finished_at=_now_iso())
-
-    threading.Thread(target=_worker, daemon=True, name=f"large-doc-{job_id[:8]}").start()
-    return job_id
+            _update(status="error", error=f"{type(exc).__name__}: {exc}"[:500], finished_at=_now())
+        except Exception:  # noqa: BLE001
+            pass
+    finally:
+        session.close()

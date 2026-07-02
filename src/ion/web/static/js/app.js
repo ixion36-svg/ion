@@ -216,14 +216,12 @@ function updateNavForPermissions() {
         if (el) el.style.display = isAdmin ? '' : 'none';
     });
 
-    // User dropdown admin section — visible for admin/engineering roles.
-    // Must set an explicit 'block' (not '') to reveal: the section carries the
-    // migrated `_ion-s-c8be1ccba6` class (`html body .x { display:none }`), whose
-    // selector specificity beats a cleared inline style — only an inline display
-    // value overrides it. Clearing it (='') let the class re-hide Settings/Users
-    // etc. for admins. Mirrors the explicit-'block' contract in toggleUserDropdown.
-    const adminDropdown = document.getElementById('user-dropdown-admin');
-    if (adminDropdown) adminDropdown.style.display = (isAdmin || isEngineer) ? 'block' : 'none';
+    // "Administration" top-nav dropdown — visible for admin/engineering roles.
+    // It's a plain .tw-drop with no hiding class, so clearing to '' restores the
+    // stylesheet default (same pattern as nav-security-link above). The admin
+    // links moved here from the user/profile dropdown.
+    const adminNav = document.getElementById('nav-admin-dropdown');
+    if (adminNav) adminNav.style.display = (isAdmin || isEngineer) ? '' : 'none';
 
     // Forensics link — only visible when user has forensic:read
     const forensicsLink = document.getElementById('nav-forensics-link');

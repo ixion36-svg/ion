@@ -8,25 +8,22 @@ lifecycle without needing a real Ollama.
 import asyncio
 import time
 
+from sqlalchemy.orm import sessionmaker
+
 from ion.services import large_doc_service as lds
 
 
-def _clear_jobs():
-    with lds._JOBS_LOCK:
-        lds._JOBS.clear()
-
-
 # ── toggle ───────────────────────────────────────────────────────────────────
-def test_toggle_default_off(monkeypatch):
+def test_toggle_default_off(session, monkeypatch):
     monkeypatch.delenv("ION_AI_LARGE_PDF_ENABLED", raising=False)
     assert lds.is_enabled() is False
-    assert lds.status()["enabled"] is False
+    assert lds.status(session)["enabled"] is False
 
 
-def test_toggle_on(monkeypatch):
+def test_toggle_on(session, monkeypatch):
     monkeypatch.setenv("ION_AI_LARGE_PDF_ENABLED", "true")
     assert lds.is_enabled() is True
-    s = lds.status()
+    s = lds.status(session)
     assert s["enabled"] and "checklist" in s["presets"]
 
 
@@ -90,50 +87,55 @@ def test_map_reduce_truncates_at_max_chunks():
     assert res["chunks"] == 5
 
 
-# ── job lifecycle ────────────────────────────────────────────────────────────
-def test_single_job_guard():
-    _clear_jobs()
-    with lds._JOBS_LOCK:
-        lds._JOBS["running1"] = {"status": "running"}
+# ── job lifecycle (DB-backed) ────────────────────────────────────────────────
+def test_single_job_guard(session):
+    from ion.models.service_desk import DocAnalysisJob
+    session.add(DocAnalysisJob(id="running1", status="running", filename="x", task="summary"))
+    session.commit()
     try:
-        lds.start_analysis("x.txt", b"some text here", "summary", None)
+        lds.start_analysis(session, 1, "x.txt", b"some text here", "summary", None)
         assert False, "expected ValueError (already running)"
     except ValueError as e:
         assert "already running" in str(e).lower()
-    finally:
-        _clear_jobs()
 
 
-def test_start_analysis_empty_text_raises():
-    _clear_jobs()
+def test_start_analysis_empty_text_raises(session):
     try:
-        lds.start_analysis("empty.txt", b"   \n  ", "summary", None)
+        lds.start_analysis(session, 1, "empty.txt", b"   \n  ", "summary", None)
         assert False, "expected ValueError (no text)"
     except ValueError as e:
         assert "no extractable text" in str(e).lower()
 
 
-def test_start_analysis_runs_to_completion(monkeypatch):
-    _clear_jobs()
+def test_start_analysis_runs_to_completion(session, temp_db, monkeypatch):
+    # The worker thread opens its own session from get_engine() — point that at
+    # the test DB so the persisted job is observable from the poll.
     import ion.services.ollama_service as oll
+    import ion.storage.database as db
+
+    monkeypatch.setattr(db, "get_engine", lambda: temp_db)
 
     class _FakeSvc:
         async def chat(self, messages, system_prompt=None, temperature=0.2, max_tokens=None, bypass_queue=False):
             return {"content": "- key point"}
 
     monkeypatch.setattr(oll, "get_ollama_service", lambda: _FakeSvc())
-    job_id = lds.start_analysis("notes.txt", b"This is a real document with content to analyse.", "summary", None)
-    # poll the background thread
+    job_id = lds.start_analysis(
+        session, 1, "notes.txt", b"This is a real document with content to analyse.", "summary", None
+    )
+    # poll from a fresh session each tick so we see the worker's commits
+    Sess = sessionmaker(bind=temp_db)
     job = None
-    for _ in range(50):
-        job = lds.get_job(job_id)
+    for _ in range(80):
+        s2 = Sess()
+        job = lds.get_job(s2, job_id)
+        s2.close()
         if job and job["status"] in ("done", "error"):
             break
         time.sleep(0.1)
     assert job is not None and job["status"] == "done", job
     assert job["result"]["result"]
     assert job["result"]["map_hits"] >= 1
-    _clear_jobs()
 
 
 if __name__ == "__main__":

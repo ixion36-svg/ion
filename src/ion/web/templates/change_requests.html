@@ -21,8 +21,18 @@
   <div class="section-header"><h2>New change request — ION upgrade</h2></div>
   <div class="cr-form">
     <div class="cr-grid">
-      <label>Current version<input id="cf-current" class="ion-input" readonly></label>
-      <label>Target version<input id="cf-target" class="ion-input" maxlength="40" placeholder="e.g. 0.49.0"></label>
+      <label>Change type
+        <select id="cf-type" class="ion-select" data-change-action="onCRTypeChange">
+          <option value="ION version upgrade" selected>ION version upgrade</option>
+          <option value="New UAD">New UAD</option>
+          <option value="Operating System">Operating System (OS)</option>
+          <option value="Rebuild">Rebuild</option>
+          <option value="Infrastructure change">Infrastructure change</option>
+          <option value="Patching">Patching</option>
+          <option value="Other">Other</option>
+        </select>
+      </label>
+      <label class="cr-upgrade-only">Target version<input id="cf-target" class="ion-input" maxlength="40" placeholder="e.g. 0.49.0"></label>
       <label>Risk
         <select id="cf-risk" class="ion-select">
           <option value="low">Low</option>
@@ -32,7 +42,10 @@
       </label>
     </div>
     <div class="cr-row">
-      <label>Title<input id="cf-title" class="ion-input" maxlength="300" placeholder="(optional — defaults to “Upgrade ION to <target>”)"></label>
+      <label>Title<input id="cf-title" class="ion-input" maxlength="300" placeholder="(optional for an upgrade; required for other change types)"></label>
+    </div>
+    <div class="cr-row cr-upgrade-only">
+      <label>Current version<input id="cf-current" class="ion-input" readonly></label>
       <button class="ion-btn ion-btn-ghost cr-load" data-click-action="loadChangelog">Pull CHANGELOG delta</button>
     </div>
     <div class="cr-row"><label>Justification<textarea id="cf-just" class="ion-input" rows="2" placeholder="Why is this change needed?"></textarea></label></div>
@@ -80,7 +93,7 @@
   <div class="table-container">
     <table class="ion-table" id="crs-table">
       <thead>
-        <tr><th>Ref</th><th>Title</th><th>Version</th><th>Risk</th><th>Status</th><th>Requested by</th><th>GitLab</th><th>Created</th><th>Actions</th></tr>
+        <tr><th>Ref</th><th>Title</th><th>Type</th><th>Risk</th><th>Status</th><th>Requested by</th><th>GitLab</th><th>Created</th><th>Actions</th></tr>
       </thead>
       <tbody id="crs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
     </table>
@@ -103,6 +116,7 @@
 .cr-load { align-self:flex-end; margin-top:.35rem; }
 .cr-actions { display:flex; justify-content:flex-end; align-items:center; gap:1rem; }
 .cr-act { display:flex; gap:.35rem; flex-wrap:wrap; }
+.dw-hidden { display:none; }
 </style>
 
 <script nonce="{{ csp_nonce }}">
@@ -123,16 +137,28 @@ async function loadChangelog(){
   msg.textContent = d.changes ? 'CHANGELOG delta loaded.' : 'No CHANGELOG entries found for that range (enter manually).';
 }
 
+function onCRTypeChange(){
+  const upgrade = document.getElementById('cf-type').value === 'ION version upgrade';
+  document.querySelectorAll('.cr-upgrade-only').forEach(el => el.classList.toggle('dw-hidden', !upgrade));
+}
+
 async function submitCR(){
+  const type = document.getElementById('cf-type').value;
   const target = document.getElementById('cf-target').value.trim();
+  const title = document.getElementById('cf-title').value.trim();
   const msg = document.getElementById('cf-msg');
-  if(!target){ msg.textContent = 'Target version is required.'; return; }
+  if(type === 'ION version upgrade'){
+    if(!target){ msg.textContent = 'Target version is required for an ION version upgrade.'; return; }
+  } else if(!title){
+    msg.textContent = 'A title is required for this change type.'; return;
+  }
   msg.textContent = 'Creating…';
   const g = id => document.getElementById(id).value.trim() || null;
   const resp = await fetch('/api/change-requests', {
     method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({
-      title: g('cf-title'), target_version: target, risk_level: document.getElementById('cf-risk').value,
+      change_type: type,
+      title: g('cf-title'), target_version: g('cf-target'), risk_level: document.getElementById('cf-risk').value,
       justification: g('cf-just'), changes: g('cf-changes'), impact: g('cf-impact'),
       affected_systems: g('cf-affected'), implementation_plan: g('cf-impl'),
       backout_plan: g('cf-backout'), test_plan: g('cf-test'),
@@ -173,7 +199,7 @@ async function loadCRs(){
     return `<tr>
       <td><span class="ion-mono">${esc(c.reference)}</span></td>
       <td>${esc(c.title)}</td>
-      <td><small>${esc(c.current_version || '?')} → ${esc(c.target_version || '?')}</small></td>
+      <td><small>${esc(c.change_type || '—')}${c.target_version ? '<br>' + esc(c.current_version || '?') + ' → ' + esc(c.target_version) : ''}</small></td>
       <td><span class="ion-pill ${riskColor[c.risk_level]||'ion-c-muted'}">${esc(c.risk_level)}</span></td>
       <td><span class="ion-pill ${stColor[c.status]||'ion-c-muted'}">${esc(c.status)}</span></td>
       <td>${esc(c.requested_by_username || '—')}</td>
@@ -204,7 +230,7 @@ async function initCRForm(){
     }
   } catch(e) {}
 }
-document.addEventListener('DOMContentLoaded', () => { initCRForm(); loadCRs(); });
+document.addEventListener('DOMContentLoaded', () => { initCRForm(); onCRTypeChange(); loadCRs(); });
 </script>
 
 </div>

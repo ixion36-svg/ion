@@ -137,6 +137,68 @@ class ChangeRequestStatus(str, Enum):
     CANCELLED = "cancelled"
 
 
+class DocAnalysisJob(Base, TimestampMixin):
+    """A large-document AI analysis job (chunked map-reduce).
+
+    Persisted in the DB rather than in-memory so the browser can poll it from
+    any uvicorn worker — ION runs several, and an in-process registry is
+    invisible to the worker that happens to answer the poll.
+    """
+
+    __tablename__ = "doc_analysis_jobs"
+    __table_args__ = (
+        Index("ix_doc_analysis_jobs_status", "status"),
+        Index("ix_doc_analysis_jobs_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)  # uuid hex
+    status: Mapped[str] = mapped_column(String(20), default="running", nullable=False)  # running|done|error
+    phase: Mapped[str] = mapped_column(String(20), default="map", nullable=False)
+    done: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    chars: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+    filename: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
+    kind: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    task: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+
+    result_md: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    chunks: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    map_hits: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    reduce_rounds: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    truncated: Mapped[bool] = mapped_column(default=False, nullable=False)
+    error: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    created_by_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    def to_dict(self) -> dict:
+        result = None
+        if self.status == "done":
+            result = {
+                "result": self.result_md or "",
+                "chunks": self.chunks,
+                "map_hits": self.map_hits,
+                "reduce_rounds": self.reduce_rounds,
+                "truncated": self.truncated,
+            }
+        return {
+            "id": self.id,
+            "status": self.status,
+            "phase": self.phase,
+            "done": self.done,
+            "total": self.total,
+            "chars": self.chars,
+            "filename": self.filename,
+            "kind": self.kind,
+            "task": self.task,
+            "error": self.error,
+            "result": result,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+        }
+
+
 class ChangeRequest(Base, TimestampMixin):
     """A CAB change request — typically an ION version upgrade."""
 

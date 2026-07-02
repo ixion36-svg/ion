@@ -229,7 +229,24 @@
               </div>
             </div>
 
-            <!-- Settings moved to user dropdown admin section -->
+            <!-- Administration — admin/engineering only (revealed by app.js). -->
+            <div class="tw-drop" data-drop id="nav-admin-dropdown">
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/settings') or p.startswith('/users') or p.startswith('/integrations') or p.startswith('/change-requests') or p.startswith('/gitlab') or p.startswith('/audit-logs') or p.startswith('/service-accounts') or p.startswith('/ai-scorecard') or p.startswith('/stories') or p.startswith('/admin/courses') %}is-active{% endif %}">Administration
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/settings" class="tw-drop-item {% if p.startswith('/settings') %}is-active{% endif %}">Settings</a>
+                <a href="/users" class="tw-drop-item {% if p.startswith('/users') %}is-active{% endif %}">Users</a>
+                <a href="/integrations" class="tw-drop-item {% if p.startswith('/integrations') %}is-active{% endif %}">Integrations</a>
+                <a href="/change-requests" class="tw-drop-item {% if p.startswith('/change-requests') %}is-active{% endif %}">Change Requests (CAB)</a>
+                <a href="/gitlab" class="tw-drop-item {% if p.startswith('/gitlab') %}is-active{% endif %}">GitLab</a>
+                <a href="/audit-logs" class="tw-drop-item {% if p.startswith('/audit-logs') %}is-active{% endif %}">Audit Logs</a>
+                <a href="/service-accounts" class="tw-drop-item {% if p.startswith('/service-accounts') %}is-active{% endif %}">Service Accounts</a>
+                <a href="/ai-scorecard" class="tw-drop-item {% if p.startswith('/ai-scorecard') %}is-active{% endif %}">AI Scorecard</a>
+                <a href="/stories" class="tw-drop-item {% if p.startswith('/stories') %}is-active{% endif %}">Stories (automation)</a>
+                <a href="/admin/courses" class="tw-drop-item {% if p.startswith('/admin/courses') %}is-active{% endif %}">Course authoring</a>
+              </div>
+            </div>
           </nav>
         </div>
 
@@ -265,20 +282,7 @@
                 </button>
                 <a href="#" data-click-action="logout" data-prevent-default class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Sign Out</a>
               </div>
-              <!-- Admin section — shown via JS when user has admin/engineering role -->
-              <div id="user-dropdown-admin" class="border-t border-white/10 py-1 _ion-s-c8be1ccba6">
-                <div class="px-4 py-1 text-[10px] text-slate-500 uppercase tracking-wider">Admin</div>
-                <a href="/settings" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Settings</a>
-                <a href="/users" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Users</a>
-                <a href="/integrations" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Integrations</a>
-                <a href="/change-requests" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Change Requests (CAB)</a>
-                <a href="/gitlab" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">GitLab</a>
-                <a href="/audit-logs" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Audit Logs</a>
-                <a href="/service-accounts" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Service Accounts</a>
-                <a href="/ai-scorecard" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">AI Scorecard</a>
-                <a href="/stories" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Stories (automation)</a>
-                <a href="/admin/courses" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Course authoring</a>
-              </div>
+              <!-- Admin options moved to the "Administration" nav dropdown (top bar). -->
             </div>
           </div>
         </div>

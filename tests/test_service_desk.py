@@ -130,6 +130,20 @@ def test_create_change_request_autofills(session, monkeypatch):
     assert cr.title  # defaulted
 
 
+def test_create_change_request_non_upgrade_type(session, monkeypatch):
+    # A non-upgrade change type: no target version, no changelog auto-fill,
+    # title defaults to the change type.
+    monkeypatch.setattr(svc, "_find_changelog", lambda: _SAMPLE_CHANGELOG)
+    cr = asyncio.run(svc.create_change_request(
+        session, 1, {"change_type": "Patching", "justification": "monthly patches"},
+        create_gitlab=False,
+    ))
+    assert cr.change_type == "Patching"
+    assert cr.target_version is None
+    assert cr.changes is None  # changelog delta is upgrade-only
+    assert cr.title == "Patching"  # defaulted to the change type
+
+
 def test_create_change_request_gitlab_linked(session, monkeypatch):
     import ion.services.gitlab_service as gl
     fake = _FakeGitLab()

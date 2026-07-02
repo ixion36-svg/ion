@@ -158,6 +158,7 @@ from ion.models.service_desk import (  # noqa: F401
     ChangeRequest,
     ChangeRequestStatus,
     ChangeRiskLevel,
+    DocAnalysisJob,
 )
 from ion.models.skills import (
     AssessmentReviewCycle,
@@ -369,4 +370,5 @@ __all__ = [
     "ChangeRequest",
     "ChangeRequestStatus",
     "ChangeRiskLevel",
+    "DocAnalysisJob",
 ]

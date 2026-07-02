@@ -1,13 +1,39 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.49.0 -->
+<!-- ion-doc:version=0.49.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-06-25 -->
 
 # Changelog
+
+## v0.49.1 — 2026-06-30
+
+**Housekeeping: fix "lost the job" on AI Document Analysis under multiple workers; change-request types beyond version upgrades; admin options moved to a dedicated nav dropdown.**
+
+- **Fix — AI Document Analysis "lost the job".** The job registry was an
+  in-process dict, but ION runs several uvicorn workers (`ION_WORKERS`, default
+  4 in compose) — so the POST created the job in one worker and the browser's
+  poll round-robined to a different worker that had never heard of it, returning
+  404 → "Lost the job." Job state now persists to a new `doc_analysis_jobs`
+  table (`DocAnalysisJob`), written by the background worker's own DB session and
+  read by whichever worker answers the poll. Also fixes progress/result being
+  invisible across workers and lets a job survive a worker restart. The
+  single-job guard now queries the DB too.
+- **Change requests — request types beyond ION upgrades.** The New Change
+  Request form gains a **Change type** dropdown (ION version upgrade, New UAD,
+  Operating System, Rebuild, Infrastructure change, Patching, Other). The
+  version + CHANGELOG-delta fields show only for an ION version upgrade; other
+  types require a title instead of a target version. The list shows the change
+  type. Backend already stored `change_type`; the default title now reflects the
+  type for non-upgrade changes.
+- **Admin options moved to an "Administration" nav dropdown.** Settings, Users,
+  Integrations, Change Requests, GitLab, Audit Logs, Service Accounts, AI
+  Scorecard, Stories, and Course authoring moved out of the profile/user
+  dropdown into a dedicated top-nav **Administration** dropdown, revealed for
+  admin/engineering roles (same role gating as before, via `app.js`).
 
 ## v0.49.0 — 2026-06-30
 
