@@ -4,6 +4,7 @@ the internal LLM (Bob). Gated by ``ION_AI_LARGE_PDF_ENABLED`` (default off).
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
@@ -44,12 +45,22 @@ async def start_document_analysis(
             status_code=503,
             detail="Large-PDF AI analysis is disabled. Set ION_AI_LARGE_PDF_ENABLED=true to enable it.",
         )
-    content = await file.read()
+    # Cap the read BEFORE buffering: the 10 MB limit used to be enforced only
+    # after the whole body was already materialised in memory.
+    from ion.services.translation_service import MAX_FILE_BYTES
+
+    content = await file.read(MAX_FILE_BYTES + 1)
     if not content:
         raise HTTPException(status_code=400, detail="Empty file")
+    if len(content) > MAX_FILE_BYTES:
+        raise HTTPException(status_code=413, detail=f"File too large (max {MAX_FILE_BYTES} bytes)")
     try:
-        job_id = lds.start_analysis(
-            session, current_user.id, file.filename or "document", content, task, custom_prompt or None
+        # to_thread: start_analysis runs pypdf extraction of the full document —
+        # multi-second CPU work that must not stall the event loop (it froze
+        # every request/SSE stream on this worker for the duration).
+        job_id = await asyncio.to_thread(
+            lds.start_analysis,
+            session, current_user.id, file.filename or "document", content, task, custom_prompt or None,
         )
     except ValueError as exc:
         code = 409 if "already running" in str(exc).lower() else 400

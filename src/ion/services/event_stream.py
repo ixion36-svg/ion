@@ -77,6 +77,14 @@ def _heartbeat_secs() -> int:
     return _env_int("ION_SSE_HEARTBEAT", 25)
 
 
+# After this many consecutive signature failures the stream degrades to
+# interval-style refreshes: the page re-fetches on a cadence and surfaces any
+# real error through its normal JSON path, instead of sitting silently behind
+# healthy-looking keepalives (the client cancels its polling fallback while a
+# stream is open, so a quiet-but-broken stream would freeze the view forever).
+_SIG_FAILURE_DEGRADE_AFTER = 3
+
+
 # ---------------------------------------------------------------------------
 # Signature functions — cheap, read-only, must tolerate empty tables.
 # A signature is any string that changes iff the user-visible state changed.
@@ -204,6 +212,7 @@ async def event_generator(request, topic_name: str):
     tick = max(1, min(topic.interval, heartbeat))
     since_emit = 0.0
     since_beat = 0.0
+    sig_failures = 0
 
     while True:
         await asyncio.sleep(tick)
@@ -220,12 +229,33 @@ async def event_generator(request, topic_name: str):
             # Signature topic — fire only when state actually changed.
             try:
                 sig = await asyncio.to_thread(_compute_signature, topic)
-            except Exception as exc:  # transient DB hiccup — keep the stream up
-                logger.debug("SSE signature failed for %s: %s", topic_name, exc)
-                sig = last_sig
-            if sig != last_sig:
-                last_sig = sig
-                emit = True
+            except Exception as exc:
+                sig_failures += 1
+                # Loud on the first failure and periodically after — a stream
+                # that can't see the DB must not fail at debug level only.
+                if sig_failures == 1 or sig_failures % 10 == 0:
+                    logger.warning(
+                        "SSE signature failed for %s (%d consecutive): %s",
+                        topic_name, sig_failures, exc,
+                    )
+                if sig_failures >= _SIG_FAILURE_DEGRADE_AFTER:
+                    # Degraded mode: refresh on the topic cadence anyway. The
+                    # page's JSON fetch either works (signature-only breakage)
+                    # or shows the analyst a real error — never a frozen view.
+                    emit = since_emit >= topic.interval
+            else:
+                if sig_failures:
+                    logger.info(
+                        "SSE signature for %s recovered after %d failure(s)",
+                        topic_name, sig_failures,
+                    )
+                    sig_failures = 0
+                    # State may have moved during the outage — re-sync once.
+                    last_sig = sig
+                    emit = True
+                elif sig != last_sig:
+                    last_sig = sig
+                    emit = True
 
         if emit:
             yield _sse("refresh", "change")

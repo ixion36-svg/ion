@@ -118,14 +118,23 @@ async def _run_pass(engine: Engine) -> None:
 
     factory = get_session_factory(engine)
     session = factory()
+    # v0.49.3: all sync work below (SQLAlchemy + the blocking Kibana HTTP in
+    # _create_case_for_alert — up to 2 sync round-trips per alert, 5s timeout)
+    # runs via asyncio.to_thread. This pass lives on the uvicorn event loop; a
+    # slow Kibana used to freeze every request/SSE stream on the worker for up
+    # to ~10s per new alert. The session is used from one call at a time, so
+    # hopping it between worker threads is safe.
     try:
         # 3. Exclude alert IDs already recorded in alert_triage.
-        existing = {
-            row[0]
-            for row in session.query(AlertTriage.es_alert_id).filter(
-                AlertTriage.es_alert_id.in_(alert_ids)
-            ).all()
-        }
+        def _already_triaged() -> set:
+            return {
+                row[0]
+                for row in session.query(AlertTriage.es_alert_id).filter(
+                    AlertTriage.es_alert_id.in_(alert_ids)
+                ).all()
+            }
+
+        existing = await asyncio.to_thread(_already_triaged)
         new_alerts = [a for a in arkime_alerts if a.id not in existing]
         if not new_alerts:
             logger.info(
@@ -138,7 +147,7 @@ async def _run_pass(engine: Engine) -> None:
             len(new_alerts),
         )
 
-        bob_id = get_bob_user_id(session)
+        bob_id = await asyncio.to_thread(get_bob_user_id, session)
         if not bob_id:
             logger.warning(
                 "arkime_auto_case: Bob user not seeded; skipping pass"
@@ -148,30 +157,27 @@ async def _run_pass(engine: Engine) -> None:
         # 4. Create case + triage for each new alert.
         for alert in new_alerts:
             try:
-                _create_case_for_alert(
-                    session, alert, bob_id, enqueue_pcap_analysis_for_case
+                await asyncio.to_thread(
+                    _create_case_for_alert,
+                    session, alert, bob_id, enqueue_pcap_analysis_for_case,
                 )
             except Exception as exc:
-                session.rollback()
+                await asyncio.to_thread(session.rollback)
                 logger.warning(
                     "arkime_auto_case: failed to create case for alert %s: %s",
                     alert.id, exc,
                 )
     finally:
-        session.close()
+        await asyncio.to_thread(session.close)
 
 
 def _create_case_for_alert(session, alert, bob_id: int, enqueue_fn) -> None:
     """Create AlertCase + AlertTriage and enqueue PCAP for one alert."""
     from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage
-
-    last_case = session.query(AlertCase).order_by(AlertCase.id.desc()).first()
-    next_num = 1 if not last_case else last_case.id + 1
-    case_number = f"CASE-{next_num:04d}"
+    from ion.services.case_numbering import assign_case_number
 
     node_label = f" [{alert.arkime_node}]" if alert.arkime_node else ""
     case = AlertCase(
-        case_number=case_number,
         title=f"[Auto] {alert.title}{node_label}",
         description=(
             f"Automatically created from Arkime-captured alert {alert.id}. "
@@ -183,8 +189,8 @@ def _create_case_for_alert(session, alert, bob_id: int, enqueue_fn) -> None:
         assigned_to_id=bob_id,
         source_alert_ids=[alert.id],
     )
-    session.add(case)
-    session.flush()
+    # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
+    case_number = assign_case_number(session, case)
 
     triage = AlertTriage(
         es_alert_id=alert.id,

@@ -30,8 +30,9 @@ from __future__ import annotations
 import logging
 import os
 import threading
+import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -103,8 +104,42 @@ def is_enabled() -> bool:
     return _enabled()
 
 
+def _stale_minutes() -> int:
+    return _int_env("ION_AI_LARGE_PDF_STALE_MINUTES", 15)
+
+
+def _reap_stale_jobs(session) -> None:
+    """Mark orphaned 'running' rows as errors.
+
+    The worker is a daemon thread: a deploy/crash/reload mid-job kills it
+    without a status write, and the stuck 'running' row would otherwise 409
+    every future analysis until someone hand-edits the table. A live worker
+    heartbeats ``updated_at`` on every chunk via the progress callback, so a
+    row with no heartbeat past the threshold is dead, not slow."""
+    from ion.models.service_desk import DocAnalysisJob
+
+    cutoff = _now() - timedelta(minutes=_stale_minutes())
+    stale = (
+        session.query(DocAnalysisJob)
+        .filter(DocAnalysisJob.status == "running", DocAnalysisJob.updated_at < cutoff)
+        .all()
+    )
+    if not stale:
+        return
+    for job in stale:
+        job.status = "error"
+        job.error = (
+            f"Orphaned: no heartbeat for over {_stale_minutes()} min — "
+            f"the worker likely restarted mid-job. Re-run the analysis."
+        )
+        job.finished_at = _now()
+        logger.warning("large-doc: reaped stale running job %s (%s)", job.id, job.filename)
+    session.commit()
+
+
 def _running_exists(session) -> bool:
     from ion.models.service_desk import DocAnalysisJob
+    _reap_stale_jobs(session)
     return session.query(DocAnalysisJob).filter(DocAnalysisJob.status == "running").first() is not None
 
 
@@ -229,6 +264,22 @@ async def _map_reduce(
             next_level.append(r.strip())
             if progress:
                 progress("reduce", len(next_level), len(batches))
+        if next_level == level:
+            # No progress: every reduce failed (the fallback returns its input
+            # verbatim) and the batches are oversized singletons that can never
+            # shrink. Bail out with the un-consolidated content instead of
+            # spinning forever hammering the LLM while holding the job slot.
+            logger.warning(
+                "large-doc: reduce made no progress after round %d (LLM failing) — "
+                "returning un-consolidated partials", reduce_rounds,
+            )
+            note = (
+                "\n\n---\n_Note: the consolidation step failed (model "
+                "timeout/error) — these are the raw per-chunk results._"
+            )
+            return {"result": combined + note + coverage_note, "chunks": total,
+                    "map_hits": len(partials), "reduce_rounds": reduce_rounds,
+                    "truncated": truncated, "map_failures": failures}
         level = next_level
 
 
@@ -281,13 +332,32 @@ def start_analysis(session, user_id: Optional[int], filename: str, content: byte
     if not text.strip():
         raise ValueError("No extractable text found in the document.")
 
-    job_id = uuid.uuid4().hex
+    # Time-prefixed id: sorts by claim order, so concurrent claims (below)
+    # resolve to one deterministic winner without a schema change.
+    job_id = f"{int(time.time() * 1_000_000):016x}{uuid.uuid4().hex[:16]}"
     session.add(DocAnalysisJob(
         id=job_id, status="running", phase="map", done=0, total=0,
         chars=len(text), filename=(filename or "")[:300], kind=kind,
         task=task, created_by_id=user_id,
     ))
     session.commit()
+
+    # Claim check: the pre-check above is check-then-insert, so two workers
+    # can both pass it. After committing, the earliest running row (by id —
+    # time-prefixed) wins; a later claim withdraws its own row and 409s
+    # rather than starting a second GPU job.
+    winner = (
+        session.query(DocAnalysisJob.id)
+        .filter(DocAnalysisJob.status == "running")
+        .order_by(DocAnalysisJob.id.asc())
+        .first()
+    )
+    if winner and winner[0] != job_id:
+        row = session.get(DocAnalysisJob, job_id)
+        if row is not None:
+            session.delete(row)
+            session.commit()
+        raise ValueError("Another document analysis is already running — wait for it to finish.")
 
     threading.Thread(
         target=_worker, args=(job_id, text, task, custom_prompt),

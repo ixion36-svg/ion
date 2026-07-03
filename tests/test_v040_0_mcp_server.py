@@ -743,3 +743,98 @@ class TestToolAddCaseNote:
 
         mock_session.rollback.assert_called_once()
         mock_session.close.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# v0.49.3 code-review fixes
+# ---------------------------------------------------------------------------
+
+
+class TestLimitLowerBound:
+    """limit=-1 must not reach Query.limit() — SQLite treats LIMIT -1 as
+    'no limit' and dumps the whole table."""
+
+    def test_list_alerts_negative_limit_clamped_to_1(self):
+        mock_session = MagicMock()
+        mock_session.query.return_value.order_by.return_value.limit.return_value.all.return_value = []
+        with patch.object(mcp_mod, "get_session_factory") as mock_factory:
+            mock_factory.return_value.return_value = mock_session
+            mcp_mod._tool_list_alerts({"limit": -1})
+        mock_session.query.return_value.order_by.return_value.limit.assert_called_with(1)
+
+    def test_list_cases_zero_limit_clamped_to_1(self):
+        mock_session = MagicMock()
+        chain = mock_session.query.return_value.options.return_value
+        chain.order_by.return_value.limit.return_value.all.return_value = []
+        with patch.object(mcp_mod, "get_session_factory") as mock_factory:
+            mock_factory.return_value.return_value = mock_session
+            mcp_mod._tool_list_cases({"limit": 0})
+        chain.order_by.return_value.limit.assert_called_with(1)
+
+    def test_search_observables_negative_limit_clamped_to_1(self):
+        mock_session = MagicMock()
+        with patch.object(mcp_mod, "get_session_factory") as mock_factory, \
+             patch.object(mcp_mod, "ObservableService") as MockSvc:
+            mock_factory.return_value.return_value = mock_session
+            MockSvc.return_value.search.return_value = ([], 0)
+            mcp_mod._tool_search_observables({"limit": -5})
+        assert MockSvc.return_value.search.call_args.kwargs["limit"] == 1
+
+
+class TestBatchNonObjectEntries:
+    """A JSON-RPC batch entry that is not an object must yield a per-item
+    -32600 error, not an AttributeError -> 500."""
+
+    def test_batch_with_non_object_entries_returns_per_item_errors(self):
+        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+            client = TestClient(_app())
+            resp = _post(client, [1, "x", _rpc("ping", req_id=7)])
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data, list)
+        assert len(data) == 3
+        errors = [d for d in data if "error" in d]
+        assert len(errors) == 2
+        assert all(e["error"]["code"] == -32600 for e in errors)
+        assert all(e["id"] is None for e in errors)
+        ok = [d for d in data if "result" in d]
+        assert len(ok) == 1 and ok[0]["id"] == 7
+
+    def test_batch_of_only_invalid_entries_still_200(self):
+        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+            client = TestClient(_app())
+            resp = _post(client, [None, 42])
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) == 2
+        assert all(d["error"]["code"] == -32600 for d in data)
+
+
+class TestAddCaseNoteSyncsSideEffects:
+    """MCP-added notes must propagate to ES + Kibana exactly like the REST
+    route (case_lifecycle_api.add_case_note) — otherwise external views
+    silently diverge from the ION DB."""
+
+    def _call_with_mocks(self):
+        case = _mock_case()
+        case.kibana_case_id = "kb-123"
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = case
+
+        with patch.object(mcp_mod, "get_session_factory") as mock_factory, \
+             patch("ion.web.mcp_api.Note"), \
+             patch.object(mcp_mod, "_schedule_case_es_sync") as mock_es, \
+             patch.object(mcp_mod, "sync_note_to_kibana") as mock_kb:
+            mock_factory.return_value.return_value = mock_session
+            result = mcp_mod._tool_add_case_note(
+                {"case_id": 1, "content": "MCP note"}, _user()
+            )
+        return result, mock_es, mock_kb
+
+    def test_note_triggers_es_case_sync(self):
+        _, mock_es, _ = self._call_with_mocks()
+        mock_es.assert_called_once_with(1)
+
+    def test_note_syncs_to_kibana_as_comment(self):
+        _, _, mock_kb = self._call_with_mocks()
+        mock_kb.assert_called_once_with("kb-123", "analyst", "MCP note")

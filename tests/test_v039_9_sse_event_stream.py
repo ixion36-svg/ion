@@ -210,3 +210,99 @@ class TestEndpointContract:
         client = TestClient(_app())
         resp = client.get("/api/events/stream")
         assert resp.status_code == 422
+
+
+# ── v0.49.3 code-review fix: silent dead stream ──────────────────────────────
+async def _drive_generator(gen, seconds: float) -> list:
+    """Drain frames from the generator for ~seconds of wall clock."""
+    frames: list = []
+
+    async def _run():
+        async for frame in gen:
+            frames.append(frame)
+
+    task = asyncio.create_task(_run())
+    await asyncio.sleep(seconds)
+    task.cancel()
+    try:
+        await task
+    except (asyncio.CancelledError, Exception):  # noqa: BLE001
+        pass
+    return frames
+
+
+def _refresh_count(frames: list) -> int:
+    return sum(1 for f in frames if f.startswith(b"event: refresh"))
+
+
+class TestSignatureFailureFallback:
+    """A connected stream whose signature computation fails persistently must
+    not go silently dead behind keepalive frames: the analyst's queue would
+    just stop updating with no error and no polling fallback."""
+
+    def test_persistent_failure_degrades_to_interval_refresh(self, monkeypatch):
+        monkeypatch.setenv("ION_SSE_POLL_INTERVAL", "1")
+        monkeypatch.setenv("ION_SSE_HEARTBEAT", "1")
+
+        def _always_fails(topic):
+            raise RuntimeError("db pool exhausted")
+
+        monkeypatch.setattr(es, "_compute_signature", _always_fails)
+
+        async def drive():
+            gen = es.event_generator(_FakeRequest(), "investigations")
+            return await _drive_generator(gen, 6.0)
+
+        frames = asyncio.run(drive())
+        # init prime + at least one degraded-mode refresh; pre-fix the stream
+        # emits only the prime and then keepalives forever.
+        assert _refresh_count(frames) >= 2, (
+            f"stream went silently dead: {frames}"
+        )
+
+    def test_persistent_failure_logs_warning(self, monkeypatch, caplog):
+        import logging as _logging
+
+        monkeypatch.setenv("ION_SSE_POLL_INTERVAL", "1")
+        monkeypatch.setenv("ION_SSE_HEARTBEAT", "1")
+
+        def _always_fails(topic):
+            raise RuntimeError("db pool exhausted")
+
+        monkeypatch.setattr(es, "_compute_signature", _always_fails)
+
+        async def drive():
+            gen = es.event_generator(_FakeRequest(), "investigations")
+            return await _drive_generator(gen, 3.0)
+
+        with caplog.at_level(_logging.WARNING, logger="ion.services.event_stream"):
+            asyncio.run(drive())
+        assert any(
+            "signature" in r.message.lower() and r.levelno >= _logging.WARNING
+            for r in caplog.records
+        ), "persistent signature failure must be visible above DEBUG"
+
+    def test_recovery_emits_refresh_and_resumes_signature_mode(self, monkeypatch):
+        monkeypatch.setenv("ION_SSE_POLL_INTERVAL", "1")
+        monkeypatch.setenv("ION_SSE_HEARTBEAT", "1")
+        calls = {"n": 0}
+
+        def _fails_then_recovers(topic):
+            calls["n"] += 1
+            if calls["n"] <= 2:
+                raise RuntimeError("transient")
+            return "stable-sig"
+
+        monkeypatch.setattr(es, "_compute_signature", _fails_then_recovers)
+
+        async def drive():
+            gen = es.event_generator(_FakeRequest(), "investigations")
+            return await _drive_generator(gen, 6.0)
+
+        frames = asyncio.run(drive())
+        n = _refresh_count(frames)
+        # init prime + exactly one recovery refresh (state may have moved
+        # during the outage); the stable signature afterwards must NOT keep
+        # emitting refreshes.
+        assert n >= 2, f"no refresh on recovery: {frames}"
+        assert n <= 3, f"stable signature after recovery kept refreshing: {frames}"

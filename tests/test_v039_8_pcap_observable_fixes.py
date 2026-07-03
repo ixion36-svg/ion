@@ -174,3 +174,28 @@ def test_arkime_auto_case_attaches_alert_to_kibana(monkeypatch):
     case = session.query(AlertCase).first()
     assert case is not None and case.kibana_case_id == "kb-123"
     assert case.source_alert_ids == ["alert-xyz"]
+
+
+def test_alert_to_text_blob_surfaces_ip_keyed_aggregations():
+    """v0.49.3: an IOC present only as a dict KEY that is a valid IP address
+    (field-keyed aggregation maps) must still be extracted — without
+    re-emitting ECS field-name keys (which stay excluded)."""
+    from ion.services.investigation_service import _alert_to_text_blob
+    from ion.services.ioc_text_extractor import extract_iocs
+
+    alert = {
+        "source": {"ip": "10.0.0.5"},
+        "by_host": {
+            "192.168.1.50": {"hits": 3},   # IP as key — must surface
+            "203.0.113.7": {"hits": 1},
+        },
+        "host": {"name": "SRV-01"},          # ECS field key — must NOT surface
+    }
+    blob = _alert_to_text_blob(alert)
+    assert "192.168.1.50" in blob and "203.0.113.7" in blob
+    # ECS field-name keys still excluded (no regression of the values-only fix)
+    tokens = set(blob.split())
+    assert "host" not in tokens and "name" not in tokens
+
+    ips = extract_iocs(blob).get("ipv4", [])
+    assert "192.168.1.50" in ips and "203.0.113.7" in ips

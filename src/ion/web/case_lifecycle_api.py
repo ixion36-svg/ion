@@ -1237,6 +1237,9 @@ async def get_case_similar_observables(
         .filter(Observable.id.in_(case_observable_ids))
         .filter(Observable.ignore_similarity.is_(False))
         .filter(Observable.is_whitelisted.is_(False))
+        # v0.49.3: analyst-ignored indicators must not drive cross-case
+        # correlation either (baseline F1 — this path was never filtered).
+        .filter(Observable.is_ignored.is_(False))
         .all()
     )
 
@@ -1312,6 +1315,16 @@ async def get_case_detail(
     case = session.query(AlertCase).filter_by(id=case_id).first()
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    # v0.49.3: never serve analyst-ignored observables, even if this case
+    # hasn't been re-investigated since the flag was set (baseline F1).
+    from ion.services.investigation_service import (
+        _ignored_normalized_values,
+        _prune_ignored_observables,
+    )
+    _case_observables_view = _prune_ignored_observables(
+        list(case.observables or []), _ignored_normalized_values(session)
+    )
 
     # Get Kibana URL if available
     kibana_url = get_kibana_case_url(case.kibana_case_id)
@@ -1431,7 +1444,7 @@ async def get_case_detail(
         "triggered_rules": case.triggered_rules,
         "evidence_summary": case.evidence_summary,
         "source_alert_ids": case.source_alert_ids,
-        "observables": case.observables or [],
+        "observables": _case_observables_view,
         "kibana_case_id": case.kibana_case_id,
         "kibana_url": kibana_url,
         "dfir_iris_case_id": case.dfir_iris_case_id,

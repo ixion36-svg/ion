@@ -41,6 +41,7 @@ the pattern established in ``events_api.py`` for SSE streams.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -62,6 +63,7 @@ from ion.models.alert_triage import (
 )
 from ion.models.observable import Observable
 from ion.models.user import User
+from ion.services.kibana_sync_helpers import sync_note_to_kibana
 from ion.services.observable_service import ObservableService
 from ion.storage.database import get_session_factory
 from ion.storage.playbook_repository import PlaybookRepository
@@ -326,7 +328,7 @@ _ALERT_STATUS_MAP = {s.value: s for s in AlertTriageStatus}
 
 def _tool_list_alerts(args: dict) -> dict:
     raw_status = args.get("status")
-    limit = min(int(args.get("limit", 50)), 200)
+    limit = max(1, min(int(args.get("limit", 50)), 200))
 
     status_val = None
     if raw_status:
@@ -395,7 +397,7 @@ def _tool_get_alert(args: dict) -> dict:
 def _tool_list_cases(args: dict) -> dict:
     raw_status = args.get("status")
     raw_severity = args.get("severity")
-    limit = min(int(args.get("limit", 50)), 200)
+    limit = max(1, min(int(args.get("limit", 50)), 200))
 
     status_val = None
     if raw_status:
@@ -490,7 +492,7 @@ def _tool_search_observables(args: dict) -> dict:
     query = args.get("query") or None
     obs_type = args.get("type") or None
     threat_level = args.get("threat_level") or None
-    limit = min(int(args.get("limit", 50)), 200)
+    limit = max(1, min(int(args.get("limit", 50)), 200))
 
     session = get_session_factory()()
     try:
@@ -587,6 +589,29 @@ def _tool_list_playbooks(args: dict) -> dict:
         session.close()
 
 
+# Keep strong references to fire-and-forget sync tasks so they aren't GC'd
+# mid-flight (asyncio only holds weak refs to tasks).
+_BG_SYNC_TASKS: set = set()
+
+
+def _schedule_case_es_sync(case_id: int) -> None:
+    """Re-index the case into ES after a note lands — same side effect the
+    REST route (case_lifecycle_api.add_case_note) performs. Scheduled as a
+    task so the sync's HTTP round-trip doesn't block MCP dispatch; runs
+    inline when no loop is available (CLI/tests). Never raises."""
+    from ion.web.case_lifecycle_api import _background_case_sync
+
+    coro = _background_case_sync(case_id)
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        asyncio.run(coro)
+        return
+    task = loop.create_task(coro)
+    _BG_SYNC_TASKS.add(task)
+    task.add_done_callback(_BG_SYNC_TASKS.discard)
+
+
 def _tool_add_case_note(args: dict, user: User) -> dict:
     case_id = args.get("case_id")
     content = (args.get("content") or "").strip()
@@ -608,12 +633,19 @@ def _tool_add_case_note(args: dict, user: User) -> dict:
         session.add(note)
         session.commit()
         session.refresh(note)
-        return _tool_result({
+        # Mirror the REST route's side effects (case_lifecycle_api.add_case_note):
+        # notes added via MCP must reach ES-driven case views and Kibana
+        # comments too, or external state silently diverges from the ION DB.
+        kibana_case_id = case.kibana_case_id
+        result = _tool_result({
             "id": note.id,
             "case_id": note.case_id,
             "content": note.content,
             "created_at": note.created_at.isoformat() if note.created_at else None,
         })
+        _schedule_case_es_sync(case_id)
+        sync_note_to_kibana(kibana_case_id, user.username, content)
+        return result
     except Exception:
         session.rollback()
         raise
@@ -731,7 +763,16 @@ async def mcp_endpoint(request: Request) -> JSONResponse:
         )
 
     if isinstance(body, list):
-        responses = [r for msg in body if (r := _handle_message(msg, user)) is not None]
+        # JSON-RPC 2.0: a batch entry that is not an object gets a per-item
+        # -32600 (id null) — it must not AttributeError into a 500.
+        responses = []
+        for msg in body:
+            if not isinstance(msg, dict):
+                responses.append(_rpc_err(None, -32600, "Invalid Request."))
+                continue
+            r = _handle_message(msg, user)
+            if r is not None:
+                responses.append(r)
         if not responses:
             return JSONResponse(None, status_code=204)
         return JSONResponse(responses)

@@ -145,17 +145,26 @@ def _severity_for(threat_level: str) -> str:
 
 # ── session-field helpers (tolerant of Arkime's flat/nested shapes) ─────────
 def _is_private_ip(ip: str) -> bool:
-    try:
-        return ipaddress.ip_address(str(ip)).is_private
-    except ValueError:
-        return False
+    """RFC-1918-only, matching ArkimeService._is_private_ip.
+
+    Deliberately NOT ipaddress.is_private: that also counts documentation /
+    test ranges (192.0.2/24, 198.51.100/24, 203.0.113/24) as private, and
+    those show up as real egress in lab/range pcap — the beacon ES query
+    excludes only RFC-1918, so treating doc ranges as internal here silently
+    discarded their detections.
+    """
+    from ion.services.arkime_service import ArkimeService
+
+    return ArkimeService._is_private_ip(str(ip))
 
 
 def _is_external(ip: str) -> bool:
-    """External = a routable, non-private, non-loopback address."""
+    """External = routable egress: not RFC-1918, loopback, link-local or multicast."""
     try:
         addr = ipaddress.ip_address(str(ip))
-        return not (addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_multicast)
+        return not (
+            _is_private_ip(ip) or addr.is_loopback or addr.is_link_local or addr.is_multicast
+        )
     except ValueError:
         return False
 
@@ -448,8 +457,11 @@ def _load_ioc_ips(session) -> dict:
             .all()
         )
         for o in rows:
+            tl = getattr(o, "threat_level", None)
             out[o.value] = {
-                "threat_level": str(getattr(o, "threat_level", "") or "unknown"),
+                # .value, not str(): str(ThreatLevel.HIGH) is 'ThreatLevel.HIGH',
+                # which _severity_for can never match (filed every hit as medium).
+                "threat_level": getattr(tl, "value", str(tl)) if tl else "unknown",
                 "label": "IOC" if o.is_ioc else ("watched" if o.is_watched else "high-risk"),
                 "observable_id": o.id,
             }
@@ -504,15 +516,11 @@ def _open_case(session, bob_id: int, cand: Dict[str, Any], enqueue_fn) -> None:
         Note,
         NoteEntityType,
     )
-
-    last_case = session.query(AlertCase).order_by(AlertCase.id.desc()).first()
-    next_num = 1 if not last_case else last_case.id + 1
-    case_number = f"CASE-{next_num:04d}"
+    from ion.services.case_numbering import assign_case_number
 
     src, dst, node = cand.get("src", ""), cand.get("dst", ""), cand.get("node", "")
     cid, dport = cand.get("community_id", ""), cand.get("dst_port")
     case = AlertCase(
-        case_number=case_number,
         title=cand["title"][:200],
         description=(
             f"Realtime Arkime monitor [{cand['detector']}] flagged recent traffic. "
@@ -527,8 +535,8 @@ def _open_case(session, bob_id: int, cand: Dict[str, Any], enqueue_fn) -> None:
         assigned_to_id=bob_id,
         source_alert_ids=[],
     )
-    session.add(case)
-    session.flush()
+    # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
+    case_number = assign_case_number(session, case)
 
     session.add(AlertTriage(es_alert_id=cand["marker"], case_id=case.id, source_system="arkime-rtmon"))
 
@@ -613,10 +621,15 @@ async def _run_pass(engine: Engine) -> None:
 
     factory = get_session_factory(engine)
     session = factory()
+    # Every sync SQLAlchemy call below runs via asyncio.to_thread: this pass
+    # lives on the uvicorn event loop, and a blocking query/commit here stalls
+    # every in-flight HTTP request and SSE stream on the worker for its full
+    # duration. The session is only ever used from one call at a time, so
+    # hopping it between worker threads is safe.
     try:
         # Legacy IOC-IP detector (opt-in) — needs a DB session for the IOC set.
         if _flag("ION_ARKIME_RTMON_IOC_ENABLED", False):
-            iocs = _load_ioc_ips(session)
+            iocs = await asyncio.to_thread(_load_ioc_ips, session)
             if iocs:
                 try:
                     ioc_sessions = await svc.find_recent_sessions_for_ips(
@@ -629,10 +642,24 @@ async def _run_pass(engine: Engine) -> None:
         if not candidates:
             return
 
-        bob_id = get_bob_user_id(session)
+        bob_id = await asyncio.to_thread(get_bob_user_id, session)
         if not bob_id:
             logger.warning("rtmon: Bob user not seeded; skipping pass")
             return
+
+        # Batched dedup: one IN query for every candidate marker, instead of
+        # one blocking SELECT per candidate.
+        all_markers = list({c["marker"] for c in candidates})
+
+        def _already_actioned() -> set:
+            return {
+                m
+                for (m,) in session.query(AlertTriage.es_alert_id)
+                .filter(AlertTriage.es_alert_id.in_(all_markers))
+                .all()
+            }
+
+        actioned = await asyncio.to_thread(_already_actioned)
 
         dns_budget = _int_env("ION_ARKIME_RTMON_DNS_CONFIRM_BUDGET", 5)
         created = 0
@@ -645,7 +672,7 @@ async def _run_pass(engine: Engine) -> None:
             if marker in seen_markers:
                 continue  # de-dupe within this pass (e.g. multiple sessions same beacon tuple)
             seen_markers.add(marker)
-            if session.query(AlertTriage).filter(AlertTriage.es_alert_id == marker).first():
+            if marker in actioned:
                 continue  # already actioned a prior pass
 
             # Confirm-first detectors must clear their gate before a case opens.
@@ -660,15 +687,17 @@ async def _run_pass(engine: Engine) -> None:
                     continue  # unknown unconfirmed candidate — never auto-case
 
             try:
-                _open_case(session, bob_id, cand, enqueue_pcap_analysis_for_case)
+                await asyncio.to_thread(
+                    _open_case, session, bob_id, cand, enqueue_pcap_analysis_for_case
+                )
                 created += 1
             except Exception as exc:  # noqa: BLE001
-                session.rollback()
+                await asyncio.to_thread(session.rollback)
                 logger.warning("rtmon: failed to open case for %s: %s", marker, exc)
         if created:
             logger.info("rtmon: opened %d traffic-detection case(s) this pass", created)
     finally:
-        session.close()
+        await asyncio.to_thread(session.close)
 
 
 async def _loop(engine: Engine) -> None:

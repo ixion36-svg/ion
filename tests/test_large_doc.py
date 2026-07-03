@@ -183,3 +183,140 @@ if __name__ == "__main__":
 
     import pytest
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ── v0.49.3 code-review fixes ────────────────────────────────────────────────
+def _mk_running_job(session, job_id="stuck1", minutes_ago=0):
+    from datetime import datetime, timedelta, timezone
+
+    import sqlalchemy as sa
+
+    from ion.models.service_desk import DocAnalysisJob
+
+    session.add(DocAnalysisJob(id=job_id, status="running", filename="x", task="summary"))
+    session.commit()
+    if minutes_ago:
+        past = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=minutes_ago)
+        session.execute(
+            sa.update(DocAnalysisJob)
+            .where(DocAnalysisJob.id == job_id)
+            .values(updated_at=past, created_at=past)
+        )
+        session.commit()
+
+
+def test_stale_running_job_is_reaped_and_does_not_block(session):
+    """A 'running' row orphaned by a worker restart must not brick the feature
+    with 409s forever: rows with no heartbeat past the stale threshold are
+    marked error and stop counting as running."""
+    from ion.models.service_desk import DocAnalysisJob
+
+    _mk_running_job(session, "stuck1", minutes_ago=120)  # orphaned 2h ago
+    assert lds._running_exists(session) is False
+    reaped = session.get(DocAnalysisJob, "stuck1")
+    assert reaped.status == "error"
+    assert "orphan" in (reaped.error or "").lower() or "stale" in (reaped.error or "").lower()
+
+
+def test_fresh_running_job_still_blocks(session):
+    """A live job (heartbeating via progress updates) must still 409."""
+    _mk_running_job(session, "live1", minutes_ago=0)
+    assert lds._running_exists(session) is True
+    try:
+        lds.start_analysis(session, 1, "d.txt", b"some text", "summary", None)
+        assert False, "expected ValueError while a live job is running"
+    except ValueError as e:
+        assert "already running" in str(e).lower()
+
+
+def test_reduce_no_progress_returns_unconsolidated_instead_of_spinning():
+    """When every reduce call fails (LLM outage) the fallback returns its input
+    verbatim; oversized singleton batches then never shrink. The loop must
+    detect no-progress and bail out with the un-consolidated content instead
+    of spinning forever hammering Ollama."""
+    calls = {"map": 0, "reduce": 0}
+
+    async def outage_chat(messages, system_prompt=None, temperature=0.2, max_tokens=None, bypass_queue=False):
+        # Yield to the loop so wait_for's cancellation can land even while the
+        # buggy reduce loop spins (a real Ollama call always awaits I/O).
+        await asyncio.sleep(0)
+        u = messages[0]["content"]
+        if u.startswith("DOCUMENT CHUNK"):
+            calls["map"] += 1
+            return {"content": "ITEM-" + ("x" * 400)}  # big partials
+        calls["reduce"] += 1
+        raise TimeoutError("ollama down")  # every reduce fails
+
+    text = ("A requirement paragraph. " * 20 + "\n\n") * 6
+
+    async def _bounded():
+        return await asyncio.wait_for(
+            lds._map_reduce(text, "checklist", None, outage_chat,
+                            chunk_chars=400, reduce_chars=300, max_chunks=250),
+            timeout=10,
+        )
+
+    res = asyncio.run(_bounded())  # pre-fix: hangs -> TimeoutError
+    assert "ITEM-" in res["result"]  # extracted content survives
+    # bounded number of reduce attempts, not an unbounded spin
+    assert calls["reduce"] <= 2 * res["chunks"] + 4
+
+
+def test_start_analysis_second_racer_loses(session, monkeypatch):
+    """Two workers passing the pre-check simultaneously must not both start a
+    GPU job: the later claim loses deterministically."""
+    from ion.models.service_desk import DocAnalysisJob
+
+    # Simulate both racers passing the friendly pre-check.
+    monkeypatch.setattr(lds, "_running_exists", lambda s: False)
+    started = []
+    monkeypatch.setattr(lds.threading, "Thread",
+                        lambda *a, **k: type("T", (), {"start": lambda self: started.append(1)})())
+
+    job1 = lds.start_analysis(session, 1, "a.txt", b"text one", "summary", None)
+    try:
+        lds.start_analysis(session, 1, "b.txt", b"text two", "summary", None)
+        assert False, "expected the second concurrent claim to lose"
+    except ValueError:
+        pass
+    running = session.query(DocAnalysisJob).filter(DocAnalysisJob.status == "running").all()
+    assert [j.id for j in running] == [job1]
+    assert len(started) == 1  # only the winner spawned a worker
+
+
+def test_api_start_analysis_runs_off_event_loop(session, monkeypatch):
+    """The upload handler must not run pypdf extraction on the event loop —
+    lds.start_analysis has to execute where no loop is running (a thread)."""
+    from io import BytesIO
+
+    from starlette.datastructures import UploadFile
+
+    from ion.web import large_doc_api as api
+
+    monkeypatch.setattr(api.lds, "is_enabled", lambda: True)
+    seen = {}
+
+    def _probe(*a, **k):
+        try:
+            asyncio.get_running_loop()
+            seen["on_loop"] = True
+        except RuntimeError:
+            seen["on_loop"] = False
+        return "job-1"
+
+    monkeypatch.setattr(api.lds, "start_analysis", _probe)
+
+    class _U:
+        id = 1
+
+    upload = UploadFile(file=BytesIO(b"hello world"), filename="t.txt")
+
+    async def _call():
+        return await api.start_document_analysis(
+            file=upload, task="summary", custom_prompt="",
+            current_user=_U(), session=session,
+        )
+
+    out = asyncio.run(_call())
+    assert out == {"job_id": "job-1"}
+    assert seen["on_loop"] is False, "start_analysis ran ON the event loop (blocks the worker)"

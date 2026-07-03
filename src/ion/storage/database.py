@@ -41,6 +41,45 @@ def _is_postgres(engine: Engine) -> bool:
     return engine.dialect.name == "postgresql"
 
 
+def _add_column_sql(is_postgres: bool, table: str, col_name: str, col_def: str) -> str:
+    """Build the dialect-correct ADD COLUMN statement.
+
+    Postgres: ``ADD COLUMN IF NOT EXISTS`` (multi-worker-safe) and KEEP the
+    ``DEFAULT FALSE/TRUE`` boolean literals — Postgres rejects ``DEFAULT 0``
+    for a BOOLEAN column. SQLite: no ``IF NOT EXISTS`` for ADD COLUMN (the
+    caller tolerates the duplicate error), and older SQLite only accepts 0/1
+    for boolean defaults.
+    """
+    if is_postgres:
+        return f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col_name} {col_def}"
+    col_def = col_def.replace(" DEFAULT FALSE", " DEFAULT 0").replace(" DEFAULT TRUE", " DEFAULT 1")
+    return f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}"
+
+
+def _add_column_tolerant(engine: Engine, table: str, col_name: str, col_def: str) -> None:
+    """ADD COLUMN that survives the multi-worker boot race and both DBs.
+
+    Every uvicorn worker runs the migrations on startup: two workers can both
+    inspect the table, both see the column missing, and both ALTER — the loser
+    must log and continue, not crash its boot (the same v0.31.23 hardening the
+    session_token_hash migration got).
+    """
+    from sqlalchemy import text as _text
+    from sqlalchemy.exc import OperationalError, ProgrammingError
+
+    sql = _add_column_sql(_is_postgres(engine), table, col_name, col_def)
+    try:
+        with engine.begin() as conn:
+            conn.execute(_text(sql))
+            logger.info("Migrated: %s.%s", table, col_name)
+    except (OperationalError, ProgrammingError) as exc:
+        msg = str(exc).lower()
+        if "duplicate column" in msg or "already exists" in msg:
+            logger.info("%s.%s already added by another worker", table, col_name)
+        else:
+            raise
+
+
 # =========================================================================
 # Cross-worker coordination via Postgres advisory locks
 # =========================================================================
@@ -807,6 +846,10 @@ def _run_migrations(engine: Engine) -> None:
         ("ix_alert_triage_case_id", "alert_triage", "case_id"),
         ("ix_alert_triage_assigned", "alert_triage", "assigned_to_id"),
         ("ix_alert_triage_status_created", "alert_triage", "status, created_at"),
+        # v0.49.3: the v0.47 detection-health dedup GROUP BY declared this on
+        # the model only — create_all skips pre-existing tables, so upgraded
+        # deployments never got it and full-scanned the dashboard query.
+        ("ix_ai_feedback_alert_template", "ai_feedback", "alert_id, alert_prompt_template_id"),
     ]
     with engine.begin() as conn:
         for idx_name, table, columns in _perf_indexes:
@@ -915,11 +958,8 @@ def _run_migrations(engine: Engine) -> None:
         }
         for col_name, col_def in new_cols.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE observables ADD COLUMN {col_name} {col_def}")
-                    )
-                    logger.info("Migrated: observables.%s", col_name)
+                # v0.49.3: race-tolerant — every worker runs this on boot.
+                _add_column_tolerant(engine, "observables", col_name, col_def)
 
     # v0.10.17: CyAB system gains onboarding metadata (contacts + business
     # context). All nullable; pre-v0.10.17 rows stay valid. Idempotent —

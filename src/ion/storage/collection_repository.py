@@ -47,16 +47,28 @@ class CollectionRepository:
         return self.session.execute(stmt).scalar_one_or_none()
 
     def get_by_name(self, name: str) -> Optional[Collection]:
-        """Get a collection by name (first match)."""
+        """Get a collection by name (earliest id on duplicates).
+
+        Names are not unique (two seeders can both create 'Knowledge Base'),
+        so an unordered first() let different consumers resolve DIFFERENT
+        rows — articles seeded under one root while embeddings indexed
+        another. order_by(id) converges every consumer on the same root that
+        kb_embedding_service picks.
+        """
         stmt = (
             select(Collection)
             .options(selectinload(Collection.templates))
             .where(Collection.name == name)
+            .order_by(Collection.id.asc())
         )
         return self.session.execute(stmt).scalars().first()
 
     def get_by_name_and_parent(self, name: str, parent_id: int | None) -> Optional[Collection]:
-        """Get a collection by name within a specific parent folder."""
+        """Get a collection by name within a specific parent folder.
+
+        Deterministic on duplicates (earliest id) — scalar_one_or_none()
+        raised MultipleResultsFound the moment a name was seeded twice.
+        """
         if parent_id is None:
             stmt = (
                 select(Collection)
@@ -67,7 +79,7 @@ class CollectionRepository:
                 select(Collection)
                 .where(and_(Collection.name == name, Collection.parent_id == parent_id))
             )
-        return self.session.execute(stmt).scalar_one_or_none()
+        return self.session.execute(stmt.order_by(Collection.id.asc())).scalars().first()
 
     def list_all(self) -> List[Collection]:
         """List all collections with eager loading."""

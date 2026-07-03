@@ -49,6 +49,95 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Analyst-ignored observable suppression (v0.49.3 — baseline F1/F2/F4 fix)
+# ---------------------------------------------------------------------------
+# The case-observable merge tags entries with short type strings
+# ("ip"/"domain"/"url"/"sha256"/...). Map each to a representative
+# ObservableType so we can normalise a candidate value the SAME way it was
+# normalised when stored — the old code compared raw v.lower() to
+# normalized_value, so ignored CVEs (upper), MACs (separators) and
+# trailing-dot domains never matched.
+def _merge_type_to_observable_type(merge_type: str):
+    from ion.models.observable import ObservableType
+
+    return {
+        "ip": ObservableType.IPV4,
+        "ipv4": ObservableType.IPV4,
+        "ipv6": ObservableType.IPV6,
+        "domain": ObservableType.DOMAIN,
+        "hostname": ObservableType.HOSTNAME,
+        "url": ObservableType.URL,
+        "email": ObservableType.EMAIL,
+        "md5": ObservableType.FILE_HASH_MD5,
+        "sha1": ObservableType.FILE_HASH_SHA1,
+        "sha256": ObservableType.FILE_HASH_SHA256,
+        "mac": ObservableType.MAC_ADDRESS,
+        "mac_address": ObservableType.MAC_ADDRESS,
+        "cve": ObservableType.CVE,
+    }.get((merge_type or "").lower())
+
+
+def _obs_family(obs_type) -> str:
+    """Collapse ip family (ipv4/ipv6 normalise identically) so an ignored IP
+    matches regardless of which family column it was stored under; every other
+    type keys on its own value so cross-type text collisions don't suppress."""
+    from ion.models.observable import ObservableType
+
+    if obs_type in (ObservableType.IPV4, ObservableType.IPV6):
+        return "ip"
+    return getattr(obs_type, "value", str(obs_type))
+
+
+def _ignored_normalized_values(db) -> set:
+    """Set of (type-family, normalized_value) for every analyst-ignored
+    observable. Loud on failure — a silent empty set would re-surface every
+    suppressed indicator with no clue why (baseline F4)."""
+    try:
+        from ion.models.observable import Observable
+
+        rows = (
+            db.query(Observable.type, Observable.normalized_value)
+            .filter(Observable.is_ignored.is_(True))
+            .all()
+        )
+        return {(_obs_family(t), nv) for (t, nv) in rows if nv}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "Failed to load analyst-ignored observables — suppression disabled "
+            "for this pass: %s", exc,
+        )
+        return set()
+
+
+def _is_ignored_ioc(merge_type: str, value: str, ignored: set) -> bool:
+    """True if `value` (a freshly-extracted IOC of the given merge type) matches
+    an analyst-ignored observable, normalising it the same way it was stored."""
+    if not ignored or not value:
+        return False
+    obs_type = _merge_type_to_observable_type(merge_type)
+    if obs_type is None:
+        return False
+    from ion.models.observable import Observable
+
+    normalized = Observable.normalize_value(obs_type, value)
+    return (_obs_family(obs_type), normalized) in ignored
+
+
+def _prune_ignored_observables(observables: list, ignored: set) -> list:
+    """Drop entries whose value is now analyst-ignored (baseline F1 — an
+    observable ignored AFTER it was merged stayed in the case list forever)."""
+    if not ignored:
+        return observables
+    return [
+        o for o in observables
+        if not (
+            isinstance(o, dict)
+            and _is_ignored_ioc(o.get("type", ""), o.get("value", ""), ignored)
+        )
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Public exception
 # ---------------------------------------------------------------------------
 
@@ -674,11 +763,29 @@ def _alert_to_text_blob(alert: dict) -> str:
     label is a real TLD). Walking values-only structurally prevents that, while
     still surfacing hostnames/URLs/hashes embedded in message/reason fields.
     """
+    import ipaddress
+
     parts: list = []
+
+    def _is_ip_key(k) -> bool:
+        # A dict KEY that is a valid IP address is an IOC (field-keyed
+        # aggregation maps, e.g. {"192.168.1.5": {...}}), NOT an ECS field
+        # path — ECS keys are dotted names like "source.ip", never a bare IP.
+        # Emitting only IP-shaped keys surfaces those IOCs without re-opening
+        # the field-name-as-domain bug the values-only walk fixed.
+        if not isinstance(k, str):
+            return False
+        try:
+            ipaddress.ip_address(k)
+            return True
+        except ValueError:
+            return False
 
     def _walk(node) -> None:
         if isinstance(node, dict):
-            for v in node.values():
+            for k, v in node.items():
+                if _is_ip_key(k):
+                    parts.append(k)
                 _walk(v)
         elif isinstance(node, (list, tuple)):
             for v in node:
@@ -1212,22 +1319,21 @@ class InvestigationService:
 
                 # Merge investigation IOCs into case.observables (dedup by
                 # type+value). Shape matches extract_observables_from_raw.
+                # Analyst-ignored observables must not be (re-)surfaced in the
+                # investigation guide / case observable list — matched on the
+                # SAME normalization used at storage (baseline F1/F2/F4).
+                ignored_values = _ignored_normalized_values(db)
+
+                # Prune anything already merged that has since been ignored —
+                # the old code only guarded new adds, so a pre-existing entry
+                # stayed forever.
+                existing = list(case.observables or [])
+                pruned = _prune_ignored_observables(existing, ignored_values)
+                pruned_count = len(existing) - len(pruned)
+                existing = pruned
+
                 if iocs:
-                    existing = list(case.observables or [])
                     seen = {(o.get("type"), o.get("value")) for o in existing if isinstance(o, dict)}
-                    # Analyst-ignored observables must not be (re-)surfaced in the
-                    # investigation guide / case observable list. Collect their
-                    # normalized values and skip any match during the merge.
-                    try:
-                        from ion.models.observable import Observable
-                        ignored_values = {
-                            (nv or "").lower()
-                            for (nv,) in db.query(Observable.normalized_value)
-                            .filter(Observable.is_ignored.is_(True))
-                            .all()
-                        }
-                    except Exception:
-                        ignored_values = set()
                     type_map = {
                         "ips": "ip", "ip": "ip",
                         "domains": "domain", "domain": "domain",
@@ -1243,7 +1349,7 @@ class InvestigationService:
                         for v in (vals if isinstance(vals, list) else [vals]):
                             if not isinstance(v, str) or not v:
                                 continue
-                            if v.lower() in ignored_values:
+                            if _is_ignored_ioc(obs_type, v, ignored_values):
                                 continue  # analyst-suppressed observable
                             key = (obs_type, v)
                             if key in seen:
@@ -1255,12 +1361,18 @@ class InvestigationService:
                                 "source": "investigation",
                             })
                             added_count += 1
-                    if added_count:
+                    if added_count or pruned_count:
                         case.observables = existing
                         logger.debug(
-                            "Merged %d new observables into case %s from inv #%d",
-                            added_count, case.case_number, inv_id,
+                            "Case %s obs: +%d merged, -%d pruned (ignored) from inv #%d",
+                            case.case_number, added_count, pruned_count, inv_id,
                         )
+                elif pruned_count:
+                    case.observables = existing
+                    logger.debug(
+                        "Case %s: pruned %d now-ignored observable(s) from inv #%d",
+                        case.case_number, pruned_count, inv_id,
+                    )
 
                 # Move alert triage to ACKNOWLEDGED so analysts know the AI
                 # has done its pass and it's their turn.

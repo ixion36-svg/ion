@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -29,11 +30,44 @@ logger = logging.getLogger(__name__)
 _es_client: Optional[httpx.AsyncClient] = None
 _es_client_creds: Optional[str] = None  # fingerprint of (headers, auth) used at creation
 _es_client_loop: Optional[asyncio.AbstractEventLoop] = None  # loop the client is bound to
+# v0.49.3: guards every read-check-create-assign of the slot above. Without it
+# a background thread's asyncio.run() cycle could rebind the global between a
+# web-loop caller's creation and its `return`, handing that caller a client
+# bound to a throwaway loop — the exact "Event loop is closed" crash the
+# loop-binding fix was meant to close.
+_es_client_lock = threading.Lock()
 
 
 def _creds_fingerprint(headers: Dict, auth: Optional[tuple]) -> str:
     raw = repr(sorted(headers.items())) + repr(auth)
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def _dispose_client(
+    client: Optional[httpx.AsyncClient],
+    bound_loop: Optional[asyncio.AbstractEventLoop],
+    current_loop: Optional[asyncio.AbstractEventLoop],
+) -> None:
+    """Best-effort aclose of a displaced client. Never raises.
+
+    asyncio.run() teardown does NOT close httpx connection pools, so simply
+    dropping the reference leaks keepalive sockets. Closing cross-loop is
+    safe via run_coroutine_threadsafe as long as the owning loop still runs;
+    only when it is already dead do we fall back to dropping the reference
+    (GC finalizers reclaim the sockets).
+    """
+    if client is None or client.is_closed:
+        return
+    try:
+        if current_loop is not None and current_loop is bound_loop:
+            current_loop.create_task(client.aclose())
+        elif bound_loop is not None and not bound_loop.is_closed():
+            asyncio.run_coroutine_threadsafe(client.aclose(), bound_loop)
+        elif bound_loop is None and current_loop is None:
+            asyncio.run(client.aclose())
+        # else: owning loop already dead — nothing can run its aclose; drop.
+    except Exception:  # noqa: BLE001 — disposal must never break a request
+        pass
 
 
 def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
@@ -44,8 +78,10 @@ def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
     running event loop differs from the one the client was bound to. The loop
     check is what prevents "Event loop is closed": background services issue ES
     queries via asyncio.run() on throwaway loops; reusing a client bound to a
-    now-dead loop would fail. The client is captured + used within a single
-    _request call, so a concurrent rebind from another loop is harmless here.
+    now-dead loop would fail.
+
+    Thread-safe: the whole check-create-assign runs under _es_client_lock and
+    callers receive a local reference, never a re-read of the mutable global.
     """
     global _es_client, _es_client_creds, _es_client_loop
     fp = _creds_fingerprint(headers, auth)
@@ -53,52 +89,42 @@ def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         loop = None  # sync context (e.g. unit tests) — single shared slot
-    if (
-        _es_client is None
-        or _es_client.is_closed
-        or fp != _es_client_creds
-        or loop is not _es_client_loop
-    ):
-        # Only aclose the previous client if we're on its own loop; closing it
-        # from a different loop would itself raise "Event loop is closed". When
-        # the binding loop differs (or is gone), drop the reference and let that
-        # loop's teardown reclaim its connections.
+    with _es_client_lock:
+        client = _es_client
         if (
-            _es_client is not None
-            and not _es_client.is_closed
-            and loop is not None
-            and loop is _es_client_loop
+            client is None
+            or client.is_closed
+            or fp != _es_client_creds
+            or loop is not _es_client_loop
         ):
-            try:
-                loop.create_task(_es_client.aclose())
-            except RuntimeError:
-                pass
-        _es_client = httpx.AsyncClient(
-            headers=headers,
-            auth=auth,
-            verify=verify_ssl,
-            timeout=timeout,
-            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-        )
-        _es_client_creds = fp
-        _es_client_loop = loop
-    return _es_client
+            _dispose_client(client, _es_client_loop, loop)
+            client = httpx.AsyncClient(
+                headers=headers,
+                auth=auth,
+                verify=verify_ssl,
+                timeout=timeout,
+                limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+            )
+            # test/debug bookkeeping: which loop this client belongs to
+            client._ion_bound_loop = loop  # type: ignore[attr-defined]
+            _es_client = client
+            _es_client_creds = fp
+            _es_client_loop = loop
+        return client
 
 
 def _close_es_client() -> None:
     """Close the shared ES client (call on config change)."""
     global _es_client, _es_client_creds, _es_client_loop
-    if _es_client is not None and not _es_client.is_closed:
-        try:
-            loop = asyncio.get_running_loop()
-            # Only safe to aclose on the client's own loop (see _get_es_client).
-            if loop is _es_client_loop:
-                loop.create_task(_es_client.aclose())
-        except RuntimeError:
-            pass
-    _es_client = None
-    _es_client_creds = None
-    _es_client_loop = None
+    try:
+        current = asyncio.get_running_loop()
+    except RuntimeError:
+        current = None
+    with _es_client_lock:
+        _dispose_client(_es_client, _es_client_loop, current)
+        _es_client = None
+        _es_client_creds = None
+        _es_client_loop = None
 
 
 def _redact_url(url: str) -> str:
@@ -578,7 +604,7 @@ class ElasticsearchService:
             )
             return result.get("profiles", []) if isinstance(result, dict) else []
         except ElasticsearchError as e:
-            logger.debug("ES profile suggest failed for %r: %s", name, e)
+            logger.debug("ES profile suggest failed for %r: %s", name, type(e).__name__)
             return []
 
     async def resolve_user_uid(self, username: str) -> Optional[str]:
@@ -613,7 +639,7 @@ class ElasticsearchService:
                 f"/_security/profile/{','.join(uids)}",
             )
         except ElasticsearchError as e:
-            logger.debug("ES profile bulk_get failed for %d uids: %s", len(uids), e)
+            logger.debug("ES profile bulk_get failed for %d uids: %s", len(uids), type(e).__name__)
             return {}
         out: Dict[str, Dict[str, Any]] = {}
         for p in (result.get("profiles", []) if isinstance(result, dict) else []):
@@ -851,10 +877,10 @@ class ElasticsearchService:
         except ElasticsearchError as e:
             if "index_not_found" in str(e).lower() or "404" in str(e):
                 return []
-            logger.warning("alert histogram failed: %s", e)
+            logger.warning("alert histogram failed: %s", type(e).__name__)
             return []
         except Exception as e:
-            logger.warning("alert histogram unexpected: %s", e)
+            logger.warning("alert histogram unexpected: %s", type(e).__name__)
             return []
 
         buckets = (
@@ -1405,7 +1431,7 @@ class ElasticsearchService:
             return blocks
 
         except ElasticsearchError as e:
-            logger.warning("Failed to fetch building blocks for %s: %s", alert_id, e)
+            logger.warning("Failed to fetch building blocks for %s: %s", alert_id, type(e).__name__)
             return []
 
     async def resolve_process_event_docs(
@@ -1577,7 +1603,7 @@ class ElasticsearchService:
                 json=query,
             )
         except ElasticsearchError as e:
-            logger.error(f"Error fetching alerts by ID: {e}")
+            logger.error("Error fetching alerts by ID: %s", type(e).__name__)
             return []
 
         alerts = []
@@ -1669,7 +1695,7 @@ class ElasticsearchService:
             )
             return True
         except Exception as e:
-            logger.warning("Failed to index case %s to Elasticsearch: %s", case_id, e)
+            logger.warning("Failed to index case %s to Elasticsearch: %s", case_id, type(e).__name__)
             return False
 
     async def delete_case(self, case_id: int) -> bool:
@@ -1688,7 +1714,7 @@ class ElasticsearchService:
             )
             return True
         except Exception as e:
-            logger.warning("Failed to delete case %s from Elasticsearch: %s", case_id, e)
+            logger.warning("Failed to delete case %s from Elasticsearch: %s", case_id, type(e).__name__)
             return False
 
     async def index_kfp(self, kfp_doc: dict) -> bool:
@@ -1713,7 +1739,7 @@ class ElasticsearchService:
             )
             return True
         except Exception as e:
-            logger.warning("Failed to index KFP %s to Elasticsearch: %s", kfp_id, e)
+            logger.warning("Failed to index KFP %s to Elasticsearch: %s", kfp_id, type(e).__name__)
             return False
 
     async def delete_kfp(self, kfp_id: int) -> bool:
@@ -1732,7 +1758,7 @@ class ElasticsearchService:
             )
             return True
         except Exception as e:
-            logger.warning("Failed to delete KFP %s from Elasticsearch: %s", kfp_id, e)
+            logger.warning("Failed to delete KFP %s from Elasticsearch: %s", kfp_id, type(e).__name__)
             return False
 
     # ION triage status → Kibana alert workflow_status mapping (1:1 now)
@@ -1865,7 +1891,7 @@ class ElasticsearchService:
             return False
 
         except Exception as e:
-            logger.warning("Kibana API workflow_status update failed: %s", e)
+            logger.warning("Kibana API workflow_status update failed: %s", type(e).__name__)
             return False
 
     async def _update_via_es_direct(
@@ -1906,7 +1932,7 @@ class ElasticsearchService:
             return True
         except ElasticsearchError as e:
             logger.warning(
-                "Failed to update alert workflow_status in ES: %s", e,
+                "Failed to update alert workflow_status in ES: %s", type(e).__name__,
             )
             return False
 
@@ -1963,7 +1989,7 @@ class ElasticsearchService:
             )
             return False
         except ElasticsearchError as e:
-            logger.warning("update_alert failed for %s: %s", alert_id, e)
+            logger.warning("update_alert failed for %s: %s", alert_id, type(e).__name__)
             return False
 
     # =========================================================================
@@ -2021,7 +2047,7 @@ class ElasticsearchService:
             return users
 
         except ElasticsearchError as e:
-            logger.warning("Failed to fetch assignment users from ES: %s", e)
+            logger.warning("Failed to fetch assignment users from ES: %s", type(e).__name__)
             # Return stale cache if available (graceful degradation)
             if _assignment_users_cache:
                 logger.info("Returning stale assignment users cache (%d users)", len(_assignment_users_cache))
@@ -2148,7 +2174,7 @@ class ElasticsearchService:
             return True
 
         except ElasticsearchError as e:
-            logger.warning("Failed to update alert assignment in ES: %s", e)
+            logger.warning("Failed to update alert assignment in ES: %s", type(e).__name__)
             return False
 
     async def get_cluster_health(self) -> Dict[str, Any]:
