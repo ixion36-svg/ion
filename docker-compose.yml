@@ -267,6 +267,11 @@ services:
       - .env
     environment:
       - ION_SEED_URL=http://ion:8000
+      # v0.49.3: the DB-direct seeds (seed_courses, seed_lab_fixtures) run in
+      # THIS container — without the URL they silently fell back to a
+      # throwaway SQLite inside the container and the courses/labs never
+      # reached Postgres.
+      - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD:-ion2025}@postgres:5432/ion
     networks:
       - ion-net
     depends_on:
