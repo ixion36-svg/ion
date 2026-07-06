@@ -52,4 +52,9 @@ def build_case_description(
         if len(alert_ids) > 10:
             parts.append(f"- ... and {len(alert_ids) - 10} more")
 
-    return "\n".join(parts).strip()
+    result = "\n".join(parts).strip()
+    # Kibana >= 8.19 rejects an empty case description outright (400: "The
+    # description field cannot be an empty string"), and the 60s sync loop
+    # would retry such a case forever. A case created with no description and
+    # no enrichment produced exactly that — live-caught against 8.19.11.
+    return result or "_No description provided._"
