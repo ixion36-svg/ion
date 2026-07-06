@@ -1,6 +1,6 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.4 -->
 <!-- ion-doc:version=0.49.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
