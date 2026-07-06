@@ -1464,21 +1464,44 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
                 "(is the image pgvector/pgvector:pg16?): %s", exc,
             )
 
-    Base.metadata.create_all(engine)
-    _run_migrations(engine)
-    # v0.10.4: HNSW index on case_embeddings.embedding needs the table to
-    # exist first — runs after create_all and the column migrations.
-    try:
-        from ion.models.case_embedding import ensure_hnsw_index
-        ensure_hnsw_index(engine)
-    except Exception as exc:  # pragma: no cover
-        logger.debug("HNSW index creation skipped: %s", exc)
-    # v0.10.6: HNSW index on kb_document_embeddings.embedding.
-    try:
-        from ion.models.kb_document_embedding import ensure_kb_hnsw_index
-        ensure_kb_hnsw_index(engine)
-    except Exception as exc:  # pragma: no cover
-        logger.debug("KB HNSW index creation skipped: %s", exc)
+    def _create_schema() -> None:
+        Base.metadata.create_all(engine)
+        _run_migrations(engine)
+        # v0.10.4: HNSW index on case_embeddings.embedding needs the table to
+        # exist first — runs after create_all and the column migrations.
+        try:
+            from ion.models.case_embedding import ensure_hnsw_index
+            ensure_hnsw_index(engine)
+        except Exception as exc:  # pragma: no cover
+            logger.debug("HNSW index creation skipped: %s", exc)
+        # v0.10.6: HNSW index on kb_document_embeddings.embedding.
+        try:
+            from ion.models.kb_document_embedding import ensure_kb_hnsw_index
+            ensure_kb_hnsw_index(engine)
+        except Exception as exc:  # pragma: no cover
+            logger.debug("KB HNSW index creation skipped: %s", exc)
+
+    if _is_postgres(engine):
+        # v0.49.3: serialize schema init across the N uvicorn workers with a
+        # BLOCKING advisory lock. create_all's inspect-then-create races when
+        # several workers boot against the same fresh DB — live-reproduced:
+        # 3 of 4 workers crashed on a pg_type UniqueViolation creating the
+        # network_assets tables. Late workers now wait for the winner, then
+        # find every table present (checkfirst) and continue.
+        _SCHEMA_INIT_LOCK_ID = 0x494F4E53  # 'IONS'chema
+        with engine.connect() as lock_conn:
+            lock_conn.execute(
+                text("SELECT pg_advisory_lock(:id)"), {"id": _SCHEMA_INIT_LOCK_ID}
+            )
+            try:
+                _create_schema()
+            finally:
+                lock_conn.execute(
+                    text("SELECT pg_advisory_unlock(:id)"), {"id": _SCHEMA_INIT_LOCK_ID}
+                )
+                lock_conn.commit()
+    else:
+        _create_schema()
     return engine
 
 

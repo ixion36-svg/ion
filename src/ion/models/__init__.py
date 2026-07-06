@@ -112,6 +112,17 @@ from ion.models.investigation import Investigation  # noqa: F401
 from ion.models.kb_document_embedding import KBDocumentEmbedding  # noqa: F401
 from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.maturity import MaturityAssessment
+
+# v0.49.3 live-boot fix: these two were missing from the registry, so the
+# entrypoint's single-process create_all never made their tables and the N
+# uvicorn workers raced to create them — 3 of 4 crashed on a pg_type
+# UniqueViolation on the first boot of a fresh Postgres. Every model module
+# MUST be imported here (pinned by tests/test_v049_3_model_registry.py).
+from ion.models.network_asset import (  # noqa: F401
+    NetworkAsset,
+    NetworkAssetIP,
+    NetworkAssetMAC,
+)
 from ion.models.note_folder import NoteFolder
 from ion.models.observable import (
     Observable,
@@ -143,6 +154,7 @@ from ion.models.saved_search import (
     SavedSearch,
     SearchType,
 )
+from ion.models.scheduler import JobExecution, ScheduledJob  # noqa: F401
 from ion.models.security import (
     BlockedIP,
     SecurityAlertRule,
