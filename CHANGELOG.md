@@ -1,13 +1,95 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.49.2 -->
+<!-- ion-doc:version=0.49.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-06-25 -->
+<!-- ion-doc:date=2026-07-06 -->
 
 # Changelog
+
+## v0.49.3 — 2026-07-06
+
+**Code-review remediation + live-stack hardening: 29 fixes from a deep code review and its adversarial audit, then three more caught by live integration testing against Postgres 16, Elastic/Kibana 8.19.11, and Ollama on GPU.**
+
+- **Fix — RTMON filed every known-critical IOC hit as medium severity.**
+  `str(ThreatLevel.HIGH)` yields `'ThreatLevel.HIGH'`, which the severity
+  mapper could never match; the IOC loader now uses `.value`. Also: RTMON's
+  private-IP test reuses ArkimeService's deliberate RFC-1918-only semantics,
+  so documentation-range egress (203.0.113.0/24 etc.) in lab pcap is no longer
+  silently dropped by the beacon/C2 detectors.
+- **Fix — shared ES client race + leak.** `_get_es_client` mutated and
+  returned the module global under a TOCTOU that could hand a request a
+  client bound to a dying background loop (recreating the "Event loop is
+  closed" crash the loop-binding fix targeted), and displaced clients were
+  dropped un-closed. The slot is now lock-guarded, callers get a local
+  reference, and displaced clients are aclosed onto their owning loop.
+- **Fix — AI Document Analysis could brick or spin forever.** An orphaned
+  `running` job (worker restart mid-run) 409'd every future analysis until a
+  manual DB edit — a stale-heartbeat reaper now clears it. A total LLM outage
+  during the reduce phase spun the hierarchical loop forever — it now detects
+  no-progress and returns the un-consolidated partials. The single-job
+  guarantee is enforced by a partial UNIQUE index on `status='running'`
+  (check-then-insert and claim-order schemes were audited beatable across
+  workers). Upload text-extraction moved off the event loop; the 10 MB cap is
+  enforced before buffering.
+- **Fix — analyst "ignore observable" now actually suppresses everywhere.**
+  Matching is type-scoped against the stored normalization (ignored CVEs,
+  MACs, and trailing-dot domains previously never matched); role-typed case
+  entries (`source_ip`, `destination_hostname`, `subject_user`, …) are
+  bridged via the same LEGACY_TYPE_MAP the ignore toggle uses; already-merged
+  entries are pruned on the next pass; and the case-detail JSON, cross-case
+  correlation, and Kibana case descriptions all filter ignored observables.
+  A failed ignore-list load now logs a warning instead of silently disabling
+  suppression. `observables.is_ignored` is indexed.
+- **Fix — SSE streams could go silently dead.** A persistently failing
+  signature query hid behind healthy keepalives while the client's polling
+  fallback stayed cancelled — the stream now logs at warning and degrades to
+  interval refreshes floored at `ION_SSE_DEGRADED_INTERVAL` (default 30s,
+  preventing a refresh stampede on an already-failing DB), resuming signature
+  mode with a re-sync on recovery.
+- **Fix — event-loop stalls.** RTMON and the Arkime auto-case loop ran sync
+  SQLAlchemy and blocking Kibana HTTP (up to 2×5s per alert) on the event
+  loop; both now run via asyncio.to_thread, with RTMON's per-candidate dedup
+  batched into one IN query. The MCP note tool's Kibana comment moved to the
+  executor.
+- **Fix — case numbering races retired.** All seven `max(id)+1` sites
+  (auto-case, RTMON, manual create, bulk add-to-new-case, Arkime commit,
+  Kibana import, case grouper) now derive `CASE-NNNN` from the DB-assigned id
+  after flush via a shared `assign_case_number` — collision-free under
+  concurrency (verified live: 24 parallel creates across 4 workers, all
+  unique).
+- **Fix — MCP server hardening.** Notes added via MCP now propagate to
+  Elasticsearch and Kibana exactly like the REST route; list-tool `limit`
+  clamps to ≥1 (a negative limit reached SQLite as `LIMIT -1` = dump the
+  table); non-object JSON-RPC batch entries return per-item `-32600` instead
+  of a 500.
+- **Fix — first boot of a fresh multi-worker Postgres crashed 3 of 4
+  workers.** `network_asset` and `scheduler` were missing from the model
+  registry, so the entrypoint's create_all skipped their tables and the
+  workers raced to create them (pg_type UniqueViolation). The registry is
+  complete (pinned by test) and schema init is serialized under a blocking
+  pg advisory lock.
+- **Fix — compose seeder wrote DB-direct seeds to a throwaway SQLite.** The
+  seeder service now receives `ION_DATABASE_URL`; courses/lab fixtures reach
+  Postgres.
+- **Fix — Kibana ≥ 8.19 rejected empty case descriptions**, and the 60s sync
+  loop retried those cases forever. `build_case_description` falls back to a
+  placeholder; verified live on 8.19.11 (75/75 cases exported, 0 errors).
+  Dev compose ES/Kibana pins bumped 8.11.0 → 8.19.11 to match the tested
+  version.
+- **Fix — ES log diagnosability restored.** `ElasticsearchError` handlers log
+  the sanitized ES reason again (version conflicts, mapping errors); raw
+  transport exceptions remain type-only for the CodeQL clear-text-logging
+  posture. An AST guard test pins the policy in both directions.
+- **Other:** alert IOC extraction surfaces IP-address dict keys from
+  field-keyed aggregation maps; KB duplicate-root resolution is deterministic
+  across ALL consumers (`get_by_name` orders by id — live-verified when both
+  seeders created the duplicate root); ~60 new regression tests (1,290
+  total); two review reports (`CODE_REVIEW_v0.39.8.md`,
+  `CODE_REVIEW_v0.49.2.md`) and a live-stack validation harness
+  (`tools/validate_v0493_fixes.py`) added.
 
 ## v0.49.2 — 2026-07-01
 
