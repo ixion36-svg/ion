@@ -850,6 +850,9 @@ def _run_migrations(engine: Engine) -> None:
         # the model only — create_all skips pre-existing tables, so upgraded
         # deployments never got it and full-scanned the dashboard query.
         ("ix_ai_feedback_alert_template", "ai_feedback", "alert_id, alert_prompt_template_id"),
+        # v0.49.3 audit: is_ignored is filtered on every case-detail GET and
+        # investigation merge (analyst-suppression lookups).
+        ("ix_observables_is_ignored", "observables", "is_ignored"),
     ]
     with engine.begin() as conn:
         for idx_name, table, columns in _perf_indexes:
@@ -858,6 +861,24 @@ def _run_migrations(engine: Engine) -> None:
                     conn.execute(text(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table} ({columns})"))
                 except Exception:
                     pass  # Index might already exist under a different name
+
+    # v0.49.3 audit: at most ONE doc-analysis job may be status='running' —
+    # the single-job guard is enforced by this partial UNIQUE index (valid on
+    # both Postgres and SQLite >= 3.8), not by check-then-insert. Tolerant:
+    # creation fails only if a deployment currently has 2+ running rows (the
+    # stale-job reaper clears those; the next boot then succeeds).
+    if insp.has_table("doc_analysis_jobs"):
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_doc_analysis_jobs_one_running "
+                    "ON doc_analysis_jobs (status) WHERE status = 'running'"
+                ))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "Could not create uq_doc_analysis_jobs_one_running (likely multiple "
+                "running rows pending reap): %s", type(exc).__name__,
+            )
 
     # Quarterly review fields on service_accounts (PCI 7.2.4 / ISO A.5.16)
     if insp.has_table("service_accounts"):

@@ -243,6 +243,7 @@ class TestSignatureFailureFallback:
     def test_persistent_failure_degrades_to_interval_refresh(self, monkeypatch):
         monkeypatch.setenv("ION_SSE_POLL_INTERVAL", "1")
         monkeypatch.setenv("ION_SSE_HEARTBEAT", "1")
+        monkeypatch.setenv("ION_SSE_DEGRADED_INTERVAL", "1")
 
         def _always_fails(topic):
             raise RuntimeError("db pool exhausted")
@@ -265,6 +266,7 @@ class TestSignatureFailureFallback:
 
         monkeypatch.setenv("ION_SSE_POLL_INTERVAL", "1")
         monkeypatch.setenv("ION_SSE_HEARTBEAT", "1")
+        monkeypatch.setenv("ION_SSE_DEGRADED_INTERVAL", "1")
 
         def _always_fails(topic):
             raise RuntimeError("db pool exhausted")
@@ -285,6 +287,7 @@ class TestSignatureFailureFallback:
     def test_recovery_emits_refresh_and_resumes_signature_mode(self, monkeypatch):
         monkeypatch.setenv("ION_SSE_POLL_INTERVAL", "1")
         monkeypatch.setenv("ION_SSE_HEARTBEAT", "1")
+        monkeypatch.setenv("ION_SSE_DEGRADED_INTERVAL", "1")
         calls = {"n": 0}
 
         def _fails_then_recovers(topic):
@@ -306,3 +309,29 @@ class TestSignatureFailureFallback:
         # emitting refreshes.
         assert n >= 2, f"no refresh on recovery: {frames}"
         assert n <= 3, f"stable signature after recovery kept refreshing: {frames}"
+
+
+class TestDegradedModeFloor:
+    """AUDIT-6: degraded mode must not stampede an already-failing DB — with
+    the default floor (30s) a 1s-tick stream in outage must NOT emit refreshes
+    every tick; only the initial prime lands within the first few seconds."""
+
+    def test_default_floor_prevents_tick_rate_refresh(self, monkeypatch):
+        monkeypatch.setenv("ION_SSE_POLL_INTERVAL", "1")
+        monkeypatch.setenv("ION_SSE_HEARTBEAT", "1")
+        monkeypatch.delenv("ION_SSE_DEGRADED_INTERVAL", raising=False)
+
+        def _always_fails(topic):
+            raise RuntimeError("db down")
+
+        monkeypatch.setattr(es, "_compute_signature", _always_fails)
+
+        async def drive():
+            gen = es.event_generator(_FakeRequest(), "investigations")
+            return await _drive_generator(gen, 5.0)
+
+        frames = asyncio.run(drive())
+        # only the connect prime — the 30s degraded floor hasn't elapsed
+        assert _refresh_count(frames) == 1, (
+            f"degraded mode refreshed at tick rate during outage: {frames}"
+        )

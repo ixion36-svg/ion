@@ -518,17 +518,9 @@ async def create_case(
     session: Session = Depends(get_db_session),
 ):
     """Create a new investigation case, optionally linking alert IDs."""
-    # Generate next case number
-    last_case = (
-        session.query(AlertCase)
-        .order_by(AlertCase.id.desc())
-        .first()
-    )
-    next_num = 1 if not last_case else last_case.id + 1
-    case_number = f"CASE-{next_num:04d}"
+    from ion.services.case_numbering import assign_case_number
 
     new_case = AlertCase(
-        case_number=case_number,
         title=data.title,
         description=data.description,
         status=AlertCaseStatus.OPEN,
@@ -541,8 +533,8 @@ async def create_case(
         evidence_summary=data.evidence_summary,
         source_alert_ids=data.alert_ids,
     )
-    session.add(new_case)
-    session.flush()
+    # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
+    case_number = assign_case_number(session, new_case)
 
     # Link alert IDs if provided
     linked = 0

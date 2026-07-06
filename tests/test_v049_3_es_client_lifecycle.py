@@ -116,12 +116,13 @@ def test_get_es_client_returns_local_not_global():
                     # the client we get must be bound to OUR loop: using it is
                     # what raised "Event loop is closed" pre-fix. We assert on
                     # the module's bookkeeping made under the lock.
-                    if client is not es_mod._es_client and not client.is_closed:
-                        # displaced by the other thread — that's fine, but then
-                        # it must be OUR creation, not the other loop's client
-                        bound = getattr(client, "_ion_bound_loop", me)
-                        if bound is not me:
-                            raise AssertionError("received a foreign-loop client")
+                    # every client the module hands out is stamped with the
+                    # loop it was created for; we must NEVER receive one bound
+                    # to the other thread's loop (that's the crash the lock +
+                    # return-local fix closes). No default: a missing stamp is
+                    # itself a failure, not a silent pass.
+                    if client._ion_bound_loop is not me:
+                        raise AssertionError("received a foreign-loop client")
 
                 asyncio.run(_body())
         except Exception as exc:  # noqa: BLE001

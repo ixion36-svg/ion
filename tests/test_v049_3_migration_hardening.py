@@ -118,3 +118,33 @@ class TestPostgresBranchSql:
             True, "cyab_systems", "business_unit", "VARCHAR(255)"
         )
         assert sql == "ALTER TABLE cyab_systems ADD COLUMN IF NOT EXISTS business_unit VARCHAR(255)"
+
+
+def test_upgraded_db_gets_single_running_job_index(sqlite_engine):
+    """AUDIT-1: upgraded deployments must receive the partial unique index
+    that enforces at most one running doc-analysis job."""
+    from ion.models.document import Base
+
+    Base.metadata.create_all(sqlite_engine)
+    with sqlite_engine.begin() as conn:
+        conn.execute(text("DROP INDEX IF EXISTS uq_doc_analysis_jobs_one_running"))
+
+    db_mod._run_migrations(sqlite_engine)
+
+    idx = {i["name"] for i in inspect(sqlite_engine).get_indexes("doc_analysis_jobs")}
+    assert "uq_doc_analysis_jobs_one_running" in idx
+
+
+def test_upgraded_db_gets_is_ignored_index(sqlite_engine):
+    """AUDIT-7: _ignored_normalized_values runs on every case-detail GET —
+    without an index Postgres seq-scans the observables table per view."""
+    from ion.models.document import Base
+
+    Base.metadata.create_all(sqlite_engine)
+    with sqlite_engine.begin() as conn:
+        conn.execute(text("DROP INDEX IF EXISTS ix_observables_is_ignored"))
+
+    db_mod._run_migrations(sqlite_engine)
+
+    idx = {i["name"] for i in inspect(sqlite_engine).get_indexes("observables")}
+    assert "ix_observables_is_ignored" in idx

@@ -838,3 +838,52 @@ class TestAddCaseNoteSyncsSideEffects:
     def test_note_syncs_to_kibana_as_comment(self):
         _, _, mock_kb = self._call_with_mocks()
         mock_kb.assert_called_once_with("kb-123", "analyst", "MCP note")
+
+
+class TestAddCaseNoteKibanaOffLoop:
+    """AUDIT-4: sync_note_to_kibana is a blocking httpx POST (5s timeout);
+    _tool_add_case_note executes ON the event loop (sync dispatch inside the
+    async endpoint), so the Kibana call must be handed off — never run
+    inline while a loop is running on this thread."""
+
+    def test_kibana_sync_not_called_on_event_loop(self):
+        import asyncio
+        import threading
+
+        case = _mock_case()
+        case.kibana_case_id = "kb-9"
+        mock_session = MagicMock()
+        mock_session.query.return_value.filter_by.return_value.first.return_value = case
+
+        seen = {}
+        done = threading.Event()
+
+        def _probe(kibana_case_id, username, content):
+            try:
+                asyncio.get_running_loop()
+                seen["on_loop"] = True
+            except RuntimeError:
+                seen["on_loop"] = False
+            done.set()
+
+        async def _drive():
+            with patch.object(mcp_mod, "get_session_factory") as mock_factory, \
+                 patch("ion.web.mcp_api.Note"), \
+                 patch.object(mcp_mod, "_schedule_case_es_sync"), \
+                 patch.object(mcp_mod, "sync_note_to_kibana", side_effect=_probe):
+                mock_factory.return_value.return_value = mock_session
+                result = mcp_mod._tool_add_case_note(
+                    {"case_id": 1, "content": "note"}, _user()
+                )
+                # give the executor a moment to run the handed-off call
+                for _ in range(50):
+                    if done.is_set():
+                        break
+                    await asyncio.sleep(0.05)
+            return result
+
+        asyncio.run(_drive())
+        assert done.is_set(), "Kibana sync was never invoked"
+        assert seen.get("on_loop") is False, (
+            "blocking Kibana HTTP ran ON the event loop"
+        )

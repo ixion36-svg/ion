@@ -494,16 +494,10 @@ async def arkime_commit(
     case: Optional[AlertCase] = None
     case_just_created = False
     if body.create_new_case:
-        last_case = (
-            session.query(AlertCase)
-            .order_by(AlertCase.id.desc())
-            .first()
-        )
-        next_num = 1 if not last_case else last_case.id + 1
-        case_number = f"CASE-{next_num:04d}"
+        from ion.services.case_numbering import assign_case_number
+
         title = body.case_title or f"PCAP investigation — {alert.get('title') or alert_id}"
         case = AlertCase(
-            case_number=case_number,
             title=title,
             description=(
                 f"Auto-generated from Arkime PCAP analysis of alert {alert_id} "
@@ -520,8 +514,8 @@ async def arkime_commit(
             evidence_summary=f"Arkime PCAP — {body.pcap_size_bytes} bytes",
             source_alert_ids=[alert_id],
         )
-        session.add(case)
-        session.flush()
+        # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
+        assign_case_number(session, case)
         case_just_created = True
     else:
         case = session.query(AlertCase).filter_by(id=body.case_id).first()

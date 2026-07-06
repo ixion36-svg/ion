@@ -3699,21 +3699,17 @@ async def bulk_update_triage(
 
     # If creating a new case for these alerts
     if data.add_to_new_case and data.new_case_title:
-        # Generate case number
-        last_case = session.query(AlertCase).order_by(AlertCase.id.desc()).first()
-        next_num = 1 if not last_case else last_case.id + 1
-        case_number = f"CASE-{next_num:04d}"
+        from ion.services.case_numbering import assign_case_number
 
         new_case = AlertCase(
-            case_number=case_number,
             title=data.new_case_title,
             status=AlertCaseStatus.OPEN,
             severity=data.new_case_severity or "medium",
             created_by_id=current_user.id,
             source_alert_ids=data.alert_ids,
         )
-        session.add(new_case)
-        session.flush()
+        # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
+        assign_case_number(session, new_case)
 
     for alert_id in data.alert_ids:
         triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()

@@ -604,7 +604,7 @@ class ElasticsearchService:
             )
             return result.get("profiles", []) if isinstance(result, dict) else []
         except ElasticsearchError as e:
-            logger.debug("ES profile suggest failed for %r: %s", name, type(e).__name__)
+            logger.debug("ES profile suggest failed for %r: %s", name, e)
             return []
 
     async def resolve_user_uid(self, username: str) -> Optional[str]:
@@ -639,7 +639,7 @@ class ElasticsearchService:
                 f"/_security/profile/{','.join(uids)}",
             )
         except ElasticsearchError as e:
-            logger.debug("ES profile bulk_get failed for %d uids: %s", len(uids), type(e).__name__)
+            logger.debug("ES profile bulk_get failed for %d uids: %s", len(uids), e)
             return {}
         out: Dict[str, Dict[str, Any]] = {}
         for p in (result.get("profiles", []) if isinstance(result, dict) else []):
@@ -877,7 +877,7 @@ class ElasticsearchService:
         except ElasticsearchError as e:
             if "index_not_found" in str(e).lower() or "404" in str(e):
                 return []
-            logger.warning("alert histogram failed: %s", type(e).__name__)
+            logger.warning("alert histogram failed: %s", e)
             return []
         except Exception as e:
             logger.warning("alert histogram unexpected: %s", type(e).__name__)
@@ -1431,7 +1431,7 @@ class ElasticsearchService:
             return blocks
 
         except ElasticsearchError as e:
-            logger.warning("Failed to fetch building blocks for %s: %s", alert_id, type(e).__name__)
+            logger.warning("Failed to fetch building blocks for %s: %s", alert_id, e)
             return []
 
     async def resolve_process_event_docs(
@@ -1603,7 +1603,7 @@ class ElasticsearchService:
                 json=query,
             )
         except ElasticsearchError as e:
-            logger.error("Error fetching alerts by ID: %s", type(e).__name__)
+            logger.error("Error fetching alerts by ID: %s", e)
             return []
 
         alerts = []
@@ -1932,7 +1932,7 @@ class ElasticsearchService:
             return True
         except ElasticsearchError as e:
             logger.warning(
-                "Failed to update alert workflow_status in ES: %s", type(e).__name__,
+                "Failed to update alert workflow_status in ES: %s", e,
             )
             return False
 
@@ -1989,7 +1989,7 @@ class ElasticsearchService:
             )
             return False
         except ElasticsearchError as e:
-            logger.warning("update_alert failed for %s: %s", alert_id, type(e).__name__)
+            logger.warning("update_alert failed for %s: %s", alert_id, e)
             return False
 
     # =========================================================================
@@ -2047,7 +2047,7 @@ class ElasticsearchService:
             return users
 
         except ElasticsearchError as e:
-            logger.warning("Failed to fetch assignment users from ES: %s", type(e).__name__)
+            logger.warning("Failed to fetch assignment users from ES: %s", e)
             # Return stale cache if available (graceful degradation)
             if _assignment_users_cache:
                 logger.info("Returning stale assignment users cache (%d users)", len(_assignment_users_cache))
@@ -2174,7 +2174,7 @@ class ElasticsearchService:
             return True
 
         except ElasticsearchError as e:
-            logger.warning("Failed to update alert assignment in ES: %s", type(e).__name__)
+            logger.warning("Failed to update alert assignment in ES: %s", e)
             return False
 
     async def get_cluster_health(self) -> Dict[str, Any]:

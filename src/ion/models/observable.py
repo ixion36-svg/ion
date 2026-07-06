@@ -87,6 +87,10 @@ class Observable(Base, TimestampMixin):
         Index("ix_observables_first_seen", "first_seen"),
         Index("ix_observables_last_seen", "last_seen"),
         Index("ix_observables_is_watched", "is_watched"),
+        # v0.49.3 audit: _ignored_normalized_values filters on is_ignored on
+        # every case-detail GET and every investigation merge — unindexed this
+        # is a Postgres seq scan per view.
+        Index("ix_observables_is_ignored", "is_ignored"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

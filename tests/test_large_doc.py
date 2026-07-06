@@ -320,3 +320,63 @@ def test_api_start_analysis_runs_off_event_loop(session, monkeypatch):
     out = asyncio.run(_call())
     assert out == {"job_id": "job-1"}
     assert seen["on_loop"] is False, "start_analysis ran ON the event loop (blocks the worker)"
+
+
+def test_two_connections_cannot_both_hold_running(tmp_path, monkeypatch):
+    """AUDIT-1: the single-winner guarantee must come from the DB (partial
+    unique index on status='running'), not from claim-order heuristics — a
+    later-id worker that commits first must not co-win with an earlier-id
+    worker under READ COMMITTED. Two separate sessions = two workers."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from ion.models.document import Base
+    from ion.models.service_desk import DocAnalysisJob
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'race.db'}")
+    Base.metadata.create_all(engine)
+    S = sessionmaker(bind=engine)
+    s1, s2 = S(), S()
+
+    monkeypatch.setattr(lds, "_running_exists", lambda s: False)  # both pass pre-check
+    started = []
+    monkeypatch.setattr(lds.threading, "Thread",
+                        lambda *a, **k: type("T", (), {"start": lambda self: started.append(1)})())
+
+    job1 = lds.start_analysis(s1, 1, "a.txt", b"text one", "summary", None)
+    try:
+        lds.start_analysis(s2, 1, "b.txt", b"text two", "summary", None)
+        assert False, "second worker's insert must fail at the DB layer"
+    except ValueError as e:
+        assert "already running" in str(e).lower()
+
+    running = s1.query(DocAnalysisJob).filter(DocAnalysisJob.status == "running").all()
+    assert [j.id for j in running] == [job1]
+    assert len(started) == 1
+    s1.close()
+    s2.close()
+
+
+def test_done_jobs_do_not_block_new_running_row(tmp_path, monkeypatch):
+    """The uniqueness must apply ONLY to status='running' — finished jobs
+    accumulate and must not trip the partial index."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from ion.models.document import Base
+    from ion.models.service_desk import DocAnalysisJob
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'hist.db'}")
+    Base.metadata.create_all(engine)
+    S = sessionmaker(bind=engine)
+    s = S()
+    s.add(DocAnalysisJob(id="old1", status="done", filename="x", task="summary"))
+    s.add(DocAnalysisJob(id="old2", status="error", filename="y", task="summary"))
+    s.commit()
+
+    monkeypatch.setattr(lds, "_running_exists", lambda sess: False)
+    monkeypatch.setattr(lds.threading, "Thread",
+                        lambda *a, **k: type("T", (), {"start": lambda self: None})())
+    job = lds.start_analysis(s, 1, "c.txt", b"new text", "summary", None)
+    assert s.get(DocAnalysisJob, job).status == "running"
+    s.close()

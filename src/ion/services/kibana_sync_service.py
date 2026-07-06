@@ -20,6 +20,25 @@ from ion.storage.database import get_engine, get_session_factory
 logger = logging.getLogger(__name__)
 
 
+def _observables_for_kibana(session: Session, observables) -> list:
+    """Observable list for a Kibana case description, with analyst-ignored
+    entries pruned (v0.49.3 audit — this external sink was left unfiltered
+    by the first is_ignored fix pass). Never raises; on any failure the
+    unpruned list is returned rather than blocking the sync."""
+    try:
+        from ion.services.investigation_service import (
+            _ignored_normalized_values,
+            _prune_ignored_observables,
+        )
+
+        return _prune_ignored_observables(
+            list(observables or []), _ignored_normalized_values(session)
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Kibana observable prune failed (sending unpruned): %s", exc)
+        return list(observables or [])
+
+
 class KibanaSyncService:
     """Service to sync comments bidirectionally between ION and Kibana."""
 
@@ -400,10 +419,6 @@ class KibanaSyncService:
             if not admin_user:
                 return {"imported": 0, "skipped": 0, "error": "No admin user found"}
 
-            # Generate next case number
-            max_case = session.query(AlertCase).order_by(AlertCase.id.desc()).first()
-            next_num = (max_case.id + 1) if max_case else 1
-
             # Get elasticsearch service for fetching alert details
             es_service = ElasticsearchService()
 
@@ -505,7 +520,7 @@ class KibanaSyncService:
                         affected_hosts=hosts_list,
                         affected_users=users_list,
                         evidence_summary=evidence,
-                        observables=observables if observables else None,
+                        observables=_observables_for_kibana(session, observables) or None,
                         alert_ids=source_alert_ids if source_alert_ids else None,
                         triggered_rules=rules_list,
                     )
@@ -536,9 +551,9 @@ class KibanaSyncService:
                                 # (elastic_uid might not be cached yet)
 
                     # Create ION case with standardized title and description
-                    case_number = f"CASE-{next_num:04d}"
+                    from ion.services.case_numbering import assign_case_number
+
                     new_case = AlertCase(
-                        case_number=case_number,
                         title=standardized_title,
                         description=formatted_description,
                         status=status,
@@ -555,8 +570,9 @@ class KibanaSyncService:
                         observables=observables if observables else None,
                     )
 
-                    session.add(new_case)
-                    session.flush()  # Get the ID
+                    # Collision-free number from the DB-assigned id
+                    # (was max(id)+1 — raced); also adds + flushes the row.
+                    case_number = assign_case_number(session, new_case)
 
                     # Link alerts to case via AlertTriage (matches native case creation)
                     for alert_id in source_alert_ids:
@@ -641,7 +657,6 @@ class KibanaSyncService:
 
                         session.add(note)
 
-                    next_num += 1
                     imported += 1
                     logger.info(
                         f"Imported case from Kibana: {case_number} "
@@ -759,7 +774,7 @@ class KibanaSyncService:
                         affected_hosts=case.affected_hosts,
                         affected_users=case.affected_users,
                         evidence_summary=case.evidence_summary,
-                        observables=case.observables,
+                        observables=_observables_for_kibana(session, case.observables),
                         alert_ids=case.source_alert_ids,
                         triggered_rules=case.triggered_rules,
                     )

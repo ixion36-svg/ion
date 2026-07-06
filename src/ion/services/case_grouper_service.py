@@ -316,13 +316,6 @@ def find_matching_open_auto_case(
     return None
 
 
-def _next_case_number(db: Session) -> str:
-    """Pick the next ``CASE-NNNN`` number, same pattern as kibana_sync_service."""
-    max_case = db.query(AlertCase).order_by(AlertCase.id.desc()).first()
-    next_num = (max_case.id + 1) if max_case else 1
-    return f"CASE-{next_num:04d}"
-
-
 def create_auto_case(
     db: Session,
     rule_key: str,
@@ -356,7 +349,6 @@ def create_auto_case(
     )
 
     case = AlertCase(
-        case_number=_next_case_number(db),
         title=title,
         description=description,
         status=AlertCaseStatus.OPEN,
@@ -367,8 +359,10 @@ def create_auto_case(
         affected_hosts=[host] if host else [],
         affected_users=[user] if user else [],
     )
-    db.add(case)
-    db.flush()
+    # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
+    from ion.services.case_numbering import assign_case_number
+
+    assign_case_number(db, case)
     return case
 
 

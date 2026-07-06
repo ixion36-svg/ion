@@ -25,6 +25,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy import (
     Enum as SQLEnum,
@@ -149,6 +150,16 @@ class DocAnalysisJob(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_doc_analysis_jobs_status", "status"),
         Index("ix_doc_analysis_jobs_created_at", "created_at"),
+        # v0.49.3 audit: the single-job guarantee is enforced by the DB, not
+        # by check-then-insert (two uvicorn workers under READ COMMITTED can
+        # otherwise both win). At most ONE row may be status='running'.
+        Index(
+            "uq_doc_analysis_jobs_one_running",
+            "status",
+            unique=True,
+            sqlite_where=text("status = 'running'"),
+            postgresql_where=text("status = 'running'"),
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)  # uuid hex

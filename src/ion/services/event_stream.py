@@ -85,6 +85,14 @@ def _heartbeat_secs() -> int:
 _SIG_FAILURE_DEGRADE_AFTER = 3
 
 
+# Degraded-mode refresh cadence floor. Signature topics tick every few seconds
+# (4s default); refreshing every tick during a DB outage would stampede the
+# already-failing DB with one JSON re-fetch per client per tick — exactly when
+# it can least cope. Floor the degraded cadence well above the tick rate.
+def _degraded_interval_secs(topic_interval: int) -> int:
+    return max(topic_interval, _env_int("ION_SSE_DEGRADED_INTERVAL", 30))
+
+
 # ---------------------------------------------------------------------------
 # Signature functions — cheap, read-only, must tolerate empty tables.
 # A signature is any string that changes iff the user-visible state changed.
@@ -239,10 +247,11 @@ async def event_generator(request, topic_name: str):
                         topic_name, sig_failures, exc,
                     )
                 if sig_failures >= _SIG_FAILURE_DEGRADE_AFTER:
-                    # Degraded mode: refresh on the topic cadence anyway. The
-                    # page's JSON fetch either works (signature-only breakage)
-                    # or shows the analyst a real error — never a frozen view.
-                    emit = since_emit >= topic.interval
+                    # Degraded mode: refresh on a floored cadence. The page's
+                    # JSON fetch either works (signature-only breakage) or
+                    # shows the analyst a real error — never a frozen view,
+                    # and never a per-tick stampede on a failing DB.
+                    emit = since_emit >= _degraded_interval_secs(topic.interval)
             else:
                 if sig_failures:
                     logger.info(

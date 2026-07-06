@@ -332,31 +332,24 @@ def start_analysis(session, user_id: Optional[int], filename: str, content: byte
     if not text.strip():
         raise ValueError("No extractable text found in the document.")
 
-    # Time-prefixed id: sorts by claim order, so concurrent claims (below)
-    # resolve to one deterministic winner without a schema change.
+    # Time-prefixed id: chronological listing; uniqueness comes from the uuid tail.
     job_id = f"{int(time.time() * 1_000_000):016x}{uuid.uuid4().hex[:16]}"
     session.add(DocAnalysisJob(
         id=job_id, status="running", phase="map", done=0, total=0,
         chars=len(text), filename=(filename or "")[:300], kind=kind,
         task=task, created_by_id=user_id,
     ))
-    session.commit()
+    # The partial unique index uq_doc_analysis_jobs_one_running (at most one
+    # status='running' row) makes the claim atomic at the DB layer: when two
+    # workers race past the friendly pre-check, exactly one commit succeeds —
+    # regardless of process interleaving or isolation level. (A claim-order
+    # heuristic here was audited and found beatable under READ COMMITTED.)
+    from sqlalchemy.exc import IntegrityError
 
-    # Claim check: the pre-check above is check-then-insert, so two workers
-    # can both pass it. After committing, the earliest running row (by id —
-    # time-prefixed) wins; a later claim withdraws its own row and 409s
-    # rather than starting a second GPU job.
-    winner = (
-        session.query(DocAnalysisJob.id)
-        .filter(DocAnalysisJob.status == "running")
-        .order_by(DocAnalysisJob.id.asc())
-        .first()
-    )
-    if winner and winner[0] != job_id:
-        row = session.get(DocAnalysisJob, job_id)
-        if row is not None:
-            session.delete(row)
-            session.commit()
+    try:
+        session.commit()
+    except IntegrityError:
+        session.rollback()
         raise ValueError("Another document analysis is already running — wait for it to finish.")
 
     threading.Thread(

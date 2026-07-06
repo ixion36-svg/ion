@@ -612,6 +612,21 @@ def _schedule_case_es_sync(case_id: int) -> None:
     task.add_done_callback(_BG_SYNC_TASKS.discard)
 
 
+def _fire_and_forget_kibana_note(kibana_case_id, username: str, content: str) -> None:
+    """Run sync_note_to_kibana without blocking the event loop.
+
+    The tool dispatch is sync code executing ON the loop; sync_note_to_kibana
+    is a blocking httpx POST (5s timeout) that already swallows its own
+    errors — hand it to the default executor when a loop is running, call it
+    inline otherwise (CLI/tests)."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        sync_note_to_kibana(kibana_case_id, username, content)
+        return
+    loop.run_in_executor(None, sync_note_to_kibana, kibana_case_id, username, content)
+
+
 def _tool_add_case_note(args: dict, user: User) -> dict:
     case_id = args.get("case_id")
     content = (args.get("content") or "").strip()
@@ -644,7 +659,7 @@ def _tool_add_case_note(args: dict, user: User) -> dict:
             "created_at": note.created_at.isoformat() if note.created_at else None,
         })
         _schedule_case_es_sync(case_id)
-        sync_note_to_kibana(kibana_case_id, user.username, content)
+        _fire_and_forget_kibana_note(kibana_case_id, user.username, content)
         return result
     except Exception:
         session.rollback()
