@@ -186,13 +186,16 @@ function setView(view) {
   if (tableEl) tableEl.style.display = 'none';
 
   if (view === 'graph') {
-    graphEl.style.display = '';
+    // Explicit 'block' (not '') — these panels carry a migrated
+    // `html body ._ion-s-…{display:none}` rule whose specificity beats an
+    // empty inline value, so '' would leave them hidden.
+    graphEl.style.display = 'block';
     renderGraph();
   } else if (view === 'topology') {
-    topoEl.style.display = '';
+    topoEl.style.display = 'block';
     renderTopology();
   } else {
-    if (tableEl) tableEl.style.display = '';
+    if (tableEl) tableEl.style.display = 'block';
   }
 }
 

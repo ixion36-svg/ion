@@ -4257,10 +4257,19 @@ function renderCasesSummary() {
                 <span class="_ion-s-1a3ecb21b1">
                     <strong>${escapeHtml(c.case_number)}</strong> ${escapeHtml(c.title)}${closureBadge}
                 </span>
-                <span class="list-item-count _ion-s-e6b60de75d">${c.alert_count}</span>
+                <span class="list-item-count" data-case-count="${c.id}">${c.alert_count}</span>
             </div>
         `;
     }).join('');
+    // The status colour was lost when the style→class migration hashed the
+    // dynamic `background:${statusColor}` inline style into an (invalid, dead)
+    // CSS class. Re-apply it as a JS property (CSP style-src-attr 'none' allows
+    // element.style.* assignment, just not a style="" attribute in markup).
+    casesData.slice(0, 10).forEach(c => {
+        const el = container.querySelector(`[data-case-count="${c.id}"]`);
+        if (el) el.style.background = c.status === 'open' ? '#1976d2'
+            : c.status === 'acknowledged' ? '#f57c00' : '#616161';
+    });
 }
 
 async function showCaseDetail(caseId) {

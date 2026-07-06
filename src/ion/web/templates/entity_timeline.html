@@ -52,10 +52,12 @@
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
 .et-search-bar{display:flex;gap:8px;margin-bottom:20px;align-items:center}
-.et-input{flex:1;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);color:var(--text-primary);font-size:.9rem}
+/* flex:1 1 240px + width:auto so the input grows; the type-select carries the
+   ion-select class (width:100%) which would otherwise eat the whole flex row. */
+.et-input{flex:1 1 240px;width:auto;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);color:var(--text-primary);font-size:.9rem}
 .et-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-dim)}
 .et-input::placeholder{color:var(--text-muted)}
-.et-select{padding:10px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
+.et-select{flex:0 0 auto;width:auto;padding:10px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
 .et-empty{text-align:center;padding:60px;color:var(--text-secondary);font-size:.9rem}
 
 /* Entity header */

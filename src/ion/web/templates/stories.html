@@ -130,7 +130,7 @@
           {
             id: 'note',
             type: 'case_note',
-            config: { case_id: '{{ trigger.case_id }}', content: 'Hello from a story.' },
+            config: { case_id: '{% raw %}{{ trigger.case_id }}{% endraw %}', content: 'Hello from a story.' },
             next: null
           }
         ]

@@ -1,13 +1,55 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.4 -->
-<!-- ion-doc:version=0.49.4 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.5 -->
+<!-- ion-doc:version=0.49.5 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-06 -->
 
 # Changelog
+
+## v0.49.5 — 2026-07-06
+
+**Six creeping-regression fixes — mostly UI fallout from the historic inline-style→class and event-delegation migrations, plus two server-side 500s.**
+
+- **Fix — the Stories automation page 500'd.** `stories.html` embeds a blank-story
+  JS scaffold whose `case_id: '{{ trigger.case_id }}'` is a literal story-DSL
+  placeholder, but Jinja evaluated it → `UndefinedError: 'trigger' is undefined`.
+  Wrapped in `{% raw %}` so it renders literally.
+- **Fix — /audit-logs showed "Error loading audit logs".** The endpoint called
+  `json.loads(details)` on every row inside a list comprehension; legacy rows
+  with bare-string `details` (`"203.0.113.0/24"`, `"deleted entry 2"`, …) raised
+  `JSONDecodeError` and 500'd the whole page. `_parse_audit_details` now falls
+  back to the raw string (the frontend already renders a plain string). New tests
+  `tests/test_v049_5_audit_details_parse.py`.
+- **Fix — Alerts "Cases" side widget lost its colour.** The v0.31.21
+  style→class migration hashed the dynamic `background:${statusColor}` inline
+  style into an (invalid, dead) CSS class, so every case-count pill went grey.
+  Colour is re-applied via a CSP-safe `element.style.background` assignment
+  (open=blue / acknowledged=orange / other=grey).
+- **Fix — Network Map graph & topology rendered blank.** `setView()` revealed
+  the panels with `style.display = ''`, which loses to a migrated
+  `html body ._ion-s-…{display:none}` rule (higher specificity than an empty
+  inline value). Changed to `display = 'block'`.
+- **Fix — Entity Timeline search bar was gone.** A re-skin added the `ion-select`
+  class (`width:100%`) to the type dropdown, which dominated the flex row and
+  collapsed the search `<input>` to a ~30px sliver. The input now has an explicit
+  flex-basis and the select is content-sized.
+- **Fix — Arkime Traffic Analytics never populated traffic/geo on Arkime 4.x/5.x.**
+  The volume histogram read only the Moloch/OpenArkime-2–3.x graph keys
+  (`srcDataHisto`/`dstDataHisto`/`totDataBytes`) with no fallback, and the geo
+  query requested `country.src`/`country.dst` (expression aliases, not SPI field
+  names) in `fields=`, which some viewer builds 400. The histogram + byte totals
+  are now version-tolerant (legacy names first, then `source.bytesHisto` etc.),
+  and the geo request asks only for real SPI fields (`_geo_code` still parses
+  either shape on the response side).
+
+**Note:** Bugs on the alerts widget and network map are two instances of a wider
+latent issue — the v0.31.21 migration left ~130 rules in `ion-migrated-styles.css`
+containing literal `${…}` JS fragments (invalid CSS, silently dropped). A dedicated
+page-by-page sweep is tracked separately. No new routes, permissions, schema, or
+dependencies. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.49.4 — 2026-07-06
 

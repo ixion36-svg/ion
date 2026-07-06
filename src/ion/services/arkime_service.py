@@ -567,12 +567,36 @@ class ArkimeService:
             protocols = graph.get("protocols") or graph.get("protocolCnt") or {}
             if not protocols:
                 protocols = await self._sample_protocol_mix(start_ts, stop_ts, expression)
+
+            def _first(d, *keys):
+                for k in keys:
+                    v = d.get(k)
+                    if v:
+                        return v
+                return None
+
+            # The facet-graph series were renamed between Moloch/OpenArkime
+            # 2–3.x (srcDataHisto/dstDataHisto/totDataBytes) and Arkime 4.x/5.x
+            # (source.bytesHisto/destination.bytesHisto, per-side byte totals).
+            # Try the legacy names first (keeps the mocked tests green) then the
+            # newer ones, so the volume chart populates on either dialect.
+            total_bytes = (
+                graph.get("totDataBytes")
+                or (graph.get("source.bytes") or 0) + (graph.get("destination.bytes") or 0)
+                or payload.get("totalBytes")
+                or 0
+            )
             return {
-                "src_histo": graph.get("srcDataHisto") or [],
-                "dst_histo": graph.get("dstDataHisto") or [],
+                "src_histo": _first(graph, "srcDataHisto", "source.bytesHisto", "srcBytesHisto") or [],
+                "dst_histo": _first(graph, "dstDataHisto", "destination.bytesHisto", "dstBytesHisto") or [],
                 "protocols": protocols,
-                "total_sessions": payload.get("recordsFiltered") or payload.get("total") or 0,
-                "total_bytes": graph.get("totDataBytes") or 0,
+                "total_sessions": (
+                    payload.get("recordsFiltered")
+                    or payload.get("recordsTotal")
+                    or payload.get("total")
+                    or 0
+                ),
+                "total_bytes": total_bytes,
             }
         except ArkimeError:
             raise
@@ -875,9 +899,12 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
-            # Request every country alias — viewer builds differ on whether they
-            # return srcGEO/dstGEO vs country.src/country.dst (see _geo_code).
-            "fields": "srcGEO,dstGEO,country.src,country.dst,totBytes",
+            # Only request real SPI field names. `country.src`/`country.dst` are
+            # expression aliases, not DB field names, and some viewer builds
+            # 400 the WHOLE query when they appear in `fields=` — which emptied
+            # the geo map entirely. `_geo_code` still reads srcGEO/dstGEO OR the
+            # nested country{} shape on the response side.
+            "fields": "srcGEO,dstGEO,totBytes",
         }
         if expression:
             params["expression"] = expression

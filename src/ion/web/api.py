@@ -1211,6 +1211,22 @@ async def list_roles(
 # Audit log endpoint
 # =============================================================================
 
+def _parse_audit_details(raw: Optional[str]):
+    """Audit ``details`` is usually a JSON object, but some historical
+    producers stored a bare string (e.g. ``"203.0.113.0/24"``,
+    ``"deleted entry 2"``). ``json.loads`` on those raises and, in a list
+    comprehension, 500s the WHOLE audit-log page. Fall back to the raw string
+    so one legacy row can't blank the entire view (the frontend
+    ``formatDetails`` already renders a plain string). (v0.49.5)
+    """
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except (ValueError, TypeError):
+        return raw
+
+
 @router.get("/audit-logs", dependencies=[Depends(require_permission("system:audit_view"))])
 async def list_audit_logs(
     limit: int = 100,
@@ -1238,7 +1254,7 @@ async def list_audit_logs(
             "action": log.action,
             "resource_type": log.resource_type,
             "resource_id": log.resource_id,
-            "details": json.loads(log.details) if log.details else None,
+            "details": _parse_audit_details(log.details),
             "ip_address": log.ip_address,
             "timestamp": log.timestamp.isoformat() if log.timestamp else None,
         }
