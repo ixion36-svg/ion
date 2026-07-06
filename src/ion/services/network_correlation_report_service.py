@@ -24,6 +24,21 @@ from sqlalchemy.orm import Session
 _NET_TYPES = {"ipv4", "ipv6", "domain", "url", "hostname"}
 
 
+def _enum_val(x: Any, default: str = "") -> str:
+    """Render an ORM enum column as its lowercase value, not ``ClassName.MEMBER``.
+
+    ``Observable.type``/``threat_level`` and ``AlertCase.status`` are
+    ``SQLEnum(native_enum=False)`` columns, so on read they come back as enum
+    *members* — ``str(ThreatLevel.HIGH)`` is ``"ThreatLevel.HIGH"``, not
+    ``"high"``. Using the raw ``str()`` here made ``net_obs`` (the ``_NET_TYPES``
+    membership test below) match nothing, silently emptying every network
+    section of the report. Tolerates plain strings and None. (v0.49.4)
+    """
+    if x is None or x == "":
+        return default
+    return x.value if hasattr(x, "value") else str(x)
+
+
 def _latest_enrichment(obs) -> Any:
     enr = getattr(obs, "enrichments", None) or []
     return enr[0] if enr else None
@@ -83,7 +98,7 @@ def generate_network_correlation_report(session: Session, days: int = 7) -> Dict
 
     for c in cases:
         obs_list = case_obs.get(c.id, [])
-        net_obs = [o for o in obs_list if str(getattr(o, "type", "")).lower() in _NET_TYPES]
+        net_obs = [o for o in obs_list if _enum_val(getattr(o, "type", "")).lower() in _NET_TYPES]
         is_netmon = c.id in netmon_case_ids
         if not net_obs and not is_netmon:
             continue  # not a network-relevant case
@@ -107,16 +122,16 @@ def generate_network_correlation_report(session: Session, days: int = 7) -> Dict
                 malicious_count += 1
             val = getattr(o, "value", "")
             obs_entries.append({
-                "type": str(getattr(o, "type", "")),
+                "type": _enum_val(getattr(o, "type", "")),
                 "value": val,
-                "threat_level": str(getattr(o, "threat_level", "") or "unknown"),
+                "threat_level": _enum_val(getattr(o, "threat_level", ""), "unknown"),
                 "malicious": malicious,
                 "score": score,
                 "threat_actors": actors,
                 "labels": labels,
             })
             # cross-case rollups
-            ie = ioc_rollup.setdefault(val, {"value": val, "type": str(getattr(o, "type", "")),
+            ie = ioc_rollup.setdefault(val, {"value": val, "type": _enum_val(getattr(o, "type", "")),
                                              "malicious": malicious, "cases": set(), "actors": set()})
             ie["cases"].add(c.case_number)
             ie["malicious"] = ie["malicious"] or malicious
@@ -129,8 +144,8 @@ def generate_network_correlation_report(session: Session, days: int = 7) -> Dict
         report_cases.append({
             "case_number": c.case_number,
             "title": c.title,
-            "severity": str(getattr(c, "severity", "") or ""),
-            "status": str(getattr(c, "status", "") or ""),
+            "severity": _enum_val(getattr(c, "severity", "")),
+            "status": _enum_val(getattr(c, "status", "")),
             "created_at": c.created_at.isoformat() if c.created_at else None,
             "from_netmon": is_netmon,
             "observables": obs_entries,

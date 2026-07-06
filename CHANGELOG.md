@@ -1,13 +1,41 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
 <!-- ion-doc:subtitle=Per-release change history from v0.9.43 to current -->
-<!-- ion-doc:version=0.49.3 -->
+<!-- ion-doc:version=0.49.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-06 -->
 
 # Changelog
+
+## v0.49.4 — 2026-07-06
+
+**Post-release cleanup: one functional fix caught by the v0.49.3 review, plus a config-tuning doc note.**
+
+- **Fix — the network-correlation report dropped every network case.** The
+  report rendered `Observable.type` / `threat_level` and `AlertCase.status`
+  (all `SQLEnum(native_enum=False)` columns, i.e. enum *members* on read) with
+  a raw `str()`, yielding `"ObservableType.IPV4"` / `"ThreatLevel.HIGH"` /
+  `"AlertCaseStatus.OPEN"` instead of `ipv4` / `high` / `open`. Because the
+  `_NET_TYPES` membership test keyed on that string, `net_obs` matched nothing —
+  so network-relevant non-netmon cases were silently skipped and netmon cases
+  were listed with an empty observable list and an empty cross-case IOC/actor
+  rollup. A shared `_enum_val` helper (the same `x.value if hasattr(…) else
+  str(x)` pattern used in `case_lifecycle_api`) now renders every enum column as
+  its value. This is the identical `str(Enum)` anti-pattern the v0.49.3 RTMON
+  severity fix removed — missed by that sweep in this one report. New tests
+  `tests/test_v049_4_correlation_enum_render.py`.
+- **Docs — AI Document Analysis reaper vs. Ollama timeout.** The stale-job
+  reaper heartbeats only *between* chunks, not during a single Ollama call, so
+  `.env.deploy` now warns that `ION_AI_LARGE_PDF_STALE_MINUTES` (15) must stay
+  above your worst-case single-call time — if you raise `ION_OLLAMA_TIMEOUT`
+  past the reaper window a legitimately slow chunk can be reaped mid-run.
+- **Process — the v0.49.3 git tag was re-signed** (the original was annotated
+  but unsigned, unlike v0.49.0–v0.49.2); it now carries the maintainer ED25519
+  signature and points at the same commit.
+
+No new routes, permissions, schema, or dependencies. Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.49.3 — 2026-07-06
 
