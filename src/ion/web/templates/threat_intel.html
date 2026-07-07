@@ -233,7 +233,12 @@
              case + triage data. Fed by /api/threat-intel/recently-active. -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
-            <h3 class="font-sans font-semibold text-base text-white mb-3">Recently Active Observables <span class="text-[11px] text-slate-500 font-normal">— last 30d in cases</span></h3>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-sans font-semibold text-base text-white">Recently Active Observables <span class="text-[11px] text-slate-500 font-normal">— last 30d in cases</span></h3>
+              <label class="text-[11px] text-slate-400 inline-flex items-center gap-1.5 cursor-pointer" title="Hide rule-field / command-content items (process names, command lines, file paths, registry) — not trackable IOCs">
+                <input type="checkbox" id="ti-hide-rule-obs" checked data-change-action="loadRecentlyActive"> Hide rule-field
+              </label>
+            </div>
             <div id="ti-recent-obs" class="text-sm text-slate-400">Loading…</div>
           </div>
           <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
@@ -725,7 +730,9 @@ data-click-action="tiCloseReport"></div>
 
     async function loadRecentlyActive() {
         try {
-            const r = await fetch(API + '/recently-active?days=30&top_n=8');
+            const hideEl = document.getElementById('ti-hide-rule-obs');
+            const hide = hideEl ? hideEl.checked : true;
+            const r = await fetch(API + '/recently-active?days=30&top_n=8&hide_rule_observables=' + hide);
             if (!r.ok) return;
             const d = await r.json();
             const obsEl = document.getElementById('ti-recent-obs');
@@ -760,6 +767,9 @@ data-click-action="tiCloseReport"></div>
             console.warn('Recently-active widget failed', e);
         }
     }
+    // Exposed on window so the "Hide rule-field" checkbox's data-change-action
+    // (resolved via window[name] by event-delegation.js) can reach it.
+    window.loadRecentlyActive = loadRecentlyActive;
 
     // ── v0.27.0: helper for safe HTML escaping in inline-rendered cells ──
     function escapeHtml(s) {
@@ -979,7 +989,7 @@ data-click-action="tiCloseReport"></div>
                         ${chainOrder.map((stage, i) => {
                             const active = tacticsSet.has(stage);
                             return (i > 0 ? '<span class="_ion-s-20db64ea41">→</span>' : '') +
-                                `<span class="_ion-s-060fd90cff">${escapeHtml(stage)}</span>`;
+                                `<span class="_ion-s-060fd90cff${active ? ' active' : ''}">${escapeHtml(stage)}</span>`;
                         }).join('')}
                        </div>`
                     : '';

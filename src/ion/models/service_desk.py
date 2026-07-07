@@ -14,11 +14,12 @@ Both mirror the established model conventions: ``Base`` + ``TimestampMixin``
 the enum value as a string.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Optional
 
 from sqlalchemy import (
+    Date,
     DateTime,
     ForeignKey,
     Index,
@@ -244,6 +245,9 @@ class ChangeRequest(Base, TimestampMixin):
 
     scheduled_start: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     scheduled_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # CAB planned change date (date-only; distinct from the maintenance window
+    # above). Added v0.49.6 so submitters stop typing the date into free-text.
+    planned_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
 
     status: Mapped[str] = mapped_column(
         SQLEnum(ChangeRequestStatus, native_enum=False),
@@ -284,6 +288,7 @@ class ChangeRequest(Base, TimestampMixin):
             "test_plan": self.test_plan,
             "scheduled_start": self.scheduled_start.isoformat() if self.scheduled_start else None,
             "scheduled_end": self.scheduled_end.isoformat() if self.scheduled_end else None,
+            "planned_date": self.planned_date.isoformat() if self.planned_date else None,
             "status": self.status,
             "requested_by_id": self.requested_by_id,
             "requested_by_username": self.requested_by.username if self.requested_by else None,

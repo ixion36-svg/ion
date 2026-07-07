@@ -59,22 +59,18 @@ def _auth_dependency(
 
 
 def _require_enrich(user: User = Depends(_auth_dependency)) -> User:
-    """Enforce ``alerts:enrich`` when the permission system knows about it.
+    """Enforce the ``observable:enrich`` permission (fail closed).
 
-    If the user lacks the permission *and* it exists in the permission system
-    as a defined permission, return 403. Otherwise, allow authenticated users
-    through (graceful for deployments that haven't added the permission yet).
+    v0.49.6: previously this swallowed any ``has_permission`` exception as
+    "allowed" (fail-open) and carried a hand-rolled ``is_admin`` bypass — the
+    only such bypass in the codebase, diverging from ION's no-superuser-bypass
+    model (admin already holds every defined permission, so the bypass was
+    redundant *and* a footgun). The 403 also named a non-existent
+    ``alerts:enrich``. Now a single, correct, fail-closed check.
     """
-    try:
-        has = user.has_permission("observable:enrich")
-    except Exception:
-        has = True
-    if has:
+    if user.has_permission("observable:enrich"):
         return user
-    # Admins always pass
-    if getattr(user, "is_admin", False):
-        return user
-    raise HTTPException(status_code=403, detail="Permission denied: alerts:enrich required")
+    raise HTTPException(status_code=403, detail="Permission denied: observable:enrich required")
 
 
 # --- Request / response models --------------------------------------------

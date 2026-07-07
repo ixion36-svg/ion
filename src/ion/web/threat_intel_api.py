@@ -14,6 +14,7 @@ from ion.auth.dependencies import get_db_session, require_permission
 from ion.core.safe_errors import safe_error
 from ion.models.user import User
 from ion.services.country_mapper import country_code_to_flag, get_country_code, get_country_name
+from ion.services.observable_service import DISPLAY_ONLY_TYPES
 from ion.services.opencti_service import OpenCTIError, get_opencti_service
 from ion.services.threat_intel_service import ThreatIntelService
 
@@ -423,6 +424,9 @@ async def unified_search(
 def recently_active(
     days: int = Query(30, ge=1, le=365),
     top_n: int = Query(10, ge=1, le=50),
+    hide_rule_observables: bool = Query(
+        True, description="Exclude rule-field / command-content observables (file paths, process/command lines, registry) from the IOC list."
+    ),
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
 ):
@@ -465,6 +469,11 @@ def recently_active(
             if isinstance(o, dict):
                 t = str(o.get("type") or "")
                 v = str(o.get("value") or "")
+                # Rule-field / command-content roles (process_name, command_line,
+                # file_path, registry_*, …) are not trackable IOCs — the user can
+                # toggle them out (default on).
+                if hide_rule_observables and t in DISPLAY_ONLY_TYPES:
+                    continue
                 if t and v:
                     obs_counter[(t, v)] += 1
 
@@ -486,8 +495,15 @@ def recently_active(
         except (TypeError, ValueError, json.JSONDecodeError):
             continue
         for t in tech_list or []:
-            if t:
-                tech_counter[str(t)] += 1
+            if not t:
+                continue
+            # The column is written in two shapes: bare ids ("T1059", from
+            # seeds/fixtures) and dicts ({"technique_id": "T1059", ...}, from the
+            # manual triage-edit PUT). Tolerate both — str(dict) used to produce
+            # a Python-repr that never matched a Txxxx id, blanking the widget.
+            tid = t.get("technique_id") if isinstance(t, dict) else str(t)
+            if tid:
+                tech_counter[str(tid).upper()] += 1
 
     return {
         "time_window_days": days,

@@ -72,10 +72,14 @@ def list_bug_reports(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
+    # v0.49.6: object-level scoping. Anyone can file a bug, but only a
+    # privileged user (system:settings — the CAB/admin surface) may see
+    # everyone's; a normal analyst is scoped to their own submissions.
+    can_see_all = current_user.has_permission("system:settings")
     stmt = select(BugReport)
     if status and status != "all":
         stmt = stmt.where(BugReport.status == status)
-    if mine:
+    if mine or not can_see_all:
         stmt = stmt.where(BugReport.reported_by_id == current_user.id)
     stmt = stmt.order_by(BugReport.created_at.desc()).limit(500)
     rows = session.execute(stmt).scalars().all()
@@ -91,6 +95,9 @@ def get_bug_report(
     br = session.get(BugReport, report_id)
     if not br:
         raise HTTPException(status_code=404, detail="Bug report not found")
+    # Owner or privileged only; 404 (not 403) for others — no existence oracle.
+    if br.reported_by_id != current_user.id and not current_user.has_permission("system:settings"):
+        raise HTTPException(status_code=404, detail="Bug report not found")
     return br.to_dict()
 
 
@@ -102,6 +109,8 @@ async def sync_bug_report(
 ):
     br = session.get(BugReport, report_id)
     if not br:
+        raise HTTPException(status_code=404, detail="Bug report not found")
+    if br.reported_by_id != current_user.id and not current_user.has_permission("system:settings"):
         raise HTTPException(status_code=404, detail="Bug report not found")
     if not br.gitlab_issue_iid:
         raise HTTPException(status_code=409, detail="No linked GitLab issue to sync")

@@ -53,6 +53,7 @@ class ChangeRequestCreate(BaseModel):
     test_plan: Optional[str] = None
     scheduled_start: Optional[str] = None
     scheduled_end: Optional[str] = None
+    planned_date: Optional[str] = None
     create_gitlab: bool = True
 
 

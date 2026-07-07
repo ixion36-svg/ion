@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -154,6 +154,7 @@ def cab_markdown(cr: ChangeRequest) -> str:
         f"- **Version:** {cr.current_version or '—'} → {cr.target_version or '—'}",
         f"- **Risk:** {cr.risk_level}",
         f"- **Status:** {cr.status}",
+        f"- **Planned change date:** {cr.planned_date.isoformat() if cr.planned_date else '—'}",
         f"- **Maintenance window:** {window}",
         f"- **Requested by:** {cr.requested_by.username if cr.requested_by else '—'}",
         "",
@@ -285,6 +286,7 @@ async def create_change_request(
         test_plan=(data.get("test_plan") or "").strip() or None,
         scheduled_start=_parse_dt(data.get("scheduled_start")),
         scheduled_end=_parse_dt(data.get("scheduled_end")),
+        planned_date=_parse_date(data.get("planned_date")),
         status=ChangeRequestStatus.DRAFT,
         requested_by_id=user_id,
     )
@@ -328,6 +330,16 @@ def _parse_dt(val: Any) -> Optional[datetime]:
         s = str(val).replace("Z", "+00:00")
         dt = datetime.fromisoformat(s)
         return dt.replace(tzinfo=None) if dt.tzinfo else dt
+    except (TypeError, ValueError):
+        return None
+
+
+def _parse_date(val: Any) -> Optional[date]:
+    """Parse a date-only string (``YYYY-MM-DD`` from an <input type="date">)."""
+    if not val:
+        return None
+    try:
+        return date.fromisoformat(str(val)[:10])
     except (TypeError, ValueError):
         return None
 

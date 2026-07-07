@@ -60,6 +60,7 @@
     </div>
     <div class="cr-row"><label>Test / validation plan<textarea id="cf-test" class="ion-input" rows="2" placeholder="Login, dashboard, run a triage, check integrations"></textarea></label></div>
     <div class="cr-grid">
+      <label>Planned change date<input id="cf-planned" type="date" class="ion-input"></label>
       <label>Window start<input id="cf-start" type="datetime-local" class="ion-input"></label>
       <label>Window end<input id="cf-end" type="datetime-local" class="ion-input"></label>
       <label class="cr-chk"><input type="checkbox" id="cf-gitlab" checked> Create linked GitLab issue</label>
@@ -163,13 +164,14 @@ async function submitCR(){
       affected_systems: g('cf-affected'), implementation_plan: g('cf-impl'),
       backout_plan: g('cf-backout'), test_plan: g('cf-test'),
       scheduled_start: g('cf-start'), scheduled_end: g('cf-end'),
+      planned_date: g('cf-planned'),
       create_gitlab: document.getElementById('cf-gitlab').checked,
     })
   });
   if(!resp.ok){ msg.textContent = 'Failed: ' + resp.status; return; }
   const cr = await resp.json();
   msg.textContent = `Created ${cr.reference}` + (cr.gitlab_issue_iid ? ` — GitLab #${cr.gitlab_issue_iid}` : ` (GitLab: ${esc(cr.gitlab_error || 'n/a')})`);
-  ['cf-target','cf-title','cf-just','cf-changes','cf-impact','cf-affected','cf-impl','cf-backout','cf-test','cf-start','cf-end'].forEach(id => document.getElementById(id).value = '');
+  ['cf-target','cf-title','cf-just','cf-changes','cf-impact','cf-affected','cf-impl','cf-backout','cf-test','cf-start','cf-end','cf-planned'].forEach(id => document.getElementById(id).value = '');
   loadCRs();
 }
 

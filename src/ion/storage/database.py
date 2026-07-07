@@ -457,6 +457,15 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: users.is_service_account")
 
+    # v0.49.6: planned_date (CAB date-only field) on an existing
+    # change_requests table. create_all only creates missing tables, not
+    # missing columns, so pre-v0.49.6 deploys need the ALTER. Nullable DATE,
+    # no default — existing rows stay valid.
+    if insp.has_table("change_requests"):
+        existing = {col["name"] for col in insp.get_columns("change_requests")}
+        if "planned_date" not in existing:
+            _add_column_tolerant(engine, "change_requests", "planned_date", "DATE")
+
     # v0.31.17: G5 (data-min audit closure) — session_token hash-at-rest.
     # If the user_sessions table still carries the plaintext session_token
     # column, migrate it: add session_token_hash, backfill SHA-256 digests

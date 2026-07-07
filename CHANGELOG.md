@@ -1,13 +1,56 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.5 -->
-<!-- ion-doc:version=0.49.5 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.6 -->
+<!-- ion-doc:version=0.49.6 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-06 -->
 
 # Changelog
+
+## v0.49.6 — 2026-07-07
+
+**Five Threat-Intel / service-desk fixes + a permission-gate audit.**
+
+- **Fix — Threat-Intel "Recently Seen MITRE Techniques" was empty/garbage.** The
+  aggregation assumed bare-string technique ids, but the manual triage-edit path
+  stores dicts (`{"technique_id": "T1059", …}`) — `str(dict)` never matched a
+  `Txxxx` id. Now shape-tolerant (dict → `technique_id`, string as-is).
+- **Fix — "Recently Active Observables" was polluted by rule-field content.**
+  Process names, command lines, file paths and registry keys (ECS context roles,
+  not trackable IOCs) crowded out real observables. A **"Hide rule-field" toggle**
+  (default on) filters them via `observable_service.DISPLAY_ONLY_TYPES`; the
+  endpoint gains `hide_rule_observables` (default true).
+- **Fix — Reports tab restyled.** Report cards gain a cyan left-border accent +
+  coloured titles; the report detail slide-over widened 480→760px (id-scoped, so
+  the technique-drill panel stays compact) for long reports. `max-width` keeps
+  mobile safe.
+- **Fix — Attack Stories weren't highlighting the hit tactics.** The kill-chain
+  strip class carried a literal `${active ? …}` JS ternary (invalid CSS from the
+  v0.31.21 style→class migration → dropped, so every stage rendered identically).
+  Split into static `.active` / `:not(.active)` state classes applied by the
+  renderer — hit tactics now show red, un-hit dimmed/dashed.
+- **Feature — Change Requests get a dedicated "Planned change date".** A new
+  `planned_date` (date-only) column + `<input type="date">` on the CR form,
+  threaded through the API/service and surfaced on the CAB Markdown export /
+  linked GitLab issue — so submitters stop typing the date into free-text.
+  Additive column with a startup migration (existing tables don't get new
+  columns from `create_all`).
+- **Security — permission-gate audit.** Reviewed every route gate: no
+  privilege-escalation or enforced-but-undefined defects. Fixed two: the
+  enrichment API's gate **failed open** on any exception and carried a
+  hand-rolled admin-bypass (the only one in the codebase) while naming a
+  non-existent `alerts:enrich` — now a single fail-closed `observable:enrich`
+  check; and bug-report reads had **no object-level scoping** (any user could
+  read/enumerate everyone's) — now owner-or-`system:settings`, 404 (no oracle)
+  otherwise. Pruned 5 seeded-but-never-enforced permissions (`discover:read`,
+  `alert:comment`, `case:comment`, `case:link`, `investigation:run`); kept
+  `tuning:read` (it does gate the tuning-proposal read routes).
+
+New tests `tests/test_v049_6_threat_intel_recent.py`. No new external
+dependency; one additive `change_requests.planned_date` column. Net new
+findings: 0C / 0H / 0M / 0L.
 
 ## v0.49.5 — 2026-07-06
 

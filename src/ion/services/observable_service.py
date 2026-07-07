@@ -75,6 +75,11 @@ _DISPLAY_ONLY_TYPES = frozenset({
     "email_subject", "registry_key", "registry_value",
 })
 
+# Public alias — these context-role "observables" are rule-field / command
+# content, not trackable network IOCs. Consumers (e.g. the Threat-Intel
+# recently-active widget) import this to filter them out of IOC lists.
+DISPLAY_ONLY_TYPES = _DISPLAY_ONLY_TYPES
+
 
 class ObservableService:
     """Service for managing observables with enrichment and correlation."""
