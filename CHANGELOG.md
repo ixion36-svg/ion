@@ -1,13 +1,50 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.6 -->
-<!-- ion-doc:version=0.49.6 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.7 -->
+<!-- ion-doc:version=0.49.7 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-06 -->
 
 # Changelog
+
+## v0.49.7 — 2026-07-07
+
+**Bob AlertPromptTemplate catalogue — tuning + expansion (54 → 64 templates).**
+
+- **Fix — the per-template confidence-threshold lever was non-functional from
+  seed.** `AlertPromptTemplate.confidence_threshold_override` existed on the
+  model (v0.21.0) but `seed_default_templates` never passed it to
+  `repo.create()`, so every seeded template used the flat global
+  `ION_BOB_CONFIDENCE_THRESHOLD` (60) and the per-rule circuit breaker couldn't
+  be set from seed. The seeder now wires it on insert **and** tops it up on
+  existing rows (when unset, preserving analyst edits), driven by a new
+  `_TEMPLATE_THRESHOLD_MAP`.
+- **Tuning — per-rule confidence thresholds on 24 templates.** Noisy /
+  high-volume rules raised to 68–75 (Bob abstains → escalates to a human unless
+  genuinely confident: Sysmon 1/2/3/7/22, DNS/Zeek anomaly, Discovery, DLP,
+  Insider); critical rules lowered to 45–52 (Bob surfaces his verdict at more
+  modest confidence: Ransomware, C2, Sysmon 10/LSASS, endpoint tampering,
+  session hijack, identity/MFA, container/CI/supply-chain, ESXi).
+- **Tuning — enriched 5 thin prompts** (Malware Detection, Authentication
+  Failure, Discovery, DLP, Insider Threat) with concrete ECS/Wazuh field and
+  Windows event-ID references, and instructed Bob to return `inconclusive`
+  rather than guess when an air-gapped ION lacks the DLP/HR data source.
+- **Coverage — 10 new templates** (each MITRE-mapped + threshold-tuned) filling
+  real detection gaps, notably the previously thin Collection and Impact
+  tactics: DCSync / NTDS.dit extraction, remote-access / RMM tooling (AnyDesk,
+  TeamViewer, ScreenConnect), resource hijacking / cryptomining, data
+  destruction / wipers, rogue account creation, GPO / domain-policy
+  modification, AD CS / Kerberos ticket forgery, account access removal, BITS
+  jobs, and collection & archiving / data staging.
+- Fixed a KQL operator-precedence bug in the *Virtual Machine Discovery*
+  template's illustrative query stub.
+
+Internal prompt-catalogue content only — no new route, permission, schema, or
+dependency; the adversary-influenced alert content already flowed through the
+existing prompt pipeline. New tests `tests/test_v049_7_playbook_catalogue.py`.
+Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.49.6 — 2026-07-07
 

@@ -413,6 +413,10 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "spray, credential stuffing, or a benign user lockout. "
             "Examine the source IP(s), user account(s), failure count, "
             "time window, and whether any attempt eventually succeeded. "
+            "Read the relevant fields / event IDs: Windows 4625 (failed "
+            "logon) `winlog.event_data.TargetUserName` / `.IpAddress` / "
+            "`.LogonType` / `.SubStatus`, 4771/4776 (Kerberos/NTLM), or ECS "
+            "`user.name` / `source.ip` / `event.outcome`. "
             "Check for impossible travel, geo anomalies, and TOR/VPN exit "
             "nodes. Cross-reference the account against privileged-access "
             "and service-account inventories. ATT&CK: T1110 (brute force), "
@@ -450,7 +454,11 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "You are investigating a malware-detection alert from AV or EDR. "
             "First confirm the current containment state: was the sample "
             "quarantined, blocked, or executed? Establish the detection "
-            "name, family, and sample hash. Check if other hosts show the "
+            "name, family, and sample hash — read the fields your sensor "
+            "emits: ECS `file.name` / `file.path` / `file.hash.sha256` / "
+            "`event.action` / `rule.name`, or Wazuh `data.win.eventdata."
+            "threatName` / `.path` / `.actionTaken` / `.severity` (as the "
+            "Microsoft Defender template does). Check if other hosts show the "
             "same hash, IOC, or family. Identify the delivery vector "
             "(email attachment, download, USB, lateral movement). "
             "Determine whether this is a known family with public "
@@ -697,7 +705,12 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "Determine the scope: port scan (how many targets, which ports), "
             "AD enumeration (LDAP queries for privileged groups, SPNs, GPOs), "
             "or specialised tooling (BloodHound/SharpHound collection, "
-            "ADRecon, PowerView). Identify the source host and user account. "
+            "ADRecon, PowerView). Read the fields: `process.command_line` / "
+            "Wazuh `data.win.eventdata.commandLine` for SharpHound/PowerView "
+            "collection methods, Windows 4662 (directory-object access) for "
+            "high-value SPN/GPO objects, and LDAP query volume/filters for "
+            "privileged-group enumeration. Identify the source host and user "
+            "account. "
             "Assess whether this is legitimate IT operations (vulnerability "
             "scanner, Nessus, authorised pentest) or adversary reconnaissance. "
             "Check scan timing, volume, and whether the source host has prior "
@@ -1338,7 +1351,11 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "records (PHI/HIPAA), government IDs (SSN, passport), or "
             "classified/proprietary business data. Determine the channel: "
             "email attachment, cloud upload, removable media, print job, "
-            "clipboard, or screen share. Check whether the user has a "
+            "clipboard, or screen share (read what the sensor provides — ECS "
+            "`file.*`, `email.*`, `url.*`, `user.name`). If ION has no DLP "
+            "product integrated, base the verdict only on the transfer "
+            "evidence actually present and return `inconclusive` rather than "
+            "assuming a classification. Check whether the user has a "
             "business justification and whether the data was actually "
             "transmitted or only detected in transit. Assess regulatory "
             "impact (GDPR, HIPAA, PCI-DSS). ATT&CK: T1567 (Exfiltration "
@@ -1383,7 +1400,13 @@ _DEFAULT_TEMPLATES: list[dict] = [
         "prompt_text": (
             "You are investigating an insider-threat alert. These alerts "
             "require careful context — distinguish between a busy employee "
-            "and malicious intent. Examine the user's baseline: is after-hours "
+            "and malicious intent. Note: an air-gapped ION may have no HR "
+            "feed or per-user behavioural baseline — when that context is "
+            "absent, say so explicitly and lean toward `inconclusive` rather "
+            "than inferring intent; ground the verdict in the observable "
+            "signals ION does have (`user.name`, logon `event.action`, USB / "
+            "`host.*` device events, file read/download volume). "
+            "Examine the user's baseline: is after-hours "
             "access normal for their role? Has their access pattern changed "
             "recently? Check for correlation with HR events (performance "
             "review, resignation notice, disciplinary action). Review the "
@@ -2979,8 +3002,8 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "**Sample KQL:**\n"
             "```\n"
             "host.os.platform: linux AND "
-            "(process.name: esxcli AND process.args: \"vm process list\") "
-            "OR (process.name: vim-cmd AND process.args: getallvms)\n"
+            "((process.name: esxcli AND process.args: \"vm process list\") "
+            "OR (process.name: vim-cmd AND process.args: getallvms))\n"
             "```\n\n"
             "Adversary indicators: discovery immediately followed by "
             "power-off commands, large VM counts in output (>20 suggests "
@@ -3007,6 +3030,500 @@ _DEFAULT_TEMPLATES: list[dict] = [
             "session_timeline",
             "power_off_followon",
             "datastore_blast_radius",
+            "recommended_actions",
+        ],
+    },
+    # -----------------------------------------------------------------------
+    # v0.49.7 catalogue expansion — high-value coverage gaps that had no
+    # dedicated Bob prompt (fell through to generic tactic templates).
+    # -----------------------------------------------------------------------
+    {
+        "name": "DCSync / NTDS.dit Extraction",
+        "description": (
+            "Domain-wide credential theft — DCSync replication abuse or "
+            "NTDS.dit database extraction from a Domain Controller."
+        ),
+        "rule_groups": [
+            "dcsync", "ntds_dump", "ntds_extraction",
+            "credential_dumping_ad", "ntdsutil",
+        ],
+        "rule_id_pattern": r"(?i)(dcsync|ntds\.?dit|ntdsutil|drsuapi|ds.?replication|get.?changes)",
+        "priority": 12,
+        "severity_hint": "critical",
+        "confidence_threshold_override": 45,
+        "prompt_text": (
+            "You are investigating suspected DCSync or NTDS.dit extraction — "
+            "theft of the entire domain credential store. This is domain "
+            "compromise; treat as game-over until disproven. TWO distinct "
+            "signatures: (1) DCSYNC — a security principal that is NOT a Domain "
+            "Controller requests directory replication (Windows event 4662 with "
+            "the DS-Replication-Get-Changes / -All GUIDs 1131f6aa-/1131f6ad-, or "
+            "DRSUAPI DsGetNCChanges over the wire from a workstation). Look at "
+            "the requesting account and source host in `winlog.event_data."
+            "SubjectUserName` / ECS `user.name` + `source.ip`. Any non-DC source "
+            "is malicious. (2) NTDS.DIT COPY — ntdsutil `ac i ntds`/`create full`, "
+            "vssadmin/esentutl copying `ntds.dit`, or a shadow copy of the DC "
+            "volume; inspect `process.command_line` / Wazuh `data.win.eventdata."
+            "commandLine`. Identify the operator account (is it Tier-0?), the "
+            "tool, and whether replication succeeded. ATT&CK: T1003.006 (DCSync), "
+            "T1003.003 (NTDS)."
+        ),
+        "investigation_checklist_text": (
+            "- Is the requesting principal a real Domain Controller? (Only DCs "
+            "legitimately replicate — anything else is malicious.)\n"
+            "- What source host/IP issued the replication or ran ntdsutil?\n"
+            "- Which account was used, and is it Tier-0 / recently compromised?\n"
+            "- Did the replication/extraction actually succeed (bytes returned, "
+            "file created)?\n"
+            "- Is there preceding credential access or lateral movement to this "
+            "host?\n"
+            "- Containment: isolate the source, reset krbtgt TWICE, force a "
+            "domain-wide credential reset — has that started?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "attack_technique",
+            "requesting_principal",
+            "blast_radius",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Remote Access / RMM Tooling",
+        "description": (
+            "Remote monitoring & management software (AnyDesk, TeamViewer, "
+            "ScreenConnect, Atera, Splashtop) — a top hands-on-keyboard "
+            "intrusion and ransomware-precursor channel that is not malware."
+        ),
+        "rule_groups": [
+            "rmm_tooling", "remote_access_software", "anydesk",
+            "teamviewer", "screenconnect", "atera", "splashtop",
+        ],
+        "rule_id_pattern": r"(?i)(anydesk|teamviewer|screenconnect|connectwise|atera|splashtop|remote.?access.?(tool|software)|rmm)",
+        "priority": 22,
+        "severity_hint": "high",
+        "confidence_threshold_override": 55,
+        "prompt_text": (
+            "You are investigating remote-access / RMM software. These are "
+            "legitimate admin tools weaponised by intruders (especially "
+            "ransomware crews) for interactive access — so the verdict hinges "
+            "on CONTEXT, not the binary. Determine: which RMM product and "
+            "version (`process.name`/`process.executable` or Wazuh `data.win."
+            "eventdata.image`); is this product on the organisation's approved "
+            "RMM allowlist, or unsanctioned (unsanctioned RMM is a strong "
+            "intrusion signal); how did it arrive — silent/unattended install, "
+            "dropped by another process, or run portable from a temp/Downloads "
+            "path; who installed it (admin vs standard user); and the remote "
+            "peer — is the outbound connection to a residential/hosting ASN or "
+            "the vendor's cloud. Correlate with the parent process and any "
+            "preceding phishing or download. Benign if it matches sanctioned "
+            "IT use; escalate hard if unsanctioned + unusual install + unknown "
+            "peer. ATT&CK: T1219 (Remote Access Software)."
+        ),
+        "investigation_checklist_text": (
+            "- Which RMM product/version, and is it on the approved allowlist?\n"
+            "- Install method: interactive, silent/unattended, or portable from "
+            "a temp path?\n"
+            "- Who/what launched it — parent process and user context?\n"
+            "- What is the remote peer (IP/ASN/geo) — vendor cloud or "
+            "residential/hosting?\n"
+            "- Is there a preceding phishing email, download, or macro?\n"
+            "- Has the same tool appeared on other hosts (campaign spread)?\n"
+            "- Sanctioned admin use, or unauthorised remote access to escalate?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "rmm_product",
+            "install_context",
+            "remote_peer",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Resource Hijacking / Cryptomining",
+        "description": (
+            "Unauthorised compute use for cryptocurrency mining — host, "
+            "container, or cloud-instance coinminer activity."
+        ),
+        "rule_groups": [
+            "cryptomining", "coinminer", "xmrig", "resource_hijacking",
+            "mining_pool",
+        ],
+        "rule_id_pattern": r"(?i)(cryptomin|coinmin|xmrig|monero|stratum|mining.?pool|nicehash|minerd)",
+        "priority": 22,
+        "severity_hint": "high",
+        "confidence_threshold_override": 55,
+        "prompt_text": (
+            "You are investigating suspected cryptomining / resource hijacking. "
+            "The impact is stolen compute and cloud spend, not data loss — but "
+            "it is also a reliable indicator that the host/account is already "
+            "compromised (the miner is post-exploitation payload). Look for: "
+            "mining-pool connectivity (stratum+tcp://, ports 3333/4444/5555/"
+            "14444, pool domains) in `destination.domain`/`destination.port`; "
+            "miner binaries/args (xmrig, minerd, `--donate-level`, wallet "
+            "address, `-o pool`) in `process.command_line` / Wazuh `data.win."
+            "eventdata.commandLine`; sustained high CPU/GPU; and in cloud, "
+            "unexpected large-instance/GPU spin-up or container images pulled "
+            "from unknown registries. Trace HOW it got there — the initial "
+            "access (exposed service, leaked cloud key, malicious image) matters "
+            "more than the miner itself. ATT&CK: T1496 (Resource Hijacking)."
+        ),
+        "investigation_checklist_text": (
+            "- Is there mining-pool connectivity (stratum, known pool domain/"
+            "port)?\n"
+            "- What miner binary and arguments (wallet, pool) are present?\n"
+            "- Sustained abnormal CPU/GPU or cloud-spend/instance-scale spike?\n"
+            "- How did the miner arrive — exposed service, leaked key, malicious "
+            "container image, cron/scheduled task persistence?\n"
+            "- Is the same wallet/pool seen on other hosts or instances?\n"
+            "- Beyond killing the miner, what is the root compromise to remediate?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "mining_indicators",
+            "initial_access",
+            "affected_resources",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Data Destruction / Wiper",
+        "description": (
+            "Destructive activity without encryption — disk/file wipers, mass "
+            "deletion, and backup/log destruction (distinct from ransomware)."
+        ),
+        "rule_groups": [
+            "data_destruction", "wiper", "disk_wipe", "mass_delete",
+            "backup_destruction", "shadow_copy_deletion",
+        ],
+        "rule_id_pattern": r"(?i)(wiper|data.?destruction|disk.?wipe|mass.?delet|sdelete|cipher\.exe|format.?volume|dd.?of=)",
+        "priority": 12,
+        "severity_hint": "high",
+        "confidence_threshold_override": 48,
+        "prompt_text": (
+            "You are investigating suspected DATA DESTRUCTION — a wiper or mass "
+            "deletion with NO ransom/encryption artefact. Unlike ransomware "
+            "there is no decrypt path, so the verdict logic is different: assume "
+            "destructive intent and prioritise stopping spread + protecting "
+            "backups. Look for: overwrite/wipe tooling (sdelete, cipher /w, dd, "
+            "`format`, custom drivers touching \\\\.\\PhysicalDrive), mass file "
+            "deletion or extension-less overwrite, MBR/VBR overwrite, and "
+            "destruction of backups / VSS shadow copies / event logs "
+            "(`wevtutil cl`, vssadmin delete shadows). Inspect `process."
+            "command_line` / Wazuh `data.win.eventdata.commandLine` and file "
+            "delete/write volume. Determine scope (one host vs domain-wide via "
+            "GPO/PsExec push) and whether backups are intact and offline. "
+            "ATT&CK: T1485 (Data Destruction), T1561 (Disk Wipe), T1490 (Inhibit "
+            "System Recovery)."
+        ),
+        "investigation_checklist_text": (
+            "- What tool/method is destroying data (secure-delete, overwrite, "
+            "MBR wipe, mass delete)?\n"
+            "- Is this a single host or being pushed domain-wide (GPO, PsExec, "
+            "scheduled task)?\n"
+            "- Are backups, shadow copies, or event logs being deleted too?\n"
+            "- Are offline/immutable backups intact and verified?\n"
+            "- Is there a ransom note (→ pivot to Ransomware) or pure "
+            "destruction?\n"
+            "- Immediate containment: isolate, block the push mechanism, protect "
+            "backup infrastructure — done?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "destruction_method",
+            "scope",
+            "backup_status",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Rogue Account Creation",
+        "description": (
+            "Creation of a backdoor account — new local admin, new privileged "
+            "domain user, or new cloud IAM identity (persistence)."
+        ),
+        "rule_groups": [
+            "account_creation", "create_account", "new_local_admin",
+            "new_domain_account", "new_iam_user",
+        ],
+        "rule_id_pattern": r"(?i)(account.?creat|create.?account|new.?(local|domain).?(admin|account|user)|net.?user.?/add|new-?aduser|new.?iam.?user)",
+        "priority": 25,
+        "severity_hint": "high",
+        "confidence_threshold_override": 55,
+        "prompt_text": (
+            "You are investigating a newly created account — a common backdoor "
+            "persistence mechanism. Establish legitimacy: WHO created it (Windows "
+            "event 4720 local / 4741 computer / 4728-4732 group-add; `winlog."
+            "event_data.SubjectUserName` / ECS `user.name`), WHAT account was "
+            "created (`TargetUserName`), and whether it was immediately added to "
+            "a privileged group (Administrators, Domain Admins, Enterprise "
+            "Admins). Red flags: creation by a non-admin or service account, "
+            "off-hours, an anomalous naming pattern (svc-*, admin2, backup-*), "
+            "immediate privileged-group membership, no matching change/onboarding "
+            "ticket, or creation right after a suspicious logon. For cloud, check "
+            "IAM user + access-key creation and policy attachment in the audit "
+            "trail. Benign if it maps to a sanctioned onboarding/change; escalate "
+            "if unaccounted-for + privileged. ATT&CK: T1136 (Create Account), "
+            "T1098 (Account Manipulation)."
+        ),
+        "investigation_checklist_text": (
+            "- Who created the account, and are they authorised to?\n"
+            "- Was it immediately added to a privileged group?\n"
+            "- Does the name fit a normal convention or look like a backdoor?\n"
+            "- Is there a matching onboarding / change-management record?\n"
+            "- Off-hours or right after a suspicious logon / lateral movement?\n"
+            "- For cloud: were access keys or a policy attached at creation?\n"
+            "- Should the account be disabled pending verification?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "creator",
+            "privilege_granted",
+            "legitimacy",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "GPO / Domain Policy Modification",
+        "description": (
+            "Group Policy Object or domain-trust modification — a high-privilege "
+            "AD attack for mass persistence, defence-disable, or privilege "
+            "escalation."
+        ),
+        "rule_groups": [
+            "gpo_modification", "group_policy", "domain_policy_change",
+            "trust_modification",
+        ],
+        "rule_id_pattern": r"(?i)(gpo|group.?policy|domain.?polic|gplink|sysvol.?(script|change)|trust.?modif)",
+        "priority": 20,
+        "severity_hint": "high",
+        "confidence_threshold_override": 52,
+        "prompt_text": (
+            "You are investigating a Group Policy / domain-policy change. GPO "
+            "abuse is force-multiplied — one edit can run code, add admins, or "
+            "disable defences across every linked machine. Determine: which GPO "
+            "changed and which OU/domain it is linked to (blast radius = every "
+            "object under that link); what section changed — a new startup/logon "
+            "SCRIPT or scheduled task (code execution), a new restricted-groups / "
+            "local-admin membership (privilege escalation), or a security-setting "
+            "downgrade (defence evasion, e.g. disabling Defender/AV or audit); "
+            "and WHO made the change (event 5136/5137 directory-object modify; "
+            "`winlog.event_data.SubjectUserName`) — is it a sanctioned GPO admin "
+            "via a change ticket, or an unexpected principal? Inspect SYSVOL for "
+            "newly written scripts. Also flag AD trust modifications (new/"
+            "changed trust = cross-domain risk). ATT&CK: T1484.001 (GPO), "
+            "T1484.002 (Domain Trust Modification)."
+        ),
+        "investigation_checklist_text": (
+            "- Which GPO changed and which OU/domain is it linked to (blast "
+            "radius)?\n"
+            "- What was modified — startup/logon script, scheduled task, "
+            "restricted-groups membership, or a security setting downgrade?\n"
+            "- Who made the change, and are they an authorised GPO admin?\n"
+            "- Is there a change-management record for it?\n"
+            "- Were new files/scripts written to SYSVOL?\n"
+            "- Is any domain trust being added or modified?\n"
+            "- Should the GPO be reverted / unlinked immediately?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "gpo_and_scope",
+            "change_type",
+            "modifier",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "AD Certificate Services / Ticket Forgery",
+        "description": (
+            "Active Directory Certificate Services abuse (ESC1-8) and Kerberos "
+            "ticket forgery (Golden/Silver ticket) — Tier-0 credential attacks."
+        ),
+        "rule_groups": [
+            "adcs_abuse", "esc_certificate", "certipy", "golden_ticket",
+            "silver_ticket", "kerberos_forgery",
+        ],
+        "rule_id_pattern": r"(?i)(adcs|esc[1-8]\b|certipy|certif.*(request|abuse)|golden.?ticket|silver.?ticket|forged.?(ticket|tgt)|rubeus)",
+        "priority": 15,
+        "severity_hint": "critical",
+        "confidence_threshold_override": 48,
+        "prompt_text": (
+            "You are investigating AD certificate-services abuse or Kerberos "
+            "ticket forgery — routes to domain dominance that bypass password "
+            "resets. TWO families: (1) AD CS (ESC1-8) — anomalous certificate "
+            "REQUEST/ENROLLMENT where the subject/SAN does not match the "
+            "requester (privilege escalation via a cert for another principal), "
+            "vulnerable template abuse, or CA misconfig; look at CA enrollment "
+            "events (4886/4887) and tools like Certipy/Certify in `process."
+            "command_line`. (2) TICKET FORGERY — Golden ticket (forged TGT signed "
+            "with the krbtgt hash: anomalous TGT lifetime, non-existent account, "
+            "RC4 where AES expected) or Silver ticket (forged service ticket, no "
+            "TGS request logged). Rubeus/mimikatz `kerberos::` are indicators. "
+            "Determine which principal/service is impersonated and the blast "
+            "radius. Containment differs: AD CS → revoke cert + fix template; "
+            "Golden ticket → rotate krbtgt TWICE. ATT&CK: T1649 (Steal/Forge "
+            "Auth Certificates), T1558 (Forge Kerberos Tickets)."
+        ),
+        "investigation_checklist_text": (
+            "- AD CS abuse or ticket forgery (or both)?\n"
+            "- For AD CS: does the cert subject/SAN mismatch the requester? Which "
+            "template / CA?\n"
+            "- For tickets: anomalous TGT lifetime, RC4 downgrade, or a TGS with "
+            "no matching TGT request?\n"
+            "- Which account/service is being impersonated, and at what "
+            "privilege?\n"
+            "- What tool is implicated (Certipy, Rubeus, mimikatz)?\n"
+            "- Is the krbtgt hash or CA key likely compromised?\n"
+            "- Containment: revoke certs / rotate krbtgt twice — started?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "attack_family",
+            "impersonated_principal",
+            "blast_radius",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Account Access Removal",
+        "description": (
+            "Defenders or users being locked out — mass password reset, account "
+            "disable/delete, or lockout (a response-denial / impact action)."
+        ),
+        "rule_groups": [
+            "account_access_removal", "mass_password_reset",
+            "mass_account_disable", "account_lockout_mass",
+        ],
+        "rule_id_pattern": r"(?i)(account.?(access.?removal|disabl|delet|lockout)|mass.?(password.?reset|disable|lockout))",
+        "priority": 22,
+        "severity_hint": "high",
+        "confidence_threshold_override": 52,
+        "prompt_text": (
+            "You are investigating accounts being disabled, deleted, locked out, "
+            "or force-reset EN MASSE. In an active intrusion this is often the "
+            "adversary denying incident response (locking out admins) or a "
+            "final-stage impact action; it can also be a benign bulk IT/HR "
+            "operation — context decides. Determine: WHO is performing the change "
+            "(single principal touching many accounts is the key signal; `winlog."
+            "event_data.SubjectUserName` / ECS `user.name`, events 4725 disable / "
+            "4726 delete / 4740 lockout / 4724 reset), the VELOCITY (how many "
+            "accounts in how short a window), and WHO is affected (are privileged/"
+            "IR/admin accounts being removed — a targeted response-denial?). "
+            "Correlate with any preceding compromise of the acting account and "
+            "with ransomware/destruction activity. Benign if it matches a "
+            "scheduled bulk offboarding/change; escalate if an unexpected "
+            "principal is rapidly removing admin access. ATT&CK: T1531 (Account "
+            "Access Removal)."
+        ),
+        "investigation_checklist_text": (
+            "- Which single principal is changing many accounts?\n"
+            "- How many accounts, how fast (velocity)?\n"
+            "- Are privileged / IR / admin accounts among those removed "
+            "(response-denial)?\n"
+            "- Is the acting account itself compromised?\n"
+            "- Is this correlated with ransomware / destruction (final-stage "
+            "impact)?\n"
+            "- Is there a bulk offboarding / change record that explains it?\n"
+            "- Restore access + disable the acting account if malicious — done?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "acting_principal",
+            "accounts_affected",
+            "targeting",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "BITS Jobs — Ingress / Persistence",
+        "description": (
+            "Background Intelligent Transfer Service abuse — stealthy download, "
+            "upload, or reboot-surviving persistence via BITS jobs."
+        ),
+        "rule_groups": [
+            "bits_jobs", "bitsadmin", "bits_transfer",
+        ],
+        "rule_id_pattern": r"(?i)(bitsadmin|bits.?job|bits.?transfer|start-?bitstransfer)",
+        "priority": 35,
+        "severity_hint": "medium",
+        "prompt_text": (
+            "You are investigating BITS (Background Intelligent Transfer "
+            "Service) activity — a LOLBIN channel that blends with normal Windows "
+            "update traffic and can persist across reboots. Inspect the command "
+            "line (`process.command_line` / Wazuh `data.win.eventdata."
+            "commandLine`) for `bitsadmin /transfer`, `/addfile`, `/SetNotifyCmdLine` "
+            "(persistence: a BITS job that runs a command on completion), or "
+            "PowerShell `Start-BitsTransfer`. Also inspect the BITS-Client "
+            "operational log (event 59/60) for the remote URL. Determine: the "
+            "remote URL/host and whether it is a known-good update source or "
+            "suspicious; whether a payload was downloaded or data uploaded "
+            "(exfil); the parent process; and whether a notify-command persistence "
+            "was set. Benign for legitimate updaters; escalate if it fetches from "
+            "an unknown host or sets a notify command. ATT&CK: T1197 (BITS Jobs)."
+        ),
+        "investigation_checklist_text": (
+            "- What BITS operation (transfer download, upload, or notify-command "
+            "persistence)?\n"
+            "- What is the remote URL/host — known update source or suspicious?\n"
+            "- Was a payload downloaded or data uploaded?\n"
+            "- What parent process invoked bitsadmin / Start-BitsTransfer?\n"
+            "- Was a completion notify-command set (reboot-surviving "
+            "persistence)?\n"
+            "- Are there pending BITS jobs to purge?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "bits_operation",
+            "remote_url",
+            "persistence",
+            "recommended_actions",
+        ],
+    },
+    {
+        "name": "Collection & Archiving / Data Staging",
+        "description": (
+            "Pre-exfiltration staging — archiving many files (rar/7zip/tar), "
+            "automated collection, and staged data in temp directories."
+        ),
+        "rule_groups": [
+            "data_staging", "archive_collected_data", "rar_7zip_staging",
+            "automated_collection",
+        ],
+        "rule_id_pattern": r"(?i)(data.?stag|archive.?(collect|data)|rar\.exe|7z(a|ip)?\.exe|winrar|makecab|staging.?dir)",
+        "priority": 28,
+        "severity_hint": "medium-high",
+        "confidence_threshold_override": 58,
+        "prompt_text": (
+            "You are investigating data collection / staging — typically the step "
+            "just BEFORE exfiltration, which makes it a high-value intervention "
+            "point (stop it here and the data never leaves). Look for an archive "
+            "tool (rar, 7z, WinRAR, tar, makecab) reading MANY files and writing "
+            "a single archive, often password-protected (`-hp`/`-p` flags) into a "
+            "temp/staging path (%TEMP%, C:\\Windows\\Temp, /tmp, a hidden dir). "
+            "Inspect `process.command_line` / Wazuh `data.win.eventdata."
+            "commandLine` for the tool + flags, and the file read/write pattern. "
+            "Assess: what data was collected (sensitive shares, mailboxes, DB "
+            "dumps?), the archive size/location, whether it is encrypted (to "
+            "evade DLP), and whether an exfil transfer followed or is imminent. "
+            "Correlate with prior discovery and with any outbound transfer. "
+            "ATT&CK: T1560 (Archive Collected Data), T1119 (Automated "
+            "Collection), T1074 (Data Staged)."
+        ),
+        "investigation_checklist_text": (
+            "- What archive tool and flags (password-protected? split volumes?)?\n"
+            "- Where is the archive being written (temp/hidden staging path)?\n"
+            "- What source data was collected (shares, mailbox, DB dump, user "
+            "files)?\n"
+            "- How large is the staged set, and is it encrypted to evade DLP?\n"
+            "- Did an outbound transfer follow, or is exfil imminent?\n"
+            "- Is there preceding discovery/collection automation?\n"
+            "- Can the staged archive be seized and the transfer blocked now?"
+        ),
+        "expected_outputs": [
+            "verdict",
+            "archive_details",
+            "collected_data",
+            "exfil_followon",
             "recommended_actions",
         ],
     },
@@ -3247,6 +3764,86 @@ _TEMPLATE_MITRE_MAP: dict[str, dict[str, list[str]]] = {
         "techniques": ["T1673"],
         "tactics": ["TA0007"],  # Discovery
     },
+    # v0.49.7 catalogue expansion
+    "DCSync / NTDS.dit Extraction": {
+        "techniques": ["T1003.006", "T1003.003", "T1003"],
+        "tactics": ["TA0006"],  # Credential Access
+    },
+    "Remote Access / RMM Tooling": {
+        "techniques": ["T1219"],
+        "tactics": ["TA0011"],  # Command and Control
+    },
+    "Resource Hijacking / Cryptomining": {
+        "techniques": ["T1496"],
+        "tactics": ["TA0040"],  # Impact
+    },
+    "Data Destruction / Wiper": {
+        "techniques": ["T1485", "T1561", "T1490"],
+        "tactics": ["TA0040"],  # Impact
+    },
+    "Rogue Account Creation": {
+        "techniques": ["T1136", "T1098"],
+        "tactics": ["TA0003"],  # Persistence
+    },
+    "GPO / Domain Policy Modification": {
+        "techniques": ["T1484", "T1484.001", "T1484.002"],
+        "tactics": ["TA0003", "TA0004"],  # Persistence, Privilege Escalation
+    },
+    "AD Certificate Services / Ticket Forgery": {
+        "techniques": ["T1649", "T1558"],
+        "tactics": ["TA0006"],  # Credential Access
+    },
+    "Account Access Removal": {
+        "techniques": ["T1531"],
+        "tactics": ["TA0040"],  # Impact
+    },
+    "BITS Jobs — Ingress / Persistence": {
+        "techniques": ["T1197"],
+        "tactics": ["TA0005", "TA0003"],  # Defense Evasion, Persistence
+    },
+    "Collection & Archiving / Data Staging": {
+        "techniques": ["T1560", "T1119", "T1074"],
+        "tactics": ["TA0009"],  # Collection
+    },
+}
+
+
+# ---------------------------------------------------------------------------
+# Per-template confidence-threshold overrides (v0.49.7). Applied by the seeder
+# to new AND existing rows (when unset, preserving analyst edits). The value is
+# the circuit-breaker floor from investigation_service._get_bob_confidence_threshold:
+# HIGHER = Bob abstains / escalates-to-human more (raise on noisy, high-volume
+# rules so weak-evidence suggestions don't flood triage); LOWER = Bob surfaces
+# his verdict at more modest confidence (lower on critical rules where a missed
+# escalation costs more than a false suggestion). Global default is 60.
+# ---------------------------------------------------------------------------
+_TEMPLATE_THRESHOLD_MAP: dict[str, int] = {
+    # Raise — high-volume / benign-heavy telemetry: abstain unless confident.
+    "Sysmon Event 7 — Image/DLL Loaded": 75,
+    "Sysmon Event 22 — DNS Query": 75,
+    "Sysmon Event 3 — Network Connection": 72,
+    "Sysmon Event 1 — Process Creation": 70,
+    "Sysmon Event 2 — File Creation Time Changed": 70,
+    "DNS Anomaly": 70,
+    "Zeek Network Anomaly": 70,
+    "Discovery / Reconnaissance": 68,
+    "Insider Threat": 70,        # no baseline feed in air-gap → verdicts unreliable
+    "Data Loss Prevention (DLP)": 70,
+    # Lower — critical: surface Bob's take even at moderate confidence.
+    "Ransomware Indicators": 45,
+    "Command and Control (C2)": 45,
+    "Sysmon Event 10 — Process Access (LSASS / Credential Dumping)": 50,
+    "Endpoint Security Tampering": 50,
+    "Session Hijack / SSO Token Theft": 50,
+    "Entra ID — Suspicious Sign-in": 52,
+    "Okta — Suspicious Activity": 52,
+    "MFA Fatigue / Push Bombing": 52,
+    "Container / Kubernetes Runtime Anomaly": 50,
+    "CI/CD Abuse — GitHub Actions / Pipeline": 50,
+    "Supply Chain — Malicious Package / Typosquat": 50,
+    "ESXi Administration Command": 50,
+    "Hypervisor CLI Execution": 50,
+    "vSphere Installation Bundle (VIB)": 50,
 }
 
 
@@ -3821,17 +4418,24 @@ def seed_default_templates(db: Optional[Session] = None) -> int:
             techniques = mitre.get("techniques")
             tactics = mitre.get("tactics")
 
+            threshold = defn.get(
+                "confidence_threshold_override"
+            ) or _TEMPLATE_THRESHOLD_MAP.get(name)
+
             if name in existing_by_name:
                 # Top-up: row pre-dates the MITRE columns — populate them from
                 # the map so existing deployments gain technique/tactic matching
                 # without a manual resync. We only write when currently unset so
-                # user edits are preserved.
+                # user edits are preserved. Same policy for the per-template
+                # confidence-threshold override (v0.49.7).
                 row = existing_by_name[name]
                 if techniques and not row.mitre_techniques_json:
                     row.mitre_techniques_json = json.dumps(techniques)
                     topped_up += 1
                 if tactics and not row.mitre_tactics_json:
                     row.mitre_tactics_json = json.dumps(tactics)
+                if threshold is not None and row.confidence_threshold_override is None:
+                    row.confidence_threshold_override = threshold
                 continue
 
             repo.create(
@@ -3851,6 +4455,7 @@ def seed_default_templates(db: Optional[Session] = None) -> int:
                 severity_hint=defn.get("severity_hint"),
                 expected_outputs=defn.get("expected_outputs"),
                 created_by_id=None,
+                confidence_threshold_override=threshold,
             )
             inserted += 1
 
