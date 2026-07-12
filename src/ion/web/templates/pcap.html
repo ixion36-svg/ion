@@ -107,6 +107,64 @@
 .finding-title { font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
 .finding-detail { font-size: .78rem; color: var(--text-secondary); line-height: 1.4; }
 
+/* Findings triage widget */
+.findings-widget-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.findings-widget-head h3 { margin: 0; font-size: 1rem; }
+.findings-hint { font-size: .72rem; color: var(--text-secondary); }
+.findings-triage { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.triage-chip {
+    display: flex; flex-direction: column; gap: 3px; padding: 10px 14px;
+    border-radius: var(--radius-lg); background: var(--bg-secondary);
+    border: 1px solid rgba(48,54,61,.6); border-top: 3px solid var(--chip-color, var(--info));
+    cursor: pointer; transition: opacity .15s ease, box-shadow .15s ease, border-color .15s ease;
+    user-select: none; text-align: left;
+}
+.triage-chip:hover { border-color: var(--chip-color, var(--info)); }
+.triage-chip:focus-visible { outline: 2px solid var(--chip-color, var(--info)); outline-offset: 2px; }
+.triage-chip.zero { opacity: .35; cursor: default; }
+.triage-chip.muted { opacity: .3; }
+.triage-chip.selected { box-shadow: 0 0 0 1px var(--chip-color) inset; border-color: var(--chip-color); }
+.triage-count { font-size: 1.55rem; font-weight: 700; line-height: 1; color: var(--chip-color, var(--info)); font-variant-numeric: tabular-nums; }
+.triage-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text-secondary); }
+.triage-chip.total { --chip-color: var(--accent, #00e5ff); }
+.triage-chip.critical { --chip-color: var(--sev-critical, #da3633); }
+.triage-chip.high { --chip-color: var(--sev-high, #f85149); }
+.triage-chip.medium { --chip-color: var(--sev-medium, #d29922); }
+.triage-chip.low { --chip-color: var(--sev-low, #8b949e); }
+.mitre-rollup { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.mitre-chip { font-size: .7rem; padding: 3px 9px; border-radius: 12px; background: rgba(0,229,255,.07); border: 1px solid rgba(0,229,255,.22); color: var(--text-primary); font-family: var(--font-mono, monospace); white-space: nowrap; }
+.mitre-chip .tname { color: var(--text-secondary); }
+.finding-card.hidden { display: none; }
+.finding-mitre { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.finding-tid { font-size: .66rem; padding: 1px 6px; border-radius: 10px; background: rgba(139,148,158,.12); color: var(--text-secondary); font-family: var(--font-mono, monospace); }
+.findings-empty-filter { padding: 24px; text-align: center; color: var(--text-secondary); font-size: .82rem; }
+
+/* Overflow containment — long IPv6 addresses, filenames, paths, and DGA domains
+   must wrap inside their box instead of pushing the panel sideways. */
+.pcap-panel { min-width: 0; }
+.finding-title, .finding-detail { overflow-wrap: anywhere; }
+.pcap-table td { word-break: break-word; }
+.pcap-table th { white-space: nowrap; }
+#panel-network > div, #panel-data > div { min-width: 0; overflow-x: auto; }
+.conv-pair { flex-shrink: 1; min-width: 0; }
+
+/* Data-transfer direction bars (sent vs received per host) */
+.dt-legend { display: flex; gap: 16px; font-size: .72rem; color: var(--text-secondary); margin: 4px 0 12px; }
+.dt-legend span::before { content: ''; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.dt-legend .dt-l-sent::before { background: var(--warning); }
+.dt-legend .dt-l-recv::before { background: var(--info); }
+.dt-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+.dt-ip { width: 150px; flex-shrink: 0; font-size: .78rem; font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dt-track { flex: 1; min-width: 0; height: 16px; display: flex; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
+.dt-sent { background: var(--warning); height: 100%; }
+.dt-recv { background: var(--info); height: 100%; }
+.dt-vals { width: 128px; flex-shrink: 0; text-align: right; font-size: .72rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.dt-vals .dt-exfil { color: var(--danger); font-weight: 600; }
+/* Inline volume bar inside the port/IP count tables */
+.pcap-table .bar-cell { position: relative; }
+.pcap-table .bar-cell .mini-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 60%; background: rgba(88,166,255,.18); border-radius: 2px; z-index: 0; }
+.pcap-table .bar-cell .mini-val { position: relative; z-index: 1; }
+
 /* Proto bar chart */
 .proto-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .proto-label { width: 60px; font-size: .8rem; text-align: right; color: var(--text-secondary); }
@@ -461,17 +519,23 @@
 
     function ipTable(items) {
         if (!items || !items.length) return '<p class="_ion-s-4b49548152">No data</p>';
-        let rows = items.slice(0, 15).map(i =>
-            `<tr><td class="_ion-s-72126da263">${esc(i.ip)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
-        ).join('');
+        const top = items.slice(0, 15);
+        const max = Math.max(...top.map(i => i.count), 1);
+        let rows = top.map(i => {
+            const pct = (i.count / max * 100).toFixed(1);
+            return `<tr><td class="_ion-s-72126da263">${esc(i.ip)}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
+        }).join('');
         return `<table class="pcap-table"><thead><tr><th>IP Address</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function portTable(items) {
         if (!items || !items.length) return '<p class="_ion-s-4b49548152">No data</p>';
-        let rows = items.slice(0, 15).map(i =>
-            `<tr><td>${i.port}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
-        ).join('');
+        const top = items.slice(0, 15);
+        const max = Math.max(...top.map(i => i.count), 1);
+        let rows = top.map(i => {
+            const pct = (i.count / max * 100).toFixed(1);
+            return `<tr><td>${i.port}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
+        }).join('');
         return `<table class="pcap-table"><thead><tr><th>Port</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
@@ -524,7 +588,24 @@
             document.getElementById('panel-data').innerHTML = '<p class="_ion-s-ff64cacc49">No data transfer information.</p>';
             return;
         }
-        let rows = byIp.slice(0, 20).map(i => {
+        const top = byIp.slice(0, 20);
+        const maxTotal = Math.max(...top.map(i => i.sent + i.received), 1);
+        // Direction bars: length = share of the busiest host's volume; the split
+        // between amber (sent) and blue (received) makes outbound-heavy hosts —
+        // the exfiltration shape — jump out.
+        const bars = top.map(i => {
+            const total = i.sent + i.received;
+            const sentPct = (i.sent / maxTotal * 100).toFixed(1);
+            const recvPct = (i.received / maxTotal * 100).toFixed(1);
+            const exfil = i.received > 0 && i.sent / i.received > 3 && i.sent > 100000;
+            const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) + ':1' : '∞';
+            return `<div class="dt-row">
+                <div class="dt-ip" title="${esc(i.ip)}">${esc(i.ip)}</div>
+                <div class="dt-track"><div class="dt-sent" style="width:${sentPct}%"></div><div class="dt-recv" style="width:${recvPct}%"></div></div>
+                <div class="dt-vals">${fmtBytes(total)} · <span class="${exfil ? 'dt-exfil' : ''}">${ratio}</span></div>
+            </div>`;
+        }).join('');
+        const rows = top.map(i => {
             const total = i.sent + i.received;
             const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) : '∞';
             return `<tr>
@@ -538,7 +619,9 @@
         document.getElementById('panel-data').innerHTML =
             `<h3 class="_ion-s-18bb30f105">Data Transfer</h3>` +
             `<p class="_ion-s-18b8744731">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
-            `<table class="pcap-table"><thead><tr><th>IP</th><th class="_ion-s-54c2afb7ba">Sent</th><th class="_ion-s-54c2afb7ba">Received</th><th class="_ion-s-54c2afb7ba">Total</th><th class="_ion-s-54c2afb7ba">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<div class="dt-legend"><span class="dt-l-sent">Sent (outbound)</span><span class="dt-l-recv">Received (inbound)</span></div>` +
+            bars +
+            `<table class="pcap-table" style="margin-top:16px"><thead><tr><th>IP</th><th class="_ion-s-54c2afb7ba">Sent</th><th class="_ion-s-54c2afb7ba">Received</th><th class="_ion-s-54c2afb7ba">Total</th><th class="_ion-s-54c2afb7ba">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderIsakmp(d) {
@@ -947,7 +1030,8 @@
                 ...e, id: 'e'+i, smooth: {type: 'continuous'},
                 font: {color: '#8b949e', size: 9, align: 'middle'}
             })));
-            new vis.Network(container, {nodes, edges}, {
+            const network = new vis.Network(container, {nodes, edges}, {
+                autoResize: true,
                 physics: {
                     forceAtlas2Based: {gravitationalConstant: -40, springLength: 80},
                     solver: 'forceAtlas2Based',
@@ -955,43 +1039,100 @@
                 },
                 interaction: {hover: true, tooltipDelay: 100},
             });
+            // Centre the graph once laid out and freeze physics — otherwise it
+            // settles off-centre and keeps animating indefinitely.
+            network.once('stabilizationIterationsDone', function() {
+                network.setOptions({ physics: false });
+                network.fit({ animation: false });
+            });
         };
         document.head.appendChild(script);
     }
 
+    let _findingsFilter = null;  // active severity filter, or null = show all
+
+    function applyFindingsFilter(panel) {
+        panel.querySelectorAll('.triage-chip').forEach(ch => {
+            const s = ch.dataset.sev;
+            const selected = (s === 'total') ? (_findingsFilter === null) : (_findingsFilter === s);
+            ch.classList.toggle('selected', selected);
+            ch.classList.toggle('muted',
+                _findingsFilter !== null && s !== 'total' && s !== _findingsFilter && !ch.classList.contains('zero'));
+        });
+        let shown = 0;
+        panel.querySelectorAll('.finding-card').forEach(card => {
+            const hide = _findingsFilter !== null && card.dataset.sev !== _findingsFilter;
+            card.classList.toggle('hidden', hide);
+            if (!hide) shown++;
+        });
+        const none = panel.querySelector('.findings-empty-filter');
+        if (none) none.style.display = shown ? 'none' : 'block';
+    }
+
     function renderFindings(d) {
-        const items = d.findings || [];
+        const panel = document.getElementById('panel-findings');
+        const items = (d.findings || []).slice();
+        _findingsFilter = null;
         if (!items.length) {
-            document.getElementById('panel-findings').innerHTML =
+            panel.innerHTML =
                 '<div class="_ion-s-c282580208"><div class="_ion-s-8e1d1fec4a"><i class="icon-shield-check"></i></div><p class="_ion-s-d87618fbb5">No suspicious findings detected</p></div>';
             return;
         }
         const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         items.sort((a, b) => (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
-        let html = `<h3 class="_ion-s-7b85582290">${items.length} Finding(s)</h3>`;
-        // MITRE ATT&CK rollup across all findings (matches the auto-analysis case note)
+        const counts = { critical: 0, high: 0, medium: 0, low: 0 };
+        items.forEach(f => { if (counts[f.severity] != null) counts[f.severity]++; });
+
+        const chip = (sev, label) => {
+            const c = sev === 'total' ? items.length : counts[sev];
+            const zero = sev !== 'total' && c === 0;
+            return `<button type="button" class="triage-chip ${sev}${zero ? ' zero' : ''}" data-sev="${sev}" ${zero ? 'disabled' : ''}>
+                <span class="triage-count">${c}</span><span class="triage-label">${label}</span></button>`;
+        };
+
         const techniques = d.mitre_techniques || [];
-        if (techniques.length) {
-            html += `<p class="_ion-s-0648c015b2"><strong>MITRE ATT&CK:</strong> ` +
-                techniques.map(t => `<code class="_ion-s-dbd68c1058">${esc(t.id)}</code>${t.name ? ' ' + esc(t.name) : ''}`).join(' &middot; ') +
-                `</p>`;
-        }
-        for (const f of items) {
-            const mitre = (f.mitre || []);
-            const mitreLine = mitre.length
-                ? `<div class="finding-detail"><strong>ATT&CK:</strong> ${mitre.map(m => esc(m)).join(', ')}</div>`
+        const rollup = techniques.length
+            ? `<div class="mitre-rollup">` + techniques.map(t =>
+                `<span class="mitre-chip">${esc(t.id)}${t.name ? ` <span class="tname">${esc(t.name)}</span>` : ''}</span>`).join('') + `</div>`
+            : '';
+
+        const cards = items.map(f => {
+            const tids = f.mitre || [];
+            const mitreRow = tids.length
+                ? `<div class="finding-mitre">${tids.map(m => `<span class="finding-tid">${esc(m)}</span>`).join('')}</div>`
                 : '';
-            html += `<div class="finding-card ${esc(f.severity)}">
+            return `<div class="finding-card ${esc(f.severity)}" data-sev="${esc(f.severity)}">
                 <div class="finding-header">
                     <span class="finding-sev ${esc(f.severity)}">${esc(f.severity)}</span>
                     <span class="finding-cat">${esc(f.category)}</span>
                 </div>
                 <div class="finding-title">${esc(f.title)}</div>
                 <div class="finding-detail">${esc(f.detail)}</div>
-                ${mitreLine}
+                ${mitreRow}
             </div>`;
-        }
-        document.getElementById('panel-findings').innerHTML = html;
+        }).join('');
+
+        panel.innerHTML = `
+            <div class="findings-widget-head">
+                <h3>${items.length} Finding${items.length !== 1 ? 's' : ''}</h3>
+                <span class="findings-hint">Select a severity to filter</span>
+            </div>
+            <div class="findings-triage">
+                ${chip('total', 'All')}${chip('critical', 'Critical')}${chip('high', 'High')}${chip('medium', 'Medium')}${chip('low', 'Low')}
+            </div>
+            ${rollup}
+            <div id="findings-list">${cards}</div>
+            <div class="findings-empty-filter" style="display:none">No findings at this severity.</div>`;
+
+        panel.querySelectorAll('.triage-chip').forEach(ch => {
+            if (ch.classList.contains('zero')) return;
+            ch.addEventListener('click', () => {
+                const s = ch.dataset.sev;
+                _findingsFilter = (s === 'total') ? null : (_findingsFilter === s ? null : s);
+                applyFindingsFilter(panel);
+            });
+        });
+        applyFindingsFilter(panel);
     }
 
     function renderThreatIntel(d) {
