@@ -151,3 +151,6 @@ docs/guardedglass/
 # deck build scratch (node deps + intermediate HTML)
 .deck_build/
 .playwright-mcp/
+
+# Large real pcap fixture — fetch via test_pcaps/real/README.md
+test_pcaps/real/smbtorture.cap
