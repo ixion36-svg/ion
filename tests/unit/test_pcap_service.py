@@ -49,7 +49,22 @@ from ion.services.pcap_service import (
     _SHELLCODE_PATTERNS,
     _BASE64_PE_MARKERS,
     _SUSPICIOUS_UA_PATTERNS,
+    _looks_like_real_file,
 )
+
+
+def _minimal_pe(body_len: int = 64) -> bytes:
+    """A structurally-valid minimal PE: MZ + e_lfanew(0x40) -> 'PE\\0\\0'."""
+    stub = bytearray(0x40 + 4 + body_len)
+    stub[0:2] = b"MZ"
+    struct.pack_into("<I", stub, 0x3C, 0x40)  # e_lfanew -> 0x40
+    stub[0x40:0x44] = b"PE\x00\x00"
+    return bytes(stub)
+
+
+def _minimal_elf() -> bytes:
+    """A structurally-valid minimal ELF header (magic + 64-bit + little-endian)."""
+    return b"\x7fELF" + bytes([2, 1, 1, 0]) + b"\x00" * 40
 
 
 # =============================================================================
@@ -1459,11 +1474,37 @@ class TestComputeVerdict:
         assert v["score"] == 50
         assert v["label"] == "Needs Investigation"
 
-    def test_single_high_below_threshold(self):
-        """One high = score 25 = below 50 threshold."""
+    def test_single_high_is_elevated(self):
+        """One high finding (score 25) must escalate out of benign to the Elevated band.
+
+        A single high-severity signal — port scan, DNS tunnel, exe-over-SMB — is
+        worth an analyst's eyes even though its raw score sits below the
+        investigation threshold. It is not 'Needs Investigation' (no critical,
+        score < 50) but it is emphatically not 'Likely Benign' either."""
         findings = [Finding("X", "high", "Bad", "d")]
         v = _compute_verdict(findings)
         assert v["score"] == 25
+        assert v["label"] == "Elevated"
+
+    def test_high_plus_mediums_still_elevated_below_50(self):
+        """One high + mediums under the 50 cliff stays Elevated (not yet Investigate)."""
+        findings = [Finding("A", "high", "H", "d"), Finding("B", "medium", "M", "d")]
+        v = _compute_verdict(findings)
+        assert v["score"] == 35
+        assert v["label"] == "Elevated"
+
+    def test_elevated_promotes_to_investigate_at_50(self):
+        """A high finding plus enough mediums to reach 50 becomes Needs Investigation."""
+        findings = [Finding("A", "high", "H", "d")] + [Finding(f"C{i}", "medium", "M", "d") for i in range(3)]
+        v = _compute_verdict(findings)
+        assert v["score"] == 55
+        assert v["label"] == "Needs Investigation"
+
+    def test_mediums_alone_never_elevated(self):
+        """Medium accumulation below 50 stays benign — Elevated is severity-gated on high+."""
+        findings = [Finding("Cat", "medium", f"Issue {i}", "d") for i in range(4)]
+        v = _compute_verdict(findings)
+        assert v["score"] == 40
         assert v["label"] == "Likely Benign"
 
     def test_two_high_at_threshold(self):
@@ -1863,6 +1904,192 @@ class TestCraftedPcapParsing:
         pcap_data = self._build_pcap([(1.0, pkt)])
         result = parse_pcap(pcap_data, "conv.pcap")
         assert len(result.conversations) >= 1
+
+    def test_smb1_legacy_flagged(self):
+        """Legacy SMB1 traffic on port 445 should produce a finding, not just a display row."""
+        payload = b"\xffSMB" + b"\x72" + b"\x00" * 30  # SMB1 magic + negotiate-ish
+        pkt = self._build_ethernet_ip_tcp("192.168.1.10", "192.168.1.20", 49200, 445,
+                                          payload=payload, flags=0x18)
+        pcap_data = self._build_pcap([(1.0, pkt)])
+        result = parse_pcap(pcap_data, "smb1.pcap")
+        assert any(f["category"] == "Legacy SMB Protocol" for f in result.findings), \
+            f"SMB1 traffic produced no finding; got {[f['category'] for f in result.findings]}"
+
+    def test_executable_over_smb_flagged(self):
+        """A PE executable carved from a port-445 stream is lateral tool transfer, not a stray file."""
+        payload = _minimal_pe(400)  # structurally-valid PE so it survives carve validation
+        pkt = self._build_ethernet_ip_tcp("192.168.1.10", "192.168.1.20", 49201, 445,
+                                          payload=payload, flags=0x18)
+        pcap_data = self._build_pcap([(1.0, pkt)])
+        result = parse_pcap(pcap_data, "exe_over_smb.pcap")
+        smb_exe = [f for f in result.findings if f["category"] == "Lateral Tool Transfer"]
+        assert smb_exe, \
+            f"Executable over SMB produced no lateral-transfer finding; got {[f['category'] for f in result.findings]}"
+        assert smb_exe[0]["severity"] == "high"
+
+    def test_smb_findings_mapped_to_mitre(self):
+        """SMB findings must land in the ATT&CK rollup (T1021.002 SMB/Admin Shares)."""
+        payload = b"\xffSMB" + b"\x72" + b"\x00" * 30
+        pkt = self._build_ethernet_ip_tcp("192.168.1.10", "192.168.1.20", 49202, 445,
+                                          payload=payload, flags=0x18)
+        pcap_data = self._build_pcap([(1.0, pkt)])
+        result = parse_pcap(pcap_data, "smb_mitre.pcap")
+        assert any(t["id"] == "T1021.002" for t in result.mitre_techniques), \
+            f"SMB finding not mapped to T1021.002; got {[t['id'] for t in result.mitre_techniques]}"
+
+
+# =============================================================================
+# 19b. Carved-file structural validation (false-positive suppression)
+# =============================================================================
+
+class TestCarvedFileValidation:
+    """Short magic numbers (MZ, #!) match by chance in binary streams. Carved
+    files must pass a structural sanity check or the analyser drowns in phantom
+    'extracted files' — measured 50/50 false positives on a benign SMB capture."""
+
+    def test_chance_mz_rejected(self):
+        """Two 'MZ' bytes followed by junk is not a PE and must be rejected."""
+        assert not _looks_like_real_file("exe", b"MZ" + b"\x00" * 300)
+
+    def test_valid_pe_accepted(self):
+        assert _looks_like_real_file("exe", _minimal_pe())
+
+    def test_chance_shebang_rejected(self):
+        """'#!' followed by binary garbage is not a script."""
+        assert not _looks_like_real_file("script", b"#!" + bytes(range(3, 60)))
+
+    def test_valid_shebang_accepted(self):
+        assert _looks_like_real_file("script", b"#!/bin/sh\nexit 0\n")
+
+    def test_junk_elf_rejected(self):
+        """ELF magic with an invalid class byte is a chance match."""
+        assert not _looks_like_real_file("elf", b"\x7fELF" + b"\x00" * 40)
+
+    def test_valid_elf_accepted(self):
+        assert _looks_like_real_file("elf", _minimal_elf())
+
+    def test_phantom_files_not_extracted_end_to_end(self):
+        """A busy binary stream with chance MZ bytes must not yield file findings."""
+        # 4 KB of high-entropy-ish bytes containing several stray 'MZ' pairs but no real PE.
+        junk = (b"MZ" + bytes((i * 37) % 256 for i in range(200))) * 20
+        pkt = self._pkt("10.0.0.1", "10.0.0.2", 445, 55000, junk)
+        pcap_data = self._wrap([(1.0, pkt)])
+        result = parse_pcap(pcap_data, "phantom.pcap")
+        assert not any(f["category"] == "file_extraction" for f in result.findings), \
+            "chance MZ bytes were carved as real files"
+        assert not any(f["category"] == "Lateral Tool Transfer" for f in result.findings)
+
+    def _pkt(self, src, dst, sport, dport, payload):
+        import dpkt
+        tcp = dpkt.tcp.TCP(sport=sport, dport=dport, flags=0x18, data=payload, seq=0, off=5)
+        ip = dpkt.ip.IP(src=bytes(int(x) for x in src.split(".")),
+                        dst=bytes(int(x) for x in dst.split(".")),
+                        p=dpkt.ip.IP_PROTO_TCP, data=tcp)
+        ip.len = len(bytes(ip))
+        eth = dpkt.ethernet.Ethernet(dst=b"\xff" * 6, src=b"\x00" * 5 + b"\x01",
+                                     type=dpkt.ethernet.ETH_TYPE_IP, data=ip)
+        return bytes(eth)
+
+    def _wrap(self, packets):
+        buf = struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1)
+        for ts, raw in packets:
+            s = int(ts)
+            buf += struct.pack("<IIII", s, int((ts - s) * 1e6), len(raw), len(raw)) + raw
+        return buf
+
+
+# =============================================================================
+# 19c. DCE/RPC (MSRPC) lateral-movement detection
+# =============================================================================
+
+def _dcerpc_bind(uuid_str):
+    """Build a DCE/RPC v5 Bind PDU whose abstract-syntax interface is uuid_str."""
+    import uuid as _U
+    body = bytearray()
+    body += bytes([0x05, 0x00, 0x0b, 0x03])          # ver5, ptype=bind, flags
+    body += b"\x10\x00\x00\x00"                        # data representation (LE)
+    body += b"\x48\x00\x00\x00"                        # frag / auth length
+    body += b"\x01\x00\x00\x00"                        # call id
+    body += b"\xd0\x16\xd0\x16\x00\x00\x00\x00"        # max xmit/recv, assoc group
+    body += b"\x01\x00\x00\x00"                        # num ctx items (1) + pad
+    body += b"\x00\x00\x01\x00"                        # ctx id + num transfer items
+    body += _U.UUID(uuid_str).bytes_le                 # abstract syntax interface UUID
+    body += b"\x01\x00\x00\x00"                        # interface version
+    body += b"\x00" * 20                               # transfer syntax filler
+    return bytes(body)
+
+
+class TestDcerpcDetection:
+    """Remote binds to service-control / WMI / task-scheduler / DRS interfaces
+    over MSRPC are lateral-movement and remote-execution signals (PsExec, wmiexec,
+    schtasks, DCSync). A bind to the endpoint mapper alone is routine context."""
+
+    SVCCTL = "367abb81-9844-35f1-ad32-98f038001003"
+    WMI = "9556dc99-828c-11cf-a37e-00aa003240c7"
+    DRSUAPI = "e3514235-4b06-11d1-ab04-00c04fc2dcd2"
+    EPMAPPER = "e1af8308-5d1f-11c9-91a4-08002b14a0fa"
+
+    def _cap(self, uuid_str, dport=445):
+        import dpkt
+        payload = _dcerpc_bind(uuid_str)
+        tcp = dpkt.tcp.TCP(sport=50000, dport=dport, flags=0x18, data=payload, seq=0, off=5)
+        ip = dpkt.ip.IP(src=b"\x0a\x00\x00\x01", dst=b"\x0a\x00\x00\x02",
+                        p=dpkt.ip.IP_PROTO_TCP, data=tcp)
+        ip.len = len(bytes(ip))
+        eth = dpkt.ethernet.Ethernet(dst=b"\xff" * 6, src=b"\x00" * 5 + b"\x01",
+                                     type=dpkt.ethernet.ETH_TYPE_IP, data=ip)
+        buf = struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1)
+        raw = bytes(eth)
+        buf += struct.pack("<IIII", 1, 0, len(raw), len(raw)) + raw
+        return parse_pcap(buf, "dcerpc.pcap")
+
+    def test_svcctl_bind_is_high_lateral_movement(self):
+        r = self._cap(self.SVCCTL, dport=445)
+        f = [x for x in r.findings if x["category"] == "DCE/RPC Lateral Movement"]
+        assert f, f"svcctl bind not flagged; got {[x['category'] for x in r.findings]}"
+        assert f[0]["severity"] == "high"
+        assert any(t["id"] == "T1569.002" for t in r.mitre_techniques)
+
+    def test_wmi_bind_is_high(self):
+        r = self._cap(self.WMI, dport=135)
+        f = [x for x in r.findings if x["category"] == "DCE/RPC Lateral Movement"]
+        assert f and f[0]["severity"] == "high"
+        assert any(t["id"] == "T1047" for t in r.mitre_techniques)
+
+    def test_drsuapi_bind_is_critical_dcsync(self):
+        r = self._cap(self.DRSUAPI, dport=135)
+        f = [x for x in r.findings if x["category"] == "DCE/RPC Lateral Movement"]
+        assert f and f[0]["severity"] == "critical"
+        assert any(t["id"] == "T1003.006" for t in r.mitre_techniques)
+
+    def test_epmapper_bind_is_low_context_not_high(self):
+        """Endpoint-mapper lookups are routine — must NOT be a high lateral finding."""
+        r = self._cap(self.EPMAPPER, dport=135)
+        assert not any(x["category"] == "DCE/RPC Lateral Movement" for x in r.findings)
+
+    def test_recon_interfaces_are_low_context_not_noise(self):
+        """srvsvc/lsarpc binds occur in normal Windows file sharing — low context,
+        never medium noise, or every benign SMB capture lights up."""
+        for u in ("4b324fc8-1670-01d3-1278-5a47bf6ee188",   # srvsvc
+                  "12345778-1234-abcd-ef00-0123456789ab"):   # lsarpc
+            r = self._cap(u, dport=445)
+            rpc = [x for x in r.findings if "DCE/RPC" in x["category"]]
+            assert rpc and rpc[0]["severity"] == "low", f"{u}: expected low, got {rpc}"
+
+    def test_non_rpc_port135_traffic_no_false_positive(self):
+        import dpkt
+        junk = bytes((i * 7) % 256 for i in range(400))
+        tcp = dpkt.tcp.TCP(sport=50001, dport=135, flags=0x18, data=junk, seq=0, off=5)
+        ip = dpkt.ip.IP(src=b"\x0a\x00\x00\x01", dst=b"\x0a\x00\x00\x02",
+                        p=dpkt.ip.IP_PROTO_TCP, data=tcp)
+        ip.len = len(bytes(ip))
+        eth = dpkt.ethernet.Ethernet(dst=b"\xff" * 6, src=b"\x00" * 5 + b"\x01",
+                                     type=dpkt.ethernet.ETH_TYPE_IP, data=ip)
+        buf = struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1)
+        raw = bytes(eth)
+        buf += struct.pack("<IIII", 1, 0, len(raw), len(raw)) + raw
+        r = parse_pcap(buf, "junk135.pcap")
+        assert not any("DCE/RPC" in x["category"] for x in r.findings)
 
 
 # =============================================================================

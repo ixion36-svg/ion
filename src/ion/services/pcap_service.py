@@ -7,6 +7,7 @@ import math
 import re
 import socket
 import struct
+import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -34,6 +35,8 @@ class ExtractedFile:
     src_ip: str = ""
     dst_ip: str = ""
     stream_index: int = 0
+    sport: int = 0
+    dport: int = 0
 
     def to_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items()}
@@ -224,6 +227,10 @@ _FINDING_MITRE: dict[str, list[str]] = {
     "file_extraction": ["T1105"],
     "Malware Signature": ["T1105"],
     "Suspicious File Transfer": ["T1105"],
+    "Legacy SMB Protocol": ["T1021.002"],
+    "Lateral Tool Transfer": ["T1570", "T1021.002"],
+    "DCE/RPC Lateral Movement": ["T1021.003"],
+    "DCE/RPC Activity": ["T1021.003"],
     "Shellcode Detection": ["T1055", "T1027"],
     "PowerShell Abuse": ["T1059.001"],
     "ARP Spoofing": ["T1557.002"],
@@ -257,7 +264,9 @@ def _attach_mitre(findings: list[Finding]) -> None:
     """
     catalogue = _load_attack_catalogue()
     for f in findings:
-        ids = list(_FINDING_MITRE.get(f.category, []))
+        # Start from any technique the detector attached itself (e.g. DCE/RPC maps
+        # a specific interface UUID to its technique), then layer the category map.
+        ids = list(getattr(f, "mitre", []) or []) + list(_FINDING_MITRE.get(f.category, []))
         # Title-level refinements: known-malware fingerprints / C2 certs imply an
         # encrypted C2 channel over a standard web protocol on top of the base map.
         title_l = f.title.lower()
@@ -475,6 +484,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             })
 
     # ── Enhanced analyzers ──
+    dcerpc_findings: list = []  # needs raw streams; produced here, merged in assembly
     try:
         buf.seek(0)
         streams, tls_hellos, tls_server_hellos, ssh_pkts = _reassemble_tcp_streams(buf, pcap_reader_cls)
@@ -486,6 +496,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
         result.hassh_fingerprints = [h.to_dict() for h in _compute_hassh(ssh_pkts)]
         result.credential_captures = [c.to_dict() for c in _extract_credentials(streams)]
         result.smb_transfers = [s.to_dict() for s in _detect_smb(streams)]
+        dcerpc_findings = _detect_dcerpc(streams)
         result.kerberos_tickets = _detect_kerberos(streams)
         result.http_files = _extract_http_files(streams)
         result.base64_payloads = _detect_base64_payloads(streams)
@@ -561,6 +572,19 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             title=f"{len(result.credential_captures)} credential(s) captured from traffic",
             detail=", ".join(f'{c.get("protocol")}:{c.get("username","")}' for c in result.credential_captures[:5]),
         ))
+    # SMB lateral-movement findings (SMB1 hygiene + executable-over-SMB). Additive,
+    # fail-safe: smb_transfers / extracted_files are already dict-shaped here.
+    try:
+        findings.extend(_smb_findings(result.smb_transfers, result.extracted_files))
+    except Exception:
+        pass
+    try:
+        findings.extend(_arp_findings(result.arp_anomalies))
+    except Exception:
+        pass
+    # DCE/RPC (MSRPC) lateral-movement binds (svcctl/WMI/atsvc/drsuapi). Computed
+    # above where the raw streams are available; merged here.
+    findings.extend(dcerpc_findings)
     # v0.39.0 — TLS certificate + RITA beacon findings (additive, fail-safe)
     try:
         findings.extend(_tls_cert_findings(result.tls_certificates))
@@ -697,6 +721,39 @@ _FILE_SIGNATURES = [
 ]
 
 
+def _looks_like_real_file(ext: str, data: bytes) -> bool:
+    """Reject chance magic-byte matches (e.g. 'MZ' or '#!' landing mid-stream in
+    binary data). Carving keys off short magic numbers, so without a structural
+    check a busy binary stream yields dozens of phantom files — measured 50/50
+    false positives on a benign SMB torture-test capture. Formats with weak
+    (2-3 byte) magic get validated; longer, low-collision magics are trusted."""
+    if ext == "exe":  # DOS/PE: 'MZ' + e_lfanew pointer to a 'PE\0\0' signature
+        if len(data) < 0x40 or data[:2] != b"MZ":
+            return False
+        try:
+            e_lfanew = struct.unpack("<I", data[0x3C:0x40])[0]
+        except struct.error:
+            return False
+        return 0 < e_lfanew <= len(data) - 4 and data[e_lfanew:e_lfanew + 4] == b"PE\x00\x00"
+    if ext == "elf":  # ELF: magic + valid class (32/64-bit) + valid endianness
+        return len(data) > 20 and data[:4] == b"\x7fELF" and data[4] in (1, 2) and data[5] in (1, 2)
+    if ext == "script":  # shebang: '#!' + a printable interpreter path containing '/'
+        line = data[2:130].split(b"\n", 1)[0]
+        return bool(line) and all(32 <= c < 127 for c in line) and b"/" in line
+    if ext == "class":  # Java class: 0xCAFEBABE + a plausible major version (rejects Mach-O fat)
+        if len(data) < 8 or data[:4] != b"\xca\xfe\xba\xbe":
+            return False
+        try:
+            major = struct.unpack(">H", data[6:8])[0]
+        except struct.error:
+            return False
+        return 45 <= major <= 100
+    if ext == "gz":  # gzip: magic + a known compression method byte (0x08 = deflate)
+        return len(data) > 3 and data[:3] == b"\x1f\x8b\x08"
+    # zip/pdf/doc/png/jpg/gif/rar/bz2 magics are 3-8 bytes and low-collision: accept.
+    return True
+
+
 def _extract_files_from_streams(streams: dict) -> list[ExtractedFile]:
     """Scan reassembled TCP streams for file signatures and carve them out."""
     extracted: list[ExtractedFile] = []
@@ -719,6 +776,12 @@ def _extract_files_from_streams(streams: dict) -> list[ExtractedFile]:
                     offset = pos + 1
                     continue
 
+                # Reject chance magic-byte matches that aren't structurally the
+                # claimed format (short magics like MZ/#! collide constantly).
+                if not _looks_like_real_file(ext, carved):
+                    offset = pos + len(magic)
+                    continue
+
                 # MD5 used as a content fingerprint for dedup, never for security.
                 md5 = hashlib.md5(carved, usedforsecurity=False).hexdigest()
                 if md5 in seen_hashes:
@@ -736,6 +799,8 @@ def _extract_files_from_streams(streams: dict) -> list[ExtractedFile]:
                     src_ip=src_ip,
                     dst_ip=dst_ip,
                     stream_index=len(extracted),
+                    sport=sport,
+                    dport=dport,
                 ))
                 offset = pos + len(magic)
                 if len(extracted) >= 50:  # Cap
@@ -2952,6 +3017,8 @@ def _compute_verdict(findings: list[Finding]) -> dict:
         }
 
     score = sum(SEVERITY_WEIGHTS.get(f.severity, 0) for f in findings)
+    n_crit = sum(1 for f in findings if f.severity == "critical")
+    n_high = sum(1 for f in findings if f.severity == "high")
 
     # Deduplicate reasons by category
     reasons = []
@@ -2961,7 +3028,13 @@ def _compute_verdict(findings: list[Finding]) -> dict:
             reasons.append(f.title)
             seen_cats.add(f.category)
 
-    if score >= 50:
+    # Severity-aware three-band verdict. A single high-severity finding (port
+    # scan, DNS tunnel, executable staged over SMB) must escalate out of
+    # "benign" even though its raw score (25) sits below the 50-pt investigation
+    # cliff — otherwise a genuine lateral-movement signal reads as clean. The
+    # cliff still governs medium/low accumulation, and any critical or a
+    # cumulative score ≥ 50 goes straight to full investigation.
+    if n_crit >= 1 or score >= 50:
         return {
             "label": "Needs Investigation",
             "confidence": min(95, 50 + score),
@@ -2969,14 +3042,21 @@ def _compute_verdict(findings: list[Finding]) -> dict:
             "score": score,
             "finding_count": len(findings),
         }
-    else:
+    if n_high >= 1:
         return {
-            "label": "Likely Benign",
-            "confidence": max(55, 100 - score * 2),
-            "reasons": reasons if reasons else ["Minor anomalies detected but within normal parameters."],
+            "label": "Elevated",
+            "confidence": min(90, 60 + score),
+            "reasons": reasons,
             "score": score,
             "finding_count": len(findings),
         }
+    return {
+        "label": "Likely Benign",
+        "confidence": max(55, 100 - score * 2),
+        "reasons": reasons if reasons else ["Minor anomalies detected but within normal parameters."],
+        "score": score,
+        "finding_count": len(findings),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -3199,6 +3279,30 @@ def _parse_ssh_kexinit(data: bytes) -> tuple[str, str]:
 # SMB file transfer detection
 # ---------------------------------------------------------------------------
 
+def _smb2_create_name(data: bytes, pos: int) -> str:
+    """Extract the target path from an SMB2 CREATE *request* at header offset ``pos``.
+
+    Layout (offsets from the SMB2 header start): Flags at +16 (bit 0 set = a
+    response, which carries a FileId not a name); the CREATE request body begins
+    at +64 with StructureSize 57, and NameOffset/NameLength live at +108/+110.
+    The name itself is UTF-16LE at header-relative NameOffset. Returns "" on any
+    malformed/short/response PDU rather than raising."""
+    try:
+        flags = struct.unpack("<I", data[pos + 16:pos + 20])[0]
+        if flags & 0x00000001:  # SMB2_FLAGS_SERVER_TO_REDIR → response
+            return ""
+        if struct.unpack("<H", data[pos + 64:pos + 66])[0] != 57:  # CREATE req StructureSize
+            return ""
+        name_off = struct.unpack("<H", data[pos + 108:pos + 110])[0]
+        name_len = struct.unpack("<H", data[pos + 110:pos + 112])[0]
+        if not (0 < name_len <= 1024) or pos + name_off + name_len > len(data):
+            return ""
+        name = data[pos + name_off:pos + name_off + name_len].decode("utf-16-le", "replace")
+        return name.replace("\x00", "").strip()
+    except (struct.error, IndexError):
+        return ""
+
+
 def _detect_smb(streams: dict) -> list[SMBTransfer]:
     """Detect SMB/CIFS file operations in TCP streams on port 445/139."""
     results: list[SMBTransfer] = []
@@ -3236,10 +3340,15 @@ def _detect_smb(streams: dict) -> list[SMBTransfer]:
                 key = f"{src_ip}:{dst_ip}:{cmd_name}"
                 if key not in seen:
                     seen.add(key)
+                    fname = _smb2_create_name(data, pos) if cmd == 0x0005 else ""
+                    detail = f"SMB2 {cmd_name} detected on port {dport}"
+                    if fname:
+                        detail += f" — target: {fname}"
                     results.append(SMBTransfer(
                         src_ip=src_ip, dst_ip=dst_ip,
                         command=cmd_name,
-                        detail=f"SMB2 {cmd_name} detected on port {dport}",
+                        filename=fname,
+                        detail=detail,
                     ))
             offset = pos + 64
             if len(results) >= 50:
@@ -3263,6 +3372,140 @@ def _detect_smb(streams: dict) -> list[SMBTransfer]:
                         detail="Legacy SMB1 traffic detected",
                     ))
     return results
+
+
+def _arp_findings(arp_anomalies: list[dict]) -> list[Finding]:
+    """Turn detected ARP anomalies (a MAC claiming multiple IPs) into findings.
+
+    The anomaly is detected during parsing and stashed on ``arp_anomalies`` but,
+    like SMB transfers, was never surfaced in the verdict. One MAC answering for
+    many IPs is the ARP-spoofing / MITM signature (T1557.002)."""
+    findings: list[Finding] = []
+    for a in arp_anomalies:
+        ips = a.get("ips", [])
+        findings.append(Finding(
+            category="ARP Spoofing",
+            severity=a.get("severity", "medium"),
+            title=f"ARP spoofing: MAC {a.get('mac')} claims {len(ips)} IPs",
+            detail=a.get("detail", "") + (f" ({', '.join(ips[:6])}{'...' if len(ips) > 6 else ''})" if ips else ""),
+        ))
+    return findings
+
+
+# Extensions representing directly executable / script payloads. A file of one
+# of these types moving over an SMB file-share port is the classic lateral tool
+# transfer pattern (staging a payload on a remote host before executing it), so
+# it warrants a finding well above a generic file carve.
+_SMB_EXEC_EXTS = {"exe", "elf", "dll", "class", "script"}
+_SMB_PORTS = (445, 139)
+
+
+def _smb_findings(smb_transfers: list[dict], extracted_files: list[dict]) -> list[Finding]:
+    """Turn SMB evidence into findings (SMB1 hygiene + executable-over-SMB lateral transfer)."""
+    findings: list[Finding] = []
+
+    # Legacy SMB1 — deprecated, weak auth, EternalBlue/MS17-010 vector.
+    smb1 = [t for t in smb_transfers if t.get("command") == "SMB1"]
+    if smb1:
+        pairs = sorted({f'{t.get("src_ip")} -> {t.get("dst_ip")}' for t in smb1})
+        findings.append(Finding(
+            category="Legacy SMB Protocol",
+            severity="medium",
+            title=f"Legacy SMB1 traffic detected ({len(pairs)} host pair(s))",
+            detail="SMB1/CIFS is deprecated and vulnerable (e.g. EternalBlue/MS17-010). "
+                   f"Observed between: {', '.join(pairs[:5])}"
+                   + (f" ... and {len(pairs) - 5} more" if len(pairs) > 5 else ""),
+        ))
+
+    # Executable / script carved from an SMB file-share stream = lateral tool transfer.
+    exe_over_smb = []
+    for f in extracted_files:
+        if f.get("dport") in _SMB_PORTS or f.get("sport") in _SMB_PORTS:
+            fname = f.get("filename", "")
+            ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+            if ext in _SMB_EXEC_EXTS:
+                exe_over_smb.append(f)
+    if exe_over_smb:
+        names = ", ".join(f.get("filename", "?") for f in exe_over_smb[:5])
+        findings.append(Finding(
+            category="Lateral Tool Transfer",
+            severity="high",
+            title=f"Executable transferred over SMB: {len(exe_over_smb)} file(s)",
+            detail=f"Executable/script payload(s) staged over SMB (port 445/139): {names}. "
+                   "Common lateral-movement pattern (e.g. PsExec-style tool staging).",
+        ))
+
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# DCE/RPC (MSRPC) interface detection — lateral movement / remote execution
+# ---------------------------------------------------------------------------
+#
+# A bind to certain management interfaces over MSRPC (port 135 endpoint mapper,
+# or 445/139 named pipes) is the on-the-wire signature of the tools SOC teams
+# care about: PsExec (svcctl), wmiexec (IWbemServices), schtasks/at (task
+# scheduler), and DCSync (drsuapi). The endpoint mapper itself is routine, so
+# it is surfaced only as low-severity context. Detection keys off the 16-byte
+# interface UUID — a full-UUID match alongside a DCE/RPC bind marker makes false
+# positives on random binary data effectively impossible.
+
+_DCERPC_INTERFACES: dict[str, tuple] = {
+    # uuid                                   (name, severity, [mitre techniques])
+    "367abb81-9844-35f1-ad32-98f038001003": ("svcctl (Service Control Manager)", "high", ["T1569.002"]),
+    "86d35949-83c9-4044-b424-db363231fd0c": ("ITaskSchedulerService", "high", ["T1053.005"]),
+    "1ff70682-0a51-30e8-076d-740be8cee98b": ("atsvc (Task Scheduler)", "high", ["T1053.005"]),
+    "9556dc99-828c-11cf-a37e-00aa003240c7": ("IWbemServices (WMI)", "high", ["T1047"]),
+    "e3514235-4b06-11d1-ab04-00c04fc2dcd2": ("drsuapi (Directory Replication / DCSync)", "critical", ["T1003.006"]),
+    # Recon/enumeration interfaces below are used constantly by benign Windows file
+    # sharing (net view, share access, LSA lookups), so they are surfaced only as
+    # low-severity context — real breadth/volume analysis would be needed to escalate.
+    "12345778-1234-abcd-ef00-0123456789ac": ("samr (SAM account enumeration)", "low", ["T1087.002"]),
+    "12345778-1234-abcd-ef00-0123456789ab": ("lsarpc (LSA policy)", "low", ["T1482"]),
+    "4b324fc8-1670-01d3-1278-5a47bf6ee188": ("srvsvc (share enumeration)", "low", ["T1135"]),
+    "e1af8308-5d1f-11c9-91a4-08002b14a0fa": ("epmapper (endpoint mapper)", "low", ["T1046"]),
+}
+
+# Precompute little-endian UUID bytes (DCE/RPC wire format) → (uuid, name, sev, mitre).
+_DCERPC_IFACE_BYTES: dict[bytes, tuple] = {
+    uuid.UUID(u).bytes_le: (u, name, sev, mitre)
+    for u, (name, sev, mitre) in _DCERPC_INTERFACES.items()
+}
+
+_DCERPC_PORTS = (135, 139, 445)
+
+
+def _detect_dcerpc(streams: dict) -> list[Finding]:
+    """Flag DCE/RPC binds to management interfaces used for lateral movement / RCE."""
+    # uuid_str -> [name, severity, mitre, {(src, dst)}]
+    hits: dict[str, list] = {}
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if not ({sport, dport} & set(_DCERPC_PORTS)):
+            continue
+        data = bytes(payload)
+        # Require a DCE/RPC bind / alter-context marker before trusting a UUID hit.
+        if b"\x05\x00\x0b" not in data and b"\x05\x00\x0e" not in data:
+            continue
+        for ub, (uuid_str, name, sev, mitre) in _DCERPC_IFACE_BYTES.items():
+            if ub in data:
+                rec = hits.setdefault(uuid_str, [name, sev, mitre, set()])
+                rec[3].add((src_ip, dst_ip))
+
+    findings: list[Finding] = []
+    for uuid_str, (name, sev, mitre, pairs) in hits.items():
+        pair_list = sorted(f"{s} -> {d}" for s, d in pairs)
+        category = "DCE/RPC Lateral Movement" if sev in ("high", "critical") else "DCE/RPC Activity"
+        f = Finding(
+            category=category,
+            severity=sev,
+            title=f"DCE/RPC bind to {name}",
+            detail=f"Remote {name} interface accessed over MSRPC (port 135/445) between "
+                   f"{', '.join(pair_list[:5])}. Remote use of this interface is associated "
+                   "with lateral movement / remote execution.",
+        )
+        f.mitre = list(mitre)  # interface-specific technique; merged in _attach_mitre
+        findings.append(f)
+    return findings
 
 
 # ---------------------------------------------------------------------------
