@@ -206,6 +206,14 @@ class TestProtocolEvidence:
         cats = _categories(r)
         assert "Credential Exposure" in cats or "Cleartext Protocol" in cats
 
+    def test_smtp_email_and_stream_extracted(self):
+        r = _load_proto("smtp.pcap")
+        assert r.email_messages, "no email messages parsed from a real SMTP capture"
+        m = r.email_messages[0]
+        assert "@" in m["mail_from"] and m["rcpt_to"]
+        # follow-stream: the SMTP conversation should be reconstructed as a preview
+        assert r.tcp_streams and any("MAIL FROM" in s["preview"] for s in r.tcp_streams)
+
 
 class TestKerberosEvidence:
     """Classic Kerberos is UDP/88 — the ticket extractor only scanned TCP streams,

@@ -1927,6 +1927,25 @@ class TestCraftedPcapParsing:
             f"Executable over SMB produced no lateral-transfer finding; got {[f['category'] for f in result.findings]}"
         assert smb_exe[0]["severity"] == "high"
 
+    def test_email_exe_attachment_flagged(self):
+        """An executable attachment over SMTP is a phishing-delivery finding."""
+        body = (b"MAIL FROM: <attacker@evil.example>\r\nRCPT TO: <victim@corp.example>\r\nDATA\r\n"
+                b"Subject: Invoice\r\n"
+                b'Content-Disposition: attachment; filename="invoice.exe"\r\n\r\n'
+                b"TVqQAAM...\r\n.\r\n")
+        pkt = self._build_ethernet_ip_tcp("10.0.0.5", "10.0.0.6", 50000, 25, payload=body, flags=0x18)
+        result = parse_pcap(self._build_pcap([(1.0, pkt)]), "email.pcap")
+        assert any(f["category"] == "Suspicious Email Attachment" for f in result.findings), \
+            f"exe attachment not flagged; got {[f['category'] for f in result.findings]}"
+        assert result.email_messages and "invoice.exe" in result.email_messages[0]["attachments"]
+
+    def test_email_benign_attachment_not_flagged(self):
+        body = (b"MAIL FROM: <a@x.example>\r\nRCPT TO: <b@y.example>\r\nDATA\r\n"
+                b'Content-Disposition: attachment; filename="report.pdf"\r\n\r\n.\r\n')
+        pkt = self._build_ethernet_ip_tcp("10.0.0.5", "10.0.0.6", 50001, 25, payload=body, flags=0x18)
+        result = parse_pcap(self._build_pcap([(1.0, pkt)]), "email2.pcap")
+        assert not any(f["category"] == "Suspicious Email Attachment" for f in result.findings)
+
     def test_smb_findings_mapped_to_mitre(self):
         """SMB findings must land in the ATT&CK rollup (T1021.002 SMB/Admin Shares)."""
         payload = b"\xffSMB" + b"\x72" + b"\x00" * 30

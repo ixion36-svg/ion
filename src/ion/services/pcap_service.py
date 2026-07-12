@@ -209,6 +209,8 @@ class PcapResult:
     quic_flows: list = field(default_factory=list)
     dhcp_offers: list = field(default_factory=list)
     ipv6_routers: list = field(default_factory=list)
+    email_messages: list = field(default_factory=list)
+    tcp_streams: list = field(default_factory=list)  # follow-stream previews
     base64_payloads: list = field(default_factory=list)
     network_graph: dict = field(default_factory=dict)
     # v0.39.0 enhanced analyzers
@@ -284,6 +286,7 @@ _FINDING_MITRE: dict[str, list[str]] = {
     "Rogue Router Advertisement": ["T1557"],
     "Encrypted QUIC": ["T1573"],
     "YARA Match": ["T1027"],
+    "Suspicious Email Attachment": ["T1566.001"],
     "Shellcode Detection": ["T1055", "T1027"],
     "PowerShell Abuse": ["T1059.001"],
     "ARP Spoofing": ["T1557.002"],
@@ -571,6 +574,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     # ── Enhanced analyzers ──
     dcerpc_findings: list = []  # needs raw streams; produced here, merged in assembly
     dns_port_findings: list = []  # non-DNS traffic on port 53 (needs raw streams)
+    email_findings: list = []  # dangerous email attachments (needs raw streams)
     try:
         buf.seek(0)
         streams, tls_hellos, tls_server_hellos, ssh_pkts = _reassemble_tcp_streams(buf, pcap_reader_cls)
@@ -584,6 +588,9 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
         result.smb_transfers = [s.to_dict() for s in _detect_smb(streams)]
         dcerpc_findings = _detect_dcerpc(streams)
         dns_port_findings = _detect_dns_port_abuse(streams)
+        result.email_messages = _extract_email(streams)
+        email_findings = _email_findings(result.email_messages)
+        result.tcp_streams = _build_stream_previews(streams)
         result.kerberos_tickets = _detect_kerberos(streams) + _detect_kerberos_udp(kerberos_udp)
         result.http_files = _extract_http_files(streams)
         result.base64_payloads = _detect_base64_payloads(streams)
@@ -685,6 +692,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     # above where the raw streams are available; merged here.
     findings.extend(dcerpc_findings)
     findings.extend(dns_port_findings)
+    findings.extend(email_findings)
     # v0.39.0 — TLS certificate + RITA beacon findings (additive, fail-safe)
     try:
         findings.extend(_tls_cert_findings(result.tls_certificates))
@@ -3820,6 +3828,88 @@ def _detect_dns_port_abuse(streams: dict) -> list[Finding]:
                    f"covert channel riding the DNS port to evade egress filtering. Sample: {snippet!r}",
         ))
     return findings
+
+
+# ---------------------------------------------------------------------------
+# Email (SMTP/IMAP/POP3) analysis + follow-stream previews
+# ---------------------------------------------------------------------------
+
+_EMAIL_PORTS = {25, 587, 465, 110, 143, 993, 995}
+_DANGEROUS_ATTACH_EXTS = {
+    "exe", "scr", "com", "pif", "js", "jse", "vbs", "vbe", "wsf", "hta", "jar",
+    "lnk", "bat", "cmd", "ps1", "docm", "xlsm", "pptm", "iso", "img", "cpl", "msi", "dll",
+}
+
+
+def _extract_email(streams: dict) -> list[dict]:
+    """Parse SMTP/IMAP/POP3 envelope, headers, and attachment names from streams."""
+    messages: list[dict] = []
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if not ({sport, dport} & _EMAIL_PORTS):
+            continue
+        text = bytes(payload).decode("latin-1", "replace")
+        senders = re.findall(r"MAIL FROM:\s*<([^>]*)>", text, re.I)
+        rcpts = re.findall(r"RCPT TO:\s*<([^>]*)>", text, re.I)
+        subj = re.search(r"^Subject:\s*(.+)$", text, re.I | re.M)
+        frm = re.search(r"^From:\s*(.+)$", text, re.I | re.M)
+        attach = re.findall(r'(?:filename|name)\s*=\s*"?([^"\r\n;]+\.[A-Za-z0-9]{1,5})"?', text, re.I)
+        if not (senders or rcpts or subj or attach):
+            continue
+        if 143 in (sport, dport) or 993 in (sport, dport):
+            proto = "IMAP"
+        elif 110 in (sport, dport) or 995 in (sport, dport):
+            proto = "POP3"
+        else:
+            proto = "SMTP"
+        messages.append({
+            "protocol": proto,
+            "src": src_ip, "dst": dst_ip,
+            "mail_from": (senders[0] if senders else (frm.group(1).strip() if frm else ""))[:200],
+            "rcpt_to": rcpts[:5],
+            "subject": (subj.group(1).strip() if subj else "")[:200],
+            "attachments": sorted({a.strip() for a in attach})[:10],
+        })
+        if len(messages) >= 100:
+            break
+    return messages
+
+
+def _email_findings(messages: list[dict]) -> list[Finding]:
+    """Flag executable/script/macro email attachments — a phishing delivery vector."""
+    bad = set()
+    for m in messages:
+        for a in m.get("attachments", []):
+            ext = a.rsplit(".", 1)[-1].lower() if "." in a else ""
+            if ext in _DANGEROUS_ATTACH_EXTS:
+                bad.add(a)
+    if not bad:
+        return []
+    return [Finding(
+        category="Suspicious Email Attachment",
+        severity="high",
+        title=f"Dangerous email attachment(s): {', '.join(sorted(bad)[:5])}",
+        detail="Executable / script / macro attachment delivered over email — a common "
+               "phishing and malware-delivery vector.",
+    )]
+
+
+def _build_stream_previews(streams: dict, limit: int = 20, cap: int = 8192) -> list[dict]:
+    """Top TCP streams by size with a printable preview (Wireshark follow-stream style)."""
+    items = []
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if len(payload) < 16:
+            continue
+        items.append((len(payload), src_ip, sport, dst_ip, dport, bytes(payload)))
+    items.sort(key=lambda x: x[0], reverse=True)
+    out = []
+    for size, src_ip, sport, dst_ip, dport, data in items[:limit]:
+        chunk = data[:cap]
+        printable = "".join(chr(b) if (32 <= b < 127 or b in (9, 10, 13)) else "." for b in chunk)
+        out.append({
+            "src": src_ip, "sport": sport, "dst": dst_ip, "dport": dport,
+            "size": size, "truncated": size > cap, "preview": printable,
+        })
+    return out
 
 
 # ---------------------------------------------------------------------------

@@ -165,6 +165,16 @@
 .pcap-table .bar-cell .mini-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 60%; background: rgba(88,166,255,.18); border-radius: 2px; z-index: 0; }
 .pcap-table .bar-cell .mini-val { position: relative; z-index: 1; }
 
+/* Follow-stream + email panels */
+.stream-item { margin-bottom: 6px; background: var(--bg-secondary); border-radius: 6px; padding: 8px 12px; }
+.stream-item summary { cursor: pointer; font-size: .82rem; list-style: none; }
+.stream-item summary::-webkit-details-marker { display: none; }
+.stream-item summary::before { content: '▸ '; color: var(--text-secondary); }
+.stream-item[open] summary::before { content: '▾ '; }
+.stream-size { color: var(--text-secondary); font-size: .75rem; margin-left: 8px; }
+.stream-preview { margin: 8px 0 0; max-height: 340px; overflow: auto; background: var(--bg-tertiary, #0b0f14); padding: 10px; border-radius: 4px; font-size: .72rem; font-family: var(--font-mono, monospace); white-space: pre-wrap; word-break: break-all; color: var(--text-primary); }
+.attach-bad { color: var(--danger); font-weight: 600; }
+
 /* Proto bar chart */
 .proto-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
 .proto-label { width: 60px; font-size: .8rem; text-align: right; color: var(--text-secondary); }
@@ -269,6 +279,8 @@
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="httpfiles" id="tab-httpfiles">HTTP Files <span id="httpfiles-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="arp" id="tab-arp">ARP <span id="arp-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab _ion-s-6b99de8b69" data-panel="b64" id="tab-b64">Base64 <span id="b64-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="streams" id="tab-streams">Streams <span id="streams-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="email" id="tab-email">Email <span id="email-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab" data-panel="graph" id="tab-graph">Network Graph</button>
             <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
             <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
@@ -296,6 +308,8 @@
         <div class="pcap-panel" id="panel-httpfiles"></div>
         <div class="pcap-panel" id="panel-arp"></div>
         <div class="pcap-panel" id="panel-b64"></div>
+        <div class="pcap-panel" id="panel-streams"></div>
+        <div class="pcap-panel" id="panel-email"></div>
         <div class="pcap-panel" id="panel-graph"></div>
         <div class="pcap-panel" id="panel-findings"></div>
         <div class="pcap-panel" id="panel-threatintel"></div>
@@ -465,6 +479,8 @@
         renderHTTPFiles(d);
         renderARP(d);
         renderBase64(d);
+        renderStreams(d);
+        renderEmail(d);
         renderNetworkGraph(d);
         renderFindings(d);
         renderThreatIntel(d);
@@ -997,6 +1013,46 @@
     }
 
     // ── Network Graph (vis-network) ──
+    function renderStreams(d) {
+        const items = d.tcp_streams || [];
+        const tab = document.getElementById('tab-streams');
+        const badge = document.getElementById('streams-count-badge');
+        if (!items.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.textContent = items.length;
+        const rows = items.map(s => `
+            <details class="stream-item">
+                <summary><code>${esc(s.src)}:${s.sport} → ${esc(s.dst)}:${s.dport}</code>
+                    <span class="stream-size">${fmtBytes(s.size)}${s.truncated ? ' · truncated' : ''}</span></summary>
+                <pre class="stream-preview">${esc(s.preview)}</pre>
+            </details>`).join('');
+        document.getElementById('panel-streams').innerHTML =
+            `<h3>TCP Streams (${items.length})</h3>` +
+            `<p class="findings-hint">Top conversations by size — expand to follow the reassembled payload.</p>` + rows;
+    }
+
+    function renderEmail(d) {
+        const items = d.email_messages || [];
+        const tab = document.getElementById('tab-email');
+        const badge = document.getElementById('email-count-badge');
+        if (!items.length) { tab.style.display = 'none'; return; }
+        tab.style.display = '';
+        badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
+        badge.textContent = items.length;
+        const DANGER = /\.(exe|scr|com|pif|js|jse|vbs|vbe|wsf|hta|jar|lnk|bat|cmd|ps1|docm|xlsm|pptm|iso|img|cpl|msi|dll)$/i;
+        const rows = items.map(m => `<tr>
+            <td>${esc(m.protocol || '')}</td>
+            <td>${esc(m.mail_from || '')}</td>
+            <td>${(m.rcpt_to || []).map(esc).join(', ')}</td>
+            <td>${esc(m.subject || '')}</td>
+            <td>${(m.attachments || []).map(a => DANGER.test(a) ? `<span class="attach-bad">${esc(a)}</span>` : esc(a)).join(', ')}</td>
+        </tr>`).join('');
+        document.getElementById('panel-email').innerHTML =
+            `<h3>Email Messages (${items.length})</h3>` +
+            `<table class="pcap-table"><thead><tr><th>Proto</th><th>From</th><th>To</th><th>Subject</th><th>Attachments</th></tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
     function renderNetworkGraph(d) {
         const graph = d.network_graph || {};
         const panel = document.getElementById('panel-graph');
