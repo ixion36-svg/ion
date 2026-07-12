@@ -61,10 +61,53 @@ async def analyze_pcap(
         enrichments = await _enrich_pcap_observables(result, _is_private)
         if enrichments:
             response["threat_intel"] = enrichments
+            # Escalate: any pcap observable that threat intel flags as known-bad
+            # becomes a finding, and the verdict is recomputed to reflect it.
+            _apply_ti_findings(response, enrichments)
     except Exception as e:
         response["threat_intel"] = {"error": safe_error(e, "pcap_enrich"), "observables": []}
 
     return response
+
+
+def _ti_findings(enrichments: dict) -> list:
+    """Build finding dicts for pcap observables that threat intel flags known-bad."""
+    out = []
+    for e in (enrichments.get("observables") or []):
+        enr = e.get("enrichment") or {}
+        score = enr.get("score") or 0
+        if not (enr.get("is_malicious") or score >= 75):
+            continue
+        labels = ", ".join(enr.get("labels") or [])
+        actors = ", ".join(enr.get("threat_actors") or [])
+        out.append({
+            "category": "Threat Intel Match",
+            "severity": "critical" if enr.get("is_malicious") else "high",
+            "title": f"Known-bad {e.get('type', 'observable')} in traffic: {e.get('value', '?')}",
+            "detail": f"Observable {e.get('value', '?')} matched threat intel "
+                      f"(source {enr.get('source', '?')}, score {score})"
+                      + (f"; labels: {labels}" if labels else "")
+                      + (f"; actors: {actors}" if actors else "") + ".",
+            "mitre": [],
+        })
+    return out
+
+
+def _apply_ti_findings(response: dict, enrichments: dict) -> None:
+    """Append TI-match findings and recompute the verdict to fold in IOC hits."""
+    ti = _ti_findings(enrichments)
+    if not ti:
+        return
+    response["findings"] = (response.get("findings") or []) + ti
+    try:
+        from ion.services.pcap_service import Finding, _attach_mitre, _build_mitre_summary, _compute_verdict
+        fobjs = [Finding(category=f["category"], severity=f["severity"],
+                         title=f.get("title", ""), detail=f.get("detail", "")) for f in response["findings"]]
+        _attach_mitre(fobjs)
+        response["verdict"] = _compute_verdict(fobjs)
+        response["mitre_techniques"] = _build_mitre_summary(fobjs)
+    except Exception:
+        pass
 
 
 async def _enrich_pcap_observables(result, is_private_fn) -> dict:
