@@ -112,6 +112,23 @@ class TestCleartextEvidence:
         assert "Suspicious Port" in _categories(r) or "Cleartext Protocol" in _categories(r)
 
 
+class TestDnsPortAbuse:
+    """dns-remoteshell rides an interactive shell over TCP/53 to evade egress
+    filtering. Non-DNS content on the DNS port is a protocol-tunneling / C2
+    signal the analyser must flag (it previously saw only the cleartext ports)."""
+
+    def test_shell_over_port53_flagged(self):
+        r = _load("dns-remoteshell.pcap")
+        tunnel = _by_category(r, "Protocol Tunneling")
+        assert tunnel, f"shell over port 53 not flagged; categories={_categories(r)}"
+        assert tunnel[0]["severity"] in ("high", "critical")
+
+    def test_valid_dns_not_falsely_flagged(self):
+        """Captures whose port-53 traffic is real DNS must NOT trip the tunnel rule."""
+        r = _load("smb-on-windows-10.pcapng")  # has real DNS, no shell-over-53
+        assert not _by_category(r, "Protocol Tunneling")
+
+
 class TestKerberosEvidence:
     """Classic Kerberos is UDP/88 — the ticket extractor only scanned TCP streams,
     so a real domain logon surfaced zero tickets. krb-816 is a benign logon: it

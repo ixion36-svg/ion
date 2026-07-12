@@ -231,6 +231,7 @@ _FINDING_MITRE: dict[str, list[str]] = {
     "Lateral Tool Transfer": ["T1570", "T1021.002"],
     "DCE/RPC Lateral Movement": ["T1021.003"],
     "DCE/RPC Activity": ["T1021.003"],
+    "Protocol Tunneling": ["T1572", "T1071.004"],
     "Shellcode Detection": ["T1055", "T1027"],
     "PowerShell Abuse": ["T1059.001"],
     "ARP Spoofing": ["T1557.002"],
@@ -491,6 +492,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
 
     # ── Enhanced analyzers ──
     dcerpc_findings: list = []  # needs raw streams; produced here, merged in assembly
+    dns_port_findings: list = []  # non-DNS traffic on port 53 (needs raw streams)
     try:
         buf.seek(0)
         streams, tls_hellos, tls_server_hellos, ssh_pkts = _reassemble_tcp_streams(buf, pcap_reader_cls)
@@ -503,6 +505,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
         result.credential_captures = [c.to_dict() for c in _extract_credentials(streams)]
         result.smb_transfers = [s.to_dict() for s in _detect_smb(streams)]
         dcerpc_findings = _detect_dcerpc(streams)
+        dns_port_findings = _detect_dns_port_abuse(streams)
         result.kerberos_tickets = _detect_kerberos(streams) + _detect_kerberos_udp(kerberos_udp)
         result.http_files = _extract_http_files(streams)
         result.base64_payloads = _detect_base64_payloads(streams)
@@ -591,6 +594,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     # DCE/RPC (MSRPC) lateral-movement binds (svcctl/WMI/atsvc/drsuapi). Computed
     # above where the raw streams are available; merged here.
     findings.extend(dcerpc_findings)
+    findings.extend(dns_port_findings)
     # v0.39.0 — TLS certificate + RITA beacon findings (additive, fail-safe)
     try:
         findings.extend(_tls_cert_findings(result.tls_certificates))
@@ -3582,6 +3586,59 @@ def _detect_kerberos_udp(packets: list[tuple]) -> list[dict]:
         if len(results) >= 100:
             break
     return results
+
+
+def _is_dns_over_tcp(data: bytes) -> bool:
+    """True if the stream looks like legitimate DNS-over-TCP (2-byte length + DNS msg)."""
+    try:
+        if len(data) < 4:
+            return False
+        n = struct.unpack("!H", data[:2])[0]
+        msg = data[2:2 + n] if 2 + n <= len(data) else data[2:]
+        if len(msg) < 12:
+            return False
+        dns = dpkt.dns.DNS(msg)
+        # Sanity: a real DNS message carries at least one record of some kind.
+        return (len(dns.qd) + len(dns.an) + len(dns.ns) + len(dns.ar)) > 0
+    except Exception:
+        return False
+
+
+def _detect_dns_port_abuse(streams: dict) -> list[Finding]:
+    """Flag non-DNS traffic riding TCP/53 (interactive shell / tunnel to evade egress).
+
+    DNS-over-TCP is legitimate (zone transfers, large responses), so parse first
+    and skip anything that is valid DNS. What remains — high-printable-ASCII
+    content on the DNS port — is a shell or covert channel (T1572 / T1071.004).
+    The printable-ratio gate keeps binary/unknown DNS-adjacent traffic from
+    tripping the rule; only clear text-protocol abuse is flagged."""
+    findings: list[Finding] = []
+    seen: set[tuple] = set()
+    for (src_ip, sport, dst_ip, dport), payload in streams.items():
+        if 53 not in (sport, dport):
+            continue
+        data = bytes(payload)
+        if len(data) < 24:
+            continue
+        if _is_dns_over_tcp(data):
+            continue
+        sample = data[:512]
+        printable = sum(1 for b in sample if b in (9, 10, 13) or 32 <= b <= 126)
+        if printable / len(sample) < 0.85:
+            continue  # binary non-DNS — not the ASCII-shell pattern we're confident about
+        key = tuple(sorted((src_ip, dst_ip)))
+        if key in seen:
+            continue
+        seen.add(key)
+        snippet = data[:60].decode("ascii", "replace").replace("\r", " ").replace("\n", " ")
+        findings.append(Finding(
+            category="Protocol Tunneling",
+            severity="high",
+            title=f"Non-DNS traffic on port 53: {src_ip} <-> {dst_ip}",
+            detail="TCP port 53 is carrying non-DNS content — an interactive shell or "
+                   f"covert channel riding the DNS port to evade egress filtering. Sample: {snippet!r}",
+        ))
+    return findings
 
 
 # ---------------------------------------------------------------------------
