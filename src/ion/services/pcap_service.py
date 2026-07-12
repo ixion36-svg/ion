@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import dpkt
+import dpkt.icmp6
+import dpkt.dhcp
 
 
 @dataclass
@@ -161,6 +163,9 @@ class PcapResult:
     kerberos_tickets: list = field(default_factory=list)
     http_files: list = field(default_factory=list)
     arp_anomalies: list = field(default_factory=list)
+    quic_flows: list = field(default_factory=list)
+    dhcp_offers: list = field(default_factory=list)
+    ipv6_routers: list = field(default_factory=list)
     base64_payloads: list = field(default_factory=list)
     network_graph: dict = field(default_factory=dict)
     # v0.39.0 enhanced analyzers
@@ -232,6 +237,9 @@ _FINDING_MITRE: dict[str, list[str]] = {
     "DCE/RPC Lateral Movement": ["T1021.003"],
     "DCE/RPC Activity": ["T1021.003"],
     "Protocol Tunneling": ["T1572", "T1071.004"],
+    "Rogue DHCP": ["T1557"],
+    "Rogue Router Advertisement": ["T1557"],
+    "Encrypted QUIC": ["T1573"],
     "Shellcode Detection": ["T1055", "T1027"],
     "PowerShell Abuse": ["T1059.001"],
     "ARP Spoofing": ["T1557.002"],
@@ -336,6 +344,9 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     suspicious_uas: list[dict] = []  # suspicious HTTP User-Agents
     cleartext_creds: list[dict] = []  # cleartext credential leaks
     kerberos_udp: list[tuple] = []  # (src, dst, payload) for UDP/88 Kerberos (TCP is handled via streams)
+    quic_flows: dict = {}  # (src, dst) -> packet count for QUIC/HTTP3 on UDP/443
+    dhcp_offers: list[dict] = []  # parsed DHCP OFFER/ACK for rogue-server detection
+    ipv6_ra: dict = {}  # router-MAC -> set of advertised prefixes (rogue-RA detection)
 
     timestamps = []
     packet_count = 0
@@ -424,8 +435,26 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             if (udp.dport == 88 or udp.sport == 88) and udp.data and len(kerberos_udp) < 500:
                 kerberos_udp.append((src_ip, dst_ip, bytes(udp.data)))
 
+            # QUIC / HTTP3 on UDP/443 — long-header packets set the two high bits
+            # (form=1, fixed=1). JA3/JA4 cannot fingerprint QUIC, so track the flows
+            # to surface this monitoring blind spot.
+            if (udp.dport == 443 or udp.sport == 443) and udp.data and len(udp.data) >= 5 \
+                    and (udp.data[0] & 0xC0) == 0xC0:
+                qk = (src_ip, dst_ip)
+                quic_flows[qk] = quic_flows.get(qk, 0) + 1
+
+            # DHCP (UDP 67/68) — record OFFER/ACK server identity for rogue-server detection.
+            if (udp.dport in (67, 68) or udp.sport in (67, 68)) and udp.data and len(dhcp_offers) < 500:
+                _collect_dhcp(bytes(udp.data), src_ip, dst_ip, dhcp_offers)
+
         elif isinstance(ip_pkt.data, dpkt.icmp.ICMP):
             proto_counter["ICMP"] += 1
+        elif isinstance(ip_pkt.data, dpkt.icmp6.ICMP6):
+            proto_counter["ICMPv6"] += 1
+            # IPv6 Router Advertisement (type 134) — multiple distinct routers
+            # advertising is the rogue-RA / SLAAC MITM signature (T1557).
+            if getattr(ip_pkt.data, "type", None) == 134:
+                ipv6_ra[src_ip] = ipv6_ra.get(src_ip, 0) + 1
         else:
             proto_counter["Other"] += 1
 
@@ -489,6 +518,11 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
                 "severity": "high" if len(ips) > 2 else "medium",
                 "detail": f"MAC {mac} is claiming {len(ips)} different IPs — possible ARP spoofing",
             })
+
+    # Internal-protocol summaries (QUIC / DHCP / IPv6 RA) for display panels.
+    result.quic_flows = [{"src": s, "dst": d, "packets": n} for (s, d), n in quic_flows.items()]
+    result.dhcp_offers = dhcp_offers
+    result.ipv6_routers = [{"router": r, "advertisements": n} for r, n in ipv6_ra.items()]
 
     # ── Enhanced analyzers ──
     dcerpc_findings: list = []  # needs raw streams; produced here, merged in assembly
@@ -589,6 +623,14 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
         pass
     try:
         findings.extend(_arp_findings(result.arp_anomalies))
+    except Exception:
+        pass
+    # Internal-protocol findings: rogue DHCP / rogue IPv6 RA (adversary-in-the-middle),
+    # and QUIC blind-spot context. Fail-safe.
+    try:
+        findings.extend(_dhcp_findings(dhcp_offers))
+        findings.extend(_ipv6_ra_findings(ipv6_ra))
+        findings.extend(_quic_findings(quic_flows, _is_private))
     except Exception:
         pass
     # DCE/RPC (MSRPC) lateral-movement binds (svcctl/WMI/atsvc/drsuapi). Computed
@@ -3400,6 +3442,73 @@ def _arp_findings(arp_anomalies: list[dict]) -> list[Finding]:
             detail=a.get("detail", "") + (f" ({', '.join(ips[:6])}{'...' if len(ips) > 6 else ''})" if ips else ""),
         ))
     return findings
+
+
+def _collect_dhcp(data: bytes, src_ip: str, dst_ip: str, offers: list) -> None:
+    """Record a DHCP OFFER/ACK's server identity for rogue-server detection."""
+    try:
+        dhcp = dpkt.dhcp.DHCP(data)
+    except Exception:
+        return
+    msg_type = server_id = None
+    for opt, val in getattr(dhcp, "opts", []):
+        if opt == 53 and val:            # DHCP message type
+            msg_type = val[0]
+        elif opt == 54 and len(val) == 4:  # server identifier
+            server_id = socket.inet_ntoa(val)
+    if msg_type in (2, 5):  # OFFER / ACK come from a server
+        try:
+            offered = socket.inet_ntoa(struct.pack("!I", dhcp.yiaddr)) if dhcp.yiaddr else ""
+        except Exception:
+            offered = ""
+        offers.append({
+            "server_ip": server_id or src_ip,
+            "offered_ip": offered,
+            "msg_type": "OFFER" if msg_type == 2 else "ACK",
+        })
+
+
+def _dhcp_findings(offers: list) -> list[Finding]:
+    """Flag rogue DHCP: more than one server offering leases on a segment (T1557)."""
+    servers = sorted({o["server_ip"] for o in offers if o.get("server_ip")})
+    if len(servers) > 1:
+        return [Finding(
+            category="Rogue DHCP",
+            severity="high",
+            title=f"Multiple DHCP servers offering leases ({len(servers)})",
+            detail=f"More than one DHCP server responded on this segment: {', '.join(servers[:6])}. "
+                   "A rogue DHCP server enables adversary-in-the-middle via default-gateway / DNS redirection.",
+        )]
+    return []
+
+
+def _quic_findings(quic_flows: dict, is_private) -> list[Finding]:
+    """Surface QUIC/HTTP3 to external hosts — a TLS-fingerprinting blind spot."""
+    ext = sorted({dst for (src, dst), n in quic_flows.items() if not is_private(dst)})
+    if not ext:
+        return []
+    return [Finding(
+        category="Encrypted QUIC",
+        severity="low",
+        title=f"QUIC/HTTP3 to {len(ext)} external host(s) — not JA3/JA4-fingerprintable",
+        detail=f"Encrypted QUIC (UDP/443) observed to: {', '.join(ext[:6])}"
+               + (f" ... +{len(ext) - 6} more" if len(ext) > 6 else "")
+               + ". QUIC bypasses TLS fingerprinting; review if unexpected for the host.",
+    )]
+
+
+def _ipv6_ra_findings(ipv6_ra: dict) -> list[Finding]:
+    """Flag rogue IPv6 Router Advertisements: multiple routers advertising (T1557)."""
+    routers = sorted(ipv6_ra.keys())
+    if len(routers) > 1:
+        return [Finding(
+            category="Rogue Router Advertisement",
+            severity="high",
+            title=f"Multiple IPv6 routers advertising ({len(routers)})",
+            detail=f"More than one source sent ICMPv6 Router Advertisements: {', '.join(routers[:6])}. "
+                   "A rogue RA hijacks the default route / DNS (SLAAC adversary-in-the-middle).",
+        )]
+    return []
 
 
 # Extensions representing directly executable / script payloads. A file of one

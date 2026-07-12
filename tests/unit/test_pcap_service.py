@@ -2093,6 +2093,88 @@ class TestDcerpcDetection:
 
 
 # =============================================================================
+# 19d. Internal-protocol detection: QUIC / rogue DHCP / rogue IPv6 RA
+# =============================================================================
+
+class TestInternalProtocols:
+    """QUIC blind-spot awareness, rogue DHCP, and rogue IPv6 Router Advertisement.
+    Real QUIC/RA captures aren't freely downloadable, so these craft the packets;
+    DHCP extraction is separately validated against a real capture in the corpus."""
+
+    def _wrap(self, packets):
+        buf = struct.pack("<IHHiIII", 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1)
+        for ts, raw in packets:
+            s = int(ts)
+            buf += struct.pack("<IIII", s, int((ts - s) * 1e6), len(raw), len(raw)) + raw
+        return buf
+
+    def _udp(self, src, dst, sport, dport, payload):
+        import dpkt
+        udp = dpkt.udp.UDP(sport=sport, dport=dport, data=payload)
+        udp.ulen = len(bytes(udp))
+        ip = dpkt.ip.IP(src=bytes(int(x) for x in src.split(".")),
+                        dst=bytes(int(x) for x in dst.split(".")),
+                        p=dpkt.ip.IP_PROTO_UDP, data=udp)
+        ip.len = len(bytes(ip))
+        eth = dpkt.ethernet.Ethernet(dst=b"\xff" * 6, src=b"\x00" * 5 + b"\x01",
+                                     type=dpkt.ethernet.ETH_TYPE_IP, data=ip)
+        return bytes(eth)
+
+    def test_quic_to_external_flagged(self):
+        payload = bytes([0xc0]) + b"\x00\x00\x00\x01" + b"\x00" * 30  # long header + QUIC v1
+        pkt = self._udp("192.168.1.5", "8.8.4.4", 54321, 443, payload)  # external dst
+        r = parse_pcap(self._wrap([(1.0, pkt)]), "quic.pcap")
+        assert any(f["category"] == "Encrypted QUIC" for f in r.findings), \
+            f"QUIC not flagged; got {[f['category'] for f in r.findings]}"
+        assert len(r.quic_flows) >= 1
+
+    def test_quic_internal_only_not_flagged(self):
+        payload = bytes([0xc0]) + b"\x00\x00\x00\x01" + b"\x00" * 30
+        pkt = self._udp("192.168.1.5", "192.168.1.6", 54321, 443, payload)  # internal dst
+        r = parse_pcap(self._wrap([(1.0, pkt)]), "quic_int.pcap")
+        assert not any(f["category"] == "Encrypted QUIC" for f in r.findings)
+
+    def _dhcp_offer(self, server_id):
+        import dpkt
+        d = dpkt.dhcp.DHCP()
+        d.op = 2
+        d.yiaddr = struct.unpack("!I", bytes([192, 168, 0, 50]))[0]
+        d.opts = ((53, b"\x02"), (54, bytes(int(x) for x in server_id.split("."))))
+        return self._udp("0.0.0.0", "255.255.255.255", 67, 68, bytes(d))
+
+    def test_rogue_dhcp_two_servers_flagged(self):
+        pkts = [(1.0, self._dhcp_offer("192.168.0.1")), (2.0, self._dhcp_offer("192.168.0.66"))]
+        r = parse_pcap(self._wrap(pkts), "rogue_dhcp.pcap")
+        assert any(f["category"] == "Rogue DHCP" for f in r.findings), \
+            f"rogue DHCP not flagged; got {[f['category'] for f in r.findings]}"
+
+    def test_single_dhcp_server_not_rogue(self):
+        pkts = [(1.0, self._dhcp_offer("192.168.0.1")), (2.0, self._dhcp_offer("192.168.0.1"))]
+        r = parse_pcap(self._wrap(pkts), "dhcp.pcap")
+        assert not any(f["category"] == "Rogue DHCP" for f in r.findings)
+
+    def _ra(self, last):
+        import dpkt
+        icmp6 = dpkt.icmp6.ICMP6(type=134, code=0, data=b"\x00" * 16)
+        ip6 = dpkt.ip6.IP6(src=b"\xfe\x80" + b"\x00" * 13 + bytes([last]),
+                           dst=b"\xff\x02" + b"\x00" * 13 + b"\x01", nxt=58, hlim=255, data=icmp6)
+        ip6.plen = len(bytes(icmp6))
+        eth = dpkt.ethernet.Ethernet(dst=b"\x33\x33\x00\x00\x00\x01",
+                                     src=b"\x00" * 5 + bytes([last]),
+                                     type=dpkt.ethernet.ETH_TYPE_IP6, data=ip6)
+        return bytes(eth)
+
+    def test_rogue_ipv6_ra_two_routers_flagged(self):
+        r = parse_pcap(self._wrap([(1.0, self._ra(1)), (2.0, self._ra(2))]), "rogue_ra.pcap")
+        assert any(f["category"] == "Rogue Router Advertisement" for f in r.findings), \
+            f"rogue RA not flagged; got {[f['category'] for f in r.findings]}"
+
+    def test_single_ipv6_router_not_rogue(self):
+        r = parse_pcap(self._wrap([(1.0, self._ra(1)), (2.0, self._ra(1))]), "ra.pcap")
+        assert not any(f["category"] == "Rogue Router Advertisement" for f in r.findings)
+
+
+# =============================================================================
 # 20. API endpoint validation (unit-level)
 # =============================================================================
 

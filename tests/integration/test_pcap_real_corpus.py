@@ -38,6 +38,13 @@ def _load_attack(name):
     return parse_pcap(f.read_bytes(), name)
 
 
+def _load_proto(name):
+    f = CORPUS / "proto" / name
+    if not f.exists():
+        pytest.skip(f"proto corpus capture {name} not present")
+    return parse_pcap(f.read_bytes(), name)
+
+
 def _categories(result):
     return {f["category"] for f in result.findings}
 
@@ -174,6 +181,22 @@ class TestRealAttackCorpus:
         r = _load_attack("DCSync_krbtgt_dcerpc_smb.pcapng")
         assert r.packet_count > 0
         assert not _by_category(r, "DCE/RPC Lateral Movement")
+
+
+class TestProtocolEvidence:
+    """Real DHCP/SMTP captures: extraction works and benign traffic isn't
+    false-flagged (rogue-DHCP/QUIC positives are covered by crafted unit tests)."""
+
+    def test_dhcp_extracts_offers_no_rogue(self):
+        r = _load_proto("dhcp.pcap")
+        assert r.dhcp_offers, "no DHCP offers extracted from a real DORA capture"
+        # A single legitimate server must NOT trip the rogue-DHCP rule.
+        assert not _by_category(r, "Rogue DHCP")
+
+    def test_smtp_credentials_surface(self):
+        r = _load_proto("smtp.pcap")
+        cats = _categories(r)
+        assert "Credential Exposure" in cats or "Cleartext Protocol" in cats
 
 
 class TestKerberosEvidence:
