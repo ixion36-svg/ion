@@ -157,6 +157,14 @@ class TestRealAttackCorpus:
         assert r.verdict["label"] == "Needs Investigation"
         assert any(t["id"] == "T1569.002" for t in r.mitre_techniques)
 
+    def test_psexec_carved_binary_yara_match(self):
+        """The PsExec service binary carved from SMB should match a shipped YARA rule."""
+        from ion.services.pcap_service import _load_yara_rules
+        if _load_yara_rules() is None:
+            pytest.skip("yara-python not available")
+        r = _load_attack("LM_psexec_smb_dcerpc_epm_svcctl.pcapng")
+        assert _by_category(r, "YARA Match"), "carved PE matched no YARA rule"
+
     def test_smbexec_flags_svcctl(self):
         r = _load_attack("LM_smbexec_smb_dcerpc_svcctl_epm.pcapng")
         svc = [f for f in _by_category(r, "DCE/RPC Lateral Movement") if "svcctl" in f["title"]]

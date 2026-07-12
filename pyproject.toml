@@ -58,6 +58,9 @@ dependencies = [
     "psutil>=5.9.0",
     # PCAP parsing
     "dpkt>=1.9.8",
+    # YARA scanning of files carved from PCAP traffic (optional at runtime —
+    # pcap_service degrades gracefully if the module is unavailable)
+    "yara-python>=4.5.0",
     # PostgreSQL support
     "psycopg2-binary>=2.9.0",
     # v0.10.4: pgvector SQLAlchemy types for case-similarity embeddings.

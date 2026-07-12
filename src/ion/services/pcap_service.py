@@ -16,6 +16,48 @@ import dpkt
 import dpkt.icmp6
 import dpkt.dhcp
 
+try:  # YARA is optional — file carving still works without it.
+    import yara as _yara
+except Exception:  # pragma: no cover - environment-dependent
+    _yara = None
+
+_YARA_RULES = None
+_YARA_LOADED = False
+
+
+def _load_yara_rules():
+    """Lazily compile the shipped YARA ruleset; returns None if yara/rules absent."""
+    global _YARA_RULES, _YARA_LOADED
+    if _YARA_LOADED:
+        return _YARA_RULES
+    _YARA_LOADED = True
+    if _yara is None:
+        return None
+    try:
+        from pathlib import Path
+        rules_dir = Path(__file__).resolve().parents[1] / "data" / "yara_rules"
+        filepaths = {p.stem: str(p) for p in rules_dir.glob("*.yar")}
+        if filepaths:
+            _YARA_RULES = _yara.compile(filepaths=filepaths)
+    except Exception:
+        _YARA_RULES = None
+    return _YARA_RULES
+
+
+def _scan_yara(data: bytes) -> list[dict]:
+    """Match carved bytes against the ruleset → [{rule, severity}]; [] if disabled."""
+    rules = _load_yara_rules()
+    if not rules:
+        return []
+    try:
+        out = []
+        for m in rules.match(data=bytes(data[:5 * 1024 * 1024])):
+            sev = (m.meta or {}).get("severity", "high") if hasattr(m, "meta") else "high"
+            out.append({"rule": m.rule, "severity": sev})
+        return out
+    except Exception:
+        return []
+
 
 @dataclass
 class Finding:
@@ -39,6 +81,7 @@ class ExtractedFile:
     stream_index: int = 0
     sport: int = 0
     dport: int = 0
+    yara_matches: list = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {k: v for k, v in self.__dict__.items()}
@@ -240,6 +283,7 @@ _FINDING_MITRE: dict[str, list[str]] = {
     "Rogue DHCP": ["T1557"],
     "Rogue Router Advertisement": ["T1557"],
     "Encrypted QUIC": ["T1573"],
+    "YARA Match": ["T1027"],
     "Shellcode Detection": ["T1055", "T1027"],
     "PowerShell Abuse": ["T1059.001"],
     "ARP Spoofing": ["T1557.002"],
@@ -622,6 +666,10 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     except Exception:
         pass
     try:
+        findings.extend(_yara_findings(result.extracted_files))
+    except Exception:
+        pass
+    try:
         findings.extend(_arp_findings(result.arp_anomalies))
     except Exception:
         pass
@@ -853,6 +901,7 @@ def _extract_files_from_streams(streams: dict) -> list[ExtractedFile]:
                     stream_index=len(extracted),
                     sport=sport,
                     dport=dport,
+                    yara_matches=_scan_yara(carved),
                 ))
                 offset = pos + len(magic)
                 if len(extracted) >= 50:  # Cap
@@ -3509,6 +3558,27 @@ def _ipv6_ra_findings(ipv6_ra: dict) -> list[Finding]:
                    "A rogue RA hijacks the default route / DNS (SLAAC adversary-in-the-middle).",
         )]
     return []
+
+
+def _yara_findings(extracted_files: list) -> list[Finding]:
+    """Emit findings for carved files that matched a YARA rule (severity from the rule)."""
+    findings: list[Finding] = []
+    seen: set = set()
+    for f in extracted_files or []:
+        for m in f.get("yara_matches") or []:
+            rule = m.get("rule", "?")
+            key = (rule, f.get("md5"))
+            if key in seen:
+                continue
+            seen.add(key)
+            findings.append(Finding(
+                category="YARA Match",
+                severity=m.get("severity", "high"),
+                title=f"YARA rule '{rule}' matched carved file {f.get('filename', '?')}",
+                detail=f"A file carved from traffic (md5 {str(f.get('md5', ''))[:12]}, "
+                       f"{f.get('src_ip', '?')} -> {f.get('dst_ip', '?')}) matched YARA rule '{rule}'.",
+            ))
+    return findings
 
 
 # Extensions representing directly executable / script payloads. A file of one
