@@ -24,6 +24,21 @@ proven against real traffic.
 
 Tests skip gracefully if a capture is absent.
 
+## Attack captures (`attack/` subdirectory)
+
+Real adversary-tool captures from [sbousseaden/PCAP-ATTACK](https://github.com/sbousseaden/PCAP-ATTACK)
+(MIT-licensed, MITRE-ATT&CK-mapped). These are the ground truth crafted PDUs
+cannot provide — they exposed that WMI/DCSync ride a **dynamic** RPC port, not 135/445.
+
+| File | Exercises |
+|------|-----------|
+| `LM_psexec_smb_dcerpc_epm_svcctl.pcapng` | PsExec: svcctl bind + service binary over SMB → Needs Investigation |
+| `LM_smbexec_smb_dcerpc_svcctl_epm.pcapng` | smbexec: svcctl bind |
+| `LM_WMI_ProcessCallCreate.pcapng` | WMI lateral movement (IWbemServices on a dynamic port) |
+| `DCSync_krbtgt_dcerpc_smb.pcapng` | DCSync over **encrypted** RPC — documented blind spot (UUID not in cleartext) |
+| `CA_kerbrute_passwordspray_kerberos_AS-REQ.pcapng` | Kerberos AS-REQ password spray (future #13) |
+| `lm_mimikazt_skeleton_kerberos_rc4_etype.pcapng` | Kerberos RC4 etype / skeleton key (future #13) |
+
 ## Fetch the large / all captures
 
 ```sh

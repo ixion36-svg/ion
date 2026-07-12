@@ -3490,8 +3490,10 @@ def _detect_dcerpc(streams: dict) -> list[Finding]:
     # uuid_str -> [name, severity, mitre, {(src, dst)}]
     hits: dict[str, list] = {}
     for (src_ip, sport, dst_ip, dport), payload in streams.items():
-        if not ({sport, dport} & set(_DCERPC_PORTS)):
-            continue
+        # No port filter: WMI (IWbemServices) and DCSync (drsuapi) negotiate a
+        # DYNAMIC high port via the endpoint mapper, so the interface bind is not
+        # on 135/445. The bind marker + a full 16-byte known-interface UUID make
+        # false positives on non-RPC streams effectively impossible regardless of port.
         data = bytes(payload)
         # Require a DCE/RPC bind / alter-context marker before trusting a UUID hit.
         if b"\x05\x00\x0b" not in data and b"\x05\x00\x0e" not in data:

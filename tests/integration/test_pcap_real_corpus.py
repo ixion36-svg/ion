@@ -21,12 +21,20 @@ import pytest
 from ion.services.pcap_service import parse_pcap
 
 CORPUS = Path(__file__).parent.parent.parent / "test_pcaps" / "real"
+ATTACK = CORPUS / "attack"
 
 
 def _load(name):
     f = CORPUS / name
     if not f.exists():
         pytest.skip(f"real corpus capture {name} not present")
+    return parse_pcap(f.read_bytes(), name)
+
+
+def _load_attack(name):
+    f = ATTACK / name
+    if not f.exists():
+        pytest.skip(f"attack corpus capture {name} not present")
     return parse_pcap(f.read_bytes(), name)
 
 
@@ -127,6 +135,45 @@ class TestDnsPortAbuse:
         """Captures whose port-53 traffic is real DNS must NOT trip the tunnel rule."""
         r = _load("smb-on-windows-10.pcapng")  # has real DNS, no shell-over-53
         assert not _by_category(r, "Protocol Tunneling")
+
+
+class TestRealAttackCorpus:
+    """Real adversary tool captures (sbousseaden/PCAP-ATTACK, MITRE-mapped).
+    These are the ground truth that crafted PDUs cannot provide — e.g. they
+    exposed that WMI/DCSync ride a dynamic RPC port, not 135/445."""
+
+    def test_psexec_flagged_needs_investigation(self):
+        r = _load_attack("LM_psexec_smb_dcerpc_epm_svcctl.pcapng")
+        cats = _categories(r)
+        assert "DCE/RPC Lateral Movement" in cats  # svcctl
+        assert "Lateral Tool Transfer" in cats      # service binary over SMB
+        assert r.verdict["label"] == "Needs Investigation"
+        assert any(t["id"] == "T1569.002" for t in r.mitre_techniques)
+
+    def test_smbexec_flags_svcctl(self):
+        r = _load_attack("LM_smbexec_smb_dcerpc_svcctl_epm.pcapng")
+        svc = [f for f in _by_category(r, "DCE/RPC Lateral Movement") if "svcctl" in f["title"]]
+        assert svc and svc[0]["severity"] == "high"
+
+    def test_wmi_process_call_create_flagged(self):
+        """WMI ProcessCallCreate binds IWbemServices on a DYNAMIC RPC port —
+        must be detected regardless of port (T1047)."""
+        r = _load_attack("LM_WMI_ProcessCallCreate.pcapng")
+        wmi = [f for f in _by_category(r, "DCE/RPC Lateral Movement") if "WMI" in f["title"]]
+        assert wmi, f"WMI lateral movement not detected; categories={_categories(r)}"
+        assert wmi[0]["severity"] == "high"
+        assert any(t["id"] == "T1047" for t in r.mitre_techniques)
+
+    def test_dcsync_over_encrypted_rpc_is_known_blindspot(self):
+        """DOCUMENTED LIMITATION: this DCSync binds drsuapi over ENCRYPTED RPC —
+        the interface UUID never appears in cleartext (verified: absent from raw
+        bytes), so payload inspection cannot flag it. Network DCSync detection
+        needs behavioural context (a non-DC host replicating), which requires
+        asset knowledge the analyser doesn't have. Guard: parses cleanly and does
+        not emit a false positive."""
+        r = _load_attack("DCSync_krbtgt_dcerpc_smb.pcapng")
+        assert r.packet_count > 0
+        assert not _by_category(r, "DCE/RPC Lateral Movement")
 
 
 class TestKerberosEvidence:
