@@ -110,3 +110,20 @@ class TestCleartextEvidence:
     def test_dns_remoteshell_flags_cleartext(self):
         r = _load("dns-remoteshell.pcap")
         assert "Suspicious Port" in _categories(r) or "Cleartext Protocol" in _categories(r)
+
+
+class TestKerberosEvidence:
+    """Classic Kerberos is UDP/88 — the ticket extractor only scanned TCP streams,
+    so a real domain logon surfaced zero tickets. krb-816 is a benign logon: it
+    must yield tickets (context) without being flagged malicious."""
+
+    def test_krb816_extracts_udp_kerberos_tickets(self):
+        r = _load("krb-816.cap")
+        assert r.kerberos_tickets, "no Kerberos tickets extracted from a real UDP logon"
+        kinds = {t["msg_type"] for t in r.kerberos_tickets}
+        assert {"AS-REQ", "TGS-REQ"} & kinds, f"expected AS/TGS requests, got {kinds}"
+
+    def test_krb816_benign_logon_not_flagged(self):
+        """A normal domain logon must not produce high/critical findings."""
+        r = _load("krb-816.cap")
+        assert not any(f["severity"] in ("high", "critical") for f in r.findings)

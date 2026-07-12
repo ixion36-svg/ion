@@ -334,6 +334,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     payload_sigs: list[dict] = []  # malware signature hits
     suspicious_uas: list[dict] = []  # suspicious HTTP User-Agents
     cleartext_creds: list[dict] = []  # cleartext credential leaks
+    kerberos_udp: list[tuple] = []  # (src, dst, payload) for UDP/88 Kerberos (TCP is handled via streams)
 
     timestamps = []
     packet_count = 0
@@ -417,6 +418,11 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
                 _parse_isakmp(bytes(udp.data), src_ip, dst_ip, udp.sport, udp.dport,
                               ts, isakmp_sessions, proto_counter)
 
+            # Kerberos on UDP/88 (the classic transport). The TCP-stream ticket
+            # extractor never sees these, so collect them for _detect_kerberos_udp.
+            if (udp.dport == 88 or udp.sport == 88) and udp.data and len(kerberos_udp) < 500:
+                kerberos_udp.append((src_ip, dst_ip, bytes(udp.data)))
+
         elif isinstance(ip_pkt.data, dpkt.icmp.ICMP):
             proto_counter["ICMP"] += 1
         else:
@@ -497,7 +503,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
         result.credential_captures = [c.to_dict() for c in _extract_credentials(streams)]
         result.smb_transfers = [s.to_dict() for s in _detect_smb(streams)]
         dcerpc_findings = _detect_dcerpc(streams)
-        result.kerberos_tickets = _detect_kerberos(streams)
+        result.kerberos_tickets = _detect_kerberos(streams) + _detect_kerberos_udp(kerberos_udp)
         result.http_files = _extract_http_files(streams)
         result.base64_payloads = _detect_base64_payloads(streams)
         result.tls_certificates = _extract_tls_certificates(streams)
@@ -3512,33 +3518,67 @@ def _detect_dcerpc(streams: dict) -> list[Finding]:
 # Kerberos ticket detection
 # ---------------------------------------------------------------------------
 
-def _detect_kerberos(streams: dict) -> list[dict]:
-    """Detect Kerberos AS-REQ/AS-REP/TGS-REQ/TGS-REP on port 88."""
-    results: list[dict] = []
+# Kerberos ASN.1 DER application tags: AS-REQ [APPLICATION 10]=0x6a,
+# AS-REP=0x6b, TGS-REQ [12]=0x6c, TGS-REP=0x6d.
+_KERBEROS_MSG_TYPES = {0x6a: "AS-REQ", 0x6b: "AS-REP", 0x6c: "TGS-REQ", 0x6d: "TGS-REP"}
 
+
+def _kerberos_msg_type(data: bytes, window: int) -> Optional[str]:
+    """Return the Kerberos message type if an app tag appears in the first ``window`` bytes.
+
+    UDP carries the message from offset 0; TCP prefixes a 4-byte record length,
+    so the caller widens the window for stream data."""
+    for tag_byte, msg_type in _KERBEROS_MSG_TYPES.items():
+        if tag_byte in data[:window]:
+            return msg_type
+    return None
+
+
+def _detect_kerberos(streams: dict) -> list[dict]:
+    """Detect Kerberos AS-REQ/AS-REP/TGS-REQ/TGS-REP in TCP streams on port 88."""
+    results: list[dict] = []
     for (src_ip, sport, dst_ip, dport), payload in streams.items():
         if dport != 88 and sport != 88:
             continue
         data = bytes(payload)
         if len(data) < 10:
             continue
+        msg_type = _kerberos_msg_type(data, 4)
+        if msg_type:
+            results.append({
+                "msg_type": msg_type,
+                "src_ip": src_ip,
+                "dst_ip": dst_ip,
+                "detail": f"{msg_type} detected ({src_ip} → {dst_ip})",
+            })
+        if len(results) >= 100:
+            break
+    return results
 
-        # Kerberos uses ASN.1 DER encoding. The application tags are:
-        # AS-REQ: 0x6a (application 10), AS-REP: 0x6b (application 11)
-        # TGS-REQ: 0x6c (application 12), TGS-REP: 0x6d (application 13)
-        msg_types = {
-            0x6a: "AS-REQ", 0x6b: "AS-REP",
-            0x6c: "TGS-REQ", 0x6d: "TGS-REP",
-        }
-        for tag_byte, msg_type in msg_types.items():
-            if tag_byte in data[:4]:
-                results.append({
-                    "msg_type": msg_type,
-                    "src_ip": src_ip,
-                    "dst_ip": dst_ip,
-                    "detail": f"{msg_type} detected ({src_ip} → {dst_ip})",
-                })
-                break
+
+def _detect_kerberos_udp(packets: list[tuple]) -> list[dict]:
+    """Detect Kerberos messages in UDP/88 datagrams (the classic transport).
+
+    Each datagram is a bare KRB message, so the application tag is at offset 0.
+    Deduplicated per (src, dst, msg_type) to keep a busy logon from flooding."""
+    results: list[dict] = []
+    seen: set[tuple] = set()
+    for src_ip, dst_ip, data in packets:
+        if len(data) < 10:
+            continue
+        msg_type = _kerberos_msg_type(data, 2)
+        if not msg_type:
+            continue
+        key = (src_ip, dst_ip, msg_type)
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append({
+            "msg_type": msg_type,
+            "src_ip": src_ip,
+            "dst_ip": dst_ip,
+            "detail": f"{msg_type} detected over UDP ({src_ip} → {dst_ip})",
+        })
         if len(results) >= 100:
             break
     return results
