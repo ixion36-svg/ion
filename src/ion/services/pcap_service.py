@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 import dpkt
-import dpkt.icmp6
 import dpkt.dhcp
+import dpkt.icmp6
 
 try:  # YARA is optional — file carving still works without it.
     import yara as _yara

@@ -10,46 +10,47 @@ Accreditation-level test coverage:
 - Verdict scoring correctness and consistency
 """
 
-import struct
 import collections
+import struct
+
 import pytest
 
 from ion.services.pcap_service import (
-    parse_pcap,
-    PcapResult,
-    Finding,
-    _ip_to_str,
-    _is_private,
-    _fmt_bytes,
-    _shannon_entropy,
-    _detect_beaconing,
-    _detect_dns_tunneling,
-    _detect_suspicious_ports,
-    _detect_exfiltration,
-    _detect_port_scan,
-    _detect_dga,
-    _detect_isakmp_issues,
-    _detect_payload_signatures,
-    _detect_suspicious_uas,
-    _detect_cleartext_creds,
-    _scan_payload_signatures,
-    _check_suspicious_ua,
-    _check_cleartext_creds,
-    _compute_verdict,
-    _extract_tls_sni,
-    _parse_isakmp,
-    _parse_isakmp_payloads,
-    _summarise_isakmp,
-    _extract_ip,
-    _parse_dns,
-    SEVERITY_WEIGHTS,
-    SUSPICIOUS_PORTS,
-    CLEARTEXT_PORTS,
+    _BASE64_PE_MARKERS,
     _MAGIC_SIGNATURES,
     _SHELLCODE_PATTERNS,
-    _BASE64_PE_MARKERS,
     _SUSPICIOUS_UA_PATTERNS,
+    CLEARTEXT_PORTS,
+    SEVERITY_WEIGHTS,
+    SUSPICIOUS_PORTS,
+    Finding,
+    PcapResult,
+    _check_cleartext_creds,
+    _check_suspicious_ua,
+    _compute_verdict,
+    _detect_beaconing,
+    _detect_cleartext_creds,
+    _detect_dga,
+    _detect_dns_tunneling,
+    _detect_exfiltration,
+    _detect_isakmp_issues,
+    _detect_payload_signatures,
+    _detect_port_scan,
+    _detect_suspicious_ports,
+    _detect_suspicious_uas,
+    _extract_ip,
+    _extract_tls_sni,
+    _fmt_bytes,
+    _ip_to_str,
+    _is_private,
     _looks_like_real_file,
+    _parse_dns,
+    _parse_isakmp,
+    _parse_isakmp_payloads,
+    _scan_payload_signatures,
+    _shannon_entropy,
+    _summarise_isakmp,
+    parse_pcap,
 )
 
 
@@ -2023,7 +2024,7 @@ class TestCarvedFileValidation:
 
 def _dcerpc_bind(uuid_str):
     """Build a DCE/RPC v5 Bind PDU whose abstract-syntax interface is uuid_str."""
-    import uuid as _U
+    import uuid as _uuid_mod
     body = bytearray()
     body += bytes([0x05, 0x00, 0x0b, 0x03])          # ver5, ptype=bind, flags
     body += b"\x10\x00\x00\x00"                        # data representation (LE)
@@ -2032,7 +2033,7 @@ def _dcerpc_bind(uuid_str):
     body += b"\xd0\x16\xd0\x16\x00\x00\x00\x00"        # max xmit/recv, assoc group
     body += b"\x01\x00\x00\x00"                        # num ctx items (1) + pad
     body += b"\x00\x00\x01\x00"                        # ctx id + num transfer items
-    body += _U.UUID(uuid_str).bytes_le                 # abstract syntax interface UUID
+    body += _uuid_mod.UUID(uuid_str).bytes_le                 # abstract syntax interface UUID
     body += b"\x01\x00\x00\x00"                        # interface version
     body += b"\x00" * 20                               # transfer syntax filler
     return bytes(body)
