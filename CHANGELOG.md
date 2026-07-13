@@ -1,13 +1,88 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.49.7 -->
-<!-- ion-doc:version=0.49.7 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.50.0 -->
+<!-- ion-doc:version=0.50.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-07-06 -->
+<!-- ion-doc:date=2026-07-13 -->
 
 # Changelog
+
+## v0.50.0 — 2026-07-13
+
+**Observability (Prometheus metrics + Elastic APM) and PCAP internal-network
+detections.** Two feature streams land together: an opt-in observability layer
+that lets a SIEM-side Elastic stack monitor ION itself, and a major expansion
+of the PCAP analyzer into lateral-movement / internal-network territory
+validated against a real attack-capture corpus.
+
+### Observability — Prometheus `/metrics` + Elastic APM (opt-in, default OFF)
+
+- **`GET /metrics` (OpenMetrics)** — `ION_METRICS_ENABLED` gate (404 when off),
+  optional bearer-token gate (`ION_METRICS_TOKEN`), multiprocess-safe across
+  the 4 uvicorn workers via `PROMETHEUS_MULTIPROC_DIR`. Exposes HTTP request
+  counters/latency histograms labelled by route *template* (bounded
+  cardinality), build info, circuit-breaker states (ES / OpenCTI / TIDE /
+  Ollama / Kibana), and DB-pool gauges refreshed at scrape time.
+- **Elastic APM agent** — `ION_APM_ENABLED` + `ION_APM_*` env family
+  (server URL, service name, environment, secret-token / API-key auth, sample
+  rate, body/header capture both default conservative). Starlette middleware
+  provides route-templated transactions with auto-instrumented DB and template
+  spans.
+- **`ion.core.apm` safe wrappers** — every helper is a no-op when APM is off,
+  so call sites carry no guards and instrumentation can never break business
+  logic: `background_transaction` (wraps one background-loop tick as a
+  `scheduled` transaction; exceptions captured and re-raised),
+  `span`/`async_span` decorators, `set_user`, `label`.
+- **Deep instrumentation** — the 5 background loops (case grouper, case
+  embedding, KB embedding, Arkime auto-case, Bob investigation sweep) each
+  report per-tick transactions; Bob `investigate_alert` / `investigate_case`
+  and PCAP `parse_pcap` are named spans; authenticated transactions carry the
+  analyst's username for per-user APM filtering.
+- **Deploy kit** — `deploy/APM_INTEGRATION.md` (Elastic-side setup: Fleet and
+  standalone APM Server, API-key minting, Prometheus-integration scrape config)
+  plus `deploy/apm/apm-server.yml` and `deploy/apm/elastic-agent-ion.yml`
+  templates. Verified end-to-end against a live ES 8.15 + APM Server 8.15
+  stack.
+
+### PCAP — internal-network detections (validated on real attack captures)
+
+- **Lateral-movement detection** — SMB share/file access, DCE/RPC interface
+  fingerprinting incl. dynamic ports (drsuapi → DCSync T1003.006, svcctl →
+  PsExec-style service install T1569.002, WMI T1047, scheduled-task
+  T1053.005), ARP-spoofing (MAC claiming multiple IPs), 3-band verdict.
+- **Kerberos over UDP/88** — the classic transport was invisible to the
+  TCP-stream ticket extractor; AS-REQ/kerbrute password-spray patterns now
+  detected.
+- **Egress-evasion detection** — non-DNS traffic on port 53 (reverse shells /
+  tunnels riding the always-open port), DNS-over-TCP validation.
+- **Rogue infrastructure** — rogue-DHCP server detection (multiple OFFER/ACK
+  identities) and rogue-IPv6-RA / SLAAC-MITM detection (T1557); QUIC/HTTP3
+  flow awareness surfacing the JA3/JA4 fingerprinting blind spot.
+- **YARA scanning of carved files** — new optional `yara-python` dependency
+  (analyzer degrades gracefully without it); rules ship at
+  `src/ion/data/yara_rules/default.yar`, compiled once, 5 MB/file scan cap.
+- **Threat-intel cross-referencing** — PCAP-extracted external IPs/domains are
+  matched against enriched observables; IOC hits become findings and fold into
+  the recomputed verdict (detector-attached MITRE techniques preserved).
+- **Email analysis** — SMTP/IMAP/POP3 sessions parsed (senders, recipients,
+  subjects, attachments) + follow-stream reconstruction with printable-ASCII
+  previews.
+- **UI** — contained text overflow, data-transfer visualisation, centred
+  network graph.
+- **Test corpus** — real-capture regression suite under `test_pcaps/real/`
+  (kerbrute spray, DCSync, PsExec/smbexec/WMI lateral movement, Mimikatz
+  skeleton-key, ARP storm, DNS remote shell, Slammer, SMB2/3 baselines) — 330
+  tests.
+- **Hardening (review findings)** — QUIC-flow and IPv6-RA collectors capped at
+  500 distinct keys (a crafted capture of spoofed pairs could otherwise
+  balloon the JSON response); TI verdict recompute no longer drops
+  detector-attached MITRE techniques.
+
+New dependencies: `prometheus-client>=0.20.0`, `elastic-apm>=6.20.0`,
+`yara-python>=4.5.0`. New tests: metrics endpoint (4), APM helper safety
+contract (7), PCAP unit + TI + real-corpus (330). No schema migrations.
 
 ## v0.49.7 — 2026-07-07
 
