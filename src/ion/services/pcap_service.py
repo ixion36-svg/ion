@@ -488,7 +488,10 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             if (udp.dport == 443 or udp.sport == 443) and udp.data and len(udp.data) >= 5 \
                     and (udp.data[0] & 0xC0) == 0xC0:
                 qk = (src_ip, dst_ip)
-                quic_flows[qk] = quic_flows.get(qk, 0) + 1
+                # Cap distinct flows like the sibling collectors — a crafted capture
+                # of spoofed src/dst pairs must not balloon the result payload.
+                if qk in quic_flows or len(quic_flows) < 500:
+                    quic_flows[qk] = quic_flows.get(qk, 0) + 1
 
             # DHCP (UDP 67/68) — record OFFER/ACK server identity for rogue-server detection.
             if (udp.dport in (67, 68) or udp.sport in (67, 68)) and udp.data and len(dhcp_offers) < 500:
@@ -501,7 +504,8 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
             # IPv6 Router Advertisement (type 134) — multiple distinct routers
             # advertising is the rogue-RA / SLAAC MITM signature (T1557).
             if getattr(ip_pkt.data, "type", None) == 134:
-                ipv6_ra[src_ip] = ipv6_ra.get(src_ip, 0) + 1
+                if src_ip in ipv6_ra or len(ipv6_ra) < 500:
+                    ipv6_ra[src_ip] = ipv6_ra.get(src_ip, 0) + 1
         else:
             proto_counter["Other"] += 1
 

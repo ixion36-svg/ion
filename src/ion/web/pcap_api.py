@@ -102,7 +102,8 @@ def _apply_ti_findings(response: dict, enrichments: dict) -> None:
     try:
         from ion.services.pcap_service import Finding, _attach_mitre, _build_mitre_summary, _compute_verdict
         fobjs = [Finding(category=f["category"], severity=f["severity"],
-                         title=f.get("title", ""), detail=f.get("detail", "")) for f in response["findings"]]
+                         title=f.get("title", ""), detail=f.get("detail", ""),
+                         mitre=f.get("mitre") or []) for f in response["findings"]]
         _attach_mitre(fobjs)
         response["verdict"] = _compute_verdict(fobjs)
         response["mitre_techniques"] = _build_mitre_summary(fobjs)
