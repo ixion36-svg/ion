@@ -27,6 +27,7 @@ from typing import Any, Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ion.core import apm
 from ion.core.config import get_config
 from ion.models.document import Document
 from ion.models.kb_document_embedding import KBDocumentEmbedding
@@ -230,7 +231,8 @@ def _tick() -> Dict[str, Any]:
     factory = get_session_factory()
     session = factory()
     try:
-        summary = run_kb_embedding_once(session)
+        with apm.background_transaction("kb_embedding_loop"):
+            summary = run_kb_embedding_once(session)
     except Exception as exc:
         logger.exception("KB embedding tick crashed: %s", exc)
         summary = {"scanned": 0, "embedded": 0, "error": str(exc)}

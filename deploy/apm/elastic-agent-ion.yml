@@ -1,0 +1,56 @@
+# =============================================================================
+# Standalone Elastic Agent — scrape ION's Prometheus /metrics into the SIEM
+# (deploy/apm/elastic-agent-ion.yml)
+# =============================================================================
+# For those NOT using Fleet. Adds a `prometheus/metrics` input pointed at ION's
+# /metrics endpoint. Metrics land as `metrics-prometheus.collector-*` with a
+# `service.name: ion` tag so they correlate with the ION APM service.
+#
+# NOTE: standalone-agent YAML fields vary by agent version — validate against
+# your version's reference (Fleet UI, per deploy/APM_INTEGRATION.md §2a, is the
+# stabler path). This is a working starting point for 8.x.
+#
+# Prereqs on the ION side (.env.deploy):
+#   ION_METRICS_ENABLED=true
+#   ION_METRICS_TOKEN=<token>            # optional but recommended
+#   PROMETHEUS_MULTIPROC_DIR=/tmp/ion-metrics   # if ION_WORKERS > 1
+# =============================================================================
+
+outputs:
+  default:
+    type: elasticsearch
+    hosts: ["${ELASTICSEARCH_HOSTS:http://elasticsearch:9200}"]
+    username: "${ELASTICSEARCH_USERNAME:elastic}"
+    password: "${ELASTICSEARCH_PASSWORD}"
+    # ssl.certificate_authorities: ["/etc/elastic-agent/ca.crt"]
+
+inputs:
+  - type: prometheus/metrics
+    id: ion-metrics
+    use_output: default
+    data_stream:
+      namespace: default
+    streams:
+      - id: prometheus.collector.ion
+        data_stream:
+          type: metrics
+          dataset: prometheus.collector
+        # ION host:port — the app listens on 8099 by default.
+        hosts: ["${ION_HOST:ion}:${ION_PORT:8099}"]
+        metrics_path: /metrics
+        period: 30s
+        # Bearer auth — omit this block if ION_METRICS_TOKEN is unset.
+        headers:
+          Authorization: "Bearer ${ION_METRICS_TOKEN}"
+        # Tag the metrics with the same service name as the APM service.
+        processors:
+          - add_fields:
+              target: service
+              fields:
+                name: ion
+                environment: "${ENVIRONMENT:production}"
+
+# Optional: this same standalone agent can also host the APM Server input
+# (type: apm) instead of running a separate apm-server — see the Elastic docs
+# for the `apm` input. Most estates run APM via the Fleet APM integration; keep
+# them separate unless you have a reason to combine.

@@ -58,6 +58,8 @@ def _scan_yara(data: bytes) -> list[dict]:
     except Exception:
         return []
 
+from ion.core import apm
+
 
 @dataclass
 class Finding:
@@ -358,6 +360,7 @@ def _build_mitre_summary(findings: list[Finding]) -> list[dict]:
     return out
 
 
+@apm.span("pcap.parse", "task")
 def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     """Parse a PCAP/PCAPNG file and return analysis results."""
     buf = io.BytesIO(file_bytes)

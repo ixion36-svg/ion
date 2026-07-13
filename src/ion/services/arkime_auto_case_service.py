@@ -26,6 +26,8 @@ from typing import Optional
 
 from sqlalchemy.engine import Engine
 
+from ion.core import apm
+
 logger = logging.getLogger(__name__)
 
 _task: Optional[asyncio.Task] = None
@@ -272,7 +274,8 @@ async def _loop(engine: Engine) -> None:
             break
         if not _running:
             break
-        await _run_pass(engine)
+        with apm.background_transaction("arkime_auto_case_loop"):
+            await _run_pass(engine)
 
 
 def start_background_loop(engine: Engine) -> Optional[asyncio.Task]:

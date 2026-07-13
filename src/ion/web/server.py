@@ -300,6 +300,47 @@ app.add_middleware(RateLimitSecurityMiddleware)
 # Add request logging middleware (ECS-compliant)
 app.add_middleware(RequestLoggingMiddleware)
 
+# --- Observability (opt-in) --------------------------------------------------
+# Prometheus request metrics: only attach the middleware when /metrics is on,
+# so a disabled deployment carries zero overhead.
+try:
+    from ion.web.metrics_api import PrometheusMiddleware, metrics_enabled
+    if metrics_enabled():
+        app.add_middleware(PrometheusMiddleware)
+        logger.info("Prometheus /metrics endpoint enabled")
+except Exception as _metrics_e:  # pragma: no cover - defensive
+    logger.warning("Prometheus metrics setup failed (continuing without): %s", _metrics_e)
+
+# Elastic APM agent (in-process): ships transaction/DB/httpx spans to a separate
+# APM Server. Gated by ION_APM_ENABLED; added last so it is the outermost
+# middleware and captures the full request transaction.
+if os.environ.get("ION_APM_ENABLED", "").strip().lower() in ("1", "true", "yes", "on"):
+    try:
+        from elasticapm.contrib.starlette import ElasticAPM, make_apm_client
+        _apm_cfg = {
+            "SERVICE_NAME": os.environ.get("ION_APM_SERVICE_NAME", "ion"),
+            "SERVICE_VERSION": ion.__version__,
+            "SERVER_URL": os.environ.get("ION_APM_SERVER_URL", "http://localhost:8200"),
+            "ENVIRONMENT": os.environ.get("ION_APM_ENVIRONMENT", "production"),
+            # Sampling — lower on a busy prod (e.g. 0.2) to cut trace volume.
+            "TRANSACTION_SAMPLE_RATE": float(os.environ.get("ION_APM_SAMPLE_RATE", "1.0")),
+            # SECURITY: default OFF. ION request bodies carry alert content / PII,
+            # so never capture them unless an operator explicitly opts in.
+            "CAPTURE_BODY": os.environ.get("ION_APM_CAPTURE_BODY", "off"),
+            "CAPTURE_HEADERS": os.environ.get("ION_APM_CAPTURE_HEADERS", "false").strip().lower() in ("1", "true", "yes", "on"),
+        }
+        if os.environ.get("ION_APM_SECRET_TOKEN"):
+            _apm_cfg["SECRET_TOKEN"] = os.environ["ION_APM_SECRET_TOKEN"]
+        if os.environ.get("ION_APM_API_KEY"):
+            _apm_cfg["API_KEY"] = os.environ["ION_APM_API_KEY"]
+        app.add_middleware(ElasticAPM, client=make_apm_client(_apm_cfg))
+        logger.info(
+            "Elastic APM enabled: service=%s server=%s env=%s",
+            _apm_cfg["SERVICE_NAME"], _apm_cfg["SERVER_URL"], _apm_cfg["ENVIRONMENT"],
+        )
+    except Exception as _apm_e:
+        logger.warning("Elastic APM enable failed (continuing without APM): %s", _apm_e)
+
 # Configure rate limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -443,6 +484,12 @@ app.include_router(webhook_router, prefix="/api")
 app.include_router(daily_standup_router, prefix="/api")
 # v0.21.0: Bob Prompt Evaluation Harness — /api/bob-eval/* + /bob-eval page
 app.include_router(bob_eval_router, prefix="")
+
+# Prometheus scrape endpoint at the root (/metrics). The route itself is
+# gated by ION_METRICS_ENABLED (404 when off), so it's always safe to mount.
+from ion.web.metrics_api import router as metrics_router
+
+app.include_router(metrics_router)
 
 
 def _validate_startup_config():

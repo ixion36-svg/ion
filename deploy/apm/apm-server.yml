@@ -1,0 +1,50 @@
+# =============================================================================
+# Standalone Elastic APM Server config for ION  (deploy/apm/apm-server.yml)
+# =============================================================================
+# Only needed if you run apm-server standalone (not the Fleet-managed APM
+# integration). Receives traces from ION's in-process APM agent and writes them
+# to Elasticsearch. Air-gapped: talks only to your in-estate ES.
+#
+# Run (see deploy/APM_INTEGRATION.md §1c):
+#   docker run -d --name ion-apm --network ion-net -p 8200:8200 \
+#     -v $PWD/deploy/apm/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro \
+#     -e APM_SECRET_TOKEN=... -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 \
+#     -e ELASTICSEARCH_USERNAME=elastic -e ELASTICSEARCH_PASSWORD=... \
+#     docker.elastic.co/apm/apm-server:8.19.11   # match your stack version
+# =============================================================================
+
+apm-server:
+  host: "0.0.0.0:8200"
+
+  # Auth — the token here MUST equal ION's ION_APM_SECRET_TOKEN. (Or switch to
+  # API-key auth: api_key.enabled: true, and set ION_APM_API_KEY instead.)
+  auth:
+    secret_token: "${APM_SECRET_TOKEN}"
+    # api_key:
+    #   enabled: true
+
+  # ION is a backend service — no browser Real User Monitoring. Keep RUM OFF so
+  # no unauthenticated CORS endpoint is exposed.
+  rum:
+    enabled: false
+
+  # TLS to clients (optional; ION → APM can also be plain HTTP inside the estate)
+  # ssl:
+  #   enabled: true
+  #   certificate: "/etc/apm-server/apm.crt"
+  #   key: "/etc/apm-server/apm.key"
+
+output.elasticsearch:
+  hosts: ["${ELASTICSEARCH_HOSTS:http://elasticsearch:9200}"]
+  username: "${ELASTICSEARCH_USERNAME:elastic}"
+  password: "${ELASTICSEARCH_PASSWORD}"
+  # Self-signed ES: point at your CA bundle.
+  # ssl.certificate_authorities: ["/etc/apm-server/ca.crt"]
+
+# APM Server manages its own data streams + ILM in 8.x. To cap retention, edit
+# the `traces-apm*` / `metrics-apm*` / `logs-apm*` ILM policies in Kibana, or
+# reuse the pattern in deploy/elasticsearch/ilm-policy.json.
+
+logging:
+  level: info
+  to_stderr: true

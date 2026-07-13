@@ -37,6 +37,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from ion.core import apm
 from ion.models.investigation import Investigation
 from ion.storage import investigation_memory_repository as inv_repo
 from ion.storage.database import (
@@ -2079,6 +2080,7 @@ class InvestigationService:
     # Main entry point
     # ------------------------------------------------------------------ #
 
+    @apm.async_span("bob.investigate_alert", "ai")
     async def investigate_alert(
         self,
         alert_id: str,
@@ -2398,6 +2400,7 @@ class InvestigationService:
     # Cluster-level investigation (one LLM call per case, not per alert)
     # ------------------------------------------------------------------ #
 
+    @apm.async_span("bob.investigate_case", "ai")
     async def investigate_case(
         self,
         case_id: int,
@@ -2841,9 +2844,10 @@ class InvestigationService:
                         )
                     except Exception:
                         pass
-                    result = asyncio.run(
-                        self.investigate_open_alerts_sweep(max_alerts=max_per)
-                    )
+                    with apm.background_transaction("investigation_sweep_loop"):
+                        result = asyncio.run(
+                            self.investigate_open_alerts_sweep(max_alerts=max_per)
+                        )
                     logger.info(
                         "Investigation sweep complete: %s",
                         json.dumps(result, default=str),

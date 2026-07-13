@@ -47,6 +47,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
+from ion.core import apm
 from ion.core.config import get_config
 from ion.models.alert_triage import (
     AlertCase,
@@ -809,7 +810,8 @@ def _tick() -> Dict[str, Any]:
     factory = get_session_factory()
     session = factory()
     try:
-        summary = run_grouper_once(session)
+        with apm.background_transaction("case_grouper_loop"):
+            summary = run_grouper_once(session)
     except Exception as exc:
         logger.exception("Case grouper tick crashed: %s", exc)
         summary = {

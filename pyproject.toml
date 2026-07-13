@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.49.7"
+version = "0.50.0"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -88,6 +88,11 @@ dependencies = [
     "Pillow>=12.2.0",          # CVE-2026-40192 + 4 others (WeasyPrint dep)
     "pyasn1>=0.6.3",           # CVE-2026-30922: recursion bomb DoS via crafted ASN.1
     "pygments>=2.20.0",        # CVE-2026-4539: ReDoS in AdlLexer (local access)
+    # Observability (opt-in): Prometheus /metrics endpoint + Elastic APM agent.
+    # Both are gated (ION_METRICS_ENABLED / ION_APM_ENABLED, default off) and
+    # imported lazily, so the app runs without them if the import ever fails.
+    "prometheus-client>=0.20.0",
+    "elastic-apm>=6.20.0",
 ]
 
 [project.optional-dependencies]

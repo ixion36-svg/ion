@@ -94,6 +94,13 @@ def get_current_user(
                 detail="Password change required before continuing",
             )
 
+    # APM: tag the transaction with the analyst (no-op when APM is off).
+    from ion.core import apm
+    apm.set_user(
+        username=getattr(user, "username", None),
+        user_id=getattr(user, "id", None),
+        email=getattr(user, "email", None),
+    )
     return user
 
 
