@@ -16,6 +16,14 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from ion.models.alert_prompt import AlertPromptTemplate
+
+# v0.50.1: the enrichment-digest implementation moved to embedding_service so
+# the stored case vector (case_embedding_service) digests enrichment with the
+# exact same code as the query vector here. Aliased to its historical private
+# name because the query-vector builder and existing callers/tests use it.
+from ion.services.embedding_service import (
+    format_enrichment_digest as _enrichment_digest,
+)
 from ion.storage.alert_prompt_repository import AlertPromptRepository
 
 logger = logging.getLogger(__name__)
@@ -66,30 +74,6 @@ def _kb_rag_enabled() -> bool:
     return os.environ.get("ION_KB_RAG_ENABLED", "true").lower() in (
         "true", "1", "yes",
     )
-
-
-def _enrichment_digest(enrichment: object, *, max_chars: int = 400) -> str:
-    """Compact one-line digest of TI enrichment verdicts for the query vector.
-
-    Enrichment shape (per ``investigation_service``) is
-    ``{kind: {indicator: context}}`` with ``kind`` in ip/domain/url/hash.
-    We emit ``kind: indicator (context…); …`` with each context clipped and
-    the whole digest capped at ``max_chars`` so one verbose enrichment field
-    cannot dominate the embedding. Non-dict / empty → "".
-    """
-    if not isinstance(enrichment, dict):
-        return ""
-    bits: list[str] = []
-    for kind, hits in enrichment.items():
-        if not isinstance(hits, dict) or not hits:
-            continue
-        inds = []
-        for ind, ctx in hits.items():
-            ctx_str = ctx if isinstance(ctx, str) else str(ctx)
-            inds.append(f"{ind} ({ctx_str[:60]})" if ctx_str else str(ind))
-        if inds:
-            bits.append(f"{kind}: " + ", ".join(inds))
-    return "; ".join(bits)[:max_chars]
 
 
 def _alert_text_for_embedding(alert: dict) -> str:

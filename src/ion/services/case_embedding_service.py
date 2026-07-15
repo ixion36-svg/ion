@@ -3,8 +3,9 @@
 Runs under advisory lock ``LOCK_CASE_EMBEDDING_BG`` (1019). On each tick:
 
 1. Build the embed-source text for each case (title + description +
-   triggered rules + affected hosts + evidence summary + Bob's latest
-   investigation summary).
+   triggered rules + affected hosts + evidence summary + MITRE-technique
+   union + TI-enrichment digest + Bob's latest decisive investigation
+   summary).
 2. Hash the source text (SHA-256).
 3. Find cases whose ``case_embeddings`` row is missing OR whose
    ``source_text_hash`` differs from the current hash (stale — case edited).
@@ -17,6 +18,7 @@ Honours ``ION_EMBEDDING_ENABLED`` and ``ION_CASE_EMBEDDING_INTERVAL_S``.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import threading
@@ -28,7 +30,7 @@ from sqlalchemy.orm import Session
 
 from ion.core import apm
 from ion.core.config import get_config
-from ion.models.alert_triage import AlertCase
+from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.case_embedding import CaseEmbedding
 from ion.models.investigation import Investigation
 from ion.services.embedding_service import (
@@ -52,12 +54,95 @@ _last_result: Optional[Dict[str, Any]] = None
 # ---------------------------------------------------------------------------
 
 
+# v0.50.1: bounds for the symmetry sections. MITRE capped by technique count
+# (IDs are tiny — 20 is far beyond any real case's union); the enrichment
+# digest reuses the query side's 400-char default. The lookback bounds how
+# many recent IOC snapshots we scan for a non-empty enrichment digest — the
+# newest snapshot can legitimately be empty (no IOCs extracted on that run)
+# while an older one carries the case's real TI verdicts.
+_MITRE_MAX_TECHNIQUES = 20
+_ENRICHMENT_SNAPSHOT_LOOKBACK = 5
+
+
+def _case_mitre_techniques(session: Session, case: AlertCase) -> list[str]:
+    """Union of MITRE technique IDs across the case's triage entries.
+
+    ``AlertTriage.mitre_techniques`` rows are lists of dicts
+    (``{technique_id, technique_name, tactic_name, source}`` — see the
+    validator in ``web/api.py``); legacy rows may hold bare ID strings.
+    Both shapes are accepted. Deduped and sorted so the source text (and
+    therefore its hash) is stable regardless of triage-row order.
+    """
+    rows = session.execute(
+        select(AlertTriage.mitre_techniques)
+        .where(AlertTriage.case_id == case.id)
+        .where(AlertTriage.mitre_techniques.isnot(None))
+    ).scalars().all()
+    ids: set[str] = set()
+    for techs in rows:
+        if not isinstance(techs, list):
+            continue
+        for tech in techs:
+            if isinstance(tech, dict):
+                tid = str(tech.get("technique_id") or "").strip()
+            else:
+                tid = str(tech).strip()
+            if tid:
+                ids.add(tid)
+    return sorted(ids)[:_MITRE_MAX_TECHNIQUES]
+
+
+def _case_enrichment_digest(session: Session, case: AlertCase) -> str:
+    """TI-enrichment digest for the case, from stored IOC snapshots.
+
+    Investigations persist ``{"extracted": …, "enrichment": {kind:
+    {indicator: context}}}`` in ``ioc_snapshot_json`` — the enrichment
+    sub-dict is exactly the shape the shared digest consumes. Unlike the
+    AI summary (v0.37.0 decisive-verdict filter), enrichment is factual
+    TI-lookup output, not LLM prose, so an inconclusive run's enrichment
+    is still valid signal — no verdict filter here. Scans the most recent
+    ``_ENRICHMENT_SNAPSHOT_LOOKBACK`` snapshots and returns the first
+    non-empty digest.
+    """
+    from ion.services.embedding_service import format_enrichment_digest
+
+    if not case.source_alert_ids:
+        return ""
+    snapshots = (
+        session.execute(
+            select(Investigation.ioc_snapshot_json)
+            .where(Investigation.alert_id_ref.in_(list(case.source_alert_ids)))
+            .where(Investigation.ioc_snapshot_json.isnot(None))
+            .order_by(Investigation.id.desc())
+            .limit(_ENRICHMENT_SNAPSHOT_LOOKBACK)
+        ).scalars().all()
+    )
+    for raw in snapshots:
+        try:
+            snap = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(snap, dict):
+            continue
+        digest = format_enrichment_digest(snap.get("enrichment"))
+        if digest:
+            return digest
+    return ""
+
+
 def _case_source_text(session: Session, case: AlertCase) -> str:
     """Build the blob of text that represents this case for embedding.
 
     Designed to be stable — same case, same text. If the case is edited
     (title, description, notes) or a new investigation summary lands, the
     hash will change and the background loop re-embeds.
+
+    v0.50.1: appends ``MITRE:`` and ``Enrichment:`` sections mirroring the
+    labels/format the alert query vector has carried since v0.37.0
+    (``alert_prompt_service._alert_text_for_embedding``) — before this the
+    query side's sharpest sections had nothing case-side to match against.
+    They sit before the AI summary so the compact high-signal text stays
+    clear of nomic's silent end-of-window truncation.
     """
     from ion.services.embedding_service import (
         _clip,
@@ -88,6 +173,14 @@ def _case_source_text(session: Session, case: AlertCase) -> str:
     )
     if case.evidence_summary:
         parts.append(f"Evidence: {_clip(case.evidence_summary, 1200)}")
+
+    # v0.50.1 symmetry sections — same labels/format as the query vector.
+    techniques = _case_mitre_techniques(session, case)
+    if techniques:
+        parts.append("MITRE: " + ", ".join(techniques))
+    enrichment = _case_enrichment_digest(session, case)
+    if enrichment:
+        parts.append(f"Enrichment: {enrichment}")
 
     # Bob's most recent DECISIVE investigation summary for any alert in this
     # case adds strong signal — two cases with similar Bob-analyses are likely

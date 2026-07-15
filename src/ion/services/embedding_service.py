@@ -71,6 +71,34 @@ def _clip(value: object, max_chars: int) -> str:
     return s[:max_chars] if max_chars and len(s) > max_chars else s
 
 
+def format_enrichment_digest(enrichment: object, *, max_chars: int = 400) -> str:
+    """Compact one-line digest of TI enrichment verdicts for embedding text.
+
+    Enrichment shape (per ``investigation_service``) is
+    ``{kind: {indicator: context}}`` with ``kind`` in ip/domain/url/hash.
+    We emit ``kind: indicator (context…); …`` with each context clipped and
+    the whole digest capped at ``max_chars`` so one verbose enrichment field
+    cannot dominate the embedding. Non-dict / empty → "".
+
+    v0.50.1: moved here from ``alert_prompt_service`` so the alert query
+    vector and the stored case vector digest enrichment identically —
+    same centralisation rationale as ``format_core_embedding_sections``.
+    """
+    if not isinstance(enrichment, dict):
+        return ""
+    bits: list[str] = []
+    for kind, hits in enrichment.items():
+        if not isinstance(hits, dict) or not hits:
+            continue
+        inds = []
+        for ind, ctx in hits.items():
+            ctx_str = ctx if isinstance(ctx, str) else str(ctx)
+            inds.append(f"{ind} ({ctx_str[:60]})" if ctx_str else str(ind))
+        if inds:
+            bits.append(f"{kind}: " + ", ".join(inds))
+    return "; ".join(bits)[:max_chars]
+
+
 def format_core_embedding_sections(
     *,
     title: object = None,
