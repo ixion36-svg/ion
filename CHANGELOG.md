@@ -1,13 +1,40 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.51.0 -->
-<!-- ion-doc:version=0.51.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.51.1 -->
+<!-- ion-doc:version=0.51.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-15 -->
 
 # Changelog
+
+## v0.51.1 — 2026-07-15
+
+**AI air-gap best-practices documentation + briefing deck.** Knowledge-transfer
+release distilling ION's AI development experience into reusable guidance:
+
+- **`docs/AI_AIRGAP_BEST_PRACTICES_HLD.md`** (+ branded PDF) — principles,
+  reference architecture, governance model, OWASP LLM Top 10 mapping, and a
+  lessons-learned register: 13 practices for deploying AI/LLM capability
+  inside a disconnected security boundary, each tied to the concrete ION
+  incident or measurement that produced it.
+- **`docs/AI_AIRGAP_BEST_PRACTICES_LLD.md`** (+ branded PDF) — the
+  implementation companion: prompt-budget algorithm, citation-validation
+  pattern, chunking parameters, staleness/re-embed triggers, feedback-ledger
+  contracts, eval-harness design, AI data-at-rest inventory, model-swap
+  runbook, ranked test strategy, and the full configuration reference.
+- **New `/briefings` deck — "AI in Air-Gap (Best Practices)"**: 12 authored
+  SVG slides in the house deck style (context → architecture → the 13
+  principles with their incident stories → OWASP mapping → adoption path);
+  the deck's PDF download serves the full HLD document as the handout.
+
+**No new attack surface**: same class as the v0.48.0 AD decks — static
+same-origin SVG served as `<img>` under the strict CSP, deck id resolved
+through the fixed server-side allowlist (path-traversal regression suite
+still green, plus a new test pinning the deck's 12 slides and PDF link).
+No new route, permission, schema, or dependency. Net new findings:
+0C / 0H / 0M / 0L.
 
 ## v0.51.0 — 2026-07-15
 
