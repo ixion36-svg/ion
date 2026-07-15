@@ -1,13 +1,52 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.50.1 -->
-<!-- ion-doc:version=0.50.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.50.2 -->
+<!-- ion-doc:version=0.50.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-15 -->
 
 # Changelog
+
+## v0.50.2 — 2026-07-15
+
+**Evidence-grounded AI closure rewrite (NIST SP 800-61 structure).** The Close
+Case dialog's "AI rewrite" (v0.42.0) sent the model NO case evidence — only
+the analyst's draft, the closure reason, the title, and a similar-case
+precedent block — so with a thin draft the model's only concrete material was
+precedent, and the output degenerated into "a similar case 00025 was closed
+as benign". This release makes the note evidence-first:
+
+- **Case evidence in the prompt** — a new `_gather_closure_evidence()`
+  (`web/ai_api.py`) feeds the model this case's own facts as the ONLY
+  citable source: case description, affected hosts/users, triggered rules,
+  extracted observables, evidence summary, triage-entry rule names, the
+  MITRE technique union, analyst triage notes, the latest **decisive** Bob
+  investigation summary, and the TI-enrichment digest (reusing the v0.50.1
+  case-embedding helper). Per-section clipped, 3,000-char cap, best-effort
+  (any lookup failure degrades to the previous no-evidence behaviour).
+- **NIST SP 800-61 structure** — the note is generated as four labelled
+  plain-text sections per incident-documentation practice: **Summary**
+  (what was detected, scope), **Evidence** (quoting real values — IPs,
+  hostnames, hashes, rule names, technique IDs), **Rationale** (why the
+  evidence supports the selected closure reason), **Follow-up** (actions
+  taken/recommended, or "None."). The empty-draft skeleton keeps the same
+  structure with `[observable]`-style placeholders.
+- **Analyst comment + outcome are authoritative** — the Rationale
+  instruction is bound to the analyst's selected closure reason, and the
+  draft's facts and verdict may not be altered or contradicted.
+- **Precedent demoted** — comparable past closures may contribute at most
+  ONE trailing sentence at the end of Rationale, never open the note, and
+  never substitute for this case's own evidence.
+- Response adds `evidence_used` alongside `precedents_used`.
+
+No new route, permission, schema, or dependency — the endpoint, its auth,
+and the frontend payload are unchanged (`cases.html` already sent
+`case_id`); the evidence gathered is first-party case data the caller can
+already read, flowing to the same local Ollama trust boundary. **8 new
+tests** (`tests/test_v050_2_closure_rewrite_evidence.py`); the v0.42.0
+suite still passes unchanged (12 total). Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.50.1 — 2026-07-15
 
