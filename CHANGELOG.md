@@ -1,13 +1,49 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.50.0 -->
-<!-- ion-doc:version=0.50.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.50.1 -->
+<!-- ion-doc:version=0.50.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-07-13 -->
+<!-- ion-doc:date=2026-07-15 -->
 
 # Changelog
+
+## v0.50.1 — 2026-07-15
+
+**RAG case-embedding symmetry.** Since v0.37.0 the alert *query* vector has
+carried `MITRE:` and `Enrichment:` sections, but the stored *case* vector only
+had that signal incidentally in prose — the query's sharpest sections had
+nothing case-side to match against. This release closes the asymmetry (the
+"case-side MITRE/enrichment symmetry" item from the RAG-rework backlog).
+
+- **`MITRE:` section on the case vector** — `_case_source_text` now embeds the
+  deduped, sorted union of `AlertTriage.mitre_techniques` across the case's
+  triage entries (validated dict shape and legacy bare-string IDs both
+  accepted; capped at 20 techniques). Sorted so the source text — and its
+  re-embed-trigger hash — is stable regardless of triage-row order.
+- **`Enrichment:` section on the case vector** — the shared TI-verdict digest
+  over the `enrichment` sub-dict of the case's recent
+  `Investigation.ioc_snapshot_json` snapshots (5-snapshot lookback, skipping
+  empty ones). Deliberately **no** decisive-verdict filter: unlike the AI
+  summary (v0.37.0), enrichment is factual TI-lookup output, so an
+  inconclusive run's verdicts still count.
+- **Section order** — Evidence → MITRE → Enrichment → AI summary: the compact
+  high-signal sections sit ahead of the large summary blob, clear of
+  nomic-embed-text's silent end-of-window truncation.
+- **One digest implementation** — `_enrichment_digest` moved to
+  `embedding_service.format_enrichment_digest` (same centralisation rationale
+  as `format_core_embedding_sections`); `alert_prompt_service` keeps an alias,
+  so the query and case builders cannot drift.
+- **No spurious corpus re-embed** — cases with neither section produce
+  byte-identical source text (hash unchanged, skipped by the background
+  loop); only cases that actually gain signal re-embed.
+
+Internal embedding-text logic only — no new route, permission, schema, or
+dependency; adversary-controlled alert content already flowed into the prompt
+and the vectors are similarity-only. **13 new tests**
+(`tests/test_v050_1_case_embedding_symmetry.py`); v0.35–v0.38 RAG suites green
+(57 total). Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.50.0 — 2026-07-13
 
