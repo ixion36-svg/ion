@@ -716,6 +716,121 @@ def _gather_closure_precedents(case_id: int, limit: int = 3) -> List[dict]:
     return []
 
 
+def _gather_closure_evidence(case_id: int) -> str:
+    """Bounded factual evidence block for the closure-rewrite prompt.
+
+    v0.50.2: the rewrite previously saw NO case evidence — only the draft,
+    reason, title, and precedent block — so when the draft was thin the
+    model's only concrete material was precedent and it parroted "a similar
+    case NNNNN was closed as …". This gathers THIS case's own facts so the
+    note can be structured around, and quote, real evidence:
+
+    - AlertCase: description, affected hosts/users, triggered rules,
+      extracted observables, evidence summary.
+    - AlertTriage entries: detection rule names, MITRE technique union,
+      analyst triage notes.
+    - The latest DECISIVE Bob investigation summary (same filter the case
+      embedder uses — inconclusive boilerplate is noise).
+    - The TI-enrichment digest (reuses the case-embedding helper).
+
+    Every section is clipped and the whole block capped, so one verbose
+    field cannot crowd out the rest of the prompt. Best-effort: any failure
+    returns "" and the rewrite proceeds without an evidence block.
+    """
+    try:
+        from ion.models.alert_triage import AlertCase, AlertTriage
+        from ion.models.investigation import Investigation
+        from ion.services.case_embedding_service import _case_enrichment_digest
+
+        for db in get_session():
+            case = db.get(AlertCase, case_id)
+            if case is None:
+                return ""
+            lines: List[str] = []
+            if case.description:
+                lines.append(f"Case description: {str(case.description)[:600]}")
+            if case.affected_hosts:
+                lines.append(
+                    "Affected hosts: "
+                    + ", ".join(str(h) for h in case.affected_hosts[:10])
+                )
+            if case.affected_users:
+                lines.append(
+                    "Affected users: "
+                    + ", ".join(str(u) for u in case.affected_users[:10])
+                )
+            if case.triggered_rules:
+                lines.append(
+                    "Triggered rules: "
+                    + ", ".join(str(r) for r in case.triggered_rules[:8])
+                )
+            if case.observables:
+                obs_bits = []
+                for o in case.observables[:15]:
+                    if isinstance(o, dict):
+                        obs_bits.append(
+                            f"{o.get('type', 'observable')}={o.get('value', '')}"
+                        )
+                    else:
+                        obs_bits.append(str(o))
+                lines.append("Extracted observables: " + "; ".join(obs_bits))
+            if case.evidence_summary:
+                lines.append(
+                    f"Evidence summary: {str(case.evidence_summary)[:800]}"
+                )
+
+            triages = (
+                db.query(AlertTriage)
+                .filter(AlertTriage.case_id == case_id)
+                .limit(20)
+                .all()
+            )
+            rule_names = sorted({t.rule_name for t in triages if t.rule_name})
+            if rule_names:
+                lines.append("Detection rules: " + ", ".join(rule_names[:8]))
+            mitre_ids: set = set()
+            for t in triages:
+                if not isinstance(t.mitre_techniques, list):
+                    continue
+                for tech in t.mitre_techniques:
+                    tid = (
+                        str(tech.get("technique_id") or "").strip()
+                        if isinstance(tech, dict) else str(tech).strip()
+                    )
+                    if tid:
+                        mitre_ids.add(tid)
+            if mitre_ids:
+                lines.append("MITRE techniques: " + ", ".join(sorted(mitre_ids)[:12]))
+            triage_notes = [t.analyst_notes for t in triages if t.analyst_notes]
+            for note in triage_notes[:3]:
+                lines.append(f"Analyst triage note: {str(note)[:300]}")
+
+            if case.source_alert_ids:
+                inv = (
+                    db.query(Investigation)
+                    .filter(Investigation.alert_id_ref.in_(list(case.source_alert_ids)))
+                    .filter(Investigation.summary_text.isnot(None))
+                    .filter(Investigation.verdict.isnot(None))
+                    .filter(Investigation.verdict != "inconclusive")
+                    .order_by(Investigation.id.desc())
+                    .first()
+                )
+                if inv and inv.summary_text:
+                    lines.append(
+                        f"AI investigation ({inv.verdict}): "
+                        f"{str(inv.summary_text)[:600]}"
+                    )
+
+            digest = _case_enrichment_digest(db, case)
+            if digest:
+                lines.append(f"TI enrichment: {digest}")
+
+            return "\n".join(lines)[:3000]
+    except Exception as exc:  # noqa: BLE001 — evidence is best-effort enrichment
+        logger.debug("Closure-evidence lookup failed for case %s: %s", case_id, exc)
+    return ""
+
+
 @router.post("/closure/rewrite")
 async def closure_rewrite(
     request_data: dict,
@@ -724,12 +839,18 @@ async def closure_rewrite(
     """Polish an analyst's draft case-closure comment into a clear rationale.
 
     Takes the analyst's draft notes plus the selected closure reason (and an
-    optional case title for context) and returns a tightened, professional
-    closing comment, kept to a few short paragraphs. When the draft is empty it
-    produces a sensible starting point keyed off the closure reason. When a
-    ``case_id`` is supplied, comparable closed cases (with their closure notes)
-    are surfaced to the model as precedent so the rationale can reference how
-    similar cases were resolved.
+    optional case title for context) and returns a structured, professional
+    closing note. When the draft is empty it produces a skeleton keyed off the
+    closure reason.
+
+    v0.50.2: the note is structured after NIST SP 800-61 incident
+    documentation — Summary / Evidence / Rationale / Follow-up — and when a
+    ``case_id`` is supplied the case's own evidence (observables, rules,
+    MITRE, triage notes, decisive AI investigation, TI enrichment) is fed to
+    the model as the ONLY citable fact source, with the analyst's draft and
+    selected closure reason authoritative for the disposition. Precedent
+    (comparable closed cases) is demoted to at most one trailing sentence —
+    it may no longer carry the note.
     """
     service = get_ollama_service()
 
@@ -748,12 +869,14 @@ async def closure_rewrite(
     context_block = "\n".join(context_lines)
 
     precedents: List[dict] = []
+    evidence_block = ""
     if isinstance(case_id, int) or (isinstance(case_id, str) and case_id.isdigit()):
         precedents = _gather_closure_precedents(int(case_id))
+        evidence_block = _gather_closure_evidence(int(case_id))
     precedent_block = ""
     if precedents:
         lines = [
-            "Comparable past closures (for precedent only — do NOT copy their "
+            "Comparable past closures (background only — do NOT copy their "
             "specific observables/hosts into this note):",
         ]
         for p in precedents:
@@ -763,42 +886,69 @@ async def closure_rewrite(
             )
         precedent_block = "\n".join(lines)
 
+    evidence_instr = ""
+    if evidence_block:
+        evidence_instr = (
+            "\n\nCase evidence — the ONLY facts you may cite; quote specific "
+            "values (hostnames, IPs, usernames, hashes, rule names, technique "
+            "IDs) from here:\n"
+            f"\"\"\"\n{evidence_block}\n\"\"\""
+        )
+
     if draft:
         task = (
             "Rewrite the analyst's draft closing comment below into a clear, "
-            "concise, professional rationale that explains WHY the case is being "
-            "closed under this reason. Preserve every fact, observable, hostname, "
-            "IP, username and decision the analyst included — do not invent new "
-            "details or alter the verdict. Fix grammar, tighten wording, and make "
-            "it read like a defensible SOC closure note."
-            f"\n\nDraft closing comment:\n\"\"\"\n{draft}\n\"\"\""
+            "concise, professional closure note that explains WHY the case is "
+            "being closed under the selected reason. The analyst's draft and "
+            "their selected closure reason are AUTHORITATIVE: preserve every "
+            "fact, observable, hostname, IP, username and decision the analyst "
+            "included, and the note's conclusion MUST agree with both — do not "
+            "invent new details or alter the verdict."
+            f"\n\nAnalyst's draft closing comment:\n\"\"\"\n{draft}\n\"\"\""
         )
     else:
         task = (
-            "The analyst has not written a closing comment yet. Draft a short, "
-            "professional skeleton closure note appropriate for this closure "
-            "reason that the analyst can fill in. Use neutral placeholders like "
-            "[observable] or [finding] where specific evidence is needed rather "
-            "than inventing facts."
+            "The analyst has not written a closing comment yet. Draft a "
+            "closure note in the structure below, grounded in the case "
+            "evidence where it is available, whose conclusion agrees with the "
+            "selected closure reason. Use neutral placeholders like "
+            "[observable] or [finding] where a needed fact is missing rather "
+            "than inventing it."
         )
 
     precedent_instr = ""
     if precedent_block:
         precedent_instr = (
             f"\n\n{precedent_block}\n\n"
-            "If the precedent above is relevant, you MAY add ONE short sentence "
-            "noting that comparable cases were closed the same way (cite the case "
-            "number). Ground everything else strictly in THIS case's own facts."
+            "Precedent is background, never the argument: at most ONE short "
+            "sentence at the END of the Rationale section noting that "
+            "comparable cases were closed the same way (cite the case "
+            "number), and only if directly relevant. Never open the note or "
+            "any section with precedent, and never let it substitute for this "
+            "case's own evidence."
         )
 
+    # Structure per NIST SP 800-61 incident documentation: what was detected,
+    # the evidence examined, the analysis behind the disposition, follow-up.
     prompt = (
         "You are assisting a SOC analyst writing the closing comment for a "
-        "security investigation case.\n\n"
-        f"{context_block}\n\n{task}{precedent_instr}\n\n"
-        "Keep the result SHORT: two to three brief paragraphs, four at the "
-        "absolute most (roughly 150 words). Respond with ONLY the rewritten "
-        "closing comment as plain text — no preamble, no markdown headings, no "
-        "quotation marks around the whole response."
+        "security investigation case. Closure notes follow NIST SP 800-61 "
+        "incident-documentation practice: record what was detected, the "
+        "evidence examined, the analysis that led to the disposition, and any "
+        "follow-up actions.\n\n"
+        f"{context_block}\n\n{task}{evidence_instr}{precedent_instr}\n\n"
+        "Structure the note as exactly these four labelled parts, each a "
+        "short plain-text paragraph (label, colon, then the text):\n"
+        f"Summary: what was detected and its scope (host, user, rule), 1-2 sentences.\n"
+        "Evidence: the specific observables and facts reviewed — quote real "
+        "values from the case evidence and the analyst's draft.\n"
+        f"Rationale: why that evidence supports closing as \"{reason_label}\" "
+        "— consistent with the analyst's stated conclusion.\n"
+        "Follow-up: actions taken or recommended (tuning, monitoring, "
+        "escalation); write \"None.\" if none.\n\n"
+        "Keep the whole note under roughly 180 words across the four short "
+        "paragraphs. Respond with ONLY the closure note as plain text — no "
+        "preamble, no markdown, no quotation marks around the whole response."
     )
 
     try:
@@ -813,6 +963,7 @@ async def closure_rewrite(
             "content": (result["content"] or "").strip(),
             "model": result["model"],
             "precedents_used": len(precedents),
+            "evidence_used": bool(evidence_block),
         }
     except OllamaError as e:
         raise HTTPException(status_code=503, detail=safe_error(e))
