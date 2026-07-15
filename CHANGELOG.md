@@ -1,13 +1,72 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.50.2 -->
-<!-- ion-doc:version=0.50.2 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.51.0 -->
+<!-- ion-doc:version=0.51.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-15 -->
 
 # Changelog
+
+## v0.51.0 — 2026-07-15
+
+**RAG rework Phase 3: chunk-level KB embeddings + Playbook RAG layer.**
+
+### KB chunking
+
+- **Chunk-level vectors** — `KBChunkEmbedding` (`kb_chunk_embeddings`,
+  composite PK `document_id`+`chunk_index`, the chunk's own text stored)
+  replaces the whole-document `KBDocumentEmbedding`. One vector per article
+  had two defects: long articles lost their tails (nomic-embed-text's silent
+  end-of-window truncation plus an 8,000-char input cap), and retrieval
+  could only surface the *document*, so the prompt excerpt was the first
+  800 chars of the doc head — often not the passage that matched at all.
+- **Chunker** — greedy paragraph packing to ≈1,600 chars (≈400 tokens, well
+  inside nomic's window), overlap carry-over on hard splits of oversized
+  paragraphs, 64-chunk cap per doc, and a chunking-scheme marker folded
+  into the staleness hash so a future parameter change re-chunks the corpus
+  exactly once.
+- **Atomic re-embeds** — a document's chunk set is only ever replaced
+  whole; any mid-doc Ollama failure skips the doc for this tick. The batch
+  budget now counts chunk embeds (`ION_KB_EMBEDDING_BATCH`, default 40)
+  with an at-least-one-doc guarantee so a long article can't stall the
+  queue.
+- **Retrieval quotes the matched passage** — top chunks are ranked, deduped
+  back to documents (best chunk per doc, up to 3 docs, threshold 0.65
+  unchanged), and the *matched chunk's* text goes into the prompt.
+- **Migration** — the retired `kb_document_embeddings` table is dropped
+  (embeddings are regenerable; the background loop re-embeds the whole KB
+  into the chunk table over its next ticks). HNSW index on the new table
+  wired into `init_db`.
+
+### Playbook RAG (new 4th prompt layer)
+
+- Bob's system prompt gains a **"Relevant Response Playbooks"** layer —
+  the SOC's documented response procedures, injected between gold
+  exemplars and Elastic Agent Skills in the v0.35.0 token-budget ladder
+  (drop order is now skills → playbooks → exemplars → KB).
+- **Deterministic arm first**: `find_matching_playbooks` over each
+  playbook's own trigger conditions (rule patterns / severity / MITRE
+  techniques) — precise, auditable, and works with no Ollama at all.
+- **Similarity fallback**: a new `PlaybookEmbedding` table
+  (`playbook_embeddings`, HNSW-indexed) populated by a new background loop
+  (`playbook_embedding_service`, advisory lock **1027**, 10-min interval,
+  inactive playbooks evicted from the vector store) — fires only when
+  nothing matches structurally, so an alert type nobody wrote trigger
+  conditions for can still surface a semantically relevant procedure.
+- Rendered as playbook name + description + ordered step checklist
+  (required steps marked); gate `ION_PLAYBOOK_RAG_ENABLED` **default ON**
+  (v0.36.0 philosophy), `ION_PLAYBOOK_EMBEDDING_INTERVAL_S` tunable.
+
+DB surface: one new table (`playbook_embeddings`), one renamed/replaced
+table (`kb_chunk_embeddings`), one dropped table, one new advisory lock —
+no new routes, permissions, or external dependencies; adversary-influenced
+alert content already flowed through the prompt pipeline, and playbook/KB
+text is first-party operator content. **23 new tests**
+(`tests/test_v051_kb_chunking.py`, `tests/test_v051_playbook_rag.py`); all
+RAG suites + model-registry + KB-root tests green (87 total). Net new
+findings: 0C / 0H / 0M / 0L.
 
 ## v0.50.2 — 2026-07-15
 
