@@ -76,6 +76,12 @@ def _kb_rag_enabled() -> bool:
     )
 
 
+def _playbook_rag_enabled() -> bool:
+    return os.environ.get("ION_PLAYBOOK_RAG_ENABLED", "true").lower() in (
+        "true", "1", "yes",
+    )
+
+
 def _alert_text_for_embedding(alert: dict) -> str:
     """Serialise an alert to text for embedding.
 
@@ -179,6 +185,30 @@ def _format_kb_context_for_prompt(hits: List[dict]) -> str:
         excerpt = (h.get("excerpt") or "").strip()
         if excerpt:
             lines.append(f"{excerpt[:800]}\n")
+    return "".join(lines)
+
+
+def _format_playbook_context_for_prompt(hits: List[dict]) -> str:
+    """Render the "Relevant Response Playbooks" section. Empty list → ""."""
+    if not hits:
+        return ""
+    lines = [
+        "\n\n---\n",
+        "## Relevant Response Playbooks\n",
+        "These are the SOC's documented response procedures matched to this "
+        "alert. Where your recommended actions overlap a playbook step, "
+        "align your wording with the playbook and name it — the analyst "
+        "will execute from these procedures.\n",
+    ]
+    for h in hits:
+        via = h.get("matched_via") or "match"
+        lines.append(f"\n### {h.get('name') or 'Untitled'} (via {via})\n")
+        desc = (h.get("description") or "").strip()
+        if desc:
+            lines.append(f"{desc[:300]}\n")
+        steps = h.get("steps") or []
+        for step in steps[:10]:
+            lines.append(f"- {step}\n")
     return "".join(lines)
 
 
@@ -4149,22 +4179,27 @@ class AlertPromptService:
 
         try:
             from ion.models.document import Document
-            from ion.models.kb_document_embedding import KBDocumentEmbedding
+            from ion.models.kb_document_embedding import KBChunkEmbedding
         except Exception as exc:
             logger.debug("KB RAG imports failed: %s", exc)
             return []
 
         try:
-            distance = KBDocumentEmbedding.embedding.cosine_distance(vec)
+            # v0.51.0 chunk-level retrieval: rank chunks, then dedup back to
+            # documents keeping each doc's best chunk. Over-fetch (k*4 chunks)
+            # because several top chunks may come from the same article.
+            distance = KBChunkEmbedding.embedding.cosine_distance(vec)
             rows = (
-                self.session.query(Document, distance.label("distance"))
+                self.session.query(
+                    Document, KBChunkEmbedding, distance.label("distance")
+                )
                 .join(
-                    KBDocumentEmbedding,
-                    KBDocumentEmbedding.document_id == Document.id,
+                    KBChunkEmbedding,
+                    KBChunkEmbedding.document_id == Document.id,
                 )
                 .filter(Document.status == "active")
                 .order_by(distance.asc())
-                .limit(max(1, int(k)))
+                .limit(max(1, int(k)) * 4)
                 .all()
             )
         except Exception as exc:
@@ -4172,20 +4207,139 @@ class AlertPromptService:
             return []
 
         out: list[dict] = []
-        for doc, dist in rows:
+        seen_docs: set[int] = set()
+        for doc, chunk_row, dist in rows:
+            if len(out) >= max(1, int(k)):
+                break
             similarity = 1.0 - float(dist)
             if similarity < float(min_similarity):
+                # Rows are distance-ordered — everything after is worse.
+                break
+            if doc.id in seen_docs:
                 continue
-            # First ~800 chars of rendered content keeps the system prompt
-            # tight. Full article is available via /documents/<id> if the
-            # analyst (or Bob via MCP later) wants more.
-            excerpt = (doc.rendered_content or "")[:800]
+            seen_docs.add(doc.id)
+            # v0.51.0: the excerpt is the chunk that actually MATCHED (was:
+            # the first 800 chars of the doc head, which for a long article
+            # often wasn't the relevant passage at all). Full article is
+            # available via /documents/<id> if the analyst wants more.
+            excerpt = (chunk_row.chunk_text or "")[:800]
             out.append({
                 "document_id": doc.id,
                 "name": doc.name,
                 "excerpt": excerpt,
                 "similarity": similarity,
+                "chunk_index": chunk_row.chunk_index,
             })
+        return out
+
+    def _get_playbook_context_for_alert(
+        self,
+        alert: dict,
+        *,
+        k: int = 2,
+        min_similarity: float = 0.65,
+    ) -> List[dict]:
+        """Return up to ``k`` playbooks relevant to ``alert`` (v0.51.0).
+
+        Two arms, deterministic first:
+
+        1. **Structured match** — ``PlaybookRepository.find_matching_
+           playbooks`` over the playbook's own trigger conditions (rule
+           patterns / severity / MITRE techniques / tactics). Precise,
+           auditable, and works with no Ollama at all.
+        2. **Similarity fallback** — only when nothing matches structurally:
+           cosine over ``PlaybookEmbedding`` so an alert type nobody wrote
+           trigger conditions for can still surface a semantically relevant
+           procedure.
+        """
+        if not _playbook_rag_enabled() or self.session is None or not alert:
+            return []
+
+        rule_name = (
+            alert.get("rule_name")
+            or (alert.get("rule") or {}).get("name")
+            or alert.get("alert_signature")
+        )
+        severity = alert.get("severity")
+        mitre = alert.get("mitre_tags")
+        mitre_list = (
+            [str(t) for t in mitre] if isinstance(mitre, (list, tuple)) else []
+        )
+
+        def _hit(pb, via: str, similarity: Optional[float] = None) -> dict:
+            steps = sorted(pb.steps or [], key=lambda s: s.step_order or 0)
+            step_lines = []
+            for s in steps[:10]:
+                label = s.title or ""
+                if s.is_required:
+                    label += " (required)"
+                step_lines.append(label)
+            out = {
+                "playbook_id": pb.id,
+                "name": pb.name,
+                "description": pb.description or "",
+                "steps": step_lines,
+                "matched_via": via,
+            }
+            if similarity is not None:
+                out["similarity"] = similarity
+            return out
+
+        # Arm 1 — deterministic trigger-condition match.
+        try:
+            from ion.storage.playbook_repository import PlaybookRepository
+            matched = PlaybookRepository(self.session).find_matching_playbooks(
+                rule_name=rule_name,
+                severity=severity,
+                mitre_techniques=mitre_list,
+                mitre_tactics=[],
+            )
+        except Exception as exc:
+            logger.debug("Playbook structured match failed: %s", exc)
+            matched = []
+        if matched:
+            return [_hit(pb, "trigger match") for pb in matched[: max(1, int(k))]]
+
+        # Arm 2 — embedding similarity fallback.
+        try:
+            from ion.services.embedding_service import get_embedding_service
+        except Exception:
+            return []
+        svc = get_embedding_service()
+        if not svc.is_enabled:
+            return []
+        text = _alert_text_for_embedding(alert)
+        if not text:
+            return []
+        vec = svc.embed(text, mode="query")
+        if vec is None:
+            return []
+
+        try:
+            from ion.models.playbook import Playbook
+            from ion.models.playbook_embedding import PlaybookEmbedding
+            distance = PlaybookEmbedding.embedding.cosine_distance(vec)
+            rows = (
+                self.session.query(Playbook, distance.label("distance"))
+                .join(
+                    PlaybookEmbedding,
+                    PlaybookEmbedding.playbook_id == Playbook.id,
+                )
+                .filter(Playbook.is_active.is_(True))
+                .order_by(distance.asc())
+                .limit(max(1, int(k)))
+                .all()
+            )
+        except Exception as exc:
+            logger.debug("Playbook similarity query failed: %s", exc)
+            return []
+
+        out: list[dict] = []
+        for pb, dist in rows:
+            similarity = 1.0 - float(dist)
+            if similarity < float(min_similarity):
+                continue
+            out.append(_hit(pb, f"similarity {similarity:.2f}", similarity))
         return out
 
     # ------------------------------------------------------------------ render
@@ -4265,7 +4419,7 @@ class AlertPromptService:
 
         if alert is not None:
             # v0.10.6: KB RAG — topic-level investigation background.
-            # Priority 1 of 3 (injected before exemplars and skills).
+            # Priority 1 of 4 (injected before exemplars, playbooks, skills).
             kb_block = ""
             if remaining > 0:
                 try:
@@ -4288,7 +4442,7 @@ class AlertPromptService:
                 parts.append(kb_block)
 
             # v0.10.5: Gold exemplars — prior analyst-verified cases.
-            # Priority 2 of 3.
+            # Priority 2 of 4.
             exemplar_block = ""
             if remaining > 0:
                 try:
@@ -4310,8 +4464,32 @@ class AlertPromptService:
             if exemplar_block:
                 parts.append(exemplar_block)
 
+            # v0.51.0: Playbook RAG — the SOC's documented response
+            # procedures. Priority 3 of 4 (deterministic trigger-condition
+            # match first, embedding similarity fallback).
+            playbook_block = ""
+            if remaining > 0:
+                try:
+                    playbook_hits = self._get_playbook_context_for_alert(alert)
+                except Exception as exc:
+                    logger.debug("Playbook RAG retrieval failed: %s", exc)
+                    playbook_hits = []
+                if playbook_hits:
+                    candidate = _format_playbook_context_for_prompt(playbook_hits)
+                    cost = _estimate_tokens(candidate)
+                    if cost <= remaining:
+                        playbook_block = candidate
+                        remaining -= cost
+                    else:
+                        logger.debug(
+                            "Playbook RAG dropped: needs %d tokens, only %d remaining",
+                            cost, remaining,
+                        )
+            if playbook_block:
+                parts.append(playbook_block)
+
             # v0.13.1: Elastic Agent Skills — keyword/technique matched.
-            # Priority 3 of 3 (embedding-free, always attempted last).
+            # Priority 4 of 4 (embedding-free, always attempted last).
             if remaining > 0:
                 try:
                     from ion.services.skill_loader import (

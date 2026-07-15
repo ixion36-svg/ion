@@ -174,7 +174,7 @@ class EmbeddingService:
 
     @property
     def model_tag(self) -> str:
-        """The value stored in ``CaseEmbedding``/``KBDocumentEmbedding``.
+        """The value stored in ``CaseEmbedding``/``KBChunkEmbedding``.
 
         ``model_name`` and used as the re-embed trigger. It is the raw Ollama
         model name plus a marker for the task-prefix regime, so query and

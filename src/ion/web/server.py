@@ -940,6 +940,22 @@ async def _startup_event():
     except Exception as exc:
         logger.warning("Failed to start KB-embedding loop: %s", exc)
 
+    # ---------------------------------------------------------------
+    # Playbook embedding background producer (v0.51.0) — embeds the active
+    # playbook catalogue for the Playbook RAG layer's similarity fallback.
+    # Honours ION_PLAYBOOK_RAG_ENABLED / ION_PLAYBOOK_EMBEDDING_INTERVAL_S.
+    # ---------------------------------------------------------------
+    def _start_playbook_embedding_loop():
+        from ion.services.playbook_embedding_service import (
+            start_playbook_embedding_if_enabled,
+        )
+        start_playbook_embedding_if_enabled(engine=engine)
+        logger.info("Playbook-embedding background loop started")
+    try:
+        _start_playbook_embedding_loop()
+    except Exception as exc:
+        logger.warning("Failed to start playbook-embedding loop: %s", exc)
+
     # Version compatibility checks for connectors that declare supported ranges
     try:
         from ion.services.connectors import get_connector_registry

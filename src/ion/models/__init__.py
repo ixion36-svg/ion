@@ -109,7 +109,8 @@ from ion.models.integration import (
 from ion.models.investigation import Investigation  # noqa: F401
 
 # v0.10.6: KB article embeddings for Bob's RAG grounding.
-from ion.models.kb_document_embedding import KBDocumentEmbedding  # noqa: F401
+# v0.51.0: chunk-level (KBChunkEmbedding) replaced the whole-doc vector.
+from ion.models.kb_document_embedding import KBChunkEmbedding  # noqa: F401
 from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.maturity import MaturityAssessment
 
@@ -150,6 +151,9 @@ from ion.models.playbook import (
     PlaybookStep,
     StepType,
 )
+
+# v0.51.0: playbook embeddings — similarity fallback of the Playbook RAG layer.
+from ion.models.playbook_embedding import PlaybookEmbedding  # noqa: F401
 from ion.models.saved_search import (
     SavedSearch,
     SearchType,

@@ -3,10 +3,18 @@
 Runs under advisory lock ``LOCK_KB_EMBEDDING_BG`` (1020). On each tick:
 
 1. Find Document rows whose collection tree has "Knowledge Base" as the
-   ancestor AND that either (a) have no ``KBDocumentEmbedding`` row yet,
-   or (b) whose source_text_hash differs from the current hash (doc edited).
-2. Embed the doc's ``name + rendered_content`` via ``EmbeddingService``.
-3. Upsert the ``KBDocumentEmbedding`` row.
+   ancestor AND that either (a) have no ``KBChunkEmbedding`` rows yet,
+   or (b) whose stored source_text_hash / model tag differs from current
+   (doc edited, model changed, or chunking scheme bumped).
+2. Split the doc into passage chunks (v0.51.0 — see ``_chunk_body``),
+   embed each chunk via ``EmbeddingService``.
+3. Replace the doc's ``KBChunkEmbedding`` rows atomically (delete + insert
+   in one transaction per tick).
+
+v0.51.0: chunk-level embedding replaces the whole-doc vector. The old
+single vector lost long articles' tails (nomic end-truncation + an 8k input
+cap) and retrieval could only quote the doc head. Chunks make every passage
+retrievable and let the prompt carry the passage that matched.
 
 Default ON (v0.36.0); disable with ``ION_KB_RAG_ENABLED=false``. KB
 embedding is a graceful no-op without Ollama (same prerequisite as case
@@ -30,7 +38,7 @@ from sqlalchemy.orm import Session
 from ion.core import apm
 from ion.core.config import get_config
 from ion.models.document import Document
-from ion.models.kb_document_embedding import KBDocumentEmbedding
+from ion.models.kb_document_embedding import KBChunkEmbedding
 from ion.models.template import Collection
 from ion.services.embedding_service import (
     DEFAULT_MODEL,
@@ -47,11 +55,19 @@ _last_run_lock = threading.Lock()
 _last_run_at: Optional[datetime] = None
 _last_result: Optional[Dict[str, Any]] = None
 
-# Max characters of rendered content to embed. nomic-embed-text has an
-# 8192-token context window; at ~4 chars/token that's ~32k chars, but most
-# KB articles are well under 6k. We cap at 8k to keep embeddings stable
-# across edits (trailing-text changes below the cap don't shift the vector).
-_MAX_BODY_CHARS = 8000
+# v0.51.0 chunking parameters. Target ≈1600 chars (≈400 tokens) sits well
+# inside nomic-embed-text's window so no chunk is ever end-truncated, while
+# staying passage-sized (a topic section, not a whole article). The overlap
+# only applies when a single paragraph exceeds the target and must be
+# hard-split — it keeps a sentence that straddles the cut represented in
+# both halves. _MAX_CHUNKS_PER_DOC bounds a pathological article (64 chunks
+# ≈ 100k chars) so one doc can't monopolise the embed batch forever.
+# _CHUNK_SCHEME is folded into the staleness hash — bump it (c2, c3, …)
+# whenever these parameters change so the whole corpus re-chunks once.
+_CHUNK_TARGET_CHARS = 1600
+_CHUNK_OVERLAP_CHARS = 200
+_MAX_CHUNKS_PER_DOC = 64
+_CHUNK_SCHEME = "c1"
 
 
 # ---------------------------------------------------------------------------
@@ -59,19 +75,67 @@ _MAX_BODY_CHARS = 8000
 # ---------------------------------------------------------------------------
 
 
-def _kb_source_text(doc: Document) -> str:
-    """Build the text we embed for a KB document.
+def _chunk_body(body: str) -> list[str]:
+    """Split a document body into passage chunks.
 
-    Title is high-signal (often a question or topic); body adds detail.
-    Kept simple — no structure-aware parsing, just prefix-and-concat.
+    Greedy paragraph packing: paragraphs (split on blank lines) are packed
+    into chunks up to ``_CHUNK_TARGET_CHARS``; a paragraph longer than the
+    target is hard-split with ``_CHUNK_OVERLAP_CHARS`` of carry-over so a
+    sentence straddling the cut stays represented in both halves. Deliberately
+    simple — no markdown/heading awareness — so the chunk boundaries are
+    stable and cheap to compute.
     """
-    body = (doc.rendered_content or "")[:_MAX_BODY_CHARS]
+    body = (body or "").strip()
+    if not body:
+        return []
+    paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
+    chunks: list[str] = []
+    current = ""
+    for para in paragraphs:
+        if len(para) > _CHUNK_TARGET_CHARS:
+            if current:
+                chunks.append(current)
+                current = ""
+            start = 0
+            while start < len(para):
+                chunks.append(para[start:start + _CHUNK_TARGET_CHARS])
+                if start + _CHUNK_TARGET_CHARS >= len(para):
+                    break
+                start += _CHUNK_TARGET_CHARS - _CHUNK_OVERLAP_CHARS
+            continue
+        if current and len(current) + 2 + len(para) > _CHUNK_TARGET_CHARS:
+            chunks.append(current)
+            current = para
+        else:
+            current = f"{current}\n\n{para}" if current else para
+    if current:
+        chunks.append(current)
+    return chunks[:_MAX_CHUNKS_PER_DOC]
+
+
+def _chunk_source_text(doc: Document, chunk: str) -> str:
+    """The text actually embedded for one chunk.
+
+    The title is prepended to EVERY chunk — it's high-signal topical context
+    (standard passage-embedding practice) and keeps a mid-article chunk
+    anchored to its subject.
+    """
     parts = []
     if doc.name:
         parts.append(f"Title: {doc.name}")
-    if body:
-        parts.append(f"Content: {body}")
+    if chunk:
+        parts.append(f"Content: {chunk}")
     return "\n".join(parts)
+
+
+def _kb_doc_hash_input(doc: Document) -> str:
+    """The staleness-hash input: whole doc + chunk-scheme marker.
+
+    Hashing the FULL body (no cap) means any edit anywhere re-embeds the
+    doc; folding in ``_CHUNK_SCHEME`` re-chunks the corpus once when the
+    chunking parameters change.
+    """
+    return f"{_CHUNK_SCHEME}\nTitle: {doc.name or ''}\nContent: {doc.rendered_content or ''}"
 
 
 def _hash(text: str) -> str:
@@ -134,11 +198,19 @@ def _descendant_collection_ids(session: Session, root_id: int) -> set[int]:
 
 
 def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
-    """One pass — embed new + stale KB documents. Batched."""
+    """One pass — chunk + embed new and stale KB documents. Batched.
+
+    v0.51.0: the batch budget counts CHUNK embeds (Ollama calls), not docs,
+    so a long article costs proportionally. A document is only ever written
+    whole: if any of its chunks fails to embed, the doc is skipped this tick
+    and retried next interval — no partial chunk sets. At least one doc is
+    processed per tick even when its chunk count exceeds the remaining
+    budget, so a single long article can't stall the queue forever.
+    """
     try:
-        batch_limit = int(os.environ.get("ION_KB_EMBEDDING_BATCH", "20"))
+        batch_limit = int(os.environ.get("ION_KB_EMBEDDING_BATCH", "40"))
     except ValueError:
-        batch_limit = 20
+        batch_limit = 40
 
     svc = get_embedding_service()
     if not svc.is_enabled:
@@ -158,31 +230,29 @@ def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
             .where(Document.collection_id.in_(list(kb_collection_ids)))
             .where(Document.status == "active")
             .order_by(Document.id.desc())
-            .limit(batch_limit * 4)
+            .limit(max(batch_limit, 20) * 4)
         ).scalars().all()
     )
 
+    # One representative row per doc is enough for the staleness check —
+    # all of a doc's chunk rows share source_text_hash + model_name.
     doc_ids = [d.id for d in docs]
-    existing: Dict[int, KBDocumentEmbedding] = {}
+    existing: Dict[int, KBChunkEmbedding] = {}
     if doc_ids:
-        existing = {
-            row.document_id: row
-            for row in session.execute(
-                select(KBDocumentEmbedding).where(
-                    KBDocumentEmbedding.document_id.in_(doc_ids)
-                )
-            ).scalars().all()
-        }
+        for row in session.execute(
+            select(KBChunkEmbedding).where(
+                KBChunkEmbedding.document_id.in_(doc_ids),
+                KBChunkEmbedding.chunk_index == 0,
+            )
+        ).scalars().all():
+            existing[row.document_id] = row
 
-    embedded = skipped = failed = scanned = 0
+    docs_embedded = chunks_embedded = skipped = failed_docs = scanned = 0
     for doc in docs:
-        if embedded >= batch_limit:
+        if chunks_embedded >= batch_limit:
             break
         scanned += 1
-        source = _kb_source_text(doc)
-        if not source:
-            continue
-        hsh = _hash(source)
+        hsh = _hash(_kb_doc_hash_input(doc))
         row = existing.get(doc.id)
         if (
             row is not None
@@ -192,37 +262,53 @@ def run_kb_embedding_once(session: Session) -> Dict[str, Any]:
             skipped += 1
             continue
 
-        vec = svc.embed(source, mode="document")
-        if vec is None:
-            failed += 1
-            if failed >= 3:
+        chunks = _chunk_body(doc.rendered_content)
+        if not chunks:
+            continue
+
+        # Embed every chunk BEFORE touching the stored rows — a mid-doc
+        # Ollama failure must not leave a partial chunk set behind.
+        vectors: list = []
+        for chunk in chunks:
+            vec = svc.embed(_chunk_source_text(doc, chunk), mode="document")
+            if vec is None:
+                vectors = None
+                break
+            vectors.append(vec)
+        if vectors is None:
+            failed_docs += 1
+            if failed_docs >= 3:
                 break
             continue
 
         now = datetime.now(timezone.utc)
-        if row is None:
+        # "fetch" keeps the session identity map in sync — the re-inserted
+        # rows reuse the deleted rows' composite PKs within one transaction.
+        session.query(KBChunkEmbedding).filter(
+            KBChunkEmbedding.document_id == doc.id
+        ).delete(synchronize_session="fetch")
+        for idx, (chunk, vec) in enumerate(zip(chunks, vectors)):
             session.add(
-                KBDocumentEmbedding(
+                KBChunkEmbedding(
                     document_id=doc.id,
+                    chunk_index=idx,
+                    chunk_text=chunk,
                     embedding=vec,
                     model_name=svc.model_tag,
                     embedded_at=now,
                     source_text_hash=hsh,
                 )
             )
-        else:
-            row.embedding = vec
-            row.model_name = svc.model_tag
-            row.embedded_at = now
-            row.source_text_hash = hsh
-        embedded += 1
+        docs_embedded += 1
+        chunks_embedded += len(chunks)
 
     session.commit()
     return {
         "scanned": scanned,
-        "embedded": embedded,
+        "embedded": docs_embedded,
+        "chunks": chunks_embedded,
         "skipped_fresh": skipped,
-        "failed": failed,
+        "failed": failed_docs,
         "model": svc.model,
     }
 

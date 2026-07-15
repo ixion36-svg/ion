@@ -125,6 +125,7 @@ LOCK_SESSION_CLEANUP_BG     = 1023  # v0.31.13 — data-min P13 G1: periodic exp
 LOCK_DATA_RETENTION_BG      = 1024  # v0.31.14 — data-min P13 G2+G3: audit_logs + security_events retention
 LOCK_ARKIME_AUTO_CASE_BG    = 1025  # v0.34.0  — auto-case + PCAP for Arkime-bearing alerts
 LOCK_ARKIME_RTMON_BG        = 1026  # v0.45.0  — realtime Arkime IOC-traffic monitor
+LOCK_PLAYBOOK_EMBEDDING_BG  = 1027  # v0.51.0  — playbook-embedding background producer
 
 
 @contextmanager
@@ -361,6 +362,19 @@ def _run_migrations(engine: Engine) -> None:
         with engine.begin() as conn:
             conn.execute(text("DROP TABLE threat_hunts"))
             logger.info("Migrated: dropped threat_hunts table (v0.27.0)")
+
+    # v0.51.0: KB RAG moved from whole-document vectors to chunk-level
+    # (kb_chunk_embeddings — created by create_all). The retired per-doc
+    # table is dropped without preserving data: embeddings are regenerable,
+    # and the background loop re-embeds the whole KB into the chunk table
+    # on its next ticks.
+    if insp.has_table("kb_document_embeddings"):
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE kb_document_embeddings"))
+            logger.info(
+                "Migrated: dropped kb_document_embeddings "
+                "(v0.51.0 chunk-level KB RAG replaces it)"
+            )
 
     # Migrations for alert_cases table
     if insp.has_table("alert_cases"):
@@ -1483,12 +1497,19 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
             ensure_hnsw_index(engine)
         except Exception as exc:  # pragma: no cover
             logger.debug("HNSW index creation skipped: %s", exc)
-        # v0.10.6: HNSW index on kb_document_embeddings.embedding.
+        # v0.10.6: HNSW index on the KB embedding table (v0.51.0: now the
+        # chunk-level kb_chunk_embeddings — same helper name).
         try:
             from ion.models.kb_document_embedding import ensure_kb_hnsw_index
             ensure_kb_hnsw_index(engine)
         except Exception as exc:  # pragma: no cover
             logger.debug("KB HNSW index creation skipped: %s", exc)
+        # v0.51.0: HNSW index on playbook_embeddings.embedding.
+        try:
+            from ion.models.playbook_embedding import ensure_playbook_hnsw_index
+            ensure_playbook_hnsw_index(engine)
+        except Exception as exc:  # pragma: no cover
+            logger.debug("Playbook HNSW index creation skipped: %s", exc)
 
     if _is_postgres(engine):
         # v0.49.3: serialize schema init across the N uvicorn workers with a
