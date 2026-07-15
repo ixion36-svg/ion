@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.r{fill:#e5484d}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">PRINCIPLE 9 · CONTEXT &amp; BUDGET DISCIPLINE</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Assume every limit is silent — make it loud yourself</text>
+
+  <text x="64" y="158" class="s" font-size="17">Three separate production incidents, one shape: <tspan class="t" font-weight="700">nothing errored, quality quietly sagged.</tspan></text>
+
+  <g>
+    <rect x="64" y="188" width="368" height="240" rx="12" fill="#1c1013" stroke="#e5484d" stroke-width="1.5"/>
+    <text x="86" y="224" class="r" font-size="15" font-weight="800">L2 · THE DEFAULTED WINDOW</text>
+    <g class="s" font-size="14.5">
+      <text x="86" y="256">The runtime's context window silently</text>
+      <text x="86" y="278">defaulted to a fraction of the model's</text>
+      <text x="86" y="300">capability — prompts front-truncated</text>
+      <text x="86" y="322">for multiple releases.</text>
+      <text x="86" y="356"><tspan class="c" font-weight="700">Fix:</tspan> set the window explicitly in</text>
+      <text x="86" y="378">every request. Never trust a</text>
+      <text x="86" y="400">runtime default.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="456" y="188" width="368" height="240" rx="12" fill="#1c1013" stroke="#e5484d" stroke-width="1.5"/>
+    <text x="478" y="224" class="r" font-size="15" font-weight="800">L5a · THE GREEDY FIELD</text>
+    <g class="s" font-size="14.5">
+      <text x="478" y="256">One unbounded verbose field pushed</text>
+      <text x="478" y="278">every later section out of the</text>
+      <text x="478" y="300">embedding vector — similarity quality</text>
+      <text x="478" y="322">degraded with no visible failure.</text>
+      <text x="478" y="356"><tspan class="c" font-weight="700">Fix:</tspan> per-section clips on every</text>
+      <text x="478" y="378">field entering an embedding or</text>
+      <text x="478" y="400">evidence block.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="848" y="188" width="368" height="240" rx="12" fill="#1c1013" stroke="#e5484d" stroke-width="1.5"/>
+    <text x="870" y="224" class="r" font-size="15" font-weight="800">L5b · THE LOST TAILS</text>
+    <g class="s" font-size="14.5">
+      <text x="870" y="256">Whole-document vectors: long KB</text>
+      <text x="870" y="278">articles lost their tails to the</text>
+      <text x="870" y="300">embedding window, and retrieval</text>
+      <text x="870" y="322">could only quote the doc head.</text>
+      <text x="870" y="356"><tspan class="c" font-weight="700">Fix:</tspan> chunk-level embedding —</text>
+      <text x="870" y="378">every passage retrievable, the</text>
+      <text x="870" y="400"><tspan class="t" font-weight="700">matched</tspan> passage quoted.</text>
+    </g>
+  </g>
+
+  <rect x="64" y="460" width="1152" height="158" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="88" y="498" class="c" font-size="17" font-weight="800">THE STANDING CONTROLS</text>
+  <g class="s" font-size="16">
+    <text x="88" y="532">• Explicit token budget for prompt assembly; optional layers admitted in priority order; <tspan class="t" font-weight="700">every drop is logged</tspan>.</text>
+    <text x="88" y="560">• The output contract is exempt from budgeting — it terminates every prompt, whatever else was dropped.</text>
+    <text x="88" y="588">• Chunk sizes sit comfortably inside the embedding window; staleness hashes include the chunking-scheme version.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">09 / 12</text>
+</svg>

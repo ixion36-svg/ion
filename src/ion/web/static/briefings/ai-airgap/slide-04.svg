@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.g{fill:#4ade80}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">PRINCIPLES 1 – 2 · BOUNDARY &amp; AUTHORITY</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Local inference. Advisory only.</text>
+
+  <g>
+    <rect x="64" y="150" width="556" height="300" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="88" y="188" class="c mono" font-size="14" font-weight="700">P1 · INFERENCE STAYS INSIDE</text>
+    <g class="s" font-size="16">
+      <text x="88" y="224">All inference on infrastructure <tspan class="t" font-weight="700">inside the boundary</tspan>.</text>
+      <text x="88" y="252">Weights provisioned as versioned artefacts through</text>
+      <text x="88" y="276">the offline channel; GGUF side-loading for estates</text>
+      <text x="88" y="300">that cannot pull from a registry.</text>
+      <text x="88" y="344"><tspan class="g" font-weight="700">There is NO fallback to an external API.</tspan></text>
+      <text x="88" y="372">A missing model host degrades the feature —</text>
+      <text x="88" y="396">it never re-routes the data.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="660" y="150" width="556" height="300" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="684" y="188" class="c mono" font-size="14" font-weight="700">P2 · A HUMAN OWNS EVERY ACTION</text>
+    <g class="s" font-size="16">
+      <text x="684" y="224">The model never closes a case, blocks an IP, or</text>
+      <text x="684" y="248">mutates state. Verdicts are <tspan class="t" font-weight="700">suggestions rendered</tspan></text>
+      <text x="684" y="272"><tspan class="t" font-weight="700">beside the evidence</tspan>; the analyst decides.</text>
+      <text x="684" y="316">Autonomous <tspan class="g" font-weight="700">collection</tspan> is fine (gather evidence,</text>
+      <text x="684" y="340">enrich indicators). Autonomous <tspan class="t" font-weight="700">action</tspan> is not.</text>
+      <text x="684" y="384">Verifiable in code review: there are no</text>
+      <text x="684" y="408">state-mutating AI codepaths to find.</text>
+    </g>
+  </g>
+
+  <rect x="64" y="482" width="1152" height="136" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="88" y="522" class="c" font-size="17" font-weight="800">WHY THIS PAIRING CARRIES EVERYTHING ELSE</text>
+  <g class="s" font-size="16.5">
+    <text x="88" y="556">Hallucination, prompt injection and model regression all have <tspan class="t" font-weight="700">bounded blast radius</tspan> when output is a suggestion</text>
+    <text x="88" y="582">a trained analyst must ratify — and designing "no fallback" from day one forced graceful degradation into every feature.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">04 / 12</text>
+</svg>

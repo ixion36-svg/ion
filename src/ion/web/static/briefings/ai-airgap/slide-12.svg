@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.g{fill:#4ade80}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">ADOPTION &amp; FURTHER READING</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Where to start, and where to read more</text>
+
+  <!-- adoption sequence -->
+  <g>
+    <rect x="64" y="150" width="272" height="230" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="2"/>
+    <text x="86" y="186" class="c mono" font-size="14" font-weight="700">1 · FOUNDATIONS</text>
+    <g class="s" font-size="14.5">
+      <text x="86" y="218">Local inference (P1)</text>
+      <text x="86" y="244">Advisory-only (P2)</text>
+      <text x="86" y="270">Output contracts (P3)</text>
+      <text x="86" y="296">Input wrapping (P4)</text>
+      <text x="86" y="322">Degradation (P7)</text>
+      <text x="86" y="356" class="c" font-weight="700">Cheap now, brutal to retrofit</text>
+    </g>
+  </g>
+  <g>
+    <rect x="360" y="150" width="272" height="230" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="382" y="186" class="c mono" font-size="14" font-weight="700">2 · MEASUREMENT</text>
+    <g class="s" font-size="14.5">
+      <text x="382" y="218">Feedback ledger (P6)</text>
+      <text x="382" y="244">Offline eval harness (P6)</text>
+      <text x="382" y="282" class="t" font-weight="700">Before retrieval sophistication —</text>
+      <text x="382" y="308">you cannot improve what</text>
+      <text x="382" y="334">you cannot score.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="656" y="150" width="272" height="230" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="678" y="186" class="c mono" font-size="14" font-weight="700">3 · GROUNDING</text>
+    <g class="s" font-size="14.5">
+      <text x="678" y="218">Evidence + citations (P5)</text>
+      <text x="678" y="244">Deterministic-first (P8)</text>
+      <text x="678" y="270">Budget discipline (P9)</text>
+      <text x="678" y="308" class="t" font-weight="700">Retrieval quality changes are</text>
+      <text x="678" y="334">benchmarked on the real corpus.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="952" y="150" width="264" height="230" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="974" y="186" class="c mono" font-size="14" font-weight="700">4 · CONTINUOUS</text>
+    <g class="s" font-size="14.5">
+      <text x="974" y="218">Data-at-rest governance (P10)</text>
+      <text x="974" y="244">Supply chain (P11)</text>
+      <text x="974" y="270">Escalation tuning (P12)</text>
+      <text x="974" y="296">Observability (P13)</text>
+      <text x="974" y="334" class="t" font-weight="700">Every release records its delta.</text>
+    </g>
+  </g>
+
+  <!-- further reading -->
+  <rect x="64" y="416" width="1152" height="202" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="88" y="454" class="c" font-size="17" font-weight="800">THE FULL DELIVERABLES</text>
+  <g class="s" font-size="16">
+    <text x="88" y="490"><tspan class="t mono" font-weight="700">docs/AI_AIRGAP_BEST_PRACTICES_HLD.md</tspan> — principles, reference architecture, governance model,</text>
+    <text x="88" y="516">OWASP LLM Top 10 mapping, and the full lessons-learned register. For design authorities and accreditors.</text>
+    <text x="88" y="552"><tspan class="t mono" font-weight="700">docs/AI_AIRGAP_BEST_PRACTICES_LLD.md</tspan> — the implementation companion: algorithms, schema patterns,</text>
+    <text x="88" y="578">configuration reference, operational runbooks, and the test strategy that caught the real bugs. For engineering teams.</text>
+    <text x="88" y="606">Both available as branded PDFs alongside every other ION design document.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">12 / 12</text>
+</svg>

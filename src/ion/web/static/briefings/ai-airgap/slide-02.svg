@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.w{fill:#f5a524}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE OPERATING CONTEXT</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Why air-gapped AI is a different problem</text>
+
+  <g>
+    <rect x="64" y="150" width="556" height="150" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="88" y="186" class="c" font-size="18" font-weight="800">No external connectivity</text>
+    <g class="s" font-size="15.5">
+      <text x="88" y="216">No cloud AI APIs, no vendor callbacks, no telemetry</text>
+      <text x="88" y="240">egress. Weights, embeddings and retrieval corpus all</text>
+      <text x="88" y="264">live <tspan class="t" font-weight="700">inside the boundary</tspan> — or the feature doesn't exist.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="660" y="150" width="556" height="150" rx="12" fill="#1a1208" stroke="#f5a524" stroke-width="1.5"/>
+    <text x="684" y="186" class="w" font-size="18" font-weight="800">Adversary-authored input</text>
+    <g class="s" font-size="15.5">
+      <text x="684" y="216">The model's primary input is security telemetry.</text>
+      <text x="684" y="240">An attacker who triggers an alert <tspan class="t" font-weight="700">chooses part of</tspan></text>
+      <text x="684" y="264"><tspan class="t" font-weight="700">the model's prompt.</tspan> Injection defence is not optional.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="64" y="324" width="556" height="150" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="88" y="360" class="c" font-size="18" font-weight="800">Accreditation pressure</text>
+    <g class="s" font-size="15.5">
+      <text x="88" y="390">Every new data store, egress path or autonomous</text>
+      <text x="88" y="414">behaviour must be explainable to a design authority.</text>
+      <text x="88" y="438">Deterministic mechanisms are easier to accredit.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="660" y="324" width="556" height="150" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="684" y="360" class="c" font-size="18" font-weight="800">Humans stay in charge</text>
+    <g class="s" font-size="15.5">
+      <text x="684" y="390">A single-tenant, authenticated analyst team. The AI</text>
+      <text x="684" y="414">assists judgement — it never replaces it, and never</text>
+      <text x="684" y="438">acts on its own authority.</text>
+    </g>
+  </g>
+
+  <rect x="64" y="506" width="1152" height="112" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="88" y="546" class="c" font-size="17" font-weight="800">THE ONE REPEATED LESSON</text>
+  <g class="s" font-size="16.5">
+    <text x="88" y="578">With LLMs, the dangerous failures are <tspan class="t" font-weight="700">quiet</tspan> — a truncated prompt, a defaulted context window, an eval reading the</text>
+    <text x="88" y="602">wrong key. Nothing errors; quality just sags. <tspan class="c" font-weight="700">Only measurement and contract-pinning make silent failures loud.</tspan></text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">02 / 12</text>
+</svg>

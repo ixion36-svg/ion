@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.g{fill:#4ade80}.r{fill:#e5484d}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">PRINCIPLE 6 · MEASUREMENT</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">You cannot improve what you cannot score</text>
+
+  <g>
+    <rect x="64" y="150" width="556" height="264" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="88" y="188" class="c mono" font-size="14" font-weight="700">FEEDBACK LEDGER</text>
+    <g class="s" font-size="15.5">
+      <text x="88" y="222">Every AI verdict is recorded against the eventual</text>
+      <text x="88" y="246"><tspan class="t" font-weight="700">human decision</tspan> — dual-write at suggestion time</text>
+      <text x="88" y="270">and at case close.</text>
+      <text x="88" y="306">Gives per-rule <tspan class="c" font-weight="700">agreement rates over time</tspan> —</text>
+      <text x="88" y="330">the raw material for threshold tuning and a</text>
+      <text x="88" y="354">detection-health view of every alert type.</text>
+      <text x="88" y="390">AI and human verdicts share one enum → 1:1 comparable.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="660" y="150" width="556" height="264" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="684" y="188" class="c mono" font-size="14" font-weight="700">OFFLINE EVAL HARNESS</text>
+    <g class="s" font-size="15.5">
+      <text x="684" y="222">Replays <tspan class="t" font-weight="700">stored production prompts</tspan> against a</text>
+      <text x="684" y="246">candidate model or configuration; scores</text>
+      <text x="684" y="270">precision / recall / F1 against ledger verdicts.</text>
+      <text x="684" y="306">Model swaps, thresholds and prompt changes run</text>
+      <text x="684" y="330">through it <tspan class="c" font-weight="700">before</tspan> production. Retrieval changes are</text>
+      <text x="684" y="354">benchmarked on the real corpus (a prefix change</text>
+      <text x="684" y="378">measured <tspan class="g" font-weight="700">+57% nDCG@10</tspan> before shipping).</text>
+    </g>
+  </g>
+
+  <rect x="64" y="446" width="1152" height="172" rx="12" fill="#1c1013" stroke="#e5484d" stroke-width="1.5"/>
+  <text x="88" y="484" class="r" font-size="16" font-weight="800">INCIDENT L3 — THE EVAL THAT MEASURED NOTHING</text>
+  <g class="s" font-size="16">
+    <text x="88" y="516">The harness read the model reply from the <tspan class="t" font-weight="700">wrong response key</tspan> for several releases. Every sample scored as an</text>
+    <text x="88" y="542">abstention; precision, recall and F1 were null on every run — and nobody noticed quickly, because <tspan class="t" font-weight="700">an eval that</tspan></text>
+    <text x="88" y="568"><tspan class="t" font-weight="700">produces no signal looks exactly like an eval that found no problems.</tspan></text>
+    <text x="88" y="600"><tspan class="c" font-weight="700">Fix:</tspan> treat the evaluation pipeline as production code — test it, and alarm on degenerate outputs (all-abstain, all-agree).</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">07 / 12</text>
+</svg>

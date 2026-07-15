@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.g{fill:#4ade80}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">PRINCIPLES 7 – 8 · DEGRADATION &amp; DETERMINISM</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Degrade to absent. Prefer the boring mechanism.</text>
+
+  <g>
+    <rect x="64" y="150" width="556" height="290" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="88" y="188" class="c mono" font-size="14" font-weight="700">P7 · GRACEFUL DEGRADATION</text>
+    <g class="s" font-size="15.5">
+      <text x="88" y="222">Model host down, embedding model missing, vector</text>
+      <text x="88" y="246">store gone → a <tspan class="t" font-weight="700">clean no-op</tspan>: hidden panel, empty</text>
+      <text x="88" y="270">context section, clear 503. Never a crash, a queue</text>
+      <text x="88" y="294">backup, or a data-loss path.</text>
+      <text x="88" y="332">Retrieval returns <tspan class="mono t">[]</tspan> on any failure; embed calls</text>
+      <text x="88" y="356">return None and retry next tick.</text>
+      <text x="88" y="394"><tspan class="g" font-weight="700">This is what makes default-ON safe:</tspan> no-LLM sites</text>
+      <text x="88" y="418">pay a cheap no-op; LLM sites get it zero-config.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="660" y="150" width="556" height="290" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="684" y="188" class="c mono" font-size="14" font-weight="700">P8 · DETERMINISTIC FIRST, MODEL SECOND</text>
+    <g class="s" font-size="15.5">
+      <text x="684" y="222">Where a structured mechanism can answer, use it</text>
+      <text x="684" y="246">before the statistical one:</text>
+      <text x="684" y="284">• playbook matching: <tspan class="t" font-weight="700">trigger conditions first</tspan></text>
+      <text x="684" y="308">  (rules / ATT&amp;CK) — similarity only as fallback</text>
+      <text x="684" y="332">• prompt-template choice: a 5-tier deterministic</text>
+      <text x="684" y="356">  matcher, not a classifier</text>
+      <text x="684" y="394">Deterministic paths are <tspan class="c" font-weight="700">auditable, exactly testable,</tspan></text>
+      <text x="684" y="418"><tspan class="c" font-weight="700">free</tspan> — and they work when the model host doesn't.</text>
+    </g>
+  </g>
+
+  <rect x="64" y="472" width="1152" height="146" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="88" y="510" class="c" font-size="17" font-weight="800">GATE PHILOSOPHY (EARNED, NOT ASSUMED)</text>
+  <g class="s" font-size="16">
+    <text x="88" y="544">Retrieval / quality layers default <tspan class="g" font-weight="700">ON</tspan> — safe because degradation is proven. New <tspan class="t" font-weight="700">surfaces</tspan> (AI tool endpoints,</text>
+    <text x="88" y="570">telemetry export) default <tspan class="t" font-weight="700">OFF</tspan> — closed until an operator deliberately opens them. And pin by test that a feature's</text>
+    <text x="88" y="596">per-call gate and its background-loop gate share one default — they drifted once, and the loop spun while calls no-op'd.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">08 / 12</text>
+</svg>

@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.g{fill:#4ade80}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">RISK VIEW</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">OWASP LLM Top 10 — how the practices map</text>
+
+  <!-- table -->
+  <g class="mono" font-size="13.5">
+    <rect x="64" y="140" width="1152" height="40" rx="8" fill="#0d233a"/>
+    <text x="86" y="166" class="c" font-weight="700">RISK</text>
+    <text x="420" y="166" class="c" font-weight="700">POSTURE</text>
+  </g>
+  <g font-size="14.5">
+    <g class="s">
+      <text x="86" y="212" class="t" font-weight="700">LLM01 Prompt injection</text>
+      <text x="420" y="212">Delimited input wrapping · first-party-only RAG corpus · advisory output bounds impact</text>
+      <text x="86" y="252" class="t" font-weight="700">LLM02 Insecure output handling</text>
+      <text x="420" y="252">Fixed JSON contract + server-side enum validation · HTML-escaped rendering · no CoT variants</text>
+      <text x="86" y="292" class="t" font-weight="700">LLM04 Model DoS</text>
+      <text x="420" y="292">Token budgets · explicit context windows · timeouts + circuit breakers · batched loops</text>
+      <text x="86" y="332" class="t" font-weight="700">LLM05 Supply chain</text>
+      <text x="420" y="332">Offline artefact channel · pinning + SBOM + audit gate — <tspan class="g">proven by a caught malicious dep</tspan></text>
+      <text x="86" y="372" class="t" font-weight="700">LLM06 Sensitive info disclosure</text>
+      <text x="420" y="372">No egress · data-at-rest capped/gated/documented · telemetry opt-in and first-party</text>
+      <text x="86" y="412" class="t" font-weight="700">LLM07/08 Plugins &amp; agency</text>
+      <text x="420" y="412">No autonomous tool execution · deterministic-first · AI tool surface off by default, per-tool perms</text>
+      <text x="86" y="452" class="t" font-weight="700">LLM09 Overreliance</text>
+      <text x="420" y="452">Ledger makes AI/analyst disagreement visible · confidence surfaced · auto-escalation states</text>
+      <text x="86" y="492" class="t" font-weight="700">LLM03/10 Poisoning &amp; theft</text>
+      <text x="420" y="492">No in-boundary training · artefact provenance · weights behind platform access controls</text>
+    </g>
+    <g stroke="#1f2b40" stroke-width="1">
+      <line x1="64" y1="226" x2="1216" y2="226"/><line x1="64" y1="266" x2="1216" y2="266"/>
+      <line x1="64" y1="306" x2="1216" y2="306"/><line x1="64" y1="346" x2="1216" y2="346"/>
+      <line x1="64" y1="386" x2="1216" y2="386"/><line x1="64" y1="426" x2="1216" y2="426"/>
+      <line x1="64" y1="466" x2="1216" y2="466"/>
+    </g>
+  </g>
+
+  <rect x="64" y="530" width="1152" height="88" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <g class="s" font-size="16">
+    <text x="88" y="566"><tspan class="c" font-weight="800">NO SINGLE LAYER IS THE ANSWER.</tspan> Injection defence = wrapping + contract + advisory-only. Disclosure defence =</text>
+    <text x="88" y="592">no egress + governed data-at-rest + opt-in telemetry. Every row above is two or more principles working together.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">11 / 12</text>
+</svg>

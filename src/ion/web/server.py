@@ -1107,6 +1107,14 @@ async def briefings_page(
             "label": "AD Advanced (L2)",
             "blurb": "Advanced Active Directory tradecraft for L2/L3 — Kerberos delegation, AD CS, coercion & relay, and persistence — with the directory-write signals that expose them.",
         },
+        # v0.51.x: AI air-gap lessons-learned briefing (SVG slides). The PDF
+        # download is the full HLD deliverable, not a render of the slides.
+        "ai-airgap": {
+            "dir": "ai-airgap",
+            "label": "AI in Air-Gap (Best Practices)",
+            "blurb": "Lessons learned deploying AI/LLM capability inside a disconnected boundary — 13 principles and the production incidents that earned them. Companion to the HLD/LLD deliverables.",
+            "pdf": "/static/briefings/AI_Airgap_Best_Practices_HLD.pdf",
+        },
     }
     deck = deck if deck in decks else "executive"
     current = decks[deck]

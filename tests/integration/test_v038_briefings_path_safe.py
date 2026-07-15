@@ -30,6 +30,16 @@ def test_valid_deck_renders_its_slides(authed_client):
     assert "/static/briefings/secure-by-design/slide-" in r.text
 
 
+def test_ai_airgap_deck_renders_svg_slides(authed_client):
+    # v0.51.x: the AI air-gap lessons-learned deck (12 authored SVGs).
+    r = authed_client.get("/briefings", params={"deck": "ai-airgap"})
+    assert r.status_code == 200
+    assert "/static/briefings/ai-airgap/slide-01.svg" in r.text
+    assert "/static/briefings/ai-airgap/slide-12.svg" in r.text
+    # The PDF download is the full HLD deliverable.
+    assert "/static/briefings/AI_Airgap_Best_Practices_HLD.pdf" in r.text
+
+
 @pytest.mark.parametrize("evil", [
     "../../../../etc/passwd",
     "..%2f..%2fetc%2fpasswd",

@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.w{fill:#f5a524}.r{fill:#e5484d}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">PRINCIPLES 3 – 4 · CONTRACTS &amp; INPUTS</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Pin the output. Distrust the input.</text>
+
+  <g>
+    <rect x="64" y="150" width="556" height="278" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="88" y="188" class="c mono" font-size="14" font-weight="700">P3 · FIXED OUTPUT CONTRACTS</text>
+    <g class="s" font-size="15.5">
+      <text x="88" y="222">Model output pinned to a <tspan class="t" font-weight="700">JSON envelope</tspan>; the</text>
+      <text x="88" y="246">verdict must be a member of a <tspan class="t" font-weight="700">server-owned enum</tspan>.</text>
+      <text x="88" y="270">Validated after every call — parse failure becomes</text>
+      <text x="88" y="294">"inconclusive", never analysis text.</text>
+      <text x="88" y="332">The contract is appended <tspan class="c" font-weight="700">last</tspan> and is <tspan class="c" font-weight="700">exempt</tspan></text>
+      <text x="88" y="356">from all truncation and budget logic.</text>
+      <text x="88" y="394">Free text is a liability. Schemas are an asset.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="660" y="150" width="556" height="278" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="684" y="188" class="c mono" font-size="14" font-weight="700">P4 · ADVERSARY-INFLUENCED INPUT</text>
+    <g class="s" font-size="15.5">
+      <text x="684" y="222">Alert names, log fields and payloads are <tspan class="t" font-weight="700">attacker-</tspan></text>
+      <text x="684" y="246"><tspan class="t" font-weight="700">authored text</tspan>. All telemetry goes inside a delimited</text>
+      <text x="684" y="270">data block — never into prompt <tspan class="t" font-weight="700">instructions</tspan>.</text>
+      <text x="684" y="308">RAG corpus = <tspan class="c" font-weight="700">first-party operator content only</tspan></text>
+      <text x="684" y="332">(KB, playbooks, human-closed cases), so retrieval</text>
+      <text x="684" y="356">can't launder adversary text into future prompts.</text>
+      <text x="684" y="394">Layers: wrapping + contract + advisory-only (P2).</text>
+    </g>
+  </g>
+
+  <rect x="64" y="460" width="1152" height="158" rx="12" fill="#1c1013" stroke="#e5484d" stroke-width="1.5"/>
+  <text x="88" y="498" class="r" font-size="16" font-weight="800">INCIDENT L1 — THE CONTRACT FELL OFF THE FRONT</text>
+  <g class="s" font-size="16">
+    <text x="88" y="530">The local runtime truncates overlong prompts <tspan class="t" font-weight="700">from the front — silently</tspan>. An overweight prompt pushed the output</text>
+    <text x="88" y="556">contract out of the window and the model quietly reverted to free text. Nothing errored; parsing just started failing.</text>
+    <text x="88" y="592"><tspan class="c" font-weight="700">Fix, now structural:</tspan> token-budgeted assembly where optional layers drop first (and loudly) — the contract never does.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">05 / 12</text>
+</svg>

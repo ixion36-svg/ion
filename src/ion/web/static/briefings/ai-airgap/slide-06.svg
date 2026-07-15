@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.g{fill:#4ade80}.r{fill:#e5484d}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">PRINCIPLE 5 · EVIDENCE GROUNDING</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">The server gathers. The model cites. The server verifies.</text>
+
+  <rect x="64" y="146" width="1152" height="132" rx="12" fill="#1c1013" stroke="#e5484d" stroke-width="1.5"/>
+  <text x="88" y="182" class="r" font-size="16" font-weight="800">INCIDENT L4 — PRECEDENT PARROTING</text>
+  <g class="s" font-size="16">
+    <text x="88" y="214">The closure-note AI was given <tspan class="t" font-weight="700">no case evidence</tspan> — just the analyst's draft and a "similar cases" block. With a thin draft,</text>
+    <text x="88" y="240">precedent was its only concrete material, so every note became <tspan class="r" font-weight="700">"a similar case was closed as benign"</tspan> — zero case-specific rationale.</text>
+  </g>
+
+  <!-- pipeline -->
+  <g>
+    <rect x="64" y="316" width="340" height="180" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="86" y="350" class="c mono" font-size="13" font-weight="700">1 · SERVER GATHERS</text>
+    <g class="s" font-size="14.5">
+      <text x="86" y="380">A bounded evidence block from data</text>
+      <text x="86" y="402">the caller can already read: entities,</text>
+      <text x="86" y="424">observables, notes, TI digests.</text>
+      <text x="86" y="454"><tspan class="t" font-weight="700">Per-section clips + whole-block cap</tspan> —</text>
+      <text x="86" y="476">no field can evict the others.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="470" y="316" width="340" height="180" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+    <text x="492" y="350" class="c mono" font-size="13" font-weight="700">2 · MODEL MUST CITE</text>
+    <g class="s" font-size="14.5">
+      <text x="492" y="380">The contract requires every finding</text>
+      <text x="492" y="402">to cite <tspan class="t" font-weight="700">evidence-ledger IDs the server</tspan></text>
+      <text x="492" y="424"><tspan class="t" font-weight="700">assembled</tspan>. Evidence is framed as</text>
+      <text x="492" y="446">"the ONLY facts you may cite".</text>
+      <text x="492" y="476">Precedent: max one trailing sentence.</text>
+    </g>
+  </g>
+  <g>
+    <rect x="876" y="316" width="340" height="180" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="2"/>
+    <text x="898" y="350" class="c mono" font-size="13" font-weight="700">3 · SERVER VERIFIES</text>
+    <g class="s" font-size="14.5">
+      <text x="898" y="380">Invalid citations → <tspan class="t" font-weight="700">dropped</tspan>.</text>
+      <text x="898" y="402">Findings with none left → <tspan class="t" font-weight="700">discarded</tspan>.</text>
+      <text x="898" y="424">Decisive verdict, no surviving</text>
+      <text x="898" y="446">findings → <tspan class="g" font-weight="700">downgraded to inconclusive</tspan>.</text>
+      <text x="898" y="476">Out-of-catalogue refs → discarded.</text>
+    </g>
+  </g>
+  <g stroke="#3a5a78" stroke-width="2"><line x1="404" y1="406" x2="466" y2="406"/><line x1="810" y1="406" x2="872" y2="406"/></g>
+  <g fill="#3a5a78"><polygon points="466,406 454,399 454,413"/><polygon points="872,406 860,399 860,413"/></g>
+
+  <rect x="64" y="532" width="1152" height="86" rx="12" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <g class="s" font-size="16.5">
+    <text x="88" y="568"><tspan class="c" font-weight="800">HALLUCINATION IS BOUNDED BY CONSTRUCTION.</tspan> The model cannot cite what the server didn't provide, and cannot</text>
+    <text x="88" y="594">keep a conclusion its surviving citations don't support. Prompt-pleading ("do not make things up") is not a control.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · AI in Air-Gapped Environments</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">06 / 12</text>
+</svg>
