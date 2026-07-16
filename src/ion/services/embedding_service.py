@@ -71,6 +71,55 @@ def _clip(value: object, max_chars: int) -> str:
     return s[:max_chars] if max_chars and len(s) > max_chars else s
 
 
+def chunk_body(
+    body: str,
+    *,
+    target_chars: int = 1600,
+    overlap_chars: int = 200,
+    max_chunks: int = 64,
+) -> list[str]:
+    """Split a document body into passage chunks for embedding.
+
+    Greedy paragraph packing: paragraphs (split on blank lines) are packed
+    into chunks up to ``target_chars``; a paragraph longer than the target
+    is hard-split with ``overlap_chars`` of carry-over so a sentence
+    straddling the cut stays represented in both halves. Deliberately
+    simple — no markdown/heading awareness — so chunk boundaries are stable
+    and cheap to compute.
+
+    v0.53.0: extracted from ``kb_embedding_service`` (v0.51.0) so the KB
+    and TI-report corpora chunk identically. Callers own their parameter
+    constants and MUST fold a chunk-scheme marker into their staleness
+    hash so a parameter change re-chunks their corpus exactly once.
+    """
+    body = (body or "").strip()
+    if not body:
+        return []
+    paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
+    chunks: list[str] = []
+    current = ""
+    for para in paragraphs:
+        if len(para) > target_chars:
+            if current:
+                chunks.append(current)
+                current = ""
+            start = 0
+            while start < len(para):
+                chunks.append(para[start:start + target_chars])
+                if start + target_chars >= len(para):
+                    break
+                start += target_chars - overlap_chars
+            continue
+        if current and len(current) + 2 + len(para) > target_chars:
+            chunks.append(current)
+            current = para
+        else:
+            current = f"{current}\n\n{para}" if current else para
+    if current:
+        chunks.append(current)
+    return chunks[:max_chunks]
+
+
 def format_enrichment_digest(enrichment: object, *, max_chars: int = 400) -> str:
     """Compact one-line digest of TI enrichment verdicts for embedding text.
 

@@ -111,6 +111,60 @@ class OpenCTIService:
             "Content-Type": "application/json",
         }
 
+    async def fetch_recent_reports(self, limit: int = 100) -> list:
+        """Fetch the most recently published reports, bodies included.
+
+        v0.53.0 — feeds the TI-report RAG cache (``ti_report_service``).
+        One list query carries ``description`` AND ``content`` so the sync
+        loop never needs a per-report round trip. Returns normalised dicts:
+        ``{opencti_id, name, published, report_types, confidence, source,
+        labels, body}`` where ``body`` prefers ``content`` over
+        ``description`` (same precedence the report-detail UI uses).
+        Raises OpenCTIError on any failure — callers decide the degradation.
+        """
+        data = await self._graphql(
+            """
+            query RecentReportsWithBodies($first: Int) {
+                reports(first: $first, orderBy: published, orderMode: desc) {
+                    edges {
+                        node {
+                            id
+                            name
+                            published
+                            report_types
+                            description
+                            content
+                            confidence
+                            objectLabel { value }
+                            createdBy { name }
+                        }
+                    }
+                }
+            }
+            """,
+            {"first": limit},
+        )
+        out = []
+        for edge in (data.get("reports") or {}).get("edges", []):
+            n = edge.get("node") or {}
+            if not n.get("id") or not n.get("name"):
+                continue
+            out.append({
+                "opencti_id": n["id"],
+                "name": n["name"],
+                "published": n.get("published"),
+                "report_types": n.get("report_types") or [],
+                "confidence": n.get("confidence"),
+                "source": (n.get("createdBy") or {}).get("name"),
+                "labels": [
+                    lab.get("value")
+                    for lab in (n.get("objectLabel") or [])
+                    if isinstance(lab, dict) and lab.get("value")
+                ],
+                "body": n.get("content") or n.get("description") or "",
+            })
+        return out
+
     async def _graphql(self, query: str, variables: Optional[Dict] = None) -> Dict:
         """Execute a GraphQL query against OpenCTI.
 

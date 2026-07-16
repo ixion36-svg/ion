@@ -126,6 +126,7 @@ LOCK_DATA_RETENTION_BG      = 1024  # v0.31.14 — data-min P13 G2+G3: audit_log
 LOCK_ARKIME_AUTO_CASE_BG    = 1025  # v0.34.0  — auto-case + PCAP for Arkime-bearing alerts
 LOCK_ARKIME_RTMON_BG        = 1026  # v0.45.0  — realtime Arkime IOC-traffic monitor
 LOCK_PLAYBOOK_EMBEDDING_BG  = 1027  # v0.51.0  — playbook-embedding background producer
+LOCK_TI_REPORT_BG           = 1028  # v0.53.0  — TI-report cache sync + chunk-embedding loop
 
 
 @contextmanager
@@ -1510,6 +1511,12 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
             ensure_playbook_hnsw_index(engine)
         except Exception as exc:  # pragma: no cover
             logger.debug("Playbook HNSW index creation skipped: %s", exc)
+        # v0.53.0: HNSW index on ti_report_chunk_embeddings.embedding.
+        try:
+            from ion.models.ti_report import ensure_ti_report_hnsw_index
+            ensure_ti_report_hnsw_index(engine)
+        except Exception as exc:  # pragma: no cover
+            logger.debug("TI-report HNSW index creation skipped: %s", exc)
 
     if _is_postgres(engine):
         # v0.49.3: serialize schema init across the N uvicorn workers with a

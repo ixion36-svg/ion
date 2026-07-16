@@ -78,39 +78,18 @@ _CHUNK_SCHEME = "c1"
 def _chunk_body(body: str) -> list[str]:
     """Split a document body into passage chunks.
 
-    Greedy paragraph packing: paragraphs (split on blank lines) are packed
-    into chunks up to ``_CHUNK_TARGET_CHARS``; a paragraph longer than the
-    target is hard-split with ``_CHUNK_OVERLAP_CHARS`` of carry-over so a
-    sentence straddling the cut stays represented in both halves. Deliberately
-    simple — no markdown/heading awareness — so the chunk boundaries are
-    stable and cheap to compute.
+    v0.53.0: delegates to the shared ``embedding_service.chunk_body`` (the
+    implementation moved there so the KB and TI-report corpora chunk
+    identically); this wrapper owns only the KB parameter constants and
+    keeps the call sites + tests stable.
     """
-    body = (body or "").strip()
-    if not body:
-        return []
-    paragraphs = [p.strip() for p in body.split("\n\n") if p.strip()]
-    chunks: list[str] = []
-    current = ""
-    for para in paragraphs:
-        if len(para) > _CHUNK_TARGET_CHARS:
-            if current:
-                chunks.append(current)
-                current = ""
-            start = 0
-            while start < len(para):
-                chunks.append(para[start:start + _CHUNK_TARGET_CHARS])
-                if start + _CHUNK_TARGET_CHARS >= len(para):
-                    break
-                start += _CHUNK_TARGET_CHARS - _CHUNK_OVERLAP_CHARS
-            continue
-        if current and len(current) + 2 + len(para) > _CHUNK_TARGET_CHARS:
-            chunks.append(current)
-            current = para
-        else:
-            current = f"{current}\n\n{para}" if current else para
-    if current:
-        chunks.append(current)
-    return chunks[:_MAX_CHUNKS_PER_DOC]
+    from ion.services.embedding_service import chunk_body
+    return chunk_body(
+        body,
+        target_chars=_CHUNK_TARGET_CHARS,
+        overlap_chars=_CHUNK_OVERLAP_CHARS,
+        max_chunks=_MAX_CHUNKS_PER_DOC,
+    )
 
 
 def _chunk_source_text(doc: Document, chunk: str) -> str:

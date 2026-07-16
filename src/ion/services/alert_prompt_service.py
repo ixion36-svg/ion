@@ -82,6 +82,12 @@ def _playbook_rag_enabled() -> bool:
     )
 
 
+def _ti_report_rag_enabled() -> bool:
+    return os.environ.get("ION_TI_REPORT_RAG_ENABLED", "true").lower() in (
+        "true", "1", "yes",
+    )
+
+
 def _alert_text_for_embedding(alert: dict) -> str:
     """Serialise an alert to text for embedding.
 
@@ -185,6 +191,31 @@ def _format_kb_context_for_prompt(hits: List[dict]) -> str:
         excerpt = (h.get("excerpt") or "").strip()
         if excerpt:
             lines.append(f"{excerpt[:800]}\n")
+    return "".join(lines)
+
+
+def _format_ti_report_context_for_prompt(hits: List[dict]) -> str:
+    """Render the "Threat Intelligence Context" section. Empty list → ""."""
+    if not hits:
+        return ""
+    lines = [
+        "\n\n---\n",
+        "## Threat Intelligence Context\n",
+        "These are threat-intel report passages semantically similar to the "
+        "current alert — background about adversary activity, campaigns, and "
+        "tradecraft. They are NOT evidence about this specific alert; use "
+        "them to inform hypotheses, never as findings.\n",
+    ]
+    for h in hits:
+        meta_bits = [b for b in (h.get("published"), h.get("source")) if b]
+        meta = f" ({' · '.join(str(m) for m in meta_bits)})" if meta_bits else ""
+        lines.append(
+            f"\n### {h.get('name') or 'Untitled report'}{meta} "
+            f"(similarity {h['similarity']:.2f})\n"
+        )
+        excerpt = (h.get("excerpt") or "").strip()
+        if excerpt:
+            lines.append(f"{excerpt[:700]}\n")
     return "".join(lines)
 
 
@@ -4342,6 +4373,85 @@ class AlertPromptService:
             out.append(_hit(pb, f"similarity {similarity:.2f}", similarity))
         return out
 
+    def _get_ti_report_context_for_alert(
+        self,
+        alert: dict,
+        *,
+        k: int = 2,
+        min_similarity: float = 0.65,
+    ) -> List[dict]:
+        """Return up to ``k`` cached TI-report passages similar to ``alert``.
+
+        v0.53.0 — chunk-level retrieval over the local OpenCTI report cache
+        (``ti_reports`` / ``ti_report_chunk_embeddings``, populated by the
+        ``ti_report_service`` background loop). Same rank-chunks-then-dedup
+        shape as KB retrieval: over-fetch, keep each report's best chunk,
+        quote the matched passage. Empty on any failure — the layer is
+        purely additive context.
+        """
+        if not _ti_report_rag_enabled() or self.session is None or not alert:
+            return []
+
+        try:
+            from ion.services.embedding_service import get_embedding_service
+        except Exception:
+            return []
+        svc = get_embedding_service()
+        if not svc.is_enabled:
+            return []
+        text = _alert_text_for_embedding(alert)
+        if not text:
+            return []
+        vec = svc.embed(text, mode="query")
+        if vec is None:
+            return []
+
+        try:
+            from ion.models.ti_report import TIReport, TIReportChunkEmbedding
+        except Exception as exc:
+            logger.debug("TI-report RAG imports failed: %s", exc)
+            return []
+
+        try:
+            distance = TIReportChunkEmbedding.embedding.cosine_distance(vec)
+            rows = (
+                self.session.query(
+                    TIReport, TIReportChunkEmbedding, distance.label("distance")
+                )
+                .join(
+                    TIReportChunkEmbedding,
+                    TIReportChunkEmbedding.report_id == TIReport.id,
+                )
+                .order_by(distance.asc())
+                .limit(max(1, int(k)) * 4)
+                .all()
+            )
+        except Exception as exc:
+            logger.debug("TI-report RAG query failed: %s", exc)
+            return []
+
+        out: list[dict] = []
+        seen: set[int] = set()
+        for report, chunk_row, dist in rows:
+            if len(out) >= max(1, int(k)):
+                break
+            similarity = 1.0 - float(dist)
+            if similarity < float(min_similarity):
+                break  # distance-ordered — everything after is worse
+            if report.id in seen:
+                continue
+            seen.add(report.id)
+            out.append({
+                "report_id": report.id,
+                "name": report.name,
+                "published": report.published,
+                "source": report.source,
+                "excerpt": (chunk_row.chunk_text or "")[:700],
+                "similarity": similarity,
+                "chunk_index": chunk_row.chunk_index,
+            })
+        return out
+
     # ------------------------------------------------------------------ render
 
     def render_system_prompt(
@@ -4419,7 +4529,8 @@ class AlertPromptService:
 
         if alert is not None:
             # v0.10.6: KB RAG — topic-level investigation background.
-            # Priority 1 of 4 (injected before exemplars, playbooks, skills).
+            # Priority 1 of 5 (injected before exemplars, playbooks,
+            # TI reports, skills).
             kb_block = ""
             if remaining > 0:
                 try:
@@ -4442,7 +4553,7 @@ class AlertPromptService:
                 parts.append(kb_block)
 
             # v0.10.5: Gold exemplars — prior analyst-verified cases.
-            # Priority 2 of 4.
+            # Priority 2 of 5.
             exemplar_block = ""
             if remaining > 0:
                 try:
@@ -4465,7 +4576,7 @@ class AlertPromptService:
                 parts.append(exemplar_block)
 
             # v0.51.0: Playbook RAG — the SOC's documented response
-            # procedures. Priority 3 of 4 (deterministic trigger-condition
+            # procedures. Priority 3 of 5 (deterministic trigger-condition
             # match first, embedding similarity fallback).
             playbook_block = ""
             if remaining > 0:
@@ -4488,8 +4599,32 @@ class AlertPromptService:
             if playbook_block:
                 parts.append(playbook_block)
 
+            # v0.53.0: TI-report RAG — cached threat-intel report passages.
+            # Priority 4 of 5 (background adversary context; dropped before
+            # the layers above when the budget is tight).
+            ti_block = ""
+            if remaining > 0:
+                try:
+                    ti_hits = self._get_ti_report_context_for_alert(alert)
+                except Exception as exc:
+                    logger.debug("TI-report RAG retrieval failed: %s", exc)
+                    ti_hits = []
+                if ti_hits:
+                    candidate = _format_ti_report_context_for_prompt(ti_hits)
+                    cost = _estimate_tokens(candidate)
+                    if cost <= remaining:
+                        ti_block = candidate
+                        remaining -= cost
+                    else:
+                        logger.debug(
+                            "TI-report RAG dropped: needs %d tokens, only %d remaining",
+                            cost, remaining,
+                        )
+            if ti_block:
+                parts.append(ti_block)
+
             # v0.13.1: Elastic Agent Skills — keyword/technique matched.
-            # Priority 4 of 4 (embedding-free, always attempted last).
+            # Priority 5 of 5 (embedding-free, always attempted last).
             if remaining > 0:
                 try:
                     from ion.services.skill_loader import (

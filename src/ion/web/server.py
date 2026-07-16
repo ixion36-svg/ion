@@ -956,6 +956,21 @@ async def _startup_event():
     except Exception as exc:
         logger.warning("Failed to start playbook-embedding loop: %s", exc)
 
+    # ---------------------------------------------------------------
+    # TI-report cache sync + chunk-embedding loop (v0.53.0) — caches recent
+    # OpenCTI reports locally and embeds them for Bob's TI-report RAG layer.
+    # Honours ION_TI_REPORT_RAG_ENABLED / ION_TI_REPORT_SYNC_INTERVAL_S.
+    # No-ops phase-by-phase when OpenCTI or Ollama is unavailable.
+    # ---------------------------------------------------------------
+    def _start_ti_report_loop():
+        from ion.services.ti_report_service import start_ti_report_if_enabled
+        start_ti_report_if_enabled(engine=engine)
+        logger.info("TI-report background loop started")
+    try:
+        _start_ti_report_loop()
+    except Exception as exc:
+        logger.warning("Failed to start TI-report loop: %s", exc)
+
     # Version compatibility checks for connectors that declare supported ranges
     try:
         from ion.services.connectors import get_connector_registry

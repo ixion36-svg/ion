@@ -208,6 +208,9 @@ from ion.models.social import (
 from ion.models.story import Story, StoryRun  # noqa: F401
 from ion.models.template import Collection, Tag, Template, Variable, template_tags
 from ion.models.threat_intel import ThreatIntelWatch
+
+# v0.53.0: TI-report RAG — local OpenCTI report cache + chunk embeddings.
+from ion.models.ti_report import TIReport, TIReportChunkEmbedding  # noqa: F401
 from ion.models.ticker import (  # noqa: F401
     Ticker,
     TickerDismissal,
