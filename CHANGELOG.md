@@ -1,13 +1,51 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.52.0 -->
-<!-- ion-doc:version=0.52.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.53.0 -->
+<!-- ion-doc:version=0.53.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-16 -->
 
 # Changelog
+
+## v0.53.0 — 2026-07-16
+
+**TI-report RAG — local OpenCTI report cache + a 5th prompt layer (RAG
+rework Phase 3 completion).**
+
+- **Local report cache** — new `ti_reports` table: the most recent OpenCTI
+  reports (metadata + body, `content`-over-`description` precedence,
+  40,000-char clip) upserted by OpenCTI id. Report bodies were previously
+  never stored — every view was a live GraphQL fetch — so Bob's RAG had
+  nothing to retrieve and an estate whose OpenCTI was down had no report
+  access at all. New `OpenCTIService.fetch_recent_reports()` carries bodies
+  in the one list query (no per-report round trips).
+- **Background loop** (`ti_report_service`, advisory lock **1028**,
+  `ION_TI_REPORT_SYNC_INTERVAL_S` default 1800s): sync-then-embed each
+  tick, each phase degrading independently — no OpenCTI → sync no-ops and
+  the existing cache keeps serving; no Ollama → embed no-ops.
+- **Chunk-level embeddings** — new `ti_report_chunk_embeddings` (HNSW
+  indexed), same discipline as the v0.51.0 KB corpus: atomic per-report
+  replace, whole-report staleness hash with scheme marker `t1`,
+  chunk-counted batches (`ION_TI_EMBEDDING_BATCH` default 40). The generic
+  paragraph chunker is now shared (`embedding_service.chunk_body`); the KB
+  wrapper delegates with identical behaviour.
+- **Prompt layer 4 of 5** — "Threat Intelligence Context": top chunks
+  ranked, deduped to best-per-report, the matched passage quoted with
+  published-date/source attribution, explicitly framed as background about
+  adversary activity, **not** evidence about the specific alert. Skills
+  moves to priority 5 (still dropped first under budget). Gate
+  `ION_TI_REPORT_RAG_ENABLED` default ON.
+
+**Net-new surface (documented in SECURITY_ASSESSMENT):** locally cached
+threat-report text is a new data-at-rest surface — the operator's own
+curated OpenCTI intel, already rendered in ION's Threat Landscape UI,
+bounded per report and confined to the single-tenant DB. No new route or
+permission; the sync is read-only against the pre-existing OpenCTI
+integration. **11 new tests** (`tests/test_v053_ti_report_rag.py`); all
+RAG suites + model-registry green (93 total). Net new findings:
+0C / 0H / 0M / 0L.
 
 ## v0.52.0 — 2026-07-16
 
