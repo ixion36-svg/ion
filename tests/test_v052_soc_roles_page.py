@@ -1,7 +1,8 @@
 """v0.52.0 — /soc-roles training-section reference page.
 
 A server-rendered "SOC roles & daily duties" page in the briefing-deck
-visual style: one card per role (8 roles), pure-CSS hover expansion carrying
+visual style: one card per role (11 roles since v0.54.1), pure-CSS hover
+expansion carrying
 mission / shift timeline / standing duties / "what good looks like", and a
 Training path section joined live to the published-course catalogue by the
 role's declared CourseLevel. URL is /soc-roles — /roles stays reserved for
@@ -17,9 +18,14 @@ from ion.models.user import User
 from ion.web.api import get_db_session
 from ion.web.server import app
 
+# v0.54.1: +3 engineering seats (Security Platform Engineer, Automation
+# Engineer (SOAR), Network Security Engineer) grouped with Detection
+# Engineer under the "Engineering" tier.
 ROLE_NAMES = [
     "L1 Triage Analyst", "L2 Investigation Analyst", "L3 / Incident Lead",
-    "Detection Engineer", "Threat Hunter", "Threat Intel Analyst",
+    "Detection Engineer", "Security Platform Engineer",
+    "Automation Engineer (SOAR)", "Network Security Engineer",
+    "Threat Hunter", "Threat Intel Analyst",
     "DFIR Specialist", "SOC Manager",
 ]
 
@@ -36,13 +42,14 @@ def client(session):
     app.dependency_overrides.clear()
 
 
-def test_page_renders_all_eight_roles(client):
+def test_page_renders_all_roles(client):
     r = client.get("/soc-roles")
     assert r.status_code == 200
     for name in ROLE_NAMES:
         assert name in r.text
     # Deck styling: per-role colour classes + the CSS hover-expansion hook.
-    for color in ("cyan", "green", "amber", "violet", "coral", "pink", "teal", "ice"):
+    for color in ("cyan", "green", "amber", "violet", "coral", "pink", "teal",
+                  "ice", "steel", "lime", "rose"):
         assert f"sr-c-{color}" in r.text
     assert ".sr-role:hover .sr-detail" in r.text
     # CSP: page styles ship in a nonced style block, no inline style attrs
