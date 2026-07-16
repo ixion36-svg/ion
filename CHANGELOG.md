@@ -1,13 +1,32 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.54.0 -->
-<!-- ion-doc:version=0.54.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.54.1 -->
+<!-- ion-doc:version=0.54.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-16 -->
 
 # Changelog
+
+## v0.54.1 — 2026-07-16
+
+**`/soc-roles` — the missing engineering seats.**
+
+- Three new roles join the training reference page (11 total), grouped
+  with Detection Engineer under a new **Engineering** tier (retagged from
+  "Specialist"): **Security Platform Engineer** (ingest pipelines, sensor
+  estate, storage, upgrades), **Automation Engineer (SOAR)** (playbooks as
+  code, toil hunting, manual fallbacks, AI-stays-advisory guardrail), and
+  **Network Security Engineer** (taps/SPANs, sensor placement, capture
+  quality, segmentation review).
+- Each gets its own colour identity (new `sr-c-steel` / `sr-c-lime` /
+  `sr-c-rose` classes in the existing nonced style block — CSP posture
+  unchanged), the same pure-CSS hover expansion, and training-path links
+  joined live to the published-course catalogue (L3/L3/L2).
+- Content-only change to an existing authenticated page: no new route,
+  permission, schema, or dependency. `tests/test_v052_soc_roles_page.py`
+  extended to assert all 11 roles + the new colour classes.
 
 ## v0.54.0 — 2026-07-16
 
