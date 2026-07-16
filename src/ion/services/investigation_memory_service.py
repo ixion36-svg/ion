@@ -246,16 +246,21 @@ class InvestigationMemoryService:
                 if past:
                     lines.append(
                         f"- Prior investigations for rule **{signature}** "
-                        f"(last {len(past)}):"
+                        f"({len(past)}, most confident first):"
                     )
                     for p in past:
                         verdict = p.verdict or "?"
                         when = p.created_at.date().isoformat() if p.created_at else "?"
                         sev = p.severity_assessment or "-"
+                        conf = (
+                            f", confidence={p.confidence_int}"
+                            if p.confidence_int is not None
+                            else ""
+                        )
                         snippet = (p.summary_text or "").strip().splitlines()
                         head = snippet[0][:140] if snippet else ""
                         lines.append(
-                            f"  - {when}: verdict={verdict}, severity={sev}"
+                            f"  - {when}: verdict={verdict}, severity={sev}{conf}"
                             + (f" — {head}" if head else "")
                         )
                 else:
@@ -263,6 +268,13 @@ class InvestigationMemoryService:
                         f"- No prior completed investigations for rule "
                         f"**{signature}**."
                     )
+
+                # --- Human review outcomes (v0.54.0, RAG P4) -------------
+                # What did analysts DECIDE when cases on this rule closed?
+                # Disagreements are the highest-value memory signal there
+                # is: they tell the model its own priors on this rule have
+                # been overruled by a human before.
+                lines.extend(self._human_outcome_lines(signature, db))
 
             # --- IOC history for indicators carried by the alert ---------
             ioc_lines = self._ioc_history_lines(alert, db)
@@ -291,6 +303,55 @@ class InvestigationMemoryService:
     # ------------------------------------------------------------------ #
     # Internal helpers
     # ------------------------------------------------------------------ #
+
+    def _human_outcome_lines(self, signature: str, db: Session) -> list[str]:
+        """Render closed-case human verdicts for this rule (v0.54.0).
+
+        One summary line (agreed/disagreed counts), then one line per
+        DISAGREEMENT — Bob's verdict vs what the human closed it as, with
+        the closer's delta reason when they left one. Agreements are only
+        counted, not itemised: concordant history adds little beyond the
+        prior-investigation lines, and the memory block is char-capped.
+
+        Best-effort: any failure returns [] so memory keeps working on a
+        DB without the ledger (e.g. minimal test fixtures).
+        """
+        try:
+            rows = repo.feedback_outcomes_for_signature(signature, db, limit=5)
+        except Exception as exc:
+            logger.debug("human-outcome lookup failed for %s: %s", signature, exc)
+            return []
+        if not rows:
+            return []
+
+        agreed = sum(1 for r in rows if r.agreement is True)
+        disagreed = [r for r in rows if r.agreement is False]
+        no_verdict = sum(1 for r in rows if r.agreement is None)
+
+        lines = [
+            f"- Human review outcomes for this rule (last {len(rows)} closed): "
+            f"{agreed} agreed with the AI verdict, {len(disagreed)} disagreed"
+            + (f", {no_verdict} had no AI verdict" if no_verdict else "")
+            + "."
+        ]
+        for r in disagreed:
+            conf = (
+                f" (confidence {r.bob_confidence_int})"
+                if r.bob_confidence_int is not None
+                else ""
+            )
+            reason = (r.delta_reason or "").strip()
+            lines.append(
+                f"  - **ANALYST DISAGREED**: AI said {r.bob_suggested_verdict}"
+                f"{conf} → human closed as **{r.human_verdict}**"
+                + (f" — {reason[:160]}" if reason else "")
+            )
+        if disagreed:
+            lines.append(
+                "  - Weigh the human closures above your own prior verdicts "
+                "when they conflict."
+            )
+        return lines
 
     def _ioc_history_lines(self, alert: dict, db: Session) -> list[str]:
         """Best-effort IOC-history lookup from common alert fields.

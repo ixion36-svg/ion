@@ -16,6 +16,14 @@ The endpoint gathers five inputs the user asked for:
    verdict keyed off the lead alert alone.
 5. Similar closed cases via pgvector (cosine distance ≥ 0.5 by default).
 
+v0.54.0 (RAG P4) aligned this endpoint to the full prompt stack the
+autonomous path uses: the matched AlertPromptTemplate guide plus the
+budget-gated RAG layers (KB → exemplars → playbooks → TI reports → skills)
+are appended to the system prompt via
+``AlertPromptService.build_rag_context_blocks``, and the investigation
+memory block (FP signatures, confidence-sorted prior verdicts,
+analyst-disagreement history) joins the user prompt.
+
 Bob's response is returned to the UI verbatim; the endpoint does NOT
 persist anything. If the analyst wants to keep the analysis, they click
 "Save as note", which calls the existing
@@ -132,34 +140,45 @@ def _gather_similar_cases(
 _MAX_ALERTS_IN_PROMPT = 12
 
 
-async def _gather_alert_field_summaries(alert_ids: list[str]) -> list[dict]:
+async def _gather_alert_field_summaries(
+    alert_ids: list[str],
+) -> tuple[list[dict], Optional[dict]]:
     """Well-known-field summary for EVERY linked alert (best-effort via ES).
 
-    Returns one dict per alert — ``{es_id, rule_name, fields}`` — where
-    ``fields`` is the investigation service's compact well-known-field map
-    (rule, host, user, process, network, file, plus the detection rule's
-    description / investigation guide). This is what lets a multi-alert case
-    get a genuine case-WIDE analysis instead of one keyed off the lead alert
-    only: even when no per-alert autonomous investigation has run yet, Bob
-    sees the salient fields from each alert in the cluster.
+    Returns ``(summaries, first_raw_alert)``. ``summaries`` holds one dict
+    per alert — ``{es_id, rule_name, fields}`` — where ``fields`` is the
+    investigation service's compact well-known-field map (rule, host, user,
+    process, network, file, plus the detection rule's description /
+    investigation guide). This is what lets a multi-alert case get a genuine
+    case-WIDE analysis instead of one keyed off the lead alert only: even
+    when no per-alert autonomous investigation has run yet, Bob sees the
+    salient fields from each alert in the cluster.
+
+    ``first_raw_alert`` (v0.54.0) is the lead alert's raw ES document — the
+    seed for the representative-alert dict that drives template resolution
+    and RAG retrieval, so the prompt-stack layers see the same field shapes
+    the autonomous path embeds.
     """
     if not alert_ids:
-        return []
+        return [], None
     try:
         from ion.services.elasticsearch_service import ElasticsearchService
         from ion.services.investigation_service import InvestigationService
 
         es = ElasticsearchService()
         if not es.is_configured:
-            return []
+            return [], None
         hits = await es.get_alerts_by_ids(alert_ids[:_MAX_ALERTS_IN_PROMPT])
         if not hits:
-            return []
+            return [], None
         inv = InvestigationService()
         out: list[dict] = []
+        first_raw: Optional[dict] = None
         for h in hits:
             raw = dict(getattr(h, "raw_data", None) or {})
             raw.setdefault("_id", getattr(h, "id", None))
+            if first_raw is None and raw:
+                first_raw = raw
             try:
                 summary = inv._build_alert_summary(raw)
             except Exception:  # noqa: BLE001 — one bad doc shouldn't sink the set
@@ -169,10 +188,62 @@ async def _gather_alert_field_summaries(alert_ids: list[str]) -> list[dict]:
                 "rule_name": getattr(h, "rule_name", None),
                 "fields": summary,
             })
-        return out
+        return out, first_raw
     except Exception as exc:
         logger.debug("Per-alert field summary gather failed: %s", exc)
-        return []
+        return [], None
+
+
+def _build_representative_alert(
+    case: AlertCase,
+    linked_triages: list[AlertTriage],
+    first_raw_alert: Optional[dict],
+) -> dict:
+    """Build the alert dict the prompt-stack layers key off (v0.54.0).
+
+    Prefer the lead alert's raw ES document (real field shapes for the
+    embedding text and the template matcher's rule-id tier); backfill from
+    the triage/case rows so the stack still works when ES is unreachable.
+    ``mitre_tags`` mirrors the merged-copy convention the autonomous
+    ``investigate_case`` path uses — it's what the playbook matcher and the
+    query-embedding text look for.
+    """
+    rep: dict = dict(first_raw_alert or {})
+    lead = linked_triages[0] if linked_triages else None
+    if lead is not None:
+        for key, value in (
+            ("rule_name", lead.rule_name),
+            ("rule_id", getattr(lead, "rule_id", None)),
+        ):
+            if value and not rep.get(key):
+                rep[key] = value
+    if case.severity and not rep.get("severity"):
+        rep["severity"] = case.severity
+    mitre = list(getattr(case, "mitre_techniques", None) or [])
+    if mitre and not rep.get("mitre_tags"):
+        rep["mitre_tags"] = mitre
+    return rep
+
+
+def _gather_memory_context(rep_alert: dict) -> str:
+    """Investigation-memory block for the representative alert (v0.54.0).
+
+    Reuses the autonomous path's guard wrapper so the same env kill-switch
+    (``ION_INVESTIGATION_MEMORY_ENABLED``) and char cap apply. This is what
+    carries the FP-signature check, prior verdicts (most confident first),
+    and analyst-disagreement history into the case analysis.
+    """
+    if not rep_alert:
+        return ""
+    try:
+        from ion.services.investigation_memory_service import (
+            get_investigation_memory_service,
+        )
+        from ion.services.investigation_service import _build_memory_ctx
+        return _build_memory_ctx(get_investigation_memory_service(), rep_alert)
+    except Exception as exc:
+        logger.debug("Memory context gather failed: %s", exc)
+        return ""
 
 
 # ── Prompt builder ───────────────────────────────────────────────────────
@@ -200,8 +271,69 @@ _SYSTEM_PROMPT = (
     "verdict. "
     "4) **Recommended next steps** — 3-5 bullet actions the analyst "
     "should take. "
-    "Be concise. Aim for under 400 words total."
+    "Be concise. Aim for under 400 words total. "
+    "You may also be given a per-rule investigation guide, knowledge-base "
+    "excerpts, response playbooks, and threat-intel context below — use "
+    "them to sharpen the analysis, but the case data in the user message "
+    "is the evidence; never present background context as case evidence."
 )
+
+
+def _augment_system_prompt(session: Session, rep_alert: dict) -> tuple[str, dict]:
+    """Extend the case-analysis persona with the full prompt stack (v0.54.0).
+
+    Appends the matched AlertPromptTemplate's guide (same 5-tier matcher as
+    the autonomous path) and the shared budget-gated RAG layers
+    (KB → exemplars → playbooks → TI reports → skills) via
+    ``AlertPromptService.build_rag_context_blocks``. The JSON output
+    contract is deliberately NOT appended — this endpoint wants the
+    markdown sections defined in the persona, not the envelope.
+
+    Returns ``(system_prompt, meta)`` where meta feeds the response's
+    ``sources`` dict. Best-effort: any failure returns the bare persona.
+    """
+    meta: dict = {"template": None, "rag_blocks": 0}
+    if not rep_alert:
+        return _SYSTEM_PROMPT, meta
+    parts: list[str] = [_SYSTEM_PROMPT]
+    try:
+        from ion.services.alert_prompt_service import (
+            _SYSTEM_PROMPT_TOKEN_BUDGET,
+            AlertPromptService,
+            _estimate_tokens,
+        )
+
+        svc = AlertPromptService(session)
+        template = None
+        try:
+            template = svc.resolve_template_for_alert(rep_alert)
+        except Exception as exc:
+            logger.debug("Template resolution failed for case analysis: %s", exc)
+        if template is not None:
+            guide: list[str] = [
+                f"\n\n---\n## Per-Rule Investigation Guide: {template.name}\n"
+            ]
+            if template.description:
+                guide.append(template.description.strip() + "\n")
+            if template.severity_hint:
+                guide.append(
+                    f"\nSeverity hint for this rule: **{template.severity_hint}**\n"
+                )
+            if template.prompt_text:
+                guide.append(
+                    "\n### Investigation Focus\n" + template.prompt_text.strip() + "\n"
+                )
+            parts.append("".join(guide))
+            meta["template"] = template.name
+
+        remaining = _SYSTEM_PROMPT_TOKEN_BUDGET - _estimate_tokens("".join(parts))
+        blocks = svc.build_rag_context_blocks(rep_alert, remaining)
+        parts.extend(blocks)
+        meta["rag_blocks"] = len(blocks)
+    except Exception as exc:
+        logger.debug("Prompt-stack alignment failed: %s", exc)
+        return _SYSTEM_PROMPT, meta
+    return "".join(parts), meta
 
 
 def _render_alert_fields_section(alert_summaries: list[dict], total_alerts: int) -> list[str]:
@@ -263,6 +395,7 @@ def _build_user_prompt(
     investigations: list[dict],
     similar_cases: list[dict],
     alert_summaries: list[dict],
+    memory_block: str = "",
 ) -> str:
     """Construct the markdown context block the analyst expects Bob to use."""
     parts: list[str] = []
@@ -341,6 +474,12 @@ def _build_user_prompt(
             )
     parts.append("")
 
+    # v0.54.0: investigation memory — FP signatures, prior verdicts (most
+    # confident first) and analyst-disagreement history for the lead rule.
+    if memory_block and memory_block.strip():
+        parts.append(memory_block.strip())
+        parts.append("")
+
     parts.append(
         "Produce the verdict + evidence + similar-cases + next-steps "
         "sections defined in the system prompt."
@@ -381,10 +520,18 @@ async def generate_bob_analysis(
 
     investigations = _gather_investigations(session, alert_ids)
     similar = _gather_similar_cases(session, case_id)
-    alert_summaries = await _gather_alert_field_summaries(alert_ids)
+    alert_summaries, first_raw_alert = await _gather_alert_field_summaries(alert_ids)
+
+    # v0.54.0 (RAG P4): align this endpoint to the full prompt stack —
+    # per-rule template guide + KB/exemplar/playbook/TI/skills layers in
+    # the system prompt, investigation memory in the user prompt.
+    rep_alert = _build_representative_alert(case, linked_triages, first_raw_alert)
+    system_prompt, stack_meta = _augment_system_prompt(session, rep_alert)
+    memory_block = _gather_memory_context(rep_alert)
 
     user_prompt = _build_user_prompt(
-        case, linked_triages, investigations, similar, alert_summaries
+        case, linked_triages, investigations, similar, alert_summaries,
+        memory_block=memory_block,
     )
 
     try:
@@ -397,7 +544,7 @@ async def generate_bob_analysis(
             )
         result = await ollama.chat(
             messages=[{"role": "user", "content": user_prompt}],
-            system_prompt=_SYSTEM_PROMPT,
+            system_prompt=system_prompt,
             context_type="case_analysis",
             user_id=user.id,
             temperature=0.4,
@@ -424,6 +571,10 @@ async def generate_bob_analysis(
             "observables_count": len(case.observables or []),
             "similar_cases_count": len(similar),
             "alert_fields_present": len(alert_summaries),
+            # v0.54.0: prompt-stack alignment telemetry
+            "prompt_template": stack_meta.get("template"),
+            "rag_blocks": stack_meta.get("rag_blocks", 0),
+            "memory_context_present": bool(memory_block and memory_block.strip()),
         },
         generated_at=datetime.now(timezone.utc).isoformat(),
     )

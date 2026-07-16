@@ -223,7 +223,9 @@ def test_layer_order_ti_reports_between_playbooks_and_skills():
     import inspect
 
     from ion.services import alert_prompt_service as aps
-    src = inspect.getsource(aps.AlertPromptService.render_system_prompt)
+    # v0.54.0: the layer injection moved from render_system_prompt into the
+    # shared build_rag_context_blocks (reused by bob_analysis_api).
+    src = inspect.getsource(aps.AlertPromptService.build_rag_context_blocks)
     assert (
         src.index("KB RAG")
         < src.index("Gold exemplars")

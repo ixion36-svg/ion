@@ -4528,127 +4528,101 @@ class AlertPromptService:
         remaining = _SYSTEM_PROMPT_TOKEN_BUDGET - fixed_tokens
 
         if alert is not None:
-            # v0.10.6: KB RAG — topic-level investigation background.
-            # Priority 1 of 5 (injected before exemplars, playbooks,
-            # TI reports, skills).
-            kb_block = ""
-            if remaining > 0:
-                try:
-                    kb_hits = self._get_kb_context_for_alert(alert)
-                except Exception as exc:
-                    logger.debug("KB RAG retrieval failed: %s", exc)
-                    kb_hits = []
-                if kb_hits:
-                    candidate = _format_kb_context_for_prompt(kb_hits)
-                    cost = _estimate_tokens(candidate)
-                    if cost <= remaining:
-                        kb_block = candidate
-                        remaining -= cost
-                    else:
-                        logger.debug(
-                            "KB RAG dropped: needs %d tokens, only %d remaining",
-                            cost, remaining,
-                        )
-            if kb_block:
-                parts.append(kb_block)
-
-            # v0.10.5: Gold exemplars — prior analyst-verified cases.
-            # Priority 2 of 5.
-            exemplar_block = ""
-            if remaining > 0:
-                try:
-                    exemplars = self._get_gold_exemplars_for_alert(alert)
-                except Exception as exc:
-                    logger.debug("Gold exemplar retrieval failed: %s", exc)
-                    exemplars = []
-                if exemplars:
-                    candidate = _format_exemplars_for_prompt(exemplars)
-                    cost = _estimate_tokens(candidate)
-                    if cost <= remaining:
-                        exemplar_block = candidate
-                        remaining -= cost
-                    else:
-                        logger.debug(
-                            "Gold exemplars dropped: needs %d tokens, only %d remaining",
-                            cost, remaining,
-                        )
-            if exemplar_block:
-                parts.append(exemplar_block)
-
-            # v0.51.0: Playbook RAG — the SOC's documented response
-            # procedures. Priority 3 of 5 (deterministic trigger-condition
-            # match first, embedding similarity fallback).
-            playbook_block = ""
-            if remaining > 0:
-                try:
-                    playbook_hits = self._get_playbook_context_for_alert(alert)
-                except Exception as exc:
-                    logger.debug("Playbook RAG retrieval failed: %s", exc)
-                    playbook_hits = []
-                if playbook_hits:
-                    candidate = _format_playbook_context_for_prompt(playbook_hits)
-                    cost = _estimate_tokens(candidate)
-                    if cost <= remaining:
-                        playbook_block = candidate
-                        remaining -= cost
-                    else:
-                        logger.debug(
-                            "Playbook RAG dropped: needs %d tokens, only %d remaining",
-                            cost, remaining,
-                        )
-            if playbook_block:
-                parts.append(playbook_block)
-
-            # v0.53.0: TI-report RAG — cached threat-intel report passages.
-            # Priority 4 of 5 (background adversary context; dropped before
-            # the layers above when the budget is tight).
-            ti_block = ""
-            if remaining > 0:
-                try:
-                    ti_hits = self._get_ti_report_context_for_alert(alert)
-                except Exception as exc:
-                    logger.debug("TI-report RAG retrieval failed: %s", exc)
-                    ti_hits = []
-                if ti_hits:
-                    candidate = _format_ti_report_context_for_prompt(ti_hits)
-                    cost = _estimate_tokens(candidate)
-                    if cost <= remaining:
-                        ti_block = candidate
-                        remaining -= cost
-                    else:
-                        logger.debug(
-                            "TI-report RAG dropped: needs %d tokens, only %d remaining",
-                            cost, remaining,
-                        )
-            if ti_block:
-                parts.append(ti_block)
-
-            # v0.13.1: Elastic Agent Skills — keyword/technique matched.
-            # Priority 5 of 5 (embedding-free, always attempted last).
-            if remaining > 0:
-                try:
-                    from ion.services.skill_loader import (
-                        format_skills_for_prompt,
-                        select_skills_for_alert,
-                    )
-                    skills = select_skills_for_alert(alert)
-                    skill_block = format_skills_for_prompt(skills)
-                    if skill_block:
-                        cost = _estimate_tokens(skill_block)
-                        if cost <= remaining:
-                            parts.append(skill_block)
-                            remaining -= cost
-                        else:
-                            logger.debug(
-                                "Skills dropped: needs %d tokens, only %d remaining",
-                                cost, remaining,
-                            )
-                except Exception as exc:
-                    logger.debug("Skill loader failed: %s", exc)
+            parts.extend(self.build_rag_context_blocks(alert, remaining))
 
         # Output contract — always appended, never budget-gated.
         parts.append(_OUTPUT_CONTRACT)
         return "".join(parts)
+
+    def build_rag_context_blocks(self, alert: dict, remaining: int) -> list[str]:
+        """Return the budget-gated RAG layers for ``alert``, in priority order.
+
+        v0.54.0 (RAG P4): extracted from ``render_system_prompt`` so the
+        on-demand case-analysis endpoint (``bob_analysis_api``) speaks from
+        the SAME KB / exemplar / playbook / TI-report / skills context as
+        the autonomous investigation path, instead of a bespoke bare prompt.
+
+        Layer priority (lowest dropped first when the budget is tight):
+          1. KB RAG (v0.10.6) — topic-level investigation background
+          2. Gold exemplars (v0.10.5) — prior analyst-verified cases
+          3. Playbook RAG (v0.51.0) — deterministic match, similarity fallback
+          4. TI-report RAG (v0.53.0) — cached threat-intel passages
+          5. Elastic Agent Skills (v0.13.1) — keyword/technique matched
+
+        Each layer is admitted only if its token cost fits ``remaining``;
+        drops and retrieval failures are logged, never raised.
+        """
+        blocks: list[str] = []
+        if not alert or remaining <= 0:
+            return blocks
+
+        def _admit(label: str, retrieve, format_) -> None:
+            nonlocal remaining
+            if remaining <= 0:
+                return
+            try:
+                hits = retrieve()
+            except Exception as exc:
+                logger.debug("%s retrieval failed: %s", label, exc)
+                return
+            if not hits:
+                return
+            candidate = format_(hits)
+            if not candidate:
+                return
+            cost = _estimate_tokens(candidate)
+            if cost <= remaining:
+                blocks.append(candidate)
+                remaining -= cost
+            else:
+                logger.debug(
+                    "%s dropped: needs %d tokens, only %d remaining",
+                    label, cost, remaining,
+                )
+
+        _admit(
+            "KB RAG",
+            lambda: self._get_kb_context_for_alert(alert),
+            _format_kb_context_for_prompt,
+        )
+        _admit(
+            "Gold exemplars",
+            lambda: self._get_gold_exemplars_for_alert(alert),
+            _format_exemplars_for_prompt,
+        )
+        _admit(
+            "Playbook RAG",
+            lambda: self._get_playbook_context_for_alert(alert),
+            _format_playbook_context_for_prompt,
+        )
+        _admit(
+            "TI-report RAG",
+            lambda: self._get_ti_report_context_for_alert(alert),
+            _format_ti_report_context_for_prompt,
+        )
+
+        # Skills — selector + formatter live together in skill_loader.
+        if remaining > 0:
+            try:
+                from ion.services.skill_loader import (
+                    format_skills_for_prompt,
+                    select_skills_for_alert,
+                )
+                skill_block = format_skills_for_prompt(select_skills_for_alert(alert))
+                if skill_block:
+                    cost = _estimate_tokens(skill_block)
+                    if cost <= remaining:
+                        blocks.append(skill_block)
+                        remaining -= cost
+                    else:
+                        logger.debug(
+                            "Skills dropped: needs %d tokens, only %d remaining",
+                            cost, remaining,
+                        )
+            except Exception as exc:
+                logger.debug("Skill loader failed: %s", exc)
+
+        return blocks
 
 
 # ---------------------------------------------------------------------------

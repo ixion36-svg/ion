@@ -235,11 +235,17 @@ def get_investigation(inv_id: int, db: Session) -> Optional[Investigation]:
 def past_investigations_for_signature(
     alert_signature: str, db: Session, limit: int = 5
 ) -> list[Investigation]:
-    """Return the most recent *completed* investigations for this rule.
+    """Return *completed* investigations for this rule, most confident first.
 
     Used by the autonomous loop to say "we've seen this rule N times —
     here's what happened before". We filter to completed runs because
     pending/failed runs carry no useful verdict.
+
+    v0.54.0 (RAG P4): ordered by ``confidence_int`` DESC (NULLS LAST) with
+    recency as the tie-break, instead of pure recency. The memory block is
+    hard-capped downstream, so what survives truncation should be the
+    verdicts Bob was most sure of — a 95-confidence prior is worth more to
+    the model than a fresher 40-confidence one.
     """
     stmt = (
         select(Investigation)
@@ -247,7 +253,48 @@ def past_investigations_for_signature(
             Investigation.alert_signature == alert_signature,
             Investigation.status == "completed",
         )
-        .order_by(desc(Investigation.created_at))
+        .order_by(
+            desc(Investigation.confidence_int).nulls_last(),
+            desc(Investigation.created_at),
+        )
+        .limit(limit)
+    )
+    return list(db.execute(stmt).scalars().all())
+
+
+def feedback_outcomes_for_signature(
+    alert_signature: str, db: Session, limit: int = 5
+) -> list:
+    """Return resolved AIFeedback rows for this rule, newest first (v0.54.0).
+
+    "Resolved" means a human actually closed the case (``human_verdict`` is
+    not the fire-time ``"pending"`` sentinel). Per the ledger's dual-write
+    contract, readers MUST dedup with MAX(id) per (alert_id, template_id) —
+    we apply that among the resolved rows so each alert contributes its
+    latest human outcome exactly once.
+
+    Signature scoping goes through ``investigations.alert_signature`` via
+    the ledger's ``investigation_id`` link; ledger rows without an
+    investigation link can't be tied to a rule and are excluded.
+    """
+    from sqlalchemy import func
+
+    from ion.models.ai_feedback import AIFeedback
+
+    resolved_ids = (
+        select(func.max(AIFeedback.id).label("max_id"))
+        .join(Investigation, Investigation.id == AIFeedback.investigation_id)
+        .where(
+            Investigation.alert_signature == alert_signature,
+            AIFeedback.human_verdict != "pending",
+        )
+        .group_by(AIFeedback.alert_id, AIFeedback.alert_prompt_template_id)
+        .subquery()
+    )
+    stmt = (
+        select(AIFeedback)
+        .where(AIFeedback.id.in_(select(resolved_ids.c.max_id)))
+        .order_by(desc(AIFeedback.id))
         .limit(limit)
     )
     return list(db.execute(stmt).scalars().all())
