@@ -1526,7 +1526,8 @@ def soc_roles_page(
             courses_by_level.setdefault(lvl, []).append(
                 {"title": c.title, "slug": c.slug}
             )
-    except Exception:  # noqa: BLE001 — page must render without the catalogue
+    except Exception as exc:  # noqa: BLE001 — page must render without the catalogue
+        logger.warning("soc-roles: course-catalogue lookup failed: %s", exc)
         courses_by_level = {}
     return _templates.TemplateResponse(
         request=request,
