@@ -1,13 +1,41 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.51.1 -->
-<!-- ion-doc:version=0.51.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.52.0 -->
+<!-- ion-doc:version=0.52.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-07-15 -->
+<!-- ion-doc:date=2026-07-16 -->
 
 # Changelog
+
+## v0.52.0 — 2026-07-16
+
+**`/soc-roles` — SOC roles & daily duties page (training section).**
+
+- New reference page in the briefing-deck visual style: one card per SOC
+  role (L1 Triage, L2 Investigation, L3/Incident Lead, Detection Engineer,
+  Threat Hunter, Threat Intel, DFIR, SOC Manager), each with its own colour
+  identity. Hovering (or keyboard-focusing) a card expands it in place —
+  pure CSS, no page JS — into the full seat brief: mission, an
+  hour-by-hour "shift in this seat" timeline, standing duties, a "what
+  good looks like" bar, and the apps the role lives in.
+- **Training paths joined live**: each role declares the CourseLevel its
+  path starts at; the route joins that to the published-course catalogue
+  and links the actual courses (`/courses/{slug}`). Levels with no
+  published course fall back to a catalogue link; drafts never appear.
+  Catalogue-lookup failures degrade gracefully and are logged.
+- URL is `/soc-roles` — `/roles` stays reserved for the planned RBAC admin
+  surface (and sits confusingly close to the existing `/api/roles`).
+- Nav: "SOC Roles" added to the Knowledge dropdown beside Training.
+
+**Surface:** one new authenticated page route (`require_page_auth`, same
+gate as `/courses`), rendering first-party static training content
+server-side; CSP-safe (nonced style block, class-based styling, zero
+inline style attributes); `prefers-reduced-motion` honoured. No new
+permission, schema, or dependency. **6 new tests**
+(`tests/test_v052_soc_roles_page.py`); briefings/base-nav suite green.
+Net new findings: 0C / 0H / 0M / 0L.
 
 ## v0.51.1 — 2026-07-15
 
