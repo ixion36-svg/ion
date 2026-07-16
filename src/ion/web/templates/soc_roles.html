@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}SOC Roles - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-ion-cyan"><use href="#i-users"/></svg>
+      <span class="label-tiny text-ion-cyan">Training &middot; the seats on the floor</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">SOC Roles &amp; Daily Duties</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Every seat in the SOC — hover a role for its mission, a shift in that seat, standing duties, and the training path that gets you there.</p>
+  </div>
+</section>
+
+<div class="sr-grid rise d-2">
+  {% for r in roles %}
+  <div class="sr-role sr-c-{{ r.color }}">
+    <div class="sr-tier">{{ r.tier }}</div>
+    <h2 class="sr-name">{{ r.name }}</h2>
+    <div class="sr-oneliner">{{ r.oneliner }}</div>
+    <div class="sr-detail">
+      <div class="sr-mission">{{ r.mission }}</div>
+      <h3 class="sr-h3">A shift in this seat</h3>
+      <div class="sr-tl">
+        {% for t, what in r.day %}
+        <div class="sr-slot"><span class="sr-time">{{ t }}</span><span class="sr-what">{{ what }}</span></div>
+        {% endfor %}
+      </div>
+      <h3 class="sr-h3">Standing duties</h3>
+      {% for d, desc in r.duties %}
+      <div class="sr-duty"><b>{{ d }}</b> &mdash; {{ desc }}</div>
+      {% endfor %}
+      <div class="sr-good"><b>WHAT GOOD LOOKS LIKE</b><br>{{ r.good }}</div>
+      <h3 class="sr-h3">Training path</h3>
+      {% set path = courses_by_level.get(r.level) %}
+      {% if path %}
+        {% for c in path %}
+        <a class="sr-course" href="/courses/{{ c.slug }}">{{ c.title }} <span class="sr-lvl">{{ r.level }}</span></a>
+        {% endfor %}
+      {% else %}
+        <div class="sr-duty">No published {{ r.level }} course yet &mdash; <a class="sr-link" href="/courses">browse the catalogue</a>.</div>
+      {% endif %}
+      <div class="sr-chips">
+        <span class="sr-chiplabel">LIVES IN</span>
+        {% for a in r.apps %}<span class="sr-chip">{{ a }}</span>{% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ csp_nonce }}">
+.sr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;align-items:start}
+.sr-role{background:#0c1322;border:1.5px solid #26405a;border-radius:12px;padding:18px;transition:all .18s ease;position:relative;border-top:3px solid var(--sr-ac)}
+.sr-tier{font-family:'JetBrains Mono','Consolas',monospace;font-size:.68rem;font-weight:700;letter-spacing:2px;color:var(--sr-ac);text-transform:uppercase}
+.sr-name{color:#f1f5f9;font-size:1.1rem;font-weight:800;margin:6px 0 4px}
+.sr-oneliner{font-size:.82rem;line-height:1.45;color:#93a4bd}
+.sr-detail{max-height:0;opacity:0;overflow:hidden;transition:all .28s ease;font-size:.78rem;line-height:1.5;color:#93a4bd}
+.sr-role:hover,.sr-role:focus-within{background:var(--sr-tint);border-color:var(--sr-ac);transform:translateY(-3px);box-shadow:0 8px 30px -12px var(--sr-glow)}
+.sr-role:hover .sr-detail,.sr-role:focus-within .sr-detail{max-height:1000px;opacity:1;margin-top:12px}
+.sr-h3{font-family:'JetBrains Mono','Consolas',monospace;font-size:.64rem;font-weight:700;letter-spacing:2px;color:var(--sr-ac);margin:12px 0 6px;text-transform:uppercase}
+.sr-mission{color:#f1f5f9;font-size:.8rem;border-top:1px solid #26405a;padding-top:10px}
+.sr-tl{border-left:2px solid #26405a;padding-left:12px;margin-left:2px}
+.sr-slot{position:relative;margin-bottom:7px}
+.sr-slot::before{content:"";position:absolute;left:-17px;top:4px;width:7px;height:7px;border-radius:50%;background:var(--sr-ac)}
+.sr-time{font-family:'JetBrains Mono','Consolas',monospace;font-size:.62rem;color:var(--sr-ac);font-weight:700}
+.sr-what{color:#f1f5f9;font-size:.76rem;font-weight:700;margin-left:5px}
+.sr-duty{margin-bottom:5px;padding-left:14px;position:relative}
+.sr-duty::before{content:"·";color:var(--sr-ac);position:absolute;left:2px;font-weight:800}
+.sr-duty b{color:#f1f5f9}
+.sr-good{background:var(--sr-tint);border:1px solid var(--sr-ac);border-radius:7px;padding:7px 10px;margin-top:10px;font-size:.72rem}
+.sr-good b{color:var(--sr-ac);font-family:'JetBrains Mono','Consolas',monospace;font-size:.6rem;letter-spacing:1.5px}
+.sr-course{display:block;background:var(--sr-tint);border:1px solid #26405a;border-radius:7px;padding:7px 10px;margin-bottom:5px;color:#f1f5f9;font-weight:700;font-size:.78rem;text-decoration:none;transition:border-color .15s ease}
+.sr-course:hover{border-color:var(--sr-ac)}
+.sr-lvl{font-family:'JetBrains Mono','Consolas',monospace;font-size:.62rem;color:var(--sr-ac);float:right;margin-top:2px}
+.sr-link{color:var(--sr-ac);text-decoration:underline}
+.sr-chips{margin-top:10px}
+.sr-chiplabel{font-family:'JetBrains Mono','Consolas',monospace;font-size:.58rem;font-weight:700;letter-spacing:1.5px;color:#93a4bd;margin-right:6px}
+.sr-chip{display:inline-block;background:var(--sr-tint);border:1px solid #26405a;border-radius:5px;font-family:'JetBrains Mono','Consolas',monospace;font-size:.62rem;color:#f1f5f9;padding:2px 7px;margin:2px 3px 0 0}
+.sr-c-cyan{--sr-ac:#34d3ee;--sr-tint:rgba(52,211,238,.08);--sr-glow:rgba(52,211,238,.35)}
+.sr-c-green{--sr-ac:#4ade80;--sr-tint:rgba(74,222,128,.08);--sr-glow:rgba(74,222,128,.35)}
+.sr-c-amber{--sr-ac:#f5a524;--sr-tint:rgba(245,165,36,.08);--sr-glow:rgba(245,165,36,.35)}
+.sr-c-violet{--sr-ac:#a78bfa;--sr-tint:rgba(167,139,250,.09);--sr-glow:rgba(167,139,250,.35)}
+.sr-c-coral{--sr-ac:#fb923c;--sr-tint:rgba(251,146,60,.08);--sr-glow:rgba(251,146,60,.35)}
+.sr-c-pink{--sr-ac:#f472b6;--sr-tint:rgba(244,114,182,.08);--sr-glow:rgba(244,114,182,.35)}
+.sr-c-teal{--sr-ac:#2dd4bf;--sr-tint:rgba(45,212,191,.08);--sr-glow:rgba(45,212,191,.35)}
+.sr-c-ice{--sr-ac:#93c5fd;--sr-tint:rgba(147,197,253,.08);--sr-glow:rgba(147,197,253,.35)}
+@media (prefers-reduced-motion: reduce){.sr-role,.sr-detail{transition:none}}
+</style>
+{% endblock %}
