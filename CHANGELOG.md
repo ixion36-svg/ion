@@ -1,13 +1,50 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.53.0 -->
-<!-- ion-doc:version=0.53.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.54.0 -->
+<!-- ion-doc:version=0.54.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-16 -->
 
 # Changelog
+
+## v0.54.0 — 2026-07-16
+
+**Investigation-memory rework + case-analysis prompt-stack alignment (RAG
+rework Phase 4 — the final phase).**
+
+- **Confidence-first memory** — prior investigations for a rule are now
+  recalled most-confident-first (`confidence_int` DESC, NULLS LAST,
+  recency tie-break) instead of newest-first, and each memory line shows
+  the verdict's confidence. The memory block is char-capped downstream,
+  so what survives truncation is now the verdicts Bob was most sure of.
+- **Analyst-disagreement surfacing** — the memory block gains a "Human
+  review outcomes" section read from the AIFeedback ledger (deduped
+  `MAX(id)` per `(alert_id, template_id)`; fire-time `pending` sentinels
+  excluded): agreement counts plus an explicit **ANALYST DISAGREED** line
+  per overruled verdict (Bob's verdict + confidence → human closure +
+  the closer's delta reason), ending with an instruction to weigh human
+  closures above the model's own priors.
+- **On-demand case analysis aligned to the full prompt stack** — the
+  "Get Bob's Analysis" endpoint previously used a bespoke bare prompt with
+  none of the autonomous path's context. The five budget-gated RAG layers
+  (KB → exemplars → playbooks → TI reports → skills) are extracted into
+  the reusable `AlertPromptService.build_rag_context_blocks` (identical
+  behaviour on the autonomous path), and case analysis now gets: the
+  matched per-rule template guide + those RAG layers in its system prompt,
+  and the investigation-memory block (FP signatures, confidence-sorted
+  priors, disagreement history) in its user prompt. The JSON output
+  contract is deliberately omitted — this endpoint speaks markdown to a
+  human. Response `sources` gains `prompt_template`, `rag_blocks`,
+  `memory_context_present` telemetry.
+- Tests: `tests/test_v054_memory_rework.py` (17 — ordering, ledger dedup/
+  scoping, disagreement rendering, layer priority + budget drops,
+  representative-alert construction, system-prompt augmentation).
+
+This completes the multi-phase Bob/RAG rework (P1 token budget → P2
+default-on gates → P2b/P2c embedding quality → P3 KB chunking + playbook +
+TI-report RAG → P4 memory).
 
 ## v0.53.0 — 2026-07-16
 
