@@ -39,11 +39,53 @@ from ion.services.cyab_assessment_questions import (
 )
 from ion.services.elasticsearch_service import ElasticsearchService
 from ion.services.tide_service import get_tide_service
-from ion.web.api import get_db_session
+from ion.web.api import get_db_session, limiter
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# ---------------------------------------------------------------------------
+# Abuse guards for the ANONYMOUS scoping/onboarding endpoints
+# ---------------------------------------------------------------------------
+# /scoping/score, /scoping/pdf and /onboard/score are intentionally
+# unauthenticated (public stakeholder tools), so they can't lean on auth to
+# bound work. /scoping/pdf in particular drives an uncapped WeasyPrint render
+# from arbitrary form data — an availability (DoS) vector. These caps refuse an
+# over-large body or an implausible field count *before* any scoring/render
+# work; the per-route rate limits (below) bound request volume per source.
+_SCOPING_MAX_BODY_BYTES = 256 * 1024   # generous: the questionnaire is small
+_SCOPING_MAX_FIELDS = 300              # far above the real question count
+
+
+async def _read_scoping_answers(request: Request) -> dict:
+    """Parse scoping/onboarding form answers with abuse guards.
+
+    Refuses (413) an over-large body or too many fields before doing any work,
+    then returns the normalised answers dict shared by /scoping/score,
+    /scoping/pdf and /onboard/score.
+    """
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > _SCOPING_MAX_BODY_BYTES:
+                raise HTTPException(status_code=413, detail="Request body too large")
+        except ValueError:
+            pass  # unparseable header — fall through to the field-count cap
+
+    raw = await request.form()
+    if len(raw) > _SCOPING_MAX_FIELDS:
+        raise HTTPException(status_code=413, detail="Too many answer fields")
+
+    answers: dict = {}
+    for key in raw.keys():
+        vals = [v for v in raw.getlist(key) if v != ""]
+        if not vals:
+            continue
+        # Single-select arrives as a one-item list; flatten unless a
+        # multi-select posted multiple values.
+        answers[key] = vals if len(vals) > 1 else vals[0]
+    return answers
 
 # Fully-configured Jinja env (bytecode cache + ion_version + csp_nonce) from the
 # shared factory; importing server.templates directly would create a loop.
@@ -2767,28 +2809,16 @@ def onboarding_create(
 # ---------------------------------------------------------------------------
 
 @router.post("/scoping/score")
+@limiter.limit("30/minute")
 async def scoping_score(request: Request):
     """Compute scoping scores from form-encoded answers, return HTMX partial.
 
     `?summary=1` returns the full summary view; otherwise just the counter.
-    Anonymous endpoint (matches the page).
+    Anonymous endpoint (matches the page); input caps + rate limit guard it.
     """
     from ion.services import cyab_scoping_engine
 
-    raw = await request.form()
-    answers: dict = {}
-    for key in raw.keys():
-        vals = raw.getlist(key)
-        if not vals:
-            continue
-        # Drop empty placeholder selections
-        vals = [v for v in vals if v != ""]
-        if not vals:
-            continue
-        # Single-select questions arrive as a one-item list; flatten unless
-        # multiple values were posted (multi-select).
-        answers[key] = vals if len(vals) > 1 else vals[0]
-
+    answers = await _read_scoping_answers(request)
     scores = cyab_scoping_engine.score_answers(answers)
     summary_mode = request.query_params.get("summary") == "1"
 
@@ -2808,18 +2838,16 @@ async def scoping_score(request: Request):
 
 
 @router.post("/scoping/pdf")
+@limiter.limit("10/minute")
 async def scoping_pdf_proxy(request: Request):
-    """Render the scoping summary as a PDF (HTML fallback if WeasyPrint missing)."""
+    """Render the scoping summary as a PDF (HTML fallback if WeasyPrint missing).
+
+    Anonymous endpoint. The WeasyPrint render is the most expensive path here,
+    so it carries the strictest input caps + rate limit of the scoping trio.
+    """
     from ion.services import cyab_scoping_engine
 
-    raw = await request.form()
-    answers: dict = {}
-    for key in raw.keys():
-        vals = [v for v in raw.getlist(key) if v != ""]
-        if not vals:
-            continue
-        answers[key] = vals if len(vals) > 1 else vals[0]
-
+    answers = await _read_scoping_answers(request)
     scores = cyab_scoping_engine.score_answers(answers)
     full_html = _render_scoping_pack_pdf_html(scores, answers)
     try:
@@ -2864,24 +2892,17 @@ async def scoping_pdf_proxy(request: Request):
 
 
 @router.post("/onboard/score")
+@limiter.limit("30/minute")
 async def onboard_score(request: Request):
     """Live-counter endpoint for the wizard's Step 2 (intake).
 
     Reuses the same ``cyab_scoping_engine.score_answers`` as
     /cyab/scoping. Returns the counter partial as HTML for HTMX swap.
+    Anonymous endpoint; input caps + rate limit guard it.
     """
     from ion.services import cyab_scoping_engine
 
-    raw = await request.form()
-    answers: dict = {}
-    for key in raw.keys():
-        vals = [v for v in raw.getlist(key) if v != ""]
-        if not vals:
-            continue
-        # Single-select arrives as a one-item list; flatten unless this
-        # is a multi-select with multiple values (matches /scoping/score).
-        answers[key] = vals if len(vals) > 1 else vals[0]
-
+    answers = await _read_scoping_answers(request)
     scores = cyab_scoping_engine.score_answers(answers)
     return templates.TemplateResponse(
         request=request,
