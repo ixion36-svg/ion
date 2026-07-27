@@ -1,13 +1,21 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.54.1 -->
-<!-- ion-doc:version=0.54.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.55.0 -->
+<!-- ion-doc:version=0.55.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-07-16 -->
+<!-- ion-doc:date=2026-07-27 -->
 
 # Changelog
+
+## v0.55.0 — 2026-07-27
+
+**Detection Engineering module — Phase 0 (DE Metrics).** First slice of the optional DE module from the roadmap (`docs/superpowers/plans/2026-07-26-detection-engineering-module-roadmap.md`). Read-only measurement, no write path — *ION drafts and measures; the analyst decides and acts*.
+
+- **Noise Campaigns** — false-positive / benign-true-positive case closures clustered by detection rule (via the `AlertTriage → AlertCase` join, so it counts every FP closure regardless of whether Bob ran). Each campaign carries a first/last-seen window, severity mix, MITRE union, top triggering signatures + hosts, and an **addressable analyst-hours** estimate (`fp_alerts × ION_DE_MINUTES_PER_ALERT`, default 10 min). Costliest-first.
+- **DE Metrics dashboard** — new `/de-metrics` page + `/api/de/metrics` & `/api/de/campaigns`, gated on a new `de:read` permission (granted to principal_analyst, lead, senior_engineer, platform_engineer, engineering; admin auto). Adds a noise trend (recent-vs-older half) and the Bob-vs-human agreement rate off the deduped `AIFeedback` ledger.
+- Computed on-read — **no new table or migration**; no feature flag (mounted unconditionally, RBAC-gated; the licence/flag gate is deferred to module Phase 4). "Hours saved" is surfaced honestly as *addressable* hours since Phase 0 applies no tuning. Mirrors the Detection Health pattern end-to-end. New tests `tests/test_v055_de_metrics.py` (10).
 
 ## v0.54.1 — 2026-07-16
 
