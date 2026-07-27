@@ -1,7 +1,7 @@
 # Detection Engineering (DE) Module — Roadmap
 
-**Status:** Roadmap / not started
-**Date:** 2026-07-26
+**Status:** Phase 0 SHIPPED (v0.55.0, 2026-07-27) · Phases 1–4 planned
+**Date:** 2026-07-26 (Phase 0 shipped 2026-07-27)
 **Type:** Optional product module (CyAB-style)
 **Owning principle:** *ION drafts and measures; the analyst decides and acts.*
 
@@ -51,11 +51,17 @@ of the leverage. The value was always in the clustering, the draft, and the meas
 
 ## 3. Phased roadmap (ordered by leverage-per-effort, lowest risk first)
 
-### Phase 0 — Measurement & read-only (no write path, zero risk)
+### Phase 0 — Measurement & read-only (no write path, zero risk) — ✅ SHIPPED v0.55.0 (2026-07-27)
 - **Noise Campaign** object: cluster FP closures by rule + trigger signature; cost estimate.
 - **DE Metrics** dashboard: noise trend, hours saved, Bob-vs-human agreement rate.
 - No proposals, no suppression — pure visibility. Ships value on day one, cannot break prod.
 - *Effort: Low.* This is the "measurement half" already agreed as the right first slice.
+
+**As built (v0.55.0):** `services/de_metrics_service.py` + `web/de_api.py` (`/api/de/metrics`, `/api/de/campaigns`) + page `/de-metrics`, gated on new perm **`de:read`**. Noise Campaigns are **computed on-read** (no table/migration) from the `AlertTriage → AlertCase` join — so every FP/benign closure counts, independent of whether Bob ran. Deviations from the sketch above, all deliberate:
+- **Clustered by rule only** for now; trigger-signature *sub*-clustering is deferred to Phase 1 (gated on §5 Q2 "what's actually in ES?"). Signatures + hosts are surfaced *within* each campaign instead.
+- **"Hours saved" → "addressable hours"** — with no write path nothing is saved yet, so the metric is the reclaimable cost (`fp_alerts × ION_DE_MINUTES_PER_ALERT`, default 10 min). Real "saved" arrives in Phase 1.
+- **No feature flag** — mounted unconditionally, RBAC-gated only; the licence/flag gate stays deferred to Phase 4 (matches CyAB, which also has no `_enabled` flag).
+- Mirrors the Detection Health (v0.47.0) dashboard pattern end-to-end. 10 tests in `tests/test_v055_de_metrics.py`.
 
 ### Phase 1 — Detection Proposals as reviewable artifacts
 - From a Noise Campaign, draft a candidate exception / tuning change (text + structured diff).
