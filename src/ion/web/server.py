@@ -68,6 +68,7 @@ from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.dashboard_layout_api import router as dashboard_layout_router
+from ion.web.de_api import router as de_router
 from ion.web.detection_health_api import router as detection_health_router
 from ion.web.elasticsearch_api import router as elasticsearch_router
 from ion.web.emulation_api import router as emulation_router
@@ -420,6 +421,8 @@ app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
 # v0.47.0 — Detection Health (per-rule IR→detection feedback analytics)
 app.include_router(detection_health_router, prefix="/api")
+# Detection Engineering module — Phase 0 (read-only noise campaigns + DE metrics)
+app.include_router(de_router, prefix="/api")
 app.include_router(attack_story_router, prefix="/api")
 app.include_router(case_similarity_router, prefix="/api")
 app.include_router(case_lifecycle_router, prefix="/api")  # /api/elasticsearch/alerts/cases/* (split from api.py, #14 inc.3)
@@ -2307,6 +2310,12 @@ async def soc_health_page(request: Request, user: User = Depends(require_page_pe
 async def detection_health_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
     """Render the Detection Health (per-rule performance) page."""
     return templates.TemplateResponse(request=request, name="detection_health.html")
+
+
+@app.get("/de-metrics", response_class=HTMLResponse)
+async def de_metrics_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+    """Render the Detection-Engineering Metrics page (Phase 0 — noise campaigns)."""
+    return templates.TemplateResponse(request=request, name="de_metrics.html")
 
 
 @app.get("/guide", response_class=HTMLResponse)

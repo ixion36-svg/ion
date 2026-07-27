@@ -178,7 +178,7 @@
 
             <!-- Reporting — metrics & compliance -->
             <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/soc-health') or p.startswith('/compliance') or p.startswith('/executive-report') or p.startswith('/analyst-efficiency') or p.startswith('/detection-health') or p.startswith('/analytics') or p.startswith('/maturity') %}is-active{% endif %}">Reporting
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/soc-health') or p.startswith('/compliance') or p.startswith('/executive-report') or p.startswith('/analyst-efficiency') or p.startswith('/detection-health') or p.startswith('/de-metrics') or p.startswith('/analytics') or p.startswith('/maturity') %}is-active{% endif %}">Reporting
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
@@ -186,6 +186,7 @@
                 <a href="/executive-report" class="tw-drop-item {% if p.startswith('/executive-report') %}is-active{% endif %}">Executive Report</a>
                 <a href="/analyst-efficiency" class="tw-drop-item {% if p.startswith('/analyst-efficiency') %}is-active{% endif %}">Analyst Efficiency</a>
                 <a href="/detection-health" class="tw-drop-item {% if p.startswith('/detection-health') %}is-active{% endif %}">Detection Health</a>
+                <a href="/de-metrics" class="tw-drop-item {% if p.startswith('/de-metrics') %}is-active{% endif %}">DE Metrics</a>
                 <a href="/compliance" class="tw-drop-item {% if p.startswith('/compliance') %}is-active{% endif %}">Compliance</a>
                 <a href="/maturity" class="tw-drop-item {% if p.startswith('/maturity') %}is-active{% endif %}">Maturity</a>
                 <a href="/analytics" class="tw-drop-item {% if p.startswith('/analytics') %}is-active{% endif %}">Analytics Engine</a>
