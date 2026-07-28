@@ -1,7 +1,7 @@
 # Detection Engineering (DE) Module — Roadmap
 
-**Status:** Phase 0 (v0.55.0) + Phase 1 (v0.56.0) SHIPPED · Phases 2–4 planned
-**Date:** 2026-07-26 (Phase 0 shipped 2026-07-27; Phase 1 shipped 2026-07-28)
+**Status:** Phase 0 (v0.55.0) + Phase 1 (v0.56.0) + Phase 2 (v0.57.0) SHIPPED · Phases 3–4 planned
+**Date:** 2026-07-26 (Phase 0 → 07-27; Phases 1 & 2 → 07-28)
 **Type:** Optional product module (CyAB-style)
 **Owning principle:** *ION drafts and measures; the analyst decides and acts.*
 
@@ -91,6 +91,24 @@ human's one-shot decision; it **never** writes to a detection backend, calls out
 - Every quirk is scoped (specific entities/rules), owned, justified, audited, and **expires**
   on a review date.
 - *Effort: Medium.* Anti-abuse controls are the bulk of the work, not the data model.
+
+**As built (v0.57.0):** new `system_quirks` table + `de_quirk_service` + `/api/de/quirks*` +
+`/de-quirks` registry page. The anti-abuse controls are enforced in code and pinned by tests,
+not just intended:
+- **No suppression, by construction.** `quirk_match` / `annotate_alerts` only *decorate* the
+  alert response dict (badge/note/nudge); there is no code path from a quirk to closing,
+  filtering, hiding, or mutating an alert's stored state. It stays clear of the separate
+  `KnownFalsePositive` auto-close path, and the annotation injected into the alerts serializer
+  is additive + exception-guarded (can't drop an alert or break the view).
+- **Separation of duties** — ION's first maker/checker control: raised `pending` by one user,
+  activatable only by a *different* user (`verified_by_id != raised_by_id`, enforced
+  server-side irrespective of role), gated by a new **`de:verify`** permission on the
+  lead/senior tier only (not `senior_engineer`, who can raise but not self-verify).
+- **Bounded + expiring** — ≥1 concrete scope required, wildcards rejected (never global); a
+  mandatory `review_date` with **on-read expiry** (a lapsed quirk is inert — no worker, so a
+  lapse can never suppress). Full AuditLog trail (raise/verify/revert) + one-click revert.
+- The "reorder triage" idea is realised as an advisory `priority_nudge` shown on the badge —
+  it never rewrites the analyst-owned `AlertTriage.priority`.
 
 ### Phase 3 — Bob improvement loop (human-approved, reversible)
 - **Bob Feedback Items** accumulate from closures where Bob disagreed with the analyst.
