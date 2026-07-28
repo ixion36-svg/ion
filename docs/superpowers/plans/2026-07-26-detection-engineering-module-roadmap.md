@@ -1,7 +1,7 @@
 # Detection Engineering (DE) Module — Roadmap
 
-**Status:** Phase 0 SHIPPED (v0.55.0, 2026-07-27) · Phases 1–4 planned
-**Date:** 2026-07-26 (Phase 0 shipped 2026-07-27)
+**Status:** Phase 0 (v0.55.0) + Phase 1 (v0.56.0) SHIPPED · Phases 2–4 planned
+**Date:** 2026-07-26 (Phase 0 shipped 2026-07-27; Phase 1 shipped 2026-07-28)
 **Type:** Optional product module (CyAB-style)
 **Owning principle:** *ION drafts and measures; the analyst decides and acts.*
 
@@ -69,6 +69,19 @@ of the leverage. The value was always in the clustering, the draft, and the meas
   decision and links the outcome back to the campaign; Phase-0 metrics then prove the drop.
 - No write-back to detection backends by ION. Human is the deploy mechanism.
 - *Effort: Medium.*
+
+**As built (v0.56.0):** new `detection_proposals` table + `de_proposal_service` +
+`/api/de/proposals*` + `/de-proposals` review page + "Draft proposal" button on DE Metrics.
+The first DE write path, tightly bounded — ION persists only its own proposal artifact + the
+human's one-shot decision; it **never** writes to a detection backend, calls out, or executes.
+- Drafting is **deterministic** (no LLM): pre-filled from the campaign's top benign
+  signature/host → a suggested exclusion + expected drop. Human edits every field.
+- Lifecycle draft → applied | rejected (one-shot, cloned from the tuning-proposal `_review`
+  pattern). Marking *applied* records `applied_at`; `measure_outcome` then re-runs the Phase-0
+  FP metric before vs after that date to show the realized drop (live-verified: 80% on a
+  seeded campaign).
+- Write gated a new **`de:propose`** permission (5 DE roles). Separation of duties
+  (`de:propose` ≠ `de:verify` ≠ `de:approve`) is introduced in **Phase 2** below.
 
 ### Phase 2 — System-Quirk register (advisory, hard anti-abuse — see §4)
 - Analysts raise a quirk from an alert/case; it enters a **pending** state.
