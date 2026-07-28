@@ -1,13 +1,22 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.55.0 -->
-<!-- ion-doc:version=0.55.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.56.0 -->
+<!-- ion-doc:version=0.56.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-07-27 -->
+<!-- ion-doc:date=2026-07-28 -->
 
 # Changelog
+
+## v0.56.0 — 2026-07-28
+
+**Detection Engineering module — Phase 1 (Detection Proposals).** Builds on the Phase-0 Noise Campaigns. Still faithful to *ION drafts and measures; the analyst decides and acts* — this is the module's first write path, but ION only records the draft + the human's decision; **it never writes to a detection backend**.
+
+- **`detection_proposals`** — new persisted, reviewable draft of a tuning change (`change_type` = exclusion / threshold / new_rule / retire / other) with `title`, `suggested_change`, `rationale`, `scope`, an expected-drop snapshot (`expected_fp_reduction`/`expected_hours_reclaimed`), the `campaign_snapshot` (computed-on-read campaigns have no PK, so snapshot by value), `mitre_techniques`, a one-shot decision record, and an `outcome_json`.
+- **Deterministic drafting** — "Draft proposal" on a DE-Metrics campaign row calls `de_proposal_service.draft_from_campaign()`, which pre-fills a suggested exclusion from the campaign's top benign signature/host + expected drop. No LLM (air-gap-friendly, testable on CPU-only dev boxes); the human edits every field.
+- **Lifecycle** — draft → applied | rejected (one-shot, cloned from the tuning-proposal review pattern). Marking *applied* records `applied_at` (the human applied it in their own backend). `measure_outcome()` then re-runs the Phase-0 FP metric for the rule **before vs after** `applied_at` to show the realized drop.
+- **Surfaces** — `/api/de/proposals…` (list/get gated `de:read`; draft/create/edit/decide/measure gated new perm **`de:propose`**, granted to the 5 DE roles), a `/de-proposals` review page + "Detection Proposals" nav (Engineering dropdown). Reusable `de_metrics_service.fp_alerts_for_rule()` added for outcome windows. Separation of duties (propose≠verify≠approve) stays deferred to Phase 2. 10 tests `tests/test_v056_de_proposals.py`.
 
 ## v0.55.0 — 2026-07-27
 
