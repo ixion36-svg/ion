@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.56.0 -->
-<!-- ion-doc:version=0.56.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.57.0 -->
+<!-- ion-doc:version=0.57.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-28 -->
 
 # Changelog
+
+## v0.57.0 — 2026-07-28
+
+**Detection Engineering module — Phase 2 (System Quirks).** A human-verified, scoped, expiring register of known-benign behaviour that **advisory-only** annotates matching alerts — it never hides, closes, or suppresses. This is the phase whose whole point is anti-abuse (roadmap §4), so the guarantees are enforced and tested, not just documented.
+
+- **`system_quirks`** — new table scoped to rules/hosts/users/ips/observables (**≥1 concrete scope required; wildcards rejected — a quirk can't be global**), with a mandatory `review_date`, an advisory `annotation` + `priority_nudge`, and full raise/verify/revert attribution.
+- **Separation of duties** — a quirk is raised (`pending`) by one person and must be verified by a **different** person (`verified_by ≠ raised_by`, enforced in the service regardless of permissions) before it has any effect. New perm **`de:verify`** gates verify/revert, granted to the lead/senior tier (principal_analyst, lead, platform_engineer, engineering, admin) — deliberately **not** senior_engineer, who can raise (`de:propose`) but not self-verify.
+- **No suppression, by construction** — the `quirk_match` / `annotate_alerts` matcher only *decorates* the alert response dict (badge/note/nudge); there is no code path from a quirk to closing/filtering an alert (contrast the separate `KnownFalsePositive` auto-close, which quirks never touch). Wired additively into the alerts serialization seam, guarded so it can never break the alerts view.
+- **On-read expiry** — a quirk past its `review_date` is inert on read (no background worker, so a lapse can never suppress). One-click revert; every raise/verify/revert writes an append-only AuditLog entry.
+- `/api/de/quirks*` + `/de-quirks` registry page + "System Quirks" nav (Engineering). 10 tests `tests/test_v057_de_quirks.py` pinning SoD, the no-suppression guarantee, scope/wildcard rules, expiry, and audit.
 
 ## v0.56.0 — 2026-07-28
 
