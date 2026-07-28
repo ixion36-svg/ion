@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}System Quirks - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-shield"/></svg>
+    <span class="label-tiny text-ion-cyan">Detection engineering · Phase 2</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">System Quirks</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Human-verified, scoped, expiring records of known-benign behaviour. A quirk <strong>advisory-only</strong> annotates matching alerts (badge + note) — it never hides or closes them. Every quirk is raised by one person and must be <strong>verified by a different person</strong>, and expires on its review date.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
+        <select id="qk-status" class="ion-select" data-change-action="qkLoad">
+            <option value="all" selected>All</option>
+            <option value="pending">Pending</option>
+            <option value="active">Active</option>
+            <option value="reverted">Reverted</option>
+        </select>
+        <button class="ion-btn" data-click-action="qkOpenRaise">Raise quirk</button>
+        <button class="ion-btn ion-btn-primary" data-click-action="qkLoad">Refresh</button>
+    </div>
+</section>
+
+<div id="qk-content"><div class="qk-loading"><span class="qk-spinner"></span> Loading quirks...</div></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
+
+<!-- Raise modal -->
+<div id="qk-raise-overlay" class="qk-modal-overlay" data-click-action="qkCloseRaise" data-only-self-click>
+  <div class="qk-modal">
+    <div class="qk-modal-title">Raise a system quirk</div>
+    <label class="qk-modal-label">Title *</label>
+    <input id="qk-title" class="qk-modal-input" type="text" placeholder="e.g. SCCM agent trips PowerShell rule nightly">
+    <label class="qk-modal-label">Advisory note (shown on matching alerts) *</label>
+    <textarea id="qk-annotation" class="qk-modal-input" rows="2" placeholder="Known-benign: this is the SCCM patch cycle on the web tier."></textarea>
+    <label class="qk-modal-label">Justification (why this is benign) *</label>
+    <textarea id="qk-justification" class="qk-modal-input" rows="2" placeholder="Confirmed with platform team; scheduled task, signed binary, runs 02:00 nightly."></textarea>
+    <div class="qk-row">
+      <div><label class="qk-modal-label">Review date * (expires)</label><input id="qk-review" class="qk-modal-input" type="date"></div>
+      <div><label class="qk-modal-label">Priority nudge (−5…0)</label><input id="qk-nudge" class="qk-modal-input" type="number" value="0" min="-5" max="5"></div>
+    </div>
+    <p class="qk-hint">Scope — at least one is required; a quirk cannot be global. Comma-separated.</p>
+    <label class="qk-modal-label">Rules</label>
+    <input id="qk-rules" class="qk-modal-input" type="text" placeholder="Suspicious PowerShell Execution">
+    <div class="qk-row">
+      <div><label class="qk-modal-label">Hosts</label><input id="qk-hosts" class="qk-modal-input" type="text" placeholder="web01, web02"></div>
+      <div><label class="qk-modal-label">Users</label><input id="qk-users" class="qk-modal-input" type="text" placeholder="svc_sccm"></div>
+    </div>
+    <label class="qk-modal-label">IPs</label>
+    <input id="qk-ips" class="qk-modal-input" type="text" placeholder="10.20.0.5">
+    <div class="qk-modal-actions">
+      <button class="ion-btn" data-click-action="qkCloseRaise">Cancel</button>
+      <button class="ion-btn ion-btn-primary" data-click-action="qkSubmitRaise">Raise (pending)</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ csp_nonce }}">
+.qk-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.qk-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:qk-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes qk-spin{to{transform:rotate(360deg)}}
+.qk-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.qk-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.qk-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.qk-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary);vertical-align:top}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.78rem}
+.qk-muted{color:var(--text-secondary)}
+.qk-pill{display:inline-block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 7px;border-radius:4px}
+.qk-pill-pending{background:rgba(245,158,11,.16);color:var(--sev-medium,#f59e0b)}
+.qk-pill-active{background:rgba(52,211,153,.16);color:var(--mitre-covered,#34d399)}
+.qk-pill-reverted{background:rgba(239,68,68,.16);color:var(--sev-critical,#ef4444)}
+.qk-pill-expired{background:rgba(99,110,123,.22);color:var(--text-secondary)}
+.qk-chip{display:inline-block;font-size:.66rem;padding:1px 6px;border-radius:4px;background:rgba(99,110,123,.18);color:var(--text-secondary);margin:1px 3px 1px 0}
+.qk-act{cursor:pointer;color:var(--primary);font-size:.74rem;background:none;border:none;padding:0;text-decoration:underline;margin-right:8px}
+.qk-act-danger{color:var(--sev-critical,#ef4444)}
+.qk-hint{font-size:.72rem;color:var(--text-secondary);margin:10px 0 2px}
+.qk-row{display:flex;gap:10px}.qk-row>div{flex:1}
+.qk-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;align-items:center;justify-content:center}
+.qk-modal-overlay.show{display:flex}
+.qk-modal{background:var(--bg-card,#0d1117);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;max-width:600px;width:92%;max-height:92vh;overflow:auto}
+.qk-modal-title{font-weight:700;margin-bottom:14px}
+.qk-modal-label{display:block;font-size:.74rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin:8px 0 4px}
+.qk-modal-input{width:100%;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:.85rem;resize:vertical}
+.qk-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+</style>
+<script nonce="{{ csp_nonce }}">
+const QK_API = '/api/de/quirks';
+function qk$(id){return document.getElementById(id)}
+function qkEsc(s){if(s===null||s===undefined)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function qkToast(m,k){ if(typeof showToast==='function') showToast(m,k); else if(k==='error') alert(m); }
+function qkCsv(v){ return (v||'').split(',').map(function(x){return x.trim()}).filter(Boolean); }
+
+async function qkLoad(){
+    const status = qk$('qk-status').value;
+    qk$('qk-content').innerHTML = '<div class="qk-loading"><span class="qk-spinner"></span> Loading quirks...</div>';
+    try {
+        const r = await fetch(QK_API + '?status=' + encodeURIComponent(status));
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        qkRender(data.quirks || []);
+    } catch(e){ qk$('qk-content').innerHTML = '<div class="qk-loading">Failed to load: ' + qkEsc(e.message) + '</div>'; }
+}
+
+function qkPill(q){
+    if(q.status === 'active' && q.expired) return '<span class="qk-pill qk-pill-expired">expired</span>';
+    const cls = q.status === 'active' ? 'qk-pill-active' : q.status === 'reverted' ? 'qk-pill-reverted' : 'qk-pill-pending';
+    return '<span class="qk-pill ' + cls + '">' + qkEsc(q.status) + '</span>';
+}
+
+function qkScope(q){
+    const bits = [];
+    (q.scope_rules||[]).forEach(function(r){bits.push('<span class="qk-chip">rule:' + qkEsc(r) + '</span>')});
+    (q.scope_hosts||[]).forEach(function(h){bits.push('<span class="qk-chip">host:' + qkEsc(h) + '</span>')});
+    (q.scope_users||[]).forEach(function(u){bits.push('<span class="qk-chip">user:' + qkEsc(u) + '</span>')});
+    (q.scope_ips||[]).forEach(function(i){bits.push('<span class="qk-chip">ip:' + qkEsc(i) + '</span>')});
+    (q.scope_observables||[]).forEach(function(o){bits.push('<span class="qk-chip">' + qkEsc(o.type) + ':' + qkEsc(o.value) + '</span>')});
+    return bits.join('') || '<span class="qk-muted">—</span>';
+}
+
+function qkRender(items){
+    if(!items.length){ qk$('qk-content').innerHTML = '<div class="qk-section qk-muted">No quirks yet. Raise one, then a different teammate verifies it.</div>'; return; }
+    let html = '<div class="qk-section"><table class="qk-table"><thead><tr>'
+        + '<th>Quirk</th><th>Scope</th><th>Status</th><th>Raised / Verified</th><th>Review</th><th>Actions</th></tr></thead><tbody>';
+    for(const q of items){
+        let actions = '';
+        if(q.status === 'pending'){
+            actions = '<button class="qk-act" data-click-action="qkVerify" data-args=\'[' + q.id + ']\'>Verify</button>'
+                + '<button class="qk-act qk-act-danger" data-click-action="qkRevert" data-args=\'[' + q.id + ']\'>Revert</button>';
+        } else if(q.status === 'active'){
+            actions = '<button class="qk-act qk-act-danger" data-click-action="qkRevert" data-args=\'[' + q.id + ']\'>Revert</button>';
+        } else { actions = '<span class="qk-muted">—</span>'; }
+        const nudge = q.priority_nudge ? ' · nudge ' + q.priority_nudge : '';
+        html += '<tr>'
+            + '<td><strong>' + qkEsc(q.title) + '</strong><div class="qk-muted" style="margin-top:3px">' + qkEsc(q.annotation) + nudge + '</div></td>'
+            + '<td>' + qkScope(q) + '</td>'
+            + '<td>' + qkPill(q) + '</td>'
+            + '<td class="qk-muted">raised: ' + qkEsc(q.raised_by_username || '—')
+                + (q.verified_by_username ? '<br>verified: ' + qkEsc(q.verified_by_username) : '')
+                + (q.reverted_by_username ? '<br>reverted: ' + qkEsc(q.reverted_by_username) : '') + '</td>'
+            + '<td class="qk-muted mono">' + qkEsc((q.review_date||'').slice(0,10)) + '</td>'
+            + '<td>' + actions + '</td>'
+            + '</tr>';
+    }
+    html += '</tbody></table></div>';
+    qk$('qk-content').innerHTML = html;
+}
+
+// ── raise ──
+function qkOpenRaise(){
+    ['qk-title','qk-annotation','qk-justification','qk-rules','qk-hosts','qk-users','qk-ips'].forEach(function(id){qk$(id).value=''});
+    qk$('qk-nudge').value = '0'; qk$('qk-review').value = '';
+    qk$('qk-raise-overlay').classList.add('show');
+}
+function qkCloseRaise(){ qk$('qk-raise-overlay').classList.remove('show'); }
+async function qkSubmitRaise(){
+    const body = {
+        title: qk$('qk-title').value.trim(),
+        annotation: qk$('qk-annotation').value.trim(),
+        justification: qk$('qk-justification').value.trim(),
+        review_date: qk$('qk-review').value ? (qk$('qk-review').value + 'T00:00:00') : '',
+        priority_nudge: parseInt(qk$('qk-nudge').value, 10) || 0,
+        scope_rules: qkCsv(qk$('qk-rules').value),
+        scope_hosts: qkCsv(qk$('qk-hosts').value),
+        scope_users: qkCsv(qk$('qk-users').value),
+        scope_ips: qkCsv(qk$('qk-ips').value)
+    };
+    if(!body.title || !body.annotation || !body.justification){ qkToast('Title, note and justification are required','warning'); return; }
+    if(!body.review_date){ qkToast('A review (expiry) date is required','warning'); return; }
+    try {
+        const r = await fetch(QK_API, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        const q = await r.json();
+        qkCloseRaise(); qkToast('Quirk #' + q.id + ' raised (pending) — a different teammate must verify it.','success'); qkLoad();
+    } catch(e){ qkToast('Raise failed: ' + (e.message||e),'error'); }
+}
+
+// ── verify / revert ──
+async function qkVerify(id){
+    try {
+        const r = await fetch(QK_API + '/' + id + '/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        qkToast('Quirk #' + id + ' verified — now advisory-active.','success'); qkLoad();
+    } catch(e){ qkToast('Verify failed: ' + (e.message||e),'error'); }
+}
+async function qkRevert(id){
+    const reason = (window.prompt('Revert reason (optional):') || '');
+    try {
+        const r = await fetch(QK_API + '/' + id + '/revert', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({reason: reason})});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        qkToast('Quirk #' + id + ' reverted.','success'); qkLoad();
+    } catch(e){ qkToast('Revert failed: ' + (e.message||e),'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', qkLoad);
+</script>
+{% endblock %}

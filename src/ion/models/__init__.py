@@ -211,6 +211,7 @@ from ion.models.social import (
 
 # v0.11.0: JSON-DAG playbook automation (Tines-inspired).
 from ion.models.story import Story, StoryRun  # noqa: F401
+from ion.models.system_quirk import SystemQuirk, SystemQuirkStatus  # noqa: F401
 from ion.models.template import Collection, Tag, Template, Variable, template_tags
 from ion.models.threat_intel import ThreatIntelWatch
 

@@ -265,6 +265,15 @@ async def get_es_alerts(
 
         out_alerts.extend(fixture_dicts)
 
+        # DE Phase 2: advisory System-Quirk annotations (badge/note/nudge).
+        # Additive-only and best-effort — a quirk NEVER hides an alert, and a
+        # failure here must not break the alerts view.
+        try:
+            from ion.services.de_quirk_service import annotate_alerts
+            annotate_alerts(session, out_alerts)
+        except Exception:
+            logger.debug("quirk annotation skipped", exc_info=True)
+
         return {
             "alerts": out_alerts,
             "total": len(out_alerts),

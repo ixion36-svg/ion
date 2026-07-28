@@ -193,3 +193,104 @@ def measure_outcome(
     except ValueError as e:
         detail = str(e)
         raise HTTPException(status_code=404 if "not found" in detail else 400, detail=detail)
+
+
+# ── Phase 2 — system quirks (advisory; SoD on verify) ────────────────────────
+
+
+class QuirkCreate(BaseModel):
+    title: str
+    annotation: str
+    justification: str
+    review_date: str  # ISO; must be in the future
+    scope_rules: Optional[list] = None
+    scope_hosts: Optional[list] = None
+    scope_users: Optional[list] = None
+    scope_ips: Optional[list] = None
+    scope_observables: Optional[list] = None
+    priority_nudge: Optional[int] = 0
+
+
+class RevertRequest(BaseModel):
+    reason: Optional[str] = None
+
+
+def _quirk_err(e: ValueError):
+    detail = str(e)
+    if "not found" in detail:
+        code = 404
+    elif "separation of duties" in detail:
+        code = 409
+    else:
+        code = 400
+    raise HTTPException(status_code=code, detail=detail)
+
+
+@router.get("/quirks", dependencies=[Depends(require_permission("de:read"))])
+def list_quirks(
+    status: str = Query("all", description="pending | active | reverted | all"),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_quirk_service import list_quirks as _list
+
+    return {"quirks": _list(session, status=status)}
+
+
+@router.get("/quirks/{quirk_id}", dependencies=[Depends(require_permission("de:read"))])
+def get_quirk(quirk_id: int, session: Session = Depends(get_db_session)):
+    from ion.services.de_quirk_service import get_quirk as _get
+
+    q = _get(session, quirk_id)
+    if q is None:
+        raise HTTPException(status_code=404, detail="quirk not found")
+    return q
+
+
+@router.post("/quirks", dependencies=[Depends(require_permission("de:propose"))])
+def raise_quirk(
+    payload: QuirkCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_quirk_service import raise_quirk as _raise
+
+    try:
+        q = _raise(session, payload.model_dump(), current_user.id)
+    except ValueError as e:
+        _quirk_err(e)
+    logger.info("DE quirk %d raised by user %s", q.id, current_user.id)
+    return q.to_dict()
+
+
+@router.post("/quirks/{quirk_id}/verify", dependencies=[Depends(require_permission("de:verify"))])
+def verify_quirk(
+    quirk_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Activate a pending quirk — a DIFFERENT user than the raiser (SoD)."""
+    from ion.services.de_quirk_service import verify_quirk as _verify
+
+    try:
+        q = _verify(session, quirk_id, current_user.id)
+    except ValueError as e:
+        _quirk_err(e)
+    logger.info("DE quirk %d verified by user %s", quirk_id, current_user.id)
+    return q.to_dict()
+
+
+@router.post("/quirks/{quirk_id}/revert", dependencies=[Depends(require_permission("de:verify"))])
+def revert_quirk(
+    quirk_id: int,
+    payload: RevertRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_quirk_service import revert_quirk as _revert
+
+    try:
+        q = _revert(session, quirk_id, current_user.id, reason=payload.reason)
+    except ValueError as e:
+        _quirk_err(e)
+    logger.info("DE quirk %d reverted by user %s", quirk_id, current_user.id)
+    return q.to_dict()
