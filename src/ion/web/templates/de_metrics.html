@@ -132,7 +132,8 @@ function deRender(d){
                 + '<td class="de-muted">' + win + '</td>'
                 + '<td>' + (sev || '<span class="de-muted">—</span>') + '</td>'
                 + '<td>' + mitre + '</td>'
-                + '<td><button class="de-act" data-click-action="deDrill" data-args=\'["' + deEsc(c.rule_name) + '"]\'>Evidence</button></td>'
+                + '<td><button class="de-act" data-click-action="deDrill" data-args=\'["' + deEsc(c.rule_name) + '"]\'>Evidence</button>'
+                + ' · <button class="de-act" data-click-action="deDraft" data-args=\'["' + deEsc(c.rule_name) + '"]\'>Draft proposal</button></td>'
                 + '</tr>';
             html += '<tr id="de-drill-' + deSlug(c.rule_name) + '" hidden><td colspan="8"><div class="de-drill">—</div></td></tr>';
         }
@@ -171,6 +172,31 @@ function deDrill(rule){
         h += '<br><strong>Sample alert ids</strong>: <span class="mono de-muted">' + ids.map(deEsc).join(', ') + '</span>';
     }
     cell.innerHTML = h;
+}
+
+function deToast(msg, kind){
+    if(typeof showToast === 'function') showToast(msg, kind);
+    else if(kind === 'error') alert(msg);
+}
+
+// Draft a Detection Proposal from a campaign: deterministic draft -> save as DRAFT.
+// The human then refines and decides it on the Detection Proposals page.
+async function deDraft(rule){
+    try {
+        const days = parseInt(de$('de-days').value, 10) || 90;
+        const dr = await fetch(DE_API + '/proposals/draft', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({rule_name: rule, days: days})});
+        if(!dr.ok){ const e = await dr.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+dr.status)); }
+        const draft = await dr.json();
+        const cr = await fetch(DE_API + '/proposals', {
+            method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(draft)});
+        if(!cr.ok){ const e = await cr.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+cr.status)); }
+        const p = await cr.json();
+        deToast('Draft proposal #' + p.id + ' created for ' + rule + ' — refine & decide it on Detection Proposals.', 'success');
+    } catch(e){
+        deToast('Draft failed: ' + (e.message || e), 'error');
+    }
 }
 
 document.addEventListener('DOMContentLoaded', deLoad);

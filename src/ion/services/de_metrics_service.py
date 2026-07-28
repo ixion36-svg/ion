@@ -261,6 +261,35 @@ def get_noise_campaigns(session: Session, days: Optional[int] = None) -> Dict[st
     }
 
 
+def fp_alerts_for_rule(
+    session: Session, rule_name: str, start: datetime, end: datetime
+) -> int:
+    """Count FP/benign alerts for one rule with `start <= closed_at < end`.
+
+    The atom behind noise campaigns (one triage row = one FP alert), reused by
+    Phase 1 outcome measurement to compare a rule's noise before vs after a
+    proposal is applied. Honours the same benign-as-FP toggle as the campaigns.
+    """
+    st = _settings()
+    reasons = [_FALSE_POSITIVE]
+    if st["benign_tp_as_fp"]:
+        reasons.append(_BENIGN_TP)
+    q = (
+        select(func.count())
+        .select_from(AlertTriage)
+        .join(AlertCase, AlertTriage.case_id == AlertCase.id)
+        .where(AlertCase.closure_reason.in_(reasons))
+        .where(AlertCase.closed_at.is_not(None))
+        .where(AlertCase.closed_at >= start)
+        .where(AlertCase.closed_at < end)
+    )
+    if rule_name == _UNMAPPED:
+        q = q.where(AlertTriage.rule_name.is_(None))
+    else:
+        q = q.where(AlertTriage.rule_name == rule_name)
+    return int(session.execute(q).scalar_one())
+
+
 def _noise_trend(session: Session, cutoff: datetime, midpoint: datetime,
                  reasons: List[str]) -> Dict[str, Any]:
     """Recent-half vs older-half FP-closure counts → is noise rising or falling."""

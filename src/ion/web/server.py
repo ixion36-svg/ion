@@ -2318,6 +2318,12 @@ async def de_metrics_page(request: Request, user: User = Depends(require_page_pe
     return templates.TemplateResponse(request=request, name="de_metrics.html")
 
 
+@app.get("/de-proposals", response_class=HTMLResponse)
+async def de_proposals_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+    """Render the Detection Proposals page (Phase 1 — draft/review/decide)."""
+    return templates.TemplateResponse(request=request, name="de_proposals.html")
+
+
 @app.get("/guide", response_class=HTMLResponse)
 async def guide_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the interactive training guide."""

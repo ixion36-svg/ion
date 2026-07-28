@@ -575,6 +575,8 @@ class AuthService:
             ("tuning:review", "tuning", "review", "Accept/reject tuning proposals"),
             # Detection Engineering module (Phase 0 — read-only noise campaigns + DE metrics)
             ("de:read", "de", "read", "View detection-engineering metrics"),
+            # Detection Engineering module (Phase 1 — draft/edit/decide detection proposals)
+            ("de:propose", "de", "propose", "Draft and decide detection proposals"),
             # v0.49.6: removed 5 seeded-but-never-enforced permissions
             # (discover:read, alert:comment, case:comment, case:link,
             # investigation:run) — no route gated on them (audit finding, same
@@ -648,7 +650,7 @@ class AuthService:
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update",
                     "forensic:read", "forensic:create", "forensic:update",
-                    "security:read", "de:read",
+                    "security:read", "de:read", "de:propose",
                     "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
@@ -667,7 +669,7 @@ class AuthService:
                     "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
-                    "security:read", "de:read",
+                    "security:read", "de:read", "de:propose",
                 ],
             ),
             (
@@ -712,7 +714,7 @@ class AuthService:
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
                     "integration:read", "integration:manage",
-                    "security:read", "de:read",
+                    "security:read", "de:read", "de:propose",
                     "system:settings",
                 ],
             ),
@@ -730,7 +732,7 @@ class AuthService:
                     "template:read", "template:create", "template:update", "template:delete",
                     "document:read", "document:create", "document:update", "document:delete",
                     "integration:read", "integration:manage",
-                    "security:read", "security:manage", "de:read",
+                    "security:read", "security:manage", "de:read", "de:propose",
                     "system:settings",
                 ],
             ),
@@ -747,7 +749,7 @@ class AuthService:
                     "template:read", "template:create", "template:update", "template:delete",
                     "document:read", "document:create", "document:update", "document:delete",
                     "integration:read", "integration:manage",
-                    "security:read", "security:manage", "de:read",
+                    "security:read", "security:manage", "de:read", "de:propose",
                     "system:settings",
                 ],
             ),

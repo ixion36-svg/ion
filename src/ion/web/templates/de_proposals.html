@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+
+{% block title %}Detection Proposals - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-shield"/></svg>
+    <span class="label-tiny text-ion-cyan">Detection engineering · Phase 1</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Detection Proposals</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Reviewable drafts of tuning changes, born from noise campaigns. You edit, then mark <em>applied</em> (after applying it in your own detection backend) or <em>rejected</em>. ION records the decision and measures the drop — it never writes to a detection backend.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
+        <select id="dp-status" class="ion-select" data-change-action="dpLoad">
+            <option value="all" selected>All</option>
+            <option value="draft">Draft</option>
+            <option value="applied">Applied</option>
+            <option value="rejected">Rejected</option>
+        </select>
+        <button class="ion-btn ion-btn-primary" data-click-action="dpLoad">Refresh</button>
+    </div>
+</section>
+
+<div id="dp-content"><div class="dp-loading"><span class="dp-spinner"></span> Loading proposals...</div></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
+
+<!-- Edit modal -->
+<div id="dp-edit-overlay" class="dp-modal-overlay" data-click-action="dpCloseEdit" data-only-self-click>
+  <div class="dp-modal">
+    <div class="dp-modal-title">Edit proposal <span id="dp-edit-id" class="mono"></span></div>
+    <label class="dp-modal-label">Title *</label>
+    <input id="dp-edit-title" class="dp-modal-input" type="text">
+    <label class="dp-modal-label">Change type</label>
+    <select id="dp-edit-type" class="dp-modal-input">
+      <option value="exclusion">Exclusion</option>
+      <option value="threshold">Threshold</option>
+      <option value="new_rule">New rule</option>
+      <option value="retire">Retire</option>
+      <option value="other">Other</option>
+    </select>
+    <label class="dp-modal-label">Suggested change *</label>
+    <textarea id="dp-edit-change" class="dp-modal-input" rows="4"></textarea>
+    <label class="dp-modal-label">Rationale</label>
+    <textarea id="dp-edit-rationale" class="dp-modal-input" rows="2"></textarea>
+    <label class="dp-modal-label">Scope</label>
+    <input id="dp-edit-scope" class="dp-modal-input" type="text">
+    <div class="dp-modal-actions">
+      <button class="ion-btn" data-click-action="dpCloseEdit">Cancel</button>
+      <button class="ion-btn ion-btn-primary" data-click-action="dpSaveEdit">Save draft</button>
+    </div>
+  </div>
+</div>
+
+<!-- Decide modal -->
+<div id="dp-decide-overlay" class="dp-modal-overlay" data-click-action="dpCloseDecide" data-only-self-click>
+  <div class="dp-modal">
+    <div class="dp-modal-title"><span id="dp-decide-verb"></span> proposal <span id="dp-decide-id" class="mono"></span></div>
+    <div id="dp-decide-applied-wrap">
+      <label class="dp-modal-label">Date applied (in your detection backend)</label>
+      <input id="dp-decide-date" class="dp-modal-input" type="date">
+      <p class="dp-hint">ION records that <strong>you</strong> applied this; it does not push the change anywhere.</p>
+    </div>
+    <label class="dp-modal-label">Decision notes</label>
+    <textarea id="dp-decide-notes" class="dp-modal-input" rows="3" placeholder="Why applied / rejected — what you actually changed, or why not"></textarea>
+    <div class="dp-modal-actions">
+      <button class="ion-btn" data-click-action="dpCloseDecide">Cancel</button>
+      <button class="ion-btn ion-btn-primary" data-click-action="dpConfirmDecide">Confirm</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ csp_nonce }}">
+.dp-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.dp-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:dp-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes dp-spin{to{transform:rotate(360deg)}}
+.dp-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.dp-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.dp-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.dp-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary);vertical-align:top}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.78rem}
+.dp-muted{color:var(--text-secondary)}
+.dp-pill{display:inline-block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 7px;border-radius:4px}
+.dp-pill-draft{background:rgba(0,212,255,.14);color:var(--ion-cyan,#00d4ff)}
+.dp-pill-applied{background:rgba(52,211,153,.16);color:var(--mitre-covered,#34d399)}
+.dp-pill-rejected{background:rgba(239,68,68,.16);color:var(--sev-critical,#ef4444)}
+.dp-chip{display:inline-block;font-size:.66rem;padding:1px 6px;border-radius:4px;background:rgba(99,110,123,.18);color:var(--text-secondary);margin-right:4px}
+.dp-act{cursor:pointer;color:var(--primary);font-size:.74rem;background:none;border:none;padding:0;text-decoration:underline;margin-right:8px}
+.dp-act-danger{color:var(--sev-critical,#ef4444)}
+.dp-change{white-space:pre-wrap;font-size:.8rem;margin-top:4px;color:var(--text-primary)}
+.dp-outcome{font-size:.76rem;color:var(--text-secondary);margin-top:6px;padding:6px 10px;background:rgba(0,0,0,.15);border-radius:4px}
+.dp-hint{font-size:.72rem;color:var(--text-secondary);margin:4px 0 0}
+.dp-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;align-items:center;justify-content:center}
+.dp-modal-overlay.show{display:flex}
+.dp-modal{background:var(--bg-card,#0d1117);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;max-width:560px;width:92%;max-height:90vh;overflow:auto}
+.dp-modal-title{font-weight:700;margin-bottom:14px}
+.dp-modal-label{display:block;font-size:.74rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px}
+.dp-modal-input{width:100%;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:.85rem;resize:vertical}
+.dp-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+</style>
+<script nonce="{{ csp_nonce }}">
+const DP_API = '/api/de/proposals';
+function dp$(id){return document.getElementById(id)}
+function dpEsc(s){if(s===null||s===undefined)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function dpToast(m,k){ if(typeof showToast==='function') showToast(m,k); else if(k==='error') alert(m); }
+let _dpItems = [];
+let _dpDecide = {id:null, decision:null};
+
+async function dpLoad(){
+    const status = dp$('dp-status').value;
+    dp$('dp-content').innerHTML = '<div class="dp-loading"><span class="dp-spinner"></span> Loading proposals...</div>';
+    try {
+        const r = await fetch(DP_API + '?status=' + encodeURIComponent(status));
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        _dpItems = data.proposals || [];
+        dpRender(_dpItems);
+    } catch(e){
+        dp$('dp-content').innerHTML = '<div class="dp-loading">Failed to load: ' + dpEsc(e.message) + '</div>';
+    }
+}
+
+function dpPill(status){
+    const cls = status === 'applied' ? 'dp-pill-applied' : status === 'rejected' ? 'dp-pill-rejected' : 'dp-pill-draft';
+    return '<span class="dp-pill ' + cls + '">' + dpEsc(status) + '</span>';
+}
+
+function dpOutcome(p){
+    const o = p.outcome;
+    if(!o) return p.status === 'applied' ? '<div class="dp-outcome dp-muted">Not yet measured.</div>' : '';
+    const drop = (o.drop_pct === null || o.drop_pct === undefined) ? 'n/a' : (o.drop_pct + '%');
+    return '<div class="dp-outcome">Noise drop <strong>' + drop + '</strong> — '
+        + o.before_count + ' FP before vs ' + o.after_count + ' after (' + o.days_observed + 'd observed)</div>';
+}
+
+function dpRender(items){
+    if(!items.length){
+        dp$('dp-content').innerHTML = '<div class="dp-section dp-muted">No proposals yet. Draft one from a campaign on the <a href="/de-metrics">DE Metrics</a> page.</div>';
+        return;
+    }
+    let html = '<div class="dp-section"><table class="dp-table"><thead><tr>'
+        + '<th>Rule</th><th>Type</th><th>Proposal</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
+    for(const p of items){
+        const expected = (p.expected_fp_reduction != null)
+            ? (p.expected_fp_reduction + ' FP · ' + (p.expected_hours_reclaimed != null ? p.expected_hours_reclaimed + 'h' : '')) : '—';
+        let actions = '';
+        if(p.status === 'draft'){
+            actions = '<button class="dp-act" data-click-action="dpEdit" data-args=\'[' + p.id + ']\'>Edit</button>'
+                + '<button class="dp-act" data-click-action="dpDecide" data-args=\'[' + p.id + ',"applied"]\'>Apply</button>'
+                + '<button class="dp-act dp-act-danger" data-click-action="dpDecide" data-args=\'[' + p.id + ',"rejected"]\'>Reject</button>';
+        } else if(p.status === 'applied'){
+            actions = '<button class="dp-act" data-click-action="dpMeasure" data-args=\'[' + p.id + ']\'>Measure outcome</button>';
+        } else {
+            actions = '<span class="dp-muted">—</span>';
+        }
+        const mitre = (p.mitre_techniques || []).slice(0,6).map(function(m){return '<span class="dp-chip">' + dpEsc(m) + '</span>'}).join('');
+        html += '<tr>'
+            + '<td class="mono">' + dpEsc(p.rule_name || '—') + '</td>'
+            + '<td><span class="dp-chip">' + dpEsc(p.change_type) + '</span></td>'
+            + '<td><strong>' + dpEsc(p.title) + '</strong>'
+                + '<div class="dp-change">' + dpEsc(p.suggested_change) + '</div>'
+                + (mitre ? '<div style="margin-top:4px">' + mitre + '</div>' : '')
+                + dpOutcome(p) + '</td>'
+            + '<td class="mono">' + dpEsc(expected) + '</td>'
+            + '<td>' + dpPill(p.status)
+                + (p.decided_by_username ? '<div class="dp-hint">by ' + dpEsc(p.decided_by_username) + '</div>' : '') + '</td>'
+            + '<td>' + actions + '</td>'
+            + '</tr>';
+    }
+    html += '</tbody></table></div>';
+    dp$('dp-content').innerHTML = html;
+}
+
+function _dpFind(id){ return _dpItems.find(function(x){return x.id === id}); }
+
+// ── edit ──
+function dpEdit(id){
+    const p = _dpFind(id); if(!p) return;
+    dp$('dp-edit-overlay').setAttribute('data-id', id);
+    dp$('dp-edit-id').textContent = '#' + id;
+    dp$('dp-edit-title').value = p.title || '';
+    dp$('dp-edit-type').value = p.change_type || 'exclusion';
+    dp$('dp-edit-change').value = p.suggested_change || '';
+    dp$('dp-edit-rationale').value = p.rationale || '';
+    dp$('dp-edit-scope').value = p.scope || '';
+    dp$('dp-edit-overlay').classList.add('show');
+}
+function dpCloseEdit(){ dp$('dp-edit-overlay').classList.remove('show'); }
+async function dpSaveEdit(){
+    const id = dp$('dp-edit-overlay').getAttribute('data-id');
+    const body = {
+        title: dp$('dp-edit-title').value.trim(),
+        change_type: dp$('dp-edit-type').value,
+        suggested_change: dp$('dp-edit-change').value.trim(),
+        rationale: dp$('dp-edit-rationale').value.trim(),
+        scope: dp$('dp-edit-scope').value.trim()
+    };
+    if(!body.title || !body.suggested_change){ dpToast('Title and suggested change are required','warning'); return; }
+    try {
+        const r = await fetch(DP_API + '/' + id, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        dpCloseEdit(); dpToast('Proposal #' + id + ' updated','success'); dpLoad();
+    } catch(e){ dpToast('Save failed: ' + (e.message||e),'error'); }
+}
+
+// ── decide ──
+function dpDecide(id, decision){
+    _dpDecide = {id: id, decision: decision};
+    dp$('dp-decide-id').textContent = '#' + id;
+    dp$('dp-decide-verb').textContent = decision === 'applied' ? 'Apply' : 'Reject';
+    dp$('dp-decide-applied-wrap').style.display = decision === 'applied' ? 'block' : 'none';
+    dp$('dp-decide-notes').value = '';
+    dp$('dp-decide-overlay').classList.add('show');
+}
+function dpCloseDecide(){ dp$('dp-decide-overlay').classList.remove('show'); }
+async function dpConfirmDecide(){
+    const {id, decision} = _dpDecide;
+    const body = {decision: decision, notes: dp$('dp-decide-notes').value.trim() || null};
+    if(decision === 'applied'){
+        const d = dp$('dp-decide-date').value;
+        if(d) body.applied_at = d + 'T00:00:00';
+    }
+    try {
+        const r = await fetch(DP_API + '/' + id + '/decide', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        dpCloseDecide(); dpToast('Proposal #' + id + ' ' + decision,'success'); dpLoad();
+    } catch(e){ dpToast('Decision failed: ' + (e.message||e),'error'); }
+}
+
+// ── measure ──
+async function dpMeasure(id){
+    try {
+        const r = await fetch(DP_API + '/' + id + '/measure-outcome', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({days:30})});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        const o = await r.json();
+        const drop = (o.drop_pct === null || o.drop_pct === undefined) ? 'n/a' : (o.drop_pct + '%');
+        dpToast('Measured: ' + drop + ' drop (' + o.before_count + '→' + o.after_count + ' FP)','success');
+        dpLoad();
+    } catch(e){ dpToast('Measure failed: ' + (e.message||e),'error'); }
+}
+
+document.addEventListener('DOMContentLoaded', dpLoad);
+</script>
+{% endblock %}
