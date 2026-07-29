@@ -1,13 +1,24 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.58.0 -->
-<!-- ion-doc:version=0.58.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.59.0 -->
+<!-- ion-doc:version=0.59.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.59.0 — 2026-07-29
+
+**Cases UX redesign — cases-as-widgets + auto-enriched observables.** Full UX rework of the Cases surface to the `ion-*` design language, driven by a widget model. *ION extracts, enriches, and surfaces — the analyst decides.*
+
+- **Board = responsive widget grid** (the drag-drop Kanban is retired). Every case renders as a self-contained widget: severity rail, case number, title, description, status pill, closure-reason badge, MITRE, alert/host/user/observable counts, Kibana/DFIR-IRIS sync chips, assignee and age. Status changes move to a per-widget control that reuses the existing case-status PATCH path (routing `closed` through the closure modal). Board-level page-size + "showing N of M" + load-more cap so a tenant with hundreds of cases opens instantly.
+- **Case detail → one widget per alert.** Each linked alert becomes a widget carrying its full summary: rule, severity, host/user/timestamp, a **common-fields** block (flow `source_ip → destination_ip`, process/parent, `command_line`, `file_hash` — from `ElasticsearchAlert.to_dict`), the extracted **observables** row, Bob's suggested verdict + confidence meter (or the amber **auto-escalated** badge when the circuit-breaker fired), and an analyst-note preview. All existing detail machinery preserved (similar closed cases, similar observables, attack-story timeline, annotations, Bob analysis, ForensicCase Workbench pins + tamper-evident sha256 ledger, create/closure modals, analytics).
+- **On-render observable extraction.** The alert-list path now attaches `observables: [{type, value, threat_level, score, source}]` to every alert via the pure `to_contract_observables()` (no DB/network), so observables appear immediately — not only after triage.
+- **Auto-enrichment (air-gap-safe).** Extracted observables are auto-enriched via OpenCTI in the background; the alert-list path back-fills `threat_level`/`score` from persisted `ObservableEnrichment` without enriching synchronously. Fixed a latent bug where `auto_enrich_new_observable` created the enrichment coroutine but never awaited it. Everything degrades to a clean no-op when OpenCTI is unconfigured (threat_level stays `unknown`) — safe for air-gapped installs.
+- **Enrichment → case note.** New `post_enrichment_note()` composes a **Threat Enrichment Summary** (OpenCTI, TLP:AMBER — counts + IOC lines with score/labels/actors) and writes it as a case `Note`, mirroring the AI Executive Summary pattern (ES + Kibana sync included), wired into case creation and gated so it's a no-op when there's nothing enrichable.
+- Collapses the bulk of the bespoke inline `cases.html` style block onto `ion-*` components + design tokens (hard-coded severity/hex literals → `--sev-*`/`--primary`/`--border`); removes dead Kanban and stat-card CSS. Tests: `tests/test_v059_cases_enrichment.py` (6) + affected case/observable suites green.
 
 ## v0.58.0 — 2026-07-29
 
