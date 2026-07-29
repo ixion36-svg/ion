@@ -38,6 +38,10 @@ from ion.models.base import Base
 
 # v0.21.0: Bob Prompt Evaluation Harness — per-template P/R/F1 runs.
 from ion.models.bob_eval import BobEvalRun, BobEvalRunSample  # noqa: F401
+from ion.models.bob_tuning_proposal import (  # noqa: F401
+    BobTuningProposal,
+    BobTuningProposalStatus,
+)
 from ion.models.canary import Canary, CanaryHit, CanaryStatus, CanaryType
 
 # v0.10.4: case-similarity embeddings (pgvector-backed).

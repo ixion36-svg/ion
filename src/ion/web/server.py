@@ -2330,6 +2330,12 @@ async def de_quirks_page(request: Request, user: User = Depends(require_page_per
     return templates.TemplateResponse(request=request, name="de_quirks.html")
 
 
+@app.get("/de-bob", response_class=HTMLResponse)
+async def de_bob_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+    """Render the Bob improvement loop page (Phase 3 — scorecard + tuning proposals)."""
+    return templates.TemplateResponse(request=request, name="de_bob.html")
+
+
 @app.get("/guide", response_class=HTMLResponse)
 async def guide_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the interactive training guide."""

@@ -163,13 +163,14 @@
                    misleading).
                  * Security stays admin-gated (security:read perm). -->
             <div class="tw-drop" data-drop id="nav-group-engineering">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/de-proposals') or p.startswith('/de-quirks') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/network-map') or p.startswith('/topology') or p.startswith('/architecture') or p.startswith('/security') %}is-active{% endif %}">Engineering
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/de-proposals') or p.startswith('/de-quirks') or p.startswith('/de-bob') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/engineering-analytics') or p.startswith('/network-map') or p.startswith('/topology') or p.startswith('/architecture') or p.startswith('/security') %}is-active{% endif %}">Engineering
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
                 <a href="/detection-engineering" class="tw-drop-item {% if p.startswith('/detection-engineering') %}is-active{% endif %}">Detection Engineering</a>
                 <a href="/de-proposals" class="tw-drop-item {% if p.startswith('/de-proposals') %}is-active{% endif %}">Detection Proposals</a>
                 <a href="/de-quirks" class="tw-drop-item {% if p.startswith('/de-quirks') %}is-active{% endif %}">System Quirks</a>
+                <a href="/de-bob" class="tw-drop-item {% if p.startswith('/de-bob') %}is-active{% endif %}">Bob Improvement</a>
                 <a href="/cyab" class="tw-drop-item {% if p.startswith('/cyab') %}is-active{% endif %}">CyAB</a>
                 <a href="/network-map" class="tw-drop-item {% if p.startswith('/topology') or p.startswith('/network-map') or p.startswith('/data-flow') %}is-active{% endif %}">Infrastructure</a>
                 <a href="/log-sources" class="tw-drop-item {% if p.startswith('/log-sources') or p.startswith('/engineering-analytics') %}is-active{% endif %}">Platform Health</a>

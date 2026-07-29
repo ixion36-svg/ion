@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}Bob Improvement - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-shield"/></svg>
+    <span class="label-tiny text-ion-cyan">Detection engineering · Phase 3</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Bob Improvement</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Where Bob and the analyst disagreed, drafted into a reviewable, reversible tuning change to the rule's Bob guidance. <strong>ION drafts and measures; the analyst decides and acts.</strong> A tuning change reaches Bob's live prompt only after a <strong>different person</strong> approves it, and a one-click revert restores the prior text exactly.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
+    <select id="bb-days" class="ion-select" data-change-action="bbLoad">
+        <option value="30">Last 30 days</option>
+        <option value="90" selected>Last 90 days</option>
+        <option value="180">Last 180 days</option>
+        <option value="365">Last 365 days</option>
+    </select>
+    <select id="bb-status" class="ion-select" data-change-action="bbLoadProposals">
+        <option value="all" selected>All</option>
+        <option value="draft">Draft</option>
+        <option value="approved">Approved</option>
+        <option value="rejected">Rejected</option>
+        <option value="reverted">Reverted</option>
+    </select>
+    <button class="ion-btn ion-btn-primary" data-click-action="bbLoad">Refresh</button>
+</div>
+</section>
+
+<div id="bb-scorecard"></div>
+<h2 class="bb-h2">Bob feedback items</h2>
+<p class="bb-sub">Scored closures where Bob disagreed with the analyst, grouped by rule and verdict shift. Draft a tuning proposal from a class to weigh the analyst reasoning.</p>
+<div id="bb-feedback"><div class="bb-loading"><span class="bb-spinner"></span> Loading feedback...</div></div>
+
+<h2 class="bb-h2">Tuning proposals</h2>
+<p class="bb-sub">A draft applies to Bob's live prompt only when a different person approves it. Approve / reject / revert require the <span class="mono">de:approve</span> permission.</p>
+<div id="bb-proposals"><div class="bb-loading"><span class="bb-spinner"></span> Loading proposals...</div></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
+
+<!-- Draft / create modal -->
+<div id="bb-draft-overlay" class="bb-modal-overlay" data-click-action="bbCloseDraft" data-only-self-click>
+  <div class="bb-modal">
+    <div class="bb-modal-title">Draft a Bob-tuning proposal</div>
+    <p class="bb-hint" id="bb-draft-problem"></p>
+    <label class="bb-modal-label">Title *</label>
+    <input id="bb-title" class="bb-modal-input" type="text" placeholder="Tune Bob for '<rule>' — N disagreements">
+    <label class="bb-modal-label">Problem statement</label>
+    <textarea id="bb-problem" class="bb-modal-input" rows="2"></textarea>
+    <label class="bb-modal-label">Proposed prompt-stack guidance * (edit before submitting)</label>
+    <textarea id="bb-proposed" class="bb-modal-input mono" rows="10"></textarea>
+    <p class="bb-hint">On approval this text replaces the rule's <span class="mono">AlertPromptTemplate.prompt_text</span>. Describe the benign/malicious distinguisher — do not hard-code a verdict.</p>
+    <div class="bb-modal-actions">
+      <button class="ion-btn" data-click-action="bbCloseDraft">Cancel</button>
+      <button class="ion-btn ion-btn-primary" data-click-action="bbSubmitDraft">Create draft</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ csp_nonce }}">
+.bb-loading{text-align:center;padding:40px;color:var(--text-secondary)}
+.bb-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:bb-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes bb-spin{to{transform:rotate(360deg)}}
+.bb-h2{font-size:1.05rem;font-weight:700;color:var(--text-primary);margin:26px 0 4px}
+.bb-sub{font-size:.8rem;color:var(--text-secondary);margin:0 0 12px;max-width:64rem}
+.bb-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.bb-cards{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px}
+.bb-card{flex:1;min-width:180px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px}
+.bb-card-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);font-weight:600}
+.bb-card-val{font-size:1.7rem;font-weight:700;color:var(--text-primary);margin-top:4px}
+.bb-card-sub{font-size:.72rem;color:var(--text-secondary);margin-top:2px}
+.bb-drift-improving{color:var(--mitre-covered,#34d399)}
+.bb-drift-declining{color:var(--sev-critical,#ef4444)}
+.bb-drift-flat{color:var(--text-secondary)}
+.bb-disclosure{font-size:.74rem;color:var(--text-secondary);background:rgba(99,110,123,.12);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:4px}
+.bb-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.bb-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.bb-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary);vertical-align:top}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.78rem}
+.bb-muted{color:var(--text-secondary)}
+.bb-verdict{display:inline-block;font-size:.7rem;padding:1px 6px;border-radius:4px;background:rgba(99,110,123,.18);color:var(--text-primary);margin:0 2px}
+.bb-pill{display:inline-block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 7px;border-radius:4px}
+.bb-pill-draft{background:rgba(245,158,11,.16);color:var(--sev-medium,#f59e0b)}
+.bb-pill-approved{background:rgba(52,211,153,.16);color:var(--mitre-covered,#34d399)}
+.bb-pill-rejected{background:rgba(239,68,68,.16);color:var(--sev-critical,#ef4444)}
+.bb-pill-reverted{background:rgba(99,110,123,.22);color:var(--text-secondary)}
+.bb-act{cursor:pointer;color:var(--primary);font-size:.74rem;background:none;border:none;padding:0;text-decoration:underline;margin-right:8px}
+.bb-act-danger{color:var(--sev-critical,#ef4444)}
+.bb-hint{font-size:.72rem;color:var(--text-secondary);margin:10px 0 2px}
+.bb-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;align-items:center;justify-content:center}
+.bb-modal-overlay.show{display:flex}
+.bb-modal{background:var(--bg-card,#0d1117);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;max-width:720px;width:92%;max-height:92vh;overflow:auto}
+.bb-modal-title{font-weight:700;margin-bottom:14px}
+.bb-modal-label{display:block;font-size:.74rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin:8px 0 4px}
+.bb-modal-input{width:100%;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:.85rem;resize:vertical}
+.bb-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+</style>
+<script nonce="{{ csp_nonce }}">
+const BB_API = '/api/de';
+function bb$(id){return document.getElementById(id)}
+function bbEsc(s){if(s===null||s===undefined)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function bbToast(m,k){ if(typeof showToast==='function') showToast(m,k); else if(k==='error') alert(m); }
+function bbDays(){ return bb$('bb-days').value; }
+
+function bbLoad(){ bbLoadScorecard(); bbLoadFeedback(); bbLoadProposals(); }
+
+async function bbLoadScorecard(){
+    try {
+        const r = await fetch(BB_API + '/scorecard?days=' + encodeURIComponent(bbDays()));
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        bbRenderScorecard(await r.json());
+    } catch(e){ bb$('bb-scorecard').innerHTML = '<div class="bb-section bb-muted">Failed to load scorecard: ' + bbEsc(e.message) + '</div>'; }
+}
+
+function bbRenderScorecard(sc){
+    const s = sc.summary || {};
+    const d = s.drift || {};
+    const rate = (s.agreement_rate === null || s.agreement_rate === undefined) ? '—' : s.agreement_rate + '%';
+    const dirCls = d.direction === 'improving' ? 'bb-drift-improving' : d.direction === 'declining' ? 'bb-drift-declining' : 'bb-drift-flat';
+    const delta = (d.delta === null || d.delta === undefined) ? '' : (d.delta > 0 ? '+' + d.delta : '' + d.delta) + ' pts';
+    const fs = s.few_shot || {};
+    let html = '<div class="bb-cards">'
+        + '<div class="bb-card"><div class="bb-card-label">Agreement rate</div><div class="bb-card-val">' + rate + '</div><div class="bb-card-sub">' + (s.agreed||0) + ' / ' + (s.scored||0) + ' scored closures</div></div>'
+        + '<div class="bb-card"><div class="bb-card-label">Drift (recent vs older)</div><div class="bb-card-val ' + dirCls + '">' + bbEsc(d.direction || 'flat') + '</div><div class="bb-card-sub">' + bbEsc(delta) + '</div></div>'
+        + '<div class="bb-card"><div class="bb-card-label">Disagreement classes</div><div class="bb-card-val">' + (s.disagreement_classes||0) + '</div><div class="bb-card-sub">' + (s.total_disagreements||0) + ' total disagreements</div></div>'
+        + '</div>';
+    html += '<div class="bb-disclosure"><strong>Gold-exemplar retrieval:</strong> '
+        + (fs.gold_exemplar_retrieval_enabled ? 'enabled' : 'disabled') + '. ' + bbEsc(fs.note || '') + '</div>';
+    bb$('bb-scorecard').innerHTML = html;
+}
+
+async function bbLoadFeedback(){
+    bb$('bb-feedback').innerHTML = '<div class="bb-loading"><span class="bb-spinner"></span> Loading feedback...</div>';
+    try {
+        const r = await fetch(BB_API + '/bob-feedback?days=' + encodeURIComponent(bbDays()));
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        bbRenderFeedback(data.classes || []);
+    } catch(e){ bb$('bb-feedback').innerHTML = '<div class="bb-section bb-muted">Failed to load: ' + bbEsc(e.message) + '</div>'; }
+}
+
+function bbRenderFeedback(classes){
+    if(!classes.length){ bb$('bb-feedback').innerHTML = '<div class="bb-section bb-muted">No scored disagreements in this window — Bob and the analysts agree.</div>'; return; }
+    let html = '<div class="bb-section"><table class="bb-table"><thead><tr>'
+        + '<th>Rule</th><th>Bob → Analyst</th><th>Count</th><th>Sample analyst reasons</th><th></th></tr></thead><tbody>';
+    for(const c of classes){
+        const reasons = (c.sample_reasons||[]).map(function(x){return bbEsc(x)}).join('<br>') || '<span class="bb-muted">—</span>';
+        const args = JSON.stringify([c.rule_name, c.bob_verdict, c.human_verdict]);
+        html += '<tr>'
+            + '<td><strong>' + bbEsc(c.rule_name) + '</strong></td>'
+            + '<td><span class="bb-verdict">' + bbEsc(c.bob_verdict) + '</span> → <span class="bb-verdict">' + bbEsc(c.human_verdict) + '</span></td>'
+            + '<td>' + (c.count||0) + '</td>'
+            + '<td class="bb-muted">' + reasons + '</td>'
+            + '<td><button class="bb-act" data-click-action="bbDraft" data-args=\'' + bbEsc(args) + '\'>Draft tuning proposal</button></td>'
+            + '</tr>';
+    }
+    html += '</tbody></table></div>';
+    bb$('bb-feedback').innerHTML = html;
+}
+
+async function bbLoadProposals(){
+    const status = bb$('bb-status').value;
+    bb$('bb-proposals').innerHTML = '<div class="bb-loading"><span class="bb-spinner"></span> Loading proposals...</div>';
+    try {
+        const r = await fetch(BB_API + '/bob-proposals?status=' + encodeURIComponent(status));
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        bbRenderProposals(data.proposals || []);
+    } catch(e){ bb$('bb-proposals').innerHTML = '<div class="bb-section bb-muted">Failed to load: ' + bbEsc(e.message) + '</div>'; }
+}
+
+function bbPill(p){
+    const cls = p.status === 'approved' ? 'bb-pill-approved' : p.status === 'rejected' ? 'bb-pill-rejected' : p.status === 'reverted' ? 'bb-pill-reverted' : 'bb-pill-draft';
+    return '<span class="bb-pill ' + cls + '">' + bbEsc(p.status) + '</span>';
+}
+
+function bbRenderProposals(items){
+    if(!items.length){ bb$('bb-proposals').innerHTML = '<div class="bb-section bb-muted">No tuning proposals yet. Draft one from a feedback item above.</div>'; return; }
+    let html = '<div class="bb-section"><table class="bb-table"><thead><tr>'
+        + '<th>Proposal</th><th>Rule</th><th>Status</th><th>Drafted / Decided</th><th>Actions</th></tr></thead><tbody>';
+    for(const p of items){
+        let actions = '';
+        if(p.status === 'draft'){
+            actions = '<button class="bb-act" data-click-action="bbApprove" data-args=\'[' + p.id + ']\'>Approve &amp; apply</button>'
+                + '<button class="bb-act bb-act-danger" data-click-action="bbReject" data-args=\'[' + p.id + ']\'>Reject</button>';
+        } else if(p.status === 'approved'){
+            actions = '<button class="bb-act bb-act-danger" data-click-action="bbRevert" data-args=\'[' + p.id + ']\'>Revert</button>';
+        } else { actions = '<span class="bb-muted">—</span>'; }
+        html += '<tr>'
+            + '<td><strong>' + bbEsc(p.title) + '</strong>' + (p.problem_statement ? '<div class="bb-muted" style="margin-top:3px">' + bbEsc(p.problem_statement) + '</div>' : '') + '</td>'
+            + '<td class="bb-muted">' + bbEsc(p.rule_name || '—') + '</td>'
+            + '<td>' + bbPill(p) + '</td>'
+            + '<td class="bb-muted">drafted: ' + bbEsc(p.created_by_username || '—')
+                + (p.decided_by_username ? '<br>decided: ' + bbEsc(p.decided_by_username) : '')
+                + (p.reverted_by_username ? '<br>reverted: ' + bbEsc(p.reverted_by_username) : '') + '</td>'
+            + '<td>' + actions + '</td>'
+            + '</tr>';
+    }
+    html += '</tbody></table></div>';
+    bb$('bb-proposals').innerHTML = html;
+}
+
+// ── draft → create ──
+let bbDraftMeta = null;
+async function bbDraft(rule_name, bob_verdict, human_verdict){
+    try {
+        const r = await fetch(BB_API + '/bob-proposals/draft', {method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({rule_name: rule_name, bob_verdict: bob_verdict, human_verdict: human_verdict, days: parseInt(bbDays(),10)})});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        const d = await r.json();
+        bbDraftMeta = {rule_name: d.rule_name, template_id: d.template_id, current_text: d.current_text, feedback_snapshot: d.feedback_snapshot};
+        bb$('bb-draft-problem').textContent = d.problem_statement || '';
+        bb$('bb-title').value = d.title || '';
+        bb$('bb-problem').value = d.problem_statement || '';
+        bb$('bb-proposed').value = d.proposed_text || '';
+        bb$('bb-draft-overlay').classList.add('show');
+    } catch(e){ bbToast('Draft failed: ' + (e.message||e), 'error'); }
+}
+function bbCloseDraft(){ bb$('bb-draft-overlay').classList.remove('show'); bbDraftMeta = null; }
+async function bbSubmitDraft(){
+    if(!bbDraftMeta){ return; }
+    const body = {
+        title: bb$('bb-title').value.trim(),
+        proposed_text: bb$('bb-proposed').value.trim(),
+        problem_statement: bb$('bb-problem').value.trim() || null,
+        rule_name: bbDraftMeta.rule_name,
+        template_id: bbDraftMeta.template_id,
+        current_text: bbDraftMeta.current_text,
+        feedback_snapshot: bbDraftMeta.feedback_snapshot
+    };
+    if(!body.title || !body.proposed_text){ bbToast('Title and proposed text are required','warning'); return; }
+    try {
+        const r = await fetch(BB_API + '/bob-proposals', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        const p = await r.json();
+        bbCloseDraft(); bbToast('Proposal #' + p.id + ' drafted — a different teammate must approve to apply it.','success'); bbLoadProposals();
+    } catch(e){ bbToast('Create failed: ' + (e.message||e), 'error'); }
+}
+
+// ── approve / reject / revert ──
+async function bbDecide(id, verb, ok){
+    const notes = (verb === 'revert') ? '' : (window.prompt(verb.charAt(0).toUpperCase() + verb.slice(1) + ' notes (optional):') || '');
+    const body = (verb === 'revert') ? '{}' : JSON.stringify({notes: notes});
+    try {
+        const r = await fetch(BB_API + '/bob-proposals/' + id + '/' + verb, {method:'POST', headers:{'Content-Type':'application/json'}, body: body});
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        bbToast(ok, 'success'); bbLoadProposals();
+    } catch(e){ bbToast(verb + ' failed: ' + (e.message||e), 'error'); }
+}
+function bbApprove(id){ bbDecide(id, 'approve', 'Proposal #' + id + ' approved — applied to Bob\'s live prompt.'); }
+function bbReject(id){ bbDecide(id, 'reject', 'Proposal #' + id + ' rejected.'); }
+function bbRevert(id){ bbDecide(id, 'revert', 'Proposal #' + id + ' reverted — prior prompt restored.'); }
+
+document.addEventListener('DOMContentLoaded', bbLoad);
+</script>
+{% endblock %}

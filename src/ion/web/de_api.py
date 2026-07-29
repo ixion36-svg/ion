@@ -294,3 +294,180 @@ def revert_quirk(
         _quirk_err(e)
     logger.info("DE quirk %d reverted by user %s", quirk_id, current_user.id)
     return q.to_dict()
+
+
+# ── Phase 3 — Bob improvement loop (feedback + scorecard + tuning proposals) ──
+
+
+class BobDraftRequest(BaseModel):
+    rule_name: str
+    bob_verdict: str
+    human_verdict: str
+    days: int = 90
+
+
+class BobProposalCreate(BaseModel):
+    title: str
+    proposed_text: str
+    rule_name: Optional[str] = None
+    template_id: Optional[int] = None
+    problem_statement: Optional[str] = None
+    current_text: Optional[str] = None
+    feedback_snapshot: Optional[dict] = None
+
+
+class BobProposalUpdate(BaseModel):
+    title: Optional[str] = None
+    proposed_text: Optional[str] = None
+    problem_statement: Optional[str] = None
+
+
+class DecisionRequest(BaseModel):
+    notes: Optional[str] = None
+
+
+def _bob_err(e: ValueError):
+    detail = str(e)
+    if "not found" in detail:
+        code = 404
+    elif "separation of duties" in detail:
+        code = 409
+    else:
+        code = 400
+    raise HTTPException(status_code=code, detail=detail)
+
+
+@router.get("/bob-feedback", dependencies=[Depends(require_permission("de:read"))])
+def bob_feedback(
+    days: int = Query(90, ge=1, le=365),
+    session: Session = Depends(get_db_session),
+):
+    """Bob-vs-analyst disagreement classes (the evidence for tuning proposals)."""
+    from ion.services.de_bob_service import get_bob_feedback
+
+    return get_bob_feedback(session, days=days)
+
+
+@router.get("/scorecard", dependencies=[Depends(require_permission("de:read"))])
+def bob_scorecard(
+    days: int = Query(90, ge=1, le=365),
+    session: Session = Depends(get_db_session),
+):
+    """Bob scorecard: agreement rate + drift + top disagreement classes."""
+    from ion.services.de_bob_service import get_bob_scorecard
+
+    return get_bob_scorecard(session, days=days)
+
+
+@router.get("/bob-proposals", dependencies=[Depends(require_permission("de:read"))])
+def list_bob_proposals(
+    status: str = Query("all", description="draft | approved | rejected | reverted | all"),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_bob_proposal_service import list_proposals as _list
+
+    return {"proposals": _list(session, status=status)}
+
+
+@router.get("/bob-proposals/{proposal_id}", dependencies=[Depends(require_permission("de:read"))])
+def get_bob_proposal(proposal_id: int, session: Session = Depends(get_db_session)):
+    from ion.services.de_bob_proposal_service import get_proposal as _get
+
+    p = _get(session, proposal_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail="proposal not found")
+    return p
+
+
+@router.post("/bob-proposals/draft", dependencies=[Depends(require_permission("de:propose"))])
+def draft_bob_proposal(payload: BobDraftRequest, session: Session = Depends(get_db_session)):
+    """Deterministic scaffold for a disagreement class (unsaved)."""
+    from ion.services.de_bob_proposal_service import draft_from_feedback
+
+    draft = draft_from_feedback(session, payload.rule_name, payload.bob_verdict,
+                                payload.human_verdict, days=payload.days)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="no such disagreement class in the window")
+    return draft
+
+
+@router.post("/bob-proposals", dependencies=[Depends(require_permission("de:propose"))])
+def create_bob_proposal(
+    payload: BobProposalCreate,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_bob_proposal_service import create_proposal as _create
+
+    try:
+        p = _create(session, payload.model_dump(), current_user.id)
+    except ValueError as e:
+        _bob_err(e)
+    logger.info("Bob-tuning proposal %d created by user %s", p.id, current_user.id)
+    return p.to_dict()
+
+
+@router.patch("/bob-proposals/{proposal_id}", dependencies=[Depends(require_permission("de:propose"))])
+def update_bob_proposal(
+    proposal_id: int,
+    payload: BobProposalUpdate,
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_bob_proposal_service import update_proposal as _update
+
+    try:
+        p = _update(session, proposal_id, payload.model_dump(exclude_unset=True))
+    except ValueError as e:
+        _bob_err(e)
+    return p.to_dict()
+
+
+@router.post("/bob-proposals/{proposal_id}/approve", dependencies=[Depends(require_permission("de:approve"))])
+def approve_bob_proposal(
+    proposal_id: int,
+    payload: DecisionRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Approve + apply to the live template. SoD: approver must differ from drafter."""
+    from ion.services.de_bob_proposal_service import approve_proposal as _approve
+
+    try:
+        p = _approve(session, proposal_id, current_user.id, notes=payload.notes)
+    except ValueError as e:
+        _bob_err(e)
+    logger.info("Bob-tuning proposal %d APPROVED+applied by user %s", proposal_id, current_user.id)
+    return p.to_dict()
+
+
+@router.post("/bob-proposals/{proposal_id}/reject", dependencies=[Depends(require_permission("de:approve"))])
+def reject_bob_proposal(
+    proposal_id: int,
+    payload: DecisionRequest,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_bob_proposal_service import reject_proposal as _reject
+
+    try:
+        p = _reject(session, proposal_id, current_user.id, notes=payload.notes)
+    except ValueError as e:
+        _bob_err(e)
+    return p.to_dict()
+
+
+@router.post("/bob-proposals/{proposal_id}/revert", dependencies=[Depends(require_permission("de:approve"))])
+def revert_bob_proposal(
+    proposal_id: int,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Roll back an approved change — restores the snapshotted template text."""
+    from ion.services.de_bob_proposal_service import revert_proposal as _revert
+
+    try:
+        p = _revert(session, proposal_id, current_user.id)
+    except ValueError as e:
+        _bob_err(e)
+    logger.info("Bob-tuning proposal %d reverted by user %s", proposal_id, current_user.id)
+    return p.to_dict()

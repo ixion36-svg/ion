@@ -579,6 +579,8 @@ class AuthService:
             ("de:propose", "de", "propose", "Draft and decide detection proposals"),
             # Detection Engineering module (Phase 2 — verify/revert system quirks; separation of duties)
             ("de:verify", "de", "verify", "Verify and revert system quirks (separation of duties)"),
+            # Detection Engineering module (Phase 3 — approve/apply Bob-tuning changes to the prompt-stack)
+            ("de:approve", "de", "approve", "Approve, apply and revert Bob-tuning prompt-stack changes"),
             # v0.49.6: removed 5 seeded-but-never-enforced permissions
             # (discover:read, alert:comment, case:comment, case:link,
             # investigation:run) — no route gated on them (audit finding, same
@@ -652,7 +654,7 @@ class AuthService:
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update",
                     "forensic:read", "forensic:create", "forensic:update",
-                    "security:read", "de:read", "de:propose", "de:verify",
+                    "security:read", "de:read", "de:propose", "de:verify", "de:approve",
                     "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
@@ -671,7 +673,7 @@ class AuthService:
                     "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
-                    "security:read", "de:read", "de:propose", "de:verify",
+                    "security:read", "de:read", "de:propose", "de:verify", "de:approve",
                 ],
             ),
             (
@@ -734,7 +736,7 @@ class AuthService:
                     "template:read", "template:create", "template:update", "template:delete",
                     "document:read", "document:create", "document:update", "document:delete",
                     "integration:read", "integration:manage",
-                    "security:read", "security:manage", "de:read", "de:propose", "de:verify",
+                    "security:read", "security:manage", "de:read", "de:propose", "de:verify", "de:approve",
                     "system:settings",
                 ],
             ),
@@ -751,7 +753,7 @@ class AuthService:
                     "template:read", "template:create", "template:update", "template:delete",
                     "document:read", "document:create", "document:update", "document:delete",
                     "integration:read", "integration:manage",
-                    "security:read", "security:manage", "de:read", "de:propose", "de:verify",
+                    "security:read", "security:manage", "de:read", "de:propose", "de:verify", "de:approve",
                     "system:settings",
                 ],
             ),
