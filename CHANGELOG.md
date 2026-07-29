@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.57.0 -->
-<!-- ion-doc:version=0.57.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.58.0 -->
+<!-- ion-doc:version=0.58.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-07-28 -->
+<!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.58.0 — 2026-07-29
+
+**Detection Engineering module — Phase 3 (Bob improvement loop).** Closes the loop from *where Bob disagreed with the analyst* to a **reviewable, versioned, reversible** tuning change to that rule's Bob prompt-stack guidance. Faithful to the module's governing principle — *ION drafts and measures; the analyst decides and acts* — the change reaches Bob's live prompt only after a **different** person approves it, and never through silent online learning.
+
+- **Read side (computed-on-read, no table)** — `de_bob_service` surfaces **Bob Feedback Items**: scored closures where Bob disagreed with the analyst, grouped into *classes* by `(rule, bob_verdict → human_verdict)` with counts, sample analyst reasons, and sample alert ids, off the same **deduped** `AIFeedback` ledger (`MAX(id)` per `alert_id, template_id`) as Detection Health / DE Metrics. Abstentions and auto-escalations are excluded — only rows where Bob made a scored suggestion count. A **Bob scorecard** adds the overall agreement rate, drift (recent-vs-older half), and a transparency disclosure of whether gold-exemplar retrieval self-adjusts from agreed cases.
+- **Write side (`bob_tuning_proposals` table)** — a proposal is drafted deterministically (`draft_from_feedback`, **no LLM**) from a feedback class: proposed guidance = the template's current `prompt_text` + a tuning comment the human then edits. Lifecycle draft → **approved (applied)** | rejected → reverted.
+- **Approve = apply, gated + separated** — approval requires the reserved new perm **`de:approve`** AND a **different** user than the drafter (separation of duties enforced in the service). On approve, the template's text is **snapshotted (`before_text`) before the write** so a one-click **revert** restores it exactly (`prompt_text` renders into Bob's prompt live, no cache). Nothing here mutates a template without an explicit human approval — there is no auto-apply path. Every approve/reject/revert writes an append-only AuditLog entry.
+- **RBAC** — `de:approve` granted to principal_analyst, lead, platform_engineer, engineering (admin auto); deliberately **not** senior_engineer, who can draft (`de:propose`) but not approve.
+- **Surfaces** — `/api/de/{bob-feedback,scorecard,bob-proposals…}` (read `de:read`; draft/create/edit `de:propose`; approve/reject/revert `de:approve`), a `/de-bob` "Bob Improvement" page + nav (Engineering dropdown). 13 tests `tests/test_v058_de_bob.py` pinning feedback grouping, scorecard/drift, deterministic draft, the SoD approval gate, the before-text snapshot + revert restore, no-auto-apply, and the audit trail.
 
 ## v0.57.0 — 2026-07-28
 
