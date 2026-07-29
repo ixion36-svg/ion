@@ -226,3 +226,81 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
     _extract_field(["registry.value"], "registry_value")
 
     return observables
+
+
+# =========================================================================
+# Frontend contract mapping (v0.59.0 Cases redesign)
+# =========================================================================
+#
+# The alert-list path emits observables in a fixed contract shape the Cases
+# widget UI binds to:
+#     {type, value, threat_level, score, source}
+# ``type`` is one of a small closed set (ip|domain|url|sha256|sha1|md5|
+# email|host|user|file|process|registry). This map collapses the richer,
+# role-preserving context types produced by ``extract_observables_from_raw``
+# down to that closed set. Types with no mapping (e.g. email_subject — a
+# subject line, not an address) are dropped from the contract list.
+CONTRACT_TYPE_MAP = {
+    # network IOCs
+    "source_ip": "ip", "destination_ip": "ip", "host_ip": "ip",
+    "domain": "domain",
+    "url": "url",
+    # hosts (display-only in the contract — not enrichable)
+    "hostname": "host", "source_hostname": "host", "destination_hostname": "host",
+    # users (display-only)
+    "target_user": "user", "subject_user": "user", "user_account": "user",
+    # hashes
+    "sha256": "sha256", "sha1": "sha1", "md5": "md5",
+    # email
+    "email": "email",
+    # files (display-only)
+    "file_path": "file", "file_name": "file",
+    # processes (display-only)
+    "process_path": "process", "process_name": "process", "command_line": "process",
+    "parent_process": "process", "parent_process_path": "process",
+    # registry (display-only)
+    "registry_key": "registry", "registry_value": "registry",
+}
+
+# Contract types whose ``threat_level`` is enrichable (via OpenCTI). Everything
+# else is display-only: threat_level/score/source are null for those.
+ENRICHABLE_CONTRACT_TYPES = frozenset({
+    "ip", "domain", "url", "sha256", "sha1", "md5", "email",
+})
+
+
+def to_contract_observables(raw_data: dict) -> List[Dict[str, Any]]:
+    """Extract observables from a raw ES alert doc in the frontend contract shape.
+
+    Returns a deduplicated list of
+    ``{type, value, threat_level, score, source}`` dicts where ``type`` is one
+    of the closed contract set. ``threat_level`` defaults to ``"unknown"`` for
+    enrichable types and ``None`` for display-only types; ``score`` and
+    ``source`` are ``None`` until an enrichment lookup fills them in.
+
+    Pure/in-memory — performs NO database or network access. Extraction-on-
+    render for the alert list; callers hydrate threat_level/score/source from
+    persisted enrichment separately.
+    """
+    out: List[Dict[str, Any]] = []
+    seen: set = set()
+    for obs in extract_observables_from_raw(raw_data):
+        ctype = CONTRACT_TYPE_MAP.get(obs.get("type"))
+        if not ctype:
+            continue
+        value = obs.get("value")
+        if not value:
+            continue
+        key = (ctype, value)
+        if key in seen:
+            continue
+        seen.add(key)
+        enrichable = ctype in ENRICHABLE_CONTRACT_TYPES
+        out.append({
+            "type": ctype,
+            "value": value,
+            "threat_level": "unknown" if enrichable else None,
+            "score": None,
+            "source": None,
+        })
+    return out

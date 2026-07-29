@@ -4,6 +4,7 @@ Provides CRUD operations, linking to alerts/cases, correlation queries,
 enrichment via OpenCTI, and migration from legacy JSON observables.
 """
 
+import asyncio
 import logging
 from collections import defaultdict
 from datetime import datetime
@@ -23,6 +24,7 @@ from ion.models.observable import (
     WatchlistAlert,
     WatchlistAlertType,
 )
+from ion.services.observable_extractor import ENRICHABLE_CONTRACT_TYPES
 from ion.services.opencti_service import OpenCTIError, get_opencti_service
 
 logger = logging.getLogger(__name__)
@@ -2254,11 +2256,23 @@ class ObservableService:
     ) -> Optional[ObservableEnrichment]:
         """Auto-enrich a new observable if enabled.
 
+        Air-gap safe: silently no-ops when OpenCTI is unconfigured, so the
+        observable's ``threat_level`` simply stays ``UNKNOWN``.
+
+        v0.59.0 bug fix: ``self.enrich(...)`` is a *coroutine*. Previously it
+        was called without ``await`` and the returned coroutine was silently
+        dropped — enrichment never actually ran ("coroutine was never
+        awaited"). We now drive the coroutine to completion: when called from
+        inside a running event loop we schedule it fire-and-forget (so we never
+        block request latency); otherwise (sync worker / script) we run it to
+        completion. The 24h throttle via ``last_auto_enriched`` is preserved.
+
         Args:
             observable: The new observable
 
         Returns:
-            Enrichment record if performed, None otherwise
+            Enrichment record if performed synchronously, None otherwise
+            (including when scheduled on a running loop or short-circuited).
         """
         if not observable.auto_enrich:
             return None
@@ -2269,13 +2283,43 @@ class ObservableService:
             if hours_since < 24:
                 return None
 
+        # Air-gap short-circuit: no OpenCTI → nothing to enrich, threat_level
+        # stays UNKNOWN. Doing this BEFORE constructing the coroutine avoids a
+        # "coroutine was never awaited" warning on the no-op path.
+        if not get_opencti_service().is_configured:
+            return None
+
+        async def _do_enrich() -> Optional[ObservableEnrichment]:
+            try:
+                enrichment = await self.enrich(observable.id)
+                observable.last_auto_enriched = datetime.utcnow()
+                self.session.flush()
+                return enrichment
+            except Exception as exc:
+                logger.warning(
+                    "Auto-enrichment failed for observable %s: %s", observable.id, exc
+                )
+                return None
+
         try:
-            enrichment = self.enrich(observable.id)
-            observable.last_auto_enriched = datetime.utcnow()
-            self.session.flush()
-            return enrichment
-        except Exception as e:
-            logger.warning(f"Auto-enrichment failed for observable {observable.id}: {e}")
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop is not None:
+            # Inside an event loop (async request / background task): schedule
+            # fire-and-forget so we don't block. Mirrors the background pattern
+            # in web/api.py (_background_enrich_triage_observables).
+            asyncio.ensure_future(_do_enrich())
+            return None
+
+        # No running loop (sync worker / CLI / test): run to completion.
+        try:
+            return asyncio.run(_do_enrich())
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning(
+                "Auto-enrichment run failed for observable %s: %s", observable.id, exc
+            )
             return None
 
     def enable_auto_enrich(self, observable_id: int) -> Observable:
@@ -2521,3 +2565,93 @@ def get_observable_service(session: Session) -> ObservableService:
         ObservableService instance
     """
     return ObservableService(session)
+
+
+# =========================================================================
+# Contract-observable hydration (v0.59.0 Cases redesign, alert-list path)
+# =========================================================================
+
+# ObservableType → frontend contract type, restricted to the enrichable set.
+# Used to key persisted observables when back-filling threat_level/score/source
+# onto the contract observables emitted by ``to_contract_observables``.
+_OBSTYPE_TO_CONTRACT = {
+    ObservableType.IPV4: "ip",
+    ObservableType.IPV6: "ip",
+    ObservableType.DOMAIN: "domain",
+    ObservableType.URL: "url",
+    ObservableType.EMAIL: "email",
+    ObservableType.FILE_HASH_SHA256: "sha256",
+    ObservableType.FILE_HASH_SHA1: "sha1",
+    ObservableType.FILE_HASH_MD5: "md5",
+}
+
+
+def _contract_norm(ctype: str, value: str) -> str:
+    """Normalize a contract observable value the same way the DB stores it."""
+    norm = (value or "").strip().lower()
+    if ctype == "domain":
+        norm = norm.rstrip(".")
+    return norm
+
+
+def hydrate_persisted_enrichment(session: Session, alerts: List[Dict[str, Any]]) -> None:
+    """Back-fill threat_level/score/source on alert-list contract observables.
+
+    For every alert dict carrying an ``observables`` list (contract shape), look
+    up any already-persisted :class:`Observable` / :class:`ObservableEnrichment`
+    by (type, normalized value) and populate ``threat_level`` (projected from the
+    observable), ``score`` and ``source`` (from the latest enrichment). Leaves
+    the defaults ("unknown"/None) in place when nothing is persisted yet.
+
+    Batch: one query across every enrichable observable in the page. Best-effort
+    and mutates ``alerts`` in place — never enriches synchronously, never raises.
+    """
+    try:
+        # Collect the enrichable (contract_type, normalized_value) pairs.
+        norm_values: set = set()
+        for alert in alerts:
+            for obs in alert.get("observables") or []:
+                ctype = obs.get("type")
+                if ctype in ENRICHABLE_CONTRACT_TYPES and obs.get("value"):
+                    norm_values.add(_contract_norm(ctype, obs["value"]))
+        if not norm_values:
+            return
+
+        rows = (
+            session.query(Observable)
+            .options(selectinload(Observable.enrichments))
+            .filter(Observable.normalized_value.in_(norm_values))
+            .all()
+        )
+        if not rows:
+            return
+
+        lookup: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for obs in rows:
+            ctype = _OBSTYPE_TO_CONTRACT.get(obs.type)
+            if not ctype:
+                continue
+            enr = obs.latest_enrichment
+            level = (
+                obs.threat_level.value
+                if hasattr(obs.threat_level, "value")
+                else str(obs.threat_level)
+            )
+            lookup[(ctype, obs.normalized_value)] = {
+                "threat_level": level,
+                "score": enr.score if enr else None,
+                "source": enr.source if enr else None,
+            }
+
+        for alert in alerts:
+            for obs in alert.get("observables") or []:
+                ctype = obs.get("type")
+                if ctype not in ENRICHABLE_CONTRACT_TYPES or not obs.get("value"):
+                    continue
+                hit = lookup.get((ctype, _contract_norm(ctype, obs["value"])))
+                if hit:
+                    obs["threat_level"] = hit["threat_level"] or "unknown"
+                    obs["score"] = hit["score"]
+                    obs["source"] = hit["source"]
+    except Exception:  # pragma: no cover — best-effort, never break the list
+        logger.debug("hydrate_persisted_enrichment failed", exc_info=True)

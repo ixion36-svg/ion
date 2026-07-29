@@ -359,6 +359,142 @@ async def _background_ai_case_summary(case_id: int, user_id: int) -> None:
     except Exception as e:
         logger.warning("AI case summary failed for case %s: %s", case_id, e)
 
+# Contract: enrichable ObservableType members whose enrichment is worth
+# summarizing in the auto-note. Display-only types (hostname, user, file,
+# process, registry) never carry OpenCTI enrichment and are excluded.
+_ENRICHMENT_NOTE_TYPES = None  # lazily built to avoid an import at module load
+
+
+def _enrichment_note_types():
+    global _ENRICHMENT_NOTE_TYPES
+    if _ENRICHMENT_NOTE_TYPES is None:
+        from ion.models.observable import ObservableType
+        _ENRICHMENT_NOTE_TYPES = frozenset({
+            ObservableType.IPV4, ObservableType.IPV6, ObservableType.DOMAIN,
+            ObservableType.URL, ObservableType.EMAIL,
+            ObservableType.FILE_HASH_SHA256, ObservableType.FILE_HASH_SHA1,
+            ObservableType.FILE_HASH_MD5,
+        })
+    return _ENRICHMENT_NOTE_TYPES
+
+
+async def post_enrichment_note(session, case_id: int, user_id: int, username: str = "system"):
+    """Compose + post a Threat Enrichment Summary note for a case's observables.
+
+    Summarizes the case's *enriched* observables into a Markdown case Note,
+    mirroring the AI Executive Summary auto-note pattern (create ``Note`` with
+    ``entity_type=CASE``, commit, then replicate the ``_sync_case_to_es`` +
+    ``sync_note_to_kibana`` side-effects).
+
+    No-op / air-gap safe: returns ``None`` when the case has no enrichable
+    observables or none of them actually carry enrichment to report (the
+    OpenCTI-unconfigured case, where every threat_level stays "unknown").
+    Idempotent-ish: skips if an identical enrichment note already exists.
+    """
+    try:
+        from collections import Counter
+
+        from ion.models.observable import (
+            Observable,
+            ObservableLink,
+            ObservableLinkType,
+        )
+
+        case = session.query(AlertCase).filter_by(id=case_id).first()
+        if not case:
+            return None
+
+        links = (
+            session.query(ObservableLink)
+            .filter(
+                ObservableLink.link_type == ObservableLinkType.CASE,
+                ObservableLink.entity_id == case_id,
+            )
+            .all()
+        )
+        obs_ids = [l.observable_id for l in links]
+        if not obs_ids:
+            return None
+
+        observables = (
+            session.query(Observable).filter(Observable.id.in_(obs_ids)).all()
+        )
+
+        enrichable_types = _enrichment_note_types()
+        order = ["critical", "high", "medium", "low", "benign", "unknown"]
+
+        # Keep only enrichable observables that carry something to report:
+        # an enrichment record, or a non-"unknown" threat level.
+        reported = []
+        for o in observables:
+            if o.type not in enrichable_types:
+                continue
+            enr = o.latest_enrichment
+            level = o.threat_level.value if hasattr(o.threat_level, "value") else str(o.threat_level)
+            if enr is None and (level is None or level == "unknown"):
+                continue
+            reported.append((o, enr, level or "unknown"))
+
+        if not reported:
+            return None
+
+        counts = Counter(level for _, _, level in reported)
+        counts_str = ", ".join(f"{counts[l]} {l}" for l in order if counts.get(l))
+
+        reported.sort(key=lambda t: order.index(t[2]) if t[2] in order else 99)
+        lines = []
+        for o, enr, level in reported:
+            score = enr.score if enr else None
+            labels = list(enr.labels) if (enr and enr.labels) else []
+            actors = (
+                [a.get("name") for a in (enr.threat_actors or []) if isinstance(a, dict) and a.get("name")]
+                if enr else []
+            )
+            line = f"- `{o.value}` — {level}"
+            if score is not None:
+                line += f" ({score})"
+            if labels:
+                line += f" [{', '.join(str(x) for x in labels)}]"
+            if actors:
+                line += f" - {', '.join(actors)}"
+            lines.append(line)
+
+        content = (
+            "**Threat Enrichment Summary** (OpenCTI, TLP:AMBER)\n\n"
+            f"{len(reported)} enrichable observable(s): {counts_str}\n\n"
+            + "\n".join(lines)
+        )
+
+        # Idempotent-ish: don't spam duplicate identical enrichment notes.
+        existing = (
+            session.query(Note)
+            .filter(
+                Note.entity_type == NoteEntityType.CASE,
+                Note.entity_id == str(case_id),
+            )
+            .all()
+        )
+        if any(n.content == content for n in existing):
+            return None
+
+        note = Note(
+            entity_type=NoteEntityType.CASE,
+            entity_id=str(case_id),
+            user_id=user_id,
+            content=content,
+        )
+        session.add(note)
+        session.commit()
+        session.refresh(case)
+
+        # Replicate the auto-note side-effects (best-effort, non-raising).
+        await _sync_case_to_es(case, session)
+        sync_note_to_kibana(case.kibana_case_id, username, content)
+        return note
+    except Exception as e:
+        logger.warning("post_enrichment_note failed for case %s: %s", case_id, e)
+        return None
+
 def _extract_community_and_node(
     raw_data: Optional[dict],
 ) -> tuple[Optional[str], Optional[str]]:
@@ -788,6 +924,16 @@ async def create_case(
         logger.warning("create_case: PCAP auto-analysis enqueue failed: %s", exc)
 
     await _sync_case_to_es(new_case, session)
+
+    # v0.59.0 Cases redesign: summarize enriched observables into a case Note.
+    # Gated / air-gap safe — a no-op when there's no enrichment to report
+    # (OpenCTI unconfigured), so nothing is written for air-gapped deployments.
+    try:
+        await post_enrichment_note(
+            session, new_case.id, current_user.id, current_user.username
+        )
+    except Exception:
+        logger.debug("post_enrichment_note skipped for case %s", new_case.id, exc_info=True)
 
     # Resolve Kibana assignee UID for case creation.
     # Read the assignee from `new_case.assigned_to_id` (already persisted) rather than

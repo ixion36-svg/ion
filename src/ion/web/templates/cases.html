@@ -87,38 +87,38 @@
     </select>
 </div>
 
-<!-- Kanban Board -->
-<div class="kanban-board" id="kanban-board">
-    <div class="kanban-column" data-status="open"
-         data-dragover-action="onDragOver"
-         data-drop-action="onDrop"
-         data-args='["$event","open"]'>
-        <div class="kanban-col-header col-open">
-            <span class="kanban-col-title">Open</span>
-            <span class="kanban-col-count" id="col-count-open">0</span>
-        </div>
-        <div class="kanban-cards" id="col-open"></div>
-    </div>
-    <div class="kanban-column" data-status="acknowledged"
-         data-dragover-action="onDragOver"
-         data-drop-action="onDrop"
-         data-args='["$event","acknowledged"]'>
-        <div class="kanban-col-header col-acknowledged">
-            <span class="kanban-col-title">Acknowledged</span>
-            <span class="kanban-col-count" id="col-count-acknowledged">0</span>
-        </div>
-        <div class="kanban-cards" id="col-acknowledged"></div>
-    </div>
-    <div class="kanban-column" data-status="closed"
-         data-dragover-action="onDragOver"
-         data-drop-action="onDrop"
-         data-args='["$event","closed"]'>
-        <div class="kanban-col-header col-closed">
-            <span class="kanban-col-title">Closed</span>
-            <span class="kanban-col-count" id="col-count-closed">0</span>
-        </div>
-        <div class="kanban-cards" id="col-closed"></div>
-    </div>
+<!-- Board toolbar (sort + page-size + showing count) -->
+<div class="cases-board-toolbar">
+    <div class="cases-showing">Showing <b id="cases-shown">0</b> of <b id="cases-total">0</b> cases</div>
+    <span class="cases-toolbar-spring"></span>
+    <label class="cases-toolbar-field">
+        <span>Sort</span>
+        <select id="cases-sort" class="cases-filter-select" data-change-action="changeSort">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="severity">Severity</option>
+            <option value="alerts">Most alerts</option>
+        </select>
+    </label>
+    <label class="cases-toolbar-field">
+        <span>Page size</span>
+        <select id="cases-pagesize" class="cases-filter-select" data-change-action="changePageSize">
+            <option value="12">12 at a time</option>
+            <option value="24" selected>24 at a time</option>
+            <option value="48">48 at a time</option>
+        </select>
+    </label>
+</div>
+
+<!-- Case widget board (replaces the drag-drop Kanban; status changes now on
+     each widget's inline control — same PATCH path the Kanban drop used). -->
+<div class="cases-board" id="cases-board"></div>
+
+<!-- Load-more cap -->
+<div class="cases-loadmore" id="cases-loadmore" hidden>
+    <button type="button" class="cases-loadmore-btn" data-click-action="loadMoreCases">Load more cases</button>
+    <p class="cases-loadmore-note">Widgets render in pages of your chosen size, so a queue of hundreds of
+        cases opens instantly. The rest stay ready until requested.</p>
 </div>
 
 <!-- Management Analytics Panel -->
@@ -318,74 +318,6 @@
     margin-top: 0.25rem;
 }
 
-/* ── Stats Bar ───────────────────────────────────────────── */
-.cases-stats-bar {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
-    margin-bottom: 1rem;
-}
-
-.cases-stat-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 0.75rem 1rem;
-    border-top: 3px solid var(--border);
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.cases-stat-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0,0,0,.2);
-}
-
-.cases-stat-card.stat-open { border-top-color: var(--info); background: linear-gradient(180deg, rgba(59,130,246,.06) 0%, transparent 60%); }
-.cases-stat-card.stat-acknowledged { border-top-color: var(--warning); background: linear-gradient(180deg, rgba(245,158,11,.06) 0%, transparent 60%); }
-.cases-stat-card.stat-critical { border-top-color: var(--danger); background: linear-gradient(180deg, rgba(239,68,68,.06) 0%, transparent 60%); }
-.cases-stat-card.stat-resolution { border-top-color: var(--success); background: linear-gradient(180deg, rgba(76,175,80,.06) 0%, transparent 60%); }
-
-.stat-icon-bg {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 0.35rem;
-    font-size: 0.9rem;
-}
-.stat-icon-info { background: rgba(59,130,246,.15); color: var(--info); }
-.stat-icon-warning { background: rgba(245,158,11,.15); color: var(--warning); }
-.stat-icon-danger { background: rgba(239,68,68,.15); color: var(--danger); }
-.stat-icon-success { background: rgba(76,175,80,.15); color: var(--success); }
-.stat-icon-purple { background: rgba(139,92,246,.15); color: var(--neon-purple); }
-
-.cases-stat-value {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-primary);
-}
-
-.stat-open .cases-stat-value { color: var(--info); }
-.stat-acknowledged .cases-stat-value { color: var(--warning); }
-.stat-critical .cases-stat-value { color: var(--danger); }
-.stat-resolution .cases-stat-value { color: var(--success); }
-
-.cases-stat-label {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    margin-top: 0.15rem;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    font-weight: 500;
-}
-
 /* ── Filters Bar ─────────────────────────────────────────── */
 .cases-filters-bar {
     display: flex;
@@ -418,224 +350,171 @@
 
 .cases-filter-select:focus { outline: none; border-color: var(--accent-color); }
 
-/* ── Kanban Board ────────────────────────────────────────── */
-.kanban-board {
+/* ── Board toolbar ───────────────────────────────────────── */
+.cases-board-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1rem;
+}
+.cases-toolbar-spring { flex: 1; }
+.cases-showing { font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.cases-showing b { color: var(--text-bright); font-family: var(--font-mono, ui-monospace, monospace); }
+.cases-toolbar-field { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+.cases-toolbar-field .cases-filter-select { min-width: 0; }
+
+/* ── Case widget board (grid) ────────────────────────────── */
+.cases-board {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.75rem;
-    min-height: calc(100vh - 380px);
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    gap: 16px;
+    align-items: start;
 }
 
-.kanban-column {
-    background: var(--bg-secondary);
+.cw {
+    position: relative;
+    background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    display: flex;
-    flex-direction: column;
-    min-height: 300px;
-}
-
-.kanban-column.drag-over {
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-}
-
-.kanban-col-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem 1rem;
-    border-bottom: 2px solid var(--border);
-    flex-shrink: 0;
-}
-
-.col-open .kanban-col-title { color: var(--info); }
-.col-acknowledged .kanban-col-title { color: var(--warning); }
-.col-closed .kanban-col-title { color: var(--text-muted); }
-
-.col-open { border-bottom-color: var(--info); }
-.col-acknowledged { border-bottom-color: var(--warning); }
-.col-closed { border-bottom-color: var(--text-muted); }
-
-.kanban-col-title {
-    font-weight: 600;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.kanban-col-count {
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 0.1rem 0.5rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-}
-
-.kanban-cards {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-/* ── Kanban Card ─────────────────────────────────────────── */
-.kanban-card {
-    background: var(--bg-primary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.75rem;
-    padding-left: calc(0.75rem + 4px);
+    overflow: hidden;
+    transition: border-color .18s, transform .18s, box-shadow .18s;
     cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
-    position: relative;
-}
-
-.kanban-card::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    border-radius: var(--radius) 0 0 var(--radius);
-}
-
-.kanban-card:hover {
-    border-color: var(--accent-color);
-    box-shadow: 0 4px 12px rgba(0,0,0,.2);
-    transform: translateY(-1px);
-}
-
-.kanban-card.dragging {
-    opacity: 0.5;
-    transform: rotate(2deg);
-}
-
-.kanban-card.sev-critical { border-color: rgba(239,68,68,.4); }
-.kanban-card.sev-high { border-color: rgba(245,158,11,.4); }
-.kanban-card.sev-medium { border-color: rgba(59,130,246,.4); }
-.kanban-card.sev-low { border-color: rgba(107,114,128,.3); }
-
-.kanban-card.sev-critical::before { background: var(--danger); }
-.kanban-card.sev-high::before { background: var(--warning); }
-.kanban-card.sev-medium::before { background: var(--info); }
-.kanban-card.sev-low::before { background: var(--text-muted); }
-
-.kcard-header {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.35rem;
+    flex-direction: column;
+}
+.cw:hover {
+    border-color: var(--border-bright);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 34px -14px rgba(0,0,0,.7), 0 0 0 1px var(--border-bright);
+}
+.cw:focus-visible { outline: 2px solid var(--border-bright); outline-offset: 2px; }
+
+.cw-rail { position: absolute; inset: 0 auto 0 0; width: 4px; }
+.cw-rail.sev-critical { background: var(--sev-critical); box-shadow: 0 0 14px var(--sev-critical-glow); }
+.cw-rail.sev-high     { background: var(--sev-high); }
+.cw-rail.sev-medium   { background: var(--sev-medium); }
+.cw-rail.sev-low      { background: var(--sev-low); }
+
+.cw-body { padding: 16px 17px 15px 20px; flex: 1; }
+.cw-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cw-idwrap { min-width: 0; }
+.cw-num { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; color: var(--text-muted); letter-spacing: .02em; }
+.cw-title {
+    font-size: 15.5px; font-weight: 600; color: var(--text-bright); margin: 5px 0 0;
+    line-height: 1.28; letter-spacing: -.01em;
+}
+.cw-desc {
+    font-size: 12px; color: var(--text-secondary); margin-top: 6px; line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
-.kcard-number {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-secondary);
+/* status pill */
+.cw-pill {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 9px; border-radius: 99px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 6px; flex: none;
+}
+.cw-pill .cw-pd { width: 6px; height: 6px; border-radius: 50%; }
+.cw-pill.status-open { background: var(--sev-critical-bg); color: var(--sev-critical); }
+.cw-pill.status-open .cw-pd { background: var(--sev-critical); }
+.cw-pill.status-acknowledged { background: var(--sev-medium-bg); color: var(--sev-medium); }
+.cw-pill.status-acknowledged .cw-pd { background: var(--sev-medium); }
+.cw-pill.status-closed { background: rgba(134,240,160,.12); color: var(--success); }
+.cw-pill.status-closed .cw-pd { background: var(--success); }
+
+/* severity tag */
+.cw-sevtag {
+    font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 6px;
+}
+.cw-sevtag.sev-critical { background: var(--sev-critical-bg); color: var(--sev-critical); }
+.cw-sevtag.sev-high     { background: var(--sev-high-bg); color: var(--sev-high); }
+.cw-sevtag.sev-medium   { background: var(--sev-medium-bg); color: var(--sev-medium); }
+.cw-sevtag.sev-low      { background: var(--sev-low-bg); color: var(--sev-low); }
+
+/* closure badge */
+.cw-closure {
+    font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border);
+}
+.cw-closure.reason-true_positive { background: var(--sev-critical-bg); color: var(--sev-critical); border-color: var(--sev-critical-dim); }
+.cw-closure.reason-benign_true_positive { background: rgba(134,240,160,.12); color: var(--success); border-color: rgba(134,240,160,.3); }
+.cw-closure.reason-false_positive { background: var(--sev-low-bg); color: var(--sev-low); }
+.cw-closure.reason-duplicate,
+.cw-closure.reason-insufficient_data,
+.cw-closure.reason-not_applicable { background: rgba(255,255,255,.05); color: var(--text-secondary); }
+
+/* chips row */
+.cw-meta { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-top: 14px; }
+.cw-chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary);
+    background: rgba(255,255,255,.05); border: 1px solid var(--border); padding: 4px 9px; border-radius: 7px;
+    font-variant-numeric: tabular-nums;
+}
+.cw-chip svg { width: 12px; height: 12px; opacity: .7; flex: none; }
+.cw-chip.cw-chip-acc { color: var(--primary); border-color: var(--border-bright); background: rgba(109,228,255,.12); }
+.cw-mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; }
+
+/* triggered-rules / mitre tcode row */
+.cw-mitre { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 11px; }
+.cw-tcode {
+    font-family: var(--font-mono, ui-monospace, monospace); font-size: 10.5px; color: var(--sev-info);
+    background: var(--sev-info-bg); border: 1px solid var(--sev-info-dim); padding: 2px 7px; border-radius: 5px;
+    max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
-.kcard-severity {
-    font-size: 0.65rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
+/* integration sync chips */
+.cw-sync { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.cw-syncchip {
+    display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-secondary);
+    background: rgba(255,255,255,.05); border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px;
+}
+.cw-syncchip .cw-sb { width: 6px; height: 6px; border-radius: 50%; }
+.cw-syncchip.kibana .cw-sb { background: #00bfb3; }
+.cw-syncchip.iris .cw-sb { background: var(--sev-high); }
+
+/* footer */
+.cw-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 11px 17px; border-top: 1px solid var(--border); background: rgba(0,0,0,.16);
+}
+.cw-who { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); min-width: 0; }
+.cw-who > span:not(.cw-av) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cw-unassigned { color: var(--text-muted); }
+.cw-av {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, #2a3444, #1a2130); border: 1px solid var(--border);
+    display: grid; place-items: center; font-size: 10px; font-weight: 700; color: var(--primary);
+    font-family: var(--font-mono, ui-monospace, monospace); flex: none;
+}
+.cw-foot-right { display: flex; align-items: center; gap: 10px; flex: none; }
+.cw-age { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; color: var(--text-muted); }
+.cw-age.stale { color: var(--sev-high); }
+
+/* per-widget status control (reuses panelUpdateField → closure modal for closed) */
+.cw-status-select {
+    font-family: inherit; font-size: 11px; color: var(--text-secondary);
+    background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 6px;
+    padding: 3px 6px; cursor: pointer; max-width: 130px;
+}
+.cw-status-select:hover { border-color: var(--border-bright); color: var(--text-primary); }
+.cw-status-select:focus { outline: 2px solid var(--border-bright); outline-offset: 1px; }
+
+.cases-empty {
+    grid-column: 1 / -1; text-align: center; color: var(--text-secondary);
+    font-size: 0.85rem; padding: 2.5rem 1rem; opacity: .8;
 }
 
-.kcard-severity.sev-critical { background: rgba(239,68,68,.12); color: var(--danger); }
-.kcard-severity.sev-high { background: rgba(245,158,11,.12); color: var(--warning); }
-.kcard-severity.sev-medium { background: rgba(59,130,246,.12); color: var(--info); }
-.kcard-severity.sev-low { background: rgba(107,114,128,.12); color: var(--text-secondary); }
-
-.kcard-title {
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    margin-bottom: 0.4rem;
+/* ── Load-more ───────────────────────────────────────────── */
+.cases-loadmore { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 26px; }
+.cases-loadmore-btn {
+    font-family: inherit; font-size: 13px; font-weight: 600; color: var(--primary);
+    background: rgba(109,228,255,.12); border: 1px solid var(--border-bright); border-radius: 10px;
+    padding: 11px 22px; cursor: pointer; transition: background .16s;
 }
-
-.kcard-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-}
-
-.kcard-assignee {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100px;
-}
-
-.kcard-footer {
-    display: flex;
-    gap: 0.35rem;
-    align-items: center;
-    margin-top: 0.35rem;
-    flex-wrap: wrap;
-}
-
-.kcard-alert-count {
-    font-size: 0.65rem;
-    font-weight: 600;
-    background: rgba(59,130,246,.12);
-    color: var(--info);
-    border-radius: 3px;
-    padding: 0.1rem 0.35rem;
-}
-
-.kcard-alert-count.has-alerts {
-    background: rgba(245,158,11,.12);
-    color: var(--warning);
-}
-
-.kcard-age {
-    font-size: 0.65rem;
-    font-weight: 500;
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
-    color: var(--text-secondary);
-}
-
-.kcard-age.age-fresh { background: rgba(76,175,80,.1); color: var(--success); }
-.kcard-age.age-normal { color: var(--text-secondary); }
-.kcard-age.age-stale { background: rgba(245,158,11,.1); color: var(--warning); }
-.kcard-age.age-old { background: rgba(239,68,68,.1); color: var(--danger); }
-
-.kcard-integration {
-    font-size: 0.6rem;
-    font-weight: 700;
-    padding: 0.05rem 0.25rem;
-    border-radius: 2px;
-    background: rgba(59,130,246,.12);
-    color: var(--info);
-}
-
-.kcard-closure {
-    font-size: 0.6rem;
-    font-weight: 600;
-    padding: 0.05rem 0.25rem;
-    border-radius: 2px;
-}
-
-.kcard-closure.reason-true_positive { background: rgba(239,68,68,.12); color: var(--danger); }
-.kcard-closure.reason-false_positive { background: rgba(107,114,128,.12); color: var(--text-secondary); }
-.kcard-closure.reason-benign_true_positive { background: rgba(245,158,11,.12); color: var(--warning); }
-.kcard-closure.reason-duplicate { background: rgba(139,92,246,.12); color: var(--neon-purple); }
-.kcard-closure.reason-insufficient_data { background: rgba(107,114,128,.12); color: var(--text-muted); }
-.kcard-closure.reason-not_applicable { background: rgba(107,114,128,.12); color: var(--text-muted); }
+.cases-loadmore-btn:hover { background: rgba(109,228,255,.2); }
+.cases-loadmore-note { font-size: 11.5px; color: var(--text-muted); text-align: center; max-width: 56ch; margin: 0; }
 
 /* ── Case Detail Panel ───────────────────────────────────── */
 /* v0.20.0 Workbench — pinned evidence + tamper-evident ledger */
@@ -1228,78 +1107,17 @@
 .cpanel-pb-badge.active { background: rgba(76,175,80,.12); color: var(--success); }
 .cpanel-pb-badge.inactive { background: rgba(33,150,243,.12); color: var(--neon-blue); }
 
-/* ── Observable List (Panel) ─────────────────────────────── */
-.cpanel-obs-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.35rem;
-}
-
-.cpanel-obs-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.4rem 0.6rem;
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    font-size: 0.8rem;
-    transition: border-color 0.15s;
-}
-
-.cpanel-obs-item:hover {
-    border-color: var(--accent-color);
-}
-
-.cpanel-obs-type {
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
-    flex-shrink: 0;
-    letter-spacing: 0.03em;
-}
-
-.cpanel-obs-type.obs-type-ip,
-.cpanel-obs-type.obs-type-ipv4,
-.cpanel-obs-type.obs-type-ipv6 { background: rgba(59,130,246,.12); color: var(--info); }
-.cpanel-obs-type.obs-type-domain { background: rgba(139,92,246,.12); color: var(--neon-purple); }
-.cpanel-obs-type.obs-type-url { background: rgba(245,158,11,.12); color: var(--warning); }
-.cpanel-obs-type.obs-type-hash,
-.cpanel-obs-type.obs-type-md5,
-.cpanel-obs-type.obs-type-sha1,
-.cpanel-obs-type.obs-type-sha256 { background: rgba(239,68,68,.12); color: var(--danger); }
-.cpanel-obs-type.obs-type-email { background: rgba(6,182,212,.12); color: var(--primary); }
-.cpanel-obs-type.obs-type-file { background: rgba(236,72,153,.12); color: var(--neon-pink); }
-.cpanel-obs-type.obs-type-unknown { background: rgba(107,114,128,.12); color: var(--text-secondary); }
-
-.cpanel-obs-value {
-    flex: 1;
-    font-family: monospace;
-    font-size: 0.78rem;
-    color: var(--text-primary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.cpanel-obs-threat {
-    font-size: 0.6rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding: 0.1rem 0.3rem;
-    border-radius: 3px;
-    flex-shrink: 0;
-}
+/* Observables in the panel now render via the shared awx-obschip helper
+   (see the alert-widget block below) — the old cpanel-obs-* list styles were
+   retired in the v0.59.0 widget redesign. */
 
 /* ── MITRE Tags ─────────────────────────────────────────── */
 .cpanel-tag-mitre {
-    background: rgba(239,68,68,.08);
-    border: 1px solid rgba(239,68,68,.2);
-    color: var(--danger);
+    background: var(--sev-critical-bg);
+    border: 1px solid var(--sev-critical-dim);
+    color: var(--sev-critical);
     font-size: 0.7rem;
-    font-family: monospace;
+    font-family: var(--font-mono, ui-monospace, monospace);
 }
 
 /* ── Alert Cards (Panel) ────────────────────────────────── */
@@ -1705,30 +1523,9 @@
     border-top: 1px solid var(--border);
 }
 
-/* ── Empty state ─────────────────────────────────────────── */
-.kanban-empty {
-    text-align: center;
-    color: var(--text-secondary);
-    font-size: 0.8rem;
-    padding: 1.5rem 0.5rem;
-    opacity: 0.7;
-}
-
 /* ── Responsive ──────────────────────────────────────────── */
-@media (max-width: 1200px) {
-    .kanban-board {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .cases-stats-bar {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 768px) {
-    .kanban-board {
-        grid-template-columns: 1fr;
-    }
-    .cases-stats-bar {
+@media (max-width: 640px) {
+    .cases-board {
         grid-template-columns: 1fr;
     }
     .cases-filters-bar {
@@ -1813,17 +1610,6 @@
     white-space: nowrap;
     flex: 1;
 }
-
-/* ── Stats Row 2 ────────────────────────────────────────── */
-.cases-stat-card.stat-mttr { border-top-color: var(--neon-purple); background: linear-gradient(180deg, rgba(139,92,246,.06) 0%, transparent 60%); }
-.cases-stat-card.stat-closure-rate { border-top-color: var(--success); background: linear-gradient(180deg, rgba(76,175,80,.06) 0%, transparent 60%); }
-.cases-stat-card.stat-weekly { border-top-color: var(--info); background: linear-gradient(180deg, rgba(59,130,246,.06) 0%, transparent 60%); }
-.cases-stat-card.stat-unassigned { border-top-color: var(--warning); background: linear-gradient(180deg, rgba(245,158,11,.06) 0%, transparent 60%); }
-
-.stat-mttr .cases-stat-value { color: var(--neon-purple); }
-.stat-closure-rate .cases-stat-value { color: var(--success); }
-.stat-weekly .cases-stat-value { color: var(--info); }
-.stat-unassigned .cases-stat-value { color: var(--warning); }
 
 /* ── Analytics Summary Strip ────────────────────────────── */
 .analytics-summary-strip {
@@ -2277,6 +2063,107 @@
         grid-template-columns: 1fr;
     }
 }
+
+/* ============================================================================
+   Alert widgets (Case Detail → Alerts tab) — v0.59.0 widget redesign.
+   Observable threat badges (OpenCTI enrichment), Bob suggested-verdict +
+   confidence meter / auto-escalated badge, common ES fields, note preview.
+   Built on design tokens; degrade gracefully when a field is absent.
+   ============================================================================ */
+.awx-common { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 11px; }
+.awx-lab {
+    font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted);
+    font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 7px;
+}
+.awx-cf { display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px; font-size: 11.5px; }
+.awx-cfk {
+    color: var(--text-muted); min-width: 46px; flex: none; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .05em;
+}
+.awx-cfv { color: var(--text-primary); word-break: break-all; }
+.awx-cfv.mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; }
+.awx-cfv.cmdline { color: var(--text-secondary); font-size: 10.5px; }
+
+/* observables row */
+.awx-obs { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 11px; }
+.awx-obscount {
+    font-family: var(--font-mono, ui-monospace, monospace); font-size: 10px; color: var(--primary);
+    background: rgba(109,228,255,.12); border: 1px solid var(--border-bright); padding: 1px 6px; border-radius: 99px;
+}
+.awx-obsrow { display: flex; flex-wrap: wrap; gap: 6px; }
+.awx-obschip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+    font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-primary);
+    background: rgba(255,255,255,.05); border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px; max-width: 100%;
+}
+.awx-ot { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.awx-ot.t-ip, .awx-ot.t-ipv4, .awx-ot.t-ipv6 { color: var(--primary); }
+.awx-ot.t-host { color: var(--neon-blue); }
+.awx-ot.t-user { color: var(--success); }
+.awx-ot.t-sha256, .awx-ot.t-sha1, .awx-ot.t-md5, .awx-ot.t-hash { color: var(--sev-info); }
+.awx-ot.t-domain, .awx-ot.t-url { color: var(--sev-medium); }
+.awx-ot.t-file, .awx-ot.t-process, .awx-ot.t-registry, .awx-ot.t-email { color: var(--text-secondary); }
+/* threat-level badge (enrichable observables only) */
+.awx-tl {
+    display: inline-flex; align-items: center; gap: 3px; font-size: 9.5px; font-weight: 700;
+    padding: 1px 5px; border-radius: 4px; letter-spacing: .02em; margin-left: 2px;
+}
+.awx-tl .awx-td { width: 5px; height: 5px; border-radius: 50%; }
+.awx-tl.tl-critical { background: var(--sev-critical-bg); color: var(--sev-critical); }
+.awx-tl.tl-critical .awx-td { background: var(--sev-critical); }
+.awx-tl.tl-high { background: var(--sev-high-bg); color: var(--sev-high); }
+.awx-tl.tl-high .awx-td { background: var(--sev-high); }
+.awx-tl.tl-medium { background: var(--sev-medium-bg); color: var(--sev-medium); }
+.awx-tl.tl-medium .awx-td { background: var(--sev-medium); }
+.awx-tl.tl-low { background: var(--sev-low-bg); color: var(--sev-low); }
+.awx-tl.tl-low .awx-td { background: var(--sev-low); }
+.awx-tl.tl-benign { background: rgba(134,240,160,.12); color: var(--success); }
+.awx-tl.tl-benign .awx-td { background: var(--success); }
+.awx-tl.tl-unknown { background: rgba(255,255,255,.05); color: var(--text-muted); }
+.awx-tl.tl-unknown .awx-td { background: var(--text-muted); }
+
+/* Bob suggested-verdict + confidence meter */
+.awx-bob {
+    margin-top: 12px; background: rgba(109,228,255,.05); border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 11px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.awx-bl {
+    font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+    font-weight: 700; display: flex; align-items: center; gap: 5px;
+}
+.awx-bl .awx-bd { width: 5px; height: 5px; border-radius: 50%; background: var(--primary); }
+.awx-verdict {
+    font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 3px 8px; border-radius: 6px;
+}
+.awx-verdict.v-true_positive { background: var(--sev-critical-bg); color: var(--sev-critical); }
+.awx-verdict.v-benign_true_positive { background: rgba(134,240,160,.12); color: var(--success); }
+.awx-verdict.v-false_positive { background: var(--sev-low-bg); color: var(--sev-low); }
+.awx-verdict.v-duplicate, .awx-verdict.v-insufficient_data, .awx-verdict.v-not_applicable {
+    background: rgba(255,255,255,.05); color: var(--text-secondary);
+}
+.awx-conf { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.awx-conf .awx-track { width: 64px; height: 5px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+.awx-conf .awx-fillb { height: 100%; border-radius: 99px; }
+.awx-conf .awx-fillb.tier-high { background: var(--success); }
+.awx-conf .awx-fillb.tier-medium { background: var(--sev-medium); }
+.awx-conf .awx-fillb.tier-low { background: var(--sev-high); }
+.awx-conf .awx-pctv { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.awx-conf .awx-tier { font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+
+/* auto-escalated badge (bob abstained / circuit-breaker) */
+.awx-escbadge {
+    margin-top: 12px; background: var(--sev-high-bg); border: 1px solid var(--sev-high-dim); border-radius: 8px;
+    padding: 8px 11px; font-size: 11.5px; color: var(--sev-high); display: flex; align-items: center; gap: 8px;
+}
+.awx-escbadge b { color: var(--sev-high); }
+
+/* analyst-note preview */
+.awx-note {
+    margin-top: 11px; font-size: 11.5px; color: var(--text-secondary); font-style: italic;
+    border-left: 2px solid var(--border); padding-left: 9px; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 </style>
 
 </div><!-- /ion-tw inner -->
@@ -2286,16 +2173,20 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 // =============================================================================
-// Cases Kanban — State
+// Cases Board — State
 // =============================================================================
 let allCases = [];
 let filteredCases = [];
 let usersCache = [];
-let dragCaseId = null;
 let pendingClosure = null; // { caseId, targetStatus }
 let teamMetricsCache = null;
 let attentionDismissed = false;
 let casesLoaded = false;
+
+// v0.59.0 widget-grid board: sort + page-size + progressive load-more cap.
+let boardSort = 'newest';
+let boardPageSize = 24;
+let boardShown = 24;
 
 const closureReasonLabels = {
     true_positive: 'TP',
@@ -2305,6 +2196,15 @@ const closureReasonLabels = {
     insufficient_data: 'N/D',
     not_applicable: 'N/A',
 };
+
+// Full-word status + verdict labels for the case/alert widgets.
+const statusLabels = { open: 'Open', acknowledged: 'Acknowledged', closed: 'Closed' };
+const verdictLabels = {
+    true_positive: 'True Positive', benign_true_positive: 'Benign TP',
+    false_positive: 'False Positive', duplicate: 'Duplicate',
+    insufficient_data: 'Insufficient', not_applicable: 'N/A',
+};
+const _sevRank = { critical: 0, high: 1, medium: 2, low: 3 };
 
 // =============================================================================
 // Helpers
@@ -2456,51 +2356,75 @@ function renderStats() {
     document.getElementById('stat-unassigned').textContent = unassigned;
 }
 
+// Sort the filtered cases per the board's current sort mode.
+function sortCases(list) {
+    const arr = list.slice();
+    if (boardSort === 'oldest') {
+        arr.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    } else if (boardSort === 'severity') {
+        arr.sort((a, b) =>
+            ((_sevRank[a.severity] ?? 9) - (_sevRank[b.severity] ?? 9))
+            || (new Date(b.created_at || 0) - new Date(a.created_at || 0)));
+    } else if (boardSort === 'alerts') {
+        arr.sort((a, b) => (b.alert_count || 0) - (a.alert_count || 0));
+    } else { // newest (default)
+        arr.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    }
+    return arr;
+}
+
+// v0.59.0 — render the responsive grid of case widgets (replaces the 3-column
+// drag-drop Kanban). Progressive cap: render up to boardShown widgets; the
+// rest stay virtualized behind the load-more button so a queue of hundreds of
+// cases paints instantly.
 function renderBoard() {
-    const columns = {
-        open: [],
-        acknowledged: [],
-        closed: [],
-    };
+    const board = document.getElementById('cases-board');
+    if (!board) return;
 
-    filteredCases.forEach(c => {
-        const status = c.status || 'open';
-        if (columns[status]) {
-            columns[status].push(c);
+    const sorted = sortCases(filteredCases);
+    const total = sorted.length;
+    const shown = Math.min(boardShown, total);
+
+    const totalEl = document.getElementById('cases-total');
+    const shownEl = document.getElementById('cases-shown');
+    if (totalEl) totalEl.textContent = total;
+    if (shownEl) shownEl.textContent = shown;
+
+    if (!total) {
+        board.innerHTML = '<div class="cases-empty">No cases match the current filters.</div>';
+    } else {
+        board.innerHTML = sorted.slice(0, shown).map(renderCaseWidget).join('');
+    }
+
+    const lm = document.getElementById('cases-loadmore');
+    if (lm) {
+        if (shown < total) {
+            lm.hidden = false;
+            const btn = lm.querySelector('button');
+            if (btn) btn.textContent = 'Load ' + Math.min(boardPageSize, total - shown) + ' more cases';
         } else {
-            columns.open.push(c);
+            lm.hidden = true;
         }
-    });
+    }
+}
 
-    const CLOSED_DISPLAY_LIMIT = 20;
+function changeSort() {
+    const sel = document.getElementById('cases-sort');
+    boardSort = sel ? sel.value : 'newest';
+    boardShown = boardPageSize;
+    renderBoard();
+}
 
-    Object.keys(columns).forEach(status => {
-        const container = document.getElementById('col-' + status);
-        const countEl = document.getElementById('col-count-' + status);
-        const cards = columns[status];
+function changePageSize() {
+    const sel = document.getElementById('cases-pagesize');
+    boardPageSize = sel ? (parseInt(sel.value, 10) || 24) : 24;
+    boardShown = boardPageSize;
+    renderBoard();
+}
 
-        if (countEl) countEl.textContent = cards.length;
-
-        if (!cards.length) {
-            container.innerHTML = '<div class="kanban-empty">No cases</div>';
-            return;
-        }
-
-        // Cap the closed column so the page doesn't grow endlessly.
-        // Open and acknowledged always show everything.
-        const visible = (status === 'closed' && cards.length > CLOSED_DISPLAY_LIMIT)
-            ? cards.slice(0, CLOSED_DISPLAY_LIMIT)
-            : cards;
-
-        let html = visible.map(c => renderCard(c)).join('');
-        if (status === 'closed' && cards.length > CLOSED_DISPLAY_LIMIT) {
-            const remaining = cards.length - CLOSED_DISPLAY_LIMIT;
-            html += '<div class="kanban-empty _ion-s-3dc98b5eb8">'
-                + remaining + ' more closed case' + (remaining === 1 ? '' : 's')
-                + ' — <a class="_ion-s-dc2e428fc7" href="/cases?status=closed">view all</a></div>';
-        }
-        container.innerHTML = html;
-    });
+function loadMoreCases() {
+    boardShown += boardPageSize;
+    renderBoard();
 }
 
 function getAgeClass(dateStr) {
@@ -2512,97 +2436,101 @@ function getAgeClass(dateStr) {
     return 'age-old';
 }
 
-function renderCard(c) {
+// Two-letter monogram for an assignee avatar.
+function initials(name) {
+    if (!name) return '?';
+    const parts = String(name).split(/[ ._@-]/).filter(Boolean).slice(0, 2);
+    const s = parts.map(w => w[0]).join('').toUpperCase();
+    return s || '?';
+}
+
+// Array → length, number → itself, else 0. The list endpoint returns
+// affected_hosts/users as arrays; observables_count arrives pre-counted.
+function asCount(v) {
+    if (Array.isArray(v)) return v.length;
+    if (typeof v === 'number') return v;
+    return 0;
+}
+
+// v0.59.0 — a single case widget. Every region maps to a real AlertCase field
+// from /api/elasticsearch/alerts/cases; blocks render only when their data is
+// present so the widget degrades gracefully on lighter rows.
+function renderCaseWidget(c) {
     const sev = c.severity || 'medium';
-    const integrations = [];
-    if (c.kibana_url) integrations.push('<span class="kcard-integration" title="Synced with Kibana">K</span>');
-    if (c.dfir_iris_case_id) integrations.push('<span class="kcard-integration" title="Escalated to DFIR-IRIS">I</span>');
-
-    let closureBadge = '';
-    if (c.closure_reason) {
-        const label = closureReasonLabels[c.closure_reason] || c.closure_reason;
-        closureBadge = '<span class="kcard-closure reason-' + esc(c.closure_reason) + '">' + esc(label) + '</span>';
-    }
-
+    const status = c.status || 'open';
     const alertCount = c.alert_count || 0;
-    const alertClass = alertCount > 0 ? ' has-alerts' : '';
+    const hostCount = asCount(c.affected_hosts);
+    const userCount = asCount(c.affected_users);
+    const obsCount = c.observables_count || asCount(c.observables);
     const ageClass = getAgeClass(c.created_at);
+    const stale = ageClass === 'age-stale' || ageClass === 'age-old';
 
-    return '<div class="kanban-card sev-' + esc(sev) + '" draggable="true"'
-        + ' data-dragstart-action="onDragStart"'
-        + ' data-dragstart-args=\'["$event",' + c.id + ']\''
-        + ' data-dragend-action="onDragEnd"'
-        + ' data-click-action="openCaseDetail"'
-        + ' data-click-args=\'[' + c.id + ']\''
-        + ' data-case-id="' + c.id + '">'
-        + '<div class="kcard-header">'
-        +   '<span class="kcard-number">' + esc(c.case_number) + '</span>'
-        +   '<span class="kcard-severity sev-' + esc(sev) + '">' + esc(sev) + '</span>'
-        + '</div>'
-        + '<div class="kcard-title">' + esc(c.title) + '</div>'
-        + '<div class="kcard-meta">'
-        +   '<span class="kcard-assignee">' + (c.assigned_to ? esc(c.assigned_to) : '<em class="_ion-s-4c4d78553a">Unassigned</em>') + '</span>'
-        +   '<span class="kcard-age ' + ageClass + '">' + ageLabel(c.created_at) + '</span>'
-        + '</div>'
-        + '<div class="kcard-footer">'
-        +   '<span class="kcard-alert-count' + alertClass + '">' + alertCount + ' alert' + (alertCount !== 1 ? 's' : '') + '</span>'
-        +   integrations.join('')
-        +   closureBadge
-        + '</div>'
-        + '</div>';
-}
-
-// =============================================================================
-// Drag & Drop
-// =============================================================================
-function onDragStart(e, caseId) {
-    dragCaseId = caseId;
-    e.dataTransfer.effectAllowed = 'move';
-    e.target.classList.add('dragging');
-}
-
-function onDragEnd(e) {
-    e.target.classList.remove('dragging');
-    document.querySelectorAll('.kanban-column').forEach(col => col.classList.remove('drag-over'));
-}
-
-function onDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const col = e.target.closest('.kanban-column');
-    if (col) {
-        document.querySelectorAll('.kanban-column').forEach(c => c.classList.remove('drag-over'));
-        col.classList.add('drag-over');
-    }
-}
-
-function onDrop(e, targetStatus) {
-    e.preventDefault();
-    document.querySelectorAll('.kanban-column').forEach(col => col.classList.remove('drag-over'));
-
-    if (!dragCaseId) return;
-
-    const caseObj = allCases.find(c => c.id === dragCaseId);
-    if (!caseObj || caseObj.status === targetStatus) {
-        dragCaseId = null;
-        return;
+    // closure badge (closed cases)
+    let closure = '';
+    if (c.closure_reason) {
+        closure = '<span class="cw-closure reason-' + esc(c.closure_reason) + '">'
+            + esc(closureReasonLabels[c.closure_reason] || c.closure_reason) + '</span>';
     }
 
-    // If dropping into closed, require closure reason
-    if (targetStatus === 'closed') {
-        pendingClosure = { caseId: dragCaseId, targetStatus: targetStatus };
-        document.getElementById('closure-modal-title').textContent = 'Close Case';
-        document.getElementById('closure-reason').value = '';
-        document.getElementById('closure-notes').value = '';
-        resetClosureAiButton();
-        document.getElementById('closure-modal-overlay').style.display = 'flex';
-        dragCaseId = null;
-        return;
-    }
+    // chips: alerts / hosts / users / observables
+    const shieldSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7z"/></svg>';
+    const hostSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>';
+    const userSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>';
+    let chips = '<span class="cw-chip cw-chip-acc">' + shieldSvg + '<span class="cw-mono">' + alertCount + '</span> alerts</span>';
+    if (hostCount) chips += '<span class="cw-chip">' + hostSvg + hostCount + ' host' + (hostCount !== 1 ? 's' : '') + '</span>';
+    if (userCount) chips += '<span class="cw-chip">' + userSvg + userCount + ' user' + (userCount !== 1 ? 's' : '') + '</span>';
+    if (obsCount) chips += '<span class="cw-chip"><span class="cw-mono">' + obsCount + '</span> obs</span>';
 
-    // Simple status transition (open / acknowledged)
-    updateCaseStatus(dragCaseId, targetStatus, null, null);
-    dragCaseId = null;
+    // triggered rules (mapped in the mock to the tcode row)
+    const rules = Array.isArray(c.triggered_rules) ? c.triggered_rules.filter(Boolean).slice(0, 6) : [];
+    const mitre = rules.length
+        ? '<div class="cw-mitre">' + rules.map(r => '<span class="cw-tcode" title="' + esc(r) + '">' + esc(r) + '</span>').join('') + '</div>'
+        : '';
+
+    // integration sync chips
+    let sync = '';
+    if (c.kibana_case_id || c.kibana_url) sync += '<span class="cw-syncchip kibana"><span class="cw-sb"></span>Kibana</span>';
+    if (c.dfir_iris_case_id) sync += '<span class="cw-syncchip iris"><span class="cw-sb"></span>DFIR-IRIS</span>';
+    const syncblk = sync ? '<div class="cw-sync">' + sync + '</div>' : '';
+
+    // per-widget status control — reuses panelUpdateField (routes 'closed' to
+    // the closure modal, other statuses PATCH directly), the SAME path the
+    // Kanban drop fired. data-stop-propagation keeps the <select> click from
+    // bubbling up to the card's openCaseDetail action.
+    const statusCtl = '<select class="cw-status-select" title="Change status" data-stop-propagation '
+        + 'data-change-action="panelUpdateField" data-args=\'[' + c.id + ',"status","$value"]\'>'
+        + ['open', 'acknowledged', 'closed'].map(s =>
+            '<option value="' + s + '"' + (status === s ? ' selected' : '') + '>' + statusLabels[s] + '</option>').join('')
+        + '</select>';
+
+    const desc = c.description || c.evidence_summary || '';
+
+    return '<article class="cw sev-' + esc(sev) + '" tabindex="0" role="button" '
+        + 'data-click-action="openCaseDetail" data-click-args=\'[' + c.id + ']\' '
+        + 'data-case-id="' + c.id + '" aria-label="Open case ' + esc(c.case_number || '') + '">'
+        + '<span class="cw-rail sev-' + esc(sev) + '"></span>'
+        + '<div class="cw-body">'
+        +   '<div class="cw-top">'
+        +     '<div class="cw-idwrap">'
+        +       '<div class="cw-num">' + esc(c.case_number || '') + '</div>'
+        +       '<h3 class="cw-title">' + esc(c.title || 'Untitled case') + '</h3>'
+        +     '</div>'
+        +     '<span class="cw-pill status-' + esc(status) + '"><span class="cw-pd"></span>' + (statusLabels[status] || esc(status)) + '</span>'
+        +   '</div>'
+        +   (desc ? '<div class="cw-desc">' + esc(desc) + '</div>' : '')
+        +   '<div class="cw-meta">'
+        +     '<span class="cw-sevtag sev-' + esc(sev) + '">' + esc(sev) + '</span>'
+        +     closure + chips
+        +   '</div>'
+        +   mitre + syncblk
+        + '</div>'
+        + '<div class="cw-foot">'
+        +   '<div class="cw-who"><span class="cw-av">' + esc(initials(c.assigned_to)) + '</span>'
+        +     (c.assigned_to ? '<span>' + esc(c.assigned_to) + '</span>' : '<span class="cw-unassigned">Unassigned</span>') + '</div>'
+        +   '<div class="cw-foot-right">' + statusCtl
+        +     '<span class="cw-age' + (stale ? ' stale' : '') + '">' + ageLabel(c.created_at) + '</span></div>'
+        + '</div>'
+        + '</article>';
 }
 
 // =============================================================================
@@ -2771,7 +2699,11 @@ function cancelClosure() {
     if (pendingClosure) {
         const caseObj = allCases.find(c => c.id === pendingClosure.caseId);
         if (caseObj) {
-            document.querySelectorAll('.cpanel-meta-grid select').forEach(sel => {
+            // Reset both the panel's status select AND the board widget's
+            // per-widget status select back to the case's real status, so a
+            // cancelled close doesn't leave either dropdown stuck on "closed"
+            // (a same-value re-pick wouldn't re-fire change).
+            document.querySelectorAll('.cpanel-meta-grid select, .cw-status-select').forEach(sel => {
                 let parsed = null;
                 try { parsed = JSON.parse(sel.getAttribute('data-args') || ''); }
                 catch (e) { /* not our select */ }
@@ -2812,6 +2744,9 @@ async function openCaseDetail(caseId) {
         panel.dataset.caseId = String(c.id);
 
         body.innerHTML = renderPanelContent(c);
+        // v0.59.0: paint the alert-widget confidence meters (CSSOM width;
+        // inline style attrs are blocked by the strict CSP).
+        applyConfidenceMeters(body);
         // v0.31.0: apply the active tab after each render so panel
         // re-renders (status change, severity change, note add)
         // don't bump the analyst back to Overview.
@@ -3218,6 +3153,119 @@ function copyProcCmd(key) {
     }
 }
 
+// Enrichable observable types (mirror the backend/OpenCTI TYPE_MAP). Only
+// these carry a threat_level badge; display-only types (host/user/file/
+// process/registry) render as a plain typed chip.
+const _enrichableObsTypes = { ip: 1, ipv4: 1, ipv6: 1, domain: 1, url: 1, sha256: 1, sha1: 1, md5: 1, hash: 1, email: 1 };
+
+// Render one observable as a typed chip. Data contract (v0.59.0):
+//   o = { type, value, threat_level, score, source }
+// Enrichable types get a colored threat-level badge + score; others get a
+// plain chip. Degrades gracefully when threat_level/score are null/missing.
+function _obsChipHtml(o) {
+    if (!o) return '';
+    const type = String(o.type || 'unknown').toLowerCase();
+    const value = o.value || '';
+    const shortVal = value.length > 44 ? value.substring(0, 41) + '…' : value;
+    let tl = '';
+    if (_enrichableObsTypes[type]) {
+        const lvl = String(o.threat_level || 'unknown').toLowerCase();
+        let label;
+        if (o.score != null && o.score !== '') label = o.score;
+        else if (lvl === 'benign') label = 'ok';
+        else if (lvl === 'unknown') label = '?';
+        else label = lvl;
+        const tip = 'Threat level: ' + lvl
+            + (o.score != null && o.score !== '' ? ' · score ' + o.score : '')
+            + (o.source ? ' · ' + o.source : '');
+        tl = '<span class="awx-tl tl-' + esc(lvl) + '" title="' + esc(tip) + '">'
+            + '<span class="awx-td"></span>' + esc(String(label)) + '</span>';
+    }
+    return '<span class="awx-obschip" title="' + esc(value) + '">'
+        + '<span class="awx-ot t-' + esc(type) + '">' + esc(type) + '</span>' + esc(shortVal) + tl + '</span>';
+}
+
+// One "Common fields" key/value row for an alert widget.
+function _cfRow(k, v, extraClass) {
+    return '<div class="awx-cf"><span class="awx-cfk">' + esc(k) + '</span>'
+        + '<span class="awx-cfv mono' + (extraClass ? ' ' + extraClass : '') + '">' + esc(v) + '</span></div>';
+}
+
+// v0.59.0 — the alert-widget body appended to each linked-alert card:
+// common ES fields, enriched observables (threat badges), Bob suggested
+// verdict + confidence meter (or an amber auto-escalated badge), and an
+// analyst-note preview. Every block is optional; a lighter alert row that
+// lacks a field simply omits that block.
+function _alertWidgetExtras(a) {
+    let h = '';
+
+    // Common ES fields (ElasticsearchAlert.to_dict): flow / proc / parent / cmd / hash.
+    const srcIp = a.source_ip || a.src_ip || '';
+    const dstIp = a.destination_ip || a.dest_ip || a.dst_ip || '';
+    const proc = a.process_name || a.process || '';
+    const parent = a.parent_process_name || a.parent_process || '';
+    const cmd = a.command_line || a.process_command_line || '';
+    const hash = a.file_hash || a.sha256 || a.hash || '';
+    const cfRows = [];
+    if (srcIp) cfRows.push(_cfRow('flow', srcIp + (dstIp ? ' → ' + dstIp : '')));
+    if (proc) cfRows.push(_cfRow('proc', proc));
+    if (parent) cfRows.push(_cfRow('parent', parent));
+    if (cmd) cfRows.push(_cfRow('cmd', cmd, 'cmdline'));
+    if (hash) cfRows.push(_cfRow('sha256', hash));
+    if (cfRows.length) {
+        h += '<div class="awx-common"><div class="awx-lab">Common fields</div>' + cfRows.join('') + '</div>';
+    }
+
+    // Enriched observables (data contract v0.59.0).
+    const obs = a.observables || [];
+    if (obs.length) {
+        h += '<div class="awx-obs"><div class="awx-lab">Observables <span class="awx-obscount">' + obs.length + '</span></div>'
+            + '<div class="awx-obsrow">' + obs.map(_obsChipHtml).join('') + '</div></div>';
+    }
+
+    // Bob suggested-verdict + confidence, OR auto-escalated badge.
+    if (a.bob_escalation_badge) {
+        h += '<div class="awx-escbadge"><span>⚠</span><div><b>Auto-escalated</b> — Bob abstained (circuit-breaker); verdict suppressed for human triage.</div></div>';
+    } else if (a.suggested_verdict) {
+        const v = a.suggested_verdict;
+        let conf = null;
+        if (a.suggested_verdict_confidence_int != null) {
+            conf = a.suggested_verdict_confidence_int;
+        } else if (a.suggested_verdict_confidence != null) {
+            const raw = a.suggested_verdict_confidence;
+            conf = Math.round(raw <= 1 ? raw * 100 : raw);
+        }
+        let tier = a.confidence_tier || '';
+        if (!tier && conf != null) tier = conf >= 80 ? 'high' : (conf >= 50 ? 'medium' : 'low');
+        let meter = '';
+        if (conf != null) {
+            const pct = Math.max(0, Math.min(100, conf));
+            // width applied post-insert (CSP blocks inline style attrs).
+            meter = '<span class="awx-conf"><span class="awx-track">'
+                + '<span class="awx-fillb tier-' + esc(tier) + '" data-pct="' + pct + '"></span></span>'
+                + '<span class="awx-pctv">' + conf + '</span><span class="awx-tier">' + esc(tier) + '</span></span>';
+        }
+        h += '<div class="awx-bob"><span class="awx-bl"><span class="awx-bd"></span>Bob</span>'
+            + '<span class="awx-verdict v-' + esc(v) + '">' + esc(verdictLabels[v] || v) + '</span>' + meter + '</div>';
+    }
+
+    // Analyst-note preview.
+    if (a.analyst_notes) {
+        const note = String(a.analyst_notes).trim();
+        if (note) h += '<div class="awx-note">"' + esc(note) + '"</div>';
+    }
+
+    return h;
+}
+
+// Apply the confidence-meter widths after the panel HTML is inserted
+// (CSSOM, not an inline style attribute — the strict CSP blocks the latter).
+function applyConfidenceMeters(root) {
+    (root || document).querySelectorAll('.awx-fillb[data-pct]').forEach(el => {
+        el.style.width = (parseFloat(el.getAttribute('data-pct')) || 0) + '%';
+    });
+}
+
 function renderPanelContent(c) {
     let html = '';
 
@@ -3348,21 +3396,17 @@ function renderPanelContent(c) {
     html += '<div class="cpanel-section" data-tab="observables">';
     html += '<div class="cpanel-section-title">Observables (' + allObs.length + ')</div>';
     if (allObs.length) {
-        html += '<div class="cpanel-obs-list">';
-        allObs.forEach(o => {
-            const type = o.type || 'unknown';
-            const value = o.value || '';
-            const threat = o.threat_level || o.priority || '';
-            const tc = priorityColors[threat] || { bg: 'rgba(107,114,128,.12)', color: '#9ca3af' };
-            html += '<div class="cpanel-obs-item">'
-                + '<span class="cpanel-obs-type obs-type-' + esc(type) + '">' + esc(type) + '</span>'
-                + '<span class="cpanel-obs-value" title="' + esc(value) + '">' + esc(value.length > 45 ? value.substring(0,42) + '...' : value) + '</span>';
-            if (threat) {
-                html += '<span class="cpanel-obs-threat _ion-s-fd30e09699">' + esc(threat) + '</span>';
-            }
-            html += '</div>';
-        });
-        html += '</div>';
+        // Threat-level badges come from OpenCTI enrichment (the case's
+        // enrichment summary is also surfaced as a Note in the Notes section).
+        html += '<div class="awx-obsrow">'
+            + allObs.map(o => _obsChipHtml({
+                type: o.type,
+                value: o.value,
+                threat_level: o.threat_level != null ? o.threat_level : o.priority,
+                score: o.score,
+                source: o.source,
+            })).join('')
+            + '</div>';
     } else {
         html += '<div class="cpanel-empty-hint"><i class="icon-search"></i> No observables extracted yet</div>';
     }
@@ -3459,6 +3503,10 @@ function renderPanelContent(c) {
             html +=     '<i class="icon-chevron-down cpanel-alert-chevron" id="chev-' + fieldsId + '"></i>'
                 +   '</div>'
                 + '</div>';
+            // v0.59.0 — alert-widget body: common fields, enriched observables
+            // (threat badges), Bob verdict + confidence / auto-escalated badge,
+            // note preview. Rendered only for the blocks the alert row carries.
+            html += _alertWidgetExtras(a);
             // Lazy-loaded flattened-fields dropdown (hidden until expanded).
             html += '<div class="cpanel-alert-fields" id="' + fieldsId + '" hidden></div>';
             // Rule guide: the detection rule's description + investigation guide
@@ -4746,7 +4794,7 @@ function renderSLAIndicators() {
     container.innerHTML = slaBar + top8.map(c => {
         const ageMs = now - new Date(c.created_at).getTime();
         const colorClass = getSLAColor(ageMs);
-        const sevBadge = '<span class="kcard-severity sev-' + esc(c.severity || 'medium') + ' _ion-s-1b7b7cb248">' + esc(c.severity || 'med') + '</span>';
+        const sevBadge = '<span class="cw-sevtag sev-' + esc(c.severity || 'medium') + ' _ion-s-1b7b7cb248">' + esc(c.severity || 'med') + '</span>';
         return '<div class="sla-row" data-click-action="openCaseDetail" data-args=\'[' + c.id + ']\'>'
             + '<span class="sla-dot ' + colorClass + '"></span>'
             + sevBadge
@@ -4769,13 +4817,13 @@ function renderRecentClosures() {
         const reasonLabel = closureReasonLabels[c.closure_reason] || c.closure_reason || '-';
         const reasonClass = c.closure_reason ? 'reason-' + c.closure_reason : '';
         const sevBadge = c.severity
-            ? '<span class="kcard-severity sev-' + esc(c.severity) + ' _ion-s-aa98f0a520">' + esc(c.severity) + '</span>'
+            ? '<span class="cw-sevtag sev-' + esc(c.severity) + ' _ion-s-aa98f0a520">' + esc(c.severity) + '</span>'
             : '';
         return '<div class="rclosure-row">'
             + sevBadge
             + '<span class="rclosure-num">' + esc(c.case_number) + '</span>'
             + '<span class="rclosure-title">' + esc(c.title) + '</span>'
-            + '<span class="rclosure-reason kcard-closure ' + esc(reasonClass) + '">' + esc(reasonLabel) + '</span>'
+            + '<span class="rclosure-reason cw-closure ' + esc(reasonClass) + '">' + esc(reasonLabel) + '</span>'
             + '<span class="rclosure-who">' + esc(c.closed_by) + '</span>'
             + '<span class="rclosure-when">' + ageLabel(c.closed_at) + ' ago</span>'
             + '</div>';
@@ -4802,6 +4850,17 @@ document.addEventListener('keydown', function(e) {
             closeCreateCaseModal();
         } else if (document.getElementById('case-panel').classList.contains('open')) {
             closeCasePanel();
+        }
+        return;
+    }
+    // Keyboard-activate a focused case widget (role="button"). Ignore the
+    // per-widget status <select> so arrow/Enter selection still works there.
+    if ((e.key === 'Enter' || e.key === ' ')) {
+        const card = e.target.closest && e.target.closest('.cw');
+        if (card && !(e.target.closest && e.target.closest('.cw-status-select'))) {
+            e.preventDefault();
+            const id = parseInt(card.getAttribute('data-case-id') || '0', 10);
+            if (id) openCaseDetail(id);
         }
     }
 });

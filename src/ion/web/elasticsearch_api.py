@@ -27,6 +27,8 @@ from ion.services.elasticsearch_service import (
     assemble_full_process_tree,
     build_process_tree,
 )
+from ion.services.observable_extractor import to_contract_observables
+from ion.services.observable_service import hydrate_persisted_enrichment
 from ion.storage.database import get_db_session
 
 logger = logging.getLogger(__name__)
@@ -261,7 +263,25 @@ async def get_es_alerts(
                 d["cyab_data_source_name"] = res.get("cyab_data_source_name")
                 d["tide_system_id"] = res.get("tide_system_id")
                 d["tide_system_name"] = res.get("tide_system_name")
+            # v0.59.0 Cases redesign: extract observables on-the-fly from the
+            # raw _source BEFORE it's dropped, so every alert widget can render
+            # its extracted + auto-enriched observables. Extraction-on-render:
+            # cheap, in-memory, NOT persisted here. Per-alert try/except so a
+            # single malformed doc never breaks the whole list.
+            try:
+                d["observables"] = to_contract_observables(a.raw_data or {})
+            except Exception:
+                logger.debug("observable extraction skipped for alert %s", a.id, exc_info=True)
+                d["observables"] = []
             out_alerts.append(d)
+
+        # Back-fill threat_level/score/source on the extracted observables from
+        # any already-persisted enrichment (one batch query). Never enriches
+        # synchronously in the list path; air-gap deployments keep "unknown".
+        try:
+            hydrate_persisted_enrichment(session, out_alerts)
+        except Exception:
+            logger.debug("observable enrichment hydration skipped", exc_info=True)
 
         out_alerts.extend(fixture_dicts)
 
