@@ -1,7 +1,7 @@
 # Detection Engineering (DE) Module — Roadmap
 
-**Status:** Phase 0 (v0.55.0) + Phase 1 (v0.56.0) + Phase 2 (v0.57.0) SHIPPED · Phases 3–4 planned
-**Date:** 2026-07-26 (Phase 0 → 07-27; Phases 1 & 2 → 07-28)
+**Status:** Phase 0 (v0.55.0) + Phase 1 (v0.56.0) + Phase 2 (v0.57.0) + Phase 3 (v0.58.0) SHIPPED · Phase 4 planned
+**Date:** 2026-07-26 (Phase 0 → 07-27; Phases 1 & 2 → 07-28; Phase 3 → 07-29)
 **Type:** Optional product module (CyAB-style)
 **Owning principle:** *ION drafts and measures; the analyst decides and acts.*
 
@@ -110,7 +110,7 @@ not just intended:
 - The "reorder triage" idea is realised as an advisory `priority_nudge` shown on the badge —
   it never rewrites the analyst-owned `AlertTriage.priority`.
 
-### Phase 3 — Bob improvement loop (human-approved, reversible)
+### Phase 3 — Bob improvement loop (human-approved, reversible) — ✅ SHIPPED v0.58.0 (2026-07-29)
 - **Bob Feedback Items** accumulate from closures where Bob disagreed with the analyst.
 - Weekly **Bob scorecard** (productised Bob-eval): agreement rate, drift, top disagreement
   classes.
