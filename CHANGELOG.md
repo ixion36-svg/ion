@@ -1,13 +1,24 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.59.0 -->
-<!-- ion-doc:version=0.59.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.60.0 -->
+<!-- ion-doc:version=0.60.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.60.0 — 2026-07-30
+
+**Attack Path (Bob Pathfinding) — Phase 0: deterministic path model.** First slice of a phased feature that closes Bob's gap versus exploit-pathfinding tools (e.g. Maze): Bob triages per-alert/per-case as narrative with no explicit attack graph. *ION traces the path and shows the evidence; the analyst decides.*
+
+- **New `attack_path_service`** — `build_attack_path(session, case_id)` derives a directed kill-chain graph for a case **on-read** (no table, no LLM, no writes) from the alerts' v0.59.0 observables + common fields. Emits `{nodes, edges, phases, stats}`.
+- **Nodes** — deduped entities across the case's alerts (host, user, process, ip, domain, file, hash), stable ids (`host:…`, `ip:…`), with `threat_level` carried from enriched observables (highest severity wins).
+- **Edges** — all four directed relations, deduped, carrying contributing `alert_ids`: `process_lineage` (parent→child), `network_flow` (src→dst ip), `auth_presence` (user→host), and `shared_observable` — the cross-alert linkage that turns per-alert trees into a single path.
+- **Phases** — MITRE tactic lanes ordered along the kill chain (reconnaissance → impact; unmapped last), nodes/alerts ordered by timestamp within a lane. `stats.reaches_impact` is a cheap precursor to the Phase 2 reachability score.
+- **Read endpoint** `GET /api/elasticsearch/alerts/cases/{id}/attack-path`, gated `case:read` (no new permission). Advisory, read-only, **air-gap-safe** (deterministic; no-op enrichment when OpenCTI/ES unconfigured).
+- Tests: `tests/test_v060_attack_path.py` (19) — node dedup, all four edge types, cross-alert shared-observable linkage, tactic ordering, `reaches_impact`, air-gap. Roadmap: `docs/superpowers/plans/2026-07-30-attack-path-graph-roadmap.md`.
 
 ## v0.59.0 — 2026-07-29
 
