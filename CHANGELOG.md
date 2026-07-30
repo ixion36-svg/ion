@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.60.0 -->
-<!-- ion-doc:version=0.60.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.61.0 -->
+<!-- ion-doc:version=0.61.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.61.0 — 2026-07-30
+
+**Attack Path (Bob Pathfinding) — Phase 1: the kill-chain graph UI.** Renders the Phase 0 path model as a visual graph in the case detail. Additive, presentation-only.
+
+- New **"Attack Path" tab** in the Case Detail panel (between Timeline and Notes; reuses the existing `switchPanelTab` machinery). The chronological Attack Story Timeline stays as its own tab — this is a second view, not a replacement.
+- **Tactic-laned left→right DAG** — one column per MITRE tactic present, kill-chain ordered (initial-access → impact); each node placed in its earliest tactic lane (unattributed nodes fall into a trailing lane so nothing is dropped).
+- **Node cards** coloured by `threat_level` (reuses `--sev-*` tokens); **hand-rolled SVG edge overlay** draws cubic-bezier connectors between cards (positions read via `getBoundingClientRect`, geometry set via `setAttribute`), coloured + arrow-headed per edge type (process_lineage / network_flow / auth_presence / shared_observable) with a legend. Redraws on `ResizeObserver` + tab-show.
+- **Stats strip** — node/edge/alert counts, `tactics_reached` (kill-chain ordered), and an amber **"reaches impact"** badge when `stats.reaches_impact`.
+- Strict-CSP-safe: no external JS/CSS libraries, all SVG hand-rolled, styling via the existing `nonce`'d block + design tokens, `esc()` on all values. Graceful empty/one-node/unavailable states. v0.59.0 widget board, Workbench ledger, similar-cases, and modals untouched.
 
 ## v0.60.0 — 2026-07-30
 
