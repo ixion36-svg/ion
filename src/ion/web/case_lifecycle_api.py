@@ -1332,6 +1332,32 @@ async def get_case_timeline(
         },
     }
 
+@router.get("/elasticsearch/alerts/cases/{case_id}/attack-path")
+async def get_case_attack_path(
+    case_id: int,
+    current_user: User = Depends(require_permission("case:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Attack Path (Bob Pathfinding) — Phase 0.
+
+    Deterministic, compute-on-read attack-path graph for a case: dedupes the
+    entities across the case's alerts into typed nodes, derives the four edge
+    types (process lineage, network flow, user→host presence, shared-observable
+    cross-alert linkage), and orders nodes/alerts into MITRE-tactic "lanes"
+    along the kill chain (initial-access → impact).
+
+    Advisory, read-only, air-gap-safe: no LLM, no writes, and no network beyond
+    the existing ES alert fetch (a no-op when ES is unconfigured — the graph is
+    still valid, just empty). See ``attack_path_service.build_attack_path`` for
+    the emitted schema (``nodes``/``edges``/``phases``/``stats``).
+    """
+    case = session.query(AlertCase).filter_by(id=case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    from ion.services.attack_path_service import build_attack_path
+    return await build_attack_path(session, case_id)
+
 @router.get("/elasticsearch/alerts/cases/{case_id}/similar-observables")
 async def get_case_similar_observables(
     case_id: int,
