@@ -2164,6 +2164,114 @@
     border-left: 2px solid var(--border); padding-left: 9px; line-height: 1.45;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+
+/* ═══ Attack Path (Bob Pathfinding) — Phase 1 kill-chain graph ═══ */
+.apg-root { font-size: 12px; }
+
+/* Stats header strip */
+.apg-stats {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin-bottom: 10px;
+}
+.apg-stat {
+    background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 6px; padding: 3px 9px; color: var(--text-secondary);
+    font-size: 11px; white-space: nowrap;
+}
+.apg-stat b { color: var(--text-primary); font-weight: 700; }
+.apg-stat-tactics { color: var(--text-muted); }
+.apg-arrow-sep { color: var(--text-muted); opacity: .7; }
+.apg-impact-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--sev-high-bg); border: 1px solid var(--sev-high-dim);
+    color: var(--sev-high); font-weight: 700; font-size: 11px;
+    border-radius: 6px; padding: 3px 9px;
+}
+
+/* Legend (edge types) */
+.apg-legend {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    margin-bottom: 10px; padding: 6px 2px;
+    font-size: 10.5px; color: var(--text-muted);
+}
+.apg-legend-item { display: inline-flex; align-items: center; gap: 5px; }
+.apg-legend-swatch {
+    width: 16px; height: 0; border-top: 2px solid var(--border);
+    display: inline-block; border-radius: 2px;
+}
+.apg-sw-process_lineage   { border-top-color: var(--sev-info); }
+.apg-sw-network_flow      { border-top-color: var(--info); }
+.apg-sw-auth_presence     { border-top-color: var(--success); }
+.apg-sw-shared_observable { border-top-color: var(--sev-medium); }
+
+/* Graph container — position:relative so the SVG overlay is anchored to its
+   content box; scrolls horizontally when the kill-chain is wide. */
+.apg-graph {
+    position: relative; overflow: auto;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg-elevated);
+    padding: 12px; max-height: 560px;
+}
+.apg-lanes {
+    position: relative; z-index: 1;
+    display: flex; gap: 34px; align-items: flex-start;
+    min-height: 60px; width: max-content;
+}
+.apg-lane { display: flex; flex-direction: column; min-width: 150px; max-width: 190px; }
+.apg-lane-head {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--text-muted);
+    padding: 0 0 8px; margin-bottom: 8px;
+    border-bottom: 1px solid var(--border); text-align: center;
+}
+.apg-lane-body { display: flex; flex-direction: column; gap: 16px; }
+.apg-lane-empty { color: var(--text-muted); text-align: center; font-size: 11px; opacity: .5; }
+
+/* Node card — border/dot coloured by threat_level (reuses --sev-* tokens) */
+.apg-node {
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface, var(--bg-primary, #12161f));
+    border: 1px solid var(--border); border-left-width: 3px;
+    border-radius: 7px; padding: 7px 9px;
+}
+.apg-node-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.apg-node-type {
+    font-size: 9.5px; font-weight: 700; color: var(--text-muted);
+    background: var(--bg-elevated); border-radius: 4px; padding: 1px 5px; flex-shrink: 0;
+}
+.apg-node-val {
+    font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px;
+    color: var(--text-primary); word-break: break-all; line-height: 1.3;
+    overflow: hidden; text-overflow: ellipsis; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+}
+.apg-node.tl-critical { border-left-color: var(--sev-critical); }
+.apg-node.tl-critical .apg-node-dot { background: var(--sev-critical); }
+.apg-node.tl-high     { border-left-color: var(--sev-high); }
+.apg-node.tl-high .apg-node-dot { background: var(--sev-high); }
+.apg-node.tl-medium   { border-left-color: var(--sev-medium); }
+.apg-node.tl-medium .apg-node-dot { background: var(--sev-medium); }
+.apg-node.tl-low      { border-left-color: var(--sev-low); }
+.apg-node.tl-low .apg-node-dot { background: var(--sev-low); }
+.apg-node.tl-benign   { border-left-color: var(--success); }
+.apg-node.tl-benign .apg-node-dot { background: var(--success); }
+/* unknown / null threat_level → muted border + dot (the default) */
+
+/* SVG connector overlay — behind the cards, non-interactive */
+.apg-svg {
+    position: absolute; top: 0; left: 0; z-index: 0;
+    pointer-events: none; overflow: visible;
+}
+.apg-edge { stroke-width: 1.6; fill: none; opacity: .85; }
+.apg-edge-process_lineage   { stroke: var(--sev-info); }
+.apg-edge-network_flow      { stroke: var(--info); }
+.apg-edge-auth_presence     { stroke: var(--success); }
+.apg-edge-shared_observable { stroke: var(--sev-medium); }
+.apg-mk-process_lineage   { fill: var(--sev-info); }
+.apg-mk-network_flow      { fill: var(--info); }
+.apg-mk-auth_presence     { fill: var(--success); }
+.apg-mk-shared_observable { fill: var(--sev-medium); }
 </style>
 
 </div><!-- /ion-tw inner -->
@@ -2758,6 +2866,8 @@ async function openCaseDetail(caseId) {
         }
         // v0.10.20: attack story timeline
         loadCaseTimeline(c.id);
+        // Attack Path (Bob Pathfinding) Phase 1 — kill-chain graph
+        loadAttackPath(c.id);
         // Similar cases sidebar — best-effort async load
         loadSimilarCases(c.id);
         // v0.10.19: cross-case observable sightings (deterministic sibling)
@@ -3290,6 +3400,7 @@ function renderPanelContent(c) {
         + '<button type="button" class="cpanel-tab-btn" data-tab="alerts" data-click-action="switchPanelTab" data-args=\'["alerts"]\'>Alerts (' + alertCount + ')</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="observables" data-click-action="switchPanelTab" data-args=\'["observables"]\'>Observables (' + obsCount + ')</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="timeline" data-click-action="switchPanelTab" data-args=\'["timeline"]\'>Timeline</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="attackpath" data-click-action="switchPanelTab" data-args=\'["attackpath"]\'>Attack Path</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="notes" data-click-action="switchPanelTab" data-args=\'["notes"]\'>Notes</button>'
         + '</div>';
 
@@ -3442,6 +3553,17 @@ function renderPanelContent(c) {
     html += '<div class="cpanel-section" data-tab="timeline">';
     html += '<div class="cpanel-section-title">Attack Story Timeline</div>';
     html += '<div class="_ion-s-65382d79e2" id="case-timeline-container">Loading…</div>';
+    html += '</div>';
+
+    // ── Attack Path (Bob Pathfinding) — Phase 1 kill-chain graph ─
+    // Additional view alongside the chronological timeline. Renders the
+    // Phase-0 attack-path endpoint's JSON as a tactic-laned left→right DAG:
+    // MITRE tactic columns (recon→impact), node cards coloured by
+    // threat_level, and an SVG connector overlay drawn post-layout via
+    // getBoundingClientRect (see loadAttackPath / drawAttackPathEdges).
+    html += '<div class="cpanel-section" data-tab="attackpath">';
+    html += '<div class="cpanel-section-title">Attack Path</div>';
+    html += '<div class="apg-root" id="attack-path-container">Loading…</div>';
     html += '</div>';
 
     // ── Similar Cases (pgvector-backed, loaded async) ──────
@@ -3739,6 +3861,272 @@ async function loadSimilarCases(caseId) {
     }
 }
 
+// ═════════════════════════════════════════════════════════
+// Attack Path (Bob Pathfinding) — Phase 1 kill-chain graph
+// ─────────────────────────────────────────────────────────
+// Renders the deterministic Phase-0 endpoint
+//   GET /api/elasticsearch/alerts/cases/{id}/attack-path   (case:read)
+// as a tactic-laned left→right DAG. Lanes = phases[] in rank order (MITRE
+// kill-chain recon→impact); each node card sits in the earliest phase whose
+// node_ids contains it, bordered by threat_level (reusing the --sev-* tokens).
+// Edges are an absolutely-positioned <svg> overlay whose coordinates are
+// computed from each card's getBoundingClientRect AFTER layout, coloured by
+// edge type with a per-type arrowhead marker. All geometry is set via
+// setAttribute (no inline style= — strict CSP); colours come from CSS classes
+// that resolve --tokens. Redrawn on ResizeObserver + when the tab is shown.
+//
+// DOM-id / class contracts:
+//   #attack-path-container   the section body loadAttackPath() paints into
+//   .apg-graph               position:relative scroll container (edge coords
+//                            are computed relative to this element)
+//   .apg-svg                 the connector overlay (first child of .apg-graph)
+//   .apg-node[data-apg-node] one card per node; data-apg-node = node id, the
+//                            key drawAttackPathEdges() joins edges on
+//   _apgState                module-level { redraw } handle switchPanelTab and
+//                            the ResizeObserver call to repaint edges
+
+// Edge type → CSS suffix (colour + arrowhead marker are keyed off this).
+const _APG_EDGE_TYPES = ['process_lineage', 'network_flow', 'auth_presence', 'shared_observable'];
+const _APG_EDGE_LABELS = {
+    process_lineage: 'Process lineage',
+    network_flow: 'Network flow',
+    auth_presence: 'Auth / presence',
+    shared_observable: 'Shared observable',
+};
+// Node type → short glyph label shown on the card.
+const _APG_TYPE_GLYPH = {
+    host: 'H', user: 'U', process: 'P', ip: 'IP', domain: 'D', file: 'F', hash: '#',
+};
+
+// Module-level handle so switchPanelTab / ResizeObserver can trigger a repaint
+// without re-fetching. Reset on every load.
+let _apgState = { redraw: null, ro: null };
+
+function _apgTacticLabel(slug) {
+    if (!slug) return 'Unattributed';
+    return String(slug).split('-').map(function (w) {
+        return w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    }).join(' ');
+}
+
+async function loadAttackPath(caseId) {
+    const container = document.getElementById('attack-path-container');
+    if (!container) return;
+    // Tear down any prior ResizeObserver from a previously-open case.
+    if (_apgState.ro) { try { _apgState.ro.disconnect(); } catch (e) {} }
+    _apgState = { redraw: null, ro: null };
+
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/attack-path');
+        if (!resp.ok) {
+            container.innerHTML = '<div class="cpanel-empty-hint">Attack path unavailable</div>';
+            return;
+        }
+        const data = await resp.json();
+        const nodes = data.nodes || [];
+        const edges = data.edges || [];
+        const phases = data.phases || [];
+        const stats = data.stats || {};
+
+        if (nodes.length === 0) {
+            container.innerHTML = '<div class="cpanel-empty-hint">'
+                + '<i class="icon-share-2"></i> No attack path derived yet</div>';
+            return;
+        }
+
+        // ── Stats header strip ───────────────────────────────
+        const edgeStats = stats.edges || {};
+        const reached = (stats.tactics_reached || []).map(_apgTacticLabel);
+        let html = '<div class="apg-stats">';
+        html += '<span class="apg-stat"><b>' + (stats.nodes != null ? stats.nodes : nodes.length) + '</b> nodes</span>';
+        html += '<span class="apg-stat"><b>' + (edgeStats.total != null ? edgeStats.total : edges.length) + '</b> edges</span>';
+        html += '<span class="apg-stat"><b>' + (stats.alerts != null ? stats.alerts : 0) + '</b> alerts</span>';
+        if (reached.length) {
+            html += '<span class="apg-stat apg-stat-tactics" title="MITRE tactics reached, kill-chain order">'
+                + reached.map(esc).join(' <span class="apg-arrow-sep">→</span> ') + '</span>';
+        }
+        if (stats.reaches_impact) {
+            html += '<span class="apg-impact-badge" title="This path reaches an impact-class MITRE tactic">'
+                + '<i class="icon-alert-triangle"></i> reaches impact</span>';
+        }
+        html += '</div>';
+
+        // ── Legend (edge types) ──────────────────────────────
+        html += '<div class="apg-legend">';
+        _APG_EDGE_TYPES.forEach(function (t) {
+            html += '<span class="apg-legend-item">'
+                + '<span class="apg-legend-swatch apg-sw-' + t + '"></span>'
+                + esc(_APG_EDGE_LABELS[t]) + '</span>';
+        });
+        html += '</div>';
+
+        // ── Node → lane placement ────────────────────────────
+        // A node's lane = the earliest phase (rank order) whose node_ids
+        // contains it. Nodes absent from every phase fall into a trailing
+        // "Unattributed" lane so the graph still renders everything.
+        const laneOf = {};
+        phases.forEach(function (ph, idx) {
+            (ph.node_ids || []).forEach(function (nid) {
+                if (laneOf[nid] === undefined) laneOf[nid] = idx;
+            });
+        });
+        const lanes = phases.map(function (ph) {
+            return { tactic: ph.tactic, nodes: [] };
+        });
+        let unattributed = null;
+        const nodeById = {};
+        nodes.forEach(function (n) {
+            nodeById[n.id] = n;
+            const li = laneOf[n.id];
+            if (li !== undefined && lanes[li]) {
+                lanes[li].nodes.push(n);
+            } else {
+                if (!unattributed) { unattributed = { tactic: null, nodes: [] }; }
+                unattributed.nodes.push(n);
+            }
+        });
+        const laneList = lanes.slice();
+        if (unattributed) laneList.push(unattributed);
+
+        // ── Lanes + node cards ───────────────────────────────
+        html += '<div class="apg-graph"><div class="apg-lanes">';
+        laneList.forEach(function (lane) {
+            html += '<div class="apg-lane">';
+            html += '<div class="apg-lane-head" title="MITRE tactic">' + esc(_apgTacticLabel(lane.tactic)) + '</div>';
+            html += '<div class="apg-lane-body">';
+            if (lane.nodes.length === 0) {
+                html += '<div class="apg-lane-empty">—</div>';
+            }
+            lane.nodes.forEach(function (n) {
+                const type = String(n.type || 'unknown').toLowerCase();
+                const tl = n.threat_level ? String(n.threat_level).toLowerCase() : 'unknown';
+                const glyph = _APG_TYPE_GLYPH[type] || '?';
+                const val = n.label || n.value || n.id || '';
+                html += '<div class="apg-node tl-' + esc(tl) + '" data-apg-node="' + esc(n.id) + '"'
+                    + ' title="' + esc(type + ' · ' + val + ' · threat: ' + tl) + '">'
+                    + '<span class="apg-node-dot"></span>'
+                    + '<span class="apg-node-type t-' + esc(type) + '">' + esc(glyph) + '</span>'
+                    + '<span class="apg-node-val">' + esc(val) + '</span>'
+                    + '</div>';
+            });
+            html += '</div></div>';
+        });
+        html += '</div></div>';
+
+        container.innerHTML = html;
+
+        // ── Edge overlay ─────────────────────────────────────
+        const graph = container.querySelector('.apg-graph');
+        if (!graph) return;
+        // Build node-id → card element map for edge endpoint lookup.
+        const cardMap = {};
+        graph.querySelectorAll('.apg-node[data-apg-node]').forEach(function (el) {
+            cardMap[el.getAttribute('data-apg-node')] = el;
+        });
+
+        const redraw = function () { drawAttackPathEdges(graph, edges, cardMap); };
+        _apgState.redraw = redraw;
+        // First paint (rAF so layout has settled). If the tab is currently
+        // hidden the rects are zero — switchPanelTab repaints on reveal.
+        requestAnimationFrame(redraw);
+
+        // Repaint on container resize (panel width change, font load, etc.).
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(function () { requestAnimationFrame(redraw); });
+            ro.observe(graph);
+            _apgState.ro = ro;
+        }
+    } catch (e) {
+        container.innerHTML = '<div class="cpanel-empty-hint">Attack path failed to load</div>';
+    }
+}
+
+// Draw the SVG connectors. Coordinates are computed relative to the graph
+// container's content box (accounting for scroll) from each card's
+// getBoundingClientRect, so the overlay tracks the cards on resize/scroll.
+// Every coord is applied via setAttribute — no inline style= (strict CSP);
+// stroke colours come from the .apg-edge-<type> / .apg-mk-<type> CSS classes.
+function drawAttackPathEdges(graph, edges, cardMap) {
+    if (!graph) return;
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    // Remove a previous overlay before redrawing.
+    const prev = graph.querySelector('.apg-svg');
+    if (prev) prev.remove();
+
+    const gRect = graph.getBoundingClientRect();
+    const w = Math.max(graph.scrollWidth, graph.clientWidth);
+    const h = Math.max(graph.scrollHeight, graph.clientHeight);
+    if (w === 0 || h === 0) return; // tab hidden — nothing laid out yet
+
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('class', 'apg-svg');
+    svg.setAttribute('width', String(w));
+    svg.setAttribute('height', String(h));
+    svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+
+    // One arrowhead marker per edge type (coloured via CSS class on the path).
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    _APG_EDGE_TYPES.forEach(function (t) {
+        const marker = document.createElementNS(SVG_NS, 'marker');
+        marker.setAttribute('id', 'apg-arrow-' + t);
+        marker.setAttribute('markerWidth', '8');
+        marker.setAttribute('markerHeight', '8');
+        marker.setAttribute('refX', '7');
+        marker.setAttribute('refY', '3');
+        marker.setAttribute('orient', 'auto');
+        marker.setAttribute('markerUnits', 'userSpaceOnUse');
+        const tri = document.createElementNS(SVG_NS, 'path');
+        tri.setAttribute('d', 'M0,0 L7,3 L0,6 Z');
+        tri.setAttribute('class', 'apg-mk apg-mk-' + t);
+        marker.appendChild(tri);
+        defs.appendChild(marker);
+    });
+    svg.appendChild(defs);
+
+    // Content-box coordinate of a card (top-left), scroll-compensated.
+    function pos(el) {
+        const r = el.getBoundingClientRect();
+        return {
+            x: r.left - gRect.left + graph.scrollLeft,
+            y: r.top - gRect.top + graph.scrollTop,
+            w: r.width,
+            h: r.height,
+        };
+    }
+
+    (edges || []).forEach(function (e) {
+        const s = cardMap[e.source];
+        const t = cardMap[e.target];
+        if (!s || !t) return; // endpoint not rendered — skip, never fabricate
+        const ps = pos(s);
+        const pt = pos(t);
+        // Source: right-edge centre. Target: left-edge centre. For same-lane
+        // or backward edges the cubic control points still yield a clean arc.
+        const x1 = ps.x + ps.w;
+        const y1 = ps.y + ps.h / 2;
+        const x2 = pt.x;
+        const y2 = pt.y + pt.h / 2;
+        const dx = Math.max(28, Math.abs(x2 - x1) / 2);
+        const type = _APG_EDGE_TYPES.indexOf(e.type) >= 0 ? e.type : 'shared_observable';
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', 'M' + x1 + ',' + y1
+            + ' C' + (x1 + dx) + ',' + y1 + ' ' + (x2 - dx) + ',' + y2 + ' ' + x2 + ',' + y2);
+        path.setAttribute('class', 'apg-edge apg-edge-' + type);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('marker-end', 'url(#apg-arrow-' + type + ')');
+        const lbl = e.label || _APG_EDGE_LABELS[type] || e.type;
+        if (lbl) {
+            const titleEl = document.createElementNS(SVG_NS, 'title');
+            titleEl.textContent = String(lbl);
+            path.appendChild(titleEl);
+        }
+        svg.appendChild(path);
+    });
+
+    // Insert as first child so cards (z-index above) stay clickable/legible.
+    graph.insertBefore(svg, graph.firstChild);
+}
+
 // ── v0.10.20: Load Attack Story Timeline ─────────────────
 async function loadCaseTimeline(caseId) {
     const container = document.getElementById('case-timeline-container');
@@ -3946,6 +4334,12 @@ function switchPanelTab(tabName) {
     document.querySelectorAll('.cpanel-section[data-tab]').forEach(s => {
         s.classList.toggle('tab-hidden', s.dataset.tab !== tabName);
     });
+    // The Attack Path SVG connectors are laid out from getBoundingClientRect,
+    // which returns zeroes while the section is display:none. Redraw once the
+    // tab is actually visible so edges land on their node cards.
+    if (tabName === 'attackpath' && typeof _apgState !== 'undefined' && _apgState.redraw) {
+        requestAnimationFrame(_apgState.redraw);
+    }
 }
 
 function closeCasePanel() {
