@@ -267,7 +267,8 @@ _SYSTEM_PROMPT = (
     "Do not speculate beyond what the data shows. "
     "Structure your output as markdown with these sections, in order: "
     "1) **Verdict** — one of true_positive | false_positive | "
-    "benign_true_positive | inconclusive, with a one-line rationale. "
+    "benign_true_positive | inconclusive, with a one-line rationale and an "
+    "explicit confidence level (high | medium | low). "
     "2) **Evidence** — bulleted list of the specific findings (rule, "
     "host, user, observables, prior investigations) you grounded the "
     "verdict on. "
@@ -661,6 +662,7 @@ async def generate_bob_analysis(
     # path block is "" and the prompt degrades to the prior behaviour.
     path_block = ""
     reachability: dict = {}
+    attack_path: Optional[dict] = None
     try:
         from ion.services.attack_path_service import build_attack_path
         attack_path = await build_attack_path(session, case_id)
@@ -703,6 +705,35 @@ async def generate_bob_analysis(
             detail="Bob returned an empty response — please retry.",
         )
 
+    # v0.63.0 (Attack Path Phase 3): adversarial verifier pass. Fork E — only
+    # medium-confidence *decisive* verdicts are checked against the deterministic
+    # attack path; high-confidence + abstentions are skipped (cheap). Advisory
+    # only + air-gap safe: any skip/failure leaves the analysis untouched and
+    # NEVER changes stored state. When it runs, its result is surfaced as an
+    # advisory "Verification" block appended to the analysis + telemetry.
+    verifier: dict = {"skipped": True, "supported": None, "reason": "not-run"}
+    try:
+        from ion.services.bob_verifier_service import (
+            extract_confidence_band,
+            extract_verdict,
+            render_verification_block,
+            verify_analysis,
+        )
+        verifier = await verify_analysis(
+            analysis_text,
+            extract_verdict(analysis_text),
+            extract_confidence_band(analysis_text),
+            attack_path,
+            user_id=user.id,
+            ollama=ollama,
+        )
+        if not verifier.get("skipped"):
+            block = render_verification_block(verifier)
+            if block:
+                analysis_text = analysis_text.strip() + "\n\n" + block
+    except Exception as exc:
+        logger.debug("Verifier pass skipped for case %d: %s", case_id, exc)
+
     return BobAnalysisResponse(
         analysis=analysis_text.strip(),
         model=(result or {}).get("model"),
@@ -720,6 +751,13 @@ async def generate_bob_analysis(
             "attack_path_present": bool(path_block and path_block.strip()),
             "reachability_band": reachability.get("band"),
             "reachability_score": reachability.get("score"),
+            # v0.63.0: attack-path Phase 3 recurrence hint + verifier telemetry
+            "path_recurrence": (
+                ((attack_path.get("stats") or {}).get("recurrence") or {})
+                if attack_path else {}
+            ),
+            "verified": not verifier.get("skipped", True),
+            "verifier_supported": verifier.get("supported"),
         },
         generated_at=datetime.now(timezone.utc).isoformat(),
     )

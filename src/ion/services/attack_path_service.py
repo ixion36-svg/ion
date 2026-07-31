@@ -39,10 +39,12 @@ and ``None`` when the entity is not observable-backed.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
 import re
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -577,6 +579,196 @@ def score_reachability(path_dict: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+# ── Phase-3: path signature + DE recurrence link ─────────────────────────────
+# The "attack shape" of a case = the ordered kill-chain tactics it reaches plus
+# the set of MITRE technique ids present. Two cases with the *same* shape are the
+# same recurring attack path — the hook that lets Bob Pathfinding surface "this
+# path recurs across N cases → root-cause detection/tuning here" and cross-link
+# to the DE module (Noise Campaigns / Detection Proposals). Advisory ONLY: this
+# computes a hint; it never creates a proposal or mutates state.
+
+# Technique ids look like Txxxx or Txxxx.yyy (sub-technique).
+_TECHNIQUE_RE = re.compile(r"T\d{4}(?:\.\d{3})?", re.IGNORECASE)
+
+# Compute-on-read recurrence scan bounds / threshold (env-overridable).
+_RECURRENCE_DEFAULT_DAYS = 30
+_RECURRENCE_MAX_CASES = 50  # cap the on-read scan so a busy SOC can't stall Bob
+
+
+def _recurrence_threshold() -> int:
+    """Min *other* same-shape cases before we hint a detection proposal."""
+    try:
+        return max(1, int(os.environ.get("ION_ATTACK_PATH_RECURRENCE_THRESHOLD", "2")))
+    except (TypeError, ValueError):
+        return 2
+
+
+def _naive_utc_now() -> datetime:
+    """Naive UTC — matches ``AlertCase.created_at`` (TimestampMixin)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _collect_technique_ids(alerts: Optional[List[Dict[str, Any]]]) -> List[str]:
+    """Sorted set of MITRE technique ids present across a case's alerts.
+
+    Pure + deterministic. Robust to ``mitre_technique_id`` being a scalar, a
+    list, or embedded in a longer string; anything not matching the Txxxx shape
+    is ignored. Empty when no techniques are mapped (air-gap / sparse feeds).
+    """
+    ids: set = set()
+    for a in alerts or []:
+        if not isinstance(a, dict):
+            continue
+        for raw in (a.get("mitre_technique_id"), a.get("mitre_technique")):
+            if raw is None:
+                continue
+            vals = raw if isinstance(raw, (list, tuple, set)) else [raw]
+            for v in vals:
+                for m in _TECHNIQUE_RE.findall(str(v)):
+                    ids.add(m.upper())
+    return sorted(ids)
+
+
+def _signature_components(path_dict: Dict[str, Any]) -> Tuple[List[str], List[str]]:
+    """(kill-chain-ordered tactics, sorted technique ids) for a path dict.
+
+    Tactics come from ``stats.tactics_reached`` (falling back to the phase
+    lanes); technique ids from ``stats.techniques`` when the caller has attached
+    them (``_collect_technique_ids``), else empty → tactics-only signature.
+    """
+    path_dict = path_dict or {}
+    stats = path_dict.get("stats") or {}
+
+    tactics = list(stats.get("tactics_reached") or [])
+    if not tactics:
+        tactics = [
+            p.get("tactic")
+            for p in (path_dict.get("phases") or [])
+            if p.get("tactic") and p.get("tactic") != UNKNOWN_TACTIC
+        ]
+    ordered_tactics = sorted(
+        {t for t in tactics if t and t != UNKNOWN_TACTIC},
+        key=lambda s: KILL_CHAIN_RANK.get(s, UNKNOWN_RANK),
+    )
+    techniques = sorted(
+        {str(t).strip().upper() for t in (stats.get("techniques") or []) if str(t).strip()}
+    )
+    return ordered_tactics, techniques
+
+
+def path_signature(path_dict: Dict[str, Any]) -> str:
+    """Stable, deterministic signature of a case's attack shape.
+
+    The signature is a function of the ordered list of kill-chain tactics the
+    path reaches and the sorted set of MITRE technique ids present (when the
+    caller has attached ``stats.techniques``; otherwise tactics-only). Identical
+    shape → identical signature; independent of node/edge counts, timestamps, or
+    the ``generated_at`` field. Safe on an empty / malformed dict.
+    """
+    tactics, techniques = _signature_components(path_dict)
+    payload = "t:" + ">".join(tactics) + "|k:" + ",".join(techniques)
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return f"ap1:{digest}"
+
+
+def _is_trivial_signature(path_dict: Dict[str, Any]) -> bool:
+    """A shape with no tactics AND no techniques can't meaningfully recur."""
+    tactics, techniques = _signature_components(path_dict)
+    return not tactics and not techniques
+
+
+def _recent_case_ids(session, exclude_case_id: int, days: int, limit: int) -> List[int]:
+    """Ids of the most recent cases in the window, excluding this one.
+
+    Isolated so tests can monkeypatch the case enumeration without a DB (mirrors
+    how the Phase-0 tests monkeypatch the alert fetch).
+    """
+    from ion.models.alert_triage import AlertCase
+
+    cutoff = _naive_utc_now() - timedelta(days=days)
+    rows = (
+        session.query(AlertCase.id)
+        .filter(AlertCase.created_at >= cutoff)
+        .filter(AlertCase.id != exclude_case_id)
+        .order_by(AlertCase.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+async def _signature_for_case(session, case_id: int) -> Optional[str]:
+    """Build a case's path (deterministic) and return its shape signature.
+
+    Returns ``None`` when the case has no alerts / trivial shape (nothing to
+    match on). Air-gap safe: ES-less fetch yields ``[]`` → ``None``.
+    """
+    alerts = await _fetch_case_alert_dicts(session, case_id)
+    if not alerts:
+        return None
+    path = build_attack_path_from_alerts(case_id, alerts)
+    path["stats"]["techniques"] = _collect_technique_ids(alerts)
+    if _is_trivial_signature(path):
+        return None
+    return path_signature(path)
+
+
+async def find_recurring_path(session, case_id: int, days: int = _RECURRENCE_DEFAULT_DAYS) -> Dict[str, Any]:
+    """Count how many *other* recent cases share this case's attack shape.
+
+    Compute-on-read, read-only, air-gap-safe. Signs this case's path, then scans
+    the most recent cases in the window (bounded by ``_RECURRENCE_MAX_CASES``)
+    and counts those with an identical signature. The ``suggests_detection_proposal``
+    flag is an **advisory hint only** — the "this path recurs across N cases →
+    root-cause detection/tuning" link into the DE module (Noise Campaigns /
+    Detection Proposals). It NEVER creates a proposal or mutates any state.
+
+    Returns::
+
+        {"signature": str|None, "recurrence_count": int,
+         "case_ids": [int, ...], "suggests_detection_proposal": bool}
+
+    A trivial / empty shape (no tactics, no techniques — e.g. air-gapped with no
+    ES) yields a null signature, zero recurrence, and no suggestion.
+    """
+    empty = {
+        "signature": None,
+        "recurrence_count": 0,
+        "case_ids": [],
+        "suggests_detection_proposal": False,
+    }
+    try:
+        sig = await _signature_for_case(session, case_id)
+    except Exception:
+        logger.debug("attack_path: signature build failed for case %s", case_id, exc_info=True)
+        return empty
+    if not sig:
+        return empty
+
+    try:
+        candidate_ids = _recent_case_ids(session, case_id, days, _RECURRENCE_MAX_CASES)
+    except Exception:
+        logger.debug("attack_path: recent-case enumeration failed", exc_info=True)
+        return {**empty, "signature": sig}
+
+    matches: List[int] = []
+    for cid in candidate_ids:
+        try:
+            if await _signature_for_case(session, cid) == sig:
+                matches.append(cid)
+        except Exception:
+            logger.debug("attack_path: signature build failed for case %s", cid, exc_info=True)
+            continue
+
+    count = len(matches)
+    return {
+        "signature": sig,
+        "recurrence_count": count,
+        "case_ids": matches,
+        "suggests_detection_proposal": count >= _recurrence_threshold(),
+    }
+
+
 async def _fetch_case_alert_dicts(session, case_id: int) -> Optional[List[Dict[str, Any]]]:
     """Fetch a case's alerts as enriched contract dicts.
 
@@ -649,4 +841,19 @@ async def build_attack_path(session, case_id: int) -> Dict[str, Any]:
         path["stats"]["reachability"] = score_reachability(path)
     except Exception:
         logger.debug("attack_path: reachability scoring skipped", exc_info=True)
+    # Phase 3: fold a COMPACT recurrence hint into the payload so the UI/Bob can
+    # surface "recurs across N cases" and offer the DE root-cause link. The full
+    # case-id list stays out of the Bob payload (size/privacy) — callers wanting
+    # it call find_recurring_path directly. Best-effort + air-gap safe: any
+    # failure (or ES-less) leaves the graph exactly as before.
+    if os.environ.get("ION_ATTACK_PATH_RECURRENCE_ENABLED", "1") not in ("0", "false", "False"):
+        try:
+            rec = await find_recurring_path(session, case_id, days=_RECURRENCE_DEFAULT_DAYS)
+            path["stats"]["recurrence"] = {
+                "signature": rec["signature"],
+                "recurrence_count": rec["recurrence_count"],
+                "suggests_detection_proposal": rec["suggests_detection_proposal"],
+            }
+        except Exception:
+            logger.debug("attack_path: recurrence scan skipped", exc_info=True)
     return path
