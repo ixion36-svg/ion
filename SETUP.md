@@ -1,11 +1,11 @@
 <!-- ion-doc:type=SETUP GUIDE -->
 <!-- ion-doc:title=ION Setup Guide -->
 <!-- ion-doc:subtitle=Local development setup — prerequisites, quick start, container topology -->
-<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Developers, contributors -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-07-30 -->
 
 # ION Setup Guide
 
@@ -142,10 +142,10 @@ the Similar-Cases sidebar all quietly return nothing.
 # From the repo root
 ./scripts/build-offline-package.sh [ion_version] [chat_model] [pg_version]
 
-# Examples
-./scripts/build-offline-package.sh 0.10.9
-./scripts/build-offline-package.sh 0.10.9 hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF pg17
-./scripts/build-offline-package.sh 0.10.9 qwen2.5:3b pg16
+# Examples (substitute the current release tag for the version)
+./scripts/build-offline-package.sh 0.62.0
+./scripts/build-offline-package.sh 0.62.0 hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF pg17
+./scripts/build-offline-package.sh 0.62.0 qwen2.5:3b pg16
 ```
 
 Output lands in `./dist/ion-offline-<VERSION>/` and contains:

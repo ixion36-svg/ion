@@ -1,16 +1,16 @@
 <!-- ion-doc:type=DEVELOPMENT LIFECYCLE -->
 <!-- ion-doc:title=ION Development Lifecycle -->
 <!-- ion-doc:subtitle=Secure-by-Design SDLC; 5-phase reference aligned with NCSC SD&D and SSDF -->
-<!-- ion-doc:version=0.31.10 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, compliance reviewers, customer DA -->
-<!-- ion-doc:date=2026-05-26 -->
+<!-- ion-doc:date=2026-07-30 -->
 
 # ION Development Lifecycle
 
 **Document owner:** Repository maintainer (`ixion36`)
-**Status:** Current as of v0.31.10 (2026-05-26)
+**Status:** Current as of v0.62.0 (2026-07-30)
 **Review cadence:** Every minor-version bump (v0.X.0) or on material process change, whichever is sooner.
 **Primary framework:** Secure by Design (SbD) — see `docs/SECURE_BY_DESIGN.md` for the canonical 20-principle list.
 **Secondary references:** NCSC *Secure Development and Deployment Guidance* (8 principles); NIST SP 800-218 (SSDF); CISA *Secure by Design*; OWASP SAMM; Saltzer & Schroeder (1975).

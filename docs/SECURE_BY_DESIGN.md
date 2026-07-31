@@ -1,11 +1,11 @@
 <!-- ion-doc:type=SECURE BY DESIGN -->
 <!-- ion-doc:title=ION Secure by Design Principles + Audit -->
 <!-- ion-doc:subtitle=20 numbered principles synthesized from NCSC, CISA, NIST SSDF, OWASP, and Saltzer & Schroeder; ION-specific application + audit status per principle -->
-<!-- ion-doc:version=0.31.21 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, security reviewers, integrators, external assessors -->
-<!-- ion-doc:date=2026-05-26 -->
+<!-- ion-doc:date=2026-07-30 -->
 
 # ION — Secure by Design Principles
 

@@ -1,11 +1,11 @@
 <!-- ion-doc:type=STACK REFERENCE -->
 <!-- ion-doc:title=ION Stack Reference -->
 <!-- ion-doc:subtitle=Container topology, env-var catalogue, integration endpoints, companion services -->
-<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Operators, deployment engineers, integrators -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-07-30 -->
 
 # ION Stack Reference
 

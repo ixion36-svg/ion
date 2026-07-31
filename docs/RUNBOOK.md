@@ -1,11 +1,11 @@
 <!-- ion-doc:type=OPERATOR RUNBOOK -->
 <!-- ion-doc:title=ION SOC Lead Runbook -->
 <!-- ion-doc:subtitle=Daily operational duties, integration configuration, troubleshooting, release ritual -->
-<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=SOC leads, operators, SDM -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-07-30 -->
 
 # ION SOC Lead Runbook
 
@@ -23,17 +23,7 @@ Operational guide for SOC leads running ION (Intelligent Operating Network).
 
 ### Assign Roles
 
-ION ships with these RBAC roles (ascending privilege):
-
-| Role | Tier | Typical Use |
-|------|------|-------------|
-| `analyst` | L1 | Alert triage, basic case work |
-| `senior_analyst` | L2 | Case ownership, observable enrichment |
-| `principal_analyst` | L3 | Threat hunting, forensics, playbook authoring |
-| `lead` | L3+ | Shift handover, SOC health, executive reports |
-| `forensic` | L3 | PCAP analysis, Arkime, forensic tooling |
-| `engineering` | -- | Detection engineering, CyAB, log sources |
-| `admin` | -- | Full platform administration |
+ION ships with **10 built-in RBAC roles** across an analyst tier (`analyst`, `senior_analyst`, `principal_analyst`), an engineering tier (`soc_engineer`, `senior_engineer`, `platform_engineer`, `engineering`), plus `lead`, `forensic`, and `admin`. The canonical role table with per-role capabilities lives in [`ARCHITECTURE.md`](ARCHITECTURE.md#role-hierarchy) — that is the single source of truth; do not duplicate it here.
 
 Assign one or more roles on the user edit page. Users with multiple roles can use **Focus Mode** to restrict their session to a single role's permission set. Focus mode is toggled via `POST /api/auth/focus-mode` or the pill buttons on the dashboard / user dropdown.
 
@@ -53,9 +43,9 @@ All integration settings live in **Settings > Integrations** (`/integrations`) o
 
 | Variable | Purpose | Example |
 |----------|---------|---------|
-| `ION_ES_URL` | Elasticsearch endpoint | `https://127.0.0.1:9200` |
-| `ION_ES_USERNAME` | ES username | `elastic` |
-| `ION_ES_PASSWORD` | ES password | `DocforgeTest2025` |
+| `ION_ELASTICSEARCH_URL` | Elasticsearch endpoint | `https://127.0.0.1:9200` |
+| `ION_ELASTICSEARCH_USERNAME` | ES username | `elastic` |
+| `ION_ELASTICSEARCH_PASSWORD` | ES password | `your-es-password` |
 | `ION_KIBANA_URL` | Kibana endpoint | `https://127.0.0.1:5601` |
 | `ION_CA_BUNDLE` | Path to internal CA cert | `C:\certs\ca.pem` |
 
@@ -98,7 +88,7 @@ The alert-to-PCAP workflow uses `ArkimeService.download_pcap_by_community_id(nod
 |----------|---------|---------|
 | `ION_OLLAMA_URL` | Ollama API endpoint | `http://localhost:11434` |
 | `ION_OLLAMA_MODEL` | Model name | `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF` |
-| `ION_OLLAMA_TIMEOUT` | Request timeout (seconds) | `120` |
+| `ION_OLLAMA_TIMEOUT` | Request timeout (seconds) | `300` |
 
 For dev environments with limited RAM, use `qwen2.5:0.5b`. The admin wizard at `/settings` also lets you change URL/model/timeout at runtime.
 
@@ -228,7 +218,7 @@ The Investigation Queue (`/investigate`) prioritizes cases for analyst attention
 
 **Symptom**: Alerts page is empty, "ES not configured" warnings in logs.
 
-- Verify `ION_ES_URL` points to `https://127.0.0.1:9200` (not `localhost` -- IPv6 resolution issue on Windows).
+- Verify `ION_ELASTICSEARCH_URL` points to `https://127.0.0.1:9200` (not `localhost` -- IPv6 resolution issue on Windows).
 - Check ES is running: `curl -k -u elastic:PASSWORD https://127.0.0.1:9200/_cluster/health`.
 - If using self-signed certs, set `ION_CA_BUNDLE` to the CA cert path.
 - Check Docker container status: `docker ps | grep elasticsearch`.
@@ -287,6 +277,10 @@ Past releases rotted version strings in less-obvious files. v0.22.0 cleaned up 1
 | 6 | `.env.deploy` | `ION_VERSION=X.Y.Z` AND the human-readable comment on the line above it |
 | 7 | `CHANGELOG.md` | New top entry `## vX.Y.Z — YYYY-MM-DD` |
 | 8 | `SECURITY_ASSESSMENT.md` | Bump "Application Version" header, add new column to severity-trend table, add "Net-New Surfaces in vX.Y.Z" section (and "Net-Removed Surface" if applicable) |
+
+### Also refresh the doc metadata stamps
+
+The eight files above are the **code** version bump. Separately, the public Markdown docs each carry an `<!-- ion-doc:version=X.Y.Z -->` (and `ion-doc:date`) header comment. These are **not** in the eight-file ritual, so they rot silently — refresh them (README, STACK, SETUP, and `docs/*.md`) whenever the docs are materially reviewed for a release, or at least confirm they match the current version during release closeout.
 
 ### Two sanity-check greps (must return empty before tagging)
 

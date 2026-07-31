@@ -1,11 +1,11 @@
 <!-- ion-doc:type=DEPLOYMENT GUIDE -->
 <!-- ion-doc:title=ION Deployment Guide -->
 <!-- ion-doc:subtitle=Production deployment topology, container orchestration, environment configuration -->
-<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Operators, SREs, deployment engineers -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-07-30 -->
 
 # ION Deployment Guide
 
@@ -113,6 +113,149 @@ docker exec ion python /app/seed_ion_data.py
 python seed_alerts.py
 python seed_skills_team.py
 ```
+
+---
+
+## Environment Variable Reference
+
+All configuration is via `ION_*` environment variables loaded from `.env`. Every integration follows the `ION_<NAME>_ENABLED` + `_URL` + auth pattern and is **off / unconfigured by default** unless noted.
+
+### Server
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_PORT` | `8000` | HTTP listen port |
+| `ION_HOST` | `0.0.0.0` | Bind address |
+| `ION_WORKERS` | `4` | Uvicorn worker count |
+| `ION_BASE_URL` | -- | Public URL for OIDC redirect URIs |
+| `ION_ADMIN_PASSWORD` | `admin2025` | Initial admin account password |
+| `ION_DEBUG_MODE` | `false` | Enable /docs and /redoc endpoints |
+| `ION_COOKIE_SECURE` | `false` | Force Secure flag on session cookies |
+| `ION_SECRET_KEY` | auto | JWT signing key |
+
+### Database
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_DATABASE_URL` | `postgresql://ion:ion2025@postgres:5432/ion` | PostgreSQL connection string |
+| `ION_DB_PASSWORD` | `ion2025` | PostgreSQL password (used by compose) |
+| `ION_DATA_DIR` | `/data` | Persistent data directory (Docker) |
+
+### Elasticsearch
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_ELASTICSEARCH_URL` | -- | Elasticsearch URL (e.g. `https://es:9200`) |
+| `ION_ELASTICSEARCH_USERNAME` | -- | ES username |
+| `ION_ELASTICSEARCH_PASSWORD` | -- | ES password |
+| `ION_ELASTICSEARCH_API_KEY` | -- | ES API key (alternative to user/pass) |
+| `ION_ELASTICSEARCH_ALERT_INDEX` | `.alerts-security.alerts-production` | Alert index pattern |
+| `ION_ELASTICSEARCH_VERIFY_SSL` | `false` | Verify ES TLS certificate |
+
+### Kibana
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_KIBANA_URL` | -- | Kibana URL for case sync |
+| `ION_KIBANA_USERNAME` | -- | Kibana username |
+| `ION_KIBANA_PASSWORD` | -- | Kibana password |
+| `ION_KIBANA_SPACE_ID` | `production` | Default Kibana space |
+| `ION_KIBANA_VERIFY_SSL` | `false` | Verify Kibana TLS certificate |
+
+### TIDE (Detection Engineering)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_TIDE_ENABLED` | `false` | Enable TIDE integration |
+| `ION_TIDE_URL` | -- | TIDE API base URL |
+| `ION_TIDE_API_KEY` | -- | TIDE API key |
+| `ION_TIDE_VERIFY_SSL` | `false` | Verify TIDE TLS certificate |
+
+### OpenCTI (Threat Intelligence)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_OPENCTI_ENABLED` | `false` | Enable OpenCTI integration |
+| `ION_OPENCTI_URL` | -- | OpenCTI URL |
+| `ION_OPENCTI_TOKEN` | -- | OpenCTI API token |
+| `ION_OPENCTI_VERIFY_SSL` | `false` | Verify OpenCTI TLS certificate |
+
+### Arkime (PCAP)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_ARKIME_ENABLED` | `false` | Enable Arkime integration |
+| `ION_ARKIME_URL` | -- | Arkime viewer URL |
+| `ION_ARKIME_KEYCLOAK_ISSUER` | -- | Keycloak issuer URL for Arkime auth |
+| `ION_ARKIME_KEYCLOAK_CLIENT_ID` | -- | Keycloak client ID |
+| `ION_ARKIME_KEYCLOAK_CLIENT_SECRET` | -- | Keycloak client secret |
+| `ION_ARKIME_VERIFY_SSL` | `false` | Verify Arkime TLS certificate |
+
+### Ollama (AI / LLM — Bob)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_OLLAMA_ENABLED` | `true` | Enable Ollama AI features |
+| `ION_OLLAMA_URL` | `http://ollama:11434` | Ollama API URL |
+| `ION_OLLAMA_MODEL` | `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF` | Default Bob model (security-tuned, Llama-3.1-8B based) |
+| `ION_OLLAMA_NUM_CTX` | `16384` | Context window; raise toward 65536 on RAM-rich hosts |
+| `ION_OLLAMA_TIMEOUT` | `300` | Request timeout (seconds) |
+| `ION_OLLAMA_VERIFY_SSL` | `false` | Verify Ollama TLS certificate |
+
+### Additional enrichment integrations
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_VIRUSTOTAL_ENABLED` / `ION_VIRUSTOTAL_API_KEY` | `false` / -- | VirusTotal observable enrichment |
+| `ION_SHODAN_ENABLED` / `ION_SHODAN_API_KEY` | `false` / -- | Shodan internet-facing asset intel |
+| `ION_ABUSEIPDB_ENABLED` / `ION_ABUSEIPDB_API_KEY` | `false` / -- | AbuseIPDB IP reputation |
+| `ION_DFIR_IRIS_ENABLED` / `ION_DFIR_IRIS_URL` / `ION_DFIR_IRIS_API_KEY` | `false` / -- / -- | DFIR-IRIS case escalation |
+
+### OIDC / Keycloak (SSO)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_OIDC_ENABLED` | `false` | Enable Keycloak SSO |
+| `ION_OIDC_KEYCLOAK_URL` | -- | Keycloak base URL |
+| `ION_OIDC_REALM` | -- | Keycloak realm name |
+| `ION_OIDC_CLIENT_ID` | -- | OIDC client ID |
+| `ION_OIDC_CLIENT_SECRET` | -- | OIDC client secret |
+| `ION_OIDC_VERIFY_SSL` | `false` | Verify Keycloak TLS certificate |
+
+### TLS / SSL
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_SSL_CERT` | -- | Path to TLS certificate (serve ION over HTTPS) |
+| `ION_SSL_KEY` | -- | Path to TLS private key |
+| `ION_CA_BUNDLE` | -- | Path to custom CA bundle for outbound connections |
+
+### GitLab
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_GITLAB_ENABLED` | `false` | Enable GitLab integration |
+| `ION_GITLAB_URL` | -- | GitLab instance URL |
+| `ION_GITLAB_TOKEN` | -- | GitLab personal access token |
+
+### SMTP (Email Notifications)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_SMTP_ENABLED` | `false` | Enable email notifications |
+| `ION_SMTP_HOST` | -- | SMTP server hostname |
+| `ION_SMTP_PORT` | `587` | SMTP port |
+| `ION_SMTP_USERNAME` | -- | SMTP username |
+| `ION_SMTP_PASSWORD` | -- | SMTP password |
+
+### Optional server modes (default off)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ION_MCP_ENABLED` | `false` | Expose core SOC data as MCP tools at `POST /api/mcp` |
+| `ION_METRICS_ENABLED` | `false` | Serve Prometheus OpenMetrics at `GET /metrics` |
+| `ION_METRICS_TOKEN` | -- | Optional bearer token required to scrape `/metrics` |
+| `ION_APM_ENABLED` | `false` | Enable Elastic APM instrumentation |
 
 ---
 

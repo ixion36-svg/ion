@@ -1,11 +1,11 @@
 <!-- ion-doc:type=ARCHITECTURE REFERENCE -->
 <!-- ion-doc:title=ION Architecture Reference -->
 <!-- ion-doc:subtitle=Components, data flow, schema — the original architectural reference (peer to HLD/LLD) -->
-<!-- ion-doc:version=0.29.1 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Architects, engineers, operators -->
-<!-- ion-doc:date=2026-05-12 -->
+<!-- ion-doc:date=2026-07-30 -->
 
 # ION Architecture
 
@@ -138,7 +138,8 @@ ION's business logic lives in `src/ion/services/` (80+ modules). Key services:
 | `KibanaSyncService` | `kibana_sync_service.py` | Background loop for continuous Kibana case sync |
 | `OllamaService` | `ollama_service.py` | LLM chat, streaming, model management |
 | `GitlabService` | `gitlab_service.py` | GitLab API client for change tracking |
-| `VirusTotal/Shodan` | `virustotal_service.py`, `shodan_service.py` | Observable enrichment providers |
+| `VirusTotal/Shodan` | `virustotal_service.py`, `shodan_service.py` | Observable enrichment providers (AbuseIPDB enrichment via `web/enrichment_api.py`) |
+| `DFIRIrisService` | `dfir_iris_service.py` | Case escalation to an external DFIR-IRIS platform |
 
 ### Investigation Services
 
@@ -146,6 +147,7 @@ ION's business logic lives in `src/ion/services/` (80+ modules). Key services:
 |---------|------|---------|
 | `InvestigationService` | `investigation_service.py` | Auto-investigation queue, LLM-driven alert analysis |
 | `AttackStoryService` | `attack_story_service.py` | Multi-step attack narrative correlation |
+| `AttackPathService` | `attack_path_service.py` | Bob Pathfinding — per-case directed kill-chain graph with MITRE reachability scoring (Case Detail attack-path tab) |
 | `CaseSimilarityService` | `case_similarity_service.py` | Find similar past cases by rules, hosts, observables |
 | `TriageSuggestionService` | `triage_suggestion_service.py` | Historical FP/TP suggestions |
 | `EntityTimelineService` | `entity_timeline_service.py` | Unified cross-source timeline for hosts/IPs/users |
@@ -186,6 +188,10 @@ ION's business logic lives in `src/ion/services/` (80+ modules). Key services:
 | `AIDocumentService` | `ai_document_service.py` | AI-assisted document generation |
 | `AlertPromptService` | `alert_prompt_service.py` | Pre-built prompt templates for alert types |
 | `PIIAnonService` | `pii_anon_service.py` | PII detection and anonymisation |
+
+### Detection Engineering module & optional server modes
+
+The optional **Detection Engineering (DE) module** adds read-and-review services (`de_service`, `de_proposal_service`, `de_quirk_service`, `de_bob_service` / `de_bob_proposal_service`) covering DE Metrics / Noise Campaigns, Detection Proposals, the System Quirks register, and a Bob improvement loop — gated by the `de:read` / `de:propose` / `de:verify` / `de:approve` permissions. Two optional server modes ship off by default: an **MCP server** (`mcp_api.py`, `POST /api/mcp`, `ION_MCP_ENABLED`) exposing core SOC data as MCP tools, and **observability** (`metrics_api.py` Prometheus `/metrics` + `core/apm.py` Elastic APM, `ION_METRICS_ENABLED` / `ION_APM_ENABLED`). See [`HLD.md`](HLD.md) / [`LLD.md`](LLD.md) for the full data model and sequence detail rather than duplicating it here.
 
 ---
 
