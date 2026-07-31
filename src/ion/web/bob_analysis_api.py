@@ -255,9 +255,14 @@ _SYSTEM_PROMPT = (
     "\"Get Bob's Analysis\". The analyst wants a tight, evidence-grounded "
     "verdict they can paste into the case as a note if they agree. "
     "A case may bundle MANY alerts — reason over ALL of them together: "
-    "treat the alerts as one incident, look for the relationship between "
-    "them (shared host/user/process/timeline, a kill-chain across alerts), "
-    "and give ONE overall verdict for the case rather than per-alert notes. "
+    "treat the alerts as one incident and give ONE overall verdict for the "
+    "case rather than per-alert notes. "
+    "When a structured **Attack path** is provided in the case data below, "
+    "reason over THAT explicit deterministic kill-chain graph — reference its "
+    "specific node ids, edges, and alert_ids when explaining the chain, and "
+    "factor its reachability band into your severity/priority call — rather "
+    "than inventing a kill-chain from prose. Never assert nodes or edges that "
+    "are not in the provided graph. "
     "Cite the SPECIFIC fields, observables, and prior cases you reference. "
     "Do not speculate beyond what the data shows. "
     "Structure your output as markdown with these sections, in order: "
@@ -389,6 +394,111 @@ def _render_alert_fields_section(alert_summaries: list[dict], total_alerts: int)
     return parts
 
 
+# Caps so a large graph can't blow the prompt budget; the rest are noted as
+# truncated. The path is a compact structured rendering, not the full JSON.
+_MAX_PATH_NODES_IN_PROMPT = 40
+_MAX_PATH_EDGES_IN_PROMPT = 40
+
+
+def _build_attack_path_prompt_block(path: Optional[dict]) -> str:
+    """Render the structured attack path into a compact prompt block (v0.62.0).
+
+    Pure + deterministic — no I/O, no LLM. Turns the Phase-0/Phase-2 graph dict
+    into an ordered, tactic-laned kill-chain Bob can reason over and CITE:
+    each lane lists its nodes (id + value + threat_level), a global edge list
+    gives ``source --type--> target`` with the backing ``alert_ids``, and the
+    ``stats.reachability`` score/band/rationale leads so Bob can weight
+    severity by how far the chain reaches.
+
+    Returns ``""`` when the path is empty / missing (air-gap fallback — the
+    caller then behaves exactly as before Phase 2), so this is a safe no-op.
+    Node and edge counts are capped; truncation is stated in-band.
+    """
+    if not path:
+        return ""
+    nodes = path.get("nodes") or []
+    edges = path.get("edges") or []
+    phases = path.get("phases") or []
+    if not nodes:
+        return ""
+
+    node_by_id = {n.get("id"): n for n in nodes if isinstance(n, dict)}
+    stats = path.get("stats") or {}
+    reach = stats.get("reachability") or {}
+
+    parts: list[str] = ["## Attack path (deterministic — reason over THIS graph)"]
+
+    if reach:
+        parts.append(
+            f"- **Reachability:** {reach.get('band', 'unknown')} "
+            f"(score {reach.get('score', 0)}/100) — {reach.get('rationale', '')}"
+        )
+        if reach.get("impact_tactics"):
+            parts.append(
+                f"- **Impact-class tactics reached:** {', '.join(reach['impact_tactics'])}"
+            )
+        top = reach.get("top_threat_nodes") or []
+        if top:
+            parts.append(
+                "- **Highest-threat nodes:** "
+                + ", ".join(
+                    f"`{t.get('id')}` ({t.get('threat_level')})" for t in top
+                )
+            )
+    if stats.get("reaches_impact"):
+        parts.append("- This chain reaches an impact-class tactic.")
+    parts.append("")
+
+    # Ordered kill-chain lanes with their nodes (id + value + threat_level).
+    parts.append("### Kill-chain lanes (initial-access → impact)")
+    rendered_nodes = 0
+    truncated_nodes = False
+    for p in phases:
+        tactic = p.get("tactic", "unknown")
+        node_ids = p.get("node_ids") or []
+        alert_ids = p.get("alert_ids") or []
+        header = f"- **{tactic}**"
+        if alert_ids:
+            header += f" (alerts: {', '.join(str(a) for a in alert_ids[:6])}"
+            header += ", …)" if len(alert_ids) > 6 else ")"
+        parts.append(header)
+        for nid in node_ids:
+            if rendered_nodes >= _MAX_PATH_NODES_IN_PROMPT:
+                truncated_nodes = True
+                break
+            n = node_by_id.get(nid, {})
+            tl = n.get("threat_level")
+            tl_txt = f", threat={tl}" if tl else ""
+            parts.append(f"    - `{nid}` (value={n.get('value')}{tl_txt})")
+            rendered_nodes += 1
+        if rendered_nodes >= _MAX_PATH_NODES_IN_PROMPT:
+            truncated_nodes = True
+    if truncated_nodes:
+        parts.append(
+            f"    - _…node list truncated at {_MAX_PATH_NODES_IN_PROMPT}._"
+        )
+    parts.append("")
+
+    # Global edge list: source --type--> target, with backing alert_ids.
+    parts.append("### Edges (source → target)")
+    if not edges:
+        parts.append("_No edges linking these nodes._")
+    else:
+        for e in edges[:_MAX_PATH_EDGES_IN_PROMPT]:
+            aids = e.get("alert_ids") or []
+            aid_txt = f" [alerts: {', '.join(str(a) for a in aids[:6])}]" if aids else ""
+            parts.append(
+                f"- `{e.get('source')}` --{e.get('type')}--> "
+                f"`{e.get('target')}`{aid_txt}"
+            )
+        if len(edges) > _MAX_PATH_EDGES_IN_PROMPT:
+            parts.append(
+                f"_…and {len(edges) - _MAX_PATH_EDGES_IN_PROMPT} more edge(s) not shown._"
+            )
+    parts.append("")
+    return "\n".join(parts)
+
+
 def _build_user_prompt(
     case: AlertCase,
     linked_triages: list[AlertTriage],
@@ -396,6 +506,7 @@ def _build_user_prompt(
     similar_cases: list[dict],
     alert_summaries: list[dict],
     memory_block: str = "",
+    path_block: str = "",
 ) -> str:
     """Construct the markdown context block the analyst expects Bob to use."""
     parts: list[str] = []
@@ -474,12 +585,26 @@ def _build_user_prompt(
             )
     parts.append("")
 
+    # v0.62.0: structured attack path — the deterministic kill-chain graph Bob
+    # must reason over (and cite) instead of inventing one from prose. Omitted
+    # entirely when empty (air-gap / no-graph fallback → prior behaviour).
+    if path_block and path_block.strip():
+        parts.append(path_block.strip())
+        parts.append("")
+
     # v0.54.0: investigation memory — FP signatures, prior verdicts (most
     # confident first) and analyst-disagreement history for the lead rule.
     if memory_block and memory_block.strip():
         parts.append(memory_block.strip())
         parts.append("")
 
+    if path_block and path_block.strip():
+        parts.append(
+            "Ground your verdict on the **Attack path** above: reference its "
+            "specific node ids, edges, and alert_ids when you explain the "
+            "chain, and factor its reachability band into your severity / "
+            "priority call. Do not invent nodes or edges that are not listed."
+        )
     parts.append(
         "Produce the verdict + evidence + similar-cases + next-steps "
         "sections defined in the system prompt."
@@ -529,9 +654,25 @@ async def generate_bob_analysis(
     system_prompt, stack_meta = _augment_system_prompt(session, rep_alert)
     memory_block = _gather_memory_context(rep_alert)
 
+    # v0.62.0 (Attack Path Phase 2): build the deterministic path graph and
+    # inject a compact structured rendering so Bob reasons over the explicit
+    # kill-chain (nodes/edges/reachability) rather than narrating one from
+    # prose. Best-effort + air-gap safe: any failure or empty graph → the
+    # path block is "" and the prompt degrades to the prior behaviour.
+    path_block = ""
+    reachability: dict = {}
+    try:
+        from ion.services.attack_path_service import build_attack_path
+        attack_path = await build_attack_path(session, case_id)
+        path_block = _build_attack_path_prompt_block(attack_path)
+        reachability = (attack_path.get("stats") or {}).get("reachability") or {}
+    except Exception as exc:
+        logger.debug("Attack-path prompt injection skipped for case %d: %s", case_id, exc)
+
     user_prompt = _build_user_prompt(
         case, linked_triages, investigations, similar, alert_summaries,
         memory_block=memory_block,
+        path_block=path_block,
     )
 
     try:
@@ -575,6 +716,10 @@ async def generate_bob_analysis(
             "prompt_template": stack_meta.get("template"),
             "rag_blocks": stack_meta.get("rag_blocks", 0),
             "memory_context_present": bool(memory_block and memory_block.strip()),
+            # v0.62.0: attack-path Phase 2 telemetry
+            "attack_path_present": bool(path_block and path_block.strip()),
+            "reachability_band": reachability.get("band"),
+            "reachability_score": reachability.get("score"),
         },
         generated_at=datetime.now(timezone.utc).isoformat(),
     )

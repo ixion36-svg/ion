@@ -93,6 +93,33 @@ _IMPACTFUL_TACTICS = frozenset(
     {"impact", "exfiltration", "credential-access", "lateral-movement"}
 )
 
+# ── Phase-2 reachability weights (Fork D: MITRE-tactic-reached heuristic) ─────
+# Per-tactic weight (0-100) for the "how far / how bad does this chain reach"
+# score. Deterministic, no config, no LLM: the SOC analogue of Maze's
+# exploitability-in-context over raw severity. The furthest (highest-weight)
+# tactic present dominates; breadth of tactics and a high/critical threat node
+# add on top. Ordering follows the kill chain — impact/exfil highest, recon /
+# resource-development lowest.
+_TACTIC_WEIGHT: Dict[str, int] = {
+    "impact": 95,
+    "exfiltration": 90,
+    "credential-access": 78,
+    "lateral-movement": 78,
+    "privilege-escalation": 72,
+    "command-and-control": 62,
+    "collection": 58,
+    "execution": 45,
+    "persistence": 45,
+    "defense-evasion": 45,
+    "discovery": 38,
+    "initial-access": 25,
+    "reconnaissance": 12,
+    "resource-development": 12,
+}
+
+# Threat levels that count as "a node that matters" for the scoring boost.
+_HIGH_THREATS = ("critical", "high")
+
 # ── Node model ───────────────────────────────────────────────────────────────
 # The 7 path-entity node types and their stable id prefixes.
 _NODE_PREFIX: Dict[str, str] = {
@@ -440,6 +467,116 @@ def build_attack_path_from_alerts(
     }
 
 
+def _band_for_score(score: int) -> str:
+    """Map a 0-100 reachability score to a severity band."""
+    if score >= 80:
+        return "critical"
+    if score >= 60:
+        return "high"
+    if score >= 35:
+        return "medium"
+    return "low"
+
+
+def score_reachability(path_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """Deterministic reachability score for a built attack-path graph.
+
+    Fork D — *MITRE-tactic-reached heuristic*, no new config, no LLM, no
+    network. Answers "does this chain reach something that matters, and how
+    far" rather than merely counting alerts: the SOC analogue of Maze's
+    exploitability-in-context. Score is a function of
+
+    * the **furthest (highest-weight) tactic** the path reaches (dominant term),
+    * the **breadth** of distinct tactics across the chain (small bonus), and
+    * a boost when any path node carries a high/critical ``threat_level``.
+
+    Returns::
+
+        {"score": int 0-100, "band": "low|medium|high|critical",
+         "rationale": str, "impact_tactics": [slug, ...],
+         "top_threat_nodes": [{"id","type","value","threat_level"}, ...]}
+
+    Pure and deterministic: identical input → identical output. Safe on an
+    empty / malformed dict (returns a zero, ``low`` result).
+    """
+    path_dict = path_dict or {}
+    stats = path_dict.get("stats") or {}
+    nodes = path_dict.get("nodes") or []
+
+    # Tactics present — prefer the pre-computed kill-chain-ordered list, fall
+    # back to deriving from the phase lanes (excluding the unknown lane).
+    tactics = list(stats.get("tactics_reached") or [])
+    if not tactics:
+        tactics = [
+            p.get("tactic")
+            for p in (path_dict.get("phases") or [])
+            if p.get("tactic") and p.get("tactic") != UNKNOWN_TACTIC
+        ]
+    tactics = [t for t in tactics if t in _TACTIC_WEIGHT]
+
+    # High/critical-scored nodes drive the threat boost + the surfaced list.
+    threat_nodes = [
+        n for n in nodes
+        if isinstance(n, dict) and n.get("threat_level") in _HIGH_THREATS
+    ]
+    threat_nodes.sort(
+        key=lambda n: (-_THREAT_ORDER.get(n.get("threat_level"), 0), str(n.get("id")))
+    )
+    has_critical = any(n.get("threat_level") == "critical" for n in threat_nodes)
+    has_high = any(n.get("threat_level") == "high" for n in threat_nodes)
+
+    if not tactics:
+        base = 0
+        furthest: Optional[str] = None
+    else:
+        furthest = max(tactics, key=lambda t: _TACTIC_WEIGHT[t])
+        base = _TACTIC_WEIGHT[furthest]
+
+    breadth = len(set(tactics))
+    breadth_bonus = min(max(breadth - 1, 0), 6) * 2  # up to +12
+    threat_boost = 12 if has_critical else (6 if has_high else 0)
+
+    score = 0 if base == 0 else min(100, base + breadth_bonus + threat_boost)
+    band = _band_for_score(score)
+
+    impact_tactics = sorted(
+        {t for t in tactics if t in _IMPACTFUL_TACTICS},
+        key=lambda s: KILL_CHAIN_RANK.get(s, UNKNOWN_RANK),
+    )
+    top_threat_nodes = [
+        {
+            "id": n.get("id"),
+            "type": n.get("type"),
+            "value": n.get("value"),
+            "threat_level": n.get("threat_level"),
+        }
+        for n in threat_nodes[:5]
+    ]
+
+    # Human rationale.
+    if furthest is None:
+        rationale = "No MITRE tactics mapped on this path; reachability undetermined."
+    else:
+        bits = [f"Furthest tactic reached: {furthest}"]
+        if impact_tactics:
+            bits[0] = f"Reaches {furthest} (impact-class chain)"
+        bits.append(
+            f"{breadth} distinct tactic{'s' if breadth != 1 else ''} across the chain"
+        )
+        if has_critical or has_high:
+            level = "critical" if has_critical else "high"
+            bits.append(f"{len(threat_nodes)} {level}-scored node(s)")
+        rationale = "; ".join(bits) + "."
+
+    return {
+        "score": int(score),
+        "band": band,
+        "rationale": rationale,
+        "impact_tactics": impact_tactics,
+        "top_threat_nodes": top_threat_nodes,
+    }
+
+
 async def _fetch_case_alert_dicts(session, case_id: int) -> Optional[List[Dict[str, Any]]]:
     """Fetch a case's alerts as enriched contract dicts.
 
@@ -504,4 +641,12 @@ async def build_attack_path(session, case_id: int) -> Dict[str, Any]:
     case existence first (the endpoint does).
     """
     alerts = await _fetch_case_alert_dicts(session, case_id)
-    return build_attack_path_from_alerts(case_id, alerts or [])
+    path = build_attack_path_from_alerts(case_id, alerts or [])
+    # Phase 2: fold in the deterministic reachability score so the Phase-1 UI
+    # and Bob both see it. Additive under stats.reachability — the pure builder
+    # keeps its stable Phase-0 schema; only the compute-on-read wrapper enriches.
+    try:
+        path["stats"]["reachability"] = score_reachability(path)
+    except Exception:
+        logger.debug("attack_path: reachability scoring skipped", exc_info=True)
+    return path
