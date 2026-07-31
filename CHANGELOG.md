@@ -1,13 +1,21 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.61.0 -->
-<!-- ion-doc:version=0.61.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.62.0 -->
+<!-- ion-doc:version=0.62.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.62.0 — 2026-07-30
+
+**Attack Path (Bob Pathfinding) — Phase 2: reachability scoring + Bob reasons over the path.** Bob stops guessing the kill-chain in free text and reasons over the explicit Phase 0 graph. Advisory, air-gap-safe.
+
+- **Reachability score** — new deterministic `score_reachability(path)` in `attack_path_service` (MITRE-tactic-reached heuristic, no LLM/network): `{score 0-100, band low|medium|high|critical, rationale, impact_tactics, top_threat_nodes}`. Score = furthest (highest-weight) tactic reached + breadth bonus + high/critical threat-node boost. Folded into `build_attack_path` output under `stats.reachability`.
+- **Bob reasons over the structured path** — case analysis (`bob_analysis_api`) now injects a compact structured kill-chain into the prompt: a reachability line + tactic lanes (nodes with `id`/value/`threat_level` + backing alert ids) + an edge list. The old vague "look for a kill-chain across alerts" instruction is replaced with: reason over the explicit provided graph, **cite node ids / edges / alert_ids**, never assert nodes/edges not in the graph, and factor the reachability band into severity/priority. Response telemetry gains `attack_path_present` / `reachability_band` / `reachability_score`.
+- **Air-gap-safe fallback** — empty/missing path → prior behaviour; node/edge caps (40/40) keep the prompt within budget. Tests: `tests/test_v062_attack_path_reasoning.py` (12) + Phase 0 (17) green.
 
 ## v0.61.0 — 2026-07-30
 
