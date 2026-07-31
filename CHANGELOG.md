@@ -1,13 +1,21 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.62.0 -->
-<!-- ion-doc:version=0.62.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.63.0 -->
+<!-- ion-doc:version=0.63.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.63.0 — 2026-07-30
+
+**Attack Path (Bob Pathfinding) — Phase 3** + public-docs refresh.
+
+- **Verifier pass** — `bob_verifier_service`: one temp-0 adversarial LLM check that Bob's case analysis is supported by the attack graph (cite-what's-present); gated to medium-confidence decisive verdicts; advisory "Verification" block; air-gap no-op; never mutates state.
+- **Path recurrence → DE hint** — `path_signature` + `find_recurring_path` count recent same-signature cases (`stats.recurrence`, `suggests_detection_proposal`); advisory root-cause link to the DE module, no auto-create. Env: `ION_ATTACK_PATH_RECURRENCE_ENABLED/THRESHOLD`. Tests: `test_v063_attack_path_verify.py` (21).
+- **Docs** — README trimmed 386→179 lines; env-var reference moved to `docs/DEPLOYMENT.md`; retired-kanban / DE-module / Attack-Path / MCP / observability corrected; RUNBOOK `ION_ES_*`→`ION_ELASTICSEARCH_*` fix; RBAC de-duplicated; stamps refreshed.
 
 ## v0.62.0 — 2026-07-30
 

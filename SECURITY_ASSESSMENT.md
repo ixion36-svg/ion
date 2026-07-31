@@ -1,7 +1,7 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.62.0 -->
+<!-- ion-doc:version=0.63.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,8 +9,8 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-07-30 (current: v0.62.0). Per-version deltas and history: see CHANGELOG + git history.
-**Application Version:** 0.62.0 — Attack Path (Bob Pathfinding) Phases 0-2: a deterministic, compute-on-read attack-path graph per case (`case:read`), the kill-chain graph UI, and Bob reasoning over the structured path with a MITRE-tactic reachability score. Advisory, air-gap-safe; no net-new tables or permissions. ION-side findings: **0 Critical / 0 High**. Prior per-version net-new-surface notes: see CHANGELOG + git history.
+**Assessment Date:** 2026-07-30 (current: v0.63.0). Per-version deltas and history: see CHANGELOG + git history.
+**Application Version:** 0.63.0 — Attack Path (Bob Pathfinding) Phases 0-3: a deterministic, compute-on-read attack-path graph per case (`case:read`), the kill-chain graph UI, Bob reasoning over the structured path with a MITRE-tactic reachability score, and an advisory verifier pass + path-recurrence hint. Advisory, air-gap-safe; no net-new tables or permissions. ION-side findings: **0 Critical / 0 High**. Prior per-version net-new-surface notes: see CHANGELOG + git history.
 **Previous Assessment Version:** 0.33.0 (2026-05-27)
 **Scope:** Web application security review â€” authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
@@ -24,7 +24,7 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 
 **Current findings posture (v0.54.1): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0** and have stayed at zero since. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
 
-| Severity | Open findings (v0.62.0) |
+| Severity | Open findings (v0.63.0) |
 |----------|:-----------------------:|
 | Critical | 0 |
 | High | 0 |
