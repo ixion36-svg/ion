@@ -363,15 +363,24 @@ def execute_story(
             context["nodes"][cur_id] = output
         except StoryExecutionError as exc:
             duration_ms = int((time.monotonic() - node_started) * 1000)
+            # Log the full detail server-side; return only ION-authored,
+            # non-exception-derived context (step id + type) to the client so
+            # internal paths / library internals never leak (CodeQL
+            # py/stack-trace-exposure).
+            logger.warning(
+                "story step %s (%s) failed: %s",
+                cur_id, node.get("type"), exc, exc_info=True,
+            )
+            safe_msg = f"Step '{cur_id}' ({node.get('type')}) failed"
             step_outputs[cur_id] = {
                 "status": "error",
-                "error": str(exc),
+                "error": safe_msg,
                 "duration_ms": duration_ms,
             }
             return {
                 "status": "failed",
                 "step_outputs": step_outputs,
-                "error": f"Step {cur_id}: {exc}",
+                "error": safe_msg,
             }
         cur_id = node.get("next")
 

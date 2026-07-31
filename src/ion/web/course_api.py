@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
 import secrets
 from datetime import datetime
@@ -1328,6 +1329,14 @@ async def upload_course_image(
     course_dir = _COURSE_IMAGES_ROOT / _safe_slug(course.slug)
     course_dir.mkdir(parents=True, exist_ok=True)
     target = course_dir / fname
+
+    # Path-traversal guard: even though slug/stem/ext are all sanitised, confine
+    # the resolved target to the images root before any filesystem write so a
+    # crafted name can never escape the intended directory.
+    _root = os.path.realpath(_COURSE_IMAGES_ROOT)
+    _resolved = os.path.realpath(target)
+    if _resolved != _root and not _resolved.startswith(_root + os.sep):
+        raise HTTPException(status_code=400, detail="Invalid image path")
 
     # Stream + size-cap the read so a malicious giant upload doesn't OOM us.
     bytes_written = 0

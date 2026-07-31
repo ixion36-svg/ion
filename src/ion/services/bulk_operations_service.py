@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
+from ion.core.safe_errors import safe_error
 from ion.models.alert_triage import (
     AlertCase,
     AlertCaseStatus,
@@ -57,7 +58,7 @@ def bulk_acknowledge_alerts(
 
         except Exception as exc:
             logger.warning("bulk_acknowledge error for %s: %s", es_id, exc)
-            errors.append(f"{es_id}: {exc}")
+            errors.append(f"{es_id}: {safe_error(exc, 'bulk_ops')}")
 
     session.commit()
     logger.info(
@@ -115,7 +116,7 @@ def bulk_close_alerts(
 
         except Exception as exc:
             logger.warning("bulk_close error for %s: %s", es_id, exc)
-            errors.append(f"{es_id}: {exc}")
+            errors.append(f"{es_id}: {safe_error(exc, 'bulk_ops')}")
 
     # Close parent cases whose triage entries are now all closed
     for case_id in cases_to_check:
@@ -145,7 +146,7 @@ def bulk_close_alerts(
 
         except Exception as exc:
             logger.warning("Error closing case %d: %s", case_id, exc)
-            errors.append(f"case-{case_id}: {exc}")
+            errors.append(f"case-{case_id}: {safe_error(exc, 'bulk_ops')}")
 
     session.commit()
     logger.info(
@@ -193,7 +194,7 @@ def bulk_assign_alerts(
 
         except Exception as exc:
             logger.warning("bulk_assign error for %s: %s", es_id, exc)
-            errors.append(f"{es_id}: {exc}")
+            errors.append(f"{es_id}: {safe_error(exc, 'bulk_ops')}")
 
     session.commit()
     logger.info(

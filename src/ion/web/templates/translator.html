@@ -140,7 +140,16 @@ function setStatus(msg, kind) {
   };
   el.className = 'mb-4 px-4 py-2 rounded-md text-[12.5px] flex items-center gap-2 ' + (colorMap[kind] || colorMap.busy);
   if (kind === 'busy') {
-    el.innerHTML = '<span class="inline-block h-3 w-3 rounded-full border-2 border-current border-r-transparent animate-spin"></span> <span>' + msg + '</span>';
+    // Build the spinner + message with DOM nodes so msg (which can include
+    // user-controlled text like an uploaded file name) is never parsed as HTML.
+    el.textContent = '';
+    const spin = document.createElement('span');
+    spin.className = 'inline-block h-3 w-3 rounded-full border-2 border-current border-r-transparent animate-spin';
+    const label = document.createElement('span');
+    label.textContent = msg;
+    el.appendChild(spin);
+    el.appendChild(document.createTextNode(' '));
+    el.appendChild(label);
   } else {
     el.textContent = msg;
   }

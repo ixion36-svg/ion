@@ -14,6 +14,31 @@ context string is preserved on ObservableLink.context for display.
 
 import re
 from typing import Any, Dict, List
+from urllib.parse import urlparse
+
+# Reference/documentation hosts whose URLs are rule metadata, not observables.
+_REFERENCE_HOSTS = ("attack.mitre.org", "elastic.co")
+
+
+def _host_of(value: str) -> str:
+    """Extract the lowercased host from a URL or bare domain value."""
+    v = value.strip()
+    if "://" in v:
+        host = urlparse(v).hostname or ""
+    else:
+        # Bare host, optionally with port/path — take the authority part.
+        host = v.split("/", 1)[0].split(":", 1)[0]
+    return host.lower().rstrip(".")
+
+
+def _is_reference_host(value: str) -> bool:
+    """True when the value's host is (a subdomain of) a reference host.
+
+    Uses an anchored host comparison rather than substring matching so
+    look-alike domains (e.g. ``elastic.co.evil.example``) don't match.
+    """
+    host = _host_of(value)
+    return any(host == d or host.endswith("." + d) for d in _REFERENCE_HOSTS)
 
 _IP_PATTERN = re.compile(
     r"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$"
@@ -118,7 +143,7 @@ def extract_observables_from_raw(raw_data: dict) -> List[Dict[str, str]]:
             if any(value.startswith(prefix) for prefix in _REFERENCE_URL_PREFIXES):
                 return
             # Also drop if the URL is a reference field, not an event field
-            if "attack.mitre.org" in value or "elastic.co" in value:
+            if _is_reference_host(value):
                 return
         if (obs_type, value) not in seen:
             seen.add((obs_type, value))

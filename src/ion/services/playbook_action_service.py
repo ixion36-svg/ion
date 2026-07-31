@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ion.core.safe_errors import safe_error
 from ion.models.sla import PlaybookAction, PlaybookActionLog
 
 logger = logging.getLogger(__name__)
@@ -303,9 +304,8 @@ def execute_action(session: Session, log_id: int) -> dict:
         )
 
     except Exception as exc:
-        logger.exception("Action log %d failed", log_id)
         log_entry.status = "failed"
-        log_entry.error = str(exc)
+        log_entry.error = safe_error(exc, f"execute_action[{log_id}]")
         session.commit()
         session.refresh(log_entry)
 

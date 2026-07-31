@@ -1758,7 +1758,10 @@ async def check_arkime_high_risk(
                         })
                         country_result["session_count"] += count
             except Exception as e:
-                country_result.setdefault("errors", []).append(f"{node_name}: {str(e)[:60]}")
+                from ion.core.safe_errors import safe_error
+                country_result.setdefault("errors", []).append(
+                    f"{node_name}: {safe_error(e, 'arkime_country_sessions')}"
+                )
 
         results.append(country_result)
 
@@ -1839,4 +1842,5 @@ async def arkime_node_stats(
             },
         }
     except Exception as e:
-        return {"configured": True, "error": str(e)[:100]}
+        from ion.core.safe_errors import safe_error
+        return {"configured": True, "error": safe_error(e, "arkime_node_stats")}

@@ -2321,7 +2321,9 @@ function esc(s) {
     if (!s) return '';
     const d = document.createElement('div');
     d.textContent = s;
-    return d.innerHTML;
+    // textContent→innerHTML escapes & < > ; also encode both quote characters
+    // so values remain safe inside single- or double-quoted HTML attributes.
+    return d.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function ageLabel(dateStr) {
@@ -3654,7 +3656,9 @@ function renderPanelContent(c) {
             }
             // v0.20.0: Workbench — pin this alert as key evidence on the case.
             // Title prefilled from rule_name; severity defaults to case severity.
-            const pinTitle = (displayName || alertId).replace(/'/g, "\\'");
+            // esc() (applied at the data-args insertion below) fully encodes
+            // quotes now, so no manual pre-escaping is needed here.
+            const pinTitle = displayName || alertId;
             const pinSev = a.priority || c.severity || '';
             html += '<div class="cpanel-alert-card-meta _ion-s-7b6cad76b3">'
                 +     '<button class="cpanel-pin-btn" type="button" '

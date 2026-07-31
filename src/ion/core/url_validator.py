@@ -90,8 +90,10 @@ def validate_url(
     # Parse URL
     try:
         parsed = urlparse(url)
-    except Exception as e:
-        return False, f"Invalid URL format: {e}"
+    except Exception:
+        # Don't echo the parser exception (may leak internals); a generic
+        # message is enough for the client.
+        return False, "Invalid URL format"
 
     # Check scheme
     scheme = parsed.scheme.lower()

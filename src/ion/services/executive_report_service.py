@@ -4,6 +4,7 @@ Pulls from all ION data sources to create a comprehensive executive report:
 cases, MTTR, coverage, team metrics, notable incidents.
 """
 
+import html
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -297,11 +298,6 @@ def _esc(s) -> str:
     """
     if s is None:
         return ""
-    return (
-        str(s)
-        .replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
-        .replace("'", "&#39;")
-    )
+    # Delegate to stdlib html.escape (quote=True escapes & < > " '), which is
+    # a recognized sanitizer and covers all five HTML/XML special characters.
+    return html.escape(str(s), quote=True)

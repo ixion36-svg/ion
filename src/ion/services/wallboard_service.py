@@ -35,6 +35,8 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ion.core.safe_errors import safe_error
+
 logger = logging.getLogger(__name__)
 
 # Cache TTL — recompute the snapshot at most once every 300 seconds.
@@ -58,7 +60,7 @@ def _utc_now_iso() -> str:
 
 
 def _safe(label: str, fn, *, default: Any = None) -> Any:
-    """Run a panel-collector; on exception, return ``{"error": str(e)}``.
+    """Run a panel-collector; on exception, return ``{"error": <label>}``.
 
     ``label`` only goes to the log; never user-visible. ``default`` is
     the fallback structure if the collector throws (typically a dict
@@ -67,10 +69,10 @@ def _safe(label: str, fn, *, default: Any = None) -> Any:
     try:
         return fn()
     except Exception as exc:
-        logger.warning("wallboard: %s collector failed: %s", label, exc)
+        err = safe_error(exc, f"wallboard.{label}")
         if isinstance(default, dict):
-            return {**default, "error": str(exc)}
-        return {"error": str(exc)}
+            return {**default, "error": err}
+        return {"error": err}
 
 
 # ---------------------------------------------------------------------------
@@ -702,7 +704,7 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
         configured = bool(getattr(es, "is_configured", False) or getattr(es, "url", None))
         health["elasticsearch"] = {"status": "up" if configured else "off", "details": "configured" if configured else "not configured"}
     except Exception as exc:
-        health["elasticsearch"] = {"status": "down", "details": str(exc)[:80]}
+        health["elasticsearch"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}
 
     # TIDE — circuit-breaker / connector state.
     try:
@@ -711,7 +713,7 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
         configured = tide is not None and getattr(tide, "is_configured", lambda: False)()
         health["tide"] = {"status": "up" if configured else "off", "details": "configured" if configured else "not configured"}
     except Exception as exc:
-        health["tide"] = {"status": "down", "details": str(exc)[:80]}
+        health["tide"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}
 
     # OpenCTI — connector state.
     try:
@@ -720,7 +722,7 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
         configured = bool(getattr(oc, "url", None))
         health["opencti"] = {"status": "up" if configured else "off", "details": "configured" if configured else "not configured"}
     except Exception as exc:
-        health["opencti"] = {"status": "down", "details": str(exc)[:80]}
+        health["opencti"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}
 
     # Kibana — via the connector registry.
     try:
@@ -730,7 +732,7 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
         configured = bool(kib and getattr(kib, "is_configured", False))
         health["kibana"] = {"status": "up" if configured else "off", "details": "configured" if configured else "not configured"}
     except Exception as exc:
-        health["kibana"] = {"status": "down", "details": str(exc)[:80]}
+        health["kibana"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}
 
     # Ollama — for Bob.
     try:
@@ -739,7 +741,7 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
         configured = bool(ollama_url)
         health["ollama"] = {"status": "up" if configured else "off", "details": ollama_url[:60] if ollama_url else "not configured"}
     except Exception as exc:
-        health["ollama"] = {"status": "down", "details": str(exc)[:80]}
+        health["ollama"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}
 
     # Bob (the AI analyst service account)
     try:
@@ -747,7 +749,7 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
         bob = session.scalar(select(User).where(User.username == "bob"))
         health["bob"] = {"status": "up" if bob else "off", "details": "service account active" if bob else "not seeded"}
     except Exception as exc:
-        health["bob"] = {"status": "down", "details": str(exc)[:80]}
+        health["bob"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}
 
     return health
 
@@ -845,14 +847,14 @@ def get_snapshot(session: Session, *, force: bool = False) -> Dict[str, Any]:
             _cached_at = now
             return {**snap, "cache_age_seconds": 0}
         except Exception as exc:
-            logger.error("wallboard: gather failed: %s", exc)
+            err = safe_error(exc, "wallboard.gather")
             # If gather itself fails, return the previous cached snapshot if
             # any (with explicit error indicator); otherwise an empty
             # placeholder so the page can render.
             if _cached is not None:
-                return {**_cached, "cache_age_seconds": int(now - _cached_at), "stale_due_to_error": str(exc)}
+                return {**_cached, "cache_age_seconds": int(now - _cached_at), "stale_due_to_error": err}
             return {
                 "captured_at": _utc_now_iso(),
-                "error": str(exc),
+                "error": err,
                 "cache_age_seconds": 0,
             }

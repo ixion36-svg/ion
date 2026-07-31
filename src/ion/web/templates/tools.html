@@ -844,7 +844,7 @@ function parseLog() {
     }
 
     if (parsed) {
-        let html = `<p><strong>Detected Format:</strong> ${detectedFormat.toUpperCase()}</p>`;
+        let html = `<p><strong>Detected Format:</strong> ${escapeHtml(detectedFormat.toUpperCase())}</p>`;
         html += '<table class="data-table"><tr><th>Field</th><th>Value</th></tr>';
         for (const [k, v] of Object.entries(parsed)) {
             const val = typeof v === 'object' ? JSON.stringify(v, null, 2) : v;
@@ -878,10 +878,16 @@ function parseApache(input) {
 }
 
 function parseWindowsXML(input) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(input, 'text/xml');
+    // Extract leaf <Tag ...>text</Tag> pairs with a regex rather than feeding
+    // untrusted input to DOMParser (avoids a DOM-based XSS sink). Values are
+    // still HTML-escaped when rendered below.
     const result = {};
-    doc.querySelectorAll('*').forEach(el => { if (el.textContent && !el.children.length) result[el.tagName] = el.textContent.trim(); });
+    const re = /<([\w.:-]+)(?:\s[^>]*)?>([^<]*)<\/\1>/g;
+    let m;
+    while ((m = re.exec(input)) !== null) {
+        const val = m[2].trim();
+        if (val) result[m[1]] = val;
+    }
     return result;
 }
 
@@ -921,9 +927,16 @@ function decodeFromUrl() {
 }
 
 function decodeFromHtml() {
-    const txt = document.createElement('textarea');
-    txt.innerHTML = document.getElementById('enc-html').value;
-    document.getElementById('enc-text').value = txt.value;
+    // Reverse the five entities produced by updateEncodings() with plain string
+    // replacement — avoids assigning untrusted input to innerHTML. &amp; is
+    // decoded last so an encoded "&amp;lt;" round-trips correctly.
+    const val = document.getElementById('enc-html').value;
+    document.getElementById('enc-text').value = val
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, '&');
     updateEncodings();
 }
 

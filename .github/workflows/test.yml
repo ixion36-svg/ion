@@ -30,6 +30,11 @@ on:
   pull_request:
     branches: [main]
 
+# Least-privilege default token for all jobs — these jobs only read the repo
+# (checkout) and need no write scopes. Individual jobs can widen if ever needed.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: pytest

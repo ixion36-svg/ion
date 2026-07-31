@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from ion.core.config import get_gitlab_config
+from ion.core.safe_errors import safe_error
 
 
 @dataclass
@@ -256,7 +257,7 @@ class GitLabService:
         except GitLabError as e:
             return {
                 "connected": False,
-                "error": str(e),
+                "error": safe_error(e, "gitlab.test_connection"),
             }
 
     # Issue operations

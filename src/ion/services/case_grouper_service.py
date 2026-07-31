@@ -49,6 +49,7 @@ from sqlalchemy.orm import Session
 
 from ion.core import apm
 from ion.core.config import get_config
+from ion.core.safe_errors import safe_error
 from ion.models.alert_triage import (
     AlertCase,
     AlertCaseStatus,
@@ -813,7 +814,6 @@ def _tick() -> Dict[str, Any]:
         with apm.background_transaction("case_grouper_loop"):
             summary = run_grouper_once(session)
     except Exception as exc:
-        logger.exception("Case grouper tick crashed: %s", exc)
         summary = {
             "scanned": 0,
             "grouped_new_cases": 0,
@@ -821,7 +821,7 @@ def _tick() -> Dict[str, Any]:
             "alerts_attached": 0,
             "investigations_queued": 0,
             "errors": 1,
-            "error": str(exc),
+            "error": safe_error(exc, "case_grouper_tick"),
         }
     finally:
         session.close()

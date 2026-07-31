@@ -530,7 +530,8 @@ def _validate_startup_config():
         if not es_url:
             errors.append("ION_ELASTICSEARCH_ENABLED=true but ION_ELASTICSEARCH_URL is not set")
         elif "REPLACE_WITH" in es_url:
-            errors.append(f"ION_ELASTICSEARCH_URL contains placeholder: {es_url}")
+            # Do not echo the URL — it may embed basic-auth credentials.
+            errors.append("ION_ELASTICSEARCH_URL still contains an unreplaced placeholder value")
 
     # TIDE
     if os.environ.get("ION_TIDE_ENABLED", "").lower() == "true":
@@ -1858,6 +1859,23 @@ async def cyab_audit_page(
 # CyAB Onboarding Wizard (Sub-plan B / Task 3)
 # ---------------------------------------------------------------------------
 
+_WID_RE = re.compile(r"\A[0-9a-fA-F]{32}\Z")
+
+
+def _cyab_wizard_redirect(wid: str, step: int) -> RedirectResponse:
+    """Build a safe same-site redirect into the onboarding wizard.
+
+    ``wid`` is a wizard-session id (uuid4 hex). Validate it against that
+    exact shape before reflecting it into the redirect URL so a
+    user-controlled value can never turn this into an open redirect or
+    inject extra query parameters. On any mismatch, restart the wizard.
+    """
+    if _WID_RE.match(wid or ""):
+        return RedirectResponse(
+            url=f"/cyab/onboard?wid={wid}&step={int(step)}", status_code=303
+        )
+    return RedirectResponse(url="/cyab/onboard", status_code=303)
+
 
 @app.get("/cyab/onboard", response_class=HTMLResponse)
 async def cyab_onboard_page(
@@ -1986,9 +2004,7 @@ async def cyab_onboard_step_1(
             # Step 2 partial lands in Task 4 — fall through to redirect
             # so HTMX clients still progress in the meantime.
             pass
-    return RedirectResponse(
-        url=f"/cyab/onboard?wid={wid}&step=2", status_code=303
-    )
+    return _cyab_wizard_redirect(wid, 2)
 
 
 @app.post("/api/cyab/onboard/{wid}/step/2", response_class=HTMLResponse)
@@ -2032,9 +2048,7 @@ async def cyab_onboard_step_2(
                 "subprofiles": subprofiles,
             },
         )
-    return RedirectResponse(
-        url=f"/cyab/onboard?wid={wid}&step=3", status_code=303
-    )
+    return _cyab_wizard_redirect(wid, 3)
 
 
 @app.post("/api/cyab/onboard/{wid}/step/3", response_class=HTMLResponse)
@@ -2078,9 +2092,7 @@ async def cyab_onboard_step_3(
                 "checklist": checklist,
             },
         )
-    return RedirectResponse(
-        url=f"/cyab/onboard?wid={wid}&step=4", status_code=303
-    )
+    return _cyab_wizard_redirect(wid, 4)
 
 
 @app.post("/api/cyab/onboard/{wid}/finish")

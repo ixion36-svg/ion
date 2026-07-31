@@ -683,7 +683,7 @@ def technique_drill(
                 actors = asyncio.run(actors)
             out["actors"] = actors or []
     except Exception as exc:
-        out["actors_error"] = str(exc)
+        out["actors_error"] = safe_error(exc, "threat_intel.actors_by_technique")
 
     return out
 
@@ -731,7 +731,7 @@ async def actor_profile(
             else:
                 out["actor"] = detail
     except Exception as exc:
-        out["actor_error"] = str(exc)
+        out["actor_error"] = safe_error(exc, "threat_intel.actor_profile")
 
     # Local cases referencing this actor by name or alias. Use the
     # actor's name + aliases as the haystack terms.

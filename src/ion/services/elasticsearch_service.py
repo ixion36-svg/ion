@@ -17,6 +17,7 @@ import httpx
 
 from ion.core.circuit_breaker import es_breaker
 from ion.core.config import get_elasticsearch_config, get_ssl_verify
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 
@@ -683,7 +684,7 @@ class ElasticsearchService:
                     pass
             return {
                 "connected": False,
-                "error": str(e),
+                "error": safe_error(e, "elasticsearch.test_connection"),
             }
 
     async def get_alerts(

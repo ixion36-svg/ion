@@ -728,7 +728,9 @@ def _handle_message(msg: dict, user: User) -> Optional[dict]:
             result = _DISPATCH[name](arguments, user)
         except Exception as exc:
             logger.warning("MCP tool '%s' raised: %s", name, exc, exc_info=True)
-            result = _tool_error(f"Tool error: {exc}")
+            # Return a generic message — the detail (paths, internals) is in the
+            # server log above, never in the client-facing tool result.
+            result = _tool_error(f"Tool error: {type(exc).__name__}")
         return _ok(req_id, result)
 
     if req_id is None:

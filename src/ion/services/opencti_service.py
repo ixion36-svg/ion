@@ -12,6 +12,7 @@ import httpx
 
 from ion.core.circuit_breaker import opencti_breaker
 from ion.core.config import get_opencti_config, get_ssl_verify
+from ion.core.safe_errors import safe_error
 from ion.services.country_mapper import country_code_to_flag, get_country_code, get_country_name
 
 logger = logging.getLogger(__name__)
@@ -253,7 +254,7 @@ class OpenCTIService:
         except OpenCTIError as e:
             return {
                 "connected": False,
-                "error": str(e),
+                "error": safe_error(e, "opencti.test_connection"),
             }
 
     async def enrich_observable(

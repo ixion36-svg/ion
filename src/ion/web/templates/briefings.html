@@ -116,7 +116,16 @@
     if (idx > srcs.length - 1) idx = srcs.length - 1;
     var img = document.getElementById('present-img');
     var counter = document.getElementById('present-counter');
-    if (img) { img.src = srcs[idx]; img.alt = 'Slide ' + (idx + 1); }
+    if (img) {
+      // Only assign same-origin relative paths (slides are served from
+      // /static/briefings/...); reject absolute/protocol-relative or
+      // scheme URLs so a crafted data-slide-src can't become an XSS vector.
+      var src = srcs[idx];
+      if (typeof src === 'string' && src.charAt(0) === '/' && src.charAt(1) !== '/') {
+        img.src = src;
+      }
+      img.alt = 'Slide ' + (idx + 1);
+    }
     if (counter) counter.textContent = (idx + 1) + ' / ' + srcs.length;
   }
 

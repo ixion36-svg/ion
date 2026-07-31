@@ -286,7 +286,12 @@ class TestToolsCallDispatch:
         assert resp.status_code == 200
         result = resp.json()["result"]
         assert result["isError"] is True
-        assert "db down" in result["content"][0]["text"]
+        text = result["content"][0]["text"]
+        # The tool failure is surfaced as an error, but the raw exception
+        # message must NOT be leaked to the client (py/stack-trace-exposure);
+        # only a generic label / exception type name is returned.
+        assert "Tool error" in text
+        assert "db down" not in text
 
 
 # ---------------------------------------------------------------------------

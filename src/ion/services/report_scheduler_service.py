@@ -11,6 +11,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ion.core.safe_errors import safe_error
 from ion.models.sla import ScheduledReport
 
 logger = logging.getLogger(__name__)
@@ -190,8 +191,8 @@ def run_report_now(session: Session, report_id: int) -> dict:
             "data": data,
         }
     except Exception as exc:
-        logger.exception("Failed to run report %s (%s)", report.id, report.name)
-        result = {"status": "error", "error": str(exc), "at": now.isoformat()}
+        err = safe_error(exc, f"run_report_now[{report.report_type}]")
+        result = {"status": "error", "error": err, "at": now.isoformat()}
         report.last_run_at = now
         report.last_result = json.dumps(result)
         session.commit()
@@ -199,7 +200,7 @@ def run_report_now(session: Session, report_id: int) -> dict:
             "report_id": report.id,
             "report_type": report.report_type,
             "status": "error",
-            "error": str(exc),
+            "error": err,
         }
 
 

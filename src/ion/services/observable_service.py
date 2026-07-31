@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session, selectinload
 
+from ion.core.safe_errors import safe_error
 from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.observable import (
     Observable,
@@ -2058,7 +2059,7 @@ class ObservableService:
                 )
 
             except Exception as e:
-                errors.append({"row": row_num, "error": str(e)})
+                errors.append({"row": row_num, "error": safe_error(e, "observable.import_csv")})
 
         self.session.flush()
 
@@ -2183,7 +2184,7 @@ class ObservableService:
                 )
 
             except Exception as e:
-                errors.append({"stix_id": obj.get("id"), "error": str(e)})
+                errors.append({"stix_id": obj.get("id"), "error": safe_error(e, "observable.import_stix")})
 
         self.session.flush()
 

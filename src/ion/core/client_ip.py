@@ -35,14 +35,18 @@ def _parse_trusted_proxies() -> List[_IPNet]:
     """Parse ION_TRUSTED_PROXIES env var (comma-separated CIDRs/IPs)."""
     raw = os.environ.get("ION_TRUSTED_PROXIES", "")
     nets: List[_IPNet] = []
-    for s in raw.split(","):
+    for idx, s in enumerate(raw.split(",")):
         s = s.strip()
         if not s:
             continue
         try:
             nets.append(ipaddress.ip_network(s, strict=False))
         except ValueError:
-            logger.warning("Ignoring invalid CIDR in ION_TRUSTED_PROXIES: %s", s)
+            # Redact the raw value (may carry network-topology info); the
+            # position is enough to locate the bad entry in the env var.
+            logger.warning(
+                "Ignoring invalid CIDR in ION_TRUSTED_PROXIES at position %d", idx
+            )
     return nets
 
 

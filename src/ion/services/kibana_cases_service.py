@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from ion.core.config import get_kibana_config
+from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +71,7 @@ class KibanaCasesService:
                 }
             return {"success": False, "error": f"HTTP {response.status_code}"}
         except Exception as e:
-            logger.error(f"Kibana connection test failed: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "error": safe_error(e, "kibana.test_connection")}
 
     def list_cases(
         self,

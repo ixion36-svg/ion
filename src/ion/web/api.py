@@ -2342,7 +2342,7 @@ async def deep_health_check(
         else:
             checks["elasticsearch"] = {"status": "not_configured"}
     except Exception as e:
-        checks["elasticsearch"] = {"status": "error", "error": str(e)[:100]}
+        checks["elasticsearch"] = {"status": "error", "error": safe_error(e, "health.elasticsearch")}
 
     # TIDE
     try:
@@ -2358,7 +2358,7 @@ async def deep_health_check(
         else:
             checks["tide"] = {"status": "not_configured"}
     except Exception as e:
-        checks["tide"] = {"status": "error", "error": str(e)[:100]}
+        checks["tide"] = {"status": "error", "error": safe_error(e, "health.tide")}
 
     # Ollama
     try:
@@ -2367,7 +2367,7 @@ async def deep_health_check(
         avail = await ollama.is_available()
         checks["ollama"] = {"status": "ok" if avail else "unavailable"}
     except Exception as e:
-        checks["ollama"] = {"status": "error", "error": str(e)[:100]}
+        checks["ollama"] = {"status": "error", "error": safe_error(e, "health.ollama")}
 
     # OpenCTI
     try:
@@ -2381,7 +2381,7 @@ async def deep_health_check(
         else:
             checks["opencti"] = {"status": "not_configured"}
     except Exception as e:
-        checks["opencti"] = {"status": "error", "error": str(e)[:100]}
+        checks["opencti"] = {"status": "error", "error": safe_error(e, "health.opencti")}
 
     # Arkime
     try:
@@ -2396,7 +2396,7 @@ async def deep_health_check(
         else:
             checks["arkime"] = {"status": "not_configured"}
     except Exception as e:
-        checks["arkime"] = {"status": "error", "error": str(e)[:100]}
+        checks["arkime"] = {"status": "error", "error": safe_error(e, "health.arkime")}
 
     overall = "ok" if all(
         c.get("status") in ("ok", "not_configured")

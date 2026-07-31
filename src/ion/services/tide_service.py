@@ -99,11 +99,10 @@ class TideService:
         if self.enabled:
             logger.info(
                 "TIDE service initialized: url=%s space=%s client_id=%s "
-                "api_key=%s...%s verify_ssl=%s",
+                "api_key=%s verify_ssl=%s",
                 self.url, self.space,
                 self.client_id[:8] if self.client_id else "(auto)",
-                self.api_key[:4] if self.api_key else "?",
-                self.api_key[-4:] if self.api_key else "?",
+                "(set)" if self.api_key else "(unset)",
                 self.verify,
             )
         else:
@@ -256,11 +255,10 @@ class TideService:
                         body = {}
                         detail = resp.text[:300]
                     logger.error(
-                        "TIDE %d: %s | url=%s client_id=%s api_key=%s...%s | sql=%s",
+                        "TIDE %d: %s | url=%s client_id=%s api_key=%s | sql=%s",
                         resp.status_code, detail,
                         self.url, tenant or "(none)",
-                        self.api_key[:4] if self.api_key else "?",
-                        self.api_key[-4:] if self.api_key else "?",
+                        "(set)" if self.api_key else "(unset)",
                         sql[:60],
                     )
                     if resp.status_code == 401:
