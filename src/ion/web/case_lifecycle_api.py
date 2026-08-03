@@ -354,6 +354,17 @@ async def _background_ai_case_summary(case_id: int, user_id: int) -> None:
             )
             _session.add(summary_note)
             _session.commit()
+
+            # Mirror the AI summary onto the linked Kibana case, matching the
+            # interactive add_case_note path — otherwise the summary lives only
+            # in ION's DB and never appears in Kibana. Fire-and-forget; a no-op
+            # when Kibana is disabled or the case has no Kibana link.
+            author = _session.get(User, user_id)
+            sync_note_to_kibana(
+                case.kibana_case_id,
+                author.username if author else "ion",
+                summary_note.content,
+            )
         finally:
             _session.close()
     except Exception as e:

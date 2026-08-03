@@ -574,14 +574,22 @@ def _link_pcap_observables(case_id: int, pcap_result: Optional[Any]) -> None:
 
 
 def _post_case_note(case_id: int, content: str) -> None:
-    """Open a fresh DB session, attribute the note to Bob, commit.
+    """Open a fresh DB session, attribute the note to Bob, commit, then mirror
+    the note to the linked Kibana case as a comment.
 
-    Runs inside the background thread, so it manages its own session.
+    Runs inside the background thread, so it manages its own session. The Kibana
+    push mirrors the interactive ``add_case_note`` path (case_lifecycle_api) —
+    without it, PCAP auto-analysis notes were written to ION's DB only and never
+    appeared on the Kibana case. The sync is fire-and-forget and runs after the
+    session is closed so it can never block or roll back the note write, and is
+    a silent no-op when Kibana is disabled or the case has no Kibana link.
     """
     try:
         from ion.core.config import get_config
-        from ion.models.alert_triage import Note, NoteEntityType
+        from ion.models.alert_triage import AlertCase, Note, NoteEntityType
+        from ion.models.user import User
         from ion.services.ai_user import get_bob_user_id
+        from ion.services.kibana_sync_helpers import sync_note_to_kibana
         from ion.storage.database import get_engine, get_session_factory
     except Exception as exc:
         logger.warning("pcap_analysis: cannot import deps for note write: %s", exc)
@@ -591,6 +599,8 @@ def _post_case_note(case_id: int, content: str) -> None:
     engine = get_engine(config.db_path)
     factory = get_session_factory(engine)
     session: Session = factory()
+    kibana_case_id: Optional[str] = None
+    bob_username = "Bob"
     try:
         bob_id = get_bob_user_id(session)
         if not bob_id:
@@ -605,11 +615,27 @@ def _post_case_note(case_id: int, content: str) -> None:
         session.add(note)
         session.commit()
         logger.info("pcap_analysis: posted note id=%s to case %s", note.id, case_id)
+        # Capture the Kibana link + Bob's username while the session is open so
+        # the note can be mirrored to Kibana after the session closes. Best
+        # effort — a lookup miss here just skips the sync, the note is already
+        # committed.
+        case = session.get(AlertCase, case_id)
+        kibana_case_id = getattr(case, "kibana_case_id", None) if case else None
+        bob_user = session.get(User, bob_id)
+        if bob_user and getattr(bob_user, "username", None):
+            bob_username = bob_user.username
     except Exception as exc:
         session.rollback()
         logger.warning("pcap_analysis: failed to write case note: %s", exc)
+        return
     finally:
         session.close()
+
+    if kibana_case_id:
+        try:
+            sync_note_to_kibana(kibana_case_id, bob_username, content)
+        except Exception as exc:  # defensive — sync_note_to_kibana already swallows
+            logger.warning("pcap_analysis: Kibana note sync failed: %s", exc)
 
 
 async def _runner(
