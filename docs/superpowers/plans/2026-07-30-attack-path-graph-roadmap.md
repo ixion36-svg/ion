@@ -1,6 +1,6 @@
 # Attack Path (Bob Pathfinding) — Roadmap
 
-**Status:** Forks decided (2026-07-30) — Phase 0 in build. A=compute-on-read · B=all four edges · C=tactic-laned DAG · D=MITRE-tactic heuristic (all recommended options taken).
+**Status:** COMPLETE (2026-07-30). Phase 0 → v0.60.0 · Phase 1 → v0.61.0 · Phase 2 → v0.62.0 · Phase 3 → v0.63.0 · Phase 4 → v0.64.0. All forks took the recommended option (A compute-on-read · B all four edges · C tactic-laned DAG · D MITRE-tactic heuristic · E verify medium-confidence only · F more-context/seeds same model).
 **Date:** 2026-07-30
 **Type:** Feature on shared rails (not a separate module) — lands in the Cases/Bob surface
 **Owning principle:** *ION traces the path and shows the evidence; the analyst decides.*

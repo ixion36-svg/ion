@@ -1,13 +1,21 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.63.1 -->
-<!-- ion-doc:version=0.63.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.64.0 -->
+<!-- ion-doc:version=0.64.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.64.0 — 2026-07-30
+
+**Attack Path (Bob Pathfinding) — Phase 4: escalation tier + feature flag.** Closes the Attack Path roadmap.
+
+- **Confidence-gated escalation tier** — when a **high/critical** alert lands below Bob's confidence threshold, run ONE deeper pass (more self-consistency seeds `ION_BOB_ESCALATION_SAMPLES`, optional larger `ION_BOB_ESCALATION_MODEL`) *before* abstaining to a human. Single-retry (no loop), high/critical only, air-gap no-op; the result flows through the existing circuit breaker unchanged. `escalation_attempted` telemetry on Investigation + AIFeedback (idempotent migrations). Knobs: `ION_BOB_ESCALATION_TIER_ENABLED` (on).
+- **Master feature flag** `ION_ATTACK_PATH_ENABLED` (default on) — gates the whole Attack Path surface at one choke point (`build_attack_path` → endpoint + Bob injection + recurrence). Existing `ION_ATTACK_PATH_RECURRENCE_*` sub-flags still apply.
+- Tests: `tests/test_v064_escalation_tier.py` (20); 69 attack-path/bob-confidence tests green.
 
 ## v0.63.1 — 2026-07-30
 
