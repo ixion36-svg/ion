@@ -1,7 +1,7 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.65.0 -->
+<!-- ion-doc:version=0.66.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,8 +9,8 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-08-03 (current: v0.65.0). Per-version deltas and history: see CHANGELOG + git history.
-**Application Version:** 0.65.0 — Traffic Analytics polish + Kibana note-sync fix + **Bob AI-controls hardening**: the autonomous investigation path's `<input_data>` prompt trust boundary + injection sanitiser are now reused across the on-demand AI surfaces (`/analyze/alert`, `/triage/suggest`, `/case/generate`, on-demand case analysis) and the AI chat now drops client-supplied `system`-role messages (jailbreak vector), clamps its temperature ceiling to 1.0, and sanitises RAG/uploaded-file context — a **net reduction in prompt-injection surface**. One net-new read-only endpoint (`GET /api/arkime/traffic/rtmon-summary`, `alert:read`, compute-on-read). No new permission or schema. ION-side findings: 0C / 0H. 0.64.0 — Attack Path Phase 4: confidence-gated escalation tier + master `ION_ATTACK_PATH_ENABLED` flag; advisory, air-gap-safe. 0.63.1 — CodeQL SAST remediation (hardening only, no behaviour change). Prior per-version net-new-surface notes: see CHANGELOG + git history.
+**Assessment Date:** 2026-08-03 (current: v0.66.0). Per-version deltas and history: see CHANGELOG + git history.
+**Application Version:** 0.66.0 — **Bob AI-controls hardening Phase 2**: RAG blocks (KB/exemplar/playbook/TI/skills) are injection-scrubbed before entering the highest-trust system-prompt region (P2a); a fail-soft, alert-gated confidence penalty deducts when a majority of Bob's `key_observations` cite values absent from the alert (P2b — never changes the verdict, only nudges toward the circuit breaker); the closure/exec-summary call is fenced in `<input_data>` + anti-fabrication-framed (P3b). Continues v0.65.0's **net reduction in prompt-injection surface**; no new permission, schema, or external surface. ION-side findings: 0C / 0H. 0.65.0 — Traffic Analytics polish + Kibana note-sync fix + AI-controls Phase 1 (on-demand surfaces fenced/scrubbed, chat `system`-message lockdown + temp clamp, encoded-input rule); one net-new read-only endpoint. 0.64.0 — Attack Path Phase 4: confidence-gated escalation tier + master flag; advisory, air-gap-safe. Prior per-version net-new-surface notes: see CHANGELOG + git history.
 **Previous Assessment Version:** 0.33.0 (2026-05-27)
 **Scope:** Web application security review â€” authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
@@ -24,7 +24,7 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 
 **Current findings posture (v0.54.1): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0** and have stayed at zero since. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
 
-| Severity | Open findings (v0.65.0) |
+| Severity | Open findings (v0.66.0) |
 |----------|:-----------------------:|
 | Critical | 0 |
 | High | 0 |

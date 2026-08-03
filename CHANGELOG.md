@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.65.0 -->
-<!-- ion-doc:version=0.65.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.66.0 -->
+<!-- ion-doc:version=0.66.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.66.0 — 2026-08-03
+
+**Bob AI-controls hardening — Phase 2 (grounding + RAG trust boundary).** Follows the v0.65.0 Phase 1 on-demand-surface hardening.
+
+- **RAG sanitisation (P2a)** — `build_rag_context_blocks` now scrubs injection tokens (override-keyword lines, ChatML role tokens, `</input_data>` breakout) from every KB / exemplar / playbook / TI-report / skills block before it enters the highest-trust system-prompt region. Benefits both the autonomous investigation path and the on-demand case analysis.
+- **Field-presence grounding (P2b)** — the autonomous `_compute_confidence` applies a conservative, fail-soft −15 penalty when a *majority* of Bob's `key_observations` cite values that appear nowhere in the alert the model saw. Alert-gated and confidence-only — it never drops observations or rewrites the verdict, only nudges toward the circuit breaker; mirrors the auto-investigate path's citation discipline.
+- **Closure/exec-summary framing (P3b)** — `_background_ai_case_summary` gains an analyst persona + explicit anti-fabrication grounding and fences the case/notes context in `<input_data>` (previously the weakest-framed analytic call).
+- Deferred to roadmap: PII-anonymisation default posture / raw-prompt persistence (P3a — deployment decision), streaming-chat PII tokenisation parity. See `docs/superpowers/plans/2026-08-03-ai-controls-hardening-roadmap.md`.
+- Tests `tests/test_v066_ai_grounding.py` (8).
 
 ## v0.65.0 — 2026-08-03
 
