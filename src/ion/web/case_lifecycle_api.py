@@ -332,11 +332,24 @@ async def _background_ai_case_summary(case_id: int, user_id: int) -> None:
                 for n in notes:
                     context += f"- {n.content[:200]}\n"
 
+            # v0.66.0 (P3b): analyst persona + explicit anti-fabrication
+            # grounding, and fence the case/notes context in the untrusted
+            # trust boundary (it carries observable values + free-text notes).
+            from ion.services.prompt_safety import (
+                UNTRUSTED_DIRECTIVE,
+                sanitize_untrusted,
+                wrap_untrusted,
+            )
             prompt = (
-                "Write a concise executive summary (2-3 paragraphs) for this closed security case. "
-                "Cover: what happened, what was investigated, what was the outcome, and any follow-up actions. "
-                "Write in professional incident report style. No markdown formatting.\n\n"
-                f"{context}"
+                "You are a SOC analyst writing a concise executive summary "
+                "(2-3 paragraphs) for this closed security case. Cover: what "
+                "happened, what was investigated, the outcome, and any follow-up "
+                "actions. Write in professional incident-report style, plain text "
+                "(no markdown). Ground every statement in the case data below — "
+                "never invent hosts, users, IOCs, or findings that are not "
+                "present.\n\n"
+                f"{wrap_untrusted(sanitize_untrusted(context, max_chars=0))}\n\n"
+                f"{UNTRUSTED_DIRECTIVE}"
             )
 
             result = await ollama.chat(

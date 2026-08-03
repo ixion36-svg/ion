@@ -177,13 +177,53 @@ _DEFAULT_BOB_CONFIDENCE_THRESHOLD = 60
 _DEFAULT_BOB_STORE_REASONING = False
 
 
-def _compute_confidence(parsed: Dict[str, Any]) -> int:
+def _observation_grounding_deficit(parsed: Dict[str, Any], alert: Optional[dict]) -> float:
+    """Fraction of Bob's key_observations whose cited value is absent from the alert.
+
+    Fail-soft grounding signal (v0.66.0, P2b): mirrors the citation discipline
+    the auto-investigate path enforces via ``parse_and_validate``, but as a
+    confidence *nudge* rather than a hard drop. Returns 0.0 (can't judge → no
+    penalty) when there is no alert or fewer than two judgeable observations —
+    only a clear majority of ungrounded values should move the score.
+
+    "Judgeable" = a value string of >=3 chars; shorter/generic values are
+    skipped. Matching is a case-insensitive substring test against the JSON
+    serialisation of the alert the model actually saw, so field-name-vs-value
+    or nesting differences don't cause false positives.
+    """
+    obs = parsed.get("key_observations") or []
+    if not alert or len(obs) < 2:
+        return 0.0
+    try:
+        hay = json.dumps(alert, default=str).lower()
+    except Exception:
+        return 0.0
+    ungrounded = 0
+    counted = 0
+    for o in obs:
+        if not isinstance(o, dict):
+            continue
+        val = str(o.get("value") or "").strip().lower()
+        if len(val) < 3:
+            continue
+        counted += 1
+        if val not in hay:
+            ungrounded += 1
+    if counted < 2:
+        return 0.0
+    return ungrounded / counted
+
+
+def _compute_confidence(parsed: Dict[str, Any], alert: Optional[dict] = None) -> int:
     """Compute a 0-100 confidence score from the LLM parsed envelope.
 
     Starts from the raw LLM confidence value and applies deductions:
     - Invalid verdict: -20
     - Closure reason / verdict mismatch: -15
     - No key_observations: -10
+    - Majority of key_observations cite values absent from ``alert``: -15
+      (v0.66.0, P2b — only applied when ``alert`` is supplied; fail-soft, never
+      changes the verdict, only nudges toward the circuit breaker)
 
     Result is clamped to [0, 100].
     """
@@ -198,6 +238,8 @@ def _compute_confidence(parsed: Dict[str, Any]) -> int:
         raw -= 15
     if not parsed.get("key_observations"):
         raw -= 10
+    if _observation_grounding_deficit(parsed, alert) >= 0.5:
+        raw -= 15
     return max(0, min(100, raw))
 
 
@@ -407,6 +449,7 @@ def _write_bob_outputs(
     parsed: Dict[str, Any],
     template=None,
     escalation_attempted: bool = False,
+    alert: Optional[dict] = None,
 ) -> None:
     """Write Bob's post-investigation artefacts in one transaction.
 
@@ -477,7 +520,8 @@ def _write_bob_outputs(
         return
 
     # v0.21.0: compute numeric confidence + resolve circuit-breaker threshold.
-    confidence_int = _compute_confidence(parsed)
+    # v0.66.0 (P2b): pass the alert so ungrounded key_observations deduct.
+    confidence_int = _compute_confidence(parsed, alert=alert)
     threshold = _get_bob_confidence_threshold(template)
     above_threshold = confidence_int >= threshold
 
@@ -2547,6 +2591,7 @@ class InvestigationService:
                         parsed=parsed,
                         template=template,
                         escalation_attempted=escalation_attempted,
+                        alert=prompt_alert,
                     )
                 except Exception as exc:
                     logger.warning(

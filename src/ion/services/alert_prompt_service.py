@@ -24,6 +24,7 @@ from ion.models.alert_prompt import AlertPromptTemplate
 from ion.services.embedding_service import (
     format_enrichment_digest as _enrichment_digest,
 )
+from ion.services.prompt_safety import sanitize_untrusted
 from ion.storage.alert_prompt_repository import AlertPromptRepository
 
 logger = logging.getLogger(__name__)
@@ -4622,7 +4623,13 @@ class AlertPromptService:
             except Exception as exc:
                 logger.debug("Skill loader failed: %s", exc)
 
-        return blocks
+        # v0.66.0 (P2a): RAG blocks land in the highest-trust system-prompt
+        # region. KB / TI-report / exemplar text can carry adversary-authored
+        # strings ingested from alerts or prior cases — scrub injection tokens
+        # before they enter the prompt (reference-vs-evidence framing is already
+        # baked into each block header). Conservative: only strips role tokens /
+        # breakout tags / override-keyword lines; real reference prose is intact.
+        return [sanitize_untrusted(b, max_chars=0) for b in blocks]
 
 
 # ---------------------------------------------------------------------------
