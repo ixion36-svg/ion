@@ -29,6 +29,7 @@ Authentication: HTTP Basic only (v0.10.4+). Configure via:
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import time
@@ -465,6 +466,21 @@ class ArkimeService:
             return False
 
     @staticmethod
+    def _is_noise_ip(ip: str) -> bool:
+        """True for addresses that are pure telemetry noise, not real talkers.
+
+        Covers IPv6 link-local (fe80::/10), loopback (::1 / 127.0.0.0/8),
+        the unspecified address (:: / 0.0.0.0), and IPv4 link-local
+        (169.254.0.0/16 — is_link_local covers both families). These flood the
+        top-talker aggregation with endpoints that carry no analytic value.
+        """
+        try:
+            addr = ipaddress.ip_address(ip)
+        except ValueError:
+            return False
+        return addr.is_link_local or addr.is_loopback or addr.is_unspecified  # fe80::/10, ::1, ::, 169.254/16
+
+    @staticmethod
     def build_exclusion_expression(cidrs: List[str]) -> str:
         """Arkime expression dropping any session that touches an excluded IP/CIDR.
 
@@ -851,11 +867,13 @@ class ArkimeService:
                 if exclude_private_to_private and src and dst:
                     if self._is_private_ip(src) and self._is_private_ip(dst):
                         continue
-                if src:
+                # Drop IPv6 link-local / loopback / unspecified noise endpoints
+                # so they don't pollute the ranking (fe80::/10, ::1, ::, 169.254/16).
+                if src and not self._is_noise_ip(src):
                     entry = src_map.setdefault(src, {"bytes": 0, "sessions": 0})
                     entry["bytes"] += b
                     entry["sessions"] += 1
-                if dst:
+                if dst and not self._is_noise_ip(dst):
                     entry = dst_map.setdefault(dst, {"bytes": 0, "sessions": 0})
                     entry["bytes"] += b
                     entry["sessions"] += 1
@@ -873,6 +891,14 @@ class ArkimeService:
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime top-talkers error: {type(e).__name__}: {e}") from e
 
+    @staticmethod
+    def _rank_countries(m: Dict[str, Dict[str, int]], limit: int) -> List[Dict[str, Any]]:
+        return sorted(
+            [{"country": cc, **stats} for cc, stats in m.items()],
+            key=lambda x: x["bytes"],
+            reverse=True,
+        )[:limit]
+
     async def get_top_countries(
         self,
         start_ts: int,
@@ -882,9 +908,15 @@ class ArkimeService:
     ) -> Dict[str, Any]:
         """Fetch top countries by traffic volume for the given time window.
 
-        Aggregates srcGEO/dstGEO (Arkime MaxMind ISO 3166-1 alpha-2 codes)
-        across the top _COUNTRY_SAMPLE sessions by bytes. Bias towards heavy
-        sessions is intentional — country totals are dominated by high-byte flows.
+        Primary path is Arkime's server-side SPI-graph endpoint
+        (``/api/spigraph?field=country.src|country.dst``). spigraph aggregation
+        is done in the viewer over EVERY session in the window (not a
+        top-_COUNTRY_SAMPLE-by-bytes sample), so the geo totals are unbiased and
+        don't miss low-byte flows to interesting geographies.
+
+        Falls back to the legacy srcGEO/dstGEO session-sampling method when
+        spigraph is unavailable (older Arkime builds 404 /api/spigraph or reject
+        the ``country.*`` field), so nothing regresses.
 
         Returns:
             {
@@ -894,6 +926,93 @@ class ArkimeService:
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
+        try:
+            src_map = await self._spigraph_countries("country.src", start_ts, stop_ts, expression)
+            dst_map = await self._spigraph_countries("country.dst", start_ts, stop_ts, expression)
+            if src_map or dst_map:
+                return {
+                    "by_src": self._rank_countries(src_map, limit),
+                    "by_dst": self._rank_countries(dst_map, limit),
+                }
+            # Both empty — spigraph may not be populated on this build; try the
+            # sampling method before concluding there's genuinely no geo data.
+            logger.debug("Arkime spigraph returned no country buckets — falling back to sampling")
+        except (ArkimeError, httpx.HTTPError) as exc:
+            logger.debug("Arkime spigraph country aggregation failed (%s) — falling back to sampling", exc)
+        return await self._top_countries_sampled(start_ts, stop_ts, limit, expression)
+
+    async def _spigraph_countries(
+        self,
+        field: str,
+        start_ts: int,
+        stop_ts: int,
+        expression: Optional[str] = None,
+    ) -> Dict[str, Dict[str, int]]:
+        """Server-side country buckets for one side via ``/api/spigraph``.
+
+        Returns ``{ISO2: {"bytes": N, "sessions": N}}``. Raises ``ArkimeError``
+        on a non-200 or non-JSON response so the caller can fall back. spigraph
+        buckets carry ``name`` (the field value), ``count`` (session count), and
+        ``size`` (summed byte volume on builds that report it); we read every
+        shape defensively and skip anything unparseable.
+        """
+        params = {
+            "field": field,
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "length": "100",  # top-N country buckets
+        }
+        if expression:
+            params["expression"] = expression
+        headers = await self._headers()
+        async with await self._client() as client:
+            resp = await client.get(
+                f"{self.url}/api/spigraph",
+                headers=headers,
+                params=params,
+            )
+        if resp.status_code != 200:
+            raise ArkimeError(
+                f"Arkime spigraph failed: HTTP {resp.status_code}",
+                status_code=resp.status_code,
+            )
+        content_type = resp.headers.get("content-type", "")
+        if "json" not in content_type:
+            raise ArkimeError(f"Arkime returned non-JSON ({content_type}) — check auth")
+        payload = resp.json()
+        out: Dict[str, Dict[str, int]] = {}
+        for item in payload.get("items") or []:
+            name = item.get("name")
+            if not name:
+                continue
+            cc = str(name).strip().upper()
+            if not cc:
+                continue
+            graph = item.get("graph") if isinstance(item.get("graph"), dict) else {}
+            try:
+                b = int(item.get("size") or graph.get("totDataBytes") or graph.get("totBytes") or 0)
+            except (TypeError, ValueError):
+                b = 0
+            try:
+                sess = int(item.get("count") or 0)
+            except (TypeError, ValueError):
+                sess = 0
+            entry = out.setdefault(cc, {"bytes": 0, "sessions": 0})
+            entry["bytes"] += b
+            entry["sessions"] += sess
+        return out
+
+    async def _top_countries_sampled(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        limit: int = 15,
+        expression: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Legacy fallback: aggregate srcGEO/dstGEO across the top
+        _COUNTRY_SAMPLE sessions by bytes. Byte-biased (heavy flows dominate)
+        and capped at a sample, which is exactly why spigraph is preferred — but
+        it keeps geo data flowing on Arkime builds without /api/spigraph."""
         params = {
             "length": str(self._COUNTRY_SAMPLE),
             "startTime": str(start_ts),
@@ -944,14 +1063,10 @@ class ArkimeService:
                     entry["bytes"] += b
                     entry["sessions"] += 1
 
-            def _rank(m: Dict[str, Dict[str, int]]) -> List[Dict[str, Any]]:
-                return sorted(
-                    [{"country": cc, **stats} for cc, stats in m.items()],
-                    key=lambda x: x["bytes"],
-                    reverse=True,
-                )[:limit]
-
-            return {"by_src": _rank(src_map), "by_dst": _rank(dst_map)}
+            return {
+                "by_src": self._rank_countries(src_map, limit),
+                "by_dst": self._rank_countries(dst_map, limit),
+            }
         except ArkimeError:
             raise
         except httpx.HTTPError as e:

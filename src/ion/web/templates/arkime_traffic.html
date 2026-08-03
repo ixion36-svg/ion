@@ -184,6 +184,41 @@
   </div>
 </div>
 
+<!-- Real-Time Monitor (RTMON) detections -->
+<div class="atf-card mb-6" id="rtmon-card">
+  <div class="atf-card-header">
+    <div>
+      <h2 class="atf-card-title">Real-Time Monitor (RTMON)</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Live traffic-detection cases opened by the Arkime real-time monitor over the current range</p>
+    </div>
+    <span class="text-slate-500 text-xs" id="rtmon-subtitle"></span>
+  </div>
+  <div id="rtmon-empty" class="hidden text-slate-500 text-sm text-center py-10">
+    RTMON not enabled / no detections in this range.
+  </div>
+  <div id="rtmon-body" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div>
+      <p class="text-xs text-slate-500 mb-2 text-center">By Detector</p>
+      <div class="relative atf-chart-h-220">
+        <canvas id="rtmon-detector-chart"></canvas>
+      </div>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 mb-2 text-center">By Severity</p>
+      <div class="relative atf-chart-h-220">
+        <canvas id="rtmon-severity-chart"></canvas>
+      </div>
+    </div>
+    <div>
+      <p class="text-xs text-slate-500 mb-2 text-center">Detections / Day</p>
+      <div class="relative atf-chart-h-220">
+        <canvas id="rtmon-daily-chart"></canvas>
+      </div>
+    </div>
+  </div>
+  <div id="rtmon-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
+</div>
+
 </div><!-- /max-w container -->
 </div><!-- /ion-tw-page -->
 {% endblock %}
@@ -304,6 +339,9 @@
   let talkersData = null;
   let countryData = null;
   let nodeChart   = null;
+  let rtmonDetectorChart = null;
+  let rtmonSeverityChart = null;
+  let rtmonDailyChart    = null;
 
   // ── Utility ────────────────────────────────────────────────────────────────
   function fmtBytes(b) {
@@ -715,8 +753,139 @@
     }
   }
 
+  // ── RTMON (real-time monitor) detections ────────────────────────────────────
+  var _RANGE_DAYS = { '24h': 1, '7d': 7, '30d': 30 };
+  var _SEV_COLORS = {
+    critical: '#f43f5e', high: '#f0883e', medium: '#f8b33a',
+    low: '#60a5fa', info: '#86f0a0', unknown: '#64748b',
+  };
+  var _RTMON_DET_COLORS = ['#6de4ff','#ec4899','#9a8cff','#86f0a0','#f0883e','#f8b33a','#60a5fa','#64748b'];
+
+  function _rtmonDoughnut(canvasId, labels, values, colors) {
+    var ctx = document.getElementById(canvasId).getContext('2d');
+    return new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{
+          data: values,
+          backgroundColor: colors,
+          borderColor: '#0a0c12',
+          borderWidth: 2,
+          hoverOffset: 6,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 }, padding: 6 } },
+          tooltip: {
+            backgroundColor: '#0a0c12', borderColor: '#171b24', borderWidth: 1,
+            titleColor: '#cbd5e1', bodyColor: '#94a3b8',
+            callbacks: { label: function(c) { return ' ' + c.label + ': ' + fmtNum(c.parsed); } },
+          },
+        },
+      },
+    });
+  }
+
+  function renderRtmon(data) {
+    rtmonDetectorChart = destroyChart(rtmonDetectorChart);
+    rtmonSeverityChart = destroyChart(rtmonSeverityChart);
+    rtmonDailyChart    = destroyChart(rtmonDailyChart);
+    hideOverlay('rtmon-loading');
+
+    var body  = document.getElementById('rtmon-body');
+    var empty = document.getElementById('rtmon-empty');
+    var sub   = document.getElementById('rtmon-subtitle');
+
+    if (!data || !data.total) {
+      if (body) body.classList.add('hidden');
+      if (empty) empty.classList.remove('hidden');
+      if (sub) sub.textContent = '';
+      return;
+    }
+    if (body) body.classList.remove('hidden');
+    if (empty) empty.classList.add('hidden');
+    if (sub) sub.textContent = fmtNum(data.total) + ' detection' + (data.total === 1 ? '' : 's');
+
+    // Detector breakdown (doughnut)
+    var dets = data.by_detector || [];
+    rtmonDetectorChart = _rtmonDoughnut(
+      'rtmon-detector-chart',
+      dets.map(function (d) { return d.detector; }),
+      dets.map(function (d) { return d.count; }),
+      dets.map(function (_, i) { return _RTMON_DET_COLORS[i % _RTMON_DET_COLORS.length]; })
+    );
+
+    // Severity breakdown (doughnut, semantic colours)
+    var sevs = data.by_severity || [];
+    rtmonSeverityChart = _rtmonDoughnut(
+      'rtmon-severity-chart',
+      sevs.map(function (s) { return s.severity; }),
+      sevs.map(function (s) { return s.count; }),
+      sevs.map(function (s) { return _SEV_COLORS[s.severity] || _SEV_COLORS.unknown; })
+    );
+
+    // Daily timeline (bar)
+    var daily = data.daily || [];
+    var ctx = document.getElementById('rtmon-daily-chart').getContext('2d');
+    rtmonDailyChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: daily.map(function (d) { return d.date.slice(5); }),
+        datasets: [{
+          label: 'Detections',
+          data: daily.map(function (d) { return d.count; }),
+          backgroundColor: '#6de4ff',
+          borderColor: 'transparent',
+          borderRadius: 3,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#0a0c12', borderColor: '#171b24', borderWidth: 1,
+            titleColor: '#cbd5e1', bodyColor: '#94a3b8',
+          },
+        },
+        scales: {
+          x: { ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 0, maxTicksLimit: 12 }, grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#64748b', font: { size: 10 }, precision: 0 },
+            grid: { color: 'rgba(255,255,255,.06)' },
+          },
+        },
+      },
+    });
+  }
+
+  async function loadRtmon(range) {
+    showOverlay('rtmon-loading');
+    var days = _RANGE_DAYS[range] || 7;
+    try {
+      var resp = await fetch('/api/arkime/traffic/rtmon-summary?days=' + days);
+      if (!resp.ok) {
+        var err = await resp.json().catch(function () { return { detail: resp.statusText }; });
+        throw new Error(err.detail || resp.statusText);
+      }
+      renderRtmon(await resp.json());
+    } catch (e) {
+      hideOverlay('rtmon-loading');
+      renderRtmon(null);
+      console.error('RTMON summary error:', e);
+    }
+  }
+
   async function loadAll(range) {
-    await Promise.all([loadOverview(range), loadTopTalkers(range), loadTopCountries(range), loadPerNode(range)]);
+    await Promise.all([loadOverview(range), loadTopTalkers(range), loadTopCountries(range), loadPerNode(range), loadRtmon(range)]);
   }
 
   // ── Demo mode ──────────────────────────────────────────────────────────────
@@ -800,6 +969,33 @@
     ],
   };
 
+  function _demoRtmon(range) {
+    var days = _RANGE_DAYS[range] || 7;
+    var now = Date.now();
+    var daily = [];
+    var total = 0;
+    for (var i = days - 1; i >= 0; i--) {
+      var c = Math.floor(Math.abs(Math.sin(i * 1.7)) * 4);
+      total += c;
+      daily.push({ date: new Date(now - i * 86400e3).toISOString().slice(0, 10), count: c });
+    }
+    return {
+      days: days, total: total || 12, enabled: true,
+      by_detector: [
+        { detector: 'c2_beacon_shape', count: 5 },
+        { detector: 'cleartext_credentials', count: 3 },
+        { detector: 'dns_tunneling', count: 2 },
+        { detector: 'ioc_ip', count: 2 },
+      ],
+      by_severity: [
+        { severity: 'high', count: 6 },
+        { severity: 'medium', count: 4 },
+        { severity: 'critical', count: 2 },
+      ],
+      daily: daily,
+    };
+  }
+
   function loadDemoData(range) {
     var ov = _demoOverview(range);
     document.getElementById('stat-sessions').textContent = fmtNum(ov.total_sessions);
@@ -822,6 +1018,8 @@
     talkersData = _DEMO_TALKERS; renderTalkers();
     renderNodeChart(_DEMO_NODES.nodes);
     countryData = _DEMO_COUNTRIES; renderWorldMap();
+    hideOverlay('rtmon-loading');
+    renderRtmon(_demoRtmon(range));
   }
 
   // ── Init ───────────────────────────────────────────────────────────────────

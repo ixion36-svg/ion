@@ -6,6 +6,7 @@ Five endpoints under /api/arkime/traffic:
   GET /top-talkers     — top source/dest IPs by total bytes
   GET /top-countries   — top source/dest countries by total bytes (GeoIP)
   GET /per-node        — traffic volume broken down per Arkime capture node
+  GET /rtmon-summary   — Real-Time Monitor detections (per-detector/severity/day)
 
 All are read-only and require alert:read permission (same level as
 the existing Arkime PCAP workflow).
@@ -16,7 +17,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -25,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_db_session, require_permission
 from ion.core.safe_errors import safe_error
+from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.traffic_exclusion import TrafficExclusion
 from ion.models.user import AuditLog, User
 from ion.services.arkime_service import ArkimeError, get_arkime_service
@@ -242,6 +244,120 @@ async def traffic_per_node(
     except ArkimeError as exc:
         logger.warning("Arkime per-node error: %s", exc)
         raise HTTPException(status_code=502, detail=safe_error(exc))
+
+
+# ── Real-Time Monitor (RTMON) detection summary ──────────────────────────
+# RTMON has no API of its own — its hits are stored as cases: AlertCase +
+# AlertTriage where source_system == "arkime-rtmon", with the detector encoded
+# in the AlertTriage.es_alert_id marker as `rtmon:<detector>:...`. This endpoint
+# aggregates those cases on-read (no new table). RTMON is opt-in
+# (ION_ARKIME_RTMON_ENABLED, default off), so it degrades to an empty-but-valid
+# shape when it has never run.
+
+_RTMON_SOURCE = "arkime-rtmon"
+
+
+def _rtmon_detector(marker: Optional[str]) -> str:
+    """Parse the detector name from an RTMON marker (`rtmon:<detector>:...`).
+
+    Unknown / malformed markers collapse to "other" so the breakdown never
+    drops a case."""
+    parts = (marker or "").split(":")
+    if len(parts) >= 2 and parts[0] == "rtmon" and parts[1]:
+        return parts[1]
+    return "other"
+
+
+@router.get("/rtmon-summary")
+def rtmon_summary(
+    days: int = 7,
+    user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+) -> Dict[str, Any]:
+    """Real-Time Monitor detection summary over the last ``days``.
+
+    Query params:
+        days: lookback window, 1–90 (default 7)
+
+    Response shape:
+        {
+            "days": 7,
+            "total": N,
+            "by_detector": [{"detector": "c2_beacon_shape", "count": N}, ...],
+            "by_severity": [{"severity": "high", "count": N}, ...],
+            "daily":       [{"date": "2026-08-01", "count": N}, ...],
+            "enabled": true,     # false when RTMON has produced no cases at all
+        }
+
+    Always returns a valid shape — empty series when RTMON has never run.
+    """
+    days = min(max(days, 1), 90)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    cutoff = now - timedelta(days=days)
+
+    # Pre-seed the daily buckets so the timeline is continuous (zero-filled),
+    # not just the days that happened to have a detection.
+    daily_counts: Dict[str, int] = {}
+    for i in range(days):
+        d = (cutoff + timedelta(days=i + 1)).date().isoformat()
+        daily_counts[d] = 0
+
+    empty = {
+        "days": days,
+        "total": 0,
+        "by_detector": [],
+        "by_severity": [],
+        "daily": [{"date": d, "count": c} for d, c in sorted(daily_counts.items())],
+        "enabled": False,
+    }
+
+    try:
+        rows = (
+            session.query(
+                AlertTriage.es_alert_id,
+                AlertCase.severity,
+                AlertCase.created_at,
+            )
+            .join(AlertCase, AlertTriage.case_id == AlertCase.id)
+            .filter(AlertTriage.source_system == _RTMON_SOURCE)
+            .filter(AlertCase.created_at >= cutoff)
+            .all()
+        )
+    except Exception as exc:  # noqa: BLE001 — analytics view must never 500
+        logger.debug("RTMON summary query failed: %s", exc)
+        return empty
+
+    if not rows:
+        return empty
+
+    detector_counts: Dict[str, int] = {}
+    severity_counts: Dict[str, int] = {}
+    total = 0
+    for marker, severity, created_at in rows:
+        total += 1
+        det = _rtmon_detector(marker)
+        detector_counts[det] = detector_counts.get(det, 0) + 1
+        sev = (severity or "unknown").strip().lower() or "unknown"
+        severity_counts[sev] = severity_counts.get(sev, 0) + 1
+        if created_at is not None:
+            key = created_at.date().isoformat()
+            if key in daily_counts:
+                daily_counts[key] += 1
+
+    return {
+        "days": days,
+        "total": total,
+        "by_detector": sorted(
+            [{"detector": k, "count": v} for k, v in detector_counts.items()],
+            key=lambda r: r["count"], reverse=True,
+        ),
+        "by_severity": sorted(
+            [{"severity": k, "count": v} for k, v in severity_counts.items()],
+            key=lambda r: r["count"], reverse=True,
+        ),
+        "daily": [{"date": d, "count": c} for d, c in sorted(daily_counts.items())],
+        "enabled": True,
+    }
 
 
 # ── Exclusion-list management ────────────────────────────────────────────
