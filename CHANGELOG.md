@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.63.0 -->
-<!-- ion-doc:version=0.63.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.63.1 -->
+<!-- ion-doc:version=0.63.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-07-29 -->
 
 # Changelog
+
+## v0.63.1 — 2026-07-30
+
+**Security: CodeQL SAST remediation.** Fixed the open code-scanning backlog; test-only false-positives dismissed on GitHub. No behaviour change beyond hardening.
+
+- **Stack-trace exposure (31)** — API/service errors now route through `safe_error()`: full detail logged server-side, only the exception class name returned.
+- **XSS** — reflective (2, executive report) via `html.escape`; DOM-based (7, tools/translator/briefings/cases templates) via `textContent`/anchored escapes; shared `esc()` strengthened to cover `& < > " '`.
+- **Path-injection (3, course images)** — `realpath` containment to the images root.
+- **Open-redirect (3)** — CyAB wizard id validated (uuid4) with safe fallback.
+- **Log hygiene (6)** — redact client IP / TIDE api-key / `es_url` credentials.
+- **URL-substring check (1)** — anchored host match in the observable extractor.
+- **CI (4)** — least-privilege `permissions` in the test workflow.
 
 ## v0.63.0 — 2026-07-30
 
