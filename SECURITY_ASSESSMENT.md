@@ -1,16 +1,16 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.64.0 -->
+<!-- ion-doc:version=0.65.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
-<!-- ion-doc:date=2026-07-29 -->
+<!-- ion-doc:date=2026-08-03 -->
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-07-30 (current: v0.64.0). Per-version deltas and history: see CHANGELOG + git history.
-**Application Version:** 0.64.0 — Attack Path (Bob Pathfinding) Phase 4: confidence-gated escalation tier (a bounded, high/critical-only, single-retry deeper pass before Bob abstains — advisory, air-gap-safe) + master `ION_ATTACK_PATH_ENABLED` feature flag. No net-new external surface or permission. ION-side findings: 0C / 0H. 0.63.1 — CodeQL SAST remediation: cleared the open code-scanning backlog (stack-trace exposure → `safe_error`, reflective/DOM XSS, path-injection containment, open-redirect validation, sensitive-log redaction, anchored URL host-match, least-privilege CI); test-only false-positives dismissed. Hardening only, no behaviour change. 0.63.0 — Attack Path (Bob Pathfinding) Phases 0-3: a deterministic, compute-on-read attack-path graph per case (`case:read`), the kill-chain graph UI, Bob reasoning over the structured path with a MITRE-tactic reachability score, and an advisory verifier pass + path-recurrence hint. Advisory, air-gap-safe; no net-new tables or permissions. ION-side findings: **0 Critical / 0 High**. Prior per-version net-new-surface notes: see CHANGELOG + git history.
+**Assessment Date:** 2026-08-03 (current: v0.65.0). Per-version deltas and history: see CHANGELOG + git history.
+**Application Version:** 0.65.0 — Traffic Analytics polish + Kibana note-sync fix + **Bob AI-controls hardening**: the autonomous investigation path's `<input_data>` prompt trust boundary + injection sanitiser are now reused across the on-demand AI surfaces (`/analyze/alert`, `/triage/suggest`, `/case/generate`, on-demand case analysis) and the AI chat now drops client-supplied `system`-role messages (jailbreak vector), clamps its temperature ceiling to 1.0, and sanitises RAG/uploaded-file context — a **net reduction in prompt-injection surface**. One net-new read-only endpoint (`GET /api/arkime/traffic/rtmon-summary`, `alert:read`, compute-on-read). No new permission or schema. ION-side findings: 0C / 0H. 0.64.0 — Attack Path Phase 4: confidence-gated escalation tier + master `ION_ATTACK_PATH_ENABLED` flag; advisory, air-gap-safe. 0.63.1 — CodeQL SAST remediation (hardening only, no behaviour change). Prior per-version net-new-surface notes: see CHANGELOG + git history.
 **Previous Assessment Version:** 0.33.0 (2026-05-27)
 **Scope:** Web application security review â€” authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
@@ -24,7 +24,7 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 
 **Current findings posture (v0.54.1): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0** and have stayed at zero since. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
 
-| Severity | Open findings (v0.64.0) |
+| Severity | Open findings (v0.65.0) |
 |----------|:-----------------------:|
 | Critical | 0 |
 | High | 0 |

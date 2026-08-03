@@ -1,13 +1,21 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.64.0 -->
-<!-- ion-doc:version=0.64.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.65.0 -->
+<!-- ion-doc:version=0.65.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-07-29 -->
+<!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.65.0 — 2026-08-03
+
+**Traffic Analytics polish, Kibana note-sync fix, and Bob AI-controls hardening.**
+
+- **Traffic Analytics** — moved to the Threat Intel nav; `get_top_countries()` now aggregates via Arkime's server-side `/api/spigraph` (unbiased vs the old top-500-by-bytes sample; legacy sampler fallback on older builds); new Real-Time Monitor (RTMON) card — per-detector / severity / daily — off `GET /api/arkime/traffic/rtmon-summary` (compute-on-read, empty-safe when RTMON is off); `_is_noise_ip()` drops IPv6 link-local / loopback / unspecified + IPv4 link-local from top-talkers. Tests `tests/test_v065_traffic_analytics.py` (11).
+- **Kibana note-sync fix** — PCAP auto-analysis notes (`_post_case_note`) and the AI Executive Summary (`_background_ai_case_summary`) were written to ION's DB only and never synced to the linked Kibana case. Both now mirror the note as a Kibana comment (fire-and-forget; no-op when Kibana is off or the case is unlinked), matching the interactive note path. Tests `tests/test_pcap_note_kibana_sync.py`.
+- **Bob AI-controls hardening** — new shared `prompt_safety` module lifts the autonomous path's `<input_data>` trust boundary + injection sanitiser out for reuse on the on-demand AI surfaces: `/analyze/alert`, `/triage/suggest`, `/case/generate` and the on-demand case analysis now fence + injection-scrub attacker-influenced content. AI chat drops client-supplied `system`-role messages (jailbreak vector), clamps the temperature ceiling 2.0→1.0, and sanitises RAG + uploaded-file context. New encoded-input rule in every chat persona: decode & interpret pasted hex/base64, always answer in clear English, never mirror the input encoding. Tests `tests/test_ai_controls_hardening.py` (12).
 
 ## v0.64.0 — 2026-07-30
 
