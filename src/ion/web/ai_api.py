@@ -24,6 +24,11 @@ from ion.services.ollama_service import (
     OllamaError,
     get_ollama_service,
 )
+from ion.services.prompt_safety import (
+    UNTRUSTED_DIRECTIVE,
+    sanitize_untrusted,
+    wrap_untrusted,
+)
 from ion.storage.database import get_session
 
 logger = logging.getLogger(__name__)
@@ -41,7 +46,10 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     model: Optional[str] = None
     context_type: str = Field(default="security", pattern="^(security|engineering|coding|general|analyst|default)$")
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
+    # Ceiling capped at 1.0: above that an 8B model degrades into incoherent /
+    # fabrication-prone output, which is the opposite of the expert answer the
+    # analyst wants. 0.7 default preserved.
+    temperature: float = Field(default=0.7, ge=0.0, le=1.0)
     max_tokens: Optional[int] = Field(default=None, ge=1, le=4096)
     stream: bool = False
 
@@ -261,7 +269,14 @@ async def chat(
         )
 
     try:
-        messages = [{"role": m.role, "content": m.content} for m in payload.messages]
+        # The server owns the system prompt. Drop any client-supplied
+        # system-role message so a caller can't inject their own system turn
+        # alongside it and override the persona / guardrails (jailbreak vector).
+        messages = [
+            {"role": m.role, "content": m.content}
+            for m in payload.messages
+            if m.role in ("user", "assistant")
+        ]
 
         # PII anonymisation — tokenise user messages before LLM
         pii_mapping = None
@@ -398,7 +413,14 @@ async def chat_stream(
                                     f"\nUser's custom instructions: {prefs.custom_instructions}"
                                 )
 
-                            layers.append("\n" + rag_context.to_prompt_block())
+                            # RAG content (user notes / KB / playbooks) can
+                            # carry adversary text pasted from alerts — scrub
+                            # injection tokens before it enters the system prompt.
+                            layers.append(
+                                "\n" + sanitize_untrusted(
+                                    rag_context.to_prompt_block(), max_chars=0
+                                )
+                            )
                             enhanced_system_prompt = "\n".join(layers)
 
                 # Custom instructions even without RAG
@@ -445,11 +467,19 @@ async def chat_stream(
 
     async def generate():
         try:
-            messages = [{"role": m.role, "content": m.content} for m in payload.messages]
+            # Server owns the system prompt — drop client system-role turns
+            # (jailbreak vector), keep only user/assistant.
+            messages = [
+                {"role": m.role, "content": m.content}
+                for m in payload.messages
+                if m.role in ("user", "assistant")
+            ]
 
-            # Add file context to the last user message if files are uploaded
+            # Add file context to the last user message if files are uploaded.
+            # Uploaded content is untrusted — scrub injection tokens first.
             files_context = get_files_context(current_user.id)
             if files_context and messages:
+                files_context = sanitize_untrusted(files_context, max_chars=0)
                 # Find the last user message and append file context
                 for i in range(len(messages) - 1, -1, -1):
                     if messages[i]["role"] == "user":
@@ -542,7 +572,11 @@ async def analyze_alert(
     except Exception:
         pass
 
-    # Build analysis prompt
+    # Build analysis prompt. The alert is attacker-influenced content — fence it
+    # in the trust boundary and scrub injection tokens before it hits the model.
+    alert_json = sanitize_untrusted(
+        json.dumps(alert_data, indent=2, default=str), max_chars=6000
+    )
     prompt = f"""Analyze this security alert and provide:
 1. A brief summary of what happened
 2. Potential impact and severity assessment
@@ -550,9 +584,9 @@ async def analyze_alert(
 4. Possible MITRE ATT&CK techniques involved
 
 Alert Data:
-```json
-{json.dumps(alert_data, indent=2, default=str)}
-```"""
+{wrap_untrusted(alert_json)}
+
+{UNTRUSTED_DIRECTIVE}"""
 
     try:
         result = await service.chat(
@@ -587,12 +621,15 @@ async def triage_suggest(
     if not await service.is_available():
         raise HTTPException(status_code=503, detail="AI service not available")
 
+    alert_json = sanitize_untrusted(
+        json.dumps(alert_data, indent=2, default=str), max_chars=6000
+    )
     prompt = f"""You are a security analyst assistant. Analyze this alert and provide structured triage suggestions.
 
 Alert Data:
-```json
-{json.dumps(alert_data, indent=2, default=str)}
-```
+{wrap_untrusted(alert_json)}
+
+{UNTRUSTED_DIRECTIVE}
 
 Respond EXACTLY in this format (no other text):
 
@@ -636,12 +673,15 @@ async def case_generate(
     if not await service.is_available():
         raise HTTPException(status_code=503, detail="AI service not available")
 
+    request_json = sanitize_untrusted(
+        json.dumps(request_data, indent=2, default=str), max_chars=6000
+    )
     prompt = f"""You are a security analyst writing an investigation case. Based on this alert and triage context, generate case fields.
 
 Alert and Triage Data:
-```json
-{json.dumps(request_data, indent=2, default=str)}
-```
+{wrap_untrusted(request_json)}
+
+{UNTRUSTED_DIRECTIVE}
 
 Respond EXACTLY in this format (no other text):
 
