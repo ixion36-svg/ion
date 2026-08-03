@@ -347,6 +347,11 @@ Still confirmed.
 
 ---
 
+### Accepted posture: Bob investigation prompt/response persistence — P3a (documented 2026-08-03)
+Completed Bob investigations persist the assembled prompt (`investigations.prompt_snapshot`) and the raw model output (`investigations.raw_response`) unconditionally. The persisted prompt is sanitiser-scrubbed (injection/role tokens + `</input_data>` breakout removed) but otherwise carries real alert/observable content, and PII anonymisation defaults **off** (`ION_PII_ANON_ENABLED`) — so by default this content, including any PII in the source alert, is stored at rest. **This is an accepted posture, not an open finding:** ION is air-gapped (content never egresses; the LLM is local Ollama), the `investigations` table is first-party data already RBAC-scoped to analysts, and the exact prompt + model output are operationally load-bearing (Bob-eval, the disagreement/tuning loop, debugging). Operators needing stricter data minimisation have two levers — `ION_PII_ANON_ENABLED=true` tokenises PII before it reaches the model (so both the snapshot and the response carry tokens, not real values), and `ION_BOB_STORE_REASONING=false` drops the stored `reasoning_text`. Reviewed under the AI-controls hardening program (`docs/superpowers/plans/2026-08-03-ai-controls-hardening-roadmap.md`); decision: document-and-leave, no code change.
+
+---
+
 ## Current Findings
 
 ### Medium

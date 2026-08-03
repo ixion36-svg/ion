@@ -54,16 +54,23 @@ autonomous path's defenses were not mirrored elsewhere.
   grounding instruction, and fences the case/notes context in `<input_data>` +
   the untrusted directive (previously the weakest-framed analytic call).
 
-## Deferred — decision / design needed (not yet scheduled)
+## Resolved by decision — no code change
 
-- **P3a — data-governance default posture.** PII anonymisation defaults **off**
-  (`pii_anon_service`), while the fully-assembled prompt + raw model response
-  persist to `investigations.prompt_snapshot` / `raw_response`. So the default
-  posture writes un-redacted (sanitised-but-real) untrusted content + PII at
-  rest. Flipping the default is a **deployment/compliance decision**, not a
-  silent code change — options: (a) default PII-anon on for the persisted
-  snapshot only, (b) gate raw-prompt persistence behind an explicit flag,
-  (c) leave as-is and document. **Needs an owner decision before implementation.**
+- **P3a — data-governance default posture. RESOLVED 2026-08-03: document-and-leave.**
+  PII anonymisation defaults **off** (`pii_anon_service`), while the
+  fully-assembled prompt + raw model response persist to
+  `investigations.prompt_snapshot` / `raw_response`. The owner decision is to
+  **accept and document** this posture rather than flip a default: ION is
+  air-gapped (content never egresses; local Ollama), the `investigations` table
+  is RBAC-scoped first-party data, and the exact prompt + response are
+  operationally load-bearing (Bob-eval, tuning loop, debugging). Operators
+  wanting stricter minimisation have `ION_PII_ANON_ENABLED=true` (tokenise PII
+  before the model → snapshot + response carry tokens) and
+  `ION_BOB_STORE_REASONING=false` (drop stored `reasoning_text`). Documented in
+  `SECURITY_ASSESSMENT.md` → "Accepted posture: Bob investigation prompt/response
+  persistence — P3a".
+
+## Deferred — design needed (not yet scheduled)
 - **Streaming-chat PII tokenisation parity.** `/chat` tokenises user messages
   when PII-anon is enabled; `/chat/stream` does not. Detokenising a streamed
   response per-chunk is unreliable (tokens span chunk boundaries), so this is a
