@@ -70,6 +70,11 @@ class AIFeedback(Base, TimestampMixin):
     auto_escalated: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0"
     )
+    # v0.64.0: True when Bob's confidence-gated escalation "deep pass" ran for
+    # this alert before the verdict/abstention was recorded (Attack Path Phase 4).
+    escalation_attempted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     human_closed_by = relationship("User", foreign_keys=[human_closed_by_id])
 
@@ -91,5 +96,6 @@ class AIFeedback(Base, TimestampMixin):
             "delta_reason": self.delta_reason,
             "bob_confidence_int": self.bob_confidence_int,
             "auto_escalated": self.auto_escalated,
+            "escalation_attempted": self.escalation_attempted,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }

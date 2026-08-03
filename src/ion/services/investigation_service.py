@@ -217,6 +217,104 @@ def _get_bob_confidence_threshold(template=None) -> int:
         return _DEFAULT_BOB_CONFIDENCE_THRESHOLD
 
 
+# ---------------------------------------------------------------------------
+# Confidence-gated escalation tier (v0.64.0 — Attack Path Phase 4, Fork F)
+# ---------------------------------------------------------------------------
+# The air-gap-friendly version of Maze's cost routing. When Bob's autonomous
+# confidence is BELOW threshold AND the alert/case is high|critical, run ONE
+# "deep pass" (more self-consistency seeds, and on PROD optionally a larger
+# background-queue model) to try to raise confidence BEFORE abstaining to a
+# human. Advisory only — the human still decides; this only tries harder before
+# giving up. Bounded: high/critical only (cost control), single retry (never
+# loops), and a safe no-op when Ollama is unconfigured (the LLM call errors →
+# the caller falls through to the existing abstain/auto-escalate behaviour).
+_DEFAULT_BOB_ESCALATION_SAMPLES = 3
+_HIGH_SEVERITIES = frozenset({"high", "critical"})
+
+
+def _bob_escalation_tier_enabled() -> bool:
+    """Feature flag for the deep-pass escalation tier (default ON).
+
+    Env ``ION_BOB_ESCALATION_TIER_ENABLED`` wins (operators flip without a
+    rebuild), then ``Config.bob_escalation_tier_enabled``, then default ON.
+    """
+    val = os.environ.get("ION_BOB_ESCALATION_TIER_ENABLED")
+    if val is not None and val.strip() != "":
+        return val.strip().lower() not in ("0", "false", "no", "off")
+    try:
+        from ion.core.config import get_config
+        return bool(getattr(get_config(), "bob_escalation_tier_enabled", True))
+    except Exception:
+        return True
+
+
+def _bob_escalation_samples() -> int:
+    """Self-consistency seeds for the deep pass (env → config → default 3, clamped 1..5)."""
+    raw = os.environ.get("ION_BOB_ESCALATION_SAMPLES")
+    if raw is None or not raw.strip():
+        try:
+            from ion.core.config import get_config
+            raw = str(getattr(get_config(), "bob_escalation_samples",
+                              _DEFAULT_BOB_ESCALATION_SAMPLES))
+        except Exception:
+            raw = str(_DEFAULT_BOB_ESCALATION_SAMPLES)
+    try:
+        n = int(raw)
+    except (TypeError, ValueError):
+        n = _DEFAULT_BOB_ESCALATION_SAMPLES
+    return max(1, min(5, n))
+
+
+def _bob_escalation_model() -> str:
+    """Optional larger deep-pass model; empty = same 8B model (air-gap-safe default)."""
+    val = os.environ.get("ION_BOB_ESCALATION_MODEL")
+    if val is not None and val.strip():
+        return val.strip()
+    try:
+        from ion.core.config import get_config
+        return (getattr(get_config(), "bob_escalation_model", "") or "").strip()
+    except Exception:
+        return ""
+
+
+def _severity_is_high(*severities: Any) -> bool:
+    """True when ANY provided severity string is high or critical."""
+    for s in severities:
+        if s and str(s).strip().lower() in _HIGH_SEVERITIES:
+            return True
+    return False
+
+
+def _should_escalate_deep_pass(
+    parsed: Dict[str, Any],
+    *,
+    severity: Any = None,
+    template: Any = None,
+    already_escalated: bool = False,
+) -> bool:
+    """Pure decision: run a deep pass before abstaining? (no LLM, no I/O.)
+
+    Fires ONLY when every guard holds:
+
+    * this attempt is not itself an escalated retry (single-retry guard — the
+      escalation tier can never trigger a second escalation → no loop);
+    * the escalation tier is enabled (``ION_BOB_ESCALATION_TIER_ENABLED``);
+    * the input alert/case severity OR Bob's own assessed severity is
+      high|critical (cost control — cheap alerts just abstain as today);
+    * the computed confidence is BELOW the circuit-breaker threshold.
+
+    Returns ``False`` when any guard fails; the caller then keeps today's
+    abstain / auto-escalate behaviour unchanged.
+    """
+    if already_escalated:
+        return False
+    if not _bob_escalation_tier_enabled():
+        return False
+    if not _severity_is_high(severity, parsed.get("severity")):
+        return False
+    return _compute_confidence(parsed) < _get_bob_confidence_threshold(template)
+
+
 def _render_bob_alert_note(parsed: Dict[str, Any]) -> str:
     """Render a markdown Note body from the JSON envelope.
 
@@ -308,6 +406,7 @@ def _write_bob_outputs(
     investigation_id: int,
     parsed: Dict[str, Any],
     template=None,
+    escalation_attempted: bool = False,
 ) -> None:
     """Write Bob's post-investigation artefacts in one transaction.
 
@@ -387,6 +486,9 @@ def _write_bob_outputs(
     inv_row = db.get(_Investigation, investigation_id)
     if inv_row is not None:
         inv_row.confidence_int = confidence_int
+        # v0.64.0: record whether the escalation deep pass ran for this alert.
+        if escalation_attempted:
+            inv_row.escalation_attempted = True
         # v0.36.0: default ON. Bob's analyst-explanation is persisted on the
         # Investigation row so memory + few-shot exemplar RAG can draw on it.
         # Disable with ION_BOB_STORE_REASONING=false (data-minimisation opt-out).
@@ -476,6 +578,7 @@ def _write_bob_outputs(
         human_closed_by_id=None,
         agreement=None,
         auto_escalated=not above_threshold,
+        escalation_attempted=escalation_attempted,
     )
     db.add(fb)
 
@@ -1897,6 +2000,7 @@ class InvestigationService:
         user_body: str,
         anon_map: Any,
         seed: int,
+        model: Optional[str] = None,
     ) -> Tuple[Dict[str, Any], str, Optional[int], int, str]:
         """One pass through Ollama — parsed + raw + telemetry.
 
@@ -1904,6 +2008,10 @@ class InvestigationService:
         the other determinism knobs (temperature=0, top_p=0.1, top_k=1) so
         that two different seeds actually *explore* different verdicts
         instead of converging on the same argmax token stream.
+
+        ``model`` overrides the Ollama default for this pass (used by the
+        confidence-gated escalation deep pass on PROD); ``None`` keeps the
+        configured 8B default — the air-gap-safe path.
         """
         ollama = self._get_ollama()
         if ollama is None:
@@ -1930,6 +2038,10 @@ class InvestigationService:
             # to fall back to `{}`. 4096 gives the envelope room to close.
             "max_tokens": 4096,
         }
+        # Optional model override (escalation deep pass). ``chat`` always
+        # accepts ``model``; None/empty leaves the Ollama default in place.
+        if model:
+            kwargs["model"] = model
         try:
             import inspect
             sig = inspect.signature(ollama.chat)
@@ -1989,6 +2101,8 @@ class InvestigationService:
         system_prompt: str,
         user_body: str,
         anon_map: Any,
+        samples: Optional[int] = None,
+        model: Optional[str] = None,
     ) -> Tuple[Dict[str, Any], str, Optional[int], int, str]:
         """Run the LLM call; return (parsed, model_name, eval_count, duration_ms, raw_content).
 
@@ -1999,32 +2113,40 @@ class InvestigationService:
         to ``inconclusive`` — two deterministic runs producing different
         verdicts means the prompt is genuinely ambiguous, and forcing a
         confident wrong answer is worse than admitting we don't know.
+
+        v0.64.0: ``samples`` / ``model`` may be supplied explicitly by the
+        escalation deep pass (more seeds / optionally a larger PROD model);
+        when ``samples`` is None the ION_INVESTIGATION_SAMPLES default applies.
         """
         import os
 
-        try:
-            samples = int(os.environ.get("ION_INVESTIGATION_SAMPLES", "1"))
-        except (TypeError, ValueError):
-            samples = 1
-        samples = max(1, min(3, samples))
+        if samples is None:
+            try:
+                samples = int(os.environ.get("ION_INVESTIGATION_SAMPLES", "1"))
+            except (TypeError, ValueError):
+                samples = 1
+        # Deterministic seed pool — extended to 5 so the escalation tier can
+        # request up to 5 seeds. Seeds are far apart in hash space to encourage
+        # verdict diversity when the prompt is ambiguous.
+        seed_pool = [42, 1337, 2024, 7, 90210]
+        samples = max(1, min(len(seed_pool), samples))
 
         # Single-sample fast path — indistinguishable from v0.10.11 behaviour.
         if samples == 1:
             return await self._single_llm_call(
-                system_prompt, user_body, anon_map, seed=42,
+                system_prompt, user_body, anon_map, seed=42, model=model,
             )
 
         # Multi-sample path. Seeds chosen to be deterministic across runs
         # (so two investigations of the same alert hit the same sample
         # stream) but far apart in hash space to encourage verdict diversity
         # when the prompt is ambiguous.
-        seed_pool = [42, 1337, 2024]
         seeds = seed_pool[:samples]
         results: List[Tuple[Dict[str, Any], str, Optional[int], int, str]] = []
         for s in seeds:
             results.append(
                 await self._single_llm_call(
-                    system_prompt, user_body, anon_map, seed=s,
+                    system_prompt, user_body, anon_map, seed=s, model=model,
                 )
             )
 
@@ -2075,6 +2197,48 @@ class InvestigationService:
             samples, verdicts,
         )
         return parsed, model, eval_count, total_ms, merged_content
+
+    def _alert_severity(self, alert: dict) -> str:
+        """Best-effort input severity for an alert dict (low/medium/high/critical, else '')."""
+        val = _get(
+            alert,
+            "kibana.alert.severity", "event.severity",
+            "signal.rule.severity", "severity",
+        )
+        return str(val).strip().lower() if val else ""
+
+    async def _escalation_deep_pass(
+        self,
+        *,
+        system_prompt: str,
+        user_body: str,
+        anon_map: Any,
+    ) -> Optional[Tuple[Dict[str, Any], str, Optional[int], int, str]]:
+        """Run ONE confidence-raising deep pass — more seeds / optional larger model.
+
+        Returns the ``_call_llm`` tuple, or ``None`` when the LLM is
+        unavailable/errors so the caller falls through to the existing
+        abstain / auto-escalate path (air-gap-safe). A single call — the
+        caller's ``already_escalated`` guard prevents any second escalation,
+        so this can never loop.
+        """
+        samples = _bob_escalation_samples()
+        model = _bob_escalation_model() or None
+        try:
+            return await self._call_llm(
+                system_prompt=system_prompt,
+                user_body=user_body,
+                anon_map=anon_map,
+                samples=samples,
+                model=model,
+            )
+        except InvestigationError as exc:
+            # Ollama unconfigured / unavailable → no-op deep pass.
+            logger.info("Escalation deep pass unavailable (Ollama?): %s", exc)
+            return None
+        except Exception as exc:  # pragma: no cover — defensive
+            logger.warning("Escalation deep pass failed: %s", exc)
+            return None
 
     # ------------------------------------------------------------------ #
     # Main entry point
@@ -2275,6 +2439,62 @@ class InvestigationService:
                 eval_count = None
                 llm_ms = 0
 
+            # 11b) Confidence-gated escalation tier (v0.64.0 — Attack Path Phase
+            # 4). BEFORE abstaining on a low-confidence, high/critical alert,
+            # try ONE deep pass (more seeds / optional larger model) to raise
+            # confidence. Single retry — never loops. Advisory: whatever the
+            # deep pass returns still flows through the SAME circuit breaker in
+            # _write_bob_outputs, so if it clears threshold the abstention is
+            # suppressed and if it stays low the auto-escalate badge fires as
+            # today. Air-gap-safe: a no-op deep pass leaves the first result.
+            escalation_attempted = False
+            if _should_escalate_deep_pass(
+                parsed,
+                severity=self._alert_severity(alert),
+                template=template,
+                already_escalated=False,
+            ):
+                escalation_attempted = True
+                _pre_conf = _compute_confidence(parsed)
+                _threshold = _get_bob_confidence_threshold(template)
+                logger.info(
+                    "Bob escalation tier: alert %s low-confidence (%d<%d) + "
+                    "high-severity — running deep pass (%d seeds)",
+                    alert_id, _pre_conf, _threshold, _bob_escalation_samples(),
+                )
+                deep = await self._escalation_deep_pass(
+                    system_prompt=system_prompt,
+                    user_body=user_body,
+                    anon_map=anon_map,
+                )
+                if deep is not None:
+                    deep_parsed, deep_model, deep_eval, _deep_ms, deep_raw = deep
+                    _post_conf = _compute_confidence(deep_parsed)
+                    deep_parsed["escalation"] = {
+                        "attempted": True,
+                        "prior_confidence": _pre_conf,
+                        "deep_confidence": _post_conf,
+                        "threshold": _threshold,
+                        "resolved": _post_conf >= _threshold,
+                        "samples": _bob_escalation_samples(),
+                        "model": deep_model or model_used,
+                    }
+                    # Adopt the deep-pass result — it is a strictly more-sampled
+                    # read of the SAME alert. Never cherry-pick the higher score:
+                    # if more seeds disagree, lower confidence is the honest
+                    # answer and the circuit breaker should still fire.
+                    parsed = deep_parsed
+                    model_used = deep_model or model_used
+                    if deep_eval is not None:
+                        eval_count = deep_eval
+                    raw_response_content = deep_raw or raw_response_content
+                    logger.info(
+                        "Bob escalation deep pass for %s: confidence %d → %d "
+                        "(threshold %d) — %s",
+                        alert_id, _pre_conf, _post_conf, _threshold,
+                        "resolved" if _post_conf >= _threshold else "still abstaining",
+                    )
+
             # Detokenise summary + actions before persistence so the stored
             # record carries real values.
             if anon_map is not None:
@@ -2326,6 +2546,7 @@ class InvestigationService:
                         investigation_id=inv_id,
                         parsed=parsed,
                         template=template,
+                        escalation_attempted=escalation_attempted,
                     )
                 except Exception as exc:
                     logger.warning(

@@ -1108,9 +1108,12 @@ def _run_migrations(engine: Engine) -> None:
     # Adds numeric confidence columns and circuit-breaker fields.
     if insp.has_table("investigations"):
         existing = {col["name"] for col in insp.get_columns("investigations")}
+        # v0.64.0: escalation_attempted needs a NOT NULL DEFAULT 0 (dialect-aware).
+        _bool_default = "FALSE" if _is_postgres(engine) else "0"
         for col_name, col_type in {
             "confidence_int": "INTEGER",
             "reasoning_text": "TEXT",
+            "escalation_attempted": f"BOOLEAN NOT NULL DEFAULT {_bool_default}",
         }.items():
             if col_name not in existing:
                 with engine.begin() as conn:
@@ -1150,6 +1153,17 @@ def _run_migrations(engine: Engine) -> None:
                     )
                 )
                 logger.info("Migrated: ai_feedback.auto_escalated")
+        # v0.64.0: escalation deep-pass telemetry.
+        if "escalation_attempted" not in existing:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE ai_feedback ADD COLUMN escalation_attempted BOOLEAN NOT NULL DEFAULT FALSE"
+                        if _is_postgres(engine)
+                        else "ALTER TABLE ai_feedback ADD COLUMN escalation_attempted BOOLEAN NOT NULL DEFAULT 0"
+                    )
+                )
+                logger.info("Migrated: ai_feedback.escalation_attempted")
 
     if insp.has_table("alert_prompt_templates"):
         existing = {col["name"] for col in insp.get_columns("alert_prompt_templates")}

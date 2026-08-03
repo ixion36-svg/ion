@@ -196,6 +196,29 @@ class Config:
     # shipped. Brought into line.
     investigation_llm_timeout_s: int = 300
 
+    # --- Attack Path (Bob Pathfinding) ---
+    # Master feature flag (Phase 4 package). Gates the whole Attack Path
+    # surface: the /cases/{id}/attack-path endpoint, Bob's case-analysis
+    # path-injection, and the Phase-3 recurrence link. The existing
+    # ION_ATTACK_PATH_RECURRENCE_ENABLED / _THRESHOLD sub-flags continue to
+    # work UNDER this switch. Default ON; disabling degrades to the prior
+    # (pre-Attack-Path) behaviour — air-gap-safe. Env: ION_ATTACK_PATH_ENABLED.
+    attack_path_enabled: bool = True
+
+    # --- Bob confidence-gated escalation tier (Attack Path Phase 4) ---
+    # "Try harder" deep pass before abstaining to a human: on a low-confidence
+    # verdict for a high/critical alert, re-run once with more self-consistency
+    # seeds (and optionally a larger PROD model) to raise confidence. Advisory
+    # only — the human still decides. Default ON. Env: ION_BOB_ESCALATION_TIER_ENABLED.
+    bob_escalation_tier_enabled: bool = True
+    # Self-consistency seeds for the deep pass (more seeds = steadier confidence
+    # at higher cost). Clamped 1..5. Env: ION_BOB_ESCALATION_SAMPLES.
+    bob_escalation_samples: int = 3
+    # Optional larger model for the deep pass on PROD's background queue. Empty =
+    # reuse the same Foundation-Sec-8B model (air-gap-safe default, no config
+    # needed). Env: ION_BOB_ESCALATION_MODEL.
+    bob_escalation_model: str = ""
+
     # --- Active response executors ---
     exec_dry_run: bool = True          # Safety: default TRUE; no real calls made
     exec_default_timeout_s: int = 20
@@ -387,6 +410,11 @@ class Config:
             investigation_sweep_interval_s=data.get("investigation_sweep_interval_s", 900),
             investigation_max_per_sweep=data.get("investigation_max_per_sweep", 50),
             investigation_llm_timeout_s=data.get("investigation_llm_timeout_s", 300),
+            # Attack Path + Bob escalation tier
+            attack_path_enabled=data.get("attack_path_enabled", True),
+            bob_escalation_tier_enabled=data.get("bob_escalation_tier_enabled", True),
+            bob_escalation_samples=data.get("bob_escalation_samples", 3),
+            bob_escalation_model=data.get("bob_escalation_model", ""),
             # Active response executors
             exec_dry_run=data.get("exec_dry_run", True),
             exec_default_timeout_s=data.get("exec_default_timeout_s", 20),
@@ -553,6 +581,11 @@ class Config:
                     "investigation_sweep_interval_s": self.investigation_sweep_interval_s,
                     "investigation_max_per_sweep": self.investigation_max_per_sweep,
                     "investigation_llm_timeout_s": self.investigation_llm_timeout_s,
+                    # Attack Path + Bob escalation tier
+                    "attack_path_enabled": self.attack_path_enabled,
+                    "bob_escalation_tier_enabled": self.bob_escalation_tier_enabled,
+                    "bob_escalation_samples": self.bob_escalation_samples,
+                    "bob_escalation_model": self.bob_escalation_model,
                     # Active response executors
                     "exec_dry_run": self.exec_dry_run,
                     "exec_default_timeout_s": self.exec_default_timeout_s,
@@ -898,6 +931,19 @@ def get_config() -> Config:
             _config.investigation_max_per_sweep = int(os.environ.get("ION_INVESTIGATION_MAX_PER_SWEEP", "50"))
         if os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S"):
             _config.investigation_llm_timeout_s = int(os.environ.get("ION_INVESTIGATION_LLM_TIMEOUT_S", "300"))
+
+        # Attack Path + Bob escalation-tier env overrides
+        if os.environ.get("ION_ATTACK_PATH_ENABLED"):
+            _config.attack_path_enabled = _get_env_bool("ION_ATTACK_PATH_ENABLED", True)
+        if os.environ.get("ION_BOB_ESCALATION_TIER_ENABLED"):
+            _config.bob_escalation_tier_enabled = _get_env_bool("ION_BOB_ESCALATION_TIER_ENABLED", True)
+        if os.environ.get("ION_BOB_ESCALATION_SAMPLES"):
+            try:
+                _config.bob_escalation_samples = int(os.environ["ION_BOB_ESCALATION_SAMPLES"])
+            except ValueError:
+                pass  # keep default on a non-integer value
+        if os.environ.get("ION_BOB_ESCALATION_MODEL"):
+            _config.bob_escalation_model = os.environ.get("ION_BOB_ESCALATION_MODEL", "")
 
         # Active response executor overrides
         if os.environ.get("ION_EXEC_DRY_RUN"):

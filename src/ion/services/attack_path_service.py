@@ -595,6 +595,28 @@ _RECURRENCE_DEFAULT_DAYS = 30
 _RECURRENCE_MAX_CASES = 50  # cap the on-read scan so a busy SOC can't stall Bob
 
 
+def attack_path_enabled() -> bool:
+    """Master feature flag for the Attack Path (Bob Pathfinding) surface.
+
+    Env ``ION_ATTACK_PATH_ENABLED`` (default ON) gates the whole feature — the
+    compute-on-read endpoint, Bob's case-analysis path-injection, and the
+    Phase-3 recurrence link. The existing ``ION_ATTACK_PATH_RECURRENCE_ENABLED``
+    / ``_THRESHOLD`` sub-flags continue to work UNDER this switch. Air-gap-safe:
+    disabling degrades to the prior (pre-Attack-Path) behaviour, never an error.
+
+    Resolution: env wins (operators flip without a config rewrite), then
+    ``Config.attack_path_enabled``, then default ON.
+    """
+    val = os.environ.get("ION_ATTACK_PATH_ENABLED")
+    if val is not None and val.strip() != "":
+        return val.strip().lower() not in ("0", "false", "no", "off")
+    try:
+        from ion.core.config import get_config
+        return bool(getattr(get_config(), "attack_path_enabled", True))
+    except Exception:
+        return True
+
+
 def _recurrence_threshold() -> int:
     """Min *other* same-shape cases before we hint a detection proposal."""
     try:
@@ -832,6 +854,12 @@ async def build_attack_path(session, case_id: int) -> Dict[str, Any]:
     valid empty graph is still returned — callers that need a 404 should check
     case existence first (the endpoint does).
     """
+    if not attack_path_enabled():
+        # Master flag OFF — degrade to a valid but empty graph (no ES fetch,
+        # no reachability, no recurrence scan). The endpoint returns empty,
+        # Bob's path-injection sees an empty block and narrates from prose as
+        # before. Air-gap-safe, no LLM, no writes.
+        return build_attack_path_from_alerts(case_id, [])
     alerts = await _fetch_case_alert_dicts(session, case_id)
     path = build_attack_path_from_alerts(case_id, alerts or [])
     # Phase 2: fold in the deterministic reachability score so the Phase-1 UI

@@ -87,6 +87,12 @@ class Investigation(Base):
 
     # v0.21.0: numeric confidence score (0-100) from _compute_confidence.
     confidence_int: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # v0.64.0: True when the confidence-gated escalation "deep pass" ran for
+    # this investigation (low-confidence + high/critical → try harder before
+    # abstaining). Telemetry only — advisory, the human still decides.
+    escalation_attempted: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
     # Analyst explanation text — stored when ION_BOB_STORE_REASONING=true.
     reasoning_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
