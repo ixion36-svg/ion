@@ -283,7 +283,30 @@ Net: **83 pages → ~72**, with the duplicated *metrics* consolidated behind sha
   counter), permission aligned `alert:read` → `observable:read`, module deleted, stale
   guide.html text corrected. **Remaining:** 5 CyAB routes out of `server.py`,
   `skill_publisher` → `alert_prompt` re-prefix, 2 case routes → `case_lifecycle_api`.
-- **Phases 3–4 — not started.**
+- **Phase 3 — done (the load-bearing part).** Mounting conventions normalised:
+  `role_skills` now mounts at `prefix="/api/skills"` with an in-router `/role-match`
+  (matching `skills_router` instead of using a third convention), and `arkime_api` no
+  longer self-prefixes — it mounts at `prefix="/api"` like every other router. Both
+  changes proven **URL-neutral** by diffing the full 883-entry route/method set before
+  and after: zero added, zero removed. *Deliberately skipped:* the forensics re-split.
+  Its stated purpose was closing the ledger gap, which phase 0 fixed directly at the
+  mutation sites — re-splitting now would be file reorganisation with regression risk
+  and no functional gain. `course_api`/`labs_api`'s `prefix=""` is also left alone:
+  their decorators carry absolute paths, so converting is churn without benefit.
+- **Phase 4 — done, as ALIASES not a re-prefix.** `/api/cases/*` and
+  `/api/alerts/triage/*` are now published as canonical paths. Implemented as a single
+  central mechanism in `server.py` (`_install_path_aliases`) that, after mounting,
+  registers a second `APIRoute` for each legacy route pointing at the **same endpoint
+  object** with the same response model / status / dependencies — rather than editing
+  18 decorators across 5 files (easy to miss one) or issuing 3xx redirects (fragile for
+  POST/PATCH/DELETE method+body preservation, and `docs/API.md` is a PUBLIC integration
+  contract). 18 aliases registered. All 52 in-repo frontend call sites migrated to the
+  canonical paths across `alerts.html`, `cases.html`, `analyst.html`, `dashboard_v2.html`;
+  legacy paths remain fully served so external integrators are unaffected.
+  Tests: `tests/test_route_audit_phase4_aliases.py` pins that every legacy route has a
+  twin **bound to the same endpoint**, so the two can never drift.
+  *Remaining for a future release:* retire the legacy paths once integrators have
+  migrated, and update `docs/API.md` to advertise the canonical ones.
 
 | Phase | Content | Risk |
 |---|---|---|

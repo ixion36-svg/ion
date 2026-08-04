@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, Form, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
@@ -390,10 +390,10 @@ app.include_router(kibana_router, prefix="/api/kibana")
 app.include_router(skills_router, prefix="/api/skills")
 app.include_router(worklog_router, prefix="/api/worklog")
 # Role-match router has its own /skills/role-match prefix in the router itself
-app.include_router(role_skills_router, prefix="/api")
+app.include_router(role_skills_router, prefix="/api/skills")
 app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
-app.include_router(arkime_router)  # router already has prefix="/api"
+app.include_router(arkime_router, prefix="/api")
 app.include_router(forensics_router, prefix="/api/forensics")
 # v0.20.1: ForensicCase Workbench — pinned evidence + tamper-evident ledger
 app.include_router(forensic_workbench_router, prefix="/api/forensics")
@@ -479,6 +479,69 @@ app.include_router(bob_eval_router, prefix="")
 from ion.web.metrics_api import router as metrics_router
 
 app.include_router(metrics_router)
+
+
+# ---------------------------------------------------------------------------
+# Route audit phase 4 — canonical path aliases.
+#
+# /api/elasticsearch/alerts/cases/* and /api/elasticsearch/alerts-triage/* read
+# Postgres AlertCase / AlertTriage rows (and call Ollama); nothing about them is
+# Elasticsearch. The prefix is a lineage artifact from when api.py was one
+# module. These aliases publish the accurate paths — /api/cases/* and
+# /api/alerts/triage/* — WITHOUT breaking the legacy ones.
+#
+# Aliasing (same endpoint, two paths) rather than redirecting: a 3xx that must
+# preserve method + body across POST/PATCH/DELETE is fragile, and docs/API.md is
+# a PUBLIC integration contract. Both paths therefore behave identically, byte
+# for byte, and the ~89 in-repo call sites can migrate at leisure. The legacy
+# paths stay out of the OpenAPI schema's duplicate listing via the alias being
+# the one marked deprecated.
+# ---------------------------------------------------------------------------
+
+_PATH_ALIASES = [
+    ("/api/elasticsearch/alerts/cases", "/api/cases"),
+    ("/api/elasticsearch/alerts-triage", "/api/alerts/triage"),
+]
+
+
+def _install_path_aliases() -> int:
+    """Register a second path for each legacy case/triage route.
+
+    Copies the *same* endpoint and every response-shaping attribute, so the two
+    paths cannot diverge. Returns the number of aliases added.
+    """
+    from fastapi.routing import APIRoute
+
+    added = 0
+    for route in list(app.routes):
+        if not isinstance(route, APIRoute):
+            continue
+        for legacy, canonical in _PATH_ALIASES:
+            if route.path == legacy or route.path.startswith(legacy + "/"):
+                alias_path = canonical + route.path[len(legacy):]
+                app.router.routes.append(
+                    APIRoute(
+                        alias_path,
+                        route.endpoint,
+                        methods=list(route.methods or []),
+                        name=f"{route.name}__alias",
+                        dependencies=route.dependencies,
+                        response_model=route.response_model,
+                        status_code=route.status_code,
+                        responses=route.responses,
+                        summary=route.summary,
+                        description=route.description,
+                        response_class=route.response_class,
+                        include_in_schema=False,
+                    )
+                )
+                added += 1
+                break
+    return added
+
+
+_ALIAS_COUNT = _install_path_aliases()
+logger.info("Registered %d canonical path aliases (/api/cases, /api/alerts/triage)", _ALIAS_COUNT)
 
 
 def _validate_startup_config():
@@ -1483,111 +1546,6 @@ async def cyab_systems_table_partial(
     )
 
 
-@app.post("/api/cyab/systems/bulk")
-async def cyab_systems_bulk(
-    payload: dict,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """{action, system_ids} — mark-reviewed | export-csv | rerun-health.
-
-    The rerun-health action is a stub for Sub-plan C; the response shape
-    matches the other actions so the UI flow stays uniform.
-    """
-    import csv
-    import io
-    from datetime import date
-
-    from fastapi.responses import Response
-    from sqlalchemy import select
-
-    from ion.models.cyab import CyabSystem
-
-    action = payload.get("action")
-    ids = payload.get("system_ids") or []
-    rows = session.execute(
-        select(CyabSystem).where(CyabSystem.id.in_(ids))
-    ).scalars().all()
-
-    if action == "mark-reviewed":
-        today = date.today()
-        for s in rows:
-            s.last_reviewed_date = today
-        session.commit()
-        return {"affected": len(rows)}
-
-    if action == "export-csv":
-        buf = io.StringIO()
-        w = csv.writer(buf)
-        w.writerow(["id", "name", "department", "owner", "status", "readiness"])
-        for s in rows:
-            w.writerow([
-                s.id, s.name, s.department, s.soc_analyst_owner or "",
-                s.status, s.readiness_score,
-            ])
-        return Response(
-            content=buf.getvalue(),
-            media_type="text/csv",
-            headers={"content-disposition": "attachment; filename=cyab-systems.csv"},
-        )
-
-    if action == "rerun-health":
-        # Stub — Sub-plan C wires the live data-health service into a job.
-        return JSONResponse(
-            status_code=202,
-            content={
-                "affected": len(rows),
-                "note": "queued (stub)",
-            },
-        )
-
-    # v0.19.7: bulk delete. Reuses _delete_system_row from
-    # cyab_api (migrated from cyab_studio_api in v0.20.0) so the
-    # data_sources / snapshots cascade is identical to the
-    # single-row endpoint.
-    # v0.19.16: privilege gate. The enclosing endpoint is
-    # require_page_permission("alert:read") because the read-ish
-    # actions (mark-reviewed/export-csv/rerun-health) are fine for
-    # any analyst. delete-selected is destructive and must match
-    # the gate the per-row DELETE /api/cyab/systems/{id} endpoint
-    # enforces — which is case:close, not case:update. (Fixed: these
-    # had drifted apart, letting case:update-only users bulk-delete
-    # systems they could not delete one at a time.)
-    # v0.19.16: also catches IntegrityError per-row so a single
-    # FK-violation doesn't poison the shared session for the rest
-    # of the user's selection.
-    if action == "delete-selected":
-        if not user.has_permission("case:close"):
-            raise HTTPException(
-                status_code=403,
-                detail="case:close permission required for bulk delete",
-            )
-        from sqlalchemy.exc import IntegrityError
-
-        from ion.web.cyab_api import _delete_system_row
-        deleted = 0
-        failed: list[int] = []
-        for s in rows:
-            try:
-                if _delete_system_row(session, s.id):
-                    deleted += 1
-            except IntegrityError as exc:
-                session.rollback()
-                failed.append(s.id)
-                logger.warning(
-                    "bulk delete: FK violation deleting CyAB system %s: %s",
-                    s.id, str(exc)[:120],
-                )
-                continue
-        out: dict = {"affected": deleted}
-        if failed:
-            out["failed_ids"] = failed
-        return out
-
-    raise HTTPException(status_code=400, detail=f"Unknown action: {action}")
-
-
-
 @app.get("/cyab/systems/{system_id}", response_class=HTMLResponse)
 async def cyab_system_detail_page(
     system_id: int,
@@ -1845,23 +1803,6 @@ async def cyab_audit_page(
 # CyAB Onboarding Wizard (Sub-plan B / Task 3)
 # ---------------------------------------------------------------------------
 
-_WID_RE = re.compile(r"\A[0-9a-fA-F]{32}\Z")
-
-
-def _cyab_wizard_redirect(wid: str, step: int) -> RedirectResponse:
-    """Build a safe same-site redirect into the onboarding wizard.
-
-    ``wid`` is a wizard-session id (uuid4 hex). Validate it against that
-    exact shape before reflecting it into the redirect URL so a
-    user-controlled value can never turn this into an open redirect or
-    inject extra query parameters. On any mismatch, restart the wizard.
-    """
-    if _WID_RE.match(wid or ""):
-        return RedirectResponse(
-            url=f"/cyab/onboard?wid={wid}&step={int(step)}", status_code=303
-        )
-    return RedirectResponse(url="/cyab/onboard", status_code=303)
-
 
 @app.get("/cyab/onboard", response_class=HTMLResponse)
 async def cyab_onboard_page(
@@ -1937,184 +1878,6 @@ async def cyab_onboard_page(
 
     return templates.TemplateResponse(
         request=request, name="cyab/onboard.html", context=ctx
-    )
-
-
-@app.post("/api/cyab/onboard/{wid}/step/1", response_class=HTMLResponse)
-async def cyab_onboard_step_1(
-    wid: str,
-    request: Request,
-    name: str = Form(...),
-    department: str = Form(...),
-    hostname: str = Form(""),
-    pillar: str = Form(""),
-    subprofile_id: str = Form(""),
-    owner: str = Form(""),
-    containment_authority: str = Form(""),
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """Step 1 — Identity. Persists fields and creates the backing
-    CyabSystem row via ``cyab_wizard_service.save_identity``. Returns
-    the Step 2 partial for HTMX clients, or a 303 redirect for plain
-    browsers."""
-    from ion.services import cyab_wizard_service
-
-    try:
-        state = cyab_wizard_service.save_identity(
-            session,
-            wid,
-            identity={
-                "name": name,
-                "hostname": hostname,
-                "pillar": pillar,
-                "subprofile_id": subprofile_id,
-                "owner": owner,
-                "department": department,
-                "containment_authority": containment_authority,
-            },
-        )
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Wizard session not found")
-
-    # Render Step 2 partial inline (HTMX swap), or 303 for non-HTMX clients.
-    if request.headers.get("hx-request") == "true":
-        from jinja2 import TemplateNotFound
-        try:
-            return templates.TemplateResponse(
-                request=request,
-                name="cyab/_wizard_step_2_intake.html",
-                context={"wid": wid, "step": 2, "state": state},
-            )
-        except TemplateNotFound:
-            # Step 2 partial lands in Task 4 — fall through to redirect
-            # so HTMX clients still progress in the meantime.
-            pass
-    return _cyab_wizard_redirect(wid, 2)
-
-
-@app.post("/api/cyab/onboard/{wid}/step/2", response_class=HTMLResponse)
-async def cyab_onboard_step_2(
-    wid: str,
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """Step 2 — Intake. Persists the snapshot of answers in the wizard
-    blob (real autosave goes via the Studio answers endpoint). Returns
-    Step 3 partial for HTMX or 303 redirects to the Step 3 URL."""
-    from ion.services import cyab_wizard_service
-    from ion.services.cyab_subprofile_service import (
-        list_pillars,
-        list_subprofiles_for_pillar,
-    )
-
-    form = await request.form()
-    answers = {
-        k.split("[", 1)[1].rstrip("]"): v
-        for k, v in form.items() if k.startswith("answers[")
-    }
-
-    try:
-        cyab_wizard_service.save_intake(session, wid, answers=answers)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Wizard session not found")
-
-    if request.headers.get("hx-request") == "true":
-        state = cyab_wizard_service.load_state(session, wid)
-        # Aggregate sub-profiles across all pillars (same shape the
-        # GET handler builds) so the Step 3 partial dropdown renders.
-        subprofiles: list = []
-        for p in list_pillars(session):
-            subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
-        return templates.TemplateResponse(
-            request=request, name="cyab/_wizard_step_3_source.html",
-            context={
-                "wid": wid, "step": 3, "state": state,
-                "subprofiles": subprofiles,
-            },
-        )
-    return _cyab_wizard_redirect(wid, 3)
-
-
-@app.post("/api/cyab/onboard/{wid}/step/3", response_class=HTMLResponse)
-async def cyab_onboard_step_3(
-    wid: str,
-    request: Request,
-    name: str = Form(...),
-    data_source_type: str = Form(""),
-    subprofile_id: str = Form(""),
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """Step 3 — First data source. Persists a CyabDataSource on the
-    backing system, lazy-seeds the doc checklist so Step 4 has rows to
-    render, and either returns the Step 4 partial (HTMX) or redirects."""
-    from ion.services import cyab_doc_checklist_service, cyab_wizard_service
-
-    try:
-        state = cyab_wizard_service.save_source(
-            session, wid,
-            source={
-                "name": name,
-                "data_source_type": data_source_type or None,
-                "subprofile_id": subprofile_id or None,
-            },
-        )
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Wizard session not found")
-
-    # Lazy-seed the checklist now so Step 4 has rows to render.
-    cyab_doc_checklist_service.seed_for_system(session, state["system_id"])
-    checklist = cyab_doc_checklist_service.list_for_system(
-        session, state["system_id"]
-    )
-
-    if request.headers.get("hx-request") == "true":
-        return templates.TemplateResponse(
-            request=request, name="cyab/_wizard_step_4_docs.html",
-            context={
-                "wid": wid, "step": 4, "state": state,
-                "checklist": checklist,
-            },
-        )
-    return _cyab_wizard_redirect(wid, 4)
-
-
-@app.post("/api/cyab/onboard/{wid}/finish")
-async def cyab_onboard_finish(
-    wid: str,
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """Apply doc-placeholder overrides, mark wizard complete, redirect to
-    the per-system page."""
-    from ion.services import cyab_wizard_service
-
-    form = await request.form()
-    # Parse docs[<kind>][<field>] = value
-    overrides: dict[str, dict] = {}
-    for k, v in form.items():
-        if not k.startswith("docs["):
-            continue
-        # docs[HLD][url] -> ('HLD', 'url')
-        rest = k[len("docs["):]
-        try:
-            kind, field = rest.split("][", 1)
-        except ValueError:
-            continue
-        field = field.rstrip("]")
-        overrides.setdefault(kind, {})[field] = v
-
-    try:
-        sys_id = cyab_wizard_service.finish(
-            session, wid, doc_overrides=overrides
-        )
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Wizard session not found")
-    return RedirectResponse(
-        url=f"/cyab/systems/{sys_id}", status_code=303
     )
 
 

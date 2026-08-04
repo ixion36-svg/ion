@@ -463,7 +463,7 @@
     const [dash, metrics, casesResp, handover] = await Promise.all([
       apiGet('/api/dashboard').catch((e) => { console.warn('dashboard failed', e); return null; }),
       apiGet('/api/dashboard/team-metrics').catch((e) => { console.warn('team-metrics failed', e); return null; }),
-      apiGet('/api/elasticsearch/alerts/cases?status=open').catch((e) => { console.warn('cases failed', e); return null; }),
+      apiGet('/api/cases?status=open').catch((e) => { console.warn('cases failed', e); return null; }),
       apiGet('/api/shift-handover/report?hours=8').catch((e) => { console.warn('handover failed', e); return null; }),
     ]);
 

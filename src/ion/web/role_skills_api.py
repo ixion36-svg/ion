@@ -11,7 +11,8 @@ from ion.models.user import User
 from ion.services import role_skills_service
 from ion.web.api import get_db_session
 
-router = APIRouter(prefix="/skills/role-match", tags=["role-match"])
+# Mounted at prefix="/api/skills" in server.py, matching skills_router.
+router = APIRouter(prefix="/role-match", tags=["role-match"])
 
 
 class RoleAssessmentSubmit(BaseModel):

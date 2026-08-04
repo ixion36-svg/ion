@@ -4067,7 +4067,7 @@ async function loadTriageBatch() {
         for (const a of allAlerts) {
             if (a.status) esStatuses[a.id] = a.status;
         }
-        const response = await fetch('/api/elasticsearch/alerts-triage/batch', {
+        const response = await fetch('/api/alerts/triage/batch', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ alert_ids: alertIds, es_statuses: esStatuses }),
@@ -4222,7 +4222,7 @@ function dismissAlertAttention() {
 // =========================================================================
 async function loadCases() {
     try {
-        const response = await fetch('/api/elasticsearch/alerts/cases');
+        const response = await fetch('/api/cases');
         if (!response.ok) return;
         const data = await response.json();
         casesData = data.cases || [];
@@ -4274,7 +4274,7 @@ function renderCasesSummary() {
 
 async function showCaseDetail(caseId) {
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const response = await fetch(`/api/cases/${caseId}`);
         if (!response.ok) throw new Error('Failed to load case');
         const caseData = await response.json();
         renderCaseManagementModal(caseData);
@@ -4531,7 +4531,7 @@ async function confirmCloseCaseWithAlerts(caseId, closureType) {
 
     try {
         // Get case details to find linked alerts
-        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const caseResp = await fetch(`/api/cases/${caseId}`);
         if (!caseResp.ok) throw new Error('Failed to load case');
         const caseData = await caseResp.json();
 
@@ -4566,7 +4566,7 @@ async function confirmCloseCaseWithAlerts(caseId, closureType) {
                 escalated: 'true_positive',
             };
             const finalReason = closureReasonMap[closureType] || closureType;
-            await fetch(`/api/elasticsearch/alerts/cases/${caseId}`, {
+            await fetch(`/api/cases/${caseId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -4944,7 +4944,7 @@ async function confirmCaseClosure(caseId, newStatus) {
     const notes = document.getElementById('closure-notes-input').value.trim();
 
     try {
-        const resp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`, {
+        const resp = await fetch(`/api/cases/${caseId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: newStatus, closure_reason: reason, closure_notes: notes || null }),
@@ -4995,7 +4995,7 @@ async function confirmCaseClosure(caseId, newStatus) {
         await loadCases();
 
         // Refresh the case management modal
-        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const caseResp = await fetch(`/api/cases/${caseId}`);
         if (caseResp.ok) {
             const caseData = await caseResp.json();
             renderCaseManagementModal(caseData);
@@ -5021,7 +5021,7 @@ async function confirmCaseClosure(caseId, newStatus) {
 
 async function updateCaseField(caseId, field, value) {
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`, {
+        const response = await fetch(`/api/cases/${caseId}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [field]: value }),
@@ -5035,7 +5035,7 @@ async function updateCaseField(caseId, field, value) {
         await loadCases();
 
         // Refresh the case management modal
-        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const caseResp = await fetch(`/api/cases/${caseId}`);
         if (caseResp.ok) {
             const caseData = await caseResp.json();
             renderCaseManagementModal(caseData);
@@ -5103,7 +5103,7 @@ async function checkKFPMatches(caseData) {
 
 async function closeAsKnownFP(caseId, kfpId) {
     try {
-        const resp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/close-as-fp`, {
+        const resp = await fetch(`/api/cases/${caseId}/close-as-fp`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ known_fp_id: kfpId }),
@@ -5118,7 +5118,7 @@ async function closeAsKnownFP(caseId, kfpId) {
         await loadCases();
 
         // Refresh case management modal
-        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const caseResp = await fetch(`/api/cases/${caseId}`);
         if (caseResp.ok) {
             const caseData = await caseResp.json();
             renderCaseManagementModal(caseData);
@@ -5184,7 +5184,7 @@ async function addCaseNoteFromModal(caseId) {
     if (!content) return;
 
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/notes`, {
+        const response = await fetch(`/api/cases/${caseId}/notes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content }),
@@ -5192,7 +5192,7 @@ async function addCaseNoteFromModal(caseId) {
         if (!response.ok) throw new Error('Failed to add note');
 
         // Re-fetch case and re-render modal
-        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const caseResp = await fetch(`/api/cases/${caseId}`);
         if (caseResp.ok) {
             const caseData = await caseResp.json();
             renderCaseManagementModal(caseData);
@@ -5209,7 +5209,7 @@ async function escalateToDFIRIRIS(caseId) {
         btn.textContent = 'Escalating...';
     }
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/escalate/dfir-iris`, {
+        const response = await fetch(`/api/cases/${caseId}/escalate/dfir-iris`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         });
@@ -5226,7 +5226,7 @@ async function escalateToDFIRIRIS(caseId) {
             window.open(data.iris_url, '_blank');
         }
         // Refresh the modal
-        const caseResp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const caseResp = await fetch(`/api/cases/${caseId}`);
         if (caseResp.ok) {
             const caseData = await caseResp.json();
             renderCaseManagementModal(caseData);
@@ -5247,7 +5247,7 @@ async function loadCasePlaybookExecutions(caseId) {
     if (!container) return;
 
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/playbook-executions`);
+        const response = await fetch(`/api/cases/${caseId}/playbook-executions`);
         if (!response.ok) throw new Error('Failed to load');
         const data = await response.json();
         const executions = data.executions || [];
@@ -5343,7 +5343,7 @@ async function showCasePlaybookPicker(caseId) {
 
 async function startCasePlaybook(caseId, playbookId) {
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/playbook/${playbookId}/start`, {
+        const response = await fetch(`/api/cases/${caseId}/playbook/${playbookId}/start`, {
             method: 'POST'
         });
         if (!response.ok) {
@@ -5450,7 +5450,7 @@ async function submitCreateCase(alertId) {
     const triggeredRules = alertData && alertData.rule_name ? [alertData.rule_name] : [];
 
     try {
-        const response = await fetch('/api/elasticsearch/alerts/cases', {
+        const response = await fetch('/api/cases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -6059,7 +6059,7 @@ async function aiSummarizeCase(caseId) {
     container.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>Generating case summary...</div>';
 
     try {
-        const resp = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const resp = await fetch(`/api/cases/${caseId}`);
         if (!resp.ok) throw new Error('Failed to load case');
         const caseData = await resp.json();
 
@@ -6995,7 +6995,7 @@ async function renderCaseTab(caseId) {
     container.innerHTML = '<div class="loading">Loading case...</div>';
 
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}`);
+        const response = await fetch(`/api/cases/${caseId}`);
         if (!response.ok) throw new Error('Failed');
         const c = await response.json();
 
@@ -7141,7 +7141,7 @@ async function addCaseNote(caseId) {
     if (!content) return;
 
     try {
-        const response = await fetch(`/api/elasticsearch/alerts/cases/${caseId}/notes`, {
+        const response = await fetch(`/api/cases/${caseId}/notes`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content }),
@@ -9234,7 +9234,7 @@ async function addAlertFieldsAsEvidence(caseId) {
         for (const f of fields) lines.push('- **' + f.key + '**: ' + f.value);
     }
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + encodeURIComponent(caseId) + '/notes', {
+        const resp = await fetch('/api/cases/' + encodeURIComponent(caseId) + '/notes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: lines.join('\n') }),
@@ -9639,7 +9639,7 @@ async function linkAllToCase(matchType, caseId) {
     }
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts-triage/bulk-update', {
+        const resp = await fetch('/api/alerts/triage/bulk-update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -10301,7 +10301,7 @@ async function applyBulkAction() {
     if (priority) payload.priority = priority;
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts-triage/bulk-update', {
+        const resp = await fetch('/api/alerts/triage/bulk-update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -10436,7 +10436,7 @@ async function submitBulkCreateCase() {
     }));
 
     try {
-        const response = await fetch('/api/elasticsearch/alerts/cases', {
+        const response = await fetch('/api/cases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -10556,7 +10556,7 @@ async function confirmAddToCase() {
     };
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts-triage/bulk-update', {
+        const resp = await fetch('/api/alerts/triage/bulk-update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -10846,7 +10846,7 @@ async function openCasePanel(caseId) {
     body.innerHTML = '<p class="_ion-s-bca8b928a3">Loading...</p>';
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId);
+        const resp = await fetch('/api/cases/' + caseId);
         if (!resp.ok) throw new Error('Failed to load case');
         const c = await resp.json();
         document.getElementById('acp-number').textContent = c.case_number || '';
@@ -11005,7 +11005,7 @@ async function acpUpdateField(caseId, field, value, oldStatus) {
     const body = {};
     body[field] = value;
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+        const resp = await fetch('/api/cases/' + caseId, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -11034,7 +11034,7 @@ async function confirmCasePanelClosure() {
     const notes = document.getElementById('acp-closure-notes').value.trim();
     const caseId = _acpClosurePending.caseId;
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+        const resp = await fetch('/api/cases/' + caseId, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: 'closed', closure_reason: reason, closure_notes: notes }),
@@ -11066,7 +11066,7 @@ async function acpAddNote(caseId) {
     const content = ta.value.trim();
     if (!content) return;
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes', {
+        const resp = await fetch('/api/cases/' + caseId + '/notes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content }),

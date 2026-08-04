@@ -2351,7 +2351,7 @@ function debouncedFilter() { _filterDebounce(); }
 // =============================================================================
 async function loadAllCases() {
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases');
+        const resp = await fetch('/api/cases');
         if (!resp.ok) throw new Error('Failed to load cases');
         const data = await resp.json();
         allCases = data.cases || [];
@@ -2563,7 +2563,7 @@ function asCount(v) {
 }
 
 // v0.59.0 — a single case widget. Every region maps to a real AlertCase field
-// from /api/elasticsearch/alerts/cases; blocks render only when their data is
+// from /api/cases; blocks render only when their data is
 // present so the widget degrades gracefully on lighter rows.
 function renderCaseWidget(c) {
     const sev = c.severity || 'medium';
@@ -2656,7 +2656,7 @@ async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
         if (closureReason) body.closure_reason = closureReason;
         if (closureNotes) body.closure_notes = closureNotes;
 
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+        const resp = await fetch('/api/cases/' + caseId, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -2841,7 +2841,7 @@ async function openCaseDetail(caseId) {
     body.innerHTML = '<p class="_ion-s-bca8b928a3">Loading...</p>';
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId);
+        const resp = await fetch('/api/cases/' + caseId);
         if (!resp.ok) throw new Error('Failed to load case');
         const c = await resp.json();
 
@@ -3043,7 +3043,7 @@ async function addFieldsAsEvidence(fieldsId) {
     }
     const content = lines.join('\n');
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes', {
+        const resp = await fetch('/api/cases/' + caseId + '/notes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: content }),
@@ -3811,7 +3811,7 @@ function renderPanelContent(c) {
         +       'title="Bob gathers evidence (related alerts, enrichment, similar closed cases) and returns a cited verdict + recommended playbook">'
         +       '&#128269; Auto-Investigate</button>';
     html += '<button class="btn" data-click-action="toggleCasePlaybookBrowser" data-args=\'[' + c.id + ']\'>Start Playbook</button>';
-    html += '<a class="btn" href="/api/elasticsearch/alerts/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
+    html += '<a class="btn" href="/api/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
     html += '</div>';
     html += '<div class="_ion-s-c8be1ccba6" id="case-playbook-browser-' + c.id + '"></div>';
 
@@ -3823,7 +3823,7 @@ async function loadSimilarCases(caseId) {
     const container = document.getElementById('similar-cases-container');
     if (!container) return;
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/similar?limit=5');
+        const resp = await fetch('/api/cases/' + caseId + '/similar?limit=5');
         if (!resp.ok) {
             container.innerHTML = '<div class="cpanel-empty-hint">Similarity unavailable</div>';
             return;
@@ -3869,7 +3869,7 @@ async function loadSimilarCases(caseId) {
 // Attack Path (Bob Pathfinding) — Phase 1 kill-chain graph
 // ─────────────────────────────────────────────────────────
 // Renders the deterministic Phase-0 endpoint
-//   GET /api/elasticsearch/alerts/cases/{id}/attack-path   (case:read)
+//   GET /api/cases/{id}/attack-path   (case:read)
 // as a tactic-laned left→right DAG. Lanes = phases[] in rank order (MITRE
 // kill-chain recon→impact); each node card sits in the earliest phase whose
 // node_ids contains it, bordered by threat_level (reusing the --sev-* tokens).
@@ -3921,7 +3921,7 @@ async function loadAttackPath(caseId) {
     _apgState = { redraw: null, ro: null };
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/attack-path');
+        const resp = await fetch('/api/cases/' + caseId + '/attack-path');
         if (!resp.ok) {
             container.innerHTML = '<div class="cpanel-empty-hint">Attack path unavailable</div>';
             return;
@@ -4136,7 +4136,7 @@ async function loadCaseTimeline(caseId) {
     const container = document.getElementById('case-timeline-container');
     if (!container) return;
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/timeline');
+        const resp = await fetch('/api/cases/' + caseId + '/timeline');
         if (!resp.ok) {
             container.innerHTML = '<div class="cpanel-empty-hint">Timeline unavailable</div>';
             return;
@@ -4237,7 +4237,7 @@ async function loadSimilarObservables(caseId) {
     const container = document.getElementById('similar-observables-container');
     if (!container) return;
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/similar-observables');
+        const resp = await fetch('/api/cases/' + caseId + '/similar-observables');
         if (!resp.ok) {
             container.innerHTML = '<div class="cpanel-empty-hint">Cross-case lookup unavailable</div>';
             return;
@@ -4387,7 +4387,7 @@ async function panelUpdateField(caseId, field, value) {
         }
         body[field] = coerced;
 
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId, {
+        const resp = await fetch('/api/cases/' + caseId, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -4448,7 +4448,7 @@ async function addPanelNote(caseId) {
     }
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes', {
+        const resp = await fetch('/api/cases/' + caseId + '/notes', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ content: content }),
@@ -4482,7 +4482,7 @@ async function getBobAnalysis(caseId) {
     if (meta) meta.textContent = '';
     try {
         const resp = await fetch(
-            '/api/elasticsearch/alerts/cases/' + caseId + '/bob-analysis',
+            '/api/cases/' + caseId + '/bob-analysis',
             { method: 'POST', headers: { 'Content-Type': 'application/json' } }
         );
         const data = await resp.json();
@@ -4516,7 +4516,7 @@ async function saveBobAnalysisAsNote(caseId) {
     if (!confirm("Save this Bob analysis as a note on the case?")) return;
     try {
         const resp = await fetch(
-            '/api/elasticsearch/alerts/cases/' + caseId + '/notes',
+            '/api/cases/' + caseId + '/notes',
             {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -4656,7 +4656,7 @@ async function runCaseAutoInvestigate(caseId) {
     if (panel) panel.style.display = 'block';
     if (body) body.textContent = 'Bob is investigating — gathering evidence and reasoning (15–60s)…';
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/auto-investigate',
+        const resp = await fetch('/api/cases/' + caseId + '/auto-investigate',
             { method: 'POST', headers: { 'Content-Type': 'application/json' } });
         const data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
@@ -4674,7 +4674,7 @@ async function saveAutoInvestigateAsNote(caseId) {
     if (!data) { showToast("Run Auto-Investigate first.", 'warning'); return; }
     if (!confirm("Save this Auto-Investigate report as a note on the case?")) return;
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/notes',
+        const resp = await fetch('/api/cases/' + caseId + '/notes',
             { method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ content: _autoinvToMarkdown(data) }) });
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -4698,7 +4698,7 @@ async function escalateCase(caseId) {
     if (!confirm('Escalate this case to DFIR-IRIS?')) return;
 
     try {
-        const resp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/escalate/dfir-iris', {
+        const resp = await fetch('/api/cases/' + caseId + '/escalate/dfir-iris', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
         });
@@ -4803,7 +4803,7 @@ function filterCasePlaybooks(caseId, query) {
 
 async function startPlaybookForCase(caseId, playbookId, playbookName) {
     try {
-        const execResp = await fetch('/api/elasticsearch/alerts/cases/' + caseId + '/playbook/' + playbookId + '/start', {
+        const execResp = await fetch('/api/cases/' + caseId + '/playbook/' + playbookId + '/start', {
             method: 'POST',
         });
 
@@ -4861,7 +4861,7 @@ async function submitCreateCase() {
             if (!Number.isNaN(idNum)) body.assigned_to_id = idNum;
         }
 
-        const resp = await fetch('/api/elasticsearch/alerts/cases', {
+        const resp = await fetch('/api/cases', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),

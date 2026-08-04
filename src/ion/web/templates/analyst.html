@@ -217,7 +217,7 @@ async function loadWorkspace() {
   // Parallel fetches
   const [alertsRes, casesRes, metricsRes, obsRes] = await Promise.all([
     safeFetch('/api/elasticsearch/alerts?hours=24&limit=500'),
-    safeFetch('/api/elasticsearch/alerts/cases?status=open'),
+    safeFetch('/api/cases?status=open'),
     safeFetch('/api/dashboard/team-metrics'),
     safeFetch('/api/observables/stats'),
   ]);

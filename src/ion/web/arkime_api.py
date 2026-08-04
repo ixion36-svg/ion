@@ -52,7 +52,9 @@ from ion.services.opencti_service import get_opencti_service
 from ion.storage.database import get_db_session
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api", tags=["arkime"])
+# Mounted at prefix="/api" in server.py (was self-prefixed, the only
+# router in the app that did so).
+router = APIRouter(tags=["arkime"])
 
 
 # ════════════════════════════════ Schemas ════════════════════════════════
