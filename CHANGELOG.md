@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.67.0 -->
-<!-- ion-doc:version=0.67.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.68.0 -->
+<!-- ion-doc:version=0.68.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.68.0 — 2026-08-04
+
+**Route audit phases 2–4 — merges, mounting normalisation, canonical case paths.** Completes the consolidation roadmap's API-layer work (`docs/superpowers/plans/2026-08-04-route-audit-and-consolidation.md`).
+
+- **Canonical `/api/cases/*` + `/api/alerts/triage/*`** — these routes read Postgres `AlertCase` / `AlertTriage` rows and call Ollama; nothing about them is Elasticsearch, and the `/api/elasticsearch/...` prefix was a lineage artifact from when `api.py` was one module. Published as **aliases, not a re-prefix**: `_install_path_aliases()` registers a second route per legacy path bound to the *same endpoint object*. Chosen over redirects (a 3xx preserving method + body across POST/PATCH/DELETE is fragile, and `docs/API.md` is a PUBLIC integration contract) and over editing 18 decorators across 5 files (missing one is silent). **Legacy paths remain fully served** — no breaking change for integrators. 52 in-repo frontend call sites migrated.
+- **CyAB write endpoints moved out of `server.py`** into `cyab_api.py` (5 routes). They were declared on `@app` with absolute paths; they are now relative, since the router mounts at `prefix="/api/cyab"` — absolute paths would have produced `/api/cyab/api/cyab/...`. The `_WID_RE` open-redirect guard and `_cyab_wizard_redirect` moved with them.
+- **Case playbook sub-resources moved** from `api.py` to `case_lifecycle_api` (2 routes) — that module's declared charter, and not part of the KFP↔`close_alert` entanglement that deferred the god-module split's increment 4.
+- **Mounting conventions normalised** — `role_skills` now mounts at `prefix="/api/skills"` matching `skills_router`; `arkime_api` no longer self-prefixes. Proven URL-neutral by diffing the full 883-entry route/method set: zero added, zero removed.
+- Tests `tests/test_route_audit_phase4_aliases.py` (5) pin that every legacy route has a twin bound to the same endpoint, so the two can never drift. Verified on a local stack with seeded data (40 cases): Cases and Alerts pages confirmed working.
 
 ## v0.67.0 — 2026-08-04
 
