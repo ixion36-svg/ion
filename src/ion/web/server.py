@@ -58,7 +58,6 @@ from ion.web.canary_api import router as canary_router
 from ion.web.case_grouper_api import router as case_grouper_router
 from ion.web.case_lifecycle_api import router as case_lifecycle_router
 from ion.web.case_similarity_api import router as case_similarity_router
-from ion.web.change_log_api import router as change_log_router
 from ion.web.change_request_api import router as change_request_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.compliance_api import router as compliance_router
@@ -67,7 +66,6 @@ from ion.web.cyab_api import router as cyab_router
 from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
-from ion.web.dashboard_layout_api import router as dashboard_layout_router
 from ion.web.de_api import router as de_router
 from ion.web.detection_health_api import router as detection_health_router
 from ion.web.elasticsearch_api import router as elasticsearch_router
@@ -99,9 +97,7 @@ from ion.web.network_map_api import router as network_map_router
 from ion.web.notes_api import router as notes_router
 from ion.web.observable_api import router as observable_router
 from ion.web.pcap_api import router as pcap_router
-from ion.web.playbook_action_api import router as playbook_action_router
 from ion.web.playbook_analytics_api import router as playbook_analytics_router
-from ion.web.report_scheduler_api import router as report_scheduler_router
 from ion.web.role_skills_api import router as role_skills_router
 from ion.web.scheduler_api import router as scheduler_router
 from ion.web.security_api import router as security_router
@@ -110,8 +106,6 @@ from ion.web.service_account_api import router as service_account_router
 from ion.web.shift_handover_api import router as shift_handover_router
 from ion.web.skill_publisher_api import router as skill_publisher_router
 from ion.web.skills_api import router as skills_router
-from ion.web.sla_api import router as sla_router
-from ion.web.smtp_api import router as smtp_router
 from ion.web.soc_health_api import router as soc_health_router
 from ion.web.social_api import router as social_router
 from ion.web.story_api import router as story_router
@@ -119,7 +113,6 @@ from ion.web.story_api import router as story_router
 # v0.27.0: threat_hunt_api removed; see /threat-hunting handler note below.
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
-from ion.web.threat_watch_gap_api import router as threat_watch_gap_router
 
 # v0.26.1: ticker service + API removed (was crashing every tick on an
 # enum-case mismatch; the auto-flagging design also conflicted with
@@ -413,7 +406,6 @@ app.include_router(wallboard_router, prefix="")
 # same router so it owns its own prefixes internally.
 app.include_router(translator_router, prefix="")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
-app.include_router(threat_watch_gap_router, prefix="/api/threat-intel")
 app.include_router(threat_landscape_router, prefix="/api")
 app.include_router(shift_handover_router, prefix="/api")
 app.include_router(entity_timeline_router, prefix="/api")
@@ -448,16 +440,10 @@ app.include_router(service_account_router, prefix="/api")
 app.include_router(incident_cost_router, prefix="/api")
 app.include_router(compliance_router, prefix="/api")
 app.include_router(comm_template_router, prefix="/api")
-app.include_router(change_log_router, prefix="/api")
-app.include_router(sla_router, prefix="/api")
 app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
 # v0.27.0: threat_hunt_router removed alongside the half-built page.
-app.include_router(dashboard_layout_router, prefix="/api")
-app.include_router(report_scheduler_router, prefix="/api")
-app.include_router(playbook_action_router, prefix="/api")
 app.include_router(cyber_range_router, prefix="/api")
-app.include_router(smtp_router, prefix="/api/smtp")
 app.include_router(enrichment_router, prefix="/api/enrichment")
 app.include_router(alert_prompt_router, prefix="")
 # v0.11.0 — JSON-DAG playbook automation (Stories). The router declares

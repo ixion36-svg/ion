@@ -644,7 +644,15 @@ def mark_lesson_complete(
     if lesson.lesson_type == LessonType.QUIZ:
         raise HTTPException(
             status_code=400,
-            detail="Quiz lessons require submit-quiz to complete; this endpoint is for reading/lab",
+            detail="Quiz lessons require submit-quiz to complete; this endpoint is for reading lessons",
+        )
+    # LAB lessons must complete through /api/courses/{slug}/lessons/{id}/lab/complete
+    # (labs_api). That path runs LabGradingService and tears down the materialised
+    # mock data; completing here would skip grading AND leak the seeded rows.
+    if lesson.lesson_type == LessonType.LAB:
+        raise HTTPException(
+            status_code=400,
+            detail="Lab lessons must be completed via the lab/complete endpoint so they are graded and torn down",
         )
     prog = _ensure_progress(session, current_user.id, lesson_id)
     prog.status = LessonProgressStatus.COMPLETED

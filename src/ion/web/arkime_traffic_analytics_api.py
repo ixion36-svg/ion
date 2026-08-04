@@ -81,13 +81,6 @@ def _trend(cur_sessions: int, cur_bytes: int, prev: Dict[str, int]) -> Dict[str,
     }
 
 
-@router.get("/status")
-async def traffic_status(user: User = Depends(require_permission("alert:read"))):
-    """Check whether Arkime is configured for traffic analytics."""
-    svc = get_arkime_service()
-    return {"configured": svc.is_configured}
-
-
 @router.get("/overview")
 async def traffic_overview(
     range: str = "24h",

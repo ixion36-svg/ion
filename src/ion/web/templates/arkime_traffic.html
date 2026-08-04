@@ -1031,7 +1031,7 @@
     }
     // Check Arkime is configured
     try {
-      const st = await fetch('/api/arkime/traffic/status');
+      const st = await fetch('/api/arkime/status');
       if (st.ok) {
         const { configured } = await st.json();
         if (!configured) {

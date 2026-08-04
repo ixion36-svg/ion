@@ -16,6 +16,7 @@ from ion.models.forensics import (
     InvestigationType,
 )
 from ion.models.user import User
+from ion.services import forensic_ledger_service
 from ion.storage.forensic_repository import DEFAULT_SLA_PROFILES, ForensicRepository
 
 router = APIRouter(tags=["forensics"])
@@ -425,6 +426,25 @@ def add_evidence(
         storage_location=payload.storage_location,
         metadata=payload.metadata,
     )
+    session.flush()
+    # Chain-of-custody: this JSON path lands in the same repo.add_evidence() as
+    # the Workbench multipart upload, which has always written the ledger. Without
+    # this append the item would be invisible to /ledger/verify, which attests the
+    # chain as complete — a tamper-evidence gap.
+    forensic_ledger_service.append(
+        session,
+        forensic_case_id=case_id,
+        action="evidence_add",
+        payload={
+            "evidence_id": evidence.id,
+            "name": payload.name,
+            "evidence_type": str(payload.evidence_type),
+            "sha256": payload.hash_sha256,
+            "md5": payload.hash_md5,
+            "storage_location": payload.storage_location,
+        },
+        actor_id=user.id,
+    )
     session.commit()
     return evidence.to_dict()
 
@@ -460,6 +480,22 @@ def update_evidence(
         storage_location=payload.storage_location,
         hash_md5=payload.hash_md5,
         hash_sha256=payload.hash_sha256,
+    )
+    session.flush()
+    # Mutating an evidence hash / status / location is exactly the event the
+    # tamper-evident chain exists to record.
+    forensic_ledger_service.append(
+        session,
+        forensic_case_id=evidence.forensic_case_id,
+        action="evidence_update",
+        payload={
+            "evidence_id": evidence.id,
+            "status": str(payload.status) if payload.status is not None else None,
+            "storage_location": payload.storage_location,
+            "sha256": payload.hash_sha256,
+            "md5": payload.hash_md5,
+        },
+        actor_id=user.id,
     )
     session.commit()
     return evidence.to_dict()
@@ -498,6 +534,21 @@ def add_custody_entry(
         received_by_id=payload.received_by_id,
         location=payload.location,
         notes=payload.notes,
+    )
+    session.flush()
+    # The literal chain of custody — a handover must be attestable.
+    forensic_ledger_service.append(
+        session,
+        forensic_case_id=evidence.forensic_case_id,
+        action="custody_entry",
+        payload={
+            "evidence_id": evidence.id,
+            "custody_entry_id": entry.id,
+            "custody_action": str(payload.action),
+            "received_by_id": payload.received_by_id,
+            "location": payload.location,
+        },
+        actor_id=user.id,
     )
     session.commit()
     return entry.to_dict()
