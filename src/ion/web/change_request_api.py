@@ -150,4 +150,8 @@ def export_change_request(cr_id: int, session: Session = Depends(get_db_session)
 def change_requests_page(
     request: Request, _user: User = Depends(require_page_permission(_PERM))
 ):
-    return _templates.TemplateResponse(request=request, name="change_requests.html")
+    return _templates.TemplateResponse(
+        request=request,
+        name="change_requests.html",
+        context={"current_user": _user},
+    )

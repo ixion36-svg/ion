@@ -117,3 +117,148 @@ def test_gitlab_issue_browser_survived():
     """Only the config surface was removed — the page's actual job stays."""
     html = (TEMPLATES / "gitlab.html").read_text(encoding="utf-8")
     assert "/api/gitlab/issues" in html
+
+
+# ── phase 7: page merges ─────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("retired,target", [
+    ("/engineering-analytics", "/analytics"),
+    ("/ai-scorecard", "/alert-prompts"),
+    ("/my-courses", "/courses"),
+])
+def test_retired_pages_redirect_not_404(paths, retired, target):
+    """Merged-away pages keep a route so links and bookmarks survive."""
+    assert retired in paths
+    assert target in paths
+
+
+def test_retired_templates_are_gone():
+    for name in ("engineering_analytics.html", "ai_scorecard.html", "my_courses.html"):
+        assert not (TEMPLATES / name).exists(), f"{name} should have been deleted"
+
+
+def test_index_breakdown_ported_into_analytics():
+    """The only section unique to /engineering-analytics moved rather than died."""
+    html = (TEMPLATES / "analytics.html").read_text(encoding="utf-8")
+    assert "index-table-container" in html
+    assert "function renderIndexTable(" in html
+    assert "renderIndexTable(data.indices" in html
+
+
+def test_analytics_bar_widths_are_not_the_dead_migrated_class():
+    """The v0.31.21 inline-style migration hashed `width:${pct}%` into a STATIC
+    class, leaving a literal ${pct} in the CSS — an invalid rule browsers drop,
+    so every bar on this page rendered at zero width."""
+    html = (TEMPLATES / "analytics.html").read_text(encoding="utf-8")
+    # no element should still carry the dead class
+    assert 'class="risk-bar ${cls} _ion-s-95aea49e0e"' not in html
+    assert "_ion-s-95aea49e0e\"></div>" not in html
+    assert "function applyBarWidths(" in html
+    assert html.count("data-pct=") >= 4
+
+
+def test_ai_scorecard_kpis_folded_into_alert_prompts():
+    html = (TEMPLATES / "alert_prompt_templates.html").read_text(encoding="utf-8")
+    for tile in ("sc-kpi-templates", "sc-kpi-samples", "sc-kpi-agreement", "sc-kpi-tuning"):
+        assert tile in html
+    assert "function renderScorecardKpis" in html
+    # the old page approximated `evaluated`; the KPI must use the real count
+    assert "c.evaluated" in html
+
+
+def test_scorecards_api_exposes_exact_evaluated_count():
+    src = Path("src/ion/web/alert_prompt_api.py").read_text(encoding="utf-8")
+    assert '"evaluated": b["evaluated"]' in src
+
+
+def test_courses_page_has_scope_toggle():
+    html = (TEMPLATES / "courses.html").read_text(encoding="utf-8")
+    assert "cl-scope-all" in html and "cl-scope-mine" in html
+    assert "'/api/my-courses'" in html, "toggle must still call the enrolment endpoint"
+
+
+def test_my_courses_api_survived_the_page_merge(paths):
+    assert "/api/my-courses" in paths
+
+
+@pytest.mark.parametrize("tpl", ["bug_reports.html", "change_requests.html"])
+def test_service_desk_pages_share_a_tab_strip(tpl):
+    html = (TEMPLATES / tpl).read_text(encoding="utf-8")
+    assert '_nav_tabs.html' in html
+    assert '"/bug-reports"' in html
+
+
+def test_cab_tab_is_permission_gated():
+    """bug-reports is any-authenticated; change-requests is system:settings. The
+    tab strip must not advertise CAB to users who cannot open it."""
+    from jinja2 import Environment, FileSystemLoader
+
+    src = (TEMPLATES / "bug_reports.html").read_text(encoding="utf-8")
+    frag = src[src.index("{% set tabs = ["):
+               src.index('{% include "_nav_tabs.html" %}') + len('{% include "_nav_tabs.html" %}')]
+    env = Environment(loader=FileSystemLoader(str(TEMPLATES)))
+
+    class _U:
+        def __init__(self, ok): self._ok = ok
+        def has_permission(self, _p): return self._ok
+
+    assert "Change Requests" in env.from_string(frag).render(current_user=_U(True))
+    assert "Change Requests" not in env.from_string(frag).render(current_user=_U(False))
+    assert "Change Requests" not in env.from_string(frag).render(current_user=None)
+
+
+def test_service_desk_routes_pass_current_user():
+    """The gate above is inert unless the route actually supplies current_user."""
+    for mod in ("bug_report_api.py", "change_request_api.py"):
+        src = Path("src/ion/web") .joinpath(mod).read_text(encoding="utf-8")
+        assert '"current_user": _user' in src, f"{mod} must pass current_user"
+
+
+def test_analyst_efficiency_merged_into_executive_report(paths):
+    assert "/analyst-efficiency" in paths          # redirect
+    assert not (TEMPLATES / "analyst_efficiency.html").exists()
+    assert "/api/analyst-efficiency/metrics" in paths   # API backs the Team tab
+    html = (TEMPLATES / "executive_report.html").read_text(encoding="utf-8")
+    assert "er-tab-team" in html and "function erLoadTeam" in html
+    assert "Per-Analyst Breakdown" in html
+    # the activity bars must not use the dead migrated height rule
+    assert 'class="ae-activity-bar _ion-s-9ce2eb0cde"' not in html
+    assert "b.style.height" in html
+
+
+@pytest.mark.parametrize("tpl", ["detection_health.html", "de_metrics.html"])
+def test_detection_pages_share_a_permission_aware_strip(tpl):
+    html = (TEMPLATES / tpl).read_text(encoding="utf-8")
+    assert '_nav_tabs.html' in html
+    assert 'has_permission("de:read")' in html
+    assert 'has_permission("security:read")' in html
+
+
+def test_detection_strip_never_advertises_an_unauthorised_tab():
+    from jinja2 import Environment, FileSystemLoader
+
+    src = (TEMPLATES / "de_metrics.html").read_text(encoding="utf-8")
+    end = '{% if tabs | length > 1 %}{% include "_nav_tabs.html" %}{% endif %}'
+    frag = src[src.index("{% set tabs = [] %}"): src.index(end) + len(end)]
+    env = Environment(loader=FileSystemLoader(str(TEMPLATES)))
+
+    class _U:
+        def __init__(self, perms): self._p = perms
+        def has_permission(self, p): return p in self._p
+
+    both = env.from_string(frag).render(current_user=_U({"de:read", "security:read"}),
+                                        active_label="DE Metrics")
+    assert "DE Metrics" in both and "Detection Health" in both
+
+    de_only = env.from_string(frag).render(current_user=_U({"de:read"}),
+                                           active_label="DE Metrics")
+    assert "Detection Health" not in de_only, "must not advertise a page the user cannot open"
+
+    anon = env.from_string(frag).render(current_user=None, active_label="DE Metrics")
+    assert "Detection Health" not in anon and "DE Metrics" not in anon
+
+
+def test_detection_routes_pass_current_user():
+    src = Path("src/ion/web/server.py").read_text(encoding="utf-8")
+    assert src.count('context={"current_user": user}') >= 2

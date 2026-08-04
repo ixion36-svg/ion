@@ -349,6 +349,43 @@ Net: **83 pages → ~72**, with the duplicated *metrics* consolidated behind sha
   a copy.
 - Tests `tests/test_route_audit_phase5_metrics.py` (14).
 
+**Phase 6 — DONE (v0.70.0).** `/briefings`→`/about`; `/investigate`→`/investigation-queue`;
+`/investigations`→`/investigation-memory` (302s kept; API namespaces untouched). Nav "Tools"
+repointed to the actual toolbox; `/wallboard` linked. Removed `/daily-work`'s client-side
+handover card and the GitLab config modal (a **second raw-PAT surface** writing the same
+`.ion/config.json` as `/settings#gitlab`).
+
+**Phase 7 — 6 of 8 merges DONE (v0.71.0).**
+- Retired with redirects: `/engineering-analytics`→`/analytics?tab=systems` (its unique
+  "Index Breakdown" ported first, plus `indices` added to the system-overview payload);
+  `/ai-scorecard`→`/alert-prompts` (KPI tiles folded in); `/analyst-efficiency`→
+  `/executive-report` (9-column per-analyst breakdown + activity timeline as a **Team tab**);
+  `/my-courses`→`/courses` (All/Mine scope toggle). All four APIs kept — the merged UIs call them.
+- **Two roadmap deviations, same reason.** The plan said collapse
+  `bug-reports`+`change-requests` and `detection-health`+`de-metrics` into single pages. Each
+  pair carries **different permissions** (`require_page_auth` vs `system:settings`;
+  `security:read` vs `de:read`), so collapsing forces a permission change or an awkwardly
+  hidden tab. Used ION's sibling-tab-strip idiom instead: navigation de-duplicated, permission
+  boundaries intact, each tab rendered **only** to users who can open it (verified across all
+  combinations — a `de:read`-only user is never shown that Detection Health exists).
+  **Trap:** `current_user` is not in template context anywhere (nav gates client-side via
+  `app.js`), so those Jinja checks would have been silently inert. All four routes now pass it,
+  with a test asserting they do.
+- **Not done:** `/topology`→`/integrations` (health map merge). **Deliberately skipped:**
+  `/translator`→`/tools` — phase 6 fixed the real defect (nav pointed at the minor page), the
+  two are already grouped by tab strip, and transplanting a 277-line tool with file upload adds
+  risk for no user-visible gain.
+- **Bugs found while moving code (fixed):** `/analytics` had **four** bar charts rendering at
+  zero width — the v0.31.21 inline-style migration hashed `width:${pct}%` into a STATIC class,
+  leaving a literal `${pct}` in the CSS (invalid, dropped). Same defect found again on the
+  analyst-efficiency activity bar (`height:${pct}%`). Fixed via `data-pct` + CSP-safe
+  `el.style` appliers. **`ion-migrated-styles.css` contains 126 such dead rules** — the ones
+  touched here are fixed; the rest are a separate sweep. Also: `/ai-scorecard`'s headline KPI
+  was arithmetically wrong (it approximated `evaluated = sample_size`, over-counting whenever
+  rows were abstentions) — the API now exposes the real `evaluated` and the folded-in tile is
+  exact.
+- Tests `tests/test_route_audit_phase6_pages.py` (33).
+
 | **5** | Metric consolidation: one shared case-metrics helper (kills 4 MTTR / 3 FP-rate impls) + one `deduped_feedback()` helper (kills 4 copies, 1 already drifted). Fix `/bob-eval` P/R/F1, `/ai-scorecard` KPI, noisy/silent label clash. | Medium — behaviour-visible numbers change (they become *correct*) |
 | **6** | Cheap page wins: nav repoint ("Tools"), `/wallboard` to nav, rename `/briefings`→`/about` + investigate/investigations, delete `/daily-work` handover card + GitLab config modal | Low |
 | **7** | Page merges: analyst-efficiency→executive-report, detection-health→de-metrics, my-courses→courses, change-requests+bug-reports→service-desk, topology→integrations, translator→tools, shift-handover→briefing; delete `/engineering-analytics` + `/ai-scorecard` | Medium — UI moves + redirects for old URLs |

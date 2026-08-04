@@ -26,6 +26,29 @@
   </button>
 </section>
 
+{# KPI row folded in from the retired /ai-scorecard page (route audit phase 7).
+   That page rendered nothing this table didn't already show per-template — same
+   endpoint, same fields, same tuning flag — and linked back here for every
+   action. These four tiles were its only unique content. #}
+<section class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
+  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
+    <div class="label-tiny text-slate-500">Templates with data</div>
+    <div id="sc-kpi-templates" class="text-[24px] font-semibold text-white mt-1">—</div>
+  </div>
+  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
+    <div class="label-tiny text-slate-500">Feedback rows (30d)</div>
+    <div id="sc-kpi-samples" class="text-[24px] font-semibold text-white mt-1">—</div>
+  </div>
+  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
+    <div class="label-tiny text-slate-500">Overall agreement</div>
+    <div id="sc-kpi-agreement" class="text-[24px] font-semibold text-white mt-1">—</div>
+  </div>
+  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
+    <div class="label-tiny text-slate-500">Needs tuning</div>
+    <div id="sc-kpi-tuning" class="text-[24px] font-semibold text-white mt-1">—</div>
+  </div>
+</section>
+
 <section class="section">
     <div class="section-header">
         <h2>Templates</h2>
@@ -273,6 +296,7 @@ async function loadPrompts() {
         const scoreData = scoreResp.ok ? await scoreResp.json() : { scorecards: {} };
         _scorecards = scoreData.scorecards || {};
     } catch(e) { _scorecards = {}; }
+    renderScorecardKpis();
     renderPrompts(_cache);
 }
 let _scorecards = {};
@@ -516,6 +540,34 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPermissions();
     loadPrompts();
 });
+
+// KPI aggregation folded in from /ai-scorecard. Computed from the exact
+// `evaluated` count the API now returns — the old page approximated it with
+// `evaluated = sample_size`, which over-counts whenever rows were abstentions.
+function renderScorecardKpis() {
+    var ids = Object.keys(_scorecards || {});
+    var samples = 0, evaluated = 0, agreed = 0, tuning = 0;
+    ids.forEach(function (id) {
+        var c = _scorecards[id] || {};
+        samples += c.sample_size || 0;
+        if (c.evaluated) {
+            evaluated += c.evaluated;
+            if (c.agreement_pct !== null && c.agreement_pct !== undefined) {
+                agreed += Math.round(c.evaluated * (c.agreement_pct / 100));
+            }
+        }
+        if (c.tuning_needed) tuning++;
+    });
+    var set = function (id, v) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = v;
+    };
+    set('sc-kpi-templates', ids.length);
+    set('sc-kpi-samples', samples);
+    set('sc-kpi-agreement', evaluated ? Math.round((agreed / evaluated) * 100) + '%' : '—');
+    set('sc-kpi-tuning', tuning);
+}
+
 </script>
 
 </div>

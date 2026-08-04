@@ -5,6 +5,21 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+{# Route audit phase 7: /bug-reports and /change-requests are the same feature
+   split by record type — same models module (service_desk.py), same service
+   (service_desk_service), same submit-form-over-filtered-list skeleton, same
+   GitLab mirror fields. They are NOT collapsed into one page because they carry
+   DIFFERENT permissions (bug reports: any authenticated user; change requests:
+   system:settings). A sibling tab strip de-duplicates the navigation without
+   weakening that boundary — the same idiom Shift Operations and Reference use.
+   The Change Requests tab is only rendered for users who can actually open it. #}
+{% set tabs = [{"label": "Bug Reports", "href": "/bug-reports"}] %}
+{% if current_user and current_user.has_permission("system:settings") %}
+  {% set tabs = tabs + [{"label": "Change Requests (CAB)", "href": "/change-requests"}] %}
+{% endif %}
+{% set active_label = "Change Requests (CAB)" %}
+{% include "_nav_tabs.html" %}
+
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
   <div class="flex-1 min-w-0">

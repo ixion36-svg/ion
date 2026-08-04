@@ -28,9 +28,15 @@
         to earn the badge for that tier.
       </p>
     </div>
-    <a href="/my-courses" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[13px] font-semibold transition">
-      My courses →
-    </a>
+    {# Route audit phase 7: /my-courses was this same catalogue filtered by
+       enrolment plus four progress fields, rendering the identical card grid —
+       and each page linked to the other. It is now a scope toggle here. #}
+    <div class="inline-flex rounded-md border border-white/10 overflow-hidden" role="group" aria-label="Course scope">
+      <button type="button" id="cl-scope-all" data-click-action="setScope" data-args='["all"]'
+              class="h-10 px-5 text-[13px] font-semibold transition bg-ion-cyan text-ink-950">All courses</button>
+      <button type="button" id="cl-scope-mine" data-click-action="setScope" data-args='["mine"]'
+              class="h-10 px-5 text-[13px] font-semibold transition bg-white/5 text-slate-200 hover:bg-white/10">My courses</button>
+    </div>
   </section>
 
   <!-- Level filter strip -->
@@ -68,11 +74,27 @@
 let _courses = [];
 let _currentLevel = '';
 
+let _scope = 'all';
+
+function setScope(scope) {
+  _scope = scope === 'mine' ? 'mine' : 'all';
+  const on  = 'bg-ion-cyan text-ink-950';
+  const off = 'bg-white/5 text-slate-200 hover:bg-white/10';
+  const all = document.getElementById('cl-scope-all');
+  const mine = document.getElementById('cl-scope-mine');
+  if (all && mine) {
+    all.className  = 'h-10 px-5 text-[13px] font-semibold transition ' + (_scope === 'all' ? on : off);
+    mine.className = 'h-10 px-5 text-[13px] font-semibold transition ' + (_scope === 'mine' ? on : off);
+  }
+  loadCourses();
+}
+window.setScope = setScope;
+
 async function loadCourses() {
   const grid = document.getElementById('courses-grid');
   grid.innerHTML = '<div class="text-slate-500 text-[13px] py-8 col-span-full text-center">Loading…</div>';
   try {
-    const r = await fetch('/api/courses');
+    const r = await fetch(_scope === 'mine' ? '/api/my-courses' : '/api/courses');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     _courses = d.courses || [];

@@ -156,6 +156,18 @@
         <div class="_ion-s-c5f415d8e3" id="sys-cards-grid">
             <div class="loading-state">Loading system analytics...</div>
         </div>
+        <!-- Index Breakdown — ported from the retired /engineering-analytics
+             page (route audit phase 7). It was that page's only unique section;
+             everything else there duplicated this tab. -->
+        <div class="an-section">
+            <div class="an-section-header">
+                <h2>Index Breakdown</h2>
+                <span class="an-section-sub">Alert counts by Elasticsearch index</span>
+            </div>
+            <div id="index-table-container">
+                <div class="loading-state">Loading...</div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -848,6 +860,50 @@
 }
 .sys-unmapped-badge a { color: var(--primary); text-decoration: none; }
 .sys-unmapped-badge a:hover { text-decoration: underline; }
+
+/* Index Breakdown (ported from /engineering-analytics, phase 7) */
+.sev-pill {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    font-family: 'JetBrains Mono', monospace;
+}
+.sev-pill.crit { background: rgba(255, 69, 58, 0.15); color: var(--danger); border: 1px solid rgba(255, 69, 58, 0.3); }
+.sev-pill.high { background: rgba(255, 149, 0, 0.15); color: var(--neon-orange); border: 1px solid rgba(255, 149, 0, 0.3); }
+.sev-pill.med  { background: rgba(255, 214, 10, 0.15); color: var(--warning); border: 1px solid rgba(255, 214, 10, 0.3); }
+.sev-pill.low  { background: rgba(48, 209, 88, 0.15); color: var(--success); border: 1px solid rgba(48, 209, 88, 0.3); }
+.idx-name {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--neon-cyan);
+    font-size: 0.75rem;
+}
+.idx-bar-container {
+    flex: 1;
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.idx-bar {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple));
+    transition: width 0.4s ease;
+}
+.idx-count {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: var(--primary);
+    font-size: 0.8125rem;
+}
+.idx-sev-pills {
+    display: flex;
+    gap: 0.375rem;
+}
 </style>
 <script nonce="{{ csp_nonce }}">
 let dashboardData = null;
@@ -981,13 +1037,14 @@ function renderEntityRisk(job) {
                 <td><strong>${esc(e.entity)}</strong></td>
                 <td><span class="entity-type-badge ${e.type}">${e.type}</span></td>
                 <td class="_ion-s-bed9cea1b3">${e.risk_score}</td>
-                <td class="_ion-s-465bfea3ed"><div class="risk-bar-container"><div class="risk-bar ${cls} _ion-s-95aea49e0e"></div></div></td>
+                <td class="_ion-s-465bfea3ed"><div class="risk-bar-container"><div class="risk-bar ${cls}" data-pct="${pct}"></div></div></td>
                 <td>${e.alert_count}</td>
                 <td>${e.open_cases}</td>
                 <td class="_ion-s-7fd116b27a" title="${esc((e.rules || []).join(', '))}">${esc((e.rules || []).slice(0, 2).join(', '))}</td>
             </tr>`;
         }).join('')}</tbody>
     </table>`;
+    applyBarWidths();
 }
 
 function renderRepeatOffenders(job) {
@@ -1026,12 +1083,13 @@ function renderRuleNoise(job) {
             const fpClass = r.fp_ratio > 0.5 ? 'fp-high' : r.fp_ratio > 0.2 ? 'fp-med' : 'fp-low';
             return `<div class="noise-bar-row">
                 <span class="noise-bar-label" title="${esc(r.rule_name)}">${esc(r.rule_name)}</span>
-                <div class="noise-bar-track"><div class="noise-bar-fill ${fpClass} _ion-s-95aea49e0e"></div></div>
+                <div class="noise-bar-track"><div class="noise-bar-fill ${fpClass}" data-pct="${pct}"></div></div>
                 <span class="noise-bar-count">${r.alert_count}</span>
                 <span class="noise-bar-count _ion-s-46a161de8c" title="FP ratio">${Math.round(r.fp_ratio * 100)}% FP</span>
             </div>`;
         }).join('')}
     `;
+    applyBarWidths();
 }
 
 function renderObservableVelocity(job) {
@@ -1130,7 +1188,7 @@ function renderCaseMetrics(job) {
                     const pct = Math.round((count / totalClosed) * 100);
                     return `<div class="closure-row">
                         <span class="closure-label">${formatReason(reason)}</span>
-                        <div class="closure-bar-track"><div class="closure-bar-fill cl-${reason} _ion-s-95aea49e0e"></div></div>
+                        <div class="closure-bar-track"><div class="closure-bar-fill cl-${reason}" data-pct="${pct}"></div></div>
                         <span class="closure-count">${count}</span>
                     </div>`;
                 }).join('')}</div>
@@ -1138,6 +1196,7 @@ function renderCaseMetrics(job) {
         </div>
         ${renderSeverityBreakdown(r.by_severity || {})}
     `;
+    applyBarWidths();
 }
 
 function renderSeverityBreakdown(bySev) {
@@ -1297,6 +1356,18 @@ function switchTab(tab) {
 // =========================================================================
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
+
+// v0.71.0: the v0.31.21 inline-style migration hashed `width:${pct}%` into the
+// STATIC class ._ion-s-95aea49e0e, leaving a literal `${pct}` in the CSS. That
+// rule is invalid so browsers drop it — every bar on this page has rendered at
+// zero width since. Apply the width from data-pct instead (CSP-safe: no inline
+// style attribute, set via the style property).
+function applyBarWidths(root) {
+    (root || document).querySelectorAll('[data-pct]').forEach(function (el) {
+        el.style.width = el.getAttribute('data-pct') + '%';
+    });
+}
+
 function esc(str) {
     if (!str) return '';
     const d = document.createElement('div');
@@ -1337,6 +1408,59 @@ function showToast(msg, isError) {
 }
 
 // =========================================================================
+function renderIndexTable(indices, total) {
+    const container = document.getElementById('index-table-container');
+    if (!indices.length) {
+        container.innerHTML = '<div class="empty-state">No indices found</div>';
+        return;
+    }
+
+    const maxCount = Math.max(...indices.map(i => i.count), 1);
+
+    let rows = indices.map(idx => {
+        const sev = idx.severity || {};
+        const pct = Math.round((idx.count / maxCount) * 100);
+        let sevPills = '';
+        if (sev.critical) sevPills += `<span class="sev-pill crit">C ${sev.critical}</span>`;
+        if (sev.high) sevPills += `<span class="sev-pill high">H ${sev.high}</span>`;
+        if (sev.medium) sevPills += `<span class="sev-pill med">M ${sev.medium}</span>`;
+        if (sev.low) sevPills += `<span class="sev-pill low">L ${sev.low}</span>`;
+
+        return `<tr>
+            <td><span class="idx-name">${esc(idx.index)}</span></td>
+            <td><span class="idx-count">${idx.count.toLocaleString()}</span></td>
+            <td>
+                <div class="idx-bar-container">
+                    <div class="idx-bar" data-pct="${pct}"></div>
+                </div>
+            </td>
+            <td><div class="idx-sev-pills">${sevPills || '-'}</div></td>
+        </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+        <table class="eng-index-table">
+            <thead>
+                <tr>
+                    <th>Index</th>
+                    <th>Count</th>
+                    <th>Volume</th>
+                    <th>Severity</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>`;
+
+    // The volume bars were dead on the old page: the v0.31.21 inline-style
+    // migration hashed `width:${pct}%` into the STATIC class
+    // ._ion-s-95aea49e0e, leaving the literal `${pct}` in the CSS — an invalid
+    // rule the browser drops, so every bar rendered at zero width. Set it here
+    // instead (CSP-safe, no inline style attribute).
+    container.querySelectorAll('.idx-bar[data-pct]').forEach(function (el) {
+        el.style.width = el.getAttribute('data-pct') + '%';
+    });
+}
+
 // System Analytics Tab
 // =========================================================================
 let sysOverviewData = null;
@@ -1373,6 +1497,9 @@ function renderSystemAnalytics(data) {
         covEl.style.color = data.avg_tide_coverage >= 70 ? 'var(--neon-green)' : data.avg_tide_coverage >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
     }
     setText('sys-s-critical', (sev.critical || 0).toLocaleString());
+
+    // Index Breakdown (ported from /engineering-analytics, phase 7)
+    renderIndexTable(data.indices || [], data.total_alerts || 1);
 
     // Summary text
     const sumEl = document.getElementById('sys-summary-text');

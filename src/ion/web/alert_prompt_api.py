@@ -191,6 +191,11 @@ def get_all_scorecards(
         agreement_pct = _pct(b["agreed"], b["evaluated"])
         scorecards[tpl_id] = {
             "sample_size": n,
+            # v0.71.0: exposed so callers can aggregate an EXACT overall
+            # agreement. /ai-scorecard used to reverse-engineer this from the
+            # percentage with `evaluated = sample_size  // good enough for KPI`,
+            # which is wrong whenever some rows were unscored (abstentions).
+            "evaluated": b["evaluated"],
             "agreement_pct": agreement_pct,
             "fp_rate": _pct(b["fp"], n),
             "btp_rate": _pct(b["btp"], n),
@@ -396,18 +401,14 @@ def alert_prompts_page(
     )
 
 
-@router.get("/ai-scorecard", response_class=HTMLResponse)
-def ai_scorecard_page(
-    request: Request,
-    _user: User = Depends(require_page_auth),
-):
-    """Per-template Bob-vs-human agreement dashboard (v0.10.12).
+@router.get("/ai-scorecard")
+async def ai_scorecard_redirect():
+    """Retired in v0.71.0 (route audit phase 7).
 
-    Consumes the existing ``/api/alert-prompts/scorecards`` endpoint plus
-    ``/api/alert-prompts`` for template names. Surfaces which templates are
-    pulling their weight and which need tuning attention.
+    The page rendered nothing the /alert-prompts table did not already show
+    per-template — same endpoint, same six fields, same 60%/n>=10 tuning flag —
+    and linked back to /alert-prompts for every action. Its four KPI tiles moved
+    there (and now compute exactly, instead of the documented approximation).
     """
-    return _templates.TemplateResponse(
-        request=request,
-        name="ai_scorecard.html",
-    )
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/alert-prompts", status_code=302)

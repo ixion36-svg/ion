@@ -2003,10 +2003,18 @@ async def social_page(request: Request, user: User = Depends(require_page_auth))
     return templates.TemplateResponse(request=request, name="social.html")
 
 
-@app.get("/engineering-analytics", response_class=HTMLResponse)
-async def engineering_analytics_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Engineering System Analytics page."""
-    return templates.TemplateResponse(request=request, name="engineering_analytics.html")
+@app.get("/engineering-analytics")
+async def engineering_analytics_redirect():
+    """Retired in v0.71.0 (route audit phase 7).
+
+    This page duplicated the /analytics "Systems" tab — same
+    ElasticsearchService.get_system_analytics() call, same headings, same time
+    selector. /analytics is the superset (it also folds in CyAB namespaces and
+    TIDE coverage); the one section unique to this page, "Index Breakdown",
+    moved there first. Redirect keeps existing links and bookmarks working.
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/analytics?tab=systems", status_code=302)
 
 
 @app.get("/detection-engineering", response_class=HTMLResponse)
@@ -2087,10 +2095,19 @@ async def entity_timeline_page(request: Request, user: User = Depends(require_pa
     return templates.TemplateResponse(request=request, name="entity_timeline.html")
 
 
-@app.get("/analyst-efficiency", response_class=HTMLResponse)
-async def analyst_efficiency_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Analyst Efficiency Dashboard page."""
-    return templates.TemplateResponse(request=request, name="analyst_efficiency.html")
+@app.get("/analyst-efficiency")
+async def analyst_efficiency_redirect():
+    """Retired in v0.71.0 (route audit phase 7).
+
+    Five of its seven stat cards were identically labelled to /executive-report
+    (Cases Opened, Cases Closed, FP Rate, Avg MTTR, Alerts Triaged) at the same
+    default 7-day window, and the exec report's Team Performance table was a
+    3-column subset of this page's 9-column per-analyst breakdown. Both that
+    breakdown and the activity timeline now live on the Executive Report's Team
+    tab; /api/analyst-efficiency/metrics still backs them.
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/executive-report", status_code=302)
 
 
 @app.get("/soc-health", response_class=HTMLResponse)
@@ -2102,13 +2119,19 @@ async def soc_health_page(request: Request, user: User = Depends(require_page_pe
 @app.get("/detection-health", response_class=HTMLResponse)
 async def detection_health_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
     """Render the Detection Health (per-rule performance) page."""
-    return templates.TemplateResponse(request=request, name="detection_health.html")
+    return templates.TemplateResponse(
+        request=request, name="detection_health.html",
+        context={"current_user": user},
+    )
 
 
 @app.get("/de-metrics", response_class=HTMLResponse)
 async def de_metrics_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
     """Render the Detection-Engineering Metrics page (Phase 0 — noise campaigns)."""
-    return templates.TemplateResponse(request=request, name="de_metrics.html")
+    return templates.TemplateResponse(
+        request=request, name="de_metrics.html",
+        context={"current_user": user},
+    )
 
 
 @app.get("/de-proposals", response_class=HTMLResponse)

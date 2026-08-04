@@ -120,4 +120,10 @@ async def sync_bug_report(
 
 @router.get("/bug-reports", response_class=HTMLResponse)
 def bug_reports_page(request: Request, _user: User = Depends(require_page_auth)):
-    return _templates.TemplateResponse(request=request, name="bug_reports.html")
+    return _templates.TemplateResponse(
+        request=request,
+        name="bug_reports.html",
+        # Needed by the sibling tab strip: the Change Requests tab is only
+        # rendered for users who can actually open that page (system:settings).
+        context={"current_user": _user},
+    )

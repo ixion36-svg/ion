@@ -5,6 +5,25 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+{# Route audit phase 7: /detection-health and /de-metrics both aggregate
+   per-rule FP/noise from closed cases over a 90-day default and both offer a
+   one-click proposal draft. They are NOT collapsed because they carry different
+   permissions (security:read vs de:read) and complementary columns —
+   detection-health uniquely flags silent/decaying rules and covers rules with no
+   FP closures at all; de-metrics uniquely costs the noise in analyst-hours and
+   counts FP closures Bob never scored. A shared tab strip removes the
+   navigation duplication without changing either permission. Each tab is only
+   offered to users who can open it. #}
+{% set tabs = [] %}
+{% if current_user and current_user.has_permission("de:read") %}
+  {% set tabs = tabs + [{"label": "DE Metrics", "href": "/de-metrics"}] %}
+{% endif %}
+{% if current_user and current_user.has_permission("security:read") %}
+  {% set tabs = tabs + [{"label": "Detection Health", "href": "/detection-health"}] %}
+{% endif %}
+{% set active_label = "Detection Health" %}
+{% if tabs | length > 1 %}{% include "_nav_tabs.html" %}{% endif %}
+
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
 <div class="flex-1 min-w-0">
   <div class="flex items-center gap-3 mb-4">

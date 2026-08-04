@@ -26,7 +26,20 @@
     </div>
 </section>
 
+{# Route audit phase 7: /analyst-efficiency duplicated five of this page's
+   seven stat cards (Cases Opened/Closed, FP Rate, Avg MTTR, Alerts Triaged) at
+   the same default window, and this page's "Team Performance" table was a
+   strict 3-column subset of its 9-column "Per-Analyst Breakdown". Merged here
+   as a Team tab; that page now redirects. #}
+<div class="flex items-center gap-1 p-1 mb-6 rounded-lg bg-white/5 border border-white/10 w-fit">
+  <button type="button" id="er-tab-summary" data-click-action="erTab" data-args='["summary"]'
+          class="px-4 py-2 rounded-md text-xs font-semibold transition bg-ion-cyan text-ink-950">Summary</button>
+  <button type="button" id="er-tab-team" data-click-action="erTab" data-args='["team"]'
+          class="px-4 py-2 rounded-md text-xs font-semibold transition text-slate-400 hover:text-white">Team</button>
+</div>
+
 <div id="er-content"><div class="er-loading"><span class="er-spinner"></span> Generating executive report...</div></div>
+<div id="er-team" class="hidden"><div class="er-loading"><span class="er-spinner"></span> Loading team metrics...</div></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -64,6 +77,29 @@
 .er-trend-label{font-size:.6rem;color:var(--text-muted);white-space:nowrap}
 
 @media print{.navbar,.header-actions,.chat-widget,.chat-toggle{display:none!important}body{background:#fff;color:#000}.er-section,.er-stat{break-inside:avoid;border-color:#ddd}}
+
+/* Team tab - ported from the retired /analyst-efficiency page (phase 7) */
+.ae-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.ae-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative;overflow:hidden}
+.ae-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
+.ae-stat-val{font-size:1.5rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
+.ae-stat-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
+.ae-stat.crit .ae-stat-val{color:var(--sev-critical)}.ae-stat.crit::before{background:var(--sev-critical)}
+.ae-stat.green .ae-stat-val{color:var(--mitre-covered)}.ae-stat.green::before{background:var(--mitre-covered)}
+.ae-stat.warn .ae-stat-val{color:var(--sev-medium)}.ae-stat.warn::before{background:var(--sev-medium)}
+.ae-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
+.ae-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.ae-section-title i{color:var(--primary)}
+.ae-table{width:100%;border-collapse:collapse;font-size:.82rem}
+.ae-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);cursor:pointer}
+.ae-table th:hover{color:var(--text-primary)}
+.ae-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary)}
+.ae-table tr:hover td{background:rgba(0,212,255,.03)}
+.ae-activity-chart{display:flex;align-items:flex-end;gap:2px;height:80px;padding:8px 0}
+.ae-activity-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:var(--primary);opacity:.7;position:relative}
+.ae-activity-bar:hover{opacity:1}
+.ae-activity-bar .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);padding:3px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;font-size:.68rem;white-space:nowrap;z-index:10}
+.ae-activity-bar:hover .tip{display:block}
 </style>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/executive-report';
@@ -151,6 +187,9 @@ function renderReport(d){
     }
 
     // Team
+    // Team Performance moved to the Team tab: this 3-column table was a strict
+    // subset of the 9-column per-analyst breakdown ported from
+    // /analyst-efficiency (route audit phase 7).
     const team = (d.team||{}).analysts||[];
     if(team.length){
         html += '<div class="er-section"><div class="er-section-title"><i class="icon-users"></i> Team Performance</div>';
@@ -163,6 +202,82 @@ function renderReport(d){
 }
 
 function erStat(val,label,cls){return `<div class="er-stat ${cls}"><div class="er-stat-val">${val}</div><div class="er-stat-label">${label}</div></div>`}
+
+
+let _erTeamLoaded = false;
+
+function erTab(which) {
+    const isTeam = which === 'team';
+    const on = 'px-4 py-2 rounded-md text-xs font-semibold transition bg-ion-cyan text-ink-950';
+    const off = 'px-4 py-2 rounded-md text-xs font-semibold transition text-slate-400 hover:text-white';
+    document.getElementById('er-tab-summary').className = isTeam ? off : on;
+    document.getElementById('er-tab-team').className = isTeam ? on : off;
+    document.getElementById('er-content').classList.toggle('hidden', isTeam);
+    document.getElementById('er-team').classList.toggle('hidden', !isTeam);
+    if (isTeam && !_erTeamLoaded) erLoadTeam();
+}
+window.erTab = erTab;
+
+async function erLoadTeam() {
+    const el = document.getElementById('er-team');
+    // The exec report picks days; the team endpoint takes hours.
+    const hours = (parseInt(document.getElementById('er-days').value, 10) || 7) * 24;
+    try {
+        const r = await fetch('/api/analyst-efficiency/metrics?hours=' + hours, { credentials: 'same-origin' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        _erTeamLoaded = true;
+        let html = '';
+
+        const hourly = d.hourly_activity || [];
+        if (hourly.length) {
+            html += '<div class="ae-section"><div class="ae-section-title">Activity Timeline (Last 24h)</div>';
+            const maxVal = Math.max(...hourly.map(h => (h.cases_closed||0) + (h.alerts_triaged||0)), 1);
+            html += '<div class="ae-activity-chart">';
+            for (const h of hourly) {
+                const val = (h.cases_closed||0) + (h.alerts_triaged||0);
+                const pct = Math.max(val / maxVal * 100, 2);
+                const time = new Date(h.hour).toLocaleTimeString(undefined, {hour:'2-digit', minute:'2-digit'});
+                // data-pct rather than the migrated class: ._ion-s-9ce2eb0cde is
+                // literally `height:${pct}%` in the stylesheet - invalid CSS the
+                // browser drops, so those bars never had a height.
+                html += '<div class="ae-activity-bar" data-pct="' + pct + '"><div class="tip">' + time + ': ' + val + ' actions</div></div>';
+            }
+            html += '</div></div>';
+        }
+
+        const analysts = d.analysts || [];
+        if (analysts.length) {
+            html += '<div class="ae-section"><div class="ae-section-title">Per-Analyst Breakdown</div>';
+            html += '<table class="ae-table"><thead><tr><th>Analyst</th><th>Cases Closed</th><th>Cases Opened</th><th>Alerts Triaged</th><th>True Positives</th><th>False Positives</th><th>FP Rate</th><th>Avg MTTR</th><th>Total Actions</th></tr></thead><tbody>';
+            for (const a of analysts) {
+                html += '<tr><td>' + esc(a.username) + '</td>'
+                     + '<td class="mono">' + a.cases_closed + '</td>'
+                     + '<td class="mono">' + a.cases_opened + '</td>'
+                     + '<td class="mono">' + a.alerts_triaged + '</td>'
+                     + '<td class="mono">' + a.true_positives + '</td>'
+                     + '<td class="mono">' + a.false_positives + '</td>'
+                     + '<td class="mono">' + a.fp_rate + '%</td>'
+                     + '<td class="mono">' + (a.avg_mttr_hours != null ? a.avg_mttr_hours + 'h' : '-') + '</td>'
+                     + '<td class="mono">' + a.total_actions + '</td></tr>';
+            }
+            html += '</tbody></table>';
+            // This FP rate divides by real dispositions (TP+FP); the Summary tab
+            // divides by ALL closures. See services/case_metrics.
+            if ((d.team_summary || {}).fp_rate_basis === 'of_dispositions') {
+                html += '<p class="text-[12px] text-slate-500 mt-2">FP Rate here is measured against true/false-positive dispositions only; the Summary tab measures it against all closures.</p>';
+            }
+            html += '</div>';
+        }
+
+        el.innerHTML = html || '<div class="er-section">No team activity in this window.</div>';
+        el.querySelectorAll('.ae-activity-bar[data-pct]').forEach(function (b) {
+            b.style.height = b.getAttribute('data-pct') + '%';
+        });
+    } catch (e) {
+        el.innerHTML = '<div class="er-section">Failed to load team metrics: ' + esc(e.message) + '</div>';
+    }
+}
 
 document.addEventListener('DOMContentLoaded', erLoad);
 </script>

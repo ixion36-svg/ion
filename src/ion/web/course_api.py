@@ -1631,9 +1631,17 @@ def lesson_page(
 # v0.13.2 — analyst's "My Courses" enrolment dashboard
 # (was referenced in nav since v0.11.x but the page route + template
 # were never built — fixing the gap as part of the labs ship)
-@router.get("/my-courses", response_class=HTMLResponse)
-def my_courses_page(request: Request, _user: User = Depends(require_page_auth)):
-    return _templates.TemplateResponse(request=request, name="my_courses.html")
+@router.get("/my-courses")
+async def my_courses_redirect():
+    """Retired in v0.71.0 (route audit phase 7).
+
+    /api/my-courses is /api/courses filtered by enrolment plus four progress
+    fields, and both pages rendered the same card grid while linking to each
+    other. It is now the "My courses" scope toggle on /courses. The API endpoint
+    stays — the toggle calls it.
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/courses", status_code=302)
 
 
 # v0.11.4 — admin authoring pages
