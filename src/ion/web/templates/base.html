@@ -121,13 +121,13 @@
 
             <!-- Respond — response, forensics, automation -->
             <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/playbooks') or p.startswith('/forensics') or p.startswith('/pcap') or p == '/investigate' or p.startswith('/investigations') or p == '/case-grouper' %}is-active{% endif %}">Respond
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/playbooks') or p.startswith('/forensics') or p.startswith('/pcap') or p.startswith('/investigation-') or p == '/case-grouper' %}is-active{% endif %}">Respond
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
                 <a href="/playbooks" class="tw-drop-item {% if p.startswith('/playbooks') %}is-active{% endif %}">Playbooks</a>
-                <a href="/investigate" class="tw-drop-item {% if p == '/investigate' %}is-active{% endif %}">Investigation Queue</a>
-                <a href="/investigations" class="tw-drop-item {% if p.startswith('/investigations') %}is-active{% endif %}">Investigation Memory</a>
+                <a href="/investigation-queue" class="tw-drop-item {% if p.startswith('/investigation-queue') %}is-active{% endif %}">Investigation Queue</a>
+                <a href="/investigation-memory" class="tw-drop-item {% if p.startswith('/investigation-memory') %}is-active{% endif %}">Investigation Memory</a>
                 <a href="/forensics" id="nav-forensics-link" class="tw-drop-item {% if p.startswith('/forensics') %}is-active{% endif %}">Forensics</a>
                 <a href="/pcap" class="tw-drop-item {% if p.startswith('/pcap') %}is-active{% endif %}">PCAP Analyzer</a>
                 <a href="/case-grouper" class="tw-drop-item {% if p == '/case-grouper' %}is-active{% endif %}">Case Grouper</a>
@@ -192,6 +192,9 @@
               </button>
               <div class="tw-drop-menu">
                 <a href="/soc-health" class="tw-drop-item {% if p.startswith('/soc-health') %}is-active{% endif %}">SOC Health</a>
+                {# Wallboard is a standalone TV/NOC screen (no base.html chrome) and had no
+                   link anywhere in the app — reachable only by typing the URL. #}
+                <a href="/wallboard" target="_blank" rel="noopener" class="tw-drop-item {% if p.startswith('/wallboard') %}is-active{% endif %}">Wallboard (TV mode)</a>
                 <a href="/executive-report" class="tw-drop-item {% if p.startswith('/executive-report') %}is-active{% endif %}">Executive Report</a>
                 <a href="/analyst-efficiency" class="tw-drop-item {% if p.startswith('/analyst-efficiency') %}is-active{% endif %}">Analyst Efficiency</a>
                 <a href="/detection-health" class="tw-drop-item {% if p.startswith('/detection-health') %}is-active{% endif %}">Detection Health</a>
@@ -216,7 +219,7 @@
                 <a href="/analyst" class="tw-drop-item {% if p == '/analyst' %}is-active{% endif %}">SOC Workspace</a>
                 <a href="/briefing" class="tw-drop-item {% if p == '/briefing' or p.startswith('/shift-handover') or p == '/daily-standup' %}is-active{% endif %}">Shift Operations</a>
                 <a href="/alert-prompts" class="tw-drop-item {% if p.startswith('/alert-prompts') or p == '/bob-eval' %}is-active{% endif %}">Bob Admin</a>
-                <a href="/translator" class="tw-drop-item {% if p.startswith('/translator') or p.startswith('/tools') %}is-active{% endif %}">Tools</a>
+                <a href="/tools" class="tw-drop-item {% if p.startswith('/tools') or p.startswith('/translator') %}is-active{% endif %}">Tools</a>
                 <a href="/scheduler" class="tw-drop-item {% if p == '/scheduler' %}is-active{% endif %}">Job Scheduler</a>
               </div>
             </div>
@@ -284,7 +287,7 @@
                 <a href="/profile" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">My Profile</a>
                 <a href="/bug-reports" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">Report a Bug</a>
                 <a href="/document-analysis" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">AI Document Analysis</a>
-                <a href="/briefings" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">About ION</a>
+                <a href="/about" class="block px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">About ION</a>
                 <button type="button" data-click-action="toggleIonMode" data-prevent-default
                         class="w-full flex items-center justify-between px-4 py-2 text-[12px] text-slate-300 hover:bg-white/5 hover:text-white transition">
                   <span>Appearance</span>

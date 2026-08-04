@@ -61,11 +61,15 @@
       </div>
 
       <div>
+        {# Route audit phase 6: this card used to build a handover note client-side
+           from THIS user's timeline only — no case severity, no MTTR, no pending
+           queue, no unassigned cases. /shift-handover produces the same artefact
+           server-side for the whole SOC with all of that, so the weaker copy is
+           replaced by a link to the real one. #}
         <div class="ion-card">
           <p class="ion-card-title"><span aria-hidden="true">↪</span> Shift handover</p>
-          <p class="ion-muted dw-hint">Compile this day's work into a paste-ready note for the next shift.</p>
-          <button type="button" class="ion-btn ion-btn-primary dw-btn-full" id="dw-handover-btn">Generate handover</button>
-          <pre class="dw-handover-out" id="dw-handover-out">Click “Generate handover” to draft from the timeline…</pre>
+          <p class="ion-muted dw-hint">The shift handover report is compiled for the whole team — case severity, MTTR, closure reasons and the pending queue for the incoming shift.</p>
+          <a class="ion-btn ion-btn-primary dw-btn-full" href="/shift-handover">Open shift handover</a>
         </div>
       </div>
     </div>
@@ -115,7 +119,6 @@
   .dw-section-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 11px 2px; }
   .dw-hint { margin: 0 0 11px; font-size: 12px; }
   .dw-btn-full { width: 100%; justify-content: center; }
-  .dw-handover-out { margin-top: 12px; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px; font-family: var(--font-mono, monospace); font-size: 11.5px; line-height: 1.6; color: var(--text-secondary); white-space: pre-wrap; min-height: 60px; }
   .dw-view.dw-hidden { display: none; }
   .dw-board-head, .dw-row { display: grid; grid-template-columns: 1.5fr 2fr 1.3fr 0.7fr; gap: 10px; align-items: center; }
   .dw-board-head { padding: 0 13px 8px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
@@ -293,16 +296,6 @@
       .catch(function (e) { if (window.showToast) showToast("Log failed: " + e.message, "error"); });
   }
 
-  function generateHandover() {
-    var closed = lastItems.filter(function (i) { return i.type === "closed"; });
-    var lines = ["SHIFT HANDOVER — " + (document.getElementById("dw-sub").textContent || ""), ""];
-    lines.push("Closed today: " + closed.length + " case(s).");
-    lines.push("");
-    lines.push("Activity:");
-    lastItems.slice(0, 12).forEach(function (i) { lines.push("  • " + i.time + "  [" + i.type + "] " + i.text); });
-    document.getElementById("dw-handover-out").textContent = lines.join("\n");
-  }
-
   // ---- day calendar ----
   function calItemHtml(i) {
     var ck = colorKey(i.type);
@@ -447,7 +440,6 @@
     document.getElementById("dw-text").addEventListener("keydown", function (e) {
       if (e.key === "Enter") addEntry(document.getElementById("dw-type").value, null);
     });
-    document.getElementById("dw-handover-btn").addEventListener("click", generateHandover);
 
     // date navigation
     document.getElementById("dw-date").value = selectedDate;

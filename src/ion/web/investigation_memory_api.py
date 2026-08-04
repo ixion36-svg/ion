@@ -381,7 +381,7 @@ async def toggle_fp_endpoint(
 # HTML page
 # =========================================================================
 
-@router.get("/investigations", response_class=HTMLResponse)
+@router.get("/investigation-memory", response_class=HTMLResponse)
 async def investigations_page(
     request: Request,
     user: User = Depends(require_page_auth),

@@ -429,7 +429,7 @@ async def cancel_one(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/investigate", response_class=HTMLResponse)
+@router.get("/investigation-queue", response_class=HTMLResponse)
 async def investigation_queue_page(
     request: Request,
     user: User = Depends(require_page_auth),

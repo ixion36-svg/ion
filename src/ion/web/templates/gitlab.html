@@ -15,7 +15,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Open issues, merge requests and assigned work.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="ion-btn _ion-s-f2892a2e8a" data-click-action="showConfigModal" id="config-btn">Configure</button>
+        <a class="ion-btn _ion-s-f2892a2e8a" href="/settings#gitlab" id="config-btn">Configure</a>
         <button class="ion-btn ion-btn-primary _ion-s-f2892a2e8a" data-click-action="showCreateIssueModal" id="new-issue-btn">New Issue</button>
     </div>
 </section>
@@ -29,7 +29,7 @@
 <div id="not-configured" class="empty-state _ion-s-f2892a2e8a">
     <h2>GitLab Not Configured</h2>
     <p>Connect to GitLab to create, track, and manage issues directly from ION.</p>
-    <button class="ion-btn ion-btn-primary" data-click-action="showConfigModal">Configure GitLab</button>
+    <a class="ion-btn ion-btn-primary" href="/settings#gitlab">Configure GitLab</a>
 </div>
 
 <!-- Issues Section -->
@@ -59,36 +59,12 @@
 </div>
 
 <!-- Configuration Modal -->
-<div id="config-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-medium">
-        <div class="modal-header">
-            <h2>GitLab Configuration</h2>
-            <button class="modal-close" data-click-action="closeConfigModal">&times;</button>
-        </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label for="gitlab-url">GitLab URL</label>
-                <input type="text" id="gitlab-url" class="ion-input" placeholder="https://gitlab.example.com or http://localhost:8929">
-                <small>The URL of your GitLab instance</small>
-            </div>
-            <div class="form-group">
-                <label for="gitlab-token">Personal Access Token</label>
-                <input type="password" id="gitlab-token" class="ion-input" placeholder="glpat-xxxxxxxxxxxx">
-                <small>Token with 'api' scope. <a href="https://docs.gitlab.com/ee/user/profile/personal_access_tokens.html" target="_blank">Learn more</a></small>
-            </div>
-            <div class="form-group">
-                <label for="gitlab-project">Project ID or Path</label>
-                <input type="text" id="gitlab-project" class="ion-input" placeholder="group/project or 123">
-                <small>Project path (e.g., "mygroup/myproject") or numeric ID</small>
-            </div>
-            <div class="modal-actions">
-                <button class="ion-btn" data-click-action="closeConfigModal">Cancel</button>
-                <button class="ion-btn ion-btn-danger _ion-s-f2892a2e8a" data-click-action="disableGitLab" id="disable-gitlab-btn">Disable</button>
-                <button class="ion-btn ion-btn-primary" data-click-action="saveConfig">Save & Test</button>
-            </div>
-        </div>
-    </div>
-</div>
+{# Route audit phase 6: the GitLab config modal wrote the SAME
+   config.gitlab_url / _token / _project_id on the shared Config object as
+   /settings#gitlab — two UIs, one .ion/config.json, no cross-linking. It was
+   also a second surface handling the raw PAT, while /settings masks it on
+   read. Configuration now lives only on the Settings page; this page keeps
+   the issue browser. #}
 
 <!-- Create Issue Modal -->
 <div id="create-issue-modal" class="modal _ion-s-f2892a2e8a">
@@ -617,75 +593,6 @@ function getLabelColor(labelName) {
 }
 
 // Modal functions
-function showConfigModal() {
-    document.getElementById('config-modal').style.display = 'flex';
-
-    // Load current config
-    fetch('/api/gitlab/config')
-        .then(r => r.json())
-        .then(config => {
-            if (config.url) document.getElementById('gitlab-url').value = config.url;
-            if (config.project_id) document.getElementById('gitlab-project').value = config.project_id;
-            if (config.enabled) {
-                document.getElementById('disable-gitlab-btn').style.display = 'inline-block';
-            }
-        });
-}
-
-function closeConfigModal() {
-    document.getElementById('config-modal').style.display = 'none';
-}
-
-async function saveConfig() {
-    const url = document.getElementById('gitlab-url').value.trim();
-    const token = document.getElementById('gitlab-token').value.trim();
-    const projectId = document.getElementById('gitlab-project').value.trim();
-
-    if (!url || !token || !projectId) {
-        showToast('Please fill in all fields', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch('/api/gitlab/config', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, token, project_id: projectId })
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-            if (result.connection.connected) {
-                showToast('GitLab connected successfully!', 'success');
-                closeConfigModal();
-                checkConnection();
-            } else {
-                showToast(`Connection test failed: ${result.connection.error}`, 'error');
-            }
-        } else {
-            showToast(result.detail || 'Failed to save configuration', 'error');
-        }
-    } catch (error) {
-        showToast(`Error: ${error.message}`, 'error');
-    }
-}
-
-async function disableGitLab() {
-    if (!confirm('Are you sure you want to disable GitLab integration?')) return;
-
-    try {
-        const response = await fetch('/api/gitlab/config', { method: 'DELETE' });
-        if (response.ok) {
-            showToast('GitLab integration disabled', 'success');
-            closeConfigModal();
-            location.reload();
-        }
-    } catch (error) {
-        showToast(`Error: ${error.message}`, 'error');
-    }
-}
-
 function showCreateIssueModal() {
     document.getElementById('issue-title').value = '';
     document.getElementById('issue-description').value = '';

@@ -255,7 +255,7 @@
         <td>${iqEscape(inv.user_name || "—")}</td>
         <td class="iq-mono">${iqEscape((inv.alert_id_ref||"").slice(0,16))}</td>
         <td>
-          <a class="text-ion-cyan hover:underline text-[12px]" href="/investigations?focus=${inv.id}">Open</a>
+          <a class="text-ion-cyan hover:underline text-[12px]" href="/investigation-memory?focus=${inv.id}">Open</a>
           ${cancelBtn ? '<span class="text-slate-600 mx-2">·</span>' + cancelBtn : ''}
         </td>
       </tr>`;

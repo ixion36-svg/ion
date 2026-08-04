@@ -1124,7 +1124,7 @@ async def gitlab_page(request: Request, user: User = Depends(require_page_auth))
     return templates.TemplateResponse(request=request, name="gitlab.html")
 
 
-@app.get("/briefings", response_class=HTMLResponse)
+@app.get("/about", response_class=HTMLResponse)
 async def briefings_page(
     request: Request,
     deck: str = "executive",
@@ -1368,6 +1368,38 @@ async def threat_intel_actor_profile_page(
 async def threat_landscape_redirect():
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/threat-intel", status_code=302)
+
+
+# ---------------------------------------------------------------------------
+# Route-audit phase 6 renames — old bookmarks keep working.
+#
+# /briefings was one keystroke from /briefing, and they are unrelated: the
+# singular is a live SOC data product, the plural is static onboarding decks
+# reached from "About ION". Renamed to /about so the collision is gone.
+#
+# /investigate vs /investigations differed by ONE character while being genuinely
+# different pages (operate the queue vs mine the corpus). They now match the nav
+# labels that already read "Investigation Queue" / "Investigation Memory".
+# ---------------------------------------------------------------------------
+
+
+@app.get("/briefings")
+async def briefings_redirect(deck: str = ""):
+    from fastapi.responses import RedirectResponse
+    target = f"/about?deck={deck}" if deck else "/about"
+    return RedirectResponse(url=target, status_code=302)
+
+
+@app.get("/investigate")
+async def investigate_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/investigation-queue", status_code=302)
+
+
+@app.get("/investigations")
+async def investigations_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/investigation-memory", status_code=302)
 
 
 @app.get("/tools", response_class=HTMLResponse)
