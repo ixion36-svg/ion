@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.69.0 -->
-<!-- ion-doc:version=0.69.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.70.0 -->
+<!-- ion-doc:version=0.70.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.70.0 — 2026-08-04
+
+**Page-level cleanup — nav fixes, route renames, duplicate widgets (route audit phase 6).**
+
+- **`/briefings` → `/about`.** It sat one keystroke from `/briefing` while being an entirely unrelated page: the singular is a live SOC data product (Elasticsearch + cases + OpenCTI + TIDE + AI narrative), the plural is static onboarding decks with no `fetch()` at all, reached from the avatar menu.
+- **`/investigate` → `/investigation-queue`, `/investigations` → `/investigation-memory`.** Two adjacent nav items whose URLs differed by a single character, for genuinely different jobs (operate the queue vs mine the corpus); the nav labels already read this way. **Only page routes moved** — `/api/investigate/*` and `/api/investigations` are untouched.
+- All three legacy paths keep **302 redirects**, so bookmarks survive (precedent: `/threat-landscape`, `/attack-stories`).
+- **Nav:** Operations ▸ "Tools" pointed at `/translator` (277 lines, one tool) while the real 1076-line toolbox at `/tools` was only a second-level tab — repointed. `/wallboard` is now linked from Reporting (new tab; it is a chromeless TV screen) — it is a distinct, tested feature with its own service that had **zero inbound links anywhere**.
+- **`/daily-work`'s "Shift handover" card removed.** It built the note client-side from one user's timeline — no case severity, no MTTR, no pending queue, no unassigned cases — while `/shift-handover` produces the same artefact server-side for the whole SOC with all of that. Replaced with a link.
+- **GitLab config modal removed.** It wrote the same `config.gitlab_url` / `_token` / `_project_id` to the same `.ion/config.json` as `/settings#gitlab` — two UIs, one file, no cross-linking — and was a second surface handling the raw PAT, which `/settings` masks on read. Configuration now lives only on Settings; the issue browser (the page's actual job) is untouched and pinned by a test.
+- Tests `tests/test_route_audit_phase6_pages.py` (14); 98 affected green.
 
 ## v0.69.0 — 2026-08-04
 
