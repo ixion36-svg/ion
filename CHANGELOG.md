@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.70.0 -->
-<!-- ion-doc:version=0.70.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.71.0 -->
+<!-- ion-doc:version=0.71.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.71.0 — 2026-08-04
+
+**Page merges (route audit phase 7).** Four pages retired into the surfaces they duplicated; two pairs grouped without collapsing.
+
+- **`/engineering-analytics` → `/analytics?tab=systems`.** It duplicated the Systems tab — same `get_system_analytics()` call, same headings, same time selector. Its one unique section, **Index Breakdown**, was ported across first (`indices` added to the `system-overview` payload).
+- **`/ai-scorecard` → `/alert-prompts`.** It rendered nothing the templates table did not already show per-template, and linked back for every action. Its four KPI tiles moved across — and now compute **exactly**: the old page took `evaluated = sample_size`, over-counting whenever rows were abstentions, so the headline agreement figure was arithmetically wrong. The API now exposes the real `evaluated` count.
+- **`/analyst-efficiency` → `/executive-report`.** Five of its seven stat cards were identically labelled to the exec report at the same default window, and the exec report's Team Performance table was a 3-column subset of this page's 9-column per-analyst breakdown. That breakdown and the activity timeline are now the exec report's **Team** tab.
+- **`/my-courses` → `/courses`** as an All/Mine scope toggle. All four retired pages keep 302 redirects, and all four APIs are kept — the merged UIs call them.
+- **Grouped, not collapsed:** `/bug-reports` + `/change-requests`, and `/de-metrics` + `/detection-health`. Each pair carries **different permissions**, so a single page would have forced a permission change or an awkwardly hidden tab. They now share a sibling tab strip; each tab renders **only** for users who can open it.
+- **Four bar charts on `/analytics` were rendering at zero width** and have been since v0.31.21: the inline-style migration hashed `width:${pct}%` into a *static* CSS class, leaving a literal `${pct}` in the stylesheet — an invalid rule browsers drop. The same defect was found again on the analyst-efficiency activity bar. Both fixed via `data-pct` + CSP-safe style appliers. `ion-migrated-styles.css` still holds **126** such dead rules — a separate sweep.
+- Tests `tests/test_route_audit_phase6_pages.py` (33). **Full unit suite: 1446 passed.**
 
 ## v0.70.0 — 2026-08-04
 

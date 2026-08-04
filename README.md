@@ -9,7 +9,7 @@
 
 # ION - Intelligent Operating Network
 
-![Version](https://img.shields.io/badge/version-0.70.0-blue)
+![Version](https://img.shields.io/badge/version-0.71.0-blue)
 ![Python](https://img.shields.io/badge/python-3.14-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-ixion36%2Fion-blue)
