@@ -871,9 +871,9 @@ function stepProgress(c) {
     const color = pct === 100 ? 'var(--mitre-covered)' : pct > 0 ? 'var(--primary)' : '#6e7681';
     return `<div class="_ion-s-ac86ac1128" title="${c.steps_completed}/${c.step_count} sections">
         <div class="_ion-s-a55ef5c079">
-            <div class="_ion-s-6e624bb262"></div>
+            <div class="_ion-s-6e624bb262" data-ion-style="width:${pct}%; background:${color}"></div>
         </div>
-        <span class="_ion-s-78f8e7f1d2">${c.steps_completed}/${c.step_count}</span>
+        <span class="_ion-s-78f8e7f1d2" data-ion-style="color:${color}">${c.steps_completed}/${c.step_count}</span>
     </div>`;
 }
 
@@ -1099,7 +1099,7 @@ function renderSections(steps) {
                 ${s.description ? '<div class="section-guidance">' + esc(s.description) + '</div>' : ''}
                 ${hasFields ? '<div class="sf-fields">' + fields.map(f => renderFieldInput(f, fd[f.key], s.id)).join('') + '</div>' : ''}
                 <div class="sf-notes-group">
-                    <label class="sf-label _ion-s-58177e1de0">${hasFields ? 'Additional Notes' : 'Findings & Analysis'}</label>
+                    <label class="sf-label" data-ion-style="margin-top:${hasFields ? '12px' : '0'}">${hasFields ? 'Additional Notes' : 'Findings & Analysis'}</label>
                     <textarea class="form-input sf-input" id="section-content-${s.id}" rows="${hasFields ? 3 : 6}" placeholder="Enter your findings, analysis, and documentation...">${esc(s.content || '')}</textarea>
                 </div>
                 <div class="section-card-actions">

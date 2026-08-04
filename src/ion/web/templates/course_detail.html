@@ -122,7 +122,7 @@ function render(c) {
       <span class="text-[12px] text-slate-400">Progress: ${completed}/${total} (${pct}%)</span>
       <div class="_ion-s-690f054c4e">${enrolBtn}</div>
     </div>
-    <div class="cd-progress _ion-s-16884469a8"><div class="cd-progress-fill _ion-s-aa22b3b0a7"></div></div>
+    <div class="cd-progress _ion-s-16884469a8"><div class="cd-progress-fill" data-ion-style="width:${pct}%"></div></div>
     <div class="prose-md text-[14px] text-slate-300 leading-relaxed">${md(c.description_md || '')}</div>
     ${modulesHtml}
   `;

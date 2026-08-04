@@ -34,6 +34,10 @@
          `data-click-action="foo"` and the helper dispatches. See
          static/js/event-delegation.js for the supported attributes. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v={{ ion_version }}"></script>
+    <!-- Restores styling the v0.31.21 inline-style migration broke: it hashed
+         `style="width:${pct}%"` into a STATIC class containing the literal
+         ${pct}, which browsers drop as invalid CSS. See the file header. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/ion-dynamic-styles.js?v={{ ion_version }}"></script>
     <!-- v0.39.9: SSE-backed live updates (window.ionLiveUpdates) with a
          setInterval polling fallback. Loaded early so page scripts can call
          it from their DOMContentLoaded handlers. -->

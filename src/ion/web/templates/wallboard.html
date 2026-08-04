@@ -271,6 +271,7 @@
     <symbol id="i-zap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
   </svg>
 
+<script nonce="{{ csp_nonce }}" src="/static/js/ion-dynamic-styles.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
 const REFRESH_MS = 5 * 60 * 1000;  // matches the server-side TTL
 
@@ -453,7 +454,7 @@ function renderAlerts(a) {
     row.innerHTML = `
       <div class="text-slate-400 capitalize">${escHtml(label)}</div>
       <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div class="${cls} h-full rounded-full transition-[width] duration-700 _ion-s-95aea49e0e"></div>
+        <div class="${cls} h-full rounded-full transition-[width] duration-700" data-ion-style="width:${pct}%"></div>
       </div>
       <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
     bars.appendChild(row);
@@ -494,7 +495,7 @@ function renderCases(c) {
     row.innerHTML = `
       <div class="text-slate-400 capitalize">${escHtml(key)}</div>
       <div class="h-1.5 rounded-full bg-white/5 overflow-hidden">
-        <div class="${cls} h-full rounded-full transition-[width] duration-700 _ion-s-95aea49e0e"></div>
+        <div class="${cls} h-full rounded-full transition-[width] duration-700" data-ion-style="width:${pct}%"></div>
       </div>
       <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v)}</div>`;
     bars.appendChild(row);
@@ -562,8 +563,8 @@ function renderRules(r) {
     row.innerHTML = `
       <div class="text-slate-400 capitalize">${escHtml(key)}</div>
       <div class="h-1.5 rounded-full bg-white/5 overflow-hidden relative">
-        <div class="${cls} h-full rounded-full opacity-30 _ion-s-5cee91ad0d"></div>
-        <div class="${cls} h-full rounded-full absolute inset-y-0 left-0 _ion-s-8d4e2abbc4"></div>
+        <div class="${cls} h-full rounded-full opacity-30" data-ion-style="width:${totalPct}%"></div>
+        <div class="${cls} h-full rounded-full absolute inset-y-0 left-0" data-ion-style="width:${Math.round(totalPct * enabledPct / 100)}%"></div>
       </div>
       <div class="text-right text-slate-200 tabular-nums font-semibold">${fmtN(v.total)}</div>`;
     bars.appendChild(row);

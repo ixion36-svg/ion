@@ -152,8 +152,8 @@ function renderReport(d){
             const ch = Math.max(day.closed/maxVal*80,2);
             html += `<div class="er-trend-group">
                 <div class="er-trend-bars">
-                    <div class="er-trend-bar _ion-s-aaedcd59fa" title="Opened: ${day.opened}"></div>
-                    <div class="er-trend-bar _ion-s-26f4da1bb9" title="Closed: ${day.closed}"></div>
+                    <div class="er-trend-bar _ion-s-aaedcd59fa" data-ion-style="height:${oh}px" title="Opened: ${day.opened}"></div>
+                    <div class="er-trend-bar _ion-s-26f4da1bb9" data-ion-style="height:${ch}px" title="Closed: ${day.closed}"></div>
                 </div>
                 <span class="er-trend-label">${day.date.substring(5)}</span>
             </div>`;
@@ -170,7 +170,7 @@ function renderReport(d){
         for(const [reason,count] of Object.entries(reasons).sort((a,b)=>b[1]-a[1])){
             const pct = Math.round(count/total*100);
             const color = reason==='true_positive'?'var(--mitre-covered)':reason==='false_positive'?'var(--sev-critical)':'var(--text-secondary)';
-            html += `<div class="_ion-s-91a87015f4"><div class="mono _ion-s-2871763e47">${count}</div><div class="_ion-s-e65c44381d">${reason.replace(/_/g,' ')} (${pct}%)</div></div>`;
+            html += `<div class="_ion-s-91a87015f4"><div class="mono _ion-s-2871763e47" data-ion-style="color:${color}">${count}</div><div class="_ion-s-e65c44381d">${reason.replace(/_/g,' ')} (${pct}%)</div></div>`;
         }
         html += '</div></div>';
     }

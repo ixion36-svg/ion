@@ -905,19 +905,19 @@ async function loadServerMetrics() {
                 <span class="metric-label">CPU</span>
                 <span class="metric-value ${cpuClass}">${data.cpu.percent.toFixed(1)}%</span>
             </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${cpuClass} _ion-s-5a5b4f6ae2"></div></div>
+            <div class="metric-bar"><div class="metric-bar-fill ${cpuClass}" data-ion-style="width: ${data.cpu.percent}%"></div></div>
 
             <div class="metric-row">
                 <span class="metric-label">Memory</span>
                 <span class="metric-value ${memClass}">${data.memory.used_percent.toFixed(1)}%</span>
             </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${memClass} _ion-s-3e5bbd2767"></div></div>
+            <div class="metric-bar"><div class="metric-bar-fill ${memClass}" data-ion-style="width: ${data.memory.used_percent}%"></div></div>
 
             <div class="metric-row">
                 <span class="metric-label">Disk</span>
                 <span class="metric-value ${diskClass}">${data.disk.used_percent.toFixed(1)}%</span>
             </div>
-            <div class="metric-bar"><div class="metric-bar-fill ${diskClass} _ion-s-4b325e9d10"></div></div>
+            <div class="metric-bar"><div class="metric-bar-fill ${diskClass}" data-ion-style="width: ${data.disk.used_percent}%"></div></div>
 
             <div class="metric-row">
                 <span class="metric-label">Process</span>

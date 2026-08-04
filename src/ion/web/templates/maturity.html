@@ -485,9 +485,9 @@ function matRenderResult(a) {
     const pct = a.overall_score * 20;
 
     let html = `<div class="mat-result-overall">
-        <div class="mat-result-ring _ion-s-c5b24d62d0">
+        <div class="mat-result-ring" data-ion-style="background:conic-gradient(${color} ${pct}%, rgba(99,110,123,.2) ${pct}%)">
             <div class="mat-result-inner">
-                <div class="mat-result-score _ion-s-2243cc4df3">${a.overall_score}</div>
+                <div class="mat-result-score" data-ion-style="color:${color}">${a.overall_score}</div>
                 <div class="mat-result-label">of 5</div>
             </div>
         </div>
@@ -504,9 +504,9 @@ function matRenderResult(a) {
         html += `<div class="mat-result-bar">
             <div class="mat-result-bar-head">
                 <span class="mat-result-bar-name">${matEsc(domain.name || domainId)}</span>
-                <span class="mat-result-bar-score _ion-s-b099892f7b">${score.score}/5</span>
+                <span class="mat-result-bar-score" data-ion-style="color:${col}">${score.score}/5</span>
             </div>
-            <div class="mat-bar"><div class="mat-bar-fill _ion-s-021044d3a7"></div></div>
+            <div class="mat-bar"><div class="mat-bar-fill" data-ion-style="width:${score.pct}%; background:${col}"></div></div>
             <div class="mat-result-bar-pct">${score.pct}%</div>
         </div>`;
     }
@@ -544,7 +544,7 @@ async function matShowHistory() {
             html += `<tr>
                 <td>${a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}</td>
                 <td>${matEsc(a.title)}</td>
-                <td><strong class="_ion-s-551d72673a">${a.overall_score}/5</strong></td>
+                <td><strong data-ion-style="color:${scoreColor(a.overall_score)}">${a.overall_score}/5</strong></td>
                 <td>${matEsc(a.overall_level)}</td>
                 <td>${(s.business||{}).score||'-'}</td>
                 <td>${(s.people||{}).score||'-'}</td>

@@ -284,7 +284,7 @@ function renderCS(){
         for(const l of blueLogs)h+=`<div class="cr-log"><span class="cr-log-time">${esc(l.time)}</span><span class="cr-log-src">${esc(l.source)}</span><span class="cr-log-lvl ${l.level}">${esc(l.level)}</span><span class="cr-log-msg">${esc(l.msg)}</span></div>`;
     }else if(bottomTab==='alerts'){
         if(!blueAlerts.length)h+='<div class="_ion-s-bf6b8b4f0e">No alerts fired yet.</div>';
-        for(const a of blueAlerts)h+=`<div class="cr-alert ${a.severity}"><div class="cr-alert-title"><span class="_ion-s-979f3129c0">${esc(a.severity)}</span>${esc(a.title)}</div><div class="cr-alert-meta"><span>${esc(a.rule)}</span><span>${esc(a.host)}</span><span class="cr-alert-mitre">${esc(a.mitre)}</span></div></div>`;
+        for(const a of blueAlerts)h+=`<div class="cr-alert ${a.severity}"><div class="cr-alert-title"><span class="_ion-s-979f3129c0" data-ion-style="color:${a.severity==='critical'?'#f85149':'#f0883e'}">${esc(a.severity)}</span>${esc(a.title)}</div><div class="cr-alert-meta"><span>${esc(a.rule)}</span><span>${esc(a.host)}</span><span class="cr-alert-mitre">${esc(a.mitre)}</span></div></div>`;
     }else{
         if(!userEvents.length)h+='<div class="_ion-s-bf6b8b4f0e">Execute commands to see victim perspective.</div>';
         for(const ue of userEvents)for(const ev of ue.events)h+=`<div class="cr-ue"><span class="cr-ue-app">${esc(ev.app)}</span> ${ev.title?'— '+esc(ev.title):''}<div class="cr-ue-detail">${esc(ev.detail)}</div></div>`;

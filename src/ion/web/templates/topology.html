@@ -890,7 +890,7 @@ function drawConnections() {
         if (status === 'healthy') {
             for (let p = 0; p < 2; p++) {
                 svgContent += `
-                    <circle r="3" class="topo-particle active _ion-s-ae5ce075fb">
+                    <circle r="3" class="topo-particle active" data-ion-style="animation-delay:${p * 1.2}s">
                         <animateMotion dur="2.5s" begin="${p * 1.2}s" repeatCount="indefinite" rotate="auto">
                             <mpath href="#${pathId}"/>
                         </animateMotion>
@@ -1126,7 +1126,7 @@ function renderDetailCards() {
             metricsHtml += `
                 <div class="topo-metric">
                     <div class="topo-metric-label">Health</div>
-                    <div class="topo-metric-value _ion-s-74c9db8ded">${d.cluster_status.toUpperCase()}</div>
+                    <div class="topo-metric-value" data-ion-style="color:${csColor}">${d.cluster_status.toUpperCase()}</div>
                 </div>`;
         }
         if (d.node_count != null) {
@@ -1362,9 +1362,9 @@ function createFlowSlide() {
 
         if (stage.decision) {
             el.innerHTML = `
-                <div class="flow-stage-card _ion-s-499d77db44">
+                <div class="flow-stage-card" data-ion-style="border: 2px solid ${stage.color}55">
                     <div class="flow-stage-inner">
-                        <div class="flow-stage-icon _ion-s-838ae0074a">
+                        <div class="flow-stage-icon" data-ion-style="background:${stage.color}22; color:${stage.color}">
                             <i class="${stage.icon}"></i>
                         </div>
                         <div class="flow-stage-name">${stage.name}</div>
@@ -1377,9 +1377,9 @@ function createFlowSlide() {
                 </div>`;
         } else {
             el.innerHTML = `
-                <div class="flow-stage-card _ion-s-093390a704">
-                    <div class="_ion-s-7f433a77d0"></div>
-                    <div class="flow-stage-icon _ion-s-838ae0074a">
+                <div class="flow-stage-card" data-ion-style="border-color:${stage.color}33">
+                    <div class="_ion-s-7f433a77d0" data-ion-style="background:${stage.color}"></div>
+                    <div class="flow-stage-icon" data-ion-style="background:${stage.color}22; color:${stage.color}">
                         <i class="${stage.icon}"></i>
                     </div>
                     <div class="flow-stage-name">${stage.name}</div>
@@ -1400,9 +1400,9 @@ function createFlowSlide() {
         el.className = 'flow-harrow flow-pipe-step';
         el.dataset.step = step;
         el.innerHTML = `
-            <div class="flow-harrow-line _ion-s-0260826a3b"></div>
-            <div class="flow-harrow-head _ion-s-1c22937527"></div>
-            <div class="flow-harrow-dot _ion-s-5551ed09aa"></div>`;
+            <div class="flow-harrow-line" data-ion-style="background:${color}"></div>
+            <div class="flow-harrow-head" data-ion-style="border-left-color:${color}"></div>
+            <div class="flow-harrow-dot" data-ion-style="background:${color}; animation-delay:${delay || 0}s"></div>`;
         return el;
     }
 
@@ -1466,7 +1466,7 @@ function renderFlowLegend() {
 
     legend.innerHTML = items.map(it =>
         `<div class="flow-legend-item">
-            <div class="flow-legend-dot _ion-s-ccf801e77c"></div>
+            <div class="flow-legend-dot" data-ion-style="background:${it.color}; box-shadow:0 0 6px ${it.color}66"></div>
             ${it.label}
         </div>`
     ).join('');

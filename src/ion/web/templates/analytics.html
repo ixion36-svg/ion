@@ -1118,7 +1118,7 @@ function renderObservableVelocity(job) {
                 <div class="velocity-chart-title">New Observables / Day (30d)</div>
                 <div class="sparkline">${dailyCounts.map(d => {
                     const h = Math.max(2, Math.round((d.count / maxDay) * 56));
-                    return `<div class="sparkline-bar _ion-s-01809bf0f7" title="${d.date}: ${d.count}"></div>`;
+                    return `<div class="sparkline-bar" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
                 }).join('')}</div>
                 <div class="_ion-s-fe9b81727a">
                     <span>${dailyCounts[0]?.date || ''}</span><span>${dailyCounts[dailyCounts.length - 1]?.date || ''}</span>
@@ -1132,7 +1132,7 @@ function renderObservableVelocity(job) {
                     return `<div class="threat-dist-row">
                         <span class="threat-dist-label">${level}</span>
                         <div class="_ion-s-8bc7ebe99c">
-                            <div class="threat-dist-bar tl-${level} _ion-s-d4890133af"></div>
+                            <div class="threat-dist-bar tl-${level} _ion-s-d4890133af" data-ion-style="width:${pct}%"></div>
                         </div>
                         <span class="threat-dist-count">${count}</span>
                     </div>`;
@@ -1143,7 +1143,7 @@ function renderObservableVelocity(job) {
         <div class="_ion-s-1f64bfa5da">
             <div class="metric-card _ion-s-97445a8d93"><div class="metric-value">${r.velocity_7d || 0}</div><div class="metric-label">New IOCs (7d)</div></div>
             <div class="metric-card _ion-s-97445a8d93"><div class="metric-value">${r.velocity_prev_7d || 0}</div><div class="metric-label">Previous 7d</div></div>
-            <div class="metric-card _ion-s-97445a8d93"><div class="metric-value _ion-s-e43d6e390d">${(r.velocity_change || 0) > 0 ? '+' : ''}${r.velocity_change || 0}</div><div class="metric-label">Change</div></div>
+            <div class="metric-card _ion-s-97445a8d93"><div class="metric-value" data-ion-style="color:${(r.velocity_change || 0) > 0 ? '#ef4444' : '#22c55e'}">${(r.velocity_change || 0) > 0 ? '+' : ''}${r.velocity_change || 0}</div><div class="metric-label">Change</div></div>
         </div>
         ${staleList ? `<h3 class="_ion-s-43e49f74cc">Stale Watched IOCs</h3>
         <table class="analytics-table"><thead><tr><th>Value</th><th>Type</th><th>Threat Level</th><th>Days Stale</th></tr></thead>
@@ -1176,7 +1176,7 @@ function renderCaseMetrics(job) {
                 <div class="velocity-chart-title">Cases Created / Day</div>
                 <div class="sparkline">${trend.map(d => {
                     const h = Math.max(2, Math.round((d.count / maxTrend) * 56));
-                    return `<div class="sparkline-bar _ion-s-7f581fdb12" title="${d.date}: ${d.count}"></div>`;
+                    return `<div class="sparkline-bar _ion-s-7f581fdb12" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
                 }).join('')}</div>
                 <div class="_ion-s-fe9b81727a">
                     <span>${trend[0]?.date || ''}</span><span>${trend[trend.length - 1]?.date || ''}</span>
@@ -1595,10 +1595,10 @@ function buildSysCard(sys) {
         tideHtml = `<div class="sys-tide-bar">
             <div class="sys-tide-label">
                 <span class="tide-label-left">TIDE: ${esc(t.name || '')}</span>
-                <span class="tide-label-right _ion-s-ed463471bc">${covPct}%</span>
+                <span class="tide-label-right" data-ion-style="color:${covColor}">${covPct}%</span>
             </div>
             <div class="sys-tide-progress">
-                <div class="sys-tide-progress-fill _ion-s-afb77bc303"></div>
+                <div class="sys-tide-progress-fill" data-ion-style="width:${covPct}%; background:${covColor}"></div>
             </div>
             <div class="sys-tide-stats">
                 <span>${t.applied_rules}/${t.total_rules} rules</span>
@@ -1621,7 +1621,7 @@ function buildSysCard(sys) {
         const readColor = (c.readiness_score || 0) >= 70 ? 'var(--neon-green)' : (c.readiness_score || 0) >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
         cyabHtml = `<div class="sys-meta _ion-s-04cdf78d3c">
             <span title="CyAB System">${esc(c.cyab_system_name || c.cyab_source_name || '')}</span>
-            <span class="_ion-s-d865292c67" title="Readiness">${c.readiness_score || 0}% ready</span>
+            <span data-ion-style="color:${readColor}" title="Readiness">${c.readiness_score || 0}% ready</span>
             <span title="Use Case Status">${esc(c.use_case_status || 'Not reviewed')}</span>
         </div>`;
     }
@@ -1635,7 +1635,7 @@ function buildSysCard(sys) {
     return `<div class="sys-card ${isMapped ? 'mapped' : ''}">
         <div class="sys-card-header">
             <div class="sys-card-name">
-                <span class="sys-icon _ion-s-80f2c6f575">${icon}</span>
+                <span class="sys-icon" data-ion-style="background:${iconColor}">${icon}</span>
                 ${esc(ns)}
             </div>
             <div class="sys-card-alerts">${(sys.alert_count || 0).toLocaleString()}</div>

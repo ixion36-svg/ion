@@ -873,7 +873,7 @@ data-click-action="tiCloseReport"></div>
                 ).join('');
                 const sparkId = 'ti-spark-' + idx;
                 return `<tr>
-                    <td><strong class="_ion-s-2382a360e6">${score}</strong></td>
+                    <td><strong data-ion-style="color:${score >= 90 ? 'var(--danger)' : score >= 70 ? 'var(--neon-orange)' : 'var(--text-secondary)'}">${score}</strong></td>
                     <td><code class="_ion-s-fcf3b313f7">${escapeHtml(i.ioc_type)}</code></td>
                     <td><code class="_ion-s-55289dc131">${escapeHtml(i.ioc_value)}</code></td>
                     <td>${labels || '<span class="_ion-s-b8e0b1fa55">—</span>'}</td>
@@ -1060,7 +1060,7 @@ data-click-action="tiCloseReport"></div>
             actors.forEach((a, idx) => {
                 const aliases = (a.aliases || []).slice(0, 3).join(', ');
                 const moreAliases = (a.aliases || []).length > 3 ? ` +${a.aliases.length - 3}` : '';
-                const labels = (a.labels || []).map(l => `<span class="ti-label _ion-s-da380a1752">${esc(l.value)}</span>`).join('');
+                const labels = (a.labels || []).map(l => `<span class="ti-label" data-ion-style="background:${l.color || '#30363d'}22; color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
                 const types = (a.threat_actor_types || []).map(t => t === 'intrusion-set' ? 'Intrusion Set' : t).join(', ') || '-';
                 const conf = a.confidence != null ? a.confidence : '-';
                 const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
@@ -1189,7 +1189,7 @@ data-click-action="tiCloseReport"></div>
             let html = '<table class="ti-table"><thead><tr><th>Name</th><th>Aliases</th><th>Confidence</th><th>First Seen</th><th>Last Seen</th><th>Labels</th><th>Watch</th></tr></thead><tbody>';
             campaigns.forEach((c, idx) => {
                 const aliases = (c.aliases || []).slice(0, 3).join(', ');
-                const labels = (c.labels || []).map(l => `<span class="ti-label _ion-s-da380a1752">${esc(l.value)}</span>`).join('');
+                const labels = (c.labels || []).map(l => `<span class="ti-label" data-ion-style="background:${l.color || '#30363d'}22; color:${l.color || '#8b949e'}">${esc(l.value)}</span>`).join('');
                 const conf = c.confidence != null ? c.confidence : '-';
                 const confCls = conf >= 70 ? 'high' : conf >= 40 ? 'medium' : 'low';
                 const isWatched = watchedIds.has(c.id);

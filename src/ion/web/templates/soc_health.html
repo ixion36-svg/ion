@@ -94,15 +94,15 @@ function renderScorecard(d) {
 
     // Overall grade
     html += `<div class="sh-overall">
-        <div class="sh-grade-ring _ion-s-c8fa0c7026">
+        <div class="sh-grade-ring" data-ion-style="background:conic-gradient(${color} ${d.overall_score}%, rgba(99,110,123,.2) ${d.overall_score}%)">
             <div class="sh-grade-inner">
-                <div class="sh-grade-letter _ion-s-2243cc4df3">${esc(d.grade)}</div>
+                <div class="sh-grade-letter" data-ion-style="color:${color}">${esc(d.grade)}</div>
                 <div class="sh-grade-score">${d.overall_score}/100</div>
             </div>
         </div>
         <div class="sh-overall-text">
             <div class="sh-overall-title">SOC Maturity Score: ${d.overall_score}/100</div>
-            <div class="sh-overall-subtitle">Grade <strong class="_ion-s-2243cc4df3">${esc(d.grade)}</strong> — ${
+            <div class="sh-overall-subtitle">Grade <strong data-ion-style="color:${color}">${esc(d.grade)}</strong> — ${
                 d.overall_score >= 80 ? 'Excellent maturity across all dimensions' :
                 d.overall_score >= 65 ? 'Good maturity with some areas for improvement' :
                 d.overall_score >= 50 ? 'Moderate maturity — several areas need attention' :
@@ -131,13 +131,13 @@ function renderScorecard(d) {
         for (const [k, v] of Object.entries(details)) {
             if (v != null) detailHtml += `<div><strong>${k.replace(/_/g,' ')}:</strong> ${v}</div>`;
         }
-        html += `<div class="sh-dim _ion-s-545c709564">
-            <div class="_ion-s-8900584d48"></div>
+        html += `<div class="sh-dim" data-ion-style="--dim-color:${dc}">
+            <div class="_ion-s-8900584d48" data-ion-style="background:${dc}"></div>
             <div class="sh-dim-header">
                 <span class="sh-dim-label"><i class="icon-${dimIcons[key] || 'circle'}"></i> ${esc(dim.label)}</span>
-                <span class="sh-dim-score _ion-s-470867fd4c">${dim.score}</span>
+                <span class="sh-dim-score" data-ion-style="color:${dc}">${dim.score}</span>
             </div>
-            <div class="sh-dim-bar"><div class="sh-dim-bar-fill _ion-s-d0a4fc63b7"></div></div>
+            <div class="sh-dim-bar"><div class="sh-dim-bar-fill" data-ion-style="width:${dim.score}%; background:${dc}"></div></div>
             <div class="sh-dim-details">${detailHtml}</div>
         </div>`;
     }

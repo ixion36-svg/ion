@@ -427,11 +427,11 @@ function renderSeverityDonut(d) {
         cumPct += p;
     }
     const legend = slices.map(sl =>
-        `<div class="de-donut-legend-item"><div class="de-donut-legend-dot _ion-s-c2af6d0417"></div>${sl.label}: ${sl.value}</div>`
+        `<div class="de-donut-legend-item"><div class="de-donut-legend-dot" data-ion-style="background:${sl.color}"></div>${sl.label}: ${sl.value}</div>`
     ).join('');
 
     return `<div class="de-donut-wrap">
-        <div class="de-donut _ion-s-8735cb1b5d">
+        <div class="de-donut" data-ion-style="background:conic-gradient(${gradParts.join(',')})">
             <div class="de-donut-center"><span class="de-donut-pct">${total}</span><span class="de-donut-label">rules</span></div>
         </div>
         <div class="de-donut-legend">${legend}</div>
@@ -461,12 +461,12 @@ function renderQualityBar(q, total) {
     let bar = '<div class="de-qbar">';
     for (const s of segs) {
         const w = s.val/total*100;
-        if (w > 0) bar += `<div class="de-qbar-seg ${s.cls} _ion-s-0e54b83fb0" title="${s.label}: ${s.val}">${w>5?s.val:''}</div>`;
+        if (w > 0) bar += `<div class="de-qbar-seg ${s.cls}" data-ion-style="width:${w}%" title="${s.label}: ${s.val}">${w>5?s.val:''}</div>`;
     }
     bar += '</div>';
     bar += '<div class="_ion-s-9153f5cee8">';
     for (const s of segs) {
-        bar += `<div class="de-donut-legend-item"><div class="de-donut-legend-dot ${s.cls} _ion-s-47b73cef7f"></div>${s.label}: <strong>${s.val}</strong></div>`;
+        bar += `<div class="de-donut-legend-item"><div class="de-donut-legend-dot ${s.cls}" data-ion-style="background:${s.cls==='excellent'?'var(--quality-excellent)':s.cls==='good'?'var(--quality-good)':s.cls==='fair'?'var(--quality-fair)':'var(--quality-poor)'}"></div>${s.label}: <strong>${s.val}</strong></div>`;
     }
     bar += '</div>';
     return bar;
@@ -776,7 +776,7 @@ function renderVolumeChart(timeline) {
         const h = Math.max(t.count/max*100, 1);
         const ts = t.timestamp ? new Date(t.timestamp).toLocaleString(undefined, {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
         const color = t.count > max*0.8 ? 'var(--sev-critical)' : t.count > max*0.5 ? 'var(--sev-medium)' : 'var(--mitre-covered)';
-        bars += `<div class="de-vol-bar _ion-s-2978dd0ca9"><div class="de-vol-tip">${ts}: ${t.count}</div></div>`;
+        bars += `<div class="de-vol-bar" data-ion-style="height:${h}%; background:${color}"><div class="de-vol-tip">${ts}: ${t.count}</div></div>`;
     }
     return `<div class="de-vol-chart"><div class="de-vol-bars">${bars}</div></div>`;
 }
@@ -804,23 +804,23 @@ function renderSevTimeline(timeline) {
             const v = t[s]||0;
             if (v > 0) {
                 const h = v/maxTotal*100;
-                segs += `<div class="_ion-s-9f194acfd6" title="${s}: ${v}"></div>`;
+                segs += `<div class="_ion-s-9f194acfd6" data-ion-style="height:${h}%; background:${sevColors[s]}" title="${s}: ${v}"></div>`;
             }
         }
         const h = Math.max(total/maxTotal*100, 1);
-        bars += `<div class="de-vol-bar _ion-s-4be9060e79"><div class="de-vol-tip">${ts}: ${total}</div>${segs}</div>`;
+        bars += `<div class="de-vol-bar _ion-s-4be9060e79" data-ion-style="height:${h}%"><div class="de-vol-tip">${ts}: ${total}</div>${segs}</div>`;
     }
     return `<div class="de-vol-chart"><div class="de-vol-bars">${bars}</div></div>
         <div class="_ion-s-b7d7ed081e">
-            ${sevOrder.map(s=>`<div class="de-donut-legend-item"><div class="de-donut-legend-dot _ion-s-665cbcd35e"></div>${s}</div>`).join('')}
+            ${sevOrder.map(s=>`<div class="de-donut-legend-item"><div class="de-donut-legend-dot" data-ion-style="background:${sevColors[s]}"></div>${s}</div>`).join('')}
         </div>`;
 }
 
 function renderRateBar(rate) {
     const color = rate >= 70 ? 'var(--sev-critical)' : rate >= 40 ? 'var(--sev-medium)' : 'var(--mitre-covered)';
     return `<div class="de-rate-bar">
-        <div class="de-rate-track"><div class="de-rate-fill _ion-s-9ef11a686c"></div></div>
-        <div class="de-rate-val _ion-s-2243cc4df3">${rate}%</div>
+        <div class="de-rate-track"><div class="de-rate-fill" data-ion-style="width:${rate}%; background:${color}"></div></div>
+        <div class="de-rate-val" data-ion-style="color:${color}">${rate}%</div>
     </div>`;
 }
 
@@ -982,8 +982,8 @@ function renderSystemReadiness(data, actorId, actorType) {
             <button class="de-btn-pdf" data-click-action="deDownloadPdf" data-args='["${actorId}", "${actorType}"]'>Download PDF</button>
         </div>
         <div class="de-readiness-gauge">
-            <span class="_ion-s-c9338fc931">${r.readiness_pct}%</span>
-            <div class="de-readiness-bar"><div class="de-readiness-fill _ion-s-afd6266613"></div></div>
+            <span class="_ion-s-c9338fc931" data-ion-style="color:${barColor}">${r.readiness_pct}%</span>
+            <div class="de-readiness-bar"><div class="de-readiness-fill" data-ion-style="width:${r.readiness_pct}%; background:${barColor}"></div></div>
         </div>`;
 
     if (r.ai_summary) {
@@ -1031,13 +1031,13 @@ function renderReadiness(data, container) {
                     ${aliases ? `<div class="de-actor-aliases">${esc(aliases)}</div>` : ''}
                 </div>
                 <div class="de-actor-meta">
-                    <div class="de-actor-meta-item _ion-s-d1b54a49e1">${a.covered_count}/${a.total_ttps} TTPs</div>
+                    <div class="de-actor-meta-item" data-ion-style="color:${ringColor}">${a.covered_count}/${a.total_ttps} TTPs</div>
                     <div class="de-actor-meta-item">${a.gap_count} gaps</div>
                 </div>
                 <div class="de-actor-gauge">
-                    <div class="de-actor-gauge-ring _ion-s-75af97713e">
+                    <div class="de-actor-gauge-ring" data-ion-style="background:${ringBg}">
                         <div class="_ion-s-11a7a6dc49">
-                            <span class="de-actor-gauge-val _ion-s-d1b54a49e1">${a.readiness_pct}%</span>
+                            <span class="de-actor-gauge-val" data-ion-style="color:${ringColor}">${a.readiness_pct}%</span>
                         </div>
                     </div>
                     <div class="de-actor-gauge-label">Readiness</div>
@@ -1160,7 +1160,7 @@ function renderProgression(d) {
                 <span class="de-prog-host">${esc(p.host)}</span>
                 <span class="de-prog-playbook">${esc(p.playbook_name)}</span>
                 <span class="_ion-s-6d00061700"></span>
-                <span class="de-prog-pct _ion-s-1106fdb72c">${p.fired_steps}/${p.total_steps} steps (${p.pct_complete}%)</span>
+                <span class="de-prog-pct" data-ion-style="color:${p.severity==='critical'?'var(--sev-critical)':p.severity==='high'?'var(--sev-high)':'var(--sev-medium)'}">${p.fired_steps}/${p.total_steps} steps (${p.pct_complete}%)</span>
             </div>
             <div class="de-prog-steps">`;
 
@@ -1325,12 +1325,12 @@ async function loadD3fend() {
                     <div class="_ion-s-47faf90ee7">${esc(tac.name)}</div>
                     <div class="_ion-s-4d2abfd40f">${tac.covered_count||0}/${tac.technique_count||0} &middot; ${pct}%</div>
                 </div>
-                <div class="_ion-s-e8fc4fc43f"><div class="_ion-s-5991e152f2"></div></div>
+                <div class="_ion-s-e8fc4fc43f"><div class="_ion-s-5991e152f2" data-ion-style="width:${pct}%; background:${barColor}"></div></div>
                 <div class="_ion-s-8a462ecb5f">`;
             for (const t of techs) {
                 const cls = t.state === 'full' ? 'green' : t.state === 'partial' ? 'warn' : 'crit';
                 const color = t.state === 'full' ? 'var(--mitre-covered,#3fb950)' : t.state === 'partial' ? 'var(--sev-medium,#d29922)' : 'var(--sev-critical,#f85149)';
-                html += `<span class="_ion-s-12e1606814" title="${esc(t.description)} — ${t.covered_attacks||0}/${t.total_attacks||0} ATT&CK techniques covered"><span class="mono">${esc(t.id)}</span> ${esc(t.name)} <span class="_ion-s-2a1f67ee37">${t.coverage_pct||0}%</span></span>`;
+                html += `<span class="_ion-s-12e1606814" data-ion-style="border:1px solid ${color}; color:${color}" title="${esc(t.description)} — ${t.covered_attacks||0}/${t.total_attacks||0} ATT&CK techniques covered"><span class="mono">${esc(t.id)}</span> ${esc(t.name)} <span class="_ion-s-2a1f67ee37">${t.coverage_pct||0}%</span></span>`;
             }
             html += '</div></div>';
         }
@@ -1381,7 +1381,7 @@ async function loadEmulation() {
                     <td>${esc(p.actor_name||'-')}</td>
                     <td>${esc(p.status)}</td>
                     <td>${p.passed_count||0}/${p.step_count||0}</td>
-                    <td><span class="_ion-s-8e0f4618a7">${p.coverage_pct||0}%</span></td>
+                    <td><span class="_ion-s-8e0f4618a7" data-ion-style="color:${color}">${p.coverage_pct||0}%</span></td>
                     <td>${p.updated_at ? new Date(p.updated_at).toLocaleDateString() : '-'}</td>
                     <td><button class="btn btn-secondary btn-sm _ion-s-a318f9408e" data-click-action="emDeletePlan" data-stop-propagation data-args='[${p.id}]'>Delete</button></td>
                 </tr>`;
@@ -1432,11 +1432,11 @@ window.emOpenPlan = async function(id) {
     for (const s of p.steps || []) {
         const color = s.result === 'passed' ? 'var(--mitre-covered,#3fb950)' : s.result === 'failed' ? 'var(--sev-critical,#f85149)' : s.result === 'partial' ? 'var(--sev-medium,#d29922)' : 'var(--text-secondary)';
         const tids = (s.mitre_techniques||[]).map(t => `<span class="mono _ion-s-7d20d4a2c5">${esc(t)}</span>`).join(' ');
-        html += `<div class="_ion-s-6f26a1ac92">
+        html += `<div class="_ion-s-6f26a1ac92" data-ion-style="border-left:3px solid ${color}">
             <div class="_ion-s-c6926f1dd7">
                 <div><strong>${(s.order_index||0)+1}. ${esc(s.title)}</strong></div>
                 <div class="_ion-s-015a5e7fbe">
-                    <span class="mono _ion-s-7b3392fe6d">${esc(s.result)}</span>
+                    <span class="mono _ion-s-7b3392fe6d" data-ion-style="color:${color}">${esc(s.result)}</span>
                     ${s.matched_alert_count != null ? `<span class="_ion-s-4d2abfd40f">${s.matched_alert_count} alerts</span>` : ''}
                 </div>
             </div>
@@ -1531,14 +1531,14 @@ async function loadVulns() {
                 const cov = v.coverage || {};
                 const verdict = cov.verdict || 'unknown';
                 const verdictColor = verdict === 'covered' ? 'var(--mitre-covered,#3fb950)' : verdict === 'partial' ? 'var(--sev-medium,#d29922)' : verdict === 'blind' ? 'var(--sev-critical,#f85149)' : 'var(--text-secondary)';
-                const tids = (cov.by_tid||[]).map(t => `<span class="mono _ion-s-47e3af0bb3">${esc(t.tid)}</span>`).join(' ');
+                const tids = (cov.by_tid||[]).map(t => `<span class="mono _ion-s-47e3af0bb3" data-ion-style="border:1px solid ${t.covered ? 'var(--mitre-covered,#3fb950)' : 'var(--border)'}; color:${t.covered ? 'var(--mitre-covered,#3fb950)' : 'var(--text-secondary)'}">${esc(t.tid)}</span>`).join(' ');
                 html += `<tr>
                     <td>${v.cve_id ? `<div class="mono _ion-s-4a1ff1de6d">${esc(v.cve_id)}</div>` : ''}<div>${esc(v.title)}</div></td>
                     <td><span class="de-sev ${esc(v.severity)}">${esc(v.severity)}</span></td>
                     <td>${v.cvss_score ?? '-'}</td>
                     <td>${esc(v.status)}</td>
                     <td>${tids || '<span class="_ion-s-18f820e713">none</span>'}</td>
-                    <td><div class="_ion-s-4a9a3dd721">${esc(verdict)}</div><div class="_ion-s-46766d8657">${cov.total > 0 ? `${cov.covered}/${cov.total} TTPs &middot; ${cov.rules} rules` : 'no TTPs set'}</div></td>
+                    <td><div class="_ion-s-4a9a3dd721" data-ion-style="color:${verdictColor}">${esc(verdict)}</div><div class="_ion-s-46766d8657">${cov.total > 0 ? `${cov.covered}/${cov.total} TTPs &middot; ${cov.rules} rules` : 'no TTPs set'}</div></td>
                     <td><button class="btn btn-secondary btn-sm _ion-s-a318f9408e" data-click-action="vlnDelete" data-args='[${v.id}]'>Delete</button></td>
                 </tr>`;
             }

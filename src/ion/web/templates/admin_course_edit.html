@@ -160,7 +160,7 @@ function renderLesson(l,m,mi,li){
         <strong>${escHtml(l.title||'(untitled lesson)')}</strong>
         <span class="text-slate-500 text-[11px] ml-auto">~${l.duration_min}m · ${qcount} q</span>
       </div>
-      <div class="ce-lesson-body _ion-s-22df499f68">
+      <div class="ce-lesson-body _ion-s-22df499f68" data-ion-style="display:${isExpanded?'block':'none'}">
         <div class="ce-grid _ion-s-bba5e32d4a">
           <div><div class="ce-label">Title</div><input class="ce-input w-full" data-field="title" value="${escHtml(l.title)}"></div>
           <div><div class="ce-label">Type</div><select class="ce-select w-full" data-field="lesson_type">${typeOpts}</select></div>

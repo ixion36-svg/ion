@@ -355,7 +355,7 @@ function _renderLabCriteria(d) {
     const colour = c.matched ? '#34d399' : '#f87171';
     const label = escHtml(c.kind);
     return `<div class="_ion-s-74e2e4902a">
-              <span class="_ion-s-ea197f191f">${mark}</span>
+              <span data-ion-style="color:${colour}">${mark}</span>
               <span class="_ion-s-a76779735c">${label}</span>
               <span class="_ion-s-0e42856cf0">${c.points_earned}/${c.points_max}</span>
             </div>`;
@@ -401,7 +401,7 @@ async function _loadLabHistory() {
         const mark = c.matched ? '✓' : '✗';
         const mcol = c.matched ? '#34d399' : '#f87171';
         return `<div class="_ion-s-21d5a347b4">
-                  <span class="_ion-s-f63701491e">${mark}</span>
+                  <span data-ion-style="color:${mcol}">${mark}</span>
                   <span class="_ion-s-a76779735c">${escHtml(c.kind)}</span>
                   <span class="_ion-s-0e42856cf0">${c.points_earned}/${c.points_max}</span>
                 </div>`;
@@ -414,7 +414,7 @@ async function _loadLabHistory() {
         : '';
       return `<div class="_ion-s-bdbf1f7451" id="${cardId}">
                 <div class="_ion-s-b93035ced5">
-                  <span class="_ion-s-7ee8d1002a">${label}</span>
+                  <span class="_ion-s-7ee8d1002a" data-ion-style="color:${colour}">${label}</span>
                   <span class="_ion-s-37149aea5a">Attempt ${s.attempt_number}</span>
                   <span class="_ion-s-d997572aeb">${score}</span>
                 </div>

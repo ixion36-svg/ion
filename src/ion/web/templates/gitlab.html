@@ -508,7 +508,7 @@ async function loadIssues() {
                 </div>
                 ${issue.labels.length > 0 ? `
                     <div class="issue-labels">
-                        ${issue.labels.map(label => `<span class="issue-label _ion-s-6d5b07f975">${escapeHtml(label)}</span>`).join('')}
+                        ${issue.labels.map(label => `<span class="issue-label" data-ion-style="background: ${getLabelColor(label)}">${escapeHtml(label)}</span>`).join('')}
                     </div>
                 ` : ''}
                 <div class="issue-footer">
@@ -676,7 +676,7 @@ async function showIssueDetail(iid) {
 
         // Labels
         document.getElementById('issue-detail-labels').innerHTML = issue.labels.length > 0
-            ? issue.labels.map(l => `<span class="issue-label _ion-s-1ba644f98c">${escapeHtml(l)}</span>`).join('')
+            ? issue.labels.map(l => `<span class="issue-label" data-ion-style="background: ${getLabelColor(l)}">${escapeHtml(l)}</span>`).join('')
             : '<em>None</em>';
 
         // Assignees

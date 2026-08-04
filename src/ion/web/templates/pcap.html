@@ -500,7 +500,7 @@
             const cls = colors[proto] || 'other';
             bars += `<div class="proto-bar-row">
                 <div class="proto-label">${esc(proto)}</div>
-                <div class="proto-bar-bg"><div class="proto-bar-fill ${cls} _ion-s-95aea49e0e"></div></div>
+                <div class="proto-bar-bg"><div class="proto-bar-fill ${cls}" data-ion-style="width:${pct}%"></div></div>
                 <div class="proto-count">${fmtNum(count)} (${pct}%)</div>
             </div>`;
         }
@@ -511,7 +511,7 @@
             const pct = (c.bytes / convMax * 100).toFixed(1);
             convBars += `<div class="conv-bar">
                 <div class="conv-pair" title="${esc(c.pair)}">${esc(c.pair)}</div>
-                <div class="conv-bar-bg"><div class="conv-bar-fill _ion-s-95aea49e0e"></div></div>
+                <div class="conv-bar-bg"><div class="conv-bar-fill" data-ion-style="width:${pct}%"></div></div>
                 <div class="conv-bytes">${fmtBytes(c.bytes)}</div>
             </div>`;
         }
@@ -727,7 +727,7 @@
         panel.innerHTML = `<h3>JA3 TLS Fingerprints (${fps.length})</h3>
         <p class="_ion-s-0648c015b2">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
         <table class="pcap-table"><thead><tr><th>JA3 Hash</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr class="_ion-s-a89f389da6">
+        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
             <td><code class="_ion-s-dbd68c1058">${esc(f.ja3_hash)}</code></td>
             <td>${esc(f.sni || '-')}</td>
             <td>${esc(f.src_ip)}</td>
@@ -777,7 +777,7 @@
         document.getElementById('panel-ja3s').innerHTML = `<h3>JA3S Server Fingerprints (${fps.length})</h3>
         <p class="_ion-s-0648c015b2">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
         <table class="pcap-table"><thead><tr><th>JA3S Hash</th><th>Server</th><th>Client</th><th>Port</th><th>Malware Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr class="_ion-s-a89f389da6">
+        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
             <td><code class="_ion-s-dbd68c1058">${esc(f.ja3s_hash)}</code></td>
             <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port}</td>
             <td>${f.known_malware ? `<span class="_ion-s-75d955e5ec">${esc(f.known_malware)}</span>` : '<span class="_ion-s-ce14cb276b">No match</span>'}</td>
@@ -797,7 +797,7 @@
         document.getElementById('panel-hassh').innerHTML = `<h3>HASSH SSH Fingerprints (${fps.length})</h3>
         <p class="_ion-s-0648c015b2">SSH KEX_INIT fingerprints for client and server identification.</p>
         <table class="pcap-table"><thead><tr><th>HASSH Hash</th><th>Direction</th><th>Source</th><th>Destination</th><th>SSH Version</th><th>Match</th></tr></thead><tbody>
-        ${fps.map(f => `<tr class="_ion-s-a89f389da6">
+        ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
             <td><code class="_ion-s-dbd68c1058">${esc(f.hassh_hash)}</code></td>
             <td>${esc(f.direction)}</td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
             <td class="_ion-s-f63147b2ed">${esc(f.ssh_version || '-')}</td>
@@ -824,7 +824,7 @@
         if (cli.length) {
             html += `<h4 class="_ion-s-87ccc4da73">JA4 Client (${cli.length})</h4>
             <table class="pcap-table"><thead><tr><th>JA4</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
-            ${cli.map(f => `<tr class="_ion-s-a89f389da6">
+            ${cli.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
                 <td><code class="_ion-s-dbd68c1058">${esc(f.ja4)}</code></td>
                 <td>${esc(f.sni || '-')}</td>
                 <td>${esc(f.src_ip)}</td>
@@ -836,7 +836,7 @@
         if (srv.length) {
             html += `<h4 class="_ion-s-87ccc4da73">JA4S Server (${srv.length})</h4>
             <table class="pcap-table"><thead><tr><th>JA4S</th><th>Server</th><th>Client</th><th>Port</th></tr></thead><tbody>
-            ${srv.map(f => `<tr class="_ion-s-a89f389da6">
+            ${srv.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
                 <td><code class="_ion-s-dbd68c1058">${esc(f.ja4s)}</code></td>
                 <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port || '-'}</td>
             </tr>`).join('')}
@@ -859,7 +859,7 @@
         document.getElementById('panel-certs').innerHTML = `<h3>TLS Certificates (${certs.length})</h3>
         <p class="_ion-s-0648c015b2">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
         <table class="pcap-table"><thead><tr><th>Server</th><th>Subject</th><th>Issuer</th><th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead><tbody>
-        ${certs.map(c => `<tr class="_ion-s-a89f389da6">
+        ${certs.map(c => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
             <td>${esc(c.server_ip || '-')}</td>
             <td class="_ion-s-72126da263">${esc(c.subject || '-')}</td>
             <td class="_ion-s-72126da263">${esc(c.issuer || '-')}</td>
@@ -883,7 +883,7 @@
         document.getElementById('panel-hosts').innerHTML = `<h3>Host Profiles (${hosts.length})</h3>
         <p class="_ion-s-0648c015b2">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
         <table class="pcap-table"><thead><tr><th>Host</th><th>OS</th><th>Role</th><th>Sent</th><th>Received</th><th>SNIs</th><th>Beacons</th><th>Findings</th></tr></thead><tbody>
-        ${hosts.map(h => `<tr class="_ion-s-a89f389da6">
+        ${hosts.map(h => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
             <td><strong>${esc(h.ip)}</strong></td>
             <td>${esc(h.os || '-')}${h.os_evidence ? ` <span class="_ion-s-f63147b2ed">(${esc(h.os_evidence)})</span>` : ''}</td>
             <td>${(h.role || []).map(r => esc(r)).join(', ')}</td>
@@ -987,7 +987,7 @@
         <table class="pcap-table"><thead><tr><th>MAC</th><th>IPs Claimed</th><th>Severity</th><th>Detail</th></tr></thead><tbody>
         ${items.map(a => `<tr class="_ion-s-616924856b">
             <td><code>${esc(a.mac)}</code></td><td>${(a.ips||[]).map(ip => esc(ip)).join(', ')}</td>
-            <td><span class="_ion-s-70b267b459">${esc(a.severity)}</span></td>
+            <td><span class="_ion-s-70b267b459" data-ion-style="color:var(--sev-${a.severity})">${esc(a.severity)}</span></td>
             <td class="_ion-s-f63147b2ed">${esc(a.detail)}</td>
         </tr>`).join('')}</tbody></table>`;
     }
@@ -1221,7 +1221,7 @@
             <span>IPs checked: <strong>${ti.ips_checked}</strong></span>
             <span>Domains checked: <strong>${ti.domains_checked}</strong></span>
             <span>Total observables: <strong>${ti.total}</strong></span>
-            <span class="_ion-s-d2d795db29">Malicious hits: <strong>${ti.malicious_count}</strong></span>
+            <span data-ion-style="color:${ti.malicious_count ? 'var(--sev-critical)' : 'var(--mitre-covered)'}">Malicious hits: <strong>${ti.malicious_count}</strong></span>
         </div>`;
 
         html += '<table class="pcap-table"><thead><tr><th>Type</th><th>Value</th><th>Threat Level</th><th>Score</th><th>Labels</th><th>Threat Actors</th></tr></thead><tbody>';
@@ -1235,10 +1235,10 @@
             const actors = e && e.threat_actors && e.threat_actors.length ? e.threat_actors.map(a => esc(typeof a === 'string' ? a : a.name || '')).join(', ') : '—';
             const rowBg = e && e.is_malicious ? 'background:rgba(248,81,73,0.06);' : '';
 
-            html += `<tr class="_ion-s-2da1142fc8">
+            html += `<tr data-ion-style="${rowBg}">
                 <td><span class="_ion-s-de8dfac73b">${esc(o.type)}</span></td>
                 <td class="_ion-s-6ec2942442"><a class="_ion-s-b17605f04d" href="/observables?q=${encodeURIComponent(o.value)}">${esc(o.value)}</a></td>
-                <td><span class="_ion-s-a8287752f9">${esc(level)}</span></td>
+                <td><span class="_ion-s-a8287752f9" data-ion-style="color:${color}">${esc(level)}</span></td>
                 <td class="_ion-s-91a87015f4">${score}</td>
                 <td>${labels}</td>
                 <td>${actors}</td>

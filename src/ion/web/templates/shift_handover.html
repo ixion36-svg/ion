@@ -209,7 +209,7 @@ function renderReport(d) {
             const pct = Math.round(count / c.closed * 100);
             const color = reason === 'true_positive' ? 'var(--mitre-covered)' : reason === 'false_positive' ? 'var(--sev-critical)' : 'var(--text-secondary)';
             html += `<div class="_ion-s-91a87015f4">
-                <div class="_ion-s-edfbba956c">${count}</div>
+                <div class="_ion-s-edfbba956c" data-ion-style="color:${color}">${count}</div>
                 <div class="_ion-s-e65c44381d">${esc(label)} (${pct}%)</div>
             </div>`;
         }

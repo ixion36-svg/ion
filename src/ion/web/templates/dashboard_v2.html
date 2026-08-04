@@ -576,7 +576,7 @@
       } else {
         breakdownEl.innerHTML = rows.map(([k, color, label]) => {
           const w = Math.max(8, Math.round((breakdown[k] / total) * maxW));
-          return `<div class="flex items-center gap-1"><span class="h-1 rounded-full bg-ion-${color} _ion-s-623e7d73d0"></span><span class="font-mono text-[10px] text-slate-400">${breakdown[k]} ${label}</span></div>`;
+          return `<div class="flex items-center gap-1"><span class="h-1 rounded-full bg-ion-${color}" data-ion-style="width:${w}px"></span><span class="font-mono text-[10px] text-slate-400">${breakdown[k]} ${label}</span></div>`;
         }).join('');
       }
 

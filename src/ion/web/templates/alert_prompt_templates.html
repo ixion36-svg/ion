@@ -315,7 +315,7 @@ function renderScorecard(tplId) {
     }
     const flag = s.tuning_needed ? ' <span class="_ion-s-9dd1207e58" title="Agreement below 60% on 10+ samples — prompt may need tuning">⚠️ tune</span>' : '';
     const agreeStr = agree !== null && agree !== undefined ? `${agree}%` : '—';
-    return `<div class="_ion-s-2722fec7fb">
+    return `<div data-ion-style="${color} font-size:0.78rem">
         agree <strong>${agreeStr}</strong> · n=${s.sample_size}${flag}
         <div class="_ion-s-707a537f4d">TP ${s.tp_rate ?? 0}% · FP ${s.fp_rate ?? 0}% · BTP ${s.btp_rate ?? 0}%</div>
     </div>`;

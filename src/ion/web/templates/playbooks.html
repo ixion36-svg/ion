@@ -885,7 +885,7 @@ function displayExecutions() {
                 </td>
                 <td class="_ion-s-c7f080acfc">
                     <div class="progress-bar-container">
-                        <div class="progress-bar-fill status-${e.status} _ion-s-49775320a0"></div>
+                        <div class="progress-bar-fill status-${e.status}" data-ion-style="width:${e.progress_pct}%"></div>
                     </div>
                     <div class="progress-text">${e.completed_steps}/${e.total_steps} steps (${e.progress_pct}%)</div>
                 </td>
@@ -992,7 +992,7 @@ function renderExecDetail(exec) {
     const progressHtml = `
         <div class="_ion-s-16884469a8">
             <div class="progress-bar-container _ion-s-90fcfd6fce">
-                <div class="progress-bar-fill status-${exec.status} _ion-s-0c81f3dc06"></div>
+                <div class="progress-bar-fill status-${exec.status}" data-ion-style="width:${progress}%"></div>
             </div>
             <div class="progress-text">${completedSteps}/${steps.length} steps completed (${progress}%)</div>
         </div>

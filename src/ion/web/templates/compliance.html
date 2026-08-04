@@ -159,7 +159,7 @@ function cmpRender() {
                 <div class="cmp-fw-score ${cls}">${f.overall_score||0}%</div>
                 <div class="cmp-fw-meta">${s.fully_covered||0} / ${s.total_controls||0} controls<br>${s.partial||0} partial &middot; ${s.no_coverage||0} blind</div>
             </div>
-            <div class="cmp-fw-bar"><div class="cmp-fw-bar-fill _ion-s-d641ed4d07"></div></div>
+            <div class="cmp-fw-bar"><div class="cmp-fw-bar-fill" data-ion-style="width:${f.overall_score||0}%; background:${cmpScoreColor(f.overall_score||0)}"></div></div>
         </div>`;
     }
     html += '</div>';
@@ -197,7 +197,7 @@ function cmpRenderDetail(f) {
         html += `<tr>
             <td><span class="cmp-control-id">${cmpEsc(ctl.control_id)}</span></td>
             <td>${cmpEsc(ctl.name)}</td>
-            <td><span class="_ion-s-d0c0aa23fa">${ctl.score||0}%</span></td>
+            <td><span class="_ion-s-d0c0aa23fa" data-ion-style="color:${cmpScoreColor(ctl.score||0)}">${ctl.score||0}%</span></td>
             <td><span class="cmp-state-pill ${cmpEsc(ctl.state)}">${cmpEsc(ctl.state)}</span></td>
             <td><div class="cmp-tids">${tids.join('')}</div></td>
         </tr>`;

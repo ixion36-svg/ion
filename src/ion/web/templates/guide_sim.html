@@ -322,7 +322,7 @@ function renderSimulation() {
     const pct = Math.round(completedSteps / totalSteps * 100);
     html += `<div class="sim-progress">
         <div class="sim-progress-title">${esc(s.title)}</div>
-        <div class="sim-progress-bar"><div class="sim-progress-fill _ion-s-95aea49e0e"></div></div>
+        <div class="sim-progress-bar"><div class="sim-progress-fill" data-ion-style="width:${pct}%"></div></div>
         <div class="sim-progress-text">Step ${Math.min(currentStep+1, totalSteps)} of ${totalSteps} | ${pct}% complete</div>
     </div>`;
 
@@ -547,9 +547,9 @@ function renderScore(d) {
     const color = d.percentage >= 90 ? 'var(--mitre-covered)' : d.percentage >= 75 ? 'var(--quality-good)' : d.percentage >= 60 ? 'var(--sev-medium)' : 'var(--sev-critical)';
 
     let html = '<div class="sim-score">';
-    html += `<div class="sim-score-ring _ion-s-0f5db95de5">
+    html += `<div class="sim-score-ring" data-ion-style="background:conic-gradient(${color} ${d.percentage}%, rgba(99,110,123,.2) ${d.percentage}%)">
         <div class="sim-score-inner">
-            <div class="sim-score-grade _ion-s-2243cc4df3">${d.grade}</div>
+            <div class="sim-score-grade" data-ion-style="color:${color}">${d.grade}</div>
             <div class="sim-score-pct">${d.percentage}%</div>
         </div>
     </div>`;
@@ -567,7 +567,7 @@ function renderScore(d) {
         html += `<div class="sim-score-row">
             <span>${icon}</span>
             <span class="sim-score-row-q">${esc(r.feedback)}</span>
-            <span class="sim-score-row-pts _ion-s-9ab1d4805f">${r.earned}/${r.possible}</span>
+            <span class="sim-score-row-pts" data-ion-style="color:${r.correct ? 'var(--mitre-covered)' : 'var(--sev-critical)'}">${r.earned}/${r.possible}</span>
         </div>`;
     }
     html += '</div>';

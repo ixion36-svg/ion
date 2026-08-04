@@ -108,7 +108,7 @@ function kgRenderMeta(stats) {
     let legend = '';
     for (const t of types) {
         if (!counts[t]) continue;
-        legend += `<span class="kg-legend-item"><span class="kg-legend-dot _ion-s-7b379fa69d"></span>${kgEsc(t)} (${counts[t]})</span>`;
+        legend += `<span class="kg-legend-item"><span class="kg-legend-dot" data-ion-style="background:${colors[t]}"></span>${kgEsc(t)} (${counts[t]})</span>`;
     }
     document.getElementById('kg-meta').innerHTML = `
         <span><strong>${stats.total_nodes||0}</strong> nodes</span>

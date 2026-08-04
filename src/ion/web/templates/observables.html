@@ -1527,7 +1527,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                 <div class="enrichment-score">
                     <span>Score: ${e.score}/100</span>
                     <div class="score-bar">
-                        <div class="score-fill ${scoreClass} _ion-s-1f554283bc"></div>
+                        <div class="score-fill ${scoreClass}" data-ion-style="width: ${e.score}%"></div>
                     </div>
                     <span class="threat-badge ${e.is_malicious ? 'high' : 'benign'}">${e.is_malicious ? 'Malicious' : 'Clean'}</span>
                 </div>

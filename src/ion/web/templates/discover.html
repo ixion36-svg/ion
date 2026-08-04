@@ -814,7 +814,7 @@ function displayHistogram(data) {
     const maxCount = Math.max(...data.buckets.map(b => b.count));
     container.innerHTML = data.buckets.map(b => {
         const height = maxCount > 0 ? (b.count / maxCount * 100) : 0;
-        return `<div class="histogram-bar _ion-s-78d0d72849" title="${b.timestamp}: ${b.count} events"></div>`;
+        return `<div class="histogram-bar" data-ion-style="height: ${height}%" title="${b.timestamp}: ${b.count} events"></div>`;
     }).join('');
 }
 

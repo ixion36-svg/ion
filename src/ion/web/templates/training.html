@@ -5499,7 +5499,7 @@ function renderDetailPanel() {
             <button class="cert-filter-btn ${certFilter === 'all' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["all"]'>All</button>
             <button class="cert-filter-btn ${certFilter === 'cs' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["cs"]'>Civil Servant</button>
             <button class="cert-filter-btn ${certFilter === 'contractor' ? 'active' : ''}" data-click-action="switchCertFilter" data-args='["contractor"]'>Contractor</button>
-            <button class="cert-filter-btn ${certFilter === 'mod' ? 'active' : ''} _ion-s-8681e480f6" data-click-action="switchCertFilter" data-args='["mod"]'>MOD</button>
+            <button class="cert-filter-btn ${certFilter === 'mod' ? 'active' : ''}" data-ion-style="${certFilter === 'mod' ? '' : 'border-color:rgba(251,191,36,0.3);'}color:${certFilter === 'mod' ? '' : '#fbbf24'}" data-click-action="switchCertFilter" data-args='["mod"]'>MOD</button>
         </div>
         <div class="cert-note">${
             certFilter === 'cs'
@@ -6137,7 +6137,7 @@ function renderForecast() {
             <h3>Training Forecast — ${esc(ROLES[targetRole].title)}</h3>
             <div class="_ion-s-fac8722d73">Readiness: ${readiness}%</div>
             <div class="sa-readiness-bar">
-                <div class="sa-readiness-fill ${readinessClass} _ion-s-8b924af8c0">${readiness}%</div>
+                <div class="sa-readiness-fill ${readinessClass}" data-ion-style="width:${Math.max(readiness, 5)}%">${readiness}%</div>
             </div>
             ${gaps.length > 0 ? `
                 <div class="sa-gap-list">
@@ -6562,7 +6562,7 @@ function renderCapabilityCoverage() {
                     <span class="soc-cap-level ${levelClass}">${levelLabel}</span>
                 </div>
                 <div class="soc-cap-bar-track">
-                    <div class="soc-cap-bar-fill _ion-s-7460643335"></div>
+                    <div class="soc-cap-bar-fill" data-ion-style="width:${barPct.toFixed(0)}%; background:${barColor}"></div>
                 </div>
                 <div class="soc-cap-detail">
                     <span class="cap-stat">Avg: <strong>${teamAvg.toFixed(1)}</strong>/5</span>
@@ -6589,7 +6589,7 @@ function renderHeatmap() {
     const cols = members.length + 2; // skill name + N members + coverage
     let gridCss = `grid-template-columns: minmax(160px, 200px) repeat(${members.length}, minmax(60px, 1fr)) minmax(60px, 90px);`;
 
-    let html = `<div class="team-heatmap _ion-s-d9f6ddb9f2">`;
+    let html = `<div class="team-heatmap" data-ion-style="${gridCss}">`;
 
     // Header row
     html += `<div class="hm-cell hm-header hm-skill-name">Skill</div>`;
@@ -6653,7 +6653,7 @@ async function simulateDeparture() {
                     <div class="dr-label">Readiness Before</div>
                 </div>
                 <div class="departure-readiness-item">
-                    <div class="dr-value _ion-s-480bc3a151">${data.readiness_after}%</div>
+                    <div class="dr-value" data-ion-style="color:${data.readiness_after < data.readiness_before ? '#ef4444' : 'var(--text-bright)'}">${data.readiness_after}%</div>
                     <div class="dr-label">Readiness After</div>
                 </div>
                 <div class="departure-readiness-item">
@@ -6916,7 +6916,7 @@ function renderKnowledgeProgress(saved) {
             <span class="_ion-s-7b4cc7e1f8">${pct}% Complete</span>
             <span class="_ion-s-2620b95a9c">${total} documents expected</span>
         </div>
-        <div class="km-progress-bar"><div class="km-progress-fill _ion-s-aa22b3b0a7"></div></div>
+        <div class="km-progress-bar"><div class="km-progress-fill" data-ion-style="width:${pct}%"></div></div>
         <div class="km-summary">
             <div class="km-summary-item"><span class="km-summary-num _ion-s-6fe47583b2">${approved}</span> Approved</div>
             <div class="km-summary-item"><span class="km-summary-num _ion-s-b270adeed3">${draft}</span> Draft</div>
@@ -7292,7 +7292,7 @@ function renderGantt() {
         const mEnd = new Date(Math.min(tmpDate.getTime(), maxDate.getTime()));
         const mDays = Math.ceil((mEnd - mStart) / 86400000);
         const pct = (mDays / totalDays * 100).toFixed(1);
-        monthHeaders += `<div class="gantt-month-mark _ion-s-2e79cd37b8">${MONTH_NAMES[mStart.getMonth()].slice(0,3)} ${mStart.getFullYear()}</div>`;
+        monthHeaders += `<div class="gantt-month-mark" data-ion-style="flex:0 0 ${pct}%">${MONTH_NAMES[mStart.getMonth()].slice(0,3)} ${mStart.getFullYear()}</div>`;
     }
 
     let html = '<div class="gantt-chart">';
@@ -7315,8 +7315,8 @@ function renderGantt() {
         html += `<div class="gantt-row-label" title="${esc(item.name)}">${esc(item.name)}</div>`;
         html += `<div class="gantt-row-bar-area">`;
         // Today line
-        html += `<div class="_ion-s-cc4da19013"></div>`;
-        html += `<div class="gantt-bar ${item.catCss} _ion-s-c5d9a8ca3d" title="${esc(label)}">${esc(item.type === 'skill' ? '' : item.name)}</div>`;
+        html += `<div class="_ion-s-cc4da19013" data-ion-style="left:${todayPct}%"></div>`;
+        html += `<div class="gantt-bar ${item.catCss}" data-ion-style="left:${leftPct}%; width:${widthPct}%" title="${esc(label)}">${esc(item.type === 'skill' ? '' : item.name)}</div>`;
         html += `</div></div>`;
     });
 
@@ -7856,7 +7856,7 @@ function openMemberProfile(userId) {
         const lvl = avg >= 4.5 ? 5 : avg >= 3.5 ? 4 : avg >= 2.5 ? 3 : avg >= 1.5 ? 2 : avg > 0 ? 1 : 0;
         html += `<div class="mp-cap-row">
             <span class="mp-cap-name">${capDef.icon} ${esc(capName)}</span>
-            <span class="mp-cap-level _ion-s-6096bc8b5c">${levelLabels[lvl]} (${avg.toFixed(1)})</span>
+            <span class="mp-cap-level" data-ion-style="background:${levelColors[lvl]}; color:${lvl>=4?'#06b6d4':lvl>=3?'#22c55e':lvl>=2?'#eab308':'var(--text-muted)'}">${levelLabels[lvl]} (${avg.toFixed(1)})</span>
         </div>`;
 
         // Individual skills under this capability
@@ -7866,7 +7866,7 @@ function openMemberProfile(userId) {
             if (r === 0) return;
             const skillLabel = catSkills[k] ? catSkills[k].name : k;
             const barWidth = (r / 5 * 60);
-            html += `<span class="mp-skill-bar _ion-s-3ac3afcb8b"></span> ${esc(skillLabel)}: <strong>${r}</strong><br>`;
+            html += `<span class="mp-skill-bar" data-ion-style="width:${barWidth}px; background:${levelColors[r]}"></span> ${esc(skillLabel)}: <strong>${r}</strong><br>`;
         });
         html += '</div>';
     });
@@ -9050,7 +9050,7 @@ async function tpLoadForecast() {
             </div>
             <div class="tp-summary-card tp-summary-card-progress">
                 <div class="tp-progress-bar">
-                    <div class="tp-progress-fill _ion-s-4d12b8d117"></div>
+                    <div class="tp-progress-fill" data-ion-style="width:${overallPct}%"></div>
                 </div>
                 <div class="tp-summary-label">${overallPct}% Team Completion</div>
             </div>
@@ -9068,8 +9068,8 @@ async function tpLoadForecast() {
                     const color = EMP_TYPE_COLORS[type] || '#8b949e';
                     const liability = d.company + (d.split * 0.5) + d.tbd;
                     empHtml += `
-                    <div class="_ion-s-68e3d8f449">
-                        <div class="_ion-s-de22ce35b8">${esc(label)}</div>
+                    <div class="_ion-s-68e3d8f449" data-ion-style="border-left:3px solid ${color}">
+                        <div class="_ion-s-de22ce35b8" data-ion-style="color:${color}">${esc(label)}</div>
                         <div class="_ion-s-20d867efdd">
                             <span class="_ion-s-b8e0b1fa55">Personnel</span><span class="_ion-s-8e53798e1a">${d.headcount}</span>
                             <span class="_ion-s-b8e0b1fa55">Certifications</span><span class="_ion-s-8e53798e1a">${d.certs}</span>
@@ -9098,7 +9098,7 @@ async function tpLoadForecast() {
             const empColor = EMP_TYPE_COLORS[f.employment_type] || '#8b949e';
             return `<tr>
                 <td><strong>${esc(f.display_name)}</strong><br><span class="_ion-s-1d73b48170">${esc(f.username)}</span></td>
-                <td><span class="_ion-s-3bdd529feb">${esc(empLabel)}</span></td>
+                <td><span class="_ion-s-3bdd529feb" data-ion-style="background:${empColor}22; color:${empColor}">${esc(empLabel)}</span></td>
                 <td>${esc(f.plan_name)}</td>
                 <td>${esc(targetTitle)}</td>
                 <td class="_ion-s-dac4fe6c9b">${f.item_count}</td>
@@ -9107,7 +9107,7 @@ async function tpLoadForecast() {
                 <td class="fc-cost">\u00a3${f.self_cost.toLocaleString()}</td>
                 <td>
                     ${pct}%
-                    <span class="fc-progress"><span class="fc-progress-bar _ion-s-95aea49e0e"></span></span>
+                    <span class="fc-progress"><span class="fc-progress-bar" data-ion-style="width:${pct}%"></span></span>
                 </td>
             </tr>`;
         }).join('');
@@ -9299,8 +9299,8 @@ function crInit() {
     // Build domain columns
     grid.innerHTML = CR_DOMAINS.map(d => `
         <div class="cr-domain-col" data-domain="${d.id}">
-            <div class="cr-domain-header _ion-s-86eb42b1f1">
-                <i class="cr-dh-icon ${d.icon} _ion-s-5a3655e9ed"></i>
+            <div class="cr-domain-header" data-ion-style="border-bottom-color:${d.color}">
+                <i class="cr-dh-icon ${d.icon}" data-ion-style="color:${d.color}"></i>
                 <span class="cr-dh-name">${d.name}</span>
             </div>
             ${CR_LEVELS.map(level => `
@@ -9322,7 +9322,7 @@ function crInit() {
         chip.dataset.level = cert.level;
         chip.dataset.cost = cert.cost;
         chip.onclick = () => crShowDetail(cert.id);
-        chip.innerHTML = `<span class="cr-cert-dot _ion-s-46e06d0a81"></span>${esc(cert.abbr)} <span class="cr-cert-cost">${costDisplay}</span>`;
+        chip.innerHTML = `<span class="cr-cert-dot" data-ion-style="background:${CR_PROVIDER_COLORS[cert.provider]||'#666'}"></span>${esc(cert.abbr)} <span class="cr-cert-cost">${costDisplay}</span>`;
         cell.appendChild(chip);
     });
 
@@ -9330,7 +9330,7 @@ function crInit() {
     const providers = [...new Set(CR_CERTS.map(c => c.provider))].sort();
     const legendEl = document.getElementById('cr-legend');
     legendEl.innerHTML = providers.map(p =>
-        `<span class="cr-legend-item"><span class="cr-legend-swatch _ion-s-1afafd3468"></span>${esc(p)}</span>`
+        `<span class="cr-legend-item"><span class="cr-legend-swatch" data-ion-style="background:${CR_PROVIDER_COLORS[p]||'#666'}"></span>${esc(p)}</span>`
     ).join('');
 
     // Populate filter dropdowns
@@ -9400,7 +9400,7 @@ function crShowDetail(certId) {
         <div class="cr-d-header">
             <div>
                 <div class="cr-d-title">${esc(cert.name)}</div>
-                <div class="cr-d-provider _ion-s-ecdac7a2a8">${esc(cert.provider)}</div>
+                <div class="cr-d-provider" data-ion-style="color:${CR_PROVIDER_COLORS[cert.provider]||'#888'}">${esc(cert.provider)}</div>
             </div>
             <button class="cr-d-close" data-click-action="crCloseDetail">&times;</button>
         </div>
@@ -9411,11 +9411,11 @@ function crShowDetail(certId) {
             </div>
             <div class="cr-d-stat">
                 <span class="cr-d-stat-label">Level</span>
-                <span class="cr-d-stat-value _ion-s-b3727bc926">${levelLabels[cert.level]}</span>
+                <span class="cr-d-stat-value" data-ion-style="color:${levelColors[cert.level]}">${levelLabels[cert.level]}</span>
             </div>
             <div class="cr-d-stat">
                 <span class="cr-d-stat-label">Domain</span>
-                <span class="cr-d-stat-value">${domainInfo ? `<i class="${domainInfo.icon} _ion-s-2df5d63a05"></i>${domainInfo.name}` : cert.domain}</span>
+                <span class="cr-d-stat-value">${domainInfo ? `<i class="${domainInfo.icon} _ion-s-2df5d63a05" data-ion-style="color:${domainInfo.color}"></i>${domainInfo.name}` : cert.domain}</span>
             </div>
             <div class="cr-d-stat">
                 <span class="cr-d-stat-label">Duration</span>
