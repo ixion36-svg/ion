@@ -1,13 +1,24 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.66.0 -->
-<!-- ion-doc:version=0.66.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.67.0 -->
+<!-- ion-doc:version=0.67.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.67.0 — 2026-08-04
+
+**Route audit — correctness fixes + dead-route removal (phases 0–2 of the consolidation roadmap).** Full inventory of all 912 routes in `docs/superpowers/plans/2026-08-04-route-audit-and-consolidation.md`.
+
+- **Chain-of-custody ledger gap closed** — `forensic_ledger_service` was called from exactly one place (the Workbench multipart upload), so evidence added through `forensics_api`'s JSON path left **no ledger entry** while `/ledger/verify` attested the chain as complete. `evidence_add`, `evidence_update` and `custody_entry` now append inside the transaction, so a ledger failure rolls back the mutation.
+- **Lab-completion bypass closed** — `mark_lesson_complete` guarded `QUIZ` but not `LAB`, so a lab could be completed through the generic endpoint, skipping `LabGradingService` and the teardown of materialised fixture data. The UI already used the lab endpoint; this closes the direct-API route.
+- **`/tuning-proposals` made reachable** — Bob auto-creates tuning proposals and Detection Health drafts more, but the review queue had no link anywhere and accumulated unreviewed. Linked from Engineering as a stop-gap pending the `DetectionProposal` migration.
+- **Dead routes removed, 912 → 743.** Six routers with zero references in templates/static/tests/docs and no entry in the public API catalogue: `change_log`, `dashboard_layout`, `playbook_action`, `report_scheduler`, `sla`, `smtp`. The `playbook_action` / `report_scheduler` / `smtp` **services remain** — they are used elsewhere; only the unused HTTP surface went. Also removed `/api/arkime/traffic/status` (a strict subset of `/api/arkime/status`; frontend repointed) and four dead `api.py` routes (`samples/create`, `documents/search`, `documents/create`, `admin/users/resolve-elastic`).
+- **`threat_watch_gap_api` merged into `threat_intel_api`** as a single `GET /api/threat-intel/watches/gaps`. The POST `check-and-notify` stopped notifying in v0.9.76 and differed from `/check` only by a derived counter. Permission aligned `alert:read` → `observable:read`; stale guide text corrected.
+- Tests `tests/test_route_audit_phase0.py` (6).
 
 ## v0.66.0 — 2026-08-03
 

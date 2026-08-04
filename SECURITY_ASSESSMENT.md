@@ -1,7 +1,7 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.66.0 -->
+<!-- ion-doc:version=0.67.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,8 +9,8 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-08-03 (current: v0.66.0). Per-version deltas and history: see CHANGELOG + git history.
-**Application Version:** 0.66.0 — **Bob AI-controls hardening Phase 2**: RAG blocks (KB/exemplar/playbook/TI/skills) are injection-scrubbed before entering the highest-trust system-prompt region (P2a); a fail-soft, alert-gated confidence penalty deducts when a majority of Bob's `key_observations` cite values absent from the alert (P2b — never changes the verdict, only nudges toward the circuit breaker); the closure/exec-summary call is fenced in `<input_data>` + anti-fabrication-framed (P3b). Continues v0.65.0's **net reduction in prompt-injection surface**; no new permission, schema, or external surface. ION-side findings: 0C / 0H. 0.65.0 — Traffic Analytics polish + Kibana note-sync fix + AI-controls Phase 1 (on-demand surfaces fenced/scrubbed, chat `system`-message lockdown + temp clamp, encoded-input rule); one net-new read-only endpoint. 0.64.0 — Attack Path Phase 4: confidence-gated escalation tier + master flag; advisory, air-gap-safe. Prior per-version net-new-surface notes: see CHANGELOG + git history.
+**Assessment Date:** 2026-08-04 (current: v0.67.0). Per-version deltas and history: see CHANGELOG + git history.
+**Application Version:** 0.67.0 — **Route audit: attack-surface reduction + a tamper-evidence fix.** Removed 169 routes (912 → 743): six routers with no caller and no public-catalogue entry, a duplicate Arkime status endpoint, and four dead `api.py` routes including an unauthenticated-demo-seed leftover — a **net reduction in attack surface**, no new surface added. **Security-relevant fix:** `forensics_api`'s evidence and custody mutations never wrote the tamper-evident chain-of-custody ledger (only the Workbench upload path did), so `/ledger/verify` could attest a chain that omitted evidence added via the JSON path; all three mutations now append inside the transaction. Also closed a direct-API bypass that let a LAB lesson be completed without grading or fixture teardown, and made the unreachable `/tuning-proposals` review queue (fed by two live autonomous write paths) reachable. One route merged and re-permissioned (`alert:read` → `observable:read`, tighter). No new permission or schema. ION-side findings: 0C / 0H. 0.66.0 — **Bob AI-controls hardening Phase 2**: RAG blocks (KB/exemplar/playbook/TI/skills) are injection-scrubbed before entering the highest-trust system-prompt region (P2a); a fail-soft, alert-gated confidence penalty deducts when a majority of Bob's `key_observations` cite values absent from the alert (P2b — never changes the verdict, only nudges toward the circuit breaker); the closure/exec-summary call is fenced in `<input_data>` + anti-fabrication-framed (P3b). Continues v0.65.0's **net reduction in prompt-injection surface**; no new permission, schema, or external surface. ION-side findings: 0C / 0H. 0.65.0 — Traffic Analytics polish + Kibana note-sync fix + AI-controls Phase 1 (on-demand surfaces fenced/scrubbed, chat `system`-message lockdown + temp clamp, encoded-input rule); one net-new read-only endpoint. 0.64.0 — Attack Path Phase 4: confidence-gated escalation tier + master flag; advisory, air-gap-safe. Prior per-version net-new-surface notes: see CHANGELOG + git history.
 **Previous Assessment Version:** 0.33.0 (2026-05-27)
 **Scope:** Web application security review â€” authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
@@ -24,7 +24,7 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 
 **Current findings posture (v0.54.1): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0** and have stayed at zero since. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
 
-| Severity | Open findings (v0.66.0) |
+| Severity | Open findings (v0.67.0) |
 |----------|:-----------------------:|
 | Critical | 0 |
 | High | 0 |
