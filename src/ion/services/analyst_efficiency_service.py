@@ -262,6 +262,14 @@ def get_analyst_efficiency(session: Session, hours: int = 168) -> dict:
     total_cases_opened = sum(a["cases_opened"] for a in analysts)
     total_alerts_triaged = sum(a["alerts_triaged"] for a in analysts)
 
+    # NOTE (route audit phase 5): this FP rate uses a DIFFERENT denominator from
+    # /executive-report and /soc-health, which divide by ALL closures. Here it is
+    # only the cases where an analyst made a real threat/not-threat call
+    # (TP + FP), excluding administrative closures like duplicate /
+    # not_applicable / insufficient_data. Both are legitimate — see
+    # services/case_metrics — but they are not the same number, and the two
+    # pages used to present them under the identical heading "FP Rate".
+    # `fp_rate_basis` is emitted so a consumer can tell which one it has.
     total_dispositions = total_tp + total_fp
     overall_fp_rate = round((total_fp / total_dispositions) * 100, 1) if total_dispositions > 0 else 0.0
     team_avg_mttr = round(sum(all_mttrs) / len(all_mttrs), 2) if all_mttrs else None
@@ -271,6 +279,9 @@ def get_analyst_efficiency(session: Session, hours: int = 168) -> dict:
         "total_cases_opened": total_cases_opened,
         "total_alerts_triaged": total_alerts_triaged,
         "overall_fp_rate": overall_fp_rate,
+        # Which denominator produced overall_fp_rate. /executive-report and
+        # /soc-health report "of_closed"; this page reports "of_dispositions".
+        "fp_rate_basis": "of_dispositions",
         "avg_mttr_hours": team_avg_mttr,
         "busiest_analyst": busiest_analyst[0] or None,
         "most_efficient": most_efficient[0] if most_efficient[1] != float("inf") else None,

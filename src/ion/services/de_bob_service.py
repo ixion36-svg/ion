@@ -20,11 +20,15 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ion.models.ai_feedback import AIFeedback
 from ion.models.alert_triage import AlertTriage
+from ion.services.ai_feedback_dedupe import (
+    deduped_feedback_ids,
+    is_scored,
+)
 
 _PENDING = "pending"
 _UNMAPPED = "(unmapped)"
@@ -45,11 +49,7 @@ def _pct(num: int, denom: int) -> Optional[float]:
 
 def _deduped_rows(session: Session, cutoff: datetime):
     """Deduped ledger rows in-window, joined to the rule name."""
-    deduped_ids = (
-        select(func.max(AIFeedback.id))
-        .where(AIFeedback.created_at >= cutoff)
-        .group_by(AIFeedback.alert_id, AIFeedback.alert_prompt_template_id)
-    )
+    deduped_ids = deduped_feedback_ids(cutoff)
     return session.execute(
         select(
             AIFeedback.agreement,
@@ -67,9 +67,8 @@ def _deduped_rows(session: Session, cutoff: datetime):
     ).all()
 
 
-def _is_scored(bob_verdict, agreement, auto_escalated) -> bool:
-    """A row where Bob actually made a scored suggestion (not an abstention)."""
-    return bool(bob_verdict) and agreement is not None and not auto_escalated
+# Shared predicate — see ai_feedback_dedupe.is_scored.
+_is_scored = is_scored
 
 
 def get_bob_feedback(session: Session, days: Optional[int] = None) -> Dict[str, Any]:

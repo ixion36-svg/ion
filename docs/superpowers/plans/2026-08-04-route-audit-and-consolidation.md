@@ -315,6 +315,40 @@ Net: **83 pages → ~72**, with the duplicated *metrics* consolidated behind sha
 | **2** | Merge `threat_watch_gap` → `threat_intel`; `skill_publisher` → `alert_prompt`; move 5 CyAB routes out of `server.py`; move 2 case routes to `case_lifecycle_api` | Medium — internal moves, watch the doubled-prefix trap |
 | **3** | Forensics re-split by layer; mounting-convention normalisation; router prefixes for course/labs | Medium |
 | **4** | Re-prefix `/api/elasticsearch/alerts/cases/*` → `/api/cases/*` with one-release redirects | **Breaking** — needs a decision on the public API contract |
+**Phase 5 — DONE (v0.69.0).** Three shared contracts replaced the copies:
+- `services/ai_feedback_dedupe` — the audit found 4 copies of the AIFeedback
+  `MAX(id)` dedupe; there were actually **7** (two more in `wallboard_service` and
+  `investigation_memory_repository`, plus a second inside `detection_health_service`).
+  Five sites now share it. Two stay deliberately separate and are documented:
+  `investigation_memory_repository` (signature-scoped join — a different question)
+  and `bob_eval_service` (raw SQL, PG/sqlite branches). **The drift is fixed** —
+  `/ai-scorecard` was counting `auto_escalated` circuit-breaker abstentions in its
+  denominator; it now uses the shared `is_scored`. A test fails the build if an
+  eighth copy appears.
+- `services/case_metrics` — one computation for opened/closed/FP/MTTR/backlog.
+  **Proven divergence:** 10 closed cases (6 FP, 2 TP, 2 duplicate) →
+  `/executive-report` + `/soc-health` report **60%** FP rate, `/analyst-efficiency`
+  **75%**, same label and window. Neither is wrong: the first divides by ALL
+  closures, the second only by real threat/not-threat dispositions. So the helper
+  computes **both**, named `fp_rate_of_closed` vs `fp_rate_of_dispositions`; each
+  page keeps its existing number and `/analyst-efficiency` emits `fp_rate_basis`.
+  No number was silently changed. MTTR was pure duplication (same formula, four
+  services, different rounding) and is now computed once.
+- `/bob-eval` P/R/F1 fixed — it did `fp += 1; fn += 1` on every disagreement,
+  forcing `precision == recall == f1`. Now a real confusion matrix with "real
+  threat" as the positive class (the `tn_count` column already existed).
+  Verified: tp=8, fp=4, fn=1, tn=7 → 0.667 / 0.889 / 0.762.
+- **Noisy/silent label clash resolved.** The two pages used the same two words for
+  incompatible maths — `/detection-engineering` meant `>10 alerts, >70% closed at
+  all` (volume), `/detection-health` means `fp_rate >= 70` (closed *as FP*).
+  "Noisy"/"Silent" now belong exclusively to `/detection-health`;
+  `/detection-engineering` says **High-volume Rules** / **Non-firing Rules** and
+  each subtitle cross-references the other page. No maths changed — only the
+  words, which were the actual defect.
+- `analyst_efficiency`'s per-analyst rollup left intact — different grouping, not
+  a copy.
+- Tests `tests/test_route_audit_phase5_metrics.py` (14).
+
 | **5** | Metric consolidation: one shared case-metrics helper (kills 4 MTTR / 3 FP-rate impls) + one `deduped_feedback()` helper (kills 4 copies, 1 already drifted). Fix `/bob-eval` P/R/F1, `/ai-scorecard` KPI, noisy/silent label clash. | Medium — behaviour-visible numbers change (they become *correct*) |
 | **6** | Cheap page wins: nav repoint ("Tools"), `/wallboard` to nav, rename `/briefings`→`/about` + investigate/investigations, delete `/daily-work` handover card + GitLab config modal | Low |
 | **7** | Page merges: analyst-efficiency→executive-report, detection-health→de-metrics, my-courses→courses, change-requests+bug-reports→service-desk, topology→integrations, translator→tools, shift-handover→briefing; delete `/engineering-analytics` + `/ai-scorecard` | Medium — UI moves + redirects for old URLs |

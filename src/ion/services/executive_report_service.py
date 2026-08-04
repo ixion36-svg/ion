@@ -12,8 +12,9 @@ from typing import Any, Optional
 from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
-from ion.models.alert_triage import AlertCase, AlertCaseStatus, AlertTriage
+from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.user import AuditLog, User
+from ion.services.case_metrics import case_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -146,45 +147,34 @@ def generate_executive_pdf(report: dict) -> Optional[bytes]:
 
 
 def _case_metrics(session: Session, cutoff: datetime) -> dict:
+    """Exec-report case figures.
+
+    Opened/closed/FP/MTTR/backlog come from the shared `case_metrics` helper so
+    this report cannot disagree with /soc-health or /analyst-efficiency for the
+    same window. `fp_rate` keeps its historical meaning — false positives as a
+    share of ALL closures (`fp_rate_of_closed`) — see `services/case_metrics`
+    for why that differs from the dispositions-based rate.
+    Severity mix stays local: it is a breakdown of the cases *opened* in the
+    window, which no other surface computes.
+    """
+    core = case_metrics(session, cutoff)
+
     opened = session.execute(
         select(AlertCase).where(AlertCase.created_at >= cutoff)
     ).scalars().all()
-
-    closed = [c for c in opened if c.status == "closed"]
-    all_closed = session.execute(
-        select(AlertCase).where(
-            and_(AlertCase.closed_at.isnot(None), AlertCase.closed_at >= cutoff)
-        )
-    ).scalars().all()
-
-    closure_reasons = {}
-    mttr_values = []
-    for c in all_closed:
-        reason = c.closure_reason or "unspecified"
-        closure_reasons[reason] = closure_reasons.get(reason, 0) + 1
-        if c.created_at and c.closed_at:
-            mttr_values.append((c.closed_at - c.created_at).total_seconds() / 3600)
-
-    fp = closure_reasons.get("false_positive", 0)
-    total_closed = len(all_closed)
-
-    by_severity = {}
+    by_severity: dict = {}
     for c in opened:
         sev = c.severity or "unknown"
         by_severity[sev] = by_severity.get(sev, 0) + 1
 
-    open_backlog = session.execute(
-        select(func.count(AlertCase.id)).where(AlertCase.status != AlertCaseStatus.CLOSED)
-    ).scalar() or 0
-
     return {
-        "opened": len(opened),
-        "closed": total_closed,
-        "closure_reasons": closure_reasons,
-        "fp_rate": round(fp / total_closed * 100, 1) if total_closed else None,
-        "avg_mttr": round(sum(mttr_values) / len(mttr_values), 1) if mttr_values else None,
+        "opened": core["opened"],
+        "closed": core["closed"],
+        "closure_reasons": core["closure_reasons"],
+        "fp_rate": core["fp_rate_of_closed"],
+        "avg_mttr": core["avg_mttr_hours"],
         "by_severity": by_severity,
-        "open_backlog": open_backlog,
+        "open_backlog": core["open_backlog"],
     }
 
 

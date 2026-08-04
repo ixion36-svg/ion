@@ -43,6 +43,10 @@ from sqlalchemy.orm import Session
 
 from ion.models.ai_feedback import AIFeedback
 from ion.models.alert_triage import AlertCase, AlertTriage
+from ion.services.ai_feedback_dedupe import (
+    deduped_feedback_ids,
+    is_scored,
+)
 
 _FALSE_POSITIVE = "false_positive"
 _BENIGN_TP = "benign_true_positive"
@@ -325,11 +329,7 @@ def _noise_trend(session: Session, cutoff: datetime, midpoint: datetime,
 
 def _bob_agreement(session: Session, cutoff: datetime) -> Dict[str, Any]:
     """Bob-vs-human agreement rate off the deduped AIFeedback ledger."""
-    deduped_ids = (
-        select(func.max(AIFeedback.id))
-        .where(AIFeedback.created_at >= cutoff)
-        .group_by(AIFeedback.alert_id, AIFeedback.alert_prompt_template_id)
-    )
+    deduped_ids = deduped_feedback_ids(cutoff)
     rows = session.execute(
         select(
             AIFeedback.agreement,
@@ -339,8 +339,7 @@ def _bob_agreement(session: Session, cutoff: datetime) -> Dict[str, Any]:
     ).all()
     scored = agreed = 0
     for agreement, bob_verdict, auto_escalated in rows:
-        # Only rows where Bob actually scored a suggestion (not abstentions).
-        if bob_verdict and agreement is not None and not auto_escalated:
+        if is_scored(bob_verdict, agreement, auto_escalated):
             scored += 1
             if agreement is True:
                 agreed += 1

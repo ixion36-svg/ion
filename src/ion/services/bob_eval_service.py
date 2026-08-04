@@ -441,14 +441,33 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
 
         if agreement is None:
             abstentions += 1
-        elif agreement is True:
-            # Bob correct — count as TP
-            tp += 1
         else:
-            # Bob wrong — count as FP (over-flagged) or FN (under-flagged).
-            # Per spec: treat all disagreements as FP+FN missed bucket.
-            fp += 1
-            fn += 1
+            # v0.69.0: real confusion matrix against the analyst's verdict.
+            #
+            # This previously did `tp += 1` on agreement and `fp += 1; fn += 1`
+            # on disagreement, which made fp == fn ALWAYS — so precision ==
+            # recall == f1 == the agreement rate, and the page showed one number
+            # under three different statistical names.
+            #
+            # Bob's verdict and the human's are both known, so score them
+            # properly with "this alert is a real threat" as the positive class:
+            #   both say threat            -> TP
+            #   Bob says threat, human not -> FP  (Bob over-flagged)
+            #   Bob says not, human threat -> FN  (Bob missed a real threat)
+            #   neither says threat        -> TN
+            # Precision now means "of the alerts Bob escalated, how many were
+            # real", and recall "of the real threats, how many Bob caught" —
+            # which is what a SOC actually wants to know.
+            bob_positive = _is_threat_verdict(fresh_verdict)
+            human_positive = _is_threat_verdict(human_verdict)
+            if bob_positive and human_positive:
+                tp += 1
+            elif bob_positive and not human_positive:
+                fp += 1
+            elif not bob_positive and human_positive:
+                fn += 1
+            else:
+                tn += 1
 
         sample_rec = BobEvalRunSample(
             eval_run_id=run.id,
@@ -710,6 +729,20 @@ def _safe_int(value: Any) -> Optional[int]:
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def _is_threat_verdict(verdict: Optional[str]) -> bool:
+    """True when the verdict says "this alert is a real threat".
+
+    The positive class for the eval confusion matrix. Uses the same
+    true_positive family as ``_verdicts_agree`` so the two cannot disagree —
+    everything else (false_positive, benign_true_positive, duplicate,
+    not_applicable, insufficient_data) is treated as not-a-threat.
+    """
+    if not verdict:
+        return False
+    v = verdict.lower().strip().replace(" ", "_").replace("-", "_")
+    return v in {"true_positive", "tp"}
 
 
 def _verdicts_agree(bob_verdict: str, human_verdict: str) -> bool:

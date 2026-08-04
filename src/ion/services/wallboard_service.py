@@ -210,6 +210,7 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
     """Investigations + AI-feedback agreement rate."""
     from ion.models.ai_feedback import AIFeedback
     from ion.models.investigation import Investigation
+    from ion.services.ai_feedback_dedupe import deduped_feedback_ids
 
     cutoff_24h = datetime.utcnow() - timedelta(hours=24)
     investigations_24h = int(session.scalar(
@@ -240,11 +241,9 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
     # counted twice and the unresolved "pending" sentinel is scored as a
     # disagreement. Dedup to the latest row per key, then count / score only
     # within the 7-day window.
-    deduped_ids = (
-        select(func.max(AIFeedback.id))
-        .group_by(AIFeedback.alert_id, AIFeedback.alert_prompt_template_id)
-        .scalar_subquery()
-    )
+    # cutoff=None: dedupe across all time, then filter the window below, so a
+    # row resolved outside the window still supersedes its pending sentinel.
+    deduped_ids = deduped_feedback_ids().scalar_subquery()
     rows = session.execute(
         select(AIFeedback.human_verdict, AIFeedback.bob_suggested_verdict)
         .where(AIFeedback.id.in_(deduped_ids))

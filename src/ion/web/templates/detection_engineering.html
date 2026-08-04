@@ -685,8 +685,8 @@ function renderExecution(d) {
         <div class="de-stat"><div class="de-stat-label">Total Alerts</div><div class="de-stat-val">${(s.total_alerts||0).toLocaleString()}</div><div class="de-stat-sub">in last ${_execHours}h</div></div>
         <div class="de-stat"><div class="de-stat-label">Unique Rules Firing</div><div class="de-stat-val">${s.unique_rules_firing||0}</div><div class="de-stat-sub">${s.tide_matched||0} matched to TIDE</div></div>
         <div class="de-stat"><div class="de-stat-label">Avg / Rule</div><div class="de-stat-val">${s.avg_alerts_per_rule||0}</div><div class="de-stat-sub">alerts per firing rule</div></div>
-        <div class="de-stat warn"><div class="de-stat-label">Noisy Rules</div><div class="de-stat-val">${s.noisy_rules||0}</div><div class="de-stat-sub">&gt;70% closed, &gt;10 alerts</div></div>
-        <div class="de-stat crit"><div class="de-stat-label">Silent Rules</div><div class="de-stat-val">${s.silent_enabled_rules||0}</div><div class="de-stat-sub">enabled in TIDE, 0 alerts</div></div>
+        <div class="de-stat warn"><div class="de-stat-label">High-volume Rules</div><div class="de-stat-val">${s.noisy_rules||0}</div><div class="de-stat-sub">&gt;70% closed, &gt;10 alerts</div></div>
+        <div class="de-stat crit"><div class="de-stat-label">Non-firing Rules</div><div class="de-stat-val">${s.silent_enabled_rules||0}</div><div class="de-stat-sub">enabled in TIDE, 0 alerts</div></div>
         <div class="de-stat"><div class="de-stat-label">Open</div><div class="de-stat-val">${((s.status||{}).open||0).toLocaleString()}</div><div class="de-stat-sub">${openPct}% of total</div></div>
     </div>`;
 
@@ -704,7 +704,7 @@ function renderExecution(d) {
         </div>`;
     }
 
-    // Two columns: Top firing + Noisy
+    // Two columns: Top firing + High-volume
     html += '<div class="de-cols">';
 
     // Top firing rules
@@ -729,9 +729,9 @@ function renderExecution(d) {
     }
     html += '</div>';
 
-    // Noisy rules
+    // High-volume rules
     html += `<div class="de-section">
-        <div class="de-section-title"><i class="icon-volume-2"></i> Noisy Rules <span class="_ion-s-ad3c6656f3">(high volume, mostly closed)</span></div>`;
+        <div class="de-section-title"><i class="icon-volume-2"></i> High-volume Rules <span class="_ion-s-ad3c6656f3">(&gt;10 alerts, &gt;70% closed — volume, not FP rate; see Detection Health for noise)</span></div>`;
     if ((d.noisy_rules||[]).length) {
         html += '<table class="de-table"><thead><tr><th>Rule</th><th>Alerts</th><th>Close Rate</th><th>Open</th></tr></thead><tbody>';
         for (const r of (d.noisy_rules||[]).slice(0, 15)) {
@@ -748,10 +748,10 @@ function renderExecution(d) {
     }
     html += '</div></div>'; // close cols
 
-    // Silent rules
+    // Non-firing rules
     if ((d.silent_rules||[]).length) {
         html += `<div class="de-section">
-            <div class="de-section-title"><i class="icon-volume-x"></i> Silent Rules <span class="_ion-s-ad3c6656f3">(enabled in TIDE, 0 alerts in ES)</span></div>
+            <div class="de-section-title"><i class="icon-volume-x"></i> Non-firing Rules <span class="_ion-s-ad3c6656f3">(enabled in TIDE, 0 alerts in ES — differs from Detection Health's "silent")</span></div>
             <table class="de-table"><thead><tr><th>Rule</th><th>TIDE Severity</th><th>Quality</th><th>MITRE</th></tr></thead><tbody>`;
         for (const r of (d.silent_rules||[]).slice(0, 30)) {
             const mitre = (r.mitre_ids||[]).slice(0,5).map(m=>`<span class="de-mitre-chip">${esc(m)}</span>`).join(' ');

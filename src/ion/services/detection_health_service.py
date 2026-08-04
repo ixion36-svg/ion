@@ -32,11 +32,12 @@ import os
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ion.models.ai_feedback import AIFeedback
 from ion.models.alert_triage import AlertTriage
+from ion.services.ai_feedback_dedupe import deduped_feedback_ids
 
 _PENDING = "pending"
 _UNMAPPED = "(unmapped)"
@@ -115,12 +116,8 @@ def get_detection_health(session: Session, days: Optional[int] = None) -> Dict[s
     if th["benign_tp_as_fp"]:
         fp_set.add(_BENIGN_TP)
 
-    # Dedup: keep MAX(id) per (alert_id, template_id) within the window.
-    deduped_ids = (
-        select(func.max(AIFeedback.id))
-        .where(AIFeedback.created_at >= cutoff)
-        .group_by(AIFeedback.alert_id, AIFeedback.alert_prompt_template_id)
-    )
+    # Dedup contract lives in ai_feedback_dedupe — see that module for why.
+    deduped_ids = deduped_feedback_ids(cutoff)
     rows = session.execute(
         select(
             AIFeedback.human_verdict,
@@ -248,11 +245,7 @@ def get_rule_disagreements(session: Session, rule_name: str, days: Optional[int]
     th = _thresholds()
     lookback = days if days is not None else th["lookback_days"]
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=lookback)
-    deduped_ids = (
-        select(func.max(AIFeedback.id))
-        .where(AIFeedback.created_at >= cutoff)
-        .group_by(AIFeedback.alert_id, AIFeedback.alert_prompt_template_id)
-    )
+    deduped_ids = deduped_feedback_ids(cutoff)
     target = None if rule_name == _UNMAPPED else rule_name
     q = (
         select(

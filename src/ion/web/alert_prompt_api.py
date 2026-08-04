@@ -8,6 +8,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import (
@@ -15,7 +16,12 @@ from ion.auth.dependencies import (
     require_any_permission,
     require_page_auth,
 )
+from ion.models.ai_feedback import AIFeedback
 from ion.models.user import User
+from ion.services.ai_feedback_dedupe import (
+    deduped_feedback_ids,
+    is_scored,
+)
 from ion.services.alert_prompt_service import AlertPromptService
 from ion.storage.alert_prompt_repository import AlertPromptRepository
 from ion.web.api import get_db_session
@@ -128,50 +134,42 @@ def get_all_scorecards(
     """
     from datetime import datetime, timedelta, timezone
 
-
-    try:
-        pass
-    except Exception:
-        return {"window_days": window_days, "scorecards": {}}
-
     cutoff = datetime.now(timezone.utc) - timedelta(days=window_days)
 
-    # Fix 3: dedup by (alert_id, template_id) keeping max(id) per pair —
-    # mirrors the same dedup applied in bob_eval_service._fetch_deduped_feedback.
-    # Without this, a pending (circuit-breaker) row and a later resolved row for
-    # the same alert inflate sample_size but the pending row has agreement=NULL,
-    # silently skewing the agreement_pct denominator.
-    from sqlalchemy import text as _text
-    is_pg = (
-        session.bind is not None and
-        session.bind.dialect.name == "postgresql"
-    )
-    dedup_sql = _text("""
-        SELECT alert_prompt_template_id, agreement, human_verdict
-        FROM ai_feedback
-        WHERE id IN (
-            SELECT MAX(id)
-            FROM ai_feedback
-            WHERE alert_prompt_template_id IS NOT NULL
-              AND created_at >= :cutoff
-            GROUP BY alert_id, alert_prompt_template_id
+    # Dedup by (alert_id, template_id) keeping MAX(id) — the shared contract in
+    # ai_feedback_dedupe. Without it a pending (circuit-breaker) row and a later
+    # resolved row for the same alert both count, inflating sample_size.
+    #
+    # v0.69.0: this reader had DRIFTED from the other three. It counted any row
+    # with a non-null `agreement`, including `auto_escalated` circuit-breaker
+    # abstentions, so its denominator was wider than detection-health /
+    # de-metrics / de-bob and the agreement % correspondingly different for the
+    # same underlying data. It now uses the shared `is_scored` predicate, so the
+    # scorecard agrees with every other Bob-quality surface.
+    rows = session.execute(
+        select(
+            AIFeedback.alert_prompt_template_id,
+            AIFeedback.agreement,
+            AIFeedback.human_verdict,
+            AIFeedback.bob_suggested_verdict,
+            AIFeedback.auto_escalated,
+        ).where(
+            AIFeedback.id.in_(deduped_feedback_ids(cutoff, require_template=True)),
+            AIFeedback.alert_prompt_template_id.isnot(None),
         )
-        AND alert_prompt_template_id IS NOT NULL
-    """)
-    raw_rows = session.execute(dedup_sql, {"cutoff": cutoff}).fetchall()
-    rows = [(r[0], r[1], r[2]) for r in raw_rows]
+    ).all()
 
     # Aggregate in Python — the sample size per template is bounded by
     # analyst throughput (order of hundreds/month), so this is fine.
     buckets: dict[int, dict] = {}
-    for tpl_id, agreement, verdict in rows:
+    for tpl_id, agreement, verdict, bob_verdict, auto_escalated in rows:
         b = buckets.setdefault(
             tpl_id,
             {"sample_size": 0, "agreed": 0, "evaluated": 0,
              "fp": 0, "btp": 0, "tp": 0},
         )
         b["sample_size"] += 1
-        if agreement is not None:
+        if is_scored(bob_verdict, agreement, auto_escalated):
             b["evaluated"] += 1
             if agreement:
                 b["agreed"] += 1

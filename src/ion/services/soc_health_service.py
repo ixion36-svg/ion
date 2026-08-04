@@ -13,8 +13,9 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ion.models.alert_triage import AlertCase, AlertCaseStatus, CaseClosureReason
+from ion.models.alert_triage import AlertCase, AlertCaseStatus
 from ion.models.user import User
+from ion.services.case_metrics import case_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -127,66 +128,33 @@ def _operational_efficiency(session: Session) -> dict[str, Any]:
     }
 
     try:
-        # Cases opened in last 30 days
-        opened = session.execute(
-            select(func.count(AlertCase.id)).where(
-                AlertCase.created_at >= thirty_days_ago
-            )
-        ).scalar() or 0
-
-        # Cases closed in last 30 days
-        closed = session.execute(
-            select(func.count(AlertCase.id)).where(
-                AlertCase.status == AlertCaseStatus.CLOSED,
-                AlertCase.closed_at >= thirty_days_ago,
-            )
-        ).scalar() or 0
-
-        # False-positive count among closed cases
-        fp_count = session.execute(
-            select(func.count(AlertCase.id)).where(
-                AlertCase.status == AlertCaseStatus.CLOSED,
-                AlertCase.closed_at >= thirty_days_ago,
-                AlertCase.closure_reason == CaseClosureReason.FALSE_POSITIVE.value,
-            )
-        ).scalar() or 0
-
-        # MTTR: average time from created_at to closed_at for closed cases
-        mttr_rows = session.execute(
-            select(AlertCase.created_at, AlertCase.closed_at).where(
-                AlertCase.status == AlertCaseStatus.CLOSED,
-                AlertCase.closed_at >= thirty_days_ago,
-                AlertCase.closed_at.isnot(None),
-            )
-        ).all()
+        # Opened / closed / FP / MTTR all come from the shared case_metrics
+        # helper so this scorecard cannot disagree with /executive-report or
+        # /analyst-efficiency for the same window. `fp_rate_of_closed` preserves
+        # this dimension's historical denominator (all closures) — see
+        # services/case_metrics for why the dispositions-based rate differs.
+        core = case_metrics(session, thirty_days_ago)
+        opened = core["opened"]
+        closed = core["closed"]
+        avg_mttr = core["avg_mttr_hours"]
 
         details["cases_opened_30d"] = opened
         details["cases_closed_30d"] = closed
 
         # Closure rate score (target >= 90%)
-        closure_rate = (closed / opened * 100) if opened > 0 else 100
+        closure_rate = core["closure_rate_pct"] if opened > 0 else 100
         details["closure_rate_pct"] = round(closure_rate, 1)
         closure_score = _clamp(closure_rate / 0.9)  # 90% -> 100 score
 
         # FP rate score (target < 30%)
-        fp_rate = (fp_count / closed * 100) if closed > 0 else 0
+        fp_rate = core["fp_rate_of_closed"] or 0
         details["fp_rate_pct"] = round(fp_rate, 1)
         # 0% FP = 100 score, 30% FP = 50 score, 60%+ FP = 0 score
         fp_score = _clamp(100 - (fp_rate / 0.6))
 
         # MTTR score (< 4h = 100, > 24h = 0, linear between)
-        if mttr_rows:
-            total_hours = 0.0
-            count = 0
-            for row in mttr_rows:
-                created = row[0]
-                closed_at = row[1]
-                if created and closed_at:
-                    delta = (closed_at - created).total_seconds() / 3600.0
-                    total_hours += delta
-                    count += 1
-            avg_mttr = total_hours / count if count > 0 else None
-            details["avg_mttr_hours"] = round(avg_mttr, 1) if avg_mttr is not None else None
+        if core["mttr_sample_size"]:
+            details["avg_mttr_hours"] = avg_mttr
 
             if avg_mttr is not None:
                 if avg_mttr <= 4:
