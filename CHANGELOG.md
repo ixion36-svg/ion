@@ -1,13 +1,24 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.68.0 -->
-<!-- ion-doc:version=0.68.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.69.0 -->
+<!-- ion-doc:version=0.69.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.69.0 — 2026-08-04
+
+**Metric consolidation — one computation per metric (route audit phase 5).** ION felt duplicated partly because the *same measurement* was computed independently in several services behind identically-worded headings, so two adjacent pages could legitimately show different numbers for the same window.
+
+- **AIFeedback dedupe → one contract** (`services/ai_feedback_dedupe`). The audit found 4 hand-maintained copies of the `MAX(id)` per `(alert_id, template_id)` rule; there were actually **7**. Five sites now share one helper. `investigation_memory_repository` (signature-scoped join) and `bob_eval_service` (raw SQL, PG/sqlite branches) keep their own variants deliberately, and say so. A test fails the build if an eighth appears.
+- **Fixes a real drift:** `/ai-scorecard` counted `auto_escalated` circuit-breaker abstentions in its denominator, so it reported a different Bob-agreement rate than Detection Health / DE Metrics / Bob Improvement **for the same data**. It now uses the shared `is_scored` predicate — its numbers will change, and that is the fix.
+- **Case metrics → one computation** (`services/case_metrics`). MTTR was the same formula in four services with different rounding. FP rate genuinely diverged: `/executive-report` + `/soc-health` divide by ALL closures, `/analyst-efficiency` only by real threat/not-threat dispositions — on 10 closed cases (6 FP, 2 TP, 2 duplicate) that is **60% vs 75%** under the identical heading "FP Rate". Neither is wrong, so **no number was silently changed**: the helper computes both (`fp_rate_of_closed`, `fp_rate_of_dispositions`), each page keeps its existing figure, and `/analyst-efficiency` now emits `fp_rate_basis` so a consumer can tell which it has.
+- **`/bob-eval` Precision/Recall/F1 fixed.** Scoring did `fp += 1; fn += 1` on every disagreement, forcing `fp == fn` and therefore `precision == recall == f1` — three statistical names for one number, on a measurement page. Now a real confusion matrix with "real threat" as the positive class (the `tn_count` column already existed).
+- **Noisy/Silent label clash resolved.** `/detection-engineering` meant ">10 alerts, >70% closed at all" (volume); `/detection-health` means "FP rate ≥ 70%". Same two words, incompatible maths. The terms now belong to Detection Health alone; Detection Engineering says **High-volume** / **Non-firing** and cross-references it. Words only — no maths changed.
+- Tests `tests/test_route_audit_phase5_metrics.py` (14); 218 affected green.
 
 ## v0.68.0 — 2026-08-04
 
