@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.71.0 -->
-<!-- ion-doc:version=0.71.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.72.0 -->
+<!-- ion-doc:version=0.72.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.72.0 — 2026-08-04
+
+**Legacy tuning queue retired into the DE module (route audit phase 8).** Completes the consolidation roadmap.
+
+- Bob wrote `TuningProposal` rows **unattended** whenever a false-positive verdict carried a concrete tuning recommendation, and Detection Health filed more — but the only review UI had no link anywhere in the app, so they accumulated unreviewed (v0.67.0 added a stop-gap nav entry). `DetectionProposal` — the DE module's governed queue with a decision record and outcome measurement — had no `alert_id`/`investigation_id`, so Bob's per-alert recommendations had nowhere to land.
+- **`DetectionProposal` absorbs the legacy shape:** `source` (bob | human), `alert_id`, `investigation_id`, a `duplicate` status carried over from the old triage options, and `legacy_tuning_proposal_id` for traceability — all exposed through the API so a reviewer sees provenance.
+- **Both write paths repointed.** Bob's auto-draft still creates a **DRAFT** — it never auto-applies.
+- **Startup migration** adds the columns (`create_all` never adds columns to an existing table) and carries any still-**pending** legacy row across, keyed on `legacy_tuning_proposal_id` so it is idempotent — retiring the page must not strand proposals already filed.
+- `/api/de/proposals` gains a `source` filter; `/de-proposals` gains the control, a **Bob** badge on Bob-authored drafts, and honours `?source=bob` so the retired page's redirect lands a reviewer on exactly the queue that used to be unreachable.
+- `tuning_proposal_api` + template deleted; `/tuning-proposals` now 302s. **`tuning:read` / `tuning:review` removed — but only after moving their enforcement**: Detection Health's file-proposal action is now gated `de:propose`. Dropping a seeded permission that is still enforced locks out everyone, admin included.
+- Tests `tests/test_route_audit_phase8_proposals.py` (10). Two existing tests updated to the new permission and model; the gate is unchanged in strength (403 without it still asserted).
 
 ## v0.71.0 — 2026-08-04
 
