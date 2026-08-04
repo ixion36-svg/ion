@@ -1,11 +1,11 @@
 """Detection Health dashboard API (v0.47.0).
 
 Per-rule performance analytics over the AIFeedback ledger + closure verdicts,
-plus a one-click action to file a `TuningProposal` against a flagged rule.
+plus a one-click action to file a `DetectionProposal` against a flagged rule.
 
 Read views gated `security:read` (lead / detection-engineer audience — a step
 up from the `alert:read` used by the other reporting pages). The proposal-create
-mutation is gated `tuning:review`, matching `tuning_proposal_api`.
+mutation is gated `de:propose` — it files into the DE module's proposal queue.
 """
 
 from __future__ import annotations
@@ -18,7 +18,12 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_any_permission, require_permission
-from ion.models.tuning_proposal import TuningProposal, TuningProposalStatus
+from ion.models.detection_proposal import (
+    DetectionProposal,
+    DetectionProposalChangeType,
+    DetectionProposalSource,
+    DetectionProposalStatus,
+)
 from ion.models.user import User
 from ion.web.api import get_db_session
 
@@ -62,7 +67,10 @@ class TuningProposalCreate(BaseModel):
 
 @router.post(
     "/tuning-proposal",
-    dependencies=[Depends(require_any_permission(["tuning:review"]))],
+    # v0.72.0: this now files a DetectionProposal into the DE module's queue, so
+    # it is gated by that module's write permission rather than the retired
+    # tuning:review. de:propose is held by the same reviewer tier.
+    dependencies=[Depends(require_any_permission(["de:propose"]))],
 )
 def create_tuning_proposal(
     payload: TuningProposalCreate,
@@ -81,12 +89,16 @@ def create_tuning_proposal(
     if not change:
         raise HTTPException(status_code=400, detail="suggested_change is required")
 
-    proposal = TuningProposal(
-        rule_id=rule,
-        alert_id=(payload.alert_id or None),
+    # v0.72.0: files into the DE module's governed queue (route audit phase 8).
+    proposal = DetectionProposal(
+        rule_name=rule,
+        change_type=DetectionProposalChangeType.OTHER,
+        title=f"Detection Health: tuning proposed for {rule}",
         suggested_change=change,
         rationale=(payload.rationale or None),
-        status=TuningProposalStatus.PENDING,
+        status=DetectionProposalStatus.DRAFT,
+        source=DetectionProposalSource.HUMAN,
+        alert_id=(payload.alert_id or None),
         created_by_id=current_user.id,
     )
     session.add(proposal)

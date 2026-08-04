@@ -43,6 +43,9 @@ class DetectionProposalStatus(str, Enum):
     DRAFT = "draft"
     APPLIED = "applied"
     REJECTED = "rejected"
+    # v0.72.0: carried over from the retired TuningProposalStatus so a reviewer
+    # can still triage a proposal as a duplicate of one already filed.
+    DUPLICATE = "duplicate"
 
 
 class DetectionProposalChangeType(str, Enum):
@@ -53,6 +56,19 @@ class DetectionProposalChangeType(str, Enum):
     NEW_RULE = "new_rule"         # add a narrower/replacement rule
     RETIRE = "retire"             # retire or disable the rule
     OTHER = "other"
+
+
+class DetectionProposalSource(str, Enum):
+    """Who authored the proposal.
+
+    v0.72.0: the retired ``TuningProposal`` pipeline had Bob writing proposals
+    unattended off a false-positive verdict. That provenance matters on review —
+    a human drafted from a noise campaign is a different artifact from one Bob
+    inferred from a single alert — so it is recorded rather than flattened.
+    """
+
+    HUMAN = "human"
+    BOB = "bob"
 
 
 class DetectionProposal(Base, TimestampMixin):
@@ -96,6 +112,23 @@ class DetectionProposal(Base, TimestampMixin):
     created_by_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
+    # v0.72.0 — absorbed from the retired TuningProposal model so Bob's
+    # per-alert tuning recommendations have somewhere to land. A campaign-driven
+    # proposal leaves all three NULL.
+    source: Mapped[str] = mapped_column(
+        SQLEnum(DetectionProposalSource, native_enum=False),
+        default=DetectionProposalSource.HUMAN,
+        nullable=False,
+    )
+    alert_id: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    investigation_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("investigations.id"), nullable=True
+    )
+    # Set when a row was carried over from the legacy tuning_proposals table;
+    # makes the one-time backfill idempotent and keeps the audit trail.
+    legacy_tuning_proposal_id: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, index=True
+    )
     # Decision record (one-shot: who marked it applied/rejected, when, why).
     decided_by_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
@@ -124,6 +157,15 @@ class DetectionProposal(Base, TimestampMixin):
             "campaign_snapshot": self.campaign_snapshot,
             "mitre_techniques": self.mitre_techniques or [],
             "status": self.status,
+            # v0.72.0 — provenance absorbed from the retired TuningProposal.
+            # Exposed so a reviewer can tell a Bob-authored draft (inferred from
+            # a single alert, unattended) from one a human drafted off a noise
+            # campaign, and so the /de-proposals source filter has something to
+            # render.
+            "source": self.source,
+            "alert_id": self.alert_id,
+            "investigation_id": self.investigation_id,
+            "legacy_tuning_proposal_id": self.legacy_tuning_proposal_id,
             "created_by_id": self.created_by_id,
             "created_by_username": self.created_by.username if self.created_by else None,
             "decided_by_id": self.decided_by_id,

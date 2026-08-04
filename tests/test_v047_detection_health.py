@@ -14,7 +14,6 @@ from fastapi.testclient import TestClient
 from ion.auth.dependencies import get_current_user
 from ion.models.ai_feedback import AIFeedback
 from ion.models.alert_triage import AlertTriage, AlertTriageStatus
-from ion.models.tuning_proposal import TuningProposal
 from ion.models.user import User
 from ion.services.detection_health_service import get_detection_health
 from ion.web.api import get_db_session
@@ -212,21 +211,28 @@ def test_metrics_requires_security_read(session):
 
 
 def test_create_proposal_gate_and_validation(session):
-    # Without tuning:review → 403.
+    """v0.72.0 (route audit phase 8): this action now files a DetectionProposal
+    into the DE module's governed queue instead of the retired TuningProposal
+    table, so the gate moved tuning:review -> de:propose. The gate itself is
+    unchanged in strength — a user without it still gets 403."""
+    from ion.models.detection_proposal import DetectionProposal
+
+    # Without de:propose → 403 (security:read alone can read, not file).
     client = _client(session, perms={"security:read"})
     assert client.post("/api/detection-health/tuning-proposal",
                        json={"rule_name": "R", "suggested_change": "x"}).status_code == 403
 
-    # With tuning:review → happy path persists a TuningProposal.
-    client2 = _client(session, perms={"tuning:review"})
+    # With de:propose → happy path persists a DetectionProposal draft.
+    client2 = _client(session, perms={"de:propose"})
     r = client2.post("/api/detection-health/tuning-proposal",
                      json={"rule_name": "Noisy Rule", "suggested_change": "raise threshold to 5",
                            "rationale": "80% FP"})
     assert r.status_code == 200
     body = r.json()
-    assert body["rule_id"] == "Noisy Rule"
-    assert body["status"] == "pending"
-    assert session.query(TuningProposal).filter_by(rule_id="Noisy Rule").count() == 1
+    assert body["rule_name"] == "Noisy Rule"
+    assert body["status"] == "draft"
+    assert body["source"] == "human"      # an analyst filed it, not Bob
+    assert session.query(DetectionProposal).filter_by(rule_name="Noisy Rule").count() == 1
 
     # Missing suggested_change → 400.
     assert client2.post("/api/detection-health/tuning-proposal",

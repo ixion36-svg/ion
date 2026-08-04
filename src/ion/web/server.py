@@ -121,7 +121,6 @@ from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.training_sim_api import router as training_sim_router
 from ion.web.translator_api import router as translator_router
 from ion.web.triage_suggestion_api import router as triage_suggestion_router
-from ion.web.tuning_proposal_api import router as tuning_proposal_router
 from ion.web.vulnerability_api import router as vulnerability_router
 from ion.web.wallboard_api import router as wallboard_router
 from ion.web.webhook_api import router as webhook_router
@@ -453,7 +452,6 @@ app.include_router(story_router, prefix="")
 app.include_router(course_router, prefix="")
 # v0.21.0 — Lab fixture launch/complete lifecycle
 app.include_router(labs_router, prefix="")
-app.include_router(tuning_proposal_router, prefix="")
 # Service desk — user bug reports (→ GitLab) + CAB change requests.
 app.include_router(bug_report_router, prefix="")
 app.include_router(change_request_router, prefix="")
@@ -1394,6 +1392,21 @@ async def briefings_redirect(deck: str = ""):
 async def investigate_redirect():
     from fastapi.responses import RedirectResponse
     return RedirectResponse(url="/investigation-queue", status_code=302)
+
+
+@app.get("/tuning-proposals")
+async def tuning_proposals_redirect():
+    """Retired in v0.72.0 (route audit phase 8).
+
+    Bob wrote tuning proposals here unattended off a false-positive verdict, but
+    the review queue had no link anywhere in the app, so they accumulated
+    unreviewed (v0.67.0 added a stop-gap nav entry). The pipeline now files into
+    the DE module's governed DetectionProposal queue, which has a decision
+    record and outcome measurement. Any still-pending legacy row was carried
+    over by the startup migration.
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/de-proposals?source=bob", status_code=302)
 
 
 @app.get("/investigations")

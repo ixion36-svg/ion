@@ -20,6 +20,15 @@
             <option value="draft">Draft</option>
             <option value="applied">Applied</option>
             <option value="rejected">Rejected</option>
+            <option value="duplicate">Duplicate</option>
+        </select>
+        {# v0.72.0: Bob files proposals unattended off a false-positive verdict
+           (previously into the unreachable /tuning-proposals queue). Provenance
+           matters on review, so it is filterable rather than flattened. #}
+        <select id="dp-source" class="ion-select" data-change-action="dpLoad">
+            <option value="all" selected>Any source</option>
+            <option value="bob">From Bob</option>
+            <option value="human">From an analyst</option>
         </select>
         <button class="ion-btn ion-btn-primary" data-click-action="dpLoad">Refresh</button>
     </div>
@@ -115,9 +124,11 @@ let _dpDecide = {id:null, decision:null};
 
 async function dpLoad(){
     const status = dp$('dp-status').value;
+    const source = (dp$('dp-source') || {}).value || 'all';
     dp$('dp-content').innerHTML = '<div class="dp-loading"><span class="dp-spinner"></span> Loading proposals...</div>';
     try {
-        const r = await fetch(DP_API + '?status=' + encodeURIComponent(status));
+        const r = await fetch(DP_API + '?status=' + encodeURIComponent(status)
+                             + '&source=' + encodeURIComponent(source));
         if(!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
         _dpItems = data.proposals || [];
@@ -125,6 +136,17 @@ async function dpLoad(){
     } catch(e){
         dp$('dp-content').innerHTML = '<div class="dp-loading">Failed to load: ' + dpEsc(e.message) + '</div>';
     }
+}
+
+// v0.72.0: Bob files proposals unattended off a false-positive verdict (they
+// used to go to the unreachable /tuning-proposals queue). Flag that on review —
+// an inference from ONE alert is weaker evidence than a noise campaign, and the
+// reviewer should weigh it accordingly.
+function dpSource(p){
+    if(p.source !== 'bob') return '';
+    const via = p.alert_id ? ' from alert ' + dpEsc(p.alert_id) : '';
+    return '<span class="dp-chip" title="Drafted automatically by Bob' + via
+         + '. Review the evidence before applying.">Bob</span>';
 }
 
 function dpPill(status){
@@ -164,7 +186,7 @@ function dpRender(items){
         html += '<tr>'
             + '<td class="mono">' + dpEsc(p.rule_name || '—') + '</td>'
             + '<td><span class="dp-chip">' + dpEsc(p.change_type) + '</span></td>'
-            + '<td><strong>' + dpEsc(p.title) + '</strong>'
+            + '<td><strong>' + dpEsc(p.title) + '</strong>' + dpSource(p)
                 + '<div class="dp-change">' + dpEsc(p.suggested_change) + '</div>'
                 + (mitre ? '<div style="margin-top:4px">' + mitre + '</div>' : '')
                 + dpOutcome(p) + '</td>'
@@ -247,5 +269,15 @@ async function dpMeasure(id){
 }
 
 document.addEventListener('DOMContentLoaded', dpLoad);
+
+// The retired /tuning-proposals page redirects here as ?source=bob, so the
+// reviewer lands on exactly the queue that used to be unreachable.
+(function () {
+    var q = new URLSearchParams(window.location.search).get('source');
+    if (q) {
+        var sel = document.getElementById('dp-source');
+        if (sel) sel.value = q;
+    }
+})();
 </script>
 {% endblock %}

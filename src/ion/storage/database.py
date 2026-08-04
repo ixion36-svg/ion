@@ -481,6 +481,85 @@ def _run_migrations(engine: Engine) -> None:
         if "planned_date" not in existing:
             _add_column_tolerant(engine, "change_requests", "planned_date", "DATE")
 
+    # v0.72.0 (route audit phase 8): DetectionProposal absorbs the retired
+    # TuningProposal pipeline. Bob wrote tuning proposals unattended off a
+    # false-positive verdict, but DetectionProposal had nowhere to put the
+    # per-alert provenance, so these columns are added and the legacy rows are
+    # carried over. create_all() only creates MISSING TABLES, never missing
+    # columns — hence the explicit adds.
+    if insp.has_table("detection_proposals"):
+        existing = {col["name"] for col in insp.get_columns("detection_proposals")}
+        for col_name, col_def in (
+            ("source", "VARCHAR(20) DEFAULT 'human'"),
+            ("alert_id", "VARCHAR(500)"),
+            ("investigation_id", "INTEGER"),
+            ("legacy_tuning_proposal_id", "INTEGER"),
+        ):
+            if col_name not in existing:
+                _add_column_tolerant(engine, "detection_proposals", col_name, col_def)
+
+        # One-time backfill of any still-open legacy proposal, so retiring the
+        # /tuning-proposals review page cannot strand rows Bob already filed.
+        # Idempotent via legacy_tuning_proposal_id; only PENDING rows are
+        # carried (accepted/rejected/duplicate ones are already resolved).
+        if insp.has_table("tuning_proposals"):
+            try:
+                with engine.begin() as conn:
+                    pending = conn.execute(
+                        text(
+                            "SELECT id, investigation_id, alert_id, rule_id, "
+                            "rationale, suggested_change, created_by_id "
+                            "FROM tuning_proposals WHERE status = 'pending'"
+                        )
+                    ).fetchall()
+                    if pending:
+                        already = {
+                            r[0] for r in conn.execute(
+                                text(
+                                    "SELECT legacy_tuning_proposal_id FROM "
+                                    "detection_proposals WHERE "
+                                    "legacy_tuning_proposal_id IS NOT NULL"
+                                )
+                            ).fetchall()
+                        }
+                        carried = 0
+                        for row in pending:
+                            if row[0] in already:
+                                continue
+                            conn.execute(
+                                text(
+                                    "INSERT INTO detection_proposals "
+                                    "(rule_name, change_type, title, suggested_change, "
+                                    " rationale, status, created_by_id, source, alert_id, "
+                                    " investigation_id, legacy_tuning_proposal_id, "
+                                    " created_at, updated_at) "
+                                    "VALUES (:rule, 'other', :title, :change, :rationale, "
+                                    " 'draft', :by, 'bob', :alert, :inv, :legacy, "
+                                    " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
+                                ),
+                                {
+                                    "rule": row[3],
+                                    "title": (
+                                        f"Tuning proposal for {row[3]}" if row[3]
+                                        else "Tuning proposal (carried from legacy queue)"
+                                    ),
+                                    "change": row[5],
+                                    "rationale": row[4],
+                                    "by": row[6],
+                                    "alert": row[2],
+                                    "inv": row[1],
+                                    "legacy": row[0],
+                                },
+                            )
+                            carried += 1
+                        if carried:
+                            logger.info(
+                                "Carried %d pending tuning proposal(s) into "
+                                "detection_proposals (route audit phase 8)", carried,
+                            )
+            except Exception as exc:  # never block startup on a backfill
+                logger.warning("Legacy tuning-proposal backfill skipped: %s", exc)
+
     # v0.31.17: G5 (data-min audit closure) — session_token hash-at-rest.
     # If the user_sessions table still carries the plaintext session_token
     # column, migrate it: add session_token_hash, backfill SHA-256 digests

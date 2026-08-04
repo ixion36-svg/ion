@@ -182,7 +182,18 @@ def test_lab_guard_present_in_source():
 # ── 3. tuning-proposals reachability ─────────────────────────────────────
 
 
-def test_tuning_proposals_is_reachable_from_nav():
-    """Bob auto-creates TuningProposal rows; the review queue must be linked."""
+def test_tuning_proposals_queue_is_reachable():
+    """Bob files proposals unattended, so the review queue must be reachable.
+
+    v0.67.0 satisfied this with a stop-gap nav link to /tuning-proposals.
+    v0.72.0 (phase 8) superseded that: the pipeline was migrated into the DE
+    module's governed queue, the legacy page retired, and its URL now redirects
+    to /de-proposals?source=bob — which IS linked from the Engineering nav. The
+    invariant is unchanged; only the destination moved.
+    """
     base = Path("src/ion/web/templates/base.html").read_text(encoding="utf-8")
-    assert 'href="/tuning-proposals"' in base
+    assert 'href="/de-proposals"' in base, "the governed queue must be in the nav"
+
+    from ion.web.server import app
+    paths = {r.path for r in app.routes}
+    assert "/tuning-proposals" in paths, "legacy bookmarks must redirect, not 404"

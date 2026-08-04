@@ -570,9 +570,6 @@ class AuthService:
             ("forensic:manage_playbooks", "forensic", "manage_playbooks", "Manage forensic playbooks"),
             # Other permissions
             ("ai:chat", "ai", "chat", "Use AI chat"),
-            # Tuning proposals (detection engineering feedback queue)
-            ("tuning:read", "tuning", "read", "View tuning proposals"),
-            ("tuning:review", "tuning", "review", "Accept/reject tuning proposals"),
             # Detection Engineering module (Phase 0 — read-only noise campaigns + DE metrics)
             ("de:read", "de", "read", "View detection-engineering metrics"),
             # Detection Engineering module (Phase 1 — draft/edit/decide detection proposals)
@@ -584,8 +581,13 @@ class AuthService:
             # v0.49.6: removed 5 seeded-but-never-enforced permissions
             # (discover:read, alert:comment, case:comment, case:link,
             # investigation:run) — no route gated on them (audit finding, same
-            # class as the v0.32.1 ticker:* cleanup). tuning:read is KEPT: it
-            # does gate the tuning-proposal read routes.
+            # class as the v0.32.1 ticker:* cleanup).
+            # v0.72.0 (route audit phase 8): tuning:read + tuning:review removed
+            # WITH their enforcement, not before it. The legacy TuningProposal
+            # queue was retired into the DE module's DetectionProposal queue;
+            # tuning_proposal_api is gone and detection-health's file-proposal
+            # action is now gated de:propose. Removing a seeded permission that
+            # is still enforced would lock everyone out, admin included.
         ]
 
         permissions = []
@@ -772,7 +774,6 @@ class AuthService:
                     "observable:read", "observable:create", "observable:enrich",
                     "playbook:read",
                     "ai:chat",
-                    "tuning:read",
                 ],
             ),
         ]

@@ -94,12 +94,13 @@ class OutcomeRequest(BaseModel):
 
 @router.get("/proposals", dependencies=[Depends(require_permission("de:read"))])
 def list_proposals(
-    status: str = Query("all", description="draft | applied | rejected | all"),
+    status: str = Query("all", description="draft | applied | rejected | duplicate | all"),
+    source: str = Query("all", description="bob | human | all"),
     session: Session = Depends(get_db_session),
 ):
     from ion.services.de_proposal_service import list_proposals as _list
 
-    return {"proposals": _list(session, status=status)}
+    return {"proposals": _list(session, status=status, source=source)}
 
 
 @router.get("/proposals/{proposal_id}", dependencies=[Depends(require_permission("de:read"))])

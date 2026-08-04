@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from ion.models.detection_proposal import (
     DetectionProposal,
     DetectionProposalChangeType,
+    DetectionProposalSource,
     DetectionProposalStatus,
 )
 from ion.services.de_metrics_service import fp_alerts_for_rule, get_noise_campaigns
@@ -236,11 +237,22 @@ def measure_outcome(
 
 
 def list_proposals(
-    session: Session, status: Optional[str] = None, limit: int = 200
+    session: Session,
+    status: Optional[str] = None,
+    limit: int = 200,
+    source: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
+    """List proposals, newest first.
+
+    ``source`` filters by author (v0.72.0): Bob writes proposals unattended off
+    a false-positive verdict, and a reviewer usually wants those separated from
+    the ones a human drafted off a noise campaign.
+    """
     q = select(DetectionProposal).order_by(DetectionProposal.created_at.desc())
     if status and status != "all":
         q = q.where(DetectionProposal.status == DetectionProposalStatus(status))
+    if source and source != "all":
+        q = q.where(DetectionProposal.source == DetectionProposalSource(source))
     rows = session.execute(q.limit(limit)).scalars().all()
     return [p.to_dict() for p in rows]
 

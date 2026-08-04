@@ -633,18 +633,40 @@ def _write_bob_outputs(
         and tuning.get("rule_needs_tuning")
         and (tuning.get("suggested_change") or "").strip()
     ):
-        from ion.models.tuning_proposal import TuningProposal
+        # v0.72.0 (route audit phase 8): Bob's per-alert tuning recommendation
+        # now lands in DetectionProposal, the DE module's governed queue, instead
+        # of the retired TuningProposal table whose review page was unreachable
+        # — proposals accumulated unreviewed. Still a DRAFT requiring a human
+        # decision; source=BOB records that Bob authored it unattended.
+        from ion.models.detection_proposal import (
+            DetectionProposal,
+            DetectionProposalChangeType,
+            DetectionProposalSource,
+            DetectionProposalStatus,
+        )
 
-        rule_id: Optional[str] = None
-        # Prefer the triage row's rule_id via the investigation record later;
-        # for now derive from the alert id if looks like a rule id, else None.
-        proposal = TuningProposal(
-            investigation_id=investigation_id,
-            alert_id=str(alert_id),
-            rule_id=rule_id,
-            alert_prompt_template_id=None,
-            rationale=(tuning.get("rationale") or None),
+        rule_name: Optional[str] = None
+        triage_row = (
+            db.query(AlertTriage)
+            .filter(AlertTriage.es_alert_id == alert_id)
+            .one_or_none()
+        )
+        if triage_row is not None:
+            rule_name = getattr(triage_row, "rule_name", None)
+
+        proposal = DetectionProposal(
+            rule_name=rule_name,
+            change_type=DetectionProposalChangeType.OTHER,
+            title=(
+                f"Bob: tuning suggested for {rule_name}" if rule_name
+                else f"Bob: tuning suggested from alert {alert_id}"
+            ),
             suggested_change=str(tuning.get("suggested_change")),
+            rationale=(tuning.get("rationale") or None),
+            status=DetectionProposalStatus.DRAFT,
+            source=DetectionProposalSource.BOB,
+            alert_id=str(alert_id),
+            investigation_id=investigation_id,
             created_by_id=bob_id,
         )
         db.add(proposal)
