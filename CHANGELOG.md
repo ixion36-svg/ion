@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.73.0 -->
-<!-- ion-doc:version=0.73.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.74.0 -->
+<!-- ion-doc:version=0.74.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-08-03 -->
+<!-- ion-doc:date=2026-08-05 -->
 
 # Changelog
+
+## v0.74.0 — 2026-08-05
+
+**`/topology` merged into `/integrations` — route audit phase 7e (page merges complete).**
+
+- "Platform Topology" and "Integrations" rendered the **same service set** from the **same two endpoints** (`/api/integrations/status`, `/api/integrations/healthcheck`) — one as a hub-and-spoke diagram, one as a card list — while sitting in different nav groups under different page permissions. Topology is now the **Topology tab** of `/integrations`; `/topology` 302s to `/integrations?tab=topology`, so bookmarks and the Infrastructure sibling strip keep working.
+- **Permission note.** The retired page gate was `security:read` and `/integrations` is `alert:read`, so this widens who can reach the *view* — not the *data*. Every endpoint the diagram reads already sits at `get_current_user` or `template:read`, and `require_integration_access` explicitly admits `alert:read` on the endpoints both pages share. The page gate was protecting nothing the APIs did not already hand out.
+- The hazard the merge had to avoid: as a tab the panel starts `display:none`, and both diagrams position nodes from `getBoundingClientRect()`, which reads 0x0 on a hidden element. Init is **deferred to first tab-show**, not `DOMContentLoaded`, and re-runs the geometry pass on each subsequent show — a `DOMContentLoaded` bootstrap would have collapsed every connector to the origin, visually broken and silent in the console.
+- Verified in a browser: 7 nodes on the ring, 7 connectors with real coordinates, 0 degenerate paths, geometry stable across a Services↔Topology round-trip, all 15 `data-click-action` names resolving, no console output.
+- Tests `tests/test_route_audit_phase7e_topology.py` (18) — including a guard against duplicate top-level declarations, since the two page scripts now share one global scope. **96 route-audit tests green; 236 in the widened server-affected set.**
+
+Page count: **83 → 71**. Route audit phases 0–8 are now complete apart from the deliberately-skipped `/translator` → `/tools` merge.
 
 ## v0.73.0 — 2026-08-05
 
