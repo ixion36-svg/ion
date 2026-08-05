@@ -215,6 +215,40 @@ def test_case_opens_on_the_alerts_tab(cases):
     assert "let _currentPanelTab = 'alerts';" in js
 
 
+# ── v0.77.1: the rail is ordered by severity ─────────────────────────────
+
+
+def test_rail_is_sorted_by_severity(cases):
+    """The alert that auto-renders should be the one worth looking at first,
+    not whichever the API happened to return first."""
+    js = _inline_js(cases)
+    assert "alerts.sort(" in js
+    assert "_sevOf" in js
+
+
+def test_rail_sort_reuses_the_board_severity_scale(cases):
+    """A second severity ordering would be one more thing to keep in step."""
+    js = _inline_js(cases)
+    assert js.count("_sevRank = {") == 1, "a second severity scale was declared"
+    assert "_sevRank[a.priority || a.severity || c.severity]" in js
+
+
+def test_rail_sort_is_in_place_so_both_consumers_agree(cases):
+    """openCaseDetail reads c.alerts[0] after renderPanelContent returns and
+    passes index 0 to selectCaseAlert. If the sort produced a local copy, the
+    rail would show one alert selected while the detail column rendered a
+    different one — silently, and only on cases whose API order is not already
+    severity-descending."""
+    js = _inline_js(cases)
+    # sorting the same array the caller holds, not a slice/copy of it
+    assert "const alerts = c.alerts || [];" in js
+    sort_at = js.index("alerts.sort(")
+    decl_at = js.index("const alerts = c.alerts || [];")
+    between = js[decl_at:sort_at]
+    for copier in (".slice(", ".concat(", "[...alerts]", "Array.from("):
+        assert copier not in between, f"alerts was copied via {copier} before sorting"
+
+
 # ── the accordions must stay gone ────────────────────────────────────────
 
 

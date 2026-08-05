@@ -3587,7 +3587,24 @@ function renderPanelContent(c) {
     // Now: a rail of alerts on the left, and on the right the SAME
     // alert-detail component /alerts uses — in its stacked layout, so every
     // section is already open. Selecting an alert is the only click.
+    // v0.77.1: order the rail by severity so the alert that auto-renders is the
+    // one worth looking at first, not whichever the API happened to return
+    // first. Sorted IN PLACE on c.alerts, deliberately: openCaseDetail reads
+    // c.alerts[0] after this function returns and passes index 0 to
+    // selectCaseAlert. Sorting a local copy here would leave the rail showing
+    // one alert as selected while the detail column rendered a different one.
+    //
+    // Reuses _sevRank (the case board's ordering) rather than declaring a
+    // second severity scale. Falls back to the case severity when an alert
+    // carries no priority of its own — the same resolution the rail row uses —
+    // and breaks ties on newest-first.
     const alerts = c.alerts || [];
+    const _sevOf = a => _sevRank[a.priority || a.severity || c.severity] ?? 9;
+    alerts.sort((a, b) => {
+        const d = _sevOf(a) - _sevOf(b);
+        if (d) return d;
+        return String(b.timestamp || '').localeCompare(String(a.timestamp || ''));
+    });
     html += '<div class="cpanel-section" data-tab="alerts" data-workspace="1">';
     if (alerts.length) {
         html += '<div class="cpanel-workspace">';
