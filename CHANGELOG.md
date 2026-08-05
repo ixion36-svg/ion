@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.74.0 -->
-<!-- ion-doc:version=0.74.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.75.0 -->
+<!-- ion-doc:version=0.75.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-05 -->
 
 # Changelog
+
+## v0.75.0 — 2026-08-05
+
+**`/translator` merged into `/tools` — route audit fully complete. Plus: `/integrations` failures now say what actually went wrong.**
+
+- **`/translator` → `/tools`.** A 277-line single-purpose page whose sibling tab strip contained exactly one other entry — `/tools`, the 1076-line toolbox it belonged in. Now the **Translator tab** there; `/translator` 302s to `/tools?tab=translator`. Both sides were already `alert:read`, so this is a pure relocation: no gate widened, narrowed or removed. `/api/translator/*` untouched — `/alerts` and `/cases` call it directly and never went through the page.
+- **Latent bug the move exposed:** `switchToolTab()` ended with `event.target.classList.add('active')`, reading the implicit global `window.event`. That works for a real click and is `undefined` for any programmatic call, so the first deep link would have switched the panel while the button strip stayed behind. Now derived from the tab name; both entry points verified to agree. Language loading is also deferred to first activation, so `/tools` no longer fires `/api/translator/languages` on every visit.
+- **`/integrations` error reporting.** Nine loaders each did `if (!response.ok) throw new Error('Failed to load X')` — collapsing session expiry, permission denial, a 500 and a dropped connection into one identical sentence and discarding both the status code and the server's `detail`. A user reporting "it says failed to load" gave nobody anything to act on. All nine now share `ionFetchJson()`, verified in a browser across all five failure modes: 401 → "session has expired, sign in again"; 403 → "you do not have permission"; 5xx → status **plus** the server's `detail`; non-JSON error body → status alone; network drop → distinct message (`fetch()` rejects only on network failure, never on an HTTP error status).
+- **Not a fix for the reported production failure, and not claimed as one.** `/api/integrations/status` returns 200 authenticated in all three configurations reproducible here (empty DB; health-check rows present — the branch an empty DB never exercises; all six connectors configured against unreachable hosts), and `integration_api.py` has not changed in many releases, so an older deployment runs the same code. Upgrading will not resolve it. What ships is the diagnosability that was missing.
+- Tests `tests/test_route_audit_phase7f_translator.py` (17). **113 across the route-audit suite; 253 in the widened server-affected set.**
+
+**Route audit COMPLETE.** Phases 0–8 across v0.67 → v0.75: 912 → 743 routes, 83 → 70 pages, no deliberate omissions left.
 
 ## v0.74.0 — 2026-08-05
 
