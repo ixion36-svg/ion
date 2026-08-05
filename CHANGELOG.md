@@ -1,13 +1,26 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.76.0 -->
-<!-- ion-doc:version=0.76.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.77.0 -->
+<!-- ion-doc:version=0.77.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-05 -->
 
 # Changelog
+
+## v0.77.0 — 2026-08-05
+
+**One alert-detail renderer for `/alerts` and `/cases`; case-open rebuilt as a wide inset overlay.**
+
+- **The problem.** `/cases` opened a case into a **560px** slide-out. At that width an alert had to be folded away — parsed fields, rule guide and process tree each behind their own toggle, on top of the panel's four tabs. Seeing one alert fully cost **up to eight clicks**, and still showed less than `/alerts` did: no metadata grid, no message, no MITRE, no AI actions, no Arkime, no raw data. Underneath, three field-rendering helpers had already been copy-pasted into both templates and the copies had begun to drift.
+- **The component.** `static/js/alert-detail.js` + `static/css/alert-detail.css` render an alert **once**, in two layouts driven by one `SECTIONS` list: `tabs` for `/alerts` (unchanged — eight tabs, one visible) and `stacked` for `/cases` (every section open in one scroll, sticky jump-links backed by an IntersectionObserver). 15 functions and 40 CSS rules moved out of `alerts.html`; capability flags became options rather than page globals.
+- **The subtle part.** The component's CSS lived in the `/alerts` `<style>` block, so the first `/cases` render came out unstyled — the metadata grid stacked vertically because `.alert-meta-grid` did not exist on that page. **A component that owns its markup has to own its CSS.** The first attempt at that move used a regex that cannot see nesting and tore the closing braces off the `@media` wrappers; the redo walks the text with a brace counter and never descends into an at-rule. A test asserts the block stays balanced.
+- **Concept E on `/cases`.** `inset: 22px` overlay over the dimmed board (the board stays visible, so the analyst keeps their place; edge-to-edge below 900px). Two-column workspace: the case's alerts on the left, the shared component on the right, alerts stashed at render time so selection needs no refetch. Opens on the **Alerts** tab with the first alert already rendered. The three accordions are retired — two became load-on-select, the third replaced by the component's Fields section — and **184 lines** of dead dropdown machinery removed.
+- **Verified in a browser, both pages.** `/cases`: inset 22px, 300px+1144px workspace, 8 jump-links, 11 stacked sections, 8 meta items in a real grid, **0 accordions, 0 hidden sections**. `/alerts`: 8 meta items, 8 tabs with exactly 1 active and 7 hidden, 0 jump-links, tab strip styled as before.
+- Tests `tests/test_v077_shared_alert_detail.py` (33), **confirmed to fail if the 560px panel or the Overview default returns**. 111 across the template-affected set.
+
+**Net: eight clicks to one**, and an alert now looks the same wherever you open it.
 
 ## v0.76.0 — 2026-08-05
 
