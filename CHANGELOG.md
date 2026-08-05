@@ -1,13 +1,26 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.75.0 -->
-<!-- ion-doc:version=0.75.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.76.0 -->
+<!-- ion-doc:version=0.76.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-05 -->
 
 # Changelog
+
+## v0.76.0 — 2026-08-05
+
+**Fixes a reported production failure: `/api/integrations/status` could 500 the entire `/integrations` page.**
+
+Reported from a live **v0.50.2** deployment — "Error: Failed to load integrations", with a 500 on the `fetch('/api/integrations/status')` call and `ERR_INCOMPLETE_CHUNKED_ENCODING` on the document behind it. `git diff v0.50.2..HEAD` across `integration_api.py`, `services/connectors/`, `integration_log_service.py` and `models/integration.py` is **empty**: that deployment runs identical code to today, so this was never a version problem and upgrading alone would not have fixed it. It is data- and environment-dependent, which is why it did not reproduce on a clean database.
+
+Two independent faults, each sufficient to take down the whole endpoint:
+
+- **The metadata merge assumed a mapping.** `check_metadata` is the `details` JSON column — annotated `Optional[dict]`, but shared by every `IntegrationEvent` kind with nothing at the DB level constraining it to an object. Any non-mapping JSON value made `{**meta}` raise `TypeError: 'X' object is not a mapping`. Reproduced against list / string / number / bool: **all 500 before, all 200 after.** A non-object payload is now surfaced under `raw_details` rather than dropped — it means something wrote the column wrong, and that is worth seeing.
+- **No per-connector isolation.** The endpoint aggregates 6+ *independent* integrations and backs the whole page, so one connector raising inside `get_status_info()` killed the response for all of them — a single misconfigured integration blanked the page whose entire job is to report which integration is misconfigured. Each connector is now isolated: a fault becomes **one named error card** with the others still rendering. Full trace to the server log; the user-facing string goes through `safe_error()`, verified by test that no file paths reach the browser.
+
+Tests `tests/test_v076_integration_status_resilience.py` (11), **verified to fail against the pre-fix code** (9 of 11 fail, 11/11 pass after). 54 in the affected-module set.
 
 ## v0.75.0 — 2026-08-05
 
