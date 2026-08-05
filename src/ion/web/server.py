@@ -2215,10 +2215,26 @@ async def service_accounts_page(request: Request, user: User = Depends(require_p
     return templates.TemplateResponse(request=request, name="service_accounts.html")
 
 
-@app.get("/topology", response_class=HTMLResponse)
-async def topology_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
-    """Render the network topology visualization page."""
-    return templates.TemplateResponse(request=request, name="topology.html")
+@app.get("/topology")
+async def topology_redirect():
+    """Retired in v0.74.0 (route audit phase 7e).
+
+    "Platform Topology" rendered the SAME service set as /integrations — both
+    pages already called /api/integrations/status and /api/integrations/health-
+    check — as a hub-and-spoke diagram instead of a card list. It is now the
+    Topology tab of /integrations, so the two renderings sit side by side
+    instead of on separate pages under separate nav groups.
+
+    The old page gate was security:read while /integrations is alert:read, so
+    this widens who can reach the *view*. It does not widen the *data*: every
+    endpoint the diagram reads is already at get_current_user or template:read
+    (see api.py /opencti/config, /iris/config, elasticsearch_api, gitlab_api),
+    and /api/integrations/status is explicitly alert:read by design — see
+    require_integration_access in integration_api.py. The page gate was
+    protecting nothing the APIs did not already hand out.
+    """
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/integrations?tab=topology", status_code=302)
 
 
 @app.get("/architecture", response_class=HTMLResponse)

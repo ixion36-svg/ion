@@ -138,9 +138,14 @@ def test_every_referenced_migrated_class_still_exists():
 
 
 @pytest.mark.parametrize("tpl", ["analytics.html", "alerts.html", "training.html",
-                                 "detection_engineering.html", "topology.html"])
+                                 "detection_engineering.html", "integrations.html"])
 def test_heaviest_templates_have_no_dead_class_left(tpl):
-    """The five templates that carried the most dead rules."""
+    """The five templates that carried the most dead rules.
+
+    v0.74.0: topology.html was merged into integrations.html (route audit
+    phase 7e) — its markup, CSS and JS moved wholesale, so the assertion
+    follows the content to its new home rather than being dropped.
+    """
     text = (TPL / tpl).read_text(encoding="utf-8")
     css_body = _strip_comments(CSS.read_text(encoding="utf-8"))
     dead_classes = set(re.findall(r"\.(_ion-s-[a-f0-9]{6,})\s*\{[^}]*\$\{", css_body))
