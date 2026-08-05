@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.72.0 -->
-<!-- ion-doc:version=0.72.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.73.0 -->
+<!-- ion-doc:version=0.73.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-03 -->
 
 # Changelog
+
+## v0.73.0 — 2026-08-05
+
+**Restored styling broken by the v0.31.21 inline-style migration.**
+
+- That migration hashed inline styles into static CSS classes. Where the style was a JS template literal it emitted a **static** rule containing the literal interpolation — `._ion-s-95aea49e0e { width:${pct}%; }` — which is invalid CSS. Browsers drop the bad declaration, so the dynamic part **silently never applied**: progress bars had no width, severity text no colour, collapsible panels no display toggle. **125 rules across 29 templates, unnoticed for roughly 40 releases.** Found while porting a section during the route audit; hit three times in one session, which prompted a proper sweep.
+- **88** purely-dynamic rules deleted; **37** that *mixed* static and dynamic declarations were rewritten to keep the static part — those do apply today and dropping them would have added a visible regression on top of the invisible one.
+- The dynamic declarations return to **144 call sites** as `data-ion-style`, where the `${...}` interpolates normally again.
+- New `static/js/ion-dynamic-styles.js` applies them via `el.style.setProperty` — **CSP-safe** (a DOM write, not an inline `style=` attribute) and validating, so a malformed value degrades to unstyled rather than throwing mid-render. A `MutationObserver` covers every render path: ION builds markup with `innerHTML` in dozens of places and a missed call site is invisible, which is how this survived so long. Loaded from `base.html`, and directly in `wallboard.html` (a standalone page).
+- Tests `tests/test_migrated_css_sweep.py` (12), including a guard that fails if a `${` reappears in the stylesheet. **Full unit suite: 1468 passed.**
+
+**Expect a wide visual delta** — a lot of previously-invisible styling now appears. That is the correct rendering, not a change of design.
 
 ## v0.72.0 — 2026-08-04
 
