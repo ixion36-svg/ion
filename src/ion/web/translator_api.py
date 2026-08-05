@@ -1,10 +1,10 @@
 """Translator routes (v0.17.0).
 
-Mounted under ``/api/translator/*`` plus the page route at ``/translator``.
+Mounted under ``/api/translator/*`` plus the retired page route at ``/translator``.
 
 Routes:
 
-- ``GET  /translator``                     — the standalone page
+- ``GET  /translator``                     — 302 → /tools?tab=translator (v0.75.0)
 - ``GET  /api/translator/languages``       — supported language list
 - ``POST /api/translator/translate``       — JSON {text, source, target}
 - ``POST /api/translator/translate-file``  — multipart upload + translate
@@ -23,11 +23,10 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from ion.auth.dependencies import require_page_permission, require_permission
+from ion.auth.dependencies import require_permission
 
 # v0.19.17: route exception details through safe_error so HTTP responses
 # don't carry raw `str(exc)` (file paths, internal libraries, partial
@@ -49,24 +48,23 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-from ion.web.templating import make_templates  # noqa: E402
-
-_templates = make_templates()
+# ── Retired page route ───────────────────────────────────────────────────────────
 
 
-# ── Page route ───────────────────────────────────────────────────────────
+@router.get("/translator")
+def translator_redirect():
+    """Retired in v0.75.0 (route audit phase 7f).
 
+    A 277-line single-purpose page whose sibling tab strip contained exactly one
+    other entry — /tools, the 1076-line toolbox it belonged in. It is now the
+    Translator tab there. Same permission on both sides (`alert:read`), so this
+    is a pure relocation: no gate widened, narrowed, or removed. The
+    /api/translator/* endpoints below are untouched — /alerts and /cases both
+    call /api/translator/translate directly and never went through this page.
+    """
+    from fastapi.responses import RedirectResponse
 
-@router.get("/translator", response_class=HTMLResponse)
-def translator_page(
-    request: Request,
-    _user: User = Depends(require_page_permission("alert:read")),
-):
-    """Standalone translator page."""
-    return _templates.TemplateResponse(
-        request=request,
-        name="translator.html",
-    )
+    return RedirectResponse(url="/tools?tab=translator", status_code=302)
 
 
 # ── API: language list ───────────────────────────────────────────────────

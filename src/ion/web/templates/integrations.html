@@ -1470,6 +1470,43 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 // ═══════════════════════════════════════════════════════════════
+// Fetch helper (v0.75.0)
+// ═══════════════════════════════════════════════════════════════
+// Every loader on this page used to do `if (!response.ok) throw new
+// Error('Failed to load X')`, which collapsed session-expiry, permission
+// denial, a server fault and a network drop into one identical sentence. The
+// page then printed that sentence and there was no way — for the analyst OR
+// for whoever they reported it to — to tell which had happened. This keeps the
+// status code and the server's own `detail`, and names the two cases a user
+// can act on.
+async function ionFetchJson(url, what, options) {
+    let response;
+    try {
+        response = await fetch(url, Object.assign({credentials: 'include'}, options || {}));
+    } catch (netErr) {
+        // fetch() rejects only on network-layer failure: DNS, TLS, connection
+        // reset, or the request being blocked. Never on an HTTP error status.
+        throw new Error(`Could not reach the server while loading ${what} (${netErr.message})`);
+    }
+
+    if (response.status === 401) {
+        throw new Error(`Your session has expired — reload the page and sign in again (loading ${what})`);
+    }
+    if (response.status === 403) {
+        throw new Error(`You do not have permission to view ${what}`);
+    }
+    if (!response.ok) {
+        let detail = '';
+        try {
+            const body = await response.json();
+            if (body && body.detail) detail = `: ${typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)}`;
+        } catch (e) { /* non-JSON error body — the status alone still helps */ }
+        throw new Error(`Failed to load ${what} — HTTP ${response.status}${detail}`);
+    }
+    return response.json();
+}
+
+// ═══════════════════════════════════════════════════════════════
 // Tabs (v0.74.0 — route audit phase 7e)
 // ═══════════════════════════════════════════════════════════════
 function switchIntegrationsTab(tab) {
@@ -1515,13 +1552,7 @@ async function loadIntegrationStatus() {
     const container = document.getElementById('integration-cards');
 
     try {
-        const response = await fetch('/api/integrations/status', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load integrations');
-
-        const integrations = await response.json();
+        const integrations = await ionFetchJson('/api/integrations/status', 'integrations');
 
         if (integrations.length === 0) {
             container.innerHTML = '<p class="loading">No integrations configured</p>';
@@ -1650,13 +1681,7 @@ async function loadServerMetrics() {
     const container = document.querySelector('#server-metrics .metrics-content');
 
     try {
-        const response = await fetch('/api/integrations/metrics/server', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load server metrics');
-
-        const data = await response.json();
+        const data = await ionFetchJson('/api/integrations/metrics/server', 'server metrics');
 
         if (data.error) {
             container.innerHTML = `<p class="error">${data.error}</p>`;
@@ -1701,13 +1726,7 @@ async function loadElasticsearchMetrics() {
     const ingestContainer = document.querySelector('#es-ingest-metrics .metrics-content');
 
     try {
-        const response = await fetch('/api/integrations/metrics/elasticsearch', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load ES metrics');
-
-        const data = await response.json();
+        const data = await ionFetchJson('/api/integrations/metrics/elasticsearch', 'Elasticsearch metrics');
 
         if (!data.configured) {
             clusterContainer.innerHTML = '<p class="error">Not configured</p>';
@@ -1773,13 +1792,7 @@ async function loadDataFlowMetrics() {
     const container = document.querySelector('#data-flow-metrics .metrics-content');
 
     try {
-        const response = await fetch('/api/integrations/metrics/data-flows?hours=24', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load data flow metrics');
-
-        const data = await response.json();
+        const data = await ionFetchJson('/api/integrations/metrics/data-flows?hours=24', 'data-flow metrics');
 
         const logsByLevel = data.integration_activity?.by_level || {};
         const webhooks = data.webhooks || {};
@@ -1821,13 +1834,7 @@ async function loadServerLogsMetrics() {
     const container = document.querySelector('#server-logs-metrics .metrics-content');
 
     try {
-        const response = await fetch('/api/integrations/metrics/server-logs?hours=24', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load server logs metrics');
-
-        const data = await response.json();
+        const data = await ionFetchJson('/api/integrations/metrics/server-logs?hours=24', 'server-log metrics');
 
         if (!data.configured) {
             container.innerHTML = '<p class="error">Elasticsearch not configured</p>';
@@ -1896,13 +1903,7 @@ async function loadWebhooks() {
     const container = document.getElementById('webhooks-list');
 
     try {
-        const response = await fetch('/api/integrations/webhooks', {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load webhooks');
-
-        const webhooks = await response.json();
+        const webhooks = await ionFetchJson('/api/integrations/webhooks', 'webhooks');
 
         if (webhooks.length === 0) {
             container.innerHTML = '<p class="loading _ion-s-ef7142f76c">No webhooks configured</p>';
@@ -1985,13 +1986,7 @@ async function createWebhook(event) {
 
 async function showEditWebhookModal(webhookId) {
     try {
-        const response = await fetch(`/api/integrations/webhooks/${webhookId}`, {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load webhook');
-
-        const webhook = await response.json();
+        const webhook = await ionFetchJson(`/api/integrations/webhooks/${webhookId}`, 'this webhook');
 
         document.getElementById('edit-webhook-id').value = webhook.id;
         document.getElementById('edit-webhook-name').value = webhook.name;
@@ -2073,13 +2068,7 @@ async function showWebhookLogs(webhookId) {
     document.getElementById('webhook-logs-modal').classList.add('active');
 
     try {
-        const response = await fetch(`/api/integrations/webhooks/${webhookId}/logs?limit=50`, {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load logs');
-
-        const logs = await response.json();
+        const logs = await ionFetchJson(`/api/integrations/webhooks/${webhookId}/logs?limit=50`, 'webhook logs');
 
         if (logs.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="loading">No logs found</td></tr>';
@@ -2115,13 +2104,7 @@ async function loadIntegrationLogs() {
     if (levelFilter) url += `&level=${levelFilter}`;
 
     try {
-        const response = await fetch(url, {
-            credentials: 'include'
-        });
-
-        if (!response.ok) throw new Error('Failed to load logs');
-
-        const logs = await response.json();
+        const logs = await ionFetchJson(url, 'integration logs');
 
         if (logs.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5" class="loading">No logs found</td></tr>';
