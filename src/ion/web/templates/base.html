@@ -21,6 +21,10 @@
          no nonce needed under `style-src 'self' 'nonce-XXX'`. After this
          landed, `style-src-attr` flipped from `'unsafe-inline'` to `'none'`. -->
     <link rel="stylesheet" href="/static/css/ion-migrated-styles.css?v={{ ion_version }}">
+    <!-- v0.77.0: styles for the shared alert-detail component's STACKED layout
+         (used by /cases). The tabs layout on /alerts reuses that page's own
+         existing .detail-tab* classes, so this cannot alter /alerts. -->
+    <link rel="stylesheet" href="/static/css/alert-detail.css?v={{ ion_version }}">
     <!-- v0.31.3: tell HTMX not to inject its indicator <style> block at runtime.
          Inline-injected styles can't carry our per-request CSP nonce, so they'd
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
@@ -587,6 +591,11 @@
       }
     </script>
     <script nonce="{{ csp_nonce }}" src="/static/js/app.js?v={{ ion_version }}"></script>
+    <!-- v0.77.0: ONE alert-detail renderer for /alerts and /cases. Loaded after
+         app.js because it calls escapeHtml()/showToast() from there. Both pages
+         previously rendered an alert their own way, and three field-rendering
+         helpers had already been copy-pasted into both templates. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/alert-detail.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/ai-chat.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/quill.js"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/notepad.js?v={{ ion_version }}"></script>

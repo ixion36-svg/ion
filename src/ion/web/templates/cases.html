@@ -676,14 +676,20 @@
     color: var(--text-secondary);
 }
 
+/* v0.77.0 — case detail was a 560px right slide-out. At that width the alert
+   content had to be folded into three accordions and four tabs, so seeing one
+   alert fully cost up to eight clicks. It is now an INSET overlay at near-full
+   width: the board stays visible (and dimmed) behind it so the analyst keeps
+   their place, but the alert gets room to be shown in full. */
 .case-panel-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.45);
+    background: rgba(5, 7, 11, 0.72);
+    backdrop-filter: blur(2px);
     z-index: 1049;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s;
+    transition: opacity 0.2s;
 }
 
 .case-panel-overlay.open {
@@ -693,22 +699,92 @@
 
 .case-panel {
     position: fixed;
-    top: 0;
-    right: 0;
-    width: 560px;
-    max-width: 95vw;
-    height: 100vh;
+    inset: 22px;
     background: var(--bg-primary);
-    border-left: 1px solid var(--border);
+    border: 1px solid var(--border-bright);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
     z-index: 1050;
     display: flex;
     flex-direction: column;
-    transform: translateX(100%);
-    transition: transform 0.25s ease;
+    overflow: hidden;
+    opacity: 0;
+    transform: scale(0.985);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
 }
 
 .case-panel.open {
-    transform: translateX(0);
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+/* Below ~900px an inset overlay wastes screen — go edge to edge. */
+@media (max-width: 900px) {
+    .case-panel { inset: 0; border-radius: 0; border: none; }
+}
+
+/* Two-column alert workspace: the case's alerts on the left, the SHARED
+   alert-detail component (stacked layout) on the right. */
+.cpanel-workspace {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+}
+.cpanel-workspace > .cpanel-rail {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 1rem 1rem 1.5rem;
+}
+.cpanel-workspace > .cpanel-detail {
+    overflow-y: auto;
+    padding: 1rem 1.25rem 2rem;
+}
+@media (max-width: 1100px) {
+    .cpanel-workspace { grid-template-columns: 1fr; }
+    .cpanel-workspace > .cpanel-rail {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 34vh;
+    }
+}
+
+/* Selectable alert row in the rail. */
+.cpanel-rail-alert {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom: 0.45rem;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.15s, background 0.15s;
+}
+.cpanel-rail-alert:hover { border-color: var(--border-bright); }
+.cpanel-rail-alert.selected {
+    border-color: var(--primary);
+    background: var(--primary-dim);
+}
+.cpanel-rail-alert .rail-sev {
+    position: absolute; inset: 0 auto 0 0; width: 3px;
+}
+.cpanel-rail-alert-head {
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.55rem 0.65rem 0.55rem 0.8rem;
+}
+.cpanel-rail-alert-name {
+    font-size: 0.78rem; font-weight: 600; color: var(--text-primary);
+    flex: 1; line-height: 1.3;
+}
+.cpanel-rail-alert-sub {
+    padding: 0 0.65rem 0.55rem 0.8rem;
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    line-height: 1.55;
 }
 
 .case-panel-header {
@@ -778,6 +854,16 @@
     flex: 1;
     overflow-y: auto;
     padding: 1.25rem;
+    min-height: 0;
+}
+
+/* The Alerts tab hosts the two-column workspace, which manages its own
+   scrolling — the body must not add a second scrollbar around it. */
+.case-panel-body.workspace-mode {
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Panel sections */
@@ -2862,6 +2948,15 @@ async function openCaseDetail(caseId) {
         // don't bump the analyst back to Overview.
         switchPanelTab(_currentPanelTab);
 
+        // v0.77.0: open the case with its first alert already rendered. The
+        // right-hand column exists to show an alert; making the analyst click
+        // one before seeing anything would just reintroduce the click this
+        // rework removed.
+        const firstAlert = (c.alerts || [])[0];
+        if (firstAlert) {
+            selectCaseAlert(firstAlert.es_alert_id || 'unknown', 0, c.id);
+        }
+
         // Load Kibana comments async if case is synced
         if (c.kibana_case_id) {
             loadKibanaComments(c.kibana_case_id);
@@ -2897,202 +2992,103 @@ const statusColors = {
     closed: { bg: 'rgba(107,114,128,.12)', color: '#9ca3af' },
 };
 
-// ── Linked-alert parsed-fields dropdown ──────────────────────────────────
-// Observables ION extracted from each linked alert, keyed by the dropdown's
-// fieldsId. Populated when the panel renders so the lazy-loaded fields dropdown
-// can surface ALL extracted values for that alert — including any the dedup'd
-// case-level Observables tab dropped (same value+type seen on another alert).
-const _alertObsByFieldsId = {};
-// Maps a dropdown's fieldsId → its owning case id, so "Add fields as evidence
-// note" can post to the right case from inside the lazy-rendered dropdown.
-const _fieldsIdToCaseId = {};
+
+// v0.77.0 — the case-detail alert workspace.
+// Alerts keyed by es_alert_id, stashed while the panel renders so selecting a
+// row in the rail can hand the whole alert object straight to the shared
+// component with no refetch.
+const _railAlerts = {};
+let _selectedRailAlert = null;
+
+/**
+ * Render one of the case's alerts into the right-hand column, using the SAME
+ * component /alerts uses — in its stacked layout, so every section is open.
+ *
+ * This is the click that replaced eight: parsed fields, rule guide and process
+ * tree used to be three separate accordions, on top of the panel's own tabs.
+ */
+function selectCaseAlert(alertId, idx, caseId) {
+    const alert = _railAlerts[alertId];
+    const host = document.getElementById('cpanel-alert-workspace');
+    if (!alert || !host) return;
+
+    document.querySelectorAll('.cpanel-rail-alert').forEach(el => el.classList.remove('selected'));
+    const row = document.getElementById('rail-alert-' + idx);
+    if (row) row.classList.add('selected');
+    _selectedRailAlert = alertId;
+
+    if (typeof window.ionAlertDetail === 'undefined') {
+        host.innerHTML = '<div class="error">Alert detail component failed to load.</div>';
+        return;
+    }
+
+    // The alert rows the case API returns use es_alert_id; the shared component
+    // (and every /api/elasticsearch/alerts/... endpoint it calls) expects `id`.
+    // Normalising here rather than inside the component keeps the component's
+    // contract identical for both pages.
+    const forDetail = Object.assign({}, alert, {
+        id: alertId,
+        title: alert.rule_name || alert.title || String(alertId).substring(0, 24)
+    });
+
+    window.ionAlertDetail.mount(host, forDetail, {
+        layout: 'stacked',
+        aiAvailable: true,
+        arkimeEnabled: !!window.__ionArkimeEnabled,
+        classPrefix: 'cpanel-alert',
+        caseId: caseId
+    });
+
+    // Case-only extras the shared component has no business knowing about:
+    // pinning this alert as case evidence, and the two lazy panels that used to
+    // be accordions. They append as further stacked sections.
+    _appendCaseOnlySections(host, alertId, caseId, alert);
+}
+
+function _appendCaseOnlySections(host, alertId, caseId, alert) {
+    const rgId = 'rule-guide-' + _railSeq;
+    const ptId = 'proc-tree-' + _railSeq;
+    _railSeq += 1;
+
+    const pinTitle = alert.rule_name || String(alertId).substring(0, 24);
+    const pinSev = alert.priority || '';
+
+    const extra = document.createElement('div');
+    extra.innerHTML =
+        '<section class="iad-section"><h4 class="iad-section-title">Rule guide</h4>'
+      +   '<div class="cpanel-rule-guide-box" id="' + rgId + '"><div class="loading">Loading rule guide…</div></div>'
+      + '</section>'
+      + '<section class="iad-section"><h4 class="iad-section-title">Process tree</h4>'
+      +   '<div class="cpanel-proc-tree" id="' + ptId + '"><div class="loading">Loading process tree…</div></div>'
+      + '</section>'
+      + '<section class="iad-section">'
+      +   '<button class="cpanel-pin-btn" type="button" '
+      +     'data-click-action="pinAlertToCase" data-args=\'[' + caseId + ',"' + esc(alertId) + '","'
+      +       esc(pinTitle) + '","' + esc(pinSev) + '"]\'>'
+      +     '<i class="icon-bookmark _ion-s-782b602101"></i>Pin as evidence</button>'
+      + '</section>';
+    while (extra.firstChild) host.appendChild(extra.firstChild);
+
+    // These were behind toggles; nothing is behind a toggle any more, so load
+    // them straight away.
+    if (typeof loadRuleGuideInto === 'function') loadRuleGuideInto(alertId, rgId);
+    if (typeof loadProcessTreeInto === 'function') loadProcessTreeInto(alertId, ptId, caseId);
+}
+let _railSeq = 0;
 
 // Flatten a nested alert _source into dot-path key:value pairs (arrays of
 // scalars are joined; arrays of objects are indexed).
-function flattenAlertFields(obj, prefix, out) {
-    out = out || {};
-    prefix = prefix || '';
-    if (obj && typeof obj === 'object' && !Array.isArray(obj)) {
-        for (const k of Object.keys(obj)) {
-            flattenAlertFields(obj[k], prefix ? prefix + '.' + k : k, out);
-        }
-    } else if (Array.isArray(obj)) {
-        if (obj.every(x => x === null || typeof x !== 'object')) {
-            if (obj.length) out[prefix] = obj.join(', ');
-        } else {
-            obj.forEach((x, i) => flattenAlertFields(x, prefix + '[' + i + ']', out));
-        }
-    } else if (obj !== null && obj !== undefined && obj !== '') {
-        out[prefix] = obj;
-    }
-    return out;
-}
+// v0.77.0 — the linked-alert parsed-fields dropdown lived here: flattenAlertFields,
+// _alertFieldsTable, _extractedValuesBlock, renderFlatAlertFields,
+// toggleAllAlertFields, addFieldsAsEvidence, toggleAlertFields.
+//
+// All seven are gone. The first three were verbatim copies of functions in
+// alerts.html (the copies had already drifted apart on class names), and the
+// dropdown they powered is now the shared component's "Fields" section, open by
+// default rather than behind a toggle. static/js/alert-detail.js owns them and
+// exposes flattenAlertFields globally, which is what renderRuleGuide below
+// still calls.
 
-// Investigation-relevant ECS namespaces shown by default. A real Elastic
-// Security alert flattens to hundreds of fields (mostly kibana.alert.rule.*,
-// ecs.*, agent.* bookkeeping); this allowlist surfaces the ~20-40 that matter
-// for triage. Everything else hides behind a "Show all" toggle.
-const ALERT_KEY_PREFIXES = [
-    '@timestamp', 'message',
-    'rule.name', 'rule.description',
-    'event.action', 'event.category', 'event.outcome', 'event.severity',
-    'event.kind', 'event.type', 'event.reason',
-    'kibana.alert.severity', 'kibana.alert.workflow_status',
-    'kibana.alert.rule.name', 'kibana.alert.reason', 'kibana.alert.risk_score',
-    'host.name', 'host.hostname', 'host.ip', 'host.os',
-    'user.', 'source.', 'destination.', 'client.', 'server.',
-    'process.', 'file.', 'url.', 'dns.', 'network.', 'tls.', 'http.',
-    'registry.', 'email.', 'threat.', 'observer.', 'related.', 'winlog.event_data.',
-];
-
-function _alertFieldsTable(flat, keys) {
-    let h = '<table class="cpanel-alert-fields-table"><tbody>';
-    for (const k of keys) {
-        h += '<tr><td class="caf-key">' + esc(k) + '</td>'
-           + '<td class="caf-val">' + esc(String(flat[k])) + '</td></tr>';
-    }
-    return h + '</tbody></table>';
-}
-
-// Render the "Extracted values" block for a linked alert's fields dropdown —
-// every observable ION pulled from this alert (type + value), independent of
-// the case-level Observables tab (which dedups across alerts).
-function _extractedValuesBlock(fieldsId) {
-    const obs = _alertObsByFieldsId[fieldsId] || [];
-    if (!obs.length) return '';
-    let h = '<div class="cpanel-alert-extracted">'
-          + '<div class="cpanel-alert-extracted-title">Extracted values (' + obs.length + ')</div>'
-          + '<table class="cpanel-alert-fields-table"><tbody>';
-    for (const o of obs) {
-        const type = o.type || 'unknown';
-        const value = o.value || '';
-        h += '<tr><td class="caf-key">' + esc(type) + '</td>'
-           + '<td class="caf-val">' + esc(String(value)) + '</td></tr>';
-    }
-    return h + '</tbody></table></div>';
-}
-
-function renderFlatAlertFields(raw, fieldsId) {
-    const extracted = _extractedValuesBlock(fieldsId);
-    const flat = flattenAlertFields(raw);
-    const allKeys = Object.keys(flat).sort();
-    if (!allKeys.length) return extracted || '<div class="cpanel-alert-fields-empty">No fields</div>';
-    const isKey = k => ALERT_KEY_PREFIXES.some(p => k === p || k.startsWith(p));
-    let keyKeys = allKeys.filter(isKey);
-    let otherKeys = allKeys.filter(k => !isKey(k));
-    // Fallback: a non-ECS alert that matches nothing should still show its data.
-    if (!keyKeys.length) { keyKeys = allKeys; otherKeys = []; }
-    let h = extracted + _alertFieldsTable(flat, keyKeys);
-    if (otherKeys.length) {
-        const allId = fieldsId + '-all';
-        const moreLabel = 'Show all ' + allKeys.length + ' fields (' + otherKeys.length + ' more)';
-        h += '<button type="button" class="cpanel-alert-showall" '
-           + 'data-click-action="toggleAllAlertFields" data-args=\'["' + allId + '"]\' '
-           + 'data-more-label="' + esc(moreLabel) + '" data-less-label="Show fewer fields" '
-           + 'aria-expanded="false">' + moreLabel + '</button>';
-        h += '<div class="cpanel-alert-fields-all" id="' + allId + '" hidden>'
-           + _alertFieldsTable(flat, otherKeys) + '</div>';
-    }
-    // Stash the key (well-known) fields so the analyst can pin them to the
-    // case as an evidence note in one click.
-    _alertKeyFieldsByFieldsId[fieldsId] = keyKeys.map(k => ({ key: k, value: String(flat[k]) }));
-    h += '<button type="button" class="cpanel-alert-evidence" '
-       + 'data-click-action="addFieldsAsEvidence" data-args=\'["' + fieldsId + '"]\'>'
-       + '<i class="icon-bookmark"></i> Add fields as evidence note</button>';
-    return h;
-}
-
-// Toggle the "all remaining fields" section under a linked alert. `this` is
-// the clicked button (event-delegation calls fn.apply(el, args)), so we flip
-// its label/state to give the click visible feedback.
-function toggleAllAlertFields(allId) {
-    const el = document.getElementById(allId);
-    if (!el) return;
-    const btn = (this && this.classList && this.classList.contains('cpanel-alert-showall')) ? this : null;
-    if (el.hasAttribute('hidden')) {
-        el.removeAttribute('hidden');
-        if (btn) { btn.textContent = btn.dataset.lessLabel || 'Show fewer fields'; btn.setAttribute('aria-expanded', 'true'); }
-    } else {
-        el.setAttribute('hidden', '');
-        if (btn) { btn.textContent = btn.dataset.moreLabel || 'Show all fields'; btn.setAttribute('aria-expanded', 'false'); }
-    }
-}
-
-// Well-known (allowlisted) fields per linked-alert dropdown, captured at
-// render time so "Add fields as evidence note" can post them without re-parsing.
-const _alertKeyFieldsByFieldsId = {};
-
-// Pin the linked alert's well-known fields (+ any extracted observables) to
-// the case as a formatted investigation note. Uses the existing case-notes
-// endpoint (case:update) — no new surface.
-async function addFieldsAsEvidence(fieldsId) {
-    const caseId = _fieldsIdToCaseId[fieldsId];
-    if (!caseId) { showToast('Could not resolve the case for this alert', 'warning'); return; }
-    const fields = _alertKeyFieldsByFieldsId[fieldsId] || [];
-    const obs = _alertObsByFieldsId[fieldsId] || [];
-    if (!fields.length && !obs.length) { showToast('No fields to add', 'warning'); return; }
-    const lines = ['**Alert fields (evidence)**', ''];
-    if (obs.length) {
-        lines.push('_Extracted values:_');
-        for (const o of obs) lines.push('- `' + (o.type || 'unknown') + '` = ' + (o.value || ''));
-        lines.push('');
-    }
-    if (fields.length) {
-        lines.push('_Well-known fields:_');
-        for (const f of fields) lines.push('- **' + f.key + '**: ' + f.value);
-    }
-    const content = lines.join('\n');
-    try {
-        const resp = await fetch('/api/cases/' + caseId + '/notes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: content }),
-        });
-        if (!resp.ok) {
-            const d = await resp.json().catch(() => ({}));
-            throw new Error(d.detail || ('HTTP ' + resp.status));
-        }
-        showToast('Fields added to the case as an evidence note', 'success');
-        openCaseDetail(caseId); // refresh panel so the new note shows
-    } catch (e) {
-        showToast('Failed to add evidence note: ' + e.message, 'error');
-    }
-}
-
-// Toggle (and lazy-load) a linked alert's parsed fields.
-// NOTE: event-delegation.js spreads data-args directly as the function args
-// (fn.apply(el, args)) — there is NO leading `event` param here.
-async function toggleAlertFields(alertId, fieldsId) {
-    const el = document.getElementById(fieldsId);
-    if (!el) return;
-    const chev = document.getElementById('chev-' + fieldsId);
-    if (!el.hasAttribute('hidden')) {
-        el.setAttribute('hidden', '');
-        if (chev) chev.classList.remove('expanded');
-        return;
-    }
-    el.removeAttribute('hidden');
-    if (chev) chev.classList.add('expanded');
-    if (el.dataset.loaded === '1') return;
-    el.innerHTML = '<div class="cpanel-alert-fields-loading">Loading fields…</div>';
-    try {
-        const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw');
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok || !data.raw_data) {
-            // Still surface the extracted values even when raw _source is gone.
-            el.innerHTML = _extractedValuesBlock(fieldsId)
-                || '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
-            el.dataset.loaded = '1';
-            return;
-        }
-        el.innerHTML = renderFlatAlertFields(data.raw_data, fieldsId);
-        el.dataset.loaded = '1';
-    } catch (e) {
-        el.innerHTML = _extractedValuesBlock(fieldsId)
-            + '<div class="cpanel-alert-fields-empty">Failed to load fields: '
-            + esc(String((e && e.message) || e)) + '</div>';
-    }
-}
 
 // ── Rule guide ──────────────────────────────────────────────────────────────
 // Surfaces the detection rule's description + investigation guide (Kibana rule
@@ -3117,13 +3113,11 @@ function renderRuleGuide(raw) {
     return h;
 }
 
-async function toggleRuleGuide(alertId, rgId) {
+async function loadRuleGuideInto(alertId, rgId) {
+    // v0.77.0: was toggleRuleGuide() — an accordion. Nothing on the case-detail
+    // alert workspace is behind a toggle any more, so this only loads.
     const el = document.getElementById(rgId);
-    if (!el) return;
-    if (!el.hasAttribute('hidden')) { el.setAttribute('hidden', ''); return; }
-    el.removeAttribute('hidden');
-    if (el.dataset.loaded === '1') return;
-    el.innerHTML = '<div class="cpanel-alert-fields-loading">Loading rule guide…</div>';
+    if (!el || el.dataset.loaded === '1') return;
     try {
         const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw');
         if (r.status === 503) {
@@ -3141,6 +3135,7 @@ async function toggleRuleGuide(alertId, rgId) {
             + esc(String((e && e.message) || e)) + '</div>';
     }
 }
+
 
 // ── Process explorer ────────────────────────────────────────────────────────
 // Renders the alert-local process hierarchy (grandparent → parent → THIS ALERT)
@@ -3213,13 +3208,10 @@ function renderProcessTree(data, caseId) {
 
 // Toggle (and lazy-load) a linked alert's process tree. No leading event param
 // (event-delegation.js applies data-args directly).
-async function toggleProcessTree(alertId, ptId, caseId) {
+async function loadProcessTreeInto(alertId, ptId, caseId) {
+    // v0.77.0: was toggleProcessTree() — an accordion. See loadRuleGuideInto.
     const el = document.getElementById(ptId);
-    if (!el) return;
-    if (!el.hasAttribute('hidden')) { el.setAttribute('hidden', ''); return; }
-    el.removeAttribute('hidden');
-    if (el.dataset.loaded === '1') return;
-    el.innerHTML = '<div class="cpanel-alert-fields-loading">Loading process tree…</div>';
+    if (!el || el.dataset.loaded === '1') return;
     try {
         const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/process-tree');
         if (r.status === 503) {
@@ -3235,6 +3227,7 @@ async function toggleProcessTree(alertId, ptId, caseId) {
             + esc(String((e && e.message) || e)) + '</div>';
     }
 }
+
 
 // Pin a process node to the case workbench as evidence (reuses the pins API).
 async function pinProcessToCase(caseId, title) {
@@ -3398,8 +3391,8 @@ function renderPanelContent(c) {
     // panel-open time. Action buttons + severity strip stay outside
     // any tab so they're always reachable.
     html += '<div class="cpanel-tab-nav">'
-        + '<button type="button" class="cpanel-tab-btn active" data-tab="overview" data-click-action="switchPanelTab" data-args=\'["overview"]\'>Overview</button>'
-        + '<button type="button" class="cpanel-tab-btn" data-tab="alerts" data-click-action="switchPanelTab" data-args=\'["alerts"]\'>Alerts (' + alertCount + ')</button>'
+        + '<button type="button" class="cpanel-tab-btn active" data-tab="alerts" data-click-action="switchPanelTab" data-args=\'["alerts"]\'>Alerts (' + alertCount + ')</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="overview" data-click-action="switchPanelTab" data-args=\'["overview"]\'>Overview</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="observables" data-click-action="switchPanelTab" data-args=\'["observables"]\'>Observables (' + obsCount + ')</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="timeline" data-click-action="switchPanelTab" data-args=\'["timeline"]\'>Timeline</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="attackpath" data-click-action="switchPanelTab" data-args=\'["attackpath"]\'>Attack Path</button>'
@@ -3585,89 +3578,55 @@ function renderPanelContent(c) {
     html += '<div class="_ion-s-65382d79e2" id="similar-observables-container">Loading…</div>';
     html += '</div>';
 
-    // ── Linked Alerts (enriched) ───────────────────────────
+    // ── Linked Alerts — the two-column workspace (v0.77.0) ───────────
+    // Was: one stacked card per alert, each hiding its parsed fields, rule
+    // guide and process tree behind a separate toggle, inside a 560px panel.
+    // Seeing one alert fully cost up to eight clicks and still showed less
+    // than /alerts did.
+    //
+    // Now: a rail of alerts on the left, and on the right the SAME
+    // alert-detail component /alerts uses — in its stacked layout, so every
+    // section is already open. Selecting an alert is the only click.
     const alerts = c.alerts || [];
-    html += '<div class="cpanel-section" data-tab="alerts">';
-    html += '<div class="cpanel-section-title">Linked Alerts (' + alerts.length + ')</div>';
+    html += '<div class="cpanel-section" data-tab="alerts" data-workspace="1">';
     if (alerts.length) {
+        html += '<div class="cpanel-workspace">';
+
+        // ── left rail: the case's alerts ──
+        html += '<div class="cpanel-rail">';
+        html += '<div class="cpanel-section-title">Alerts in case (' + alerts.length + ')</div>';
         alerts.forEach((a, idx) => {
             const alertId = a.es_alert_id || 'unknown';
-            const fieldsId = 'alert-fields-' + idx;
-            // Stash this alert's extracted observables so the fields dropdown
-            // can list them alongside the raw fields (item: not all extracted
-            // values surface in the dedup'd case Observables tab).
-            _alertObsByFieldsId[fieldsId] = a.observables || [];
-            _fieldsIdToCaseId[fieldsId] = c.id;
-            // v0.19.3: prefer human-readable rule_name when available;
-            // fall back to a 24-char prefix of the opaque ES id for
-            // legacy rows where rule_name is null.
+            // Stash the alert so selecting a row can hand the whole object to
+            // the shared component without a refetch.
+            _railAlerts[alertId] = a;
             const displayName = a.rule_name && a.rule_name.trim()
                 ? a.rule_name
                 : String(alertId).substring(0, 24);
             const st = a.status || 'open';
-            const pr = a.priority || '';
-            const sc = statusColors[st] || statusColors.open;
-            const pc = priorityColors[pr] || null;
-            const obsCount = (a.observables || []).length;
-            const mitreCount = (a.mitre_techniques || []).length;
-
-            // Header is a click-to-expand toggle: clicking the alert drops down
-            // its parsed (flattened) fields, lazy-fetched from the alert's raw
-            // _source. Works for one or many linked alerts.
-            html += '<div class="cpanel-alert-card">'
-                + '<div class="cpanel-alert-card-header cpanel-alert-toggle" '
-                +   'data-click-action="toggleAlertFields" data-args=\'["' + esc(alertId) + '","' + fieldsId + '"]\' '
-                +   'title="Show parsed fields for ' + esc(alertId) + '">'
-                +   '<span class="cpanel-alert-id">' + esc(displayName) + '</span>'
-                +   '<div class="cpanel-alert-badges">'
-                +     '<span class="cpanel-alert-badge _ion-s-19fdfcbae6">' + esc(st) + '</span>';
-            if (pc) {
-                html +=  '<span class="cpanel-alert-badge _ion-s-b2554186e7">' + esc(pr) + '</span>';
-            }
-            html +=     '<i class="icon-chevron-down cpanel-alert-chevron" id="chev-' + fieldsId + '"></i>'
+            const sev = a.priority || c.severity || 'medium';
+            const bits = [];
+            if (a.process_name) bits.push(esc(a.process_name));
+            if (a.source_ip) bits.push(esc(a.source_ip) + (a.destination_ip ? ' \u2192 ' + esc(a.destination_ip) : ''));
+            html += '<div class="cpanel-rail-alert' + (idx === 0 ? ' selected' : '') + '" '
+                +   'id="rail-alert-' + idx + '" '
+                +   'data-click-action="selectCaseAlert" data-args=\'["' + esc(alertId) + '",' + idx + ',' + c.id + ']\'>'
+                +   '<span class="rail-sev" style="background:var(--sev-' + esc(sev) + ')"></span>'
+                +   '<div class="cpanel-rail-alert-head">'
+                +     '<span class="cpanel-rail-alert-name">' + esc(displayName) + '</span>'
+                +     '<span class="cpanel-alert-badge _ion-s-19fdfcbae6">' + esc(st) + '</span>'
                 +   '</div>'
+                + (bits.length ? '<div class="cpanel-rail-alert-sub">' + bits.join('<br>') + '</div>' : '')
                 + '</div>';
-            // v0.59.0 — alert-widget body: common fields, enriched observables
-            // (threat badges), Bob verdict + confidence / auto-escalated badge,
-            // note preview. Rendered only for the blocks the alert row carries.
-            html += _alertWidgetExtras(a);
-            // Lazy-loaded flattened-fields dropdown (hidden until expanded).
-            html += '<div class="cpanel-alert-fields" id="' + fieldsId + '" hidden></div>';
-            // Rule guide: the detection rule's description + investigation guide
-            // (the same context now fed to Bob), shown to the analyst (lazy-loaded).
-            const rgId = 'rule-guide-' + idx;
-            html += '<button type="button" class="cpanel-proc-toggle" '
-                +   'data-click-action="toggleRuleGuide" data-args=\'["' + esc(alertId) + '","' + rgId + '"]\'>'
-                +   '<i class="icon-book-open"></i> Rule guide</button>';
-            html += '<div class="cpanel-rule-guide-box" id="' + rgId + '" hidden></div>';
-            // Process explorer: alert-local process hierarchy (lazy-loaded).
-            const ptId = 'proc-tree-' + idx;
-            html += '<button type="button" class="cpanel-proc-toggle" '
-                +   'data-click-action="toggleProcessTree" data-args=\'["' + esc(alertId) + '","' + ptId + '",' + c.id + ']\'>'
-                +   '<i class="icon-git-branch"></i> Process tree</button>';
-            html += '<div class="cpanel-proc-tree" id="' + ptId + '" hidden></div>';
-            // Alert meta row
-            const metaParts = [];
-            if (obsCount) metaParts.push(obsCount + ' observable' + (obsCount !== 1 ? 's' : ''));
-            if (mitreCount) metaParts.push(mitreCount + ' technique' + (mitreCount !== 1 ? 's' : ''));
-            if (a.analyst_notes) metaParts.push('has notes');
-            if (metaParts.length) {
-                html += '<div class="cpanel-alert-card-meta">' + metaParts.join(' &middot; ') + '</div>';
-            }
-            // v0.20.0: Workbench — pin this alert as key evidence on the case.
-            // Title prefilled from rule_name; severity defaults to case severity.
-            // esc() (applied at the data-args insertion below) fully encodes
-            // quotes now, so no manual pre-escaping is needed here.
-            const pinTitle = displayName || alertId;
-            const pinSev = a.priority || c.severity || '';
-            html += '<div class="cpanel-alert-card-meta _ion-s-7b6cad76b3">'
-                +     '<button class="cpanel-pin-btn" type="button" '
-                +       'data-click-action="pinAlertToCase" data-args=\'[' + c.id + ',"' + esc(alertId) + '","' + esc(pinTitle) + '","' + esc(pinSev) + '"]\'>'
-                +       '<i class="icon-bookmark _ion-s-782b602101"></i>Pin as evidence'
-                +     '</button>'
-                + '</div>';
-            html += '</div>';
         });
+        html += '</div>';
+
+        // ── right: the shared alert-detail component mounts here ──
+        html += '<div class="cpanel-detail" id="cpanel-alert-workspace">'
+            +   '<div class="loading">Loading alert…</div>'
+            + '</div>';
+
+        html += '</div>';
     } else {
         html += '<div class="cpanel-empty-hint"><i class="icon-shield"></i> No linked alerts</div>';
     }
@@ -4328,7 +4287,9 @@ async function loadKibanaComments(kibanaId) {
 // v0.31.0: panel tab state. Persisted across panel re-renders (e.g.
 // panelUpdateField → openCaseDetail) so changing severity / status
 // doesn't bump the analyst back to Overview. Reset on panel close.
-let _currentPanelTab = 'overview';
+// v0.77.0: default tab is Alerts. Opening a case to a metadata form was a
+// wasted click — the analyst came to look at the alerts.
+let _currentPanelTab = 'alerts';
 
 function switchPanelTab(tabName) {
     _currentPanelTab = tabName;
@@ -4338,6 +4299,12 @@ function switchPanelTab(tabName) {
     document.querySelectorAll('.cpanel-section[data-tab]').forEach(s => {
         s.classList.toggle('tab-hidden', s.dataset.tab !== tabName);
     });
+
+    // v0.77.0: the Alerts tab hosts the two-column workspace, which scrolls its
+    // own columns. The body must drop its own scroll+padding for that tab or
+    // the analyst gets two nested scrollbars.
+    const body = document.getElementById('case-panel-body');
+    if (body) body.classList.toggle('workspace-mode', tabName === 'alerts');
     // The Attack Path SVG connectors are laid out from getBoundingClientRect,
     // which returns zeroes while the section is display:none. Redraw once the
     // tab is actually visible so edges land on their node cards.
@@ -4354,9 +4321,13 @@ function closeCasePanel() {
     // for a different case doesn't mistakenly think the panel is showing
     // it (panel is closed, dataset would be stale).
     delete panel.dataset.caseId;
-    // v0.31.0: reset the panel tab so the NEXT case opened lands on
-    // Overview rather than wherever the previous case left off.
-    _currentPanelTab = 'overview';
+    // v0.31.0: reset the panel tab so the NEXT case opened lands on the
+    // default rather than wherever the previous case left off.
+    // v0.77.0: that default is now Alerts.
+    _currentPanelTab = 'alerts';
+    _selectedRailAlert = null;
+    const body = document.getElementById('case-panel-body');
+    if (body) body.classList.remove('workspace-mode');
 }
 
 // =============================================================================

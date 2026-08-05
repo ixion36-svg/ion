@@ -1,0 +1,423 @@
+/* =============================================================================
+   ION — shared alert-detail component styles  (v0.77.0)
+   Pairs with static/js/alert-detail.js.
+
+   Only the STACKED layout needs styles of its own. The `tabs` layout used by
+   /alerts renders the same sections into the existing `.detail-tabs` /
+   `.detail-tab-content` classes that already live in alerts.html, so nothing
+   here can change how /alerts looks.
+   ========================================================================== */
+
+/* ── sticky jump-links ─────────────────────────────────────────────────────
+   These replace tabs in the stacked layout. They SCROLL, they do not hide —
+   which is the whole point: an analyst opening a case alert sees every
+   section without hunting for it. */
+.iad-jump {
+    position: sticky;
+    top: 0;
+    z-index: 6;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 9px 0 10px;
+    margin-bottom: 14px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border);
+}
+
+.iad-jump-link {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 5px;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    text-decoration: none;
+    white-space: nowrap;
+    transition: color .15s, border-color .15s, background .15s;
+}
+
+.iad-jump-link:hover {
+    color: var(--text-bright);
+    border-color: var(--border);
+}
+
+/* Driven by the IntersectionObserver in alert-detail.js, so the highlight
+   follows the scroll position rather than the last thing clicked. */
+.iad-jump-link.active {
+    color: var(--primary);
+    border-color: var(--border-bright);
+    background: var(--primary-dim);
+}
+
+/* ── stacked sections ───────────────────────────────────────────────────── */
+.iad-section {
+    margin-bottom: 18px;
+    scroll-margin-top: 56px;   /* clears the sticky jump bar on anchor scroll */
+}
+
+.iad-section-title {
+    margin: 0 0 9px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+}
+
+/* In the stacked layout every section is open at once, so the `.active`
+   toggling that the tab layout relies on must not hide anything. The JS marks
+   them all active; this makes that explicit and survives a future edit to the
+   shared .detail-tab-content rule. */
+.iad-section .detail-tab-content {
+    display: block;
+}
+
+/* ── the case-side field table ──────────────────────────────────────────────
+   The two page copies of _alertFieldsTable differed ONLY in these class names,
+   which is why the function could be parameterised into one. Both prefixes
+   resolve to the same visual result. */
+.cpanel-alert-fields-table,
+.alert-parsed-fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 11px;
+}
+
+.cpanel-alert-fields-table td,
+.alert-parsed-fields-table td {
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+.caf-key, .apf-key {
+    color: var(--text-muted);
+    white-space: nowrap;
+    width: 1%;
+}
+
+.caf-val, .apf-val {
+    color: var(--text-primary);
+    word-break: break-all;
+}
+
+
+
+/* =============================================================================
+   Moved out of alerts.html (v0.77.0).
+
+   These style the markup the shared component emits. They lived in the /alerts
+   page <style> block, which is why the first /cases render of the component
+   came out unstyled -- the metadata grid stacked vertically because
+   .alert-meta-grid simply did not exist on that page. A component that owns its
+   markup has to own its CSS too, or it only works on the page it came from.
+
+   @media blocks are deliberately NOT moved: their contents are page-layout
+   concerns, and splitting a nested block is how the first attempt at this left
+   alerts.html five braces short.
+   ========================================================================== */
+
+/* Modal detail — refreshed in v0.9.72 with the data_flow card pattern.
+   Wider grid gap, framed meta items, monospace values for keys, generous
+   message box, segmented-control style detail tabs. */
+.alert-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 22px;
+}
+
+.alert-meta-item {
+    padding: 14px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    transition: border-color .15s ease, transform .15s ease;
+}
+
+.alert-meta-item:hover {
+    border-color: rgba(0, 212, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.alert-meta-label {
+    font-size: 0.62rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.alert-meta-value {
+    font-weight: 600;
+    word-break: break-word;
+    font-size: 0.9rem;
+    color: var(--text-bright);
+    line-height: 1.4;
+}
+
+.alert-message-box {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary);
+    border-radius: var(--radius-lg);
+    padding: 18px 22px;
+    margin-bottom: 22px;
+    font-size: 0.88rem;
+    line-height: 1.65;
+    color: var(--text-primary);
+    font-family: 'JetBrains Mono', monospace;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.alert-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 22px;
+}
+
+.alert-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    border-radius: 10px;
+    background: rgba(0, 212, 255, 0.12);
+    color: var(--primary);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+}
+
+/* Detail tabs — segmented-control feel, no bottom-border underline */
+.detail-tabs {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--bg-secondary);
+    padding: 4px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+}
+
+.detail-tab-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+    transition: all .15s ease;
+}
+
+.detail-tab-btn:hover {
+    color: var(--text-bright);
+}
+
+.detail-tab-btn.active {
+    color: var(--bg-deep);
+    background: var(--primary);
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.detail-tab-content {
+    display: none;
+}
+
+.detail-tab-content.active {
+    display: block;
+}
+
+/* Raw data JSON view */
+.raw-data-container {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    padding: 1rem;
+    border-radius: var(--radius);
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    max-height: 500px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+/* Parsed-fields view (Fields tab) — flattened well-known fields + extracted values */
+.alert-parsed-fields-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+}
+
+.alert-parsed-fields-table td {
+    padding: 0.3rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+}
+
+.alert-parsed-fields-table .apf-key {
+    color: var(--text-secondary);
+    font-family: 'Consolas', 'Monaco', monospace;
+    white-space: nowrap;
+    width: 1%;
+    padding-right: 1rem;
+}
+
+.alert-parsed-fields-table .apf-val {
+    color: var(--text-primary);
+    word-break: break-word;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.alert-parsed-extracted {
+    margin-bottom: 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.alert-parsed-extracted-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--primary);
+    padding: 0.4rem 0.5rem;
+    background: var(--bg-secondary);
+}
+
+.alert-parsed-extracted .alert-parsed-fields-table { margin-bottom: 0; }
+
+.alert-parsed-showall,
+.alert-parsed-evidence {
+    display: inline-block;
+    margin: 0.25rem 0.5rem 0.25rem 0;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.78rem;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+}
+
+.alert-parsed-showall:hover,
+.alert-parsed-evidence:hover { border-color: var(--primary); color: var(--primary); }
+
+/* Bob Auto-Investigate report */
+.autoinv-intro { font-size: 0.85rem; color: var(--text-secondary); margin: 0 0 0.75rem; line-height: 1.5; }
+
+/* ============================================= */
+/* Triage bar in alert detail modal              */
+/* ============================================= */
+.triage-bar {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 0.75rem 1rem;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 1.25rem;
+}
+
+.triage-bar label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-right: 0.25rem;
+}
+
+.triage-bar select {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 0.8125rem;
+    background: var(--bg-secondary);
+}
+
+.triage-bar .triage-group {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+}
+
+.triage-bar .btn-sm {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.8125rem;
+}
+
+/* ============================================= */
+/* MITRE ATT&CK Badges and Heatmap               */
+/* ============================================= */
+.system-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(99,110,123,0.18);
+    color: var(--text-primary);
+    border: 1px solid rgba(99,110,123,0.35);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.02em;
+    cursor: default;
+}
+
+.system-badge.linked {
+    background: rgba(88,166,255,0.15);
+    color: var(--primary);
+    border-color: rgba(88,166,255,0.4);
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.system-badge.linked:hover {
+    background: rgba(88,166,255,0.25);
+}
+
+.mitre-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.5rem;
+}
+
+/* AI Assist Styles */
+.ai-assist-btn {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.375rem 0.75rem; border-radius: var(--radius);
+    background: var(--primary); color: #fff; border: none;
+    font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+    transition: background 0.15s, opacity 0.15s;
+}
+
+.ai-assist-btn:hover { background: var(--neon-blue); }
+
+.ai-assist-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.ai-analysis-bar {
+    margin: 0.75rem 0; padding: 0.5rem 0;
+    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 0.75rem; flex-direction: column;
+}
+
+.ai-analysis-result {
+    width: 100%; margin-top: 0.5rem; display: none;
+}
+
+.ai-analysis-result.visible { display: block; }
