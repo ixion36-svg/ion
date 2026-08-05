@@ -3,6 +3,7 @@
 Provides endpoints for the integration dashboard, webhooks, and integration logs.
 """
 
+import logging
 from datetime import datetime
 from typing import List, Optional
 
@@ -41,6 +42,8 @@ from ion.models.integration import (
 from ion.services.connectors import ConnectorStatus, get_connector_registry
 from ion.services.integration_log_service import get_integration_log_service
 from ion.services.webhook_service import get_webhook_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["integrations"])
 
@@ -158,31 +161,80 @@ async def get_integration_status(
 
     results = []
     for connector in registry.get_all():
-        status_info = connector.get_status_info()
-
-        # Get latest health check for this integration
-        latest_check = latest_checks.get(connector.CONNECTOR_TYPE)
-
-        response = IntegrationStatusResponse(
-            type=connector.CONNECTOR_TYPE,
-            display_name=connector.DISPLAY_NAME,
-            is_configured=status_info.get("is_configured", False),
-            is_enabled=status_info.get("is_enabled", False),
-            metadata=status_info,
-        )
-
-        if latest_check:
-            response.status = latest_check.health_status.value if hasattr(latest_check.health_status, 'value') else str(latest_check.health_status)
-            response.response_time_ms = latest_check.response_time_ms
-            response.last_check = latest_check.checked_at.isoformat() if latest_check.checked_at else None
-            response.error = latest_check.error_message
-            # Merge health check metadata (includes version_compatibility) into response
-            if latest_check.check_metadata:
-                response.metadata = {**(response.metadata or {}), **latest_check.check_metadata}
-
-        results.append(response)
+        # v0.76.0: per-connector isolation. This endpoint aggregates 6+
+        # INDEPENDENT integrations and backs the whole /integrations page. One
+        # connector raising used to 500 the entire response, so a single
+        # misconfigured integration blanked the page that exists to tell you
+        # which integration is misconfigured — and the page's own error handling
+        # reported only "Failed to load integrations". A connector that cannot
+        # describe itself is now reported as one broken card, by name, and the
+        # other five still render.
+        try:
+            results.append(_status_for(connector, latest_checks))
+        except Exception as exc:
+            logger.exception(
+                "Integration status failed for connector %s", connector.CONNECTOR_TYPE
+            )
+            results.append(
+                IntegrationStatusResponse(
+                    type=connector.CONNECTOR_TYPE,
+                    display_name=getattr(connector, "DISPLAY_NAME", connector.CONNECTOR_TYPE),
+                    is_configured=False,
+                    is_enabled=False,
+                    status=IntegrationStatus.ERROR.value,
+                    error=f"Status unavailable: {safe_error(exc, 'integration_status')}",
+                )
+            )
 
     return results
+
+
+def _status_for(connector, latest_checks) -> IntegrationStatusResponse:
+    """Build one integration's status row. Raises only for that connector."""
+    status_info = connector.get_status_info() or {}
+
+    response = IntegrationStatusResponse(
+        type=connector.CONNECTOR_TYPE,
+        display_name=connector.DISPLAY_NAME,
+        is_configured=status_info.get("is_configured", False),
+        is_enabled=status_info.get("is_enabled", False),
+        metadata=status_info,
+    )
+
+    latest_check = latest_checks.get(connector.CONNECTOR_TYPE)
+    if not latest_check:
+        return response
+
+    health = latest_check.health_status
+    response.status = health.value if hasattr(health, "value") else str(health)
+    response.response_time_ms = latest_check.response_time_ms
+    response.last_check = latest_check.checked_at.isoformat() if latest_check.checked_at else None
+    response.error = latest_check.error_message
+
+    # Merge health-check metadata (carries version_compatibility) into the row.
+    #
+    # v0.76.0: this was `{**(response.metadata or {}), **latest_check.check_metadata}`.
+    # check_metadata is the `details` JSON column, which is typed Optional[dict]
+    # but is a JSON column shared by every IntegrationEvent kind — nothing at the
+    # DB level constrains it to an object. Any non-mapping JSON value there (a
+    # list, string, number, bool) made the `**` unpack raise
+    # `TypeError: 'X' object is not a mapping`, which surfaced as a bare 500 on
+    # the endpoint backing the whole page. Confirmed by reproduction against
+    # each shape. Guard the type rather than trust the annotation.
+    meta = latest_check.check_metadata
+    if isinstance(meta, dict):
+        response.metadata = {**(response.metadata or {}), **meta}
+    elif meta is not None:
+        # Keep it visible instead of dropping it — a non-object payload here
+        # means something wrote the column wrong and that is worth seeing.
+        logger.warning(
+            "Health-check details for %s is %s, not an object — surfacing under "
+            "'raw_details' instead of merging",
+            connector.CONNECTOR_TYPE, type(meta).__name__,
+        )
+        response.metadata = {**(response.metadata or {}), "raw_details": meta}
+
+    return response
 
 
 @router.post("/healthcheck", response_model=List[HealthCheckResponse])
