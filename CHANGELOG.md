@@ -1,13 +1,21 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.77.0 -->
-<!-- ion-doc:version=0.77.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.77.1 -->
+<!-- ion-doc:version=0.77.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-05 -->
 
 # Changelog
+
+## v0.77.1 — 2026-08-05
+
+**The case-detail alert rail is ordered by severity.**
+
+- Follow-up to v0.77.0. The rail — and so the alert that auto-renders on case open — used whatever order the API returned, which on a multi-alert case routinely meant landing on a low-severity alert while a critical sat further down. Now sorted by severity, newest-first on ties, falling back to the case severity when an alert has no priority of its own. Reuses `_sevRank`, the case board's existing scale, rather than declaring a second one.
+- **Sorted in place, deliberately.** `openCaseDetail` reads `c.alerts[0]` *after* `renderPanelContent` returns and passes index 0 to `selectCaseAlert`. Sorting a copy would leave the rail highlighting one alert while the detail column rendered another — silently, and only on cases whose API order was not already severity-descending. A test asserts the array is not copied before sorting and fails if it is.
+- Verified with a deliberately worst-ordered case (low, critical, medium, high, critical, unprioritised): rail renders Critical NEWER → Critical OLDER → High → Medium → No-priority → Low, auto-selects Critical NEWER at row index 0.
 
 ## v0.77.0 — 2026-08-05
 
