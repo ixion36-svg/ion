@@ -318,6 +318,34 @@ def find_matching_open_auto_case(
     return None
 
 
+def _render_case_description(
+    rule_key: str,
+    host: Optional[str],
+    user: Optional[str],
+    n_alerts: int,
+    severity: Optional[str],
+) -> str:
+    """Structured, scannable description for an auto-grouped case.
+
+    Replaces the old flat sentence with a labelled markdown block so the case
+    UI shows what/where/who/how-many at a glance. Bob appends its cluster
+    analysis as a separate comment at case creation.
+    """
+    alert_word = "alert" if n_alerts == 1 else "alerts"
+    lines = [
+        "**Auto-grouped case** — clustered by rule + host + user within the correlation window.",
+        "",
+        f"- **Rule:** {rule_key or '(uncategorised)'}",
+        f"- **Host:** {host or '(none)'}",
+        f"- **User:** {user or '(none)'}",
+        f"- **Alerts in cluster:** {n_alerts} {alert_word}",
+        f"- **Severity:** {severity or 'unknown'}",
+        "",
+        "_Bob posts its cluster analysis as a comment below._",
+    ]
+    return "\n".join(lines)
+
+
 def create_auto_case(
     db: Session,
     rule_key: str,
@@ -344,10 +372,9 @@ def create_auto_case(
     if len(title) > 500:
         title = title[:497] + "..."
 
-    description = (
-        f"Auto-grouped by rule + host + user. "
-        f"Contributing alerts: {len(alert_ids)}. "
-        f"Grouping key: rule='{rule_key}', host='{host}', user='{user}'."
+    description = _render_case_description(
+        rule_key=rule_key, host=host, user=user,
+        n_alerts=len(alert_ids), severity=severity,
     )
 
     case = AlertCase(

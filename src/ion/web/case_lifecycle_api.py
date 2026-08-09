@@ -672,6 +672,21 @@ async def _build_pcap_flows(
 
     return flows
 
+
+def _should_investigate_new_case(
+    auto_closed: bool,
+    source_alert_ids,
+    auto_investigate_enabled: bool,
+) -> bool:
+    """Whether Bob should investigate a just-created case and post a comment.
+
+    True for a manually-created case with alerts when case auto-investigation is
+    enabled — the same behaviour as auto-grouped cases. Skipped when the case was
+    auto-closed as a known FP (nothing to investigate) or has no alerts.
+    """
+    return bool(auto_investigate_enabled) and not auto_closed and bool(source_alert_ids)
+
+
 @router.post("/elasticsearch/alerts/cases")
 async def create_case(
     data: CaseCreate,
@@ -1050,6 +1065,23 @@ async def create_case(
             auto_closed = True
             auto_closed_kfp = fp
             break
+
+    # v0.79.0: run Bob on the freshly-created case (single OR multi alert) and
+    # post its analysis as a case comment — same as auto-grouped cases, so
+    # manually-created cases get Bob too. Fire-and-forget; gated by the unified
+    # case auto-investigate switch, skipped for auto-closed FP cases.
+    try:
+        from ion.core.config import get_config
+        if _should_investigate_new_case(
+            auto_closed, new_case.source_alert_ids,
+            getattr(get_config(), "case_grouper_auto_investigate", True),
+        ):
+            from ion.services.case_grouper_service import enqueue_case_investigation
+            enqueue_case_investigation(new_case.id)
+            logger.info("Bob case investigation enqueued for new case %s", new_case.case_number)
+    except Exception:
+        logger.debug("enqueue_case_investigation failed for new case %s",
+                     getattr(new_case, "id", "?"), exc_info=True)
 
     return {
         "id": new_case.id,
