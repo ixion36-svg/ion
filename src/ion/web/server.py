@@ -856,10 +856,17 @@ async def _startup_event():
     # hold_until_close). Honours ION_INVESTIGATION_LOOP_ENABLED.
     # ---------------------------------------------------------------
     def _start_investigation_loop():
-        if not config.investigation_loop_enabled:
-            logger.info("Investigation loop disabled (config.investigation_loop_enabled=False)")
+        from ion.services.investigation_service import (
+            should_run_per_alert_sweep,
+            start_investigation_loop_if_enabled,
+        )
+        if not should_run_per_alert_sweep(config):
+            logger.info(
+                "Per-alert investigation sweep NOT started — the case grouper is the "
+                "active investigator (or the loop is disabled). Bob runs per-case at "
+                "case creation instead."
+            )
             return
-        from ion.services.investigation_service import start_investigation_loop_if_enabled
         start_investigation_loop_if_enabled(engine=engine)
         logger.info("Autonomous investigation loop startup attempted")
     run_locked(engine, LOCK_INVESTIGATION_BG, "investigation_bg_loop", _start_investigation_loop,
