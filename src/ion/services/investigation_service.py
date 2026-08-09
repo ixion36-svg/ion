@@ -2936,12 +2936,19 @@ class InvestigationService:
         except Exception as exc:
             logger.debug("investigate_case: bulk fetch failed: %s", exc)
 
-        # Aggregate IOCs across every alert, dedup by (type, value).
+        # Aggregate IOCs across every alert, dedup by (type, value). Also scan
+        # deterministically-decoded PowerShell -EncodedCommand payloads so a C2
+        # URL/IP hidden in base64 becomes an observable (same as the per-alert path).
+        from ion.services.command_deobfuscate import decoded_ioc_text
         from ion.services.ioc_text_extractor import extract_iocs
         combined_raw: Dict[str, set] = {}
         for a in alerts:
             try:
-                raw = extract_iocs(_alert_to_text_blob(a))
+                blob = _alert_to_text_blob(a)
+                dec = decoded_ioc_text(blob)
+                if dec:
+                    blob = blob + "\n" + dec
+                raw = extract_iocs(blob)
             except Exception:
                 raw = {}
             for k, vs in (raw or {}).items():
@@ -3035,6 +3042,24 @@ class InvestigationService:
             brief_lines.append(f"  {i}. [{ts}] {_safe_cluster(rule_name)} id={aid[:20]}")
         if len(alerts) > 20:
             brief_lines.append(f"  … and {len(alerts) - 20} more")
+
+        # Deterministically-decoded command lines across the cluster, handed to
+        # the model as ground truth (it hallucinates base64 decodes otherwise).
+        from ion.services.command_deobfuscate import decode_powershell_encoded
+        _decoded_cmds: List[str] = []
+        for a in alerts:
+            for d in decode_powershell_encoded(_alert_to_text_blob(a)):
+                if d not in _decoded_cmds:
+                    _decoded_cmds.append(d)
+        if _decoded_cmds:
+            brief_lines += [
+                "",
+                "## Decoded command lines (deterministic — DO NOT re-decode)",
+                "Decoded by ION, not by you. Treat as ground truth; do not re-decode.",
+            ]
+            for d in _decoded_cmds[:20]:
+                brief_lines.append(f"- {_safe_cluster(d)}")
+
         # v0.19.12: was emitting json.dumps(extracted_iocs) and
         # json.dumps(enrichment summary), which qwen2.5:7b mirrored back
         # under format="json" instead of producing the analyst envelope.
