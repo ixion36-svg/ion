@@ -472,3 +472,23 @@ def revert_bob_proposal(
         _bob_err(e)
     logger.info("Bob-tuning proposal %d reverted by user %s", proposal_id, current_user.id)
     return p.to_dict()
+
+
+# ── §4 control #7 — abuse monitor (oversight, read-only) ─────────────────────
+# The detective control over the DE module: flags two-person collusion, high-
+# volume actors, and blanket-scope quirks that the preventive controls allow.
+# Gated de:verify — the oversight tier, not the raise/propose tier.
+
+
+@router.get("/abuse-scan", dependencies=[Depends(require_permission("de:verify"))])
+def de_abuse_scan(
+    days: int = Query(90, ge=1, le=365, description="Lookback window in days"),
+    session: Session = Depends(get_db_session),
+):
+    """Read-only scan for DE abuse patterns (collusion / volume / blanket scope).
+
+    Reports only — mutates nothing. For an oversight reviewer to triage.
+    """
+    from ion.services.de_abuse_service import scan_abuse
+
+    return scan_abuse(session, days=days)

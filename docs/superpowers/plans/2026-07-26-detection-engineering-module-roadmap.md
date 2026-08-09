@@ -148,6 +148,11 @@ TTP). Controls, baked in from Phase 2:
   batched into reviewable, approved, versioned changes.
 - **Abuse monitoring.** Flag suspicious patterns: one user raising many quirks against
   high-severity rules, quirks that would blanket a MITRE technique, verify/approve collusion.
+  **✅ SHIPPED v0.78.0** — `services/de_abuse_service.py` (read-only `scan_abuse`) +
+  `GET /api/de/abuse-scan` (gated `de:verify`) + `/de-oversight` page. Detects recurring
+  raiser→verifier / drafter→approver collusion pairs, high-volume actors, and broad-scope
+  ("blanket") quirks over the DE domain tables. Reports only — mutates nothing. This closes
+  the last §4 control; the other six were preventive, this is the missing detective layer.
 
 ---
 

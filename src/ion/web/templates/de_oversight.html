@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}DE Abuse Monitor - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="flex-1 min-w-0">
+  <div class="flex items-center gap-3 mb-4">
+    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-shield"/></svg>
+    <span class="label-tiny text-ion-cyan">Detection engineering · Oversight</span>
+  </div>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Abuse Monitor</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">The detective control over the DE module. Separation-of-duties stops one person; this flags what a colluding <strong>pair</strong> could do — recurring raiser/verifier and drafter/approver pairs, high-volume actors, and over-broad "blanket" quirks. <strong>Read-only</strong>: it reports, it never changes anything.</p>
+</div>
+<div class="flex items-center gap-2 flex-wrap">
+        <select id="ab-days" class="ion-select" data-change-action="abLoad">
+            <option value="30">Last 30 days</option>
+            <option value="90" selected>Last 90 days</option>
+            <option value="180">Last 180 days</option>
+            <option value="365">Last 365 days</option>
+        </select>
+        <button class="ion-btn ion-btn-primary" data-click-action="abLoad">Refresh</button>
+    </div>
+</section>
+
+<div id="ab-content"><div class="ab-loading"><span class="ab-spinner"></span> Scanning…</div></div>
+
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ csp_nonce }}">
+.ab-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.ab-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:ab-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes ab-spin{to{transform:rotate(360deg)}}
+.ab-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.ab-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;position:relative;overflow:hidden}
+.ab-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--border)}
+.ab-stat.high::before{background:var(--sev-critical,#ef4444)}
+.ab-stat.medium::before{background:var(--sev-medium,#f59e0b)}
+.ab-stat.clean::before{background:var(--mitre-covered,#34d399)}
+.ab-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.ab-stat-val{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1;color:var(--text-primary)}
+.ab-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px;overflow-x:auto}
+.ab-table{width:100%;border-collapse:collapse;font-size:.84rem}
+.ab-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+.ab-table td{padding:9px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary);vertical-align:top}
+.ab-sev{display:inline-block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 7px;border-radius:4px}
+.ab-sev-high{background:rgba(239,68,68,.16);color:var(--sev-critical,#ef4444)}
+.ab-sev-medium{background:rgba(245,158,11,.16);color:var(--sev-medium,#f59e0b)}
+.ab-type{font-family:'JetBrains Mono',monospace;font-size:.74rem;color:var(--ion-cyan,var(--primary))}
+.ab-clean{text-align:center;padding:44px;color:var(--mitre-covered,#34d399);font-size:.9rem}
+.ab-clean .ab-sub{display:block;color:var(--text-secondary);font-size:.8rem;margin-top:6px}
+.ab-muted{color:var(--text-secondary)}
+</style>
+<script nonce="{{ csp_nonce }}">
+const AB_API = '/api/de/abuse-scan';
+function ab$(id){return document.getElementById(id)}
+function abEsc(s){if(s===null||s===undefined)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+async function abLoad(){
+    const days = ab$('ab-days').value;
+    ab$('ab-content').innerHTML = '<div class="ab-loading"><span class="ab-spinner"></span> Scanning…</div>';
+    try {
+        const r = await fetch(AB_API + '?days=' + encodeURIComponent(days));
+        if(!r.ok) throw new Error('HTTP ' + r.status);
+        abRender(await r.json());
+    } catch(e){ ab$('ab-content').innerHTML = '<div class="ab-loading">Scan failed: ' + abEsc(e.message) + '</div>'; }
+}
+
+function abSevBadge(s){ return '<span class="ab-sev ab-sev-' + abEsc(s) + '">' + abEsc(s) + '</span>'; }
+
+function abRender(d){
+    const sig = d.signals || [];
+    const sum = d.summary || {total:0, by_severity:{}};
+    if(!sig.length){
+        ab$('ab-content').innerHTML = '<div class="ab-section"><div class="ab-clean">No abuse signals in the last '
+            + abEsc(d.window_days) + ' days.<span class="ab-sub">Preventive controls held and no collusion / volume / blanket-scope pattern surfaced.</span></div></div>';
+        return;
+    }
+    const bs = sum.by_severity || {};
+    let html = '<div class="ab-stats">'
+        + '<div class="ab-stat ' + (sum.total?'medium':'clean') + '"><div class="ab-stat-label">Signals</div><div class="ab-stat-val">' + (sum.total||0) + '</div></div>'
+        + '<div class="ab-stat high"><div class="ab-stat-label">High</div><div class="ab-stat-val">' + (bs.high||0) + '</div></div>'
+        + '<div class="ab-stat medium"><div class="ab-stat-label">Medium</div><div class="ab-stat-val">' + (bs.medium||0) + '</div></div>'
+        + '<div class="ab-stat"><div class="ab-stat-label">Window</div><div class="ab-stat-val">' + abEsc(d.window_days) + 'd</div></div>'
+        + '</div>';
+
+    html += '<div class="ab-section"><table class="ab-table"><thead><tr>'
+        + '<th>Severity</th><th>Type</th><th>Detail</th><th>Count</th></tr></thead><tbody>';
+    for(const s of sig){
+        let detail = abEsc(s.description || '');
+        let count = '';
+        if(s.type === 'collusion_pair'){ count = s.count; }
+        else if(s.type === 'high_volume_actor'){ count = s.count; }
+        else if(s.type === 'broad_scope_quirk'){ count = s.rule_count + ' rules'; }
+        html += '<tr>'
+            + '<td>' + abSevBadge(s.severity) + '</td>'
+            + '<td><span class="ab-type">' + abEsc(s.type) + '</span></td>'
+            + '<td>' + detail + '</td>'
+            + '<td class="ab-muted">' + abEsc(count) + '</td>'
+            + '</tr>';
+    }
+    html += '</tbody></table></div>';
+    ab$('ab-content').innerHTML = html;
+}
+
+document.addEventListener('DOMContentLoaded', abLoad);
+</script>
+{% endblock %}

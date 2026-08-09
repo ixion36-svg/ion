@@ -2165,6 +2165,12 @@ async def de_bob_page(request: Request, user: User = Depends(require_page_permis
     return templates.TemplateResponse(request=request, name="de_bob.html")
 
 
+@app.get("/de-oversight", response_class=HTMLResponse)
+async def de_oversight_page(request: Request, user: User = Depends(require_page_permission("de:verify"))):
+    """Render the DE abuse monitor (roadmap §4 #7) — oversight, gated de:verify."""
+    return templates.TemplateResponse(request=request, name="de_oversight.html")
+
+
 @app.get("/guide", response_class=HTMLResponse)
 async def guide_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the interactive training guide."""
