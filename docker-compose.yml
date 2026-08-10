@@ -98,7 +98,7 @@ services:
     # build: .  # Uncomment to build from source instead of pulling
 
 
-    image: ixion36/ion:${ION_VERSION:-0.79.1}
+    image: ixion36/ion:${ION_VERSION:-0.79.2}
 
     container_name: ion
     restart: unless-stopped
@@ -152,12 +152,28 @@ services:
     tmpfs:
       - /tmp
 
-    # Health check — used by seeder to know when ION is ready
+    # Health check — used by seeder to know when ION is ready.
+    #
+    # v0.79.2: start_period 15s -> 90s, timeout 5s -> 10s.
+    #
+    # Boot is not a 15-second job. The startup event runs migrations and ~12
+    # advisory-locked seeders (permissions, playbooks, SOC templates, knowledge
+    # base, KEV catalog, CyAB catalogue, forensic playbooks, prompt templates)
+    # before the workers are free to answer anything. Observed on a 4-CPU dev
+    # box: first successful health probe ~40s after start, and a probe that
+    # coincided with seeding plus real request traffic took longer than the 5s
+    # timeout and was killed.
+    #
+    # Failures inside start_period do NOT count toward `retries` — they only
+    # delay the healthy transition — so a generous start_period costs nothing
+    # at steady state while removing a boot-time flap that stops dependent
+    # containers (ion-seeder waits on `condition: service_healthy`) and would
+    # be a restart loop under an orchestrator that acts on failed health.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"]
       interval: 10s
-      timeout: 5s
-      start_period: 15s
+      timeout: 10s
+      start_period: 90s
       retries: 5
 
     # Resource limits — sized for ~50 concurrent SOC users (v0.9.65 load-test
@@ -257,7 +273,7 @@ services:
   seeder:
 
 
-    image: ixion36/ion:${ION_VERSION:-0.79.1}
+    image: ixion36/ion:${ION_VERSION:-0.79.2}
 
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]

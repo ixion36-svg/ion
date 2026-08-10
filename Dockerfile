@@ -61,7 +61,7 @@ FROM python:3.14-slim AS runtime
 
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
-      org.opencontainers.image.version="0.79.1" \
+      org.opencontainers.image.version="0.79.2" \
       org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
 
 # Install runtime libraries (PostgreSQL client + WeasyPrint deps + fonts)
@@ -117,8 +117,18 @@ ENV ION_PORT=8000
 # Expose port
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+# Health check.
+#
+# v0.79.2: start-period 10s -> 90s. Boot runs migrations plus ~12 advisory-
+# locked seeders before the workers can answer anything; first successful probe
+# on a 4-CPU host is ~40s. compose overrides this for compose-started
+# containers, but a plain `docker run` of the image gets THIS one — so it has
+# to be realistic too, or the image looks broken for its first half-minute
+# under any orchestrator that acts on health.
+#
+# Probes that fail inside the start period do not count toward --retries, so
+# widening it costs nothing at steady state.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')" || exit 1
 
 # Switch to non-root user
