@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.2 -->
-<!-- ion-doc:version=0.79.2 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.3 -->
+<!-- ion-doc:version=0.79.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-10 -->
 
 # Changelog
+
+## v0.79.3 — 2026-08-10
+
+**Host and User come from the extraction ION already did, not from a second trip to Elasticsearch.**
+
+- v0.79.2 filled the blank Host/User cells on a case by re-reading the alert's `/raw` document. That worked, but it was re-deriving data the page was **already holding**: ION extracts hostname and user at triage time in `services/observable_extractor.py`, stores them on `AlertTriage.observables` (`{"type": "hostname", "value": "WIN-HR-12"}`, `{"type": "user_account", "value": "asmith"}`), and **`/api/cases/{id}` already returns that array per alert**.
+- The component now reads those observables **synchronously, before the first paint**. Two consequences worth having: the cells are correct immediately with no dash-then-correct flicker, and they populate **even when Elasticsearch is unreachable** — which is precisely the situation in which somebody opens a case.
+- The `/raw` hydration stays as the fallback for what observables do not carry (Source, Timestamp, message). It does **not** reduce request count further — Fields and Raw Data genuinely render the whole document — so `/raw` is still fetched once per alert, as in v0.79.2.
+- Only genuine blanks are filled, so `/alerts`, which sets these from the full document, is unaffected. Malformed observable rows are tolerated rather than throwing and taking the alert detail down.
+- Known duplication, flagged not fixed: "where is the hostname" is now answered in three places — `observable_extractor.py`, `elasticsearch_service.py` (`host.hostname` → `host.name`), and this component's ECS fallback. Consolidating is more than a patch release should carry.
+- 36 tests in `tests/test_v079_2_case_detail_perf.py` (11 new), the new ones confirmed to fail against v0.79.2.
+
 
 ## v0.79.2 — 2026-08-10
 
