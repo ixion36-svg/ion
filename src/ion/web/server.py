@@ -83,6 +83,7 @@ from ion.web.integration_api import router as integration_router
 from ion.web.investigation_api import router as investigation_router
 from ion.web.investigation_memory_api import router as investigation_memory_router
 from ion.web.ioc_staleness_api import router as ioc_staleness_router
+from ion.web.kev_api import router as kev_router
 from ion.web.kibana_api import router as kibana_router
 from ion.web.knowledge_graph_api import router as knowledge_graph_router
 from ion.web.labs_api import router as labs_router
@@ -429,6 +430,7 @@ app.include_router(log_source_router, prefix="/api")
 app.include_router(briefing_router, prefix="/api")
 app.include_router(knowledge_graph_router, prefix="/api")
 app.include_router(emulation_router, prefix="/api")
+app.include_router(kev_router, prefix="/api")
 app.include_router(vulnerability_router, prefix="/api")
 app.include_router(maturity_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
@@ -654,6 +656,7 @@ async def _startup_event():
         LOCK_SEED_CYAB_SUBPROFILES,
         LOCK_SEED_DEFAULT_PLAYBOOKS,
         LOCK_SEED_FORENSIC_PB,
+        LOCK_SEED_KEV_CATALOG,
         LOCK_SEED_KNOWLEDGE_BASE,
         LOCK_SEED_PERMISSIONS,
         LOCK_SEED_SOC_TEMPLATES,
@@ -711,6 +714,23 @@ async def _startup_event():
         from ion.services.kb_seed_service import seed_knowledge_base
         seed_knowledge_base()
     run_locked(engine, LOCK_SEED_KNOWLEDGE_BASE, "seed_knowledge_base", _seed_kb)
+
+    # ---------------------------------------------------------------
+    # v0.79.1: seed the bundled CISA KEV snapshot.
+    #
+    # Idempotent on the catalog VERSION, and deliberately one-way: if an
+    # operator has imported a catalog NEWER than the one in this image, the
+    # seed is a no-op rather than dragging them back to build time. Never
+    # fetches anything — ION ships air-gapped.
+    # ---------------------------------------------------------------
+    def _seed_kev():
+        from ion.services.kev_service import seed_from_bundle
+        session = factory()
+        try:
+            seed_from_bundle(session)
+        finally:
+            session.close()
+    run_locked(engine, LOCK_SEED_KEV_CATALOG, "seed_kev_catalog", _seed_kev)
 
     # ---------------------------------------------------------------
     # Seed built-in Forensic Investigation playbooks

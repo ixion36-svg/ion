@@ -120,6 +120,10 @@ from ion.models.investigation import Investigation  # noqa: F401
 # v0.10.6: KB article embeddings for Bob's RAG grounding.
 # v0.51.0: chunk-level (KBChunkEmbedding) replaced the whole-doc vector.
 from ion.models.kb_document_embedding import KBChunkEmbedding  # noqa: F401
+
+# v0.79.1: CISA KEV catalog, shipped as a build-time snapshot (air-gapped —
+# nothing fetches it at runtime).
+from ion.models.kev import KevEntry  # noqa: F401
 from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.maturity import MaturityAssessment
 

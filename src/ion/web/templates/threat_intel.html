@@ -151,6 +151,10 @@
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="reports">Reports</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge _ion-s-c8be1ccba6">0</span></button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="stories">Attack Stories</button>
+        {# v0.79.1: CISA KEV, shipped as a snapshot inside the image. Lives here
+           rather than under Reporting because "is this being exploited right
+           now" is a triage question, not a metric. #}
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="kev">KEV Catalog</button>
     </div>
 
     <!-- Overview Panel -->
@@ -373,6 +377,25 @@ data-click-action="tiCloseReport"></div>
             <div class="ti-empty">Click Refresh to correlate recent alerts into attack stories.</div>
         </div>
     </div>
+
+    {# ── KEV Catalog (v0.79.1) ─────────────────────────────────────────
+       A snapshot, not a feed. The staleness banner is not decoration: an
+       absent CVE only means "not in KEV" relative to the catalog actually
+       loaded, so the version and its age are stated on every view. #}
+    <div class="ti-panel" id="panel-kev">
+        <div id="kev-status-bar" class="mb-4"></div>
+        <div class="ti-search-bar">
+            <input id="kev-search" class="ti-search-input" type="text"
+                   placeholder="CVE, vendor or product — e.g. CVE-2026-8037, Fortinet, LoadMaster">
+            <label class="flex items-center gap-2 text-xs text-slate-400 whitespace-nowrap">
+                <input type="checkbox" id="kev-ransomware-only"> Ransomware-linked only
+            </label>
+            <button class="ion-btn ion-btn-primary" data-click-action="kevSearch">Search</button>
+        </div>
+        <div id="kev-results">
+            <div class="ti-empty">Loading catalog…</div>
+        </div>
+    </div>
 </div>
 
 
@@ -403,11 +426,86 @@ data-click-action="tiCloseReport"></div>
         if (tab.dataset.panel === 'ioc' && !window._tiIOCLoaded) { tiLoadIOCFeed(); window._tiIOCLoaded = true; }
         if (tab.dataset.panel === 'reports' && !window._tiReportsLoaded) { tiLoadReports(); window._tiReportsLoaded = true; }
         if (tab.dataset.panel === 'stories' && !window._tiStoriesLoaded) { tiLoadStories(); window._tiStoriesLoaded = true; }
+        if (tab.dataset.panel === 'kev' && !window._tiKevLoaded) { kevSearch(); window._tiKevLoaded = true; }
     });
+
+    // ── KEV catalog (v0.79.1) ──────────────────────────────────────────
+    // The catalog is a snapshot shipped in the image, so its AGE is part of
+    // every answer: "CVE-X is not in KEV" means nothing without "…according
+    // to a catalog from N days ago".
+    function kevRenderStatus(st) {
+        const bar = document.getElementById('kev-status-bar');
+        if (!bar) return;
+        if (!st || !st.loaded) {
+            bar.innerHTML = '<div class="rounded-lg border border-ion-amber/30 bg-ion-amber/[0.06] px-4 py-3 text-xs text-ion-amber">'
+                          + 'No KEV catalog loaded. An operator can import one from Settings.</div>';
+            return;
+        }
+        const age = st.age_days;
+        // Bands, not a hard cutoff: CISA publishes irregularly, so "30 days"
+        // is a prompt to check, not a failure.
+        const tone = (age == null) ? 'slate'
+                   : age <= 30 ? 'ion-lime' : age <= 90 ? 'ion-amber' : 'ion-coral';
+        const ahead = st.ahead_of_bundle
+            ? ' <span class="text-slate-500">(operator import, newer than this build)</span>' : '';
+        bar.innerHTML =
+          `<div class="rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+             <span class="text-slate-400">Catalog <b class="text-white">${escapeHtml(st.catalog_version || '—')}</b>${ahead}</span>
+             <span class="text-slate-400"><b class="text-white">${st.count}</b> known-exploited CVEs</span>
+             <span class="text-${tone}">${age == null ? 'age unknown' : age + ' days old'}</span>
+             <span class="text-slate-500">snapshot — ION does not fetch this at runtime</span>
+           </div>`;
+    }
+
+    function kevRow(e) {
+        const ransom = e.known_ransomware
+            ? '<span class="ti-badge" style="background:rgba(248,113,113,.15);color:#f87171;border-color:rgba(248,113,113,.35)">ransomware</span>'
+            : '';
+        return `<tr>
+            <td class="ti-name-cell">${escapeHtml(e.cve_id)}</td>
+            <td>${escapeHtml(e.vendor_project || '')} ${escapeHtml(e.product || '')}</td>
+            <td>${escapeHtml(e.vulnerability_name || '')} ${ransom}</td>
+            <td>${escapeHtml(e.date_added || '')}</td>
+            <td>${escapeHtml(e.due_date || '')}</td>
+        </tr>`;
+    }
+
+    async function kevSearch() {
+        const box = document.getElementById('kev-search');
+        const only = document.getElementById('kev-ransomware-only');
+        const out = document.getElementById('kev-results');
+        const params = new URLSearchParams({
+            q: box ? box.value.trim() : '',
+            ransomware_only: only && only.checked ? 'true' : 'false',
+            limit: '50',
+        });
+        try {
+            const resp = await fetch('/api/kev?' + params.toString());
+            if (!resp.ok) throw new Error('KEV lookup failed (' + resp.status + ')');
+            const data = await resp.json();
+            kevRenderStatus(data.status);
+            if (!data.results.length) {
+                // Say WHICH catalog found nothing — a bare "no results" invites
+                // the reader to conclude the CVE is safe.
+                const v = (data.status && data.status.catalog_version) || 'unknown';
+                out.innerHTML = `<div class="ti-empty">No entries in catalog ${escapeHtml(v)}.</div>`;
+                return;
+            }
+            out.innerHTML =
+              '<table class="ti-table"><thead><tr><th>CVE</th><th>Vendor / product</th>'
+            + '<th>Vulnerability</th><th>Added</th><th>Remediate by</th></tr></thead><tbody>'
+            + data.results.map(kevRow).join('') + '</tbody></table>';
+        } catch (err) {
+            out.innerHTML = '<div class="ti-empty">' + escapeHtml(err.message) + '</div>';
+        }
+    }
+    window.kevSearch = kevSearch;
 
     // ── Enter key on search ──────────────────
     document.getElementById('actor-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchActors(); });
     document.getElementById('campaign-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') searchCampaigns(); });
+    document.getElementById('kev-search').addEventListener('keydown', function(e) { if (e.key === 'Enter') kevSearch(); });
+    document.getElementById('kev-ransomware-only').addEventListener('change', kevSearch);
 
     // ── Overview ──────────────────────────────
     async function loadOverview() {

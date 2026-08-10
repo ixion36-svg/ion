@@ -127,6 +127,7 @@ LOCK_ARKIME_AUTO_CASE_BG    = 1025  # v0.34.0  — auto-case + PCAP for Arkime-b
 LOCK_ARKIME_RTMON_BG        = 1026  # v0.45.0  — realtime Arkime IOC-traffic monitor
 LOCK_PLAYBOOK_EMBEDDING_BG  = 1027  # v0.51.0  — playbook-embedding background producer
 LOCK_TI_REPORT_BG           = 1028  # v0.53.0  — TI-report cache sync + chunk-embedding loop
+LOCK_SEED_KEV_CATALOG       = 1029  # v0.79.1  — seed the bundled CISA KEV snapshot
 
 
 @contextmanager

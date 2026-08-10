@@ -980,6 +980,29 @@ def _normalise_extracted_iocs(raw: Dict[str, Any]) -> Dict[str, List[str]]:
     return out
 
 
+def _kev_lines(text: Any) -> List[str]:
+    """KEV ground-truth prompt lines for whatever CVEs appear in ``text``.
+
+    Opens its own short-lived session: the prompt builders are pure string
+    assembly and are called from several places, so threading a session through
+    all of them to add enrichment would be the wrong trade. Best-effort — an
+    unavailable catalog costs the block, never the investigation.
+    """
+    try:
+        from ion.services.kev_service import kev_prompt_block
+        from ion.storage.database import get_session_factory
+
+        blob = text if isinstance(text, str) else json.dumps(text, default=str)
+        db = get_session_factory()()
+        try:
+            return kev_prompt_block(db, blob)
+        finally:
+            db.close()
+    except Exception:  # noqa: BLE001 — enrichment must never break triage
+        logger.debug("KEV prompt lines skipped", exc_info=True)
+        return []
+
+
 def _alert_to_text_blob(alert: dict) -> str:
     """Flatten an alert dict into a single text blob for IOC extraction.
 
@@ -2157,6 +2180,13 @@ class InvestigationService:
                 out.append(f"- `{_safe(d['field'])}` decodes to: {_safe(d['decoded'])}")
             out.append("")
 
+        # v0.79.1: KEV membership, resolved in code against the shipped catalog.
+        # Same reasoning as the decode above — a model asked whether a CVE is
+        # known-exploited will answer from half-remembered numbering and be
+        # confidently wrong either way. A miss is stated as absence-from-a-
+        # snapshot, never as safety.
+        out.extend(_kev_lines(alert_summary))
+
         if rule_desc or rule_guide:
             out.append("## Detection rule context")
             if rule_desc:
@@ -3089,6 +3119,15 @@ class InvestigationService:
             ]
             for d in _decoded_cmds[:20]:
                 brief_lines.append(f"- {_safe_cluster(d)}")
+
+        # v0.79.1: KEV membership across the whole cluster, resolved in code.
+        # Built from the same per-alert blobs the decode uses, so a CVE named
+        # anywhere in the case is checked once.
+        _cluster_blob = "\n".join(_alert_to_text_blob(a) for a in alerts)
+        _kev_block = _kev_lines(_cluster_blob)
+        if _kev_block:
+            brief_lines.append("")
+            brief_lines.extend(_kev_block)
 
         # v0.19.12: was emitting json.dumps(extracted_iocs) and
         # json.dumps(enrichment summary), which qwen2.5:7b mirrored back
