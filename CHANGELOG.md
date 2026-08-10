@@ -1,13 +1,22 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.3 -->
-<!-- ion-doc:version=0.79.3 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.4 -->
+<!-- ion-doc:version=0.79.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-10 -->
 
 # Changelog
+
+## v0.79.4 — 2026-08-10
+
+**The alerts list stops sequentially scanning `alert_triage` to find lab fixtures.**
+
+- Production APM on v0.78.0 put **~50% of response time in repeated `alert_triage` selects** — 6 executions, 807 ms. The source is `_fixture_alert_dicts()`, which runs on **every** return path of the alerts-list endpoint (ION's hottest read) and filters `es_alert_id LIKE 'lab-fixture-%'`. A prefix `LIKE` **cannot use the plain btree** on `es_alert_id` under a non-C collation — that needs `text_pattern_ops` — so it planned as a Seq Scan over a table that grows one row per triaged alert, forever, to surface a handful of **lab-training fixtures a production deployment never uses**.
+- Fixed with a **partial** index (`ix_alert_triage_lab_fixture`) holding only the fixture rows. Measured at 200k rows: **Parallel Seq Scan 73.1 ms → Index Scan 0.197 ms**, index size **16 kB** (a `text_pattern_ops` index over every row would be 7 MB and pay a write cost on every triage insert). Added as an idempotent `CREATE INDEX IF NOT EXISTS` migration; failure is logged, not fatal — without it the lookup is slow, not wrong.
+- Postgres uses the index only because the query predicate and the index predicate are **identical**. Change the prefix in either place and the planner silently reverts to the scan — no error, no wrong answer, nothing to attribute the slowness to. Both sites now carry a comment naming the other, and `tests/test_v079_4_lab_fixture_index.py` executes the migration's **own DDL text** (extracted from source, never retyped) against Postgres at a size where the planner has a real choice, asserting `Index Scan`.
+- Not fixed here: production still runs a lab-training query on every alerts-list request. The index makes that free; it does not make it sensible. Removing it properly needs a labs feature flag or a boolean column — neither exists today.
 
 ## v0.79.3 — 2026-08-10
 
