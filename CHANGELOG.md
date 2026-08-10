@@ -1,13 +1,24 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.1 -->
-<!-- ion-doc:version=0.79.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.2 -->
+<!-- ion-doc:version=0.79.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-10 -->
 
 # Changelog
+
+## v0.79.2 — 2026-08-10
+
+**Reported from production on v0.78.0: the case alert detail was slow, and Host/User were blank. Both trace to the same v0.77.0 seam.**
+
+- **The same document was fetched four times per alert click.** Moving from tabs (one section loaded) to stacked (every section open) meant four consumers all wanted `/api/elasticsearch/alerts/{id}/raw` — the Fields section, the stacked Raw Data section, the tab-click Raw Data loader, and the `/cases` rule guide. They fire together, so each checks the `raw_data` cache, finds it empty, and issues its own Elasticsearch request. **One request became four, on the critical path of every selection.** Now coalesced behind a single promise per alert id: **measured 1 request on select, 1 for a different alert, and 0 when re-selecting one already loaded.** The fourth consumer was found by a test that was initially too broad — it counted all alert-endpoint fetches and caught the tab-click loader still bypassing the coalescer.
+- **Host, User, Source and Timestamp were blank on a case.** `/api/cases/{id}` returns a thin per-alert projection — `es_alert_id, rule_name, status, priority, observables, mitre_techniques, analyst_notes` — built for the old narrow slide-out that showed a rule name and little else. v0.77.0 pointed a full-detail component at it. Widening the case API would not have helped: **ION's own tables do not hold host/user either** — `alert_triage` has no such columns, that data lives in Elasticsearch. So the component fills the blanks from the `/raw` document it already fetches, at **no extra request** thanks to the coalescing above, reading ECS with fallbacks (`host.name` → `host.hostname` → `agent.name` → `winlog.computer_name`; `user.name` → the Windows `SubjectUserName`/`TargetUserName` event-data fields) and handling both flattened and nested documents. It only fills genuine blanks, so `/alerts` is untouched. Also stops rendering the literal strings `undefined` and `Invalid Date` when a field is absent.
+- **Healthcheck start period 10s/15s → 90s, timeout 5s → 10s**, in both `docker-compose.yml` and the `Dockerfile`. Boot runs migrations plus ~12 advisory-locked seeders before the workers answer anything; first successful probe on a 4-CPU host is ~40s, and a probe landing during seeding plus real traffic exceeded the 5s timeout and was killed — leaving the container "unhealthy" and blocking `ion-seeder`, whose dependency is `condition: service_healthy`. Probes failing inside the start period do not count toward `retries`, so this costs nothing at steady state. The `Dockerfile` copy matters separately: compose overrides it, but a plain `docker run` of the image does not.
+- Note for anyone patching statics by hand: the script tag is cache-busted with the **app version**, so a static-asset fix without a version bump is invisible to browsers that already loaded the page.
+- 25 tests in `tests/test_v079_2_case_detail_perf.py`, 24 confirmed to fail against the pre-fix code.
+
 
 ## v0.79.1 — 2026-08-10
 
