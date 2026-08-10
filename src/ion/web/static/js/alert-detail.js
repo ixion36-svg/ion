@@ -222,6 +222,45 @@
       }
   }
 
+  // ── coalesced raw fetch (v0.79.2) ───────────────────────────────────────
+  //
+  // The stacked layout opens every section at once, and THREE of them want the
+  // same `/raw` document: the Fields section, the Raw Data section, and (on
+  // /cases) the rule guide. They start together, so each one checks
+  // `_current.raw_data`, finds it empty, and issues its own request — the same
+  // Elasticsearch fetch three times per alert click. Under tabs only the
+  // visible section loaded, so v0.77.0 turned one request into three and put
+  // them on the critical path of every selection.
+  //
+  // One promise per alert id, shared by every caller. Cleared on failure so a
+  // transient error is retryable, and keyed by id so switching alerts does not
+  // serve the previous alert's document.
+  var _rawInflight = {};
+
+  function fetchRawOnce(alertId) {
+      if (_current && _current.id === alertId && _current.raw_data) {
+          return Promise.resolve(_current.raw_data);
+      }
+      if (_rawInflight[alertId]) return _rawInflight[alertId];
+
+      _rawInflight[alertId] = fetch(
+          '/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw'
+      ).then(function (r) {
+          return r.json().catch(function () { return {}; });
+      }).then(function (data) {
+          var raw = data && data.raw_data;
+          if (raw && _current && _current.id === alertId) _current.raw_data = raw;
+          // Keep the resolved promise cached: re-selecting an alert in the rail
+          // should not re-hit Elasticsearch.
+          return raw || null;
+      }).catch(function (e) {
+          delete _rawInflight[alertId];
+          throw e;
+      });
+      return _rawInflight[alertId];
+  }
+  window.ionAlertDetailFetchRaw = fetchRawOnce;
+
   async function loadAlertParsedFields(alertId, container) {
       if (_current && _current.raw_data) {
           container.innerHTML = renderAlertParsedFields(alertId, _current.raw_data);
@@ -229,8 +268,9 @@
       }
       container.innerHTML = '<div class="loading">Loading fields...</div>';
       try {
-          const r = await fetch(`/api/elasticsearch/alerts/${encodeURIComponent(alertId)}/raw`);
-          const data = await r.json().catch(() => ({}));
+          const raw = await fetchRawOnce(alertId);
+          const data = { raw_data: raw };
+          const r = { ok: !!raw };
           if (!r.ok || !data.raw_data) {
               // Still surface extracted values even when the raw _source is gone.
               container.innerHTML = _alertExtractedValuesBlock(alertId)
@@ -613,11 +653,14 @@
           const container = document.getElementById('raw-data-content');
           if (container && container.querySelector('.loading')) {
               container.innerHTML = '<div class="loading">Loading raw data...</div>';
-              fetch(`/api/elasticsearch/alerts/${encodeURIComponent(_current.id)}/raw`)
-                  .then(r => r.json())
-                  .then(data => {
-                      _current.raw_data = data.raw_data;
-                      container.innerHTML = syntaxHighlightJSON(data.raw_data);
+              // v0.79.2: through the coalescer like every other consumer. On
+              // /alerts this is the tab-click path, so it also benefits: opening
+              // Raw Data after Fields now reuses the document already fetched.
+              fetchRawOnce(_current.id)
+                  .then(raw => {
+                      if (!raw) { container.innerHTML = '<div class="error">No raw data available</div>'; return; }
+                      _current.raw_data = raw;
+                      container.innerHTML = syntaxHighlightJSON(raw);
                   })
                   .catch(() => { container.innerHTML = '<div class="error">Failed to load raw data</div>'; });
           }
@@ -648,15 +691,15 @@
         </div>
         <div class="alert-meta-item">
             <div class="alert-meta-label">Host</div>
-            <div class="alert-meta-value">${escapeHtml(alert.host || '-')}</div>
+            <div class="alert-meta-value" id="iad-meta-host">${escapeHtml(alert.host || '-')}</div>
         </div>
         <div class="alert-meta-item">
             <div class="alert-meta-label">User</div>
-            <div class="alert-meta-value">${escapeHtml(alert.user || '-')}</div>
+            <div class="alert-meta-value" id="iad-meta-user">${escapeHtml(alert.user || '-')}</div>
         </div>
         <div class="alert-meta-item">
             <div class="alert-meta-label">Source</div>
-            <div class="alert-meta-value">${escapeHtml(alert.source)}</div>
+            <div class="alert-meta-value" id="iad-meta-source">${escapeHtml(alert.source || '-')}</div>
         </div>
         <div class="alert-meta-item">
             <div class="alert-meta-label">Rule</div>
@@ -668,7 +711,9 @@
         </div>
         <div class="alert-meta-item">
             <div class="alert-meta-label">Timestamp</div>
-            <div class="alert-meta-value">${new Date(alert.timestamp).toLocaleString()}</div>
+            <div class="alert-meta-value" id="iad-meta-timestamp">${
+                alert.timestamp ? new Date(alert.timestamp).toLocaleString() : '-'
+            }</div>
         </div>
     </div>`;
 
@@ -799,9 +844,79 @@
     return _renderHead(alert) + _sectionsHtml(alert);
   }
 
+  // ── hydrate thin alerts from the raw document (v0.79.2) ─────────────────
+  //
+  // /alerts hands this component a full Elasticsearch document. /cases hands it
+  // a row from /api/cases/{id}, which carries only es_alert_id, rule_name,
+  // status, priority, observables, mitre_techniques and analyst_notes — a
+  // projection built for the old narrow slide-out, which showed a rule name and
+  // little else. v0.77.0 pointed a full-detail component at it, so Host, User,
+  // Source, Timestamp and the message rendered blank on a case.
+  //
+  // Rather than widening the case API (ION's own tables do not hold host/user
+  // either — they live in Elasticsearch), fill the gaps from the /raw document
+  // this component already fetches. Costs no extra request: fetchRawOnce is
+  // shared with the Fields and Raw Data sections.
+  function _ecs(src, dotted) {
+    if (!src) return undefined;
+    if (src[dotted] !== undefined) return src[dotted];   // flattened form
+    return dotted.split('.').reduce(function (o, k) {
+      return (o && typeof o === 'object') ? o[k] : undefined;
+    }, src);
+  }
+
+  function _firstOf(src, paths) {
+    for (var i = 0; i < paths.length; i++) {
+      var v = _ecs(src, paths[i]);
+      if (Array.isArray(v)) v = v[0];
+      if (v !== undefined && v !== null && String(v).trim() !== '') return String(v);
+    }
+    return undefined;
+  }
+
+  function _setMeta(id, value) {
+    var el = document.getElementById(id);
+    // Only fill a genuine blank — never overwrite something the caller supplied.
+    if (el && value && (el.textContent === '-' || el.textContent.trim() === '')) {
+      el.textContent = value;
+    }
+  }
+
+  function _hydrateFromRaw(alert) {
+    if (!alert || !alert.id) return;
+    var needs = !alert.host || !alert.user || !alert.timestamp || !alert.source;
+    if (!needs) return;
+    fetchRawOnce(alert.id).then(function (raw) {
+      if (!raw) return;
+      var host = _firstOf(raw, ['host.name', 'host.hostname', 'agent.name', 'winlog.computer_name']);
+      var user = _firstOf(raw, ['user.name', 'winlog.event_data.SubjectUserName',
+                                'winlog.event_data.TargetUserName', 'source.user.name']);
+      var ts   = _firstOf(raw, ['@timestamp', 'event.created', 'timestamp']);
+      var src  = _firstOf(raw, ['event.dataset', 'data_stream.dataset', 'event.module']);
+      var msg  = _firstOf(raw, ['message', 'kibana.alert.reason', 'signal.rule.description']);
+
+      if (host && !alert.host) alert.host = host;
+      if (user && !alert.user) alert.user = user;
+      if (ts && !alert.timestamp) alert.timestamp = ts;
+      if (src && !alert.source) alert.source = src;
+
+      _setMeta('iad-meta-host', host);
+      _setMeta('iad-meta-user', user);
+      _setMeta('iad-meta-source', src);
+      if (ts) _setMeta('iad-meta-timestamp', new Date(ts).toLocaleString());
+
+      var box = document.getElementById('alert-message-box');
+      if (box && msg && !box.textContent.trim()) {
+        box.textContent = msg;
+        box.setAttribute('data-original-message', msg);
+      }
+    }).catch(function () { /* the grid keeps its dashes */ });
+  }
+
   function mount(container, alert, opts) {
     if (!container) return;
     container.innerHTML = render(alert, opts);
+    _hydrateFromRaw(alert);
     // In stacked layout every section is already on screen, so nothing is
     // lazy - load the ones that would otherwise wait for a click the analyst
     // is never going to make.
@@ -816,9 +931,14 @@
 
   function _loadRawInto(el, alert) {
     if (!el || alert.raw_data) return;
-    fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alert.id) + '/raw')
-      .then(function (r) { return r.json(); })
-      .then(function (d) { alert.raw_data = d.raw_data; el.innerHTML = syntaxHighlightJSON(d.raw_data); })
+    // Shares the in-flight request with the Fields section and (on /cases) the
+    // rule guide instead of issuing a third identical one.
+    fetchRawOnce(alert.id)
+      .then(function (raw) {
+        if (!raw) { el.innerHTML = '<div class="error">No raw data available</div>'; return; }
+        alert.raw_data = raw;
+        el.innerHTML = syntaxHighlightJSON(raw);
+      })
       .catch(function () { el.innerHTML = '<div class="error">Failed to load raw data</div>'; });
   }
 

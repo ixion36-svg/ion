@@ -2955,15 +2955,16 @@ async function loadRuleGuideInto(alertId, rgId) {
     const el = document.getElementById(rgId);
     if (!el || el.dataset.loaded === '1') return;
     try {
-        const r = await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw');
-        if (r.status === 503) {
-            el.innerHTML = '<div class="cpanel-alert-fields-empty">Rule guide needs a live Elasticsearch connection.</div>';
-            el.dataset.loaded = '1';
-            return;
-        }
-        const data = await r.json().catch(() => ({}));
-        el.innerHTML = (data && data.raw_data)
-            ? renderRuleGuide(data.raw_data)
+        // v0.79.2: share the component's coalesced /raw request. This used to
+        // issue its own, so selecting an alert fetched the SAME document three
+        // times — here, in the Fields section and in Raw Data — all at once,
+        // all against Elasticsearch. That was the /cases slowness.
+        const raw = (typeof window.ionAlertDetailFetchRaw === 'function')
+            ? await window.ionAlertDetailFetchRaw(alertId)
+            : await fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/raw')
+                .then(r => r.json()).then(d => d && d.raw_data);
+        el.innerHTML = raw
+            ? renderRuleGuide(raw)
             : '<div class="cpanel-alert-fields-empty">No raw data available for this alert.</div>';
         el.dataset.loaded = '1';
     } catch (e) {
