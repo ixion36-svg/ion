@@ -1,13 +1,26 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.0 -->
-<!-- ion-doc:version=0.79.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.1 -->
+<!-- ion-doc:version=0.79.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-10 -->
 
 # Changelog
+
+## v0.79.1 — 2026-08-10
+
+**The CISA KEV catalog, shipped as a snapshot — and handed to Bob as ground truth.**
+
+- **1662 known-exploited CVEs bundled in the image** (`ion/data/kev_catalog.json`, catalog `2026.08.07`), seeded on startup under its own advisory lock. ION deploys air-gapped, so there is no feed to poll and **nothing fetches cisa.gov at runtime** — a test enforces that. `scripts/refresh_kev_snapshot.py` pulls a newer catalog into the bundle at **release** time and refuses to write anything that is not recognisably a KEV file, so a truncated download cannot replace a good snapshot.
+- **Operator import** for the gap between releases: upload a catalog you fetched yourself. Gated on `system:settings`, size-limited, validated before a single row is written, and audited with the resulting version. The seed is **one-way** — if a site has imported something newer, redeploying an older image will not drag them backwards. A re-import also **removes withdrawn CVEs**, because a stale row keeps ION asserting "known exploited" about something CISA no longer does.
+- **Bob gets it as deterministic ground truth**, injected into both the per-alert and cluster prompts beside the v0.78.0 command decode, for the same reason: asked whether a CVE is known-exploited, a model answers from half-remembered numbering, confidently, and wrongly in both directions.
+- **A miss is worded as absence-from-a-snapshot, never as safety.** Given a bare "not in KEV" a model reasons *not in KEV → not urgent → benign*, which is exactly backwards for a CVE published after the snapshot was taken. Every line carries the catalog version and its age, and a miss says so explicitly. KEV listing is stated as **advisory input, not an automatic verdict or severity** — the same posture as System Quirks.
+- **KEV Catalog tab on `/threat-intel`** — search by CVE, vendor or product, filter to ransomware-linked (338 of them), with the catalog version, size and **age in days** on every view. "Not found" names the catalog rather than implying the CVE is clean.
+- `"Unknown"` ransomware use is kept as the raw string alongside the boolean: CISA means *not established*, which is not the same as *no*.
+- 30 tests in `tests/test_v079_1_kev_catalog.py`; 78 across the affected set.
+
 
 ## v0.79.0 — 2026-08-10
 
