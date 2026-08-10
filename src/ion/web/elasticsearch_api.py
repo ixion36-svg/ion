@@ -142,6 +142,20 @@ def _fixture_alert_dicts(
     from ion.models.alert_triage import AlertTriage as _AlertTriage
     from ion.models.alert_triage import AlertTriageStatus as _AlertTriageStatus
 
+    # !! The 'lab-fixture-%' literal is load-bearing for performance.
+    # !!
+    # !! This helper runs on EVERY return path of the alerts-list endpoint —
+    # !! ION's hottest read. A prefix LIKE cannot use the plain btree on
+    # !! es_alert_id under a non-C collation, so this planned as a Seq Scan over
+    # !! a table that grows one row per triaged alert (73 ms at 200k rows; ~50%
+    # !! of production response time on v0.78.0 per APM).
+    # !!
+    # !! v0.79.4 added the PARTIAL index ix_alert_triage_lab_fixture in
+    # !! storage/database.py, whose WHERE clause is this same expression.
+    # !! Postgres only uses it because the two match EXACTLY. Change this string
+    # !! (or this filter's shape) without changing the index and the Seq Scan
+    # !! comes back silently — no error, no failing test except the plan
+    # !! assertion in tests/test_v079_4_lab_fixture_index.py.
     fixture_q = session.query(_AlertTriage).filter(
         _AlertTriage.es_alert_id.like("lab-fixture-%")
     )

@@ -976,6 +976,42 @@ def _run_migrations(engine: Engine) -> None:
                 except Exception:
                     pass  # Index might already exist under a different name
 
+    # v0.79.4: the lab-fixture lookup in `_fixture_alert_dicts`
+    # (web/elasticsearch_api.py) runs on EVERY return path of the alerts-list
+    # endpoint — the hottest read in ION. It filters `es_alert_id LIKE
+    # 'lab-fixture-%'`, and a prefix LIKE CANNOT use the plain btree on
+    # es_alert_id under a non-C collation (en_US.utf8 here); that needs
+    # text_pattern_ops. So it planned as a Seq Scan over a table that grows one
+    # row per triaged alert, forever.
+    #
+    # Measured at 200k rows: Parallel Seq Scan 73.1 ms -> Index Scan 0.197 ms.
+    # Production APM on v0.78.0 attributed ~50% of response time to repeated
+    # alert_triage selects (6 executions, 807 ms) — ~135 ms each, the right
+    # order for this scan at a few hundred thousand rows.
+    #
+    # A partial index rather than text_pattern_ops: it holds ONLY the handful of
+    # fixture rows, so it is 16 kB against 7 MB and costs almost nothing on
+    # write. Postgres proves the query predicate implies the index predicate
+    # because the LIKE expression is IDENTICAL.
+    #
+    # !! That identity is load-bearing. Change the prefix string in either place
+    # !! and the planner silently reverts to the Seq Scan — no error, no test
+    # !! failure, just the slowness back. tests/test_v079_4_lab_fixture_index.py
+    # !! asserts the plan to catch exactly that.
+    if insp.has_table("alert_triage"):
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_alert_triage_lab_fixture "
+                    "ON alert_triage (id) WHERE es_alert_id LIKE 'lab-fixture-%'"
+                ))
+        except Exception as exc:  # noqa: BLE001
+            # Non-fatal: without it the fixture lookup is merely slow, not wrong.
+            logger.warning(
+                "Could not create ix_alert_triage_lab_fixture (fixture lookup "
+                "will Seq Scan): %s", type(exc).__name__,
+            )
+
     # v0.49.3 audit: at most ONE doc-analysis job may be status='running' —
     # the single-job guard is enforced by this partial UNIQUE index (valid on
     # both Postgres and SQLite >= 3.8), not by check-then-insert. Tolerant:
