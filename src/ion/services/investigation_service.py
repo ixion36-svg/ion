@@ -1541,16 +1541,17 @@ class InvestigationService:
     ) -> None:
         """Best-effort: apply investigation side-effects to the case.
 
-        v0.23.1: this method previously auto-wrote a Note on the case AND
-        posted a Kibana Cases comment summarising the investigation. Both
-        comment-write paths have been removed — Bob no longer auto-comments
-        on cases. Analysts pull the analysis on demand via the case-detail
-        "Get Bob's Analysis" button, which calls a new endpoint that
-        gathers investigations + observables + raw alert + similar cases
-        and returns the analysis text WITHOUT persisting it.
+        v0.23.1 removed the unconditional auto-comment: Bob had been writing a
+        Note on the case AND a Kibana Cases comment on **every** per-alert
+        investigation, which buried analyst notes. v0.78.0 brings the comment
+        back, but only on the ``write_comment`` path — one comment per case at
+        case creation, not one per alert. Analysts can still pull the analysis
+        on demand via the case-detail "Get Bob's Analysis" button, which returns
+        the text WITHOUT persisting it.
 
-        The remaining auto-side-effects are kept because they help the SOC
-        workflow without being intrusive:
+        Side-effects, all best-effort:
+          - When ``write_comment``: one Bob Note on the case, mirrored to the
+            linked Kibana case.
           - Merge investigation IOCs into ``case.observables`` (dedup
             by type+value).
           - Move ``AlertTriage`` and ``AlertCase`` from OPEN to
@@ -1559,11 +1560,10 @@ class InvestigationService:
             Kibana Security alert page reflects ION's state.
 
         ``verdict``, ``severity``, ``summary``, ``actions``, ``mitre_tags``
-        parameters are retained for callsite compatibility but no longer
-        consumed by this method (the comment that used them is gone).
-        Never raises out of this method.
+        are consumed only when ``write_comment`` is set; per-alert callers pass
+        them for callsite compatibility. Never raises out of this method.
         """
-        # v0.79.0: when ``write_comment`` is set (per-case investigation at case
+        # v0.78.0: when ``write_comment`` is set (per-case investigation at case
         # creation), Bob posts a summary Note on the case. Per-alert callers leave
         # it False, so single-alert investigations don't spam duplicate comments.
         try:
@@ -1580,6 +1580,13 @@ class InvestigationService:
             factory = get_session_factory()
             db = factory()
             triage_moved_to_ack = False
+            # Bob's case comment is mirrored to Kibana AFTER this session closes
+            # (same shape as pcap_analysis_service). Capture what the sync needs
+            # while the session is still open — the ORM objects are unusable once
+            # it is closed.
+            bob_note_body: Optional[str] = None
+            kibana_case_id: Optional[str] = None
+            bob_username = "Bob"
             try:
                 triage = db.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
                 if triage is None or triage.case_id is None:
@@ -1615,6 +1622,12 @@ class InvestigationService:
                                 user_id=bob_id,
                                 content=body,
                             ))
+                            bob_note_body = body
+                            kibana_case_id = getattr(case, "kibana_case_id", None)
+                            from ion.models.user import User
+                            bob_user = db.get(User, bob_id)
+                            if bob_user and getattr(bob_user, "username", None):
+                                bob_username = bob_user.username
                     except Exception as exc:
                         logger.debug("Bob case comment write skipped: %s", exc)
 
@@ -1695,6 +1708,23 @@ class InvestigationService:
                 return
             finally:
                 db.close()
+
+            # Mirror Bob's case comment into the linked Kibana case. Every other
+            # note-writer in ION syncs; one that doesn't leaves the comment
+            # invisible to anyone working the case from the Kibana side. Runs
+            # after commit (the note is already durable) and off the event loop
+            # (sync_note_to_kibana does blocking HTTP). Best-effort throughout.
+            if bob_note_body and kibana_case_id:
+                try:
+                    from ion.services.kibana_sync_helpers import sync_note_to_kibana
+
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(
+                        None, sync_note_to_kibana,
+                        kibana_case_id, bob_username, bob_note_body,
+                    )
+                except Exception as exc:  # sync_note_to_kibana already swallows
+                    logger.warning("Bob case-comment Kibana sync failed: %s", exc)
 
             # Push ES alert status transition (acknowledged) — helps Kibana
             # Security UI reflect that this alert is no longer untouched.

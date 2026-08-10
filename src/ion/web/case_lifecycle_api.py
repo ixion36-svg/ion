@@ -1066,7 +1066,7 @@ async def create_case(
             auto_closed_kfp = fp
             break
 
-    # v0.79.0: run Bob on the freshly-created case (single OR multi alert) and
+    # v0.78.0: run Bob on the freshly-created case (single OR multi alert) and
     # post its analysis as a case comment — same as auto-grouped cases, so
     # manually-created cases get Bob too. Fire-and-forget; gated by the unified
     # case auto-investigate switch, skipped for auto-closed FP cases.
