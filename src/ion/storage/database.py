@@ -481,6 +481,16 @@ def _run_migrations(engine: Engine) -> None:
         if "planned_date" not in existing:
             _add_column_tolerant(engine, "change_requests", "planned_date", "DATE")
 
+    # v0.79.0: documents.created_by_id — ownership, so "delete only what you
+    # made" can be expressed at all. create_all() only creates missing TABLES,
+    # never missing columns, so an existing deploy needs the explicit ALTER.
+    # Nullable on purpose: documents that predate this column have no known
+    # author and stay deletable only by a document:delete holder.
+    if insp.has_table("documents"):
+        existing = {col["name"] for col in insp.get_columns("documents")}
+        if "created_by_id" not in existing:
+            _add_column_tolerant(engine, "documents", "created_by_id", "INTEGER")
+
     # v0.72.0 (route audit phase 8): DetectionProposal absorbs the retired
     # TuningProposal pipeline. Bob wrote tuning proposals unattended off a
     # false-positive verdict, but DetectionProposal had nowhere to put the

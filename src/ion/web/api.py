@@ -1678,11 +1678,12 @@ async def preview_template(template_id: int, render_request: RenderRequest, serv
         raise HTTPException(status_code=400, detail=safe_error(e))
 
 
-@router.post("/templates/{template_id}/render", dependencies=[Depends(require_permission("document:create"))])
+@router.post("/templates/{template_id}/render")
 async def render_template(
     template_id: int,
     render_request: RenderRequest,
     document_name: Optional[str] = None,
+    current_user: User = Depends(require_permission("document:create")),
     services: Services = Depends(get_services),
 ):
     """Render template and save document."""
@@ -1697,6 +1698,10 @@ async def render_template(
         if render_request.content_override and document:
             document.content = render_request.content_override
             content = render_request.content_override
+        # v0.79.0: rendering a template is a create path too — stamp the author
+        # so the person who produced the document can remove it again.
+        if document:
+            document.created_by_id = current_user.id
         services.session.commit()
 
         return {
@@ -1774,10 +1779,11 @@ async def validate_template_data(
         raise HTTPException(status_code=404, detail="Template not found")
 
 
-@router.post("/templates/{template_id}/batch-render", dependencies=[Depends(require_permission("document:create"))])
+@router.post("/templates/{template_id}/batch-render")
 async def batch_render_template(
     template_id: int,
     batch_request: BatchRenderRequest,
+    current_user: User = Depends(require_permission("document:create")),
     services: Services = Depends(get_services),
 ):
     """Render multiple documents from a list of data dictionaries.
@@ -1796,6 +1802,15 @@ async def batch_render_template(
             validate=batch_request.validate_data,
             stop_on_error=batch_request.stop_on_error,
         )
+        # v0.79.0: a batch is still authored work — stamp every document it
+        # saved, or the person who ran it could not delete any of them.
+        from ion.models.document import Document
+
+        saved_ids = [r.document_id for r in summary.results if r.document_id]
+        if saved_ids:
+            services.session.query(Document).filter(
+                Document.id.in_(saved_ids)
+            ).update({"created_by_id": current_user.id}, synchronize_session=False)
         services.session.commit()
 
         return {
@@ -1858,13 +1873,14 @@ async def get_template_variables(template_id: int, services: Services = Depends(
 
 
 # Document endpoints
-@router.post("/documents/upload", dependencies=[Depends(require_permission("document:create"))])
+@router.post("/documents/upload")
 async def upload_document(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
     output_format: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     collection_id: Optional[int] = Form(None),
+    current_user: User = Depends(require_permission("document:create")),
     services: Services = Depends(get_services),
 ):
     """Upload a file as a new document.
@@ -1896,6 +1912,9 @@ async def upload_document(
         rendered_content=text_content,
         output_format=output_format,
     )
+    # v0.79.0: stamp the author. This is what later lets them delete it again
+    # without holding document:delete.
+    document.created_by_id = current_user.id
 
     if collection_id:
         document.collection_id = collection_id
@@ -1909,6 +1928,18 @@ async def upload_document(
         services.document_repo.set_tags(document, tag_names)
 
     services.session.commit()
+
+    try:
+        AuditLogRepository(services.session).create(
+            action="document_create",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=document.id,
+            details=f"name={document.name}; via=upload",
+        )
+        services.session.commit()
+    except Exception:
+        logger.exception("document_create audit log write failed (non-fatal)")
 
     return {
         "id": document.id,
@@ -2006,6 +2037,11 @@ async def get_document(document_id: int, services: Services = Depends(get_servic
         "tags": [t.name for t in document.tags] if document.tags else [],
         "created_at": document.created_at.isoformat() if document.created_at else None,
         "updated_at": document.updated_at.isoformat() if document.updated_at else None,
+        # v0.79.0: the list endpoint returns these two, the detail endpoint did
+        # not — so anything opening a document directly (the KB deep-link, the
+        # rebuilt panel) could not say which folder it was in or who wrote it.
+        "collection_id": document.collection_id,
+        "created_by_id": document.created_by_id,
     }
 
 
@@ -2029,15 +2065,57 @@ async def export_document_pdf(document_id: int, services: Services = Depends(get
     )
 
 
-@router.delete("/documents/{document_id}", dependencies=[Depends(require_permission("document:delete"))])
-async def delete_document(document_id: int, services: Services = Depends(get_services)):
-    """Delete a document."""
+@router.delete("/documents/{document_id}")
+async def delete_document(
+    document_id: int,
+    current_user: User = Depends(require_permission("document:read")),
+    services: Services = Depends(get_services),
+):
+    """Delete a document — your own, or anyone's with ``document:delete``.
+
+    v0.79.0. The endpoint gate is ``document:read`` (which everyone holds)
+    because the real rule is about OWNERSHIP, not about a role: an analyst who
+    added a document can remove it again, and nobody else's work. That check
+    runs HERE, before the delete, against the row we just loaded — an
+    ownership rule enforced in the caller or the UI is not enforced at all
+    (the v0.20.1 workbench TOCTOU lesson).
+
+    Documents created before ``created_by_id`` existed have no owner, so they
+    fall through to the ``document:delete`` branch — unowned work is not
+    everyone's to delete.
+    """
     document = services.render.get_document(document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    owner_id = getattr(document, "created_by_id", None)
+    is_owner = owner_id is not None and owner_id == current_user.id
+    may_delete_any = current_user.has_permission("document:delete")
+    if not (is_owner or may_delete_any):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only delete documents you created.",
+        )
+
+    doc_name = document.name
     services.render.delete_document(document_id)
     services.session.commit()
+
+    # Audit AFTER the commit that removed it: the entry records a delete that
+    # actually happened. resource_id is kept even though the row is gone — it
+    # is what ties the entry to the document referenced elsewhere.
+    try:
+        AuditLogRepository(services.session).create(
+            action="document_delete",
+            user_id=current_user.id,
+            resource_type="document",
+            resource_id=document_id,
+            details=f"name={doc_name}; as={'owner' if is_owner else 'document:delete'}",
+        )
+        services.session.commit()
+    except Exception:
+        logger.exception("document_delete audit log write failed (non-fatal)")
+
     return {"message": "Document deleted successfully"}
 
 
@@ -5200,6 +5278,8 @@ async def get_host_patterns(
 
 @router.get("/analyst/knowledge-base")
 async def get_analyst_knowledge_base(
+    include_articles: bool = True,
+    recent: int = 0,
     current_user: User = Depends(require_permission("document:read")),
     session: Session = Depends(get_db_session),
 ):
@@ -5208,7 +5288,21 @@ async def get_analyst_knowledge_base(
     Returns articles from the 'Analyst Knowledge Base' collection,
     organized by topic for easy reference during alert triage and
     case investigation.
+
+    v0.79.0 — this endpoint existed but nothing called it, while the SOC
+    workspace's KB panel sat empty until you typed a search. Two parameters
+    make it usable as a browse surface:
+
+        include_articles=false  collection names + counts only. The full form
+                                returns every article in the library (~600),
+                                which is a lot of payload to render a topic
+                                list.
+        recent=N                the N most recently updated articles across
+                                the whole KB, so someone who does not know
+                                what to search for still has a way in.
     """
+    from sqlalchemy import func
+
     from ion.models.document import Document
     from ion.models.template import Collection
 
@@ -5228,6 +5322,7 @@ async def get_analyst_knowledge_base(
     child_collections = session.query(Collection).filter_by(
         parent_id=analyst_kb.id
     ).order_by(Collection.name).all()
+    child_ids_for_recent = [c.id for c in child_collections]
 
     result = {
         "status": "success",
@@ -5241,15 +5336,23 @@ async def get_analyst_knowledge_base(
 
     # For each collection, get its documents
     for collection in child_collections:
-        docs = session.query(Document).filter_by(
-            collection_id=collection.id
-        ).order_by(Document.name).all()
+        if include_articles:
+            docs = session.query(Document).filter_by(
+                collection_id=collection.id
+            ).order_by(Document.name).all()
+            article_count = len(docs)
+        else:
+            # Count in SQL rather than loading ~600 rows to call len() on them.
+            docs = []
+            article_count = session.query(func.count(Document.id)).filter(
+                Document.collection_id == collection.id
+            ).scalar() or 0
 
         collection_data = {
             "id": collection.id,
             "name": collection.name,
             "description": collection.description,
-            "article_count": len(docs),
+            "article_count": article_count,
             "articles": [
                 {
                     "id": doc.id,
@@ -5263,22 +5366,53 @@ async def get_analyst_knowledge_base(
         }
         result["collections"].append(collection_data)
 
+    if recent > 0 and child_ids_for_recent:
+        recent_docs = (
+            session.query(Document)
+            .filter(Document.collection_id.in_(child_ids_for_recent))
+            .order_by(Document.updated_at.desc())
+            .limit(min(recent, 50))
+            .all()
+        )
+        result["recent"] = [
+            {
+                "id": doc.id,
+                "name": doc.name,
+                "collection_id": doc.collection_id,
+                "collection_name": doc.collection.name if doc.collection else "Unknown",
+                "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
+            }
+            for doc in recent_docs
+        ]
+
     return result
 
 
 @router.get("/analyst/knowledge-base/search")
 async def search_analyst_knowledge_base(
-    q: str,
+    q: str = "",
+    collection_id: Optional[int] = None,
+    limit: int = 25,
     current_user: User = Depends(require_permission("document:read")),
     session: Session = Depends(get_db_session),
 ):
     """Search analyst knowledge base by article title or content.
 
     Parameters:
-        q: Search query string
+        q: Search query string. Optional when ``collection_id`` is given.
+        collection_id: restrict to one KB collection. Browsing a topic is
+            NOT the same as searching for its name — "Windows & Active
+            Directory" is a shelf label, and text-searching for it returns
+            nothing because no article says it. Passing the id lists what is
+            actually on that shelf.
+        limit: maximum results (capped at 100)
 
-    Returns: Matching articles with collection context
+    Returns: Matching articles with collection context, each carrying
+    ``matched_in`` ("title" or "content") and a ``snippet`` of the
+    surrounding body text when the match was in the content.
     """
+    from sqlalchemy import or_
+
     from ion.models.document import Document
     from ion.models.template import Collection
 
@@ -5297,12 +5431,51 @@ async def search_analyst_knowledge_base(
         ).all()
     ]
 
-    # Search documents in those collections
-    search_term = f"%{q.lower()}%"
+    # Search documents in those collections.
+    #
+    # v0.79.0: this filtered on Document.name ONLY, despite the docstring
+    # promising title-or-content — so an analyst searching for a command, a
+    # registry key or an event ID found nothing unless it happened to be in a
+    # title. Body text is searched too now.
+    q = (q or "").strip()
+    if not q and collection_id is None:
+        return {"results": [], "total": 0}
+
+    # A collection_id outside the KB tree must not become a way to read
+    # documents from anywhere else in the library.
+    scope_ids = [collection_id] if collection_id in child_ids else child_ids
+
+    filters = [Document.collection_id.in_(scope_ids)]
+    if q:
+        search_term = f"%{q.lower()}%"
+        filters.append(
+            or_(
+                Document.name.ilike(search_term),
+                Document.rendered_content.ilike(search_term),
+            )
+        )
+
     docs = session.query(Document).filter(
-        Document.collection_id.in_(child_ids),
-        Document.name.ilike(search_term)
-    ).order_by(Document.name).all()
+        *filters
+    ).order_by(Document.name).limit(max(1, min(limit, 100))).all()
+
+    def _snippet(doc) -> Optional[str]:
+        """A window of body text around the first match.
+
+        Without this a content hit is indistinguishable from a title hit —
+        the analyst gets a title that does not obviously contain what they
+        typed and has to open it to find out why it matched.
+        """
+        if not q:
+            return None
+        body = doc.rendered_content or ""
+        at = body.lower().find(q.lower())
+        if at < 0:
+            return None
+        start = max(0, at - 60)
+        end = min(len(body), at + len(q) + 90)
+        text = " ".join(body[start:end].split())
+        return ("…" if start else "") + text + ("…" if end < len(body) else "")
 
     results = [
         {
@@ -5313,9 +5486,19 @@ async def search_analyst_knowledge_base(
             "format": doc.output_format,
             "tags": [t.name for t in doc.tags] if doc.tags else [],
             "created_at": doc.created_at.isoformat() if doc.created_at else None,
+            "matched_in": (
+                "collection" if not q
+                else "title" if q.lower() in (doc.name or "").lower()
+                else "content"
+            ),
+            "snippet": _snippet(doc),
         }
         for doc in docs
     ]
+
+    # Title matches first — a document NAMED "LSASS credential dumping" is a
+    # better answer for "lsass" than one that mentions it in passing.
+    results.sort(key=lambda r: (r["matched_in"] != "title", r["name"].lower()))
 
     return {"results": results, "total": len(results)}
 
