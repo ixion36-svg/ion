@@ -1,13 +1,28 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.78.0 -->
-<!-- ion-doc:version=0.78.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.0 -->
+<!-- ion-doc:version=0.79.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-10 -->
 
 # Changelog
+
+## v0.79.0 — 2026-08-10
+
+**A GRC home, ownership on documents, and three surfaces that were quietly lying about what they showed.**
+
+- **New GRC nav group.** Compliance, Maturity, Security posture, Service desk and Audit logs were scattered across Reporting, Engineering and Administration, so "what do I show an auditor?" had no single answer. They are one menu now. **Five surfaces, five different permissions, every one still gated** — this is a place to find them, not a widening, and a user holding none of the five sees no GRC menu at all. Fixing that revealed the existing "hide a group when all its children are hidden" logic queried `.nav-dropdown-menu` and `<li>` — **pre-reskin markup**, so it had silently stopped doing anything.
+- **"Reference" is now "Knowledge Base"** — the same library the SOC workspace searches. Two names for one thing sent analysts looking in the wrong place.
+- **Documents have an owner, and you can delete your own.** `document:delete` was blunt: three roles could delete anything, the other seven could not delete a document they had just uploaded themselves. New `Document.created_by_id` (explicit startup migration — `create_all` does not add columns), stamped on all three create paths. The delete endpoint is gated on `document:read` with the **ownership check inside it, between loading the row and deleting it** (the v0.20.1 TOCTOU lesson). Both create and delete are audited, and the delete entry records *which authority* was used, so an admin removing someone else's document is a distinguishable event. The ~600 pre-existing documents have no author and stay behind `document:delete` — `None == None` would have made every one of them everyone's to delete.
+- **The Knowledge Base was invisible.** `/documents` filtered out every KB document *and* every KB collection, so on a library that is almost entirely KB the page read "No documents found" and ~600 articles had **no browsing surface anywhere in ION** — reachable only by searching from the workspace. The exclusion is gone.
+- **`/documents` uses the `/cases` workspace.** A 22px inset panel over the dimmed board, the current folder's documents in a left rail (next document is one click, not close → find → open), and the four tabs — Rendered, Raw, Edit, Version history — retired into stacked sections under sticky jump-links that scroll rather than hide. 26 CSS rules **moved** out of `cases.html` into `static/css/ion-workspace.css`, each carrying both the generic `.ion-ws-*` name and the `.case-panel`/`.cpanel-*` name, so there is one definition and the shipped cases markup did not change. Rail capped at 150 with the remainder stated, not silently dropped.
+- **The SOC workspace KB panel works.** Three silent faults: every result linked to `/documents#doc-<id>` and **`/documents` had no hash handling at all**, so no result ever opened; search filtered `Document.name` only despite promising title-or-content, so `Invoke-WebRequest` and `T1059` each returned **0 against a library containing both many times over** (now 8 each, with snippets and title-matches ranked first); and the panel was an empty box until you typed — it now opens on topics and recently-updated articles. Clicking the fix found a fourth: topic chips text-searched the collection's *name*, which matches nothing, because "Windows & Active Directory" is a shelf label no article contains.
+- **Filters now describe what is under them.** `/cases` gained an open/acknowledged/closed filter (`/api/cases` always returned all three; the board just could not narrow). `/alerts` computed its stat tiles and Top-N panels from `allAlerts` — "so panels always show full picture" — so narrowing to one host still listed every host. They follow the filter, with a `filtered · N of M` badge. **The status tiles deliberately ignore the status filter**: they double as the quick-filter buttons and the page loads on "Open Only", so counting the visible rows would show Closed as 0 on arrival and make the control look dead.
+- Also: `GET /api/documents/{id}` never returned `collection_id`, so a document opened directly could not say which folder it was in.
+- 268 tests across the affected set; the 75 new ones confirmed to fail against pre-change code.
+
 
 ## v0.78.0 — 2026-08-10
 
