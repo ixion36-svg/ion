@@ -143,13 +143,25 @@
   </div>
 </section>
 
-<!-- Row 4: Knowledge Base Quick Search -->
+<!-- Row 4: Knowledge Base — browse, then search.
+     v0.79.0: this was a search box and nothing else. An analyst who did not
+     already know what to type saw an empty panel and moved on, while ~600
+     articles sat one collection away. Topics and recently-updated articles
+     are shown up front; typing replaces them with results. -->
 <section class="rounded-xl border border-white/5 bg-ink-900/50 p-5 rise d-4">
-  <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">Knowledge Base</div>
-  <input id="kb-search" type="text" placeholder="Search knowledge base articles..."
+  <div class="flex items-center justify-between gap-4 mb-3">
+    <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Knowledge Base</div>
+    <a href="/documents" class="text-[11px] text-slate-500 hover:text-ion-cyan transition">Open library &rarr;</a>
+  </div>
+  <input id="kb-search" type="text" placeholder="Search titles and article text..."
          class="w-full h-10 px-4 rounded-lg border border-white/10 bg-white/5 text-[13px] text-white placeholder:text-slate-600 focus:outline-none focus:border-ion-cyan/50 focus:ring-1 focus:ring-ion-cyan/20 transition"
          data-input-action="debounceKBSearch">
   <div id="kb-results" class="mt-3 hidden divide-y divide-white/5"></div>
+  <div id="kb-browse" class="mt-4">
+    <div id="kb-topics" class="flex flex-wrap gap-1.5"></div>
+    <div class="text-[10px] uppercase tracking-wider text-slate-600 font-semibold mt-4 mb-2">Recently updated</div>
+    <div id="kb-recent" class="divide-y divide-white/5"></div>
+  </div>
 </section>
 
 </div>
@@ -407,31 +419,115 @@ function debounceKBSearch() {
   _kbTimer = setTimeout(doKBSearch, 250);
 }
 
+// One row renderer for both search results and the recent list, so the two
+// halves of this panel cannot drift apart in look or in link shape.
+function _kbRow(a, sub) {
+  return `<a href="/documents#doc-${a.id}" class="flex items-start justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer">
+    <div class="min-w-0">
+      <div class="text-[13px] text-slate-300 truncate">${esc(a.name)}</div>
+      ${sub}
+    </div>
+    <span class="text-[11px] text-slate-600 shrink-0 mt-0.5">&rarr;</span>
+  </a>`;
+}
+
 async function doKBSearch() {
   const q = document.getElementById('kb-search').value.trim();
   const el = document.getElementById('kb-results');
-  if (!q || q.length < 2) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const browse = document.getElementById('kb-browse');
+  if (!q || q.length < 2) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    if (browse) browse.classList.remove('hidden');   // clearing the box returns you to browsing
+    return;
+  }
+  if (browse) browse.classList.add('hidden');
 
-  const data = await safeFetch('/api/analyst/knowledge-base/search?q=' + encodeURIComponent(q));
+  const data = await safeFetch('/api/analyst/knowledge-base/search?q=' + encodeURIComponent(q) + '&limit=8');
   if (!data || !data.results || !data.results.length) {
     el.classList.remove('hidden');
     el.innerHTML = '<div class="py-4 text-center text-[12px] text-slate-600">No articles found</div>';
     return;
   }
   el.classList.remove('hidden');
-  el.innerHTML = data.results.slice(0, 5).map(a => {
-    const col = a.collection_name ? `<span class="text-[10px] text-slate-600">${esc(a.collection_name)}</span>` : '';
-    return `<a href="/documents#doc-${a.id}" class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer">
-      <div class="min-w-0">
-        <div class="text-[13px] text-slate-300 truncate">${esc(a.title || a.name)}</div>
-        ${col}
-      </div>
-      <span class="text-[11px] text-slate-600 shrink-0">&rarr;</span>
-    </a>`;
+  el.innerHTML = data.results.slice(0, 8).map(a => {
+    const col = a.collection_name
+      ? `<span class="text-[10px] text-slate-600">${esc(a.collection_name)}</span>` : '';
+    // A content match needs to show WHY it matched, or the analyst opens a
+    // title that does not obviously contain what they typed.
+    const snip = (a.matched_in === 'content' && a.snippet)
+      ? `<div class="text-[11px] text-slate-500 mt-1 line-clamp-2">${esc(a.snippet)}</div>` : '';
+    return _kbRow(a, col + snip);
   }).join('');
 }
 
+async function loadKBBrowse() {
+  const topics = document.getElementById('kb-topics');
+  const recent = document.getElementById('kb-recent');
+  if (!topics || !recent) return;
+
+  const data = await safeFetch('/api/analyst/knowledge-base?include_articles=false&recent=6');
+  if (!data || data.status === 'not_found') {
+    topics.innerHTML = '<span class="text-[12px] text-slate-600">Knowledge Base not configured</span>';
+    return;
+  }
+
+  // The library has ~55 topics. All of them as chips buries the rest of the
+  // workspace, so show the biggest handful and hand the rest to the library
+  // page — this panel is a way in, not a replacement for it.
+  const TOPIC_CHIPS = 12;
+  const cols = (data.collections || []).filter(c => c.article_count > 0);
+  cols.sort((a, b) => (b.article_count - a.article_count) || a.name.localeCompare(b.name));
+  const shown = cols.slice(0, TOPIC_CHIPS);
+  const hidden = cols.length - shown.length;
+
+  topics.innerHTML = (shown.map(c =>
+    `<button type="button" data-click-action="kbTopic" data-args='[${c.id}]'
+       class="text-[11px] px-2.5 py-1 rounded-md border border-white/10 bg-white/5 text-slate-400 hover:text-ion-cyan hover:border-ion-cyan/40 transition">
+       ${esc(c.name)} <span class="text-slate-600">${c.article_count}</span></button>`
+  ).join('') + (hidden > 0
+    ? `<a href="/documents" class="text-[11px] px-2.5 py-1 rounded-md border border-dashed border-white/10 text-slate-500 hover:text-ion-cyan hover:border-ion-cyan/40 transition">+${hidden} more</a>`
+    : '')) || '<span class="text-[12px] text-slate-600">No articles yet</span>';
+
+  recent.innerHTML = (data.recent || []).map(a =>
+    _kbRow(a, `<span class="text-[10px] text-slate-600">${esc(a.collection_name || '')}</span>`)
+  ).join('') || '<div class="py-3 text-[12px] text-slate-600">Nothing updated yet</div>';
+}
+
+// Clicking a topic LISTS that collection — it does not text-search for the
+// collection's name. "Windows & Active Directory" is a shelf label; no article
+// contains that phrase, so searching for it returns nothing. The analyst stays
+// on the workspace either way, which is the point of having the panel here.
+async function kbTopic(collectionId) {
+  const el = document.getElementById('kb-results');
+  const browse = document.getElementById('kb-browse');
+  const data = await safeFetch('/api/analyst/knowledge-base/search?collection_id='
+                               + encodeURIComponent(collectionId) + '&limit=12');
+  if (!data || !data.results || !data.results.length) {
+    return;   // leave the browse view up rather than showing an empty panel
+  }
+  if (browse) browse.classList.add('hidden');
+  el.classList.remove('hidden');
+  el.innerHTML =
+    `<div class="flex items-center justify-between gap-3 px-4 py-2">
+       <span class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">${esc(data.results[0].collection_name || 'Topic')}</span>
+       <button type="button" data-click-action="kbClearTopic" class="text-[11px] text-slate-500 hover:text-ion-cyan transition">Back</button>
+     </div>` +
+    data.results.map(a => _kbRow(a, '')).join('');
+}
+window.kbTopic = kbTopic;
+
+function kbClearTopic() {
+  const box = document.getElementById('kb-search');
+  if (box) box.value = '';
+  doKBSearch();   // empty query restores the browse view
+}
+window.kbClearTopic = kbClearTopic;
+
 // ── Init ────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', loadWorkspace);
+document.addEventListener('DOMContentLoaded', () => {
+  loadWorkspace();
+  loadKBBrowse();
+});
 </script>
 {% endblock %}
