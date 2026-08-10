@@ -229,14 +229,36 @@ function updateNavForPermissions() {
         forensicsLink.style.display = perms.has('forensic:read') ? '' : 'none';
     }
 
-    // Hide dropdown groups where ALL children are hidden
-    ['nav-group-engineering', 'nav-group-dfir'].forEach(groupId => {
+    // GRC group (v0.79.0) — five surfaces, five DIFFERENT permissions. They
+    // were gathered into one menu so there is a single answer to "where is the
+    // audit evidence", NOT to give anyone new access: each item is shown only
+    // to a user who already holds its page permission, and the routes enforce
+    // regardless of what the menu shows.
+    const grcItems = [
+        ['nav-grc-compliance',  perms.has('alert:read')],
+        ['nav-grc-maturity',    perms.has('alert:read')],
+        ['nav-security-link',   perms.has('security:read')],   // gated above too
+        ['nav-grc-servicedesk', perms.has('system:settings')],
+        ['nav-grc-audit',       perms.has('system:audit_view')],
+    ];
+    grcItems.forEach(([id, allowed]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = allowed ? '' : 'none';
+    });
+
+    // Hide dropdown groups where ALL children are hidden.
+    // The tw- nav renders items as <a class="tw-drop-item"> inside
+    // .tw-drop-menu — the original selectors here (.nav-dropdown-menu / li)
+    // matched the PRE-reskin markup and so this loop had quietly stopped doing
+    // anything. Query both shapes so it works either way.
+    ['nav-group-engineering', 'nav-group-dfir', 'nav-group-grc'].forEach(groupId => {
         const group = document.getElementById(groupId);
         if (!group) return;
-        const menu = group.querySelector('.nav-dropdown-menu');
+        const menu = group.querySelector('.tw-drop-menu, .nav-dropdown-menu');
         if (!menu) return;
-        const items = menu.querySelectorAll('li');
-        const allHidden = Array.from(items).every(li => li.style.display === 'none');
+        const items = menu.querySelectorAll('.tw-drop-item, li');
+        if (!items.length) return;
+        const allHidden = Array.from(items).every(el => el.style.display === 'none');
         group.style.display = allHidden ? 'none' : '';
     });
 }

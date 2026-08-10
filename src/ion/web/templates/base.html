@@ -25,6 +25,10 @@
          (used by /cases). The tabs layout on /alerts reuses that page's own
          existing .detail-tab* classes, so this cannot alter /alerts. -->
     <link rel="stylesheet" href="/static/css/alert-detail.css?v={{ ion_version }}">
+    {# v0.79.0: the inset-overlay workspace chrome shared by /cases and
+       /documents. Moved out of cases.html so the second page to use it does
+       not render unstyled — the v0.77.0 lesson. #}
+    <link rel="stylesheet" href="/static/css/ion-workspace.css?v={{ ion_version }}">
     <!-- v0.31.3: tell HTMX not to inject its indicator <style> block at runtime.
          Inline-injected styles can't carry our per-request CSP nonce, so they'd
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
@@ -177,7 +181,7 @@
                    misleading).
                  * Security stays admin-gated (security:read perm). -->
             <div class="tw-drop" data-drop id="nav-group-engineering">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/de-proposals') or p.startswith('/de-quirks') or p.startswith('/de-bob') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/network-map') or p.startswith('/architecture') or p.startswith('/security') %}is-active{% endif %}">Engineering
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/detection-engineering') or p.startswith('/de-proposals') or p.startswith('/de-quirks') or p.startswith('/de-bob') or p.startswith('/cyab') or p.startswith('/log-sources') or p.startswith('/data-flow') or p.startswith('/network-map') or p.startswith('/architecture') %}is-active{% endif %}">Engineering
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
@@ -189,13 +193,17 @@
                 <a href="/network-map" class="tw-drop-item {% if p.startswith('/network-map') or p.startswith('/data-flow') %}is-active{% endif %}">Infrastructure</a>
                 <a href="/log-sources" class="tw-drop-item {% if p.startswith('/log-sources') %}is-active{% endif %}">Platform Health</a>
                 <a href="/architecture" id="nav-architecture-link" class="tw-drop-item {% if p.startswith('/architecture') %}is-active{% endif %} _ion-s-c8be1ccba6">Workflow Orchestrator</a>
-                <a href="/security" id="nav-security-link" class="tw-drop-item {% if p.startswith('/security') %}is-active{% endif %} _ion-s-c8be1ccba6">Security</a>
+                {# v0.79.0: "Security" (ION's own posture assessment) moved to
+                   the GRC group — it is an assurance surface, not an
+                   engineering tool. Same security:read gate, same id. #}
               </div>
             </div>
 
-            <!-- Reporting — metrics & compliance -->
+            <!-- Reporting — SOC performance metrics.
+                 v0.79.0: Compliance + Maturity moved out to the new GRC group;
+                 what's left here is all operational measurement. -->
             <div class="tw-drop" data-drop>
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/soc-health') or p.startswith('/compliance') or p.startswith('/executive-report') or p.startswith('/detection-health') or p.startswith('/de-metrics') or p.startswith('/analytics') or p.startswith('/maturity') %}is-active{% endif %}">Reporting
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/soc-health') or p.startswith('/executive-report') or p.startswith('/detection-health') or p.startswith('/de-metrics') or p.startswith('/analytics') %}is-active{% endif %}">Reporting
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
@@ -206,9 +214,27 @@
                 <a href="/executive-report" class="tw-drop-item {% if p.startswith('/executive-report') %}is-active{% endif %}">Executive Report</a>
                 <a href="/detection-health" class="tw-drop-item {% if p.startswith('/detection-health') %}is-active{% endif %}">Detection Health</a>
                 <a href="/de-metrics" class="tw-drop-item {% if p.startswith('/de-metrics') %}is-active{% endif %}">DE Metrics</a>
-                <a href="/compliance" class="tw-drop-item {% if p.startswith('/compliance') %}is-active{% endif %}">Compliance</a>
-                <a href="/maturity" class="tw-drop-item {% if p.startswith('/maturity') %}is-active{% endif %}">Maturity</a>
                 <a href="/analytics" class="tw-drop-item {% if p.startswith('/analytics') %}is-active{% endif %}">Analytics Engine</a>
+              </div>
+            </div>
+
+            <!-- GRC — governance, risk & compliance (v0.79.0).
+                 These five surfaces were scattered across Reporting,
+                 Engineering and Administration, so the question "what do I
+                 show an auditor?" had no single answer. Each carries a
+                 DIFFERENT permission and keeps it — this group is a place to
+                 find them, not a widening. app.js hides the items a user
+                 can't reach, and the whole group when none of them are. -->
+            <div class="tw-drop" data-drop id="nav-group-grc">
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/compliance') or p.startswith('/maturity') or p.startswith('/security') or p.startswith('/change-requests') or p.startswith('/bug-reports') or p.startswith('/audit-logs') %}is-active{% endif %}">GRC
+                <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
+              </button>
+              <div class="tw-drop-menu">
+                <a href="/compliance" id="nav-grc-compliance" class="tw-drop-item {% if p.startswith('/compliance') %}is-active{% endif %}">Compliance</a>
+                <a href="/maturity" id="nav-grc-maturity" class="tw-drop-item {% if p.startswith('/maturity') %}is-active{% endif %}">Maturity</a>
+                <a href="/security" id="nav-security-link" class="tw-drop-item {% if p.startswith('/security') %}is-active{% endif %}">Security Posture</a>
+                <a href="/change-requests" id="nav-grc-servicedesk" class="tw-drop-item {% if p.startswith('/change-requests') or p.startswith('/bug-reports') %}is-active{% endif %}">Service Desk</a>
+                <a href="/audit-logs" id="nav-grc-audit" class="tw-drop-item {% if p.startswith('/audit-logs') %}is-active{% endif %}">Audit Logs</a>
               </div>
             </div>
 
@@ -235,7 +261,10 @@
             <!-- v0.29.0: Knowledge condensed 9 → 3 items.
                  Guide/Sim/Range/Skills/Courses → Training group
                  (default route /guide). Notes/Templates/Documents →
-                 Reference group (default /notes). -->
+                 Reference group (default /notes).
+                 v0.79.0: "Reference" renamed "Knowledge Base" — it is the same
+                 library the SOC workspace's KB search reads from, and two names
+                 for one thing sent analysts looking in the wrong place. -->
             <div class="tw-drop" data-drop>
               <button class="tw-nav-link tw-drop-btn {% if p.startswith('/social') or p.startswith('/training') or p.startswith('/daily-work') or p.startswith('/guide') or p.startswith('/notes') or p.startswith('/templates') or p.startswith('/documents') or p.startswith('/courses') or p.startswith('/lessons') or p.startswith('/my-courses') or p.startswith('/soc-roles') %}is-active{% endif %}">Knowledge
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
@@ -246,22 +275,22 @@
                 <a href="/soc-roles" class="tw-drop-item {% if p.startswith('/soc-roles') %}is-active{% endif %}">SOC Roles</a>
                 <a href="/training" class="tw-drop-item {% if p.startswith('/training') %}is-active{% endif %}">Skills &amp; Schedule</a>
                 <a href="/daily-work" class="tw-drop-item {% if p.startswith('/daily-work') %}is-active{% endif %}">My Day</a>
-                <a href="/templates" class="tw-drop-item {% if p.startswith('/notes') or p.startswith('/templates') or p.startswith('/documents') %}is-active{% endif %}">Reference</a>
+                <a href="/templates" class="tw-drop-item {% if p.startswith('/notes') or p.startswith('/templates') or p.startswith('/documents') %}is-active{% endif %}">Knowledge Base</a>
               </div>
             </div>
 
             <!-- Administration — admin/engineering only (revealed by app.js). -->
             <div class="tw-drop" data-drop id="nav-admin-dropdown">
-              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/settings') or p.startswith('/users') or p.startswith('/integrations') or p.startswith('/change-requests') or p.startswith('/bug-reports') or p.startswith('/gitlab') or p.startswith('/audit-logs') or p.startswith('/service-accounts') or p.startswith('/stories') or p.startswith('/admin/courses') %}is-active{% endif %}">Administration
+              <button class="tw-nav-link tw-drop-btn {% if p.startswith('/settings') or p.startswith('/users') or p.startswith('/integrations') or p.startswith('/gitlab') or p.startswith('/service-accounts') or p.startswith('/stories') or p.startswith('/admin/courses') %}is-active{% endif %}">Administration
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
                 <a href="/settings" class="tw-drop-item {% if p.startswith('/settings') %}is-active{% endif %}">Settings</a>
                 <a href="/users" class="tw-drop-item {% if p.startswith('/users') %}is-active{% endif %}">Users</a>
                 <a href="/integrations" class="tw-drop-item {% if p.startswith('/integrations') %}is-active{% endif %}">Integrations</a>
-                <a href="/change-requests" class="tw-drop-item {% if p.startswith('/change-requests') or p.startswith('/bug-reports') %}is-active{% endif %}">Service Desk</a>
+                {# v0.79.0: Service Desk + Audit Logs moved to GRC (change
+                   governance and the audit evidence trail). Gates unchanged. #}
                 <a href="/gitlab" class="tw-drop-item {% if p.startswith('/gitlab') %}is-active{% endif %}">GitLab</a>
-                <a href="/audit-logs" class="tw-drop-item {% if p.startswith('/audit-logs') %}is-active{% endif %}">Audit Logs</a>
                 <a href="/service-accounts" class="tw-drop-item {% if p.startswith('/service-accounts') %}is-active{% endif %}">Service Accounts</a>
                 <a href="/stories" class="tw-drop-item {% if p.startswith('/stories') %}is-active{% endif %}">Stories (automation)</a>
                 <a href="/admin/courses" class="tw-drop-item {% if p.startswith('/admin/courses') %}is-active{% endif %}">Course authoring</a>
