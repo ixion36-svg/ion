@@ -174,20 +174,73 @@ def test_component_css_is_balanced(module_css):
 # ── /cases: concept E ────────────────────────────────────────────────────
 
 
-def test_case_panel_is_an_inset_overlay_not_a_narrow_slideout(cases):
-    style = _style(cases)
-    panel = style[style.index(".case-panel {"):]
-    panel = panel[:panel.index("}")]
+@pytest.fixture(scope="module")
+def workspace_css() -> str:
+    """v0.79.0: the panel chrome moved out of cases.html into a shared sheet
+    when /documents adopted the same shape. Same move the alert-detail CSS made
+    at v0.77.0, for the same reason — the second page to use it rendered
+    unstyled while the rules lived in the first page's <style> block."""
+    return (STATIC / "css" / "ion-workspace.css").read_text(encoding="utf-8")
+
+
+def _strip_css_comments(css: str) -> str:
+    """Comments describing a selector are not a definition of it.
+
+    Third time this has produced a false positive in this suite — a note
+    mentioning `.case-panel { width: 100vw }` read as the rule still existing.
+    """
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+
+def _top_level_rule(css: str, selector: str) -> str:
+    """The body of a rule whose selector starts at column 0.
+
+    Anchoring on the first occurrence finds the copy nested inside an @media
+    block, whose declarations are the RESPONSIVE override (inset: 0), not the
+    base rule.
+    """
+    m = re.search(rf"^{re.escape(selector)}[^{{]*\{{(.*?)\}}", css, re.M | re.S)
+    assert m, f"{selector} not found as a top-level rule"
+    return m.group(1)
+
+
+def test_case_panel_is_an_inset_overlay_not_a_narrow_slideout(workspace_css):
+    panel = _top_level_rule(_strip_css_comments(workspace_css), ".ion-ws-panel,")
     assert "inset: 22px" in panel
     assert "560px" not in panel, "the 560px slide-out is back"
 
 
-def test_case_panel_has_a_two_column_workspace(cases):
-    style = _style(cases)
-    assert ".cpanel-workspace" in style
-    ws = style[style.index(".cpanel-workspace {"):]
-    ws = ws[:ws.index("}")]
+def test_case_panel_has_a_two_column_workspace(workspace_css):
+    assert ".cpanel-workspace" in workspace_css
+    ws = _top_level_rule(_strip_css_comments(workspace_css), ".ion-ws-grid,")
     assert "grid-template-columns: 300px 1fr" in ws
+
+
+def test_panel_chrome_is_defined_once_not_copied(cases, workspace_css):
+    """The move is only worth anything if the rules LEFT cases.html. Defining
+    them in both places is the duplication this exists to remove — and it is
+    invisible, because the page still looks right."""
+    style = _strip_css_comments(_style(cases))
+    for sel in (".case-panel {", ".cpanel-workspace {", ".case-panel-body {",
+                ".cpanel-rail-alert {"):
+        assert sel not in style, f"{sel} is still defined in cases.html as well"
+        assert sel.rstrip(" {") in workspace_css, f"{sel} is missing from the shared sheet"
+
+
+def test_shared_sheet_keeps_both_selector_names(workspace_css):
+    """Each rule carries the generic .ion-ws-* name /documents uses AND the
+    .case-panel/.cpanel-* name /cases already had. Drop either side and one of
+    the two pages renders unstyled."""
+    for generic, existing in ((".ion-ws-panel", ".case-panel"),
+                              (".ion-ws-grid", ".cpanel-workspace"),
+                              (".ion-ws-rail-item", ".cpanel-rail-alert"),
+                              (".ion-ws-body", ".case-panel-body")):
+        assert generic in workspace_css, f"{generic} missing — /documents loses its chrome"
+        assert existing in workspace_css, f"{existing} missing — /cases loses its chrome"
+
+
+def test_both_pages_get_the_shared_sheet(base):
+    assert "/static/css/ion-workspace.css" in base
 
 
 def test_cases_uses_the_stacked_layout(cases):

@@ -1,0 +1,231 @@
+/* =============================================================================
+   ION — shared case/document workspace chrome  (v0.79.0)
+
+   The inset overlay, its two-column workspace and the rail row styles were
+   built for /cases at v0.77.0 and lived in that page's <style> block.
+   /documents now uses the same shape, and the v0.77.0 lesson was blunt: a
+   component that owns its markup has to own its CSS, or it renders unstyled on
+   the second page that adopts it.
+
+   So these rules MOVED here rather than being copied. Each carries two
+   selectors: the generic .ion-ws-* name /documents uses, and the
+   .case-panel / .cpanel-* name /cases already had. One definition, and the
+   shipped cases markup did not have to change.
+   ========================================================================== */
+
+.ion-ws-section-title,
+.cpanel-section-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Panel sections */
+.ion-ws-section,
+.cpanel-section {
+    margin-bottom: 1.25rem;
+}
+
+/* The Alerts tab hosts the two-column workspace, which manages its own
+   scrolling — the body must not add a second scrollbar around it. */
+.ion-ws-body.workspace-mode,
+.case-panel-body.workspace-mode {
+    overflow: hidden;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.ion-ws-body,
+.case-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.25rem;
+    min-height: 0;
+}
+
+.ion-ws-section.tab-hidden,
+.cpanel-section.tab-hidden { display: none; }
+
+.ion-ws-close:hover,
+.case-panel-close:hover { color: var(--text-primary); }
+
+.ion-ws-close,
+.case-panel-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    padding: 0;
+    line-height: 1;
+}
+
+.ion-ws-title,
+.case-panel-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: block;
+}
+
+.ion-ws-eyebrow,
+.case-panel-number {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--accent-color);
+    display: block;
+    margin-bottom: 0.15rem;
+}
+
+.ion-ws-header,
+.case-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.ion-ws-rail-item-sub,
+.cpanel-rail-alert-sub {
+    padding: 0 0.65rem 0.55rem 0.8rem;
+    font-size: 0.66rem;
+    color: var(--text-secondary);
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    line-height: 1.55;
+}
+
+.ion-ws-rail-item-name,
+.cpanel-rail-alert-name {
+    font-size: 0.78rem; font-weight: 600; color: var(--text-primary);
+    flex: 1; line-height: 1.3;
+}
+
+.ion-ws-rail-item-head,
+.cpanel-rail-alert-head {
+    display: flex; align-items: center; gap: 0.4rem;
+    padding: 0.55rem 0.65rem 0.55rem 0.8rem;
+}
+
+.ion-ws-rail-item .rail-sev,
+.cpanel-rail-alert .rail-sev {
+    position: absolute; inset: 0 auto 0 0; width: 3px;
+}
+
+.ion-ws-rail-item.selected,
+.cpanel-rail-alert.selected {
+    border-color: var(--primary);
+    background: var(--primary-dim);
+}
+
+.ion-ws-rail-item:hover,
+.cpanel-rail-alert:hover { border-color: var(--border-bright); }
+
+/* Selectable alert row in the rail. */
+.ion-ws-rail-item,
+.cpanel-rail-alert {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.02);
+    margin-bottom: 0.45rem;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.15s, background 0.15s;
+}
+
+@media (max-width: 1100px) {
+    .ion-ws-grid,
+    .cpanel-workspace { grid-template-columns: 1fr; }
+    .ion-ws-grid > .ion-ws-rail,
+    .cpanel-workspace > .cpanel-rail {
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        max-height: 34vh;
+    }
+}
+
+.ion-ws-grid > .ion-ws-detail,
+.cpanel-workspace > .cpanel-detail {
+    overflow-y: auto;
+    padding: 1rem 1.25rem 2rem;
+}
+
+.ion-ws-grid > .ion-ws-rail,
+.cpanel-workspace > .cpanel-rail {
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 1rem 1rem 1.5rem;
+}
+
+/* Two-column alert workspace: the case's alerts on the left, the SHARED
+   alert-detail component (stacked layout) on the right. */
+.ion-ws-grid,
+.cpanel-workspace {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 0;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Below ~900px an inset overlay wastes screen — go edge to edge. */
+@media (max-width: 900px) {
+    .ion-ws-panel,
+    .case-panel { inset: 0; border-radius: 0; border: none; }
+}
+
+.ion-ws-panel.open,
+.case-panel.open {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+.ion-ws-panel,
+.case-panel {
+    position: fixed;
+    inset: 22px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-bright);
+    border-radius: 14px;
+    box-shadow: var(--shadow-card);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    transform: scale(0.985);
+    pointer-events: none;
+    transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.ion-ws-overlay.open,
+.case-panel-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* v0.77.0 — case detail was a 560px right slide-out. At that width the alert
+   content had to be folded into three accordions and four tabs, so seeing one
+   alert fully cost up to eight clicks. It is now an INSET overlay at near-full
+   width: the board stays visible (and dimmed) behind it so the analyst keeps
+   their place, but the alert gets room to be shown in full. */
+.ion-ws-overlay,
+.case-panel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(5, 7, 11, 0.72);
+    backdrop-filter: blur(2px);
+    z-index: 1049;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}

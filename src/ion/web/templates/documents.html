@@ -121,60 +121,96 @@
 </div>
 
 <!-- Document View Modal -->
-<div id="document-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
-            <h2 id="modal-doc-name">Document</h2>
-            <button class="modal-close" data-click-action="closeModal">&times;</button>
+{#
+  v0.79.0 — the document view is the same inset overlay /cases got at v0.77.0,
+  not a modal.
+
+  What changed and why: opening a document used to mean a centred modal whose
+  content sat behind four tabs (Rendered / Raw / Edit / Versions), so reading
+  an article and checking what changed in it were never on screen together, and
+  moving to the next document meant closing, finding it in the list, opening it
+  again. Now: the board stays visible behind a 22px inset panel, the documents
+  in the current folder sit in a left rail so the next one is one click away,
+  and every section is open in one scroll with sticky jump-links.
+
+  The chrome classes (.ion-ws-*) are the same rules /cases uses, defined once
+  in static/css/ion-workspace.css.
+#}
+<div id="doc-panel-overlay" class="ion-ws-overlay" data-click-action="closeModal"></div>
+<div id="document-modal" class="ion-ws-panel">
+    <div class="ion-ws-header">
+        <div class="doc-panel-heading">
+            <span class="ion-ws-eyebrow" id="modal-doc-collection">Knowledge Base</span>
+            <span class="ion-ws-title" id="modal-doc-name">Document</span>
         </div>
-        <div class="modal-body">
-            <div id="modal-doc-meta" class="meta-bar"></div>
-
-            <div id="modal-doc-tags" class="tags-section _ion-s-f2892a2e8a">
-                <h4>Tags</h4>
-                <div class="tags-display">
-                    <span id="modal-tags-list"></span>
-                    <span class="tag-add-inline">
-                        <input type="text" id="modal-tag-input" placeholder="Add tag..." data-enter-key-action="addDocTag" data-prevent-default>
-                        <button class="btn btn-sm" data-click-action="addDocTag">+</button>
-                    </span>
-                </div>
-            </div>
-
-            <div class="content-tabs">
-                <button type="button" class="content-tab-btn active" data-view="rendered">Rendered</button>
-                <button type="button" class="content-tab-btn" data-view="raw">Raw</button>
-                <button type="button" class="content-tab-btn" data-view="edit">Edit</button>
-                <button type="button" class="content-tab-btn" data-view="versions">Version History</button>
-            </div>
-
-            <div id="rendered-view" class="document-content rendered-content"></div>
-            <div id="raw-view" class="document-content _ion-s-f2892a2e8a">
-                <pre id="modal-doc-content" class="code-block"></pre>
-            </div>
-
-            <div id="edit-view" class="document-content _ion-s-f2892a2e8a">
-                <div id="edit-quill-wrap" class="doc-quill-wrap">
-                    <div id="edit-quill-editor"></div>
-                </div>
-            </div>
-
-
-            <div id="versions-view" class="document-content _ion-s-f2892a2e8a">
-                <div id="versions-list" class="versions-list"></div>
-            </div>
-
-            <div class="_ion-s-f2892a2e8a" id="modal-doc-data-section">
-                <h4>Input Data</h4>
-                <pre id="modal-doc-data" class="code-block"></pre>
-            </div>
+        <div class="doc-panel-actions">
+            <button id="save-amendment-btn" class="btn btn-sm btn-success _ion-s-f2892a2e8a">Save Amendment</button>
+            <button id="export-pdf-btn" class="btn btn-sm btn-primary"><i class="icon-file-text"></i> PDF</button>
+            <button id="download-btn" class="btn btn-sm">Download</button>
+            <button id="delete-doc-btn" class="btn btn-sm btn-danger">Delete</button>
+            <button class="ion-ws-close" data-click-action="closeModal">&times;</button>
         </div>
-        <div class="modal-footer">
-            <button id="save-amendment-btn" class="btn btn-success _ion-s-f2892a2e8a">Save Amendment</button>
-            <button id="export-pdf-btn" class="btn btn-primary"><i class="icon-file-text"></i> Export PDF</button>
-            <button id="download-btn" class="btn">Download Source</button>
-            <button id="delete-doc-btn" class="btn btn-danger">Delete</button>
-            <button class="btn" data-click-action="closeModal">Close</button>
+    </div>
+
+    <div class="ion-ws-body workspace-mode">
+        <div class="ion-ws-grid">
+            {# Left rail: the other documents in this folder. Same role the
+               alert rail plays on /cases — the next thing you want is already
+               on screen. #}
+            <aside class="ion-ws-rail" id="doc-rail"></aside>
+
+            <div class="ion-ws-detail" id="doc-detail">
+                {# Jump-links, not tabs: they SCROLL, they do not hide. Reuses
+                   .iad-jump from alert-detail.css. #}
+                <nav class="iad-jump" id="doc-jump"></nav>
+
+                <section class="iad-section" id="doc-sec-details">
+                    <h4 class="ion-ws-section-title">Details</h4>
+                    <div id="modal-doc-meta" class="meta-bar"></div>
+                    <div id="modal-doc-tags" class="tags-section">
+                        <div class="tags-display">
+                            <span id="modal-tags-list"></span>
+                            <span class="tag-add-inline">
+                                <input type="text" id="modal-tag-input" placeholder="Add tag..." data-enter-key-action="addDocTag" data-prevent-default>
+                                <button class="btn btn-sm" data-click-action="addDocTag">+</button>
+                            </span>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="iad-section" id="doc-sec-document">
+                    <h4 class="ion-ws-section-title">Document</h4>
+                    <div id="rendered-view" class="document-content rendered-content"></div>
+                </section>
+
+                <section class="iad-section" id="doc-sec-source">
+                    <h4 class="ion-ws-section-title">Source</h4>
+                    <div id="raw-view" class="document-content">
+                        <pre id="modal-doc-content" class="code-block"></pre>
+                    </div>
+                </section>
+
+                <section class="iad-section" id="doc-sec-edit">
+                    <h4 class="ion-ws-section-title">Edit</h4>
+                    <div id="edit-view" class="document-content">
+                        <div id="edit-quill-wrap" class="doc-quill-wrap">
+                            <div id="edit-quill-editor"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="iad-section" id="doc-sec-versions">
+                    <h4 class="ion-ws-section-title">Version history</h4>
+                    <div id="versions-view" class="document-content">
+                        <div id="versions-list" class="versions-list"></div>
+                    </div>
+                </section>
+
+                <section class="iad-section" id="modal-doc-data-section">
+                    <h4 class="ion-ws-section-title">Input data</h4>
+                    <pre id="modal-doc-data" class="code-block"></pre>
+                </section>
+            </div>
         </div>
     </div>
 </div>
@@ -572,10 +608,11 @@ function initDocQuillEditor(content, format) {
 async function loadDocuments() {
     try {
         allDocuments = await api.get('/api/documents');
-        // Filter out KB documents
-        if (kbCollectionIds.size > 0) {
-            allDocuments = allDocuments.filter(d => !kbCollectionIds.has(d.collection_id));
-        }
+        // v0.79.0: the Knowledge Base is no longer hidden here. It used to be
+        // filtered out of both the document list and the folder tree, which
+        // meant the ~600 KB articles had NO browsing surface anywhere in ION —
+        // reachable only by searching from the SOC workspace, and this page
+        // read "No documents found" on a library that was almost entirely KB.
         renderDocuments(filterDocuments());
     } catch (e) {
         document.getElementById('documents-list').innerHTML = '<p class="error">Failed to load documents</p>';
@@ -585,12 +622,13 @@ async function loadDocuments() {
 async function loadCollections() {
     try {
         allCollections = await api.get('/api/collections?flat=true');
-        // Filter out Knowledge Base collections
+        // v0.79.0: the Knowledge Base tree is shown rather than filtered out.
+        // kbCollectionIds is still populated — it marks which folders are KB so
+        // the tree can label them — but it no longer removes them.
         const kbParent = allCollections.find(c => c.name === 'Knowledge Base');
         if (kbParent) {
             kbCollectionIds = new Set([kbParent.id]);
             allCollections.filter(c => c.parent_id === kbParent.id).forEach(c => kbCollectionIds.add(c.id));
-            allCollections = allCollections.filter(c => !kbCollectionIds.has(c.id));
         }
         renderFolderTree();
         updateFolderSelects();
@@ -882,20 +920,92 @@ async function viewDocument(id) {
         document.getElementById('modal-doc-content').textContent = doc.rendered_content;
         initDocQuillEditor(doc.rendered_content, doc.output_format);
 
-        // Reset to rendered view
-        switchTab('rendered');
-
-        if (doc.input_data) {
+        const hasInputData = !!doc.input_data;
+        if (hasInputData) {
             document.getElementById('modal-doc-data').textContent = JSON.stringify(doc.input_data, null, 2);
-            document.getElementById('modal-doc-data-section').style.display = 'block';
-        } else {
-            document.getElementById('modal-doc-data-section').style.display = 'none';
         }
+        document.getElementById('modal-doc-data-section').style.display = hasInputData ? 'block' : 'none';
 
-        document.getElementById('document-modal').style.display = 'flex';
+        // Which folder this document belongs to — the panel's eyebrow, so the
+        // analyst can see where they are without the tree being visible.
+        const coll = (allCollections || []).find(c => c.id === doc.collection_id);
+        document.getElementById('modal-doc-collection').textContent =
+            coll ? coll.name : 'Uncategorised';
+
+        // Every section is open, so Save Amendment is always available rather
+        // than appearing only on an "Edit" tab.
+        document.getElementById('save-amendment-btn').style.display = 'inline-block';
+
+        updateDeleteVisibility(doc);
+        renderDocJump(hasInputData);
+        renderDocRail(id);
+        loadVersions();          // no longer waits for a tab click
+        openDocPanel();
+        document.getElementById('doc-detail').scrollTop = 0;
+        observeDocSections();
     } catch (e) {
         showToast('Failed to load document', 'error');
     }
+}
+
+// The other documents in the current view, so the next one is one click away
+// instead of close → find → open. Built from the already-loaded list, so
+// switching documents costs one request for the document itself.
+function renderDocRail(activeId) {
+    const rail = document.getElementById('doc-rail');
+    if (!rail) return;
+    // The list the analyst is actually looking at — same folder, same filters
+    // as the board behind the panel — not every document in the library.
+    let docs = [];
+    try { docs = filterDocuments() || []; } catch (e) { docs = allDocuments || []; }
+    if (!docs.length) { rail.innerHTML = ''; return; }
+
+    // Unfiltered, the library is ~600 documents — that many rail rows is a
+    // slow panel for no benefit. Cap it, keep the OPEN document in the list
+    // even if it falls outside the cap, and say what was left out rather than
+    // silently truncating.
+    const RAIL_MAX = 150;
+    let hiddenCount = 0;
+    if (docs.length > RAIL_MAX) {
+        const active = docs.find(d => d.id === activeId);
+        const capped = docs.slice(0, RAIL_MAX);
+        if (active && !capped.some(d => d.id === activeId)) capped[capped.length - 1] = active;
+        hiddenCount = docs.length - capped.length;
+        docs = capped;
+    }
+
+    rail.innerHTML = docs.map(d => `
+        <div class="ion-ws-rail-item${d.id === activeId ? ' selected' : ''}"
+             data-click-action="viewDocument" data-args='[${d.id}]'>
+          <div class="ion-ws-rail-item-head">
+            <span class="ion-ws-rail-item-name">${escapeHtml(d.name)}</span>
+          </div>
+          <div class="ion-ws-rail-item-sub">${escapeHtml(d.output_format || '')} · v${d.current_version || 1}</div>
+        </div>`).join('')
+        + (hiddenCount
+            ? `<div class="ion-ws-rail-item-sub" style="padding-top:.6rem;">${hiddenCount} more — narrow the folder or filters to see them</div>`
+            : '');
+
+    const sel = rail.querySelector('.ion-ws-rail-item.selected');
+    if (sel) sel.scrollIntoView({ block: 'nearest' });
+}
+
+// Show Delete only to someone who can actually use it — the owner, or a
+// document:delete holder. Cosmetic only: the endpoint enforces the same rule
+// server-side (see delete_document). Without this an analyst gets a Delete
+// button on every article and a 403 when they press it.
+function updateDeleteVisibility(doc) {
+    const btn = document.getElementById('delete-doc-btn');
+    if (!btn) return;
+    const me = (typeof currentUserData !== 'undefined' && currentUserData) ? currentUserData : null;
+    const perms = new Set((me && me.permissions) || []);
+    const isOwner = me && doc.created_by_id != null && doc.created_by_id === me.id;
+    btn.style.display = (isOwner || perms.has('document:delete')) ? 'inline-block' : 'none';
+}
+
+function openDocPanel() {
+    document.getElementById('doc-panel-overlay').classList.add('open');
+    document.getElementById('document-modal').classList.add('open');
 }
 
 async function deleteDocument(id, name) {
@@ -911,28 +1021,44 @@ async function deleteDocument(id, name) {
 }
 
 function closeModal() {
-    document.getElementById('document-modal').style.display = 'none';
+    // v0.79.0: the panel is shown/hidden with a class, not display — the
+    // .open transition is what gives it the scale-in the cases panel has.
+    document.getElementById('document-modal').classList.remove('open');
+    document.getElementById('doc-panel-overlay').classList.remove('open');
 }
 
-function switchTab(view) {
-    document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
-        btn.classList.remove('active');
-    });
-    document.querySelector('.content-tab-btn[data-view="' + view + '"]').classList.add('active');
+// v0.79.0: switchTab is gone. The four views it hid behind tabs — Rendered,
+// Raw, Edit, Version history — are now stacked sections that are all open at
+// once, and `docJumpTo` SCROLLS to one rather than hiding the other three.
+// Same decision as the /cases jump-links at v0.77.0: a jump-link that hides
+// its siblings is just a tab wearing a hat.
+const DOC_SECTIONS = [
+    { id: 'doc-sec-details',      label: 'Details' },
+    { id: 'doc-sec-document',     label: 'Document' },
+    { id: 'doc-sec-source',       label: 'Source' },
+    { id: 'doc-sec-edit',         label: 'Edit' },
+    { id: 'doc-sec-versions',     label: 'Versions' },
+    { id: 'modal-doc-data-section', label: 'Input data' },
+];
 
-    document.getElementById('rendered-view').style.display = view === 'rendered' ? 'block' : 'none';
-    document.getElementById('raw-view').style.display = view === 'raw' ? 'block' : 'none';
-    document.getElementById('edit-view').style.display = view === 'edit' ? 'block' : 'none';
-    document.getElementById('versions-view').style.display = view === 'versions' ? 'block' : 'none';
-
-    // Show/hide save amendment button based on edit view
-    document.getElementById('save-amendment-btn').style.display = view === 'edit' ? 'inline-block' : 'none';
-
-    // Load versions when switching to versions tab
-    if (view === 'versions') {
-        loadVersions();
-    }
+function renderDocJump(hasInputData) {
+    const nav = document.getElementById('doc-jump');
+    if (!nav) return;
+    nav.innerHTML = DOC_SECTIONS
+        .filter(s => s.id !== 'modal-doc-data-section' || hasInputData)
+        .map(s => `<a class="iad-jump-link" href="#${s.id}" data-click-action="docJumpTo" data-args='["${s.id}"]'>${s.label}</a>`)
+        .join('');
 }
+
+function docJumpTo(sectionId) {
+    const el = document.getElementById(sectionId);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelectorAll('#doc-jump .iad-jump-link').forEach(a => a.classList.remove('active'));
+    const link = document.querySelector(`#doc-jump .iad-jump-link[data-args='["${sectionId}"]']`);
+    if (link) link.classList.add('active');
+}
+window.docJumpTo = docJumpTo;
 
 async function loadVersions() {
     const container = document.getElementById('versions-list');
@@ -1261,13 +1387,30 @@ async function confirmAmendment() {
     }
 }
 
-// Content view tabs
-document.querySelectorAll('.content-tab-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        const view = this.getAttribute('data-view');
-        switchTab(view);
+// v0.79.0: the .content-tab-btn wiring is gone with the tabs themselves.
+// The jump-links are delegated via data-click-action, so there is nothing to
+// bind here.
+
+// Keep the jump-link highlight following the scroll position rather than the
+// last thing clicked — same IntersectionObserver contract the shared
+// alert-detail component uses on /cases.
+let _docSectionObserver = null;
+function observeDocSections() {
+    if (_docSectionObserver) _docSectionObserver.disconnect();
+    const root = document.getElementById('doc-detail');
+    if (!root) return;
+    _docSectionObserver = new IntersectionObserver((entries) => {
+        entries.filter(e => e.isIntersecting).forEach(e => {
+            document.querySelectorAll('#doc-jump .iad-jump-link').forEach(a => a.classList.remove('active'));
+            const link = document.querySelector(`#doc-jump .iad-jump-link[data-args='["${e.target.id}"]']`);
+            if (link) link.classList.add('active');
+        });
+    }, { root: root, rootMargin: '-45% 0px -50% 0px' });
+    DOC_SECTIONS.forEach(s => {
+        const el = document.getElementById(s.id);
+        if (el) _docSectionObserver.observe(el);
     });
-});
+}
 
 document.getElementById('export-pdf-btn').addEventListener('click', async function() {
     if (!currentDocId) return;
@@ -1335,9 +1478,11 @@ document.getElementById('delete-doc-btn').addEventListener('click', async functi
     }
 });
 
-document.getElementById('document-modal').addEventListener('click', function(e) {
-    if (e.target.id === 'document-modal') closeModal();
-});
+// v0.79.0: click-outside is the overlay's job now (it carries
+// data-click-action="closeModal"). The old handler fired when the click
+// landed on #document-modal itself — which used to be the dimmed backdrop,
+// but is now the PANEL. Left in place it would close the panel whenever the
+// analyst clicked its own padding.
 
 document.getElementById('save-amendment-btn').addEventListener('click', showAmendmentModal);
 
@@ -1532,6 +1677,22 @@ function updateTagFilter() {
     }
 }
 
+// v0.79.0: open the document named in the URL fragment.
+// The SOC workspace KB panel has always linked its search results to
+// /documents#doc-<id>, but this page had NO hash handling of any kind — so
+// every result dropped the analyst on the unfiltered document list and the
+// article they clicked never opened. Silent: no error, just the wrong page.
+async function openDocumentFromHash() {
+    const m = /^#doc-(\d+)$/.exec(window.location.hash || '');
+    if (!m) return;
+    const id = parseInt(m[1], 10);
+    try {
+        await viewDocument(id);
+    } catch (err) {
+        showToast('That document could not be opened', 'error');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async function() {
     await loadCollections();
     await loadDocuments();
@@ -1540,7 +1701,13 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('format-filter').addEventListener('change', applyFilters);
     document.getElementById('status-filter').addEventListener('change', applyFilters);
     document.getElementById('tag-filter').addEventListener('change', applyFilters);
+    // After the list is loaded, so the modal opens over a populated page.
+    await openDocumentFromHash();
 });
+
+// Handles arriving at #doc-N while already on /documents — the browser fires
+// hashchange without reloading, so DOMContentLoaded alone would miss it.
+window.addEventListener('hashchange', openDocumentFromHash);
 
 // Close modal on outside click
 document.addEventListener('click', (e) => {
