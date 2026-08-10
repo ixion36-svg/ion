@@ -54,7 +54,13 @@
   <!-- ── Stats Bar (JS-populated; IDs preserved) ── -->
   <div id="alert-stats-bar" class="flex flex-wrap gap-x-8 gap-y-4 px-5 py-4 rounded-[12px] border border-white/5 bg-ink-900/50 mb-6 rise d-3">
     <div class="flex flex-col gap-1 min-w-[70px]">
-      <span class="label-tiny text-slate-500">Total</span>
+      <span class="label-tiny text-slate-500 flex items-center gap-1.5">Total
+        {# v0.79.0: these counts follow the active filter, so the bar has to
+           say when it is showing a subset — otherwise a filtered total is
+           indistinguishable from the estate total. #}
+        <span id="stats-filtered-badge"
+              class="hidden items-center px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wide bg-ion-cyan/15 text-ion-cyan border border-ion-cyan/30"></span>
+      </span>
       <span id="stat-total" class="font-sans font-semibold tabular-nums text-[24px] leading-none text-white">–</span>
     </div>
     <button data-click-action="quickFilterByTriage" data-args='["open"]' class="flex flex-col gap-1 min-w-[70px] text-left hover:opacity-80 transition">
@@ -3391,6 +3397,10 @@ window.__switchDetailTabBySelector = function(event, dataset) {
 
 let allAlerts = [];
 let filteredAlerts = [];
+// v0.79.0: the same set as filteredAlerts but WITHOUT the status filter —
+// what the Open/Acknowledged/Closed tiles count, so they stay usable as the
+// quick-filter buttons they also are.
+let alertsIgnoringStatus = [];
 let currentSort = { field: 'timestamp', dir: 'desc' };
 let entityFilter = null; // { type: 'host'|'user'|'rule', value: '...' }
 let autoRefreshEnabled = true;
@@ -6851,16 +6861,17 @@ function applyFilters() {
     // Track whether we loaded with closed alerts
     _lastIncludedClosed = (statusFilter === 'closed' || statusFilter === 'all');
 
-    filteredAlerts = allAlerts.filter(a => {
+    // v0.79.0: the predicate is split in two so the aggregations can follow the
+    // filter WITHOUT the status tiles cannibalising themselves.
+    //
+    // The status tiles (Open / Acknowledged / Closed) are also the quick-filter
+    // buttons. The page loads on "Open Only", so if they counted the same set
+    // the table shows, Closed would read 0 on arrival and clicking it would look
+    // like a dead control. They therefore ignore the STATUS filter and honour
+    // every other one — narrow to a host and the tiles show that host's
+    // open/ack/closed split, which is the useful reading.
+    const matchesNonStatus = (a) => {
         if (severity && a.severity !== severity) return false;
-        // Prefer ION triage status over raw ES status
-        const effectiveStatus = (triageCache[a.id] && triageCache[a.id].status) || a.status;
-        // "Active" (default empty) = open + acknowledged; "all" = everything
-        if (statusFilter === '' || statusFilter === undefined) {
-            if (effectiveStatus === 'closed') return false;
-        } else if (statusFilter !== 'all' && statusFilter && effectiveStatus !== statusFilter) {
-            return false;
-        }
         if (entityFilter) {
             if (entityFilter.type === 'host' && a.host !== entityFilter.value) return false;
             if (entityFilter.type === 'user' && a.user !== entityFilter.value) return false;
@@ -6873,7 +6884,21 @@ function applyFilters() {
             if (!haystack.includes(search)) return false;
         }
         return true;
-    });
+    };
+
+    const matchesStatus = (a) => {
+        // Prefer ION triage status over raw ES status
+        const effectiveStatus = (triageCache[a.id] && triageCache[a.id].status) || a.status;
+        // "Active" (empty) = open + acknowledged; "all" = everything
+        if (statusFilter === '' || statusFilter === undefined) {
+            return effectiveStatus !== 'closed';
+        }
+        if (statusFilter === 'all' || !statusFilter) return true;
+        return effectiveStatus === statusFilter;
+    };
+
+    alertsIgnoringStatus = allAlerts.filter(matchesNonStatus);
+    filteredAlerts = alertsIgnoringStatus.filter(matchesStatus);
 
     applySorting();
     renderAlerts();
@@ -7045,9 +7070,39 @@ function renderAlerts() {
     `}).join('');
 }
 
+// v0.79.0: the aggregations follow the filter.
+//
+// These deliberately read allAlerts ("so panels always show full picture"),
+// which meant that narrowing the table to one host still showed Top Hosts for
+// every host, and the stat tiles still counted alerts the analyst had just
+// filtered out. The numbers above the table disagreed with the table — and
+// nothing said which set they described, so the only way to tell was to add up
+// the rows by hand. An aggregate that ignores the active filter is worse than
+// no aggregate: it looks like an answer to the question you just asked.
+// What the Total / severity tiles and the Top-N panels count: exactly the rows
+// in the table. Falls back to allAlerts before the first applyFilters() so the
+// initial paint is not a row of zeroes.
+function _aggregationSource() {
+    return Array.isArray(filteredAlerts) && (filteredAlerts.length || _filtersNarrow())
+        ? filteredAlerts
+        : allAlerts;
+}
+
+// What the STATUS tiles count: everything except the status filter itself, so
+// they keep working as the quick-filter buttons they also are.
+function _statusTileSource() {
+    return Array.isArray(alertsIgnoringStatus) && alertsIgnoringStatus.length
+        ? alertsIgnoringStatus
+        : allAlerts;
+}
+
+// True when the table is showing fewer rows than were loaded.
+function _filtersNarrow() {
+    return Array.isArray(filteredAlerts) && filteredAlerts.length !== allAlerts.length;
+}
+
 function renderSidePanels() {
-    // Use allAlerts (not filteredAlerts) for aggregations so panels always show full picture
-    const source = allAlerts;
+    const source = _aggregationSource();
 
     // Hosts
     const hostCounts = {};
@@ -7066,14 +7121,29 @@ function renderSidePanels() {
 }
 
 function updateStatsBar() {
-    const source = allAlerts;
+    const source = _aggregationSource();
 
     // Total
     document.getElementById('stat-total').textContent = source.length;
 
-    // By triage status
+    // Say WHICH set these numbers describe. Without this, a filtered stat bar
+    // is indistinguishable from an unfiltered one and quietly misreports the
+    // estate.
+    const badge = document.getElementById('stats-filtered-badge');
+    if (badge) {
+        const filtered = _filtersNarrow();
+        badge.textContent = filtered ? `filtered · ${source.length} of ${allAlerts.length}` : '';
+        badge.style.display = filtered ? 'inline-flex' : 'none';
+    }
+
+    // By triage status — counted over the set that IGNORES the status filter.
+    // These tiles double as the quick-filter buttons, and the page loads on
+    // "Open Only": counting the visible rows would show Closed as 0 on arrival
+    // and make the control look dead. Every other filter still applies, so
+    // narrowing to a host gives that host's open/ack/closed split.
+    const statusSource = _statusTileSource();
     const triageStatusCounts = { open: 0, acknowledged: 0, closed: 0 };
-    source.forEach(a => {
+    statusSource.forEach(a => {
         const triage = triageCache[a.id];
         const status = triage?.status || 'open';
         if (triageStatusCounts[status] !== undefined) {
