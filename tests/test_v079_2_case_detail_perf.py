@@ -179,6 +179,64 @@ def test_hydration_failure_is_silent(component):
     assert ".catch(" in fn
 
 
+# ── v0.79.3: use the extraction ION already did ──────────────────────────
+
+
+def test_host_and_user_come_from_the_observables_already_in_hand(component):
+    """ION extracts hostname/user at triage time (observable_extractor) and
+    stores them on AlertTriage.observables — and /api/cases/{id} already
+    RETURNS that array per alert. Going back to Elasticsearch for them was
+    re-deriving data the page was handed."""
+    assert "function _fromObservables(" in component
+    assert "_fromObservables(alert);" in component
+
+
+def test_observables_are_read_before_the_first_paint(component):
+    """Filling after render would flash a dash and then correct itself; filling
+    from a fetch would leave the cells blank whenever Elasticsearch is down —
+    which is exactly when someone is opening a case."""
+    fn = component[component.index("function mount(container, alert, opts)"):]
+    fn = fn[:fn.index("\n  }")]
+    assert fn.index("_fromObservables(alert);") < fn.index("container.innerHTML = render("), \
+        "observables are read after the grid is rendered"
+
+
+@pytest.mark.parametrize("obs_type", [
+    "hostname", "host", "source_hostname",          # host candidates
+    "user_account", "target_user", "source_user",   # user candidates
+])
+def test_the_observable_type_names_ion_actually_emits_are_covered(obs_type, component):
+    """These are the `type` strings observable_extractor writes. A mismatch
+    here fails silently — the cell just stays a dash."""
+    assert f"'{obs_type}'" in component
+
+
+def test_observables_never_overwrite_a_supplied_value(component):
+    """/alerts already sets host/user from the full document. Overwriting them
+    would make the two pages disagree about the same alert."""
+    fn = component[component.index("function _fromObservables("):]
+    fn = fn[:fn.index("\n  function mount(")]
+    assert "if (!alert.host)" in fn
+    assert "if (!alert.user)" in fn
+
+
+def test_observables_shape_is_tolerated(component):
+    """The column is free-form JSON; a malformed row must not throw and take
+    the whole alert detail down with it."""
+    fn = component[component.index("function _fromObservables("):]
+    fn = fn[:fn.index("\n  function mount(")]
+    assert "Array.isArray(alert.observables)" in fn
+    assert "o && o.type && o.value" in fn
+
+
+def test_raw_hydration_is_now_only_the_fallback(component):
+    """It still covers Source/Timestamp/message, which observables do not
+    carry — but it must no longer be the primary path for host/user."""
+    fn = component[component.index("function mount(container, alert, opts)"):]
+    fn = fn[:fn.index("\n  }")]
+    assert fn.index("_fromObservables(alert);") < fn.index("_hydrateFromRaw(alert);")
+
+
 # ── healthcheck ──────────────────────────────────────────────────────────
 
 

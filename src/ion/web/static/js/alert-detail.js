@@ -913,10 +913,42 @@
     }).catch(function () { /* the grid keeps its dashes */ });
   }
 
+  // ── fill from the observables ION already extracted (v0.79.2) ───────────
+  //
+  // ION extracts hostname/user from the alert at triage time
+  // (services/observable_extractor.py) and stores them on AlertTriage
+  // .observables — and /api/cases/{id} already RETURNS that array per alert.
+  // So the case page holds this data before it renders anything, and going
+  // back to Elasticsearch for it would be re-deriving what we were handed.
+  //
+  // Runs BEFORE render, synchronously, so the grid is correct on first paint
+  // with no flicker and no dependency on Elasticsearch being reachable — which
+  // matters, because a case is exactly what an analyst opens when the estate is
+  // having a bad day.
+  var _OBS_HOST = ['hostname', 'host', 'source_hostname'];
+  var _OBS_USER = ['user_account', 'target_user', 'source_user', 'username'];
+
+  function _fromObservables(alert) {
+    if (!alert || !Array.isArray(alert.observables)) return;
+    var byType = {};
+    alert.observables.forEach(function (o) {
+      if (o && o.type && o.value && byType[o.type] === undefined) byType[o.type] = o.value;
+    });
+    function pick(types) {
+      for (var i = 0; i < types.length; i++) {
+        if (byType[types[i]]) return byType[types[i]];
+      }
+      return undefined;
+    }
+    if (!alert.host) alert.host = pick(_OBS_HOST);
+    if (!alert.user) alert.user = pick(_OBS_USER);
+  }
+
   function mount(container, alert, opts) {
     if (!container) return;
+    _fromObservables(alert);          // free — the data is already in hand
     container.innerHTML = render(alert, opts);
-    _hydrateFromRaw(alert);
+    _hydrateFromRaw(alert);           // only for what observables cannot supply
     // In stacked layout every section is already on screen, so nothing is
     // lazy - load the ones that would otherwise wait for a click the analyst
     // is never going to make.
