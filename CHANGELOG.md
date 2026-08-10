@@ -1,13 +1,27 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.77.1 -->
-<!-- ion-doc:version=0.77.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.78.0 -->
+<!-- ion-doc:version=0.78.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-08-05 -->
+<!-- ion-doc:date=2026-08-10 -->
 
 # Changelog
+
+## v0.78.0 — 2026-08-10
+
+**Bob runs once per case at case creation, not once per open alert.**
+
+- **The old shape didn't work.** A background sweep ran `investigate_alert` over every open alert and mostly timed out — so the automatic analysis analysts were meant to find waiting for them frequently wasn't there. Bob's automatic run now belongs to the case grouper: one cluster investigation per case, at creation, posted as a single case comment. `should_run_per_alert_sweep()` turns the standalone per-alert sweep **off** whenever the grouper is the active investigator, and keeps it as a fallback only when the grouper is disabled. Startup logs which path is live.
+- **Manually-created cases get the same treatment.** `POST /api/elasticsearch/alerts/cases` enqueues the same `investigate_case`, gated by `_should_investigate_new_case` — skipped for auto-closed false-positive cases and cases with no alerts, and honouring the `case_grouper_auto_investigate` master switch.
+- **One comment, worded for the case.** `_render_bob_case_note` distinguishes a single-alert case ("analysed 1 alert") from a cluster ("analysed 3 alerts") and carries verdict, severity, confidence, summary, recommended actions and ATT&CK techniques. Per-alert callers pass `write_comment=False`, so nothing re-introduces the per-alert comment spam that v0.23.1 removed.
+- **Deterministic PowerShell decode — the model no longer guesses.** A live test caught Foundation-Sec inventing a *benign* command for a real `IEX` download cradle. `services/command_deobfuscate.py` decodes `-EncodedCommand` payloads in code (UTF-16LE base64), string-aware and conservative — it won't match `-ExecutionPolicy` and ignores malformed base64. The plaintext is injected into both the alert and cluster prompts as ground truth ("DO NOT re-decode") and fed to IOC extraction, so C2 URLs and IPs hidden inside base64 become observables. A case holding an encoded cradle now returns `true_positive` with isolate + forensics actions, where it previously returned `inconclusive`.
+- **LLM JSON that isn't quite JSON.** `_strip_jsonc` removes `//` and `/* */` comments and trailing commas **outside string literals only**, so real URLs survive. Foundation-Sec emits all three routinely; previously they failed `json.loads` and dumped the raw envelope into `summary`.
+- **Auto-grouped case descriptions are structured** — a labelled Rule / Host / User / alert-count / severity block instead of a flat sentence.
+- **Bob's case comment is mirrored into the linked Kibana case.** Caught during the release review: the new note-writer wrote to ION's DB only. Every other note path in ION syncs — interactive `add_case_note`, the closure note, the MCP tool, the v0.59.0 enrichment note, the PCAP report note — and one that doesn't is invisible to anyone working the case from Kibana, silently. Mirrored after commit and off the event loop, best-effort. `tests/test_v078_bob_case_note_kibana_sync.py` (4), confirmed to fail against the pre-fix code.
+- `chore(deps)`: floor `setuptools>=83.0.0` (PYSEC-2026-3447), matching ION's existing CVE-floor convention.
+- 341 tests across the affected set (Bob analysis, investigation, case grouper, case lifecycle, RAG, PCAP, route audit).
 
 ## v0.77.1 — 2026-08-05
 
