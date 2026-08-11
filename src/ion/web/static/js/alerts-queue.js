@@ -102,6 +102,20 @@
               return h;
           } },
 
+        /* Count plus the WORST threat level among them, so a row shows whether it
+           contains something already known-bad without being opened. "unknown" is
+           the floor, not a clean bill of health. */
+        { k: 'obs', label: 'Obs', cls: 'aq-obs', on: true, sort: 'obs',
+          cell: (a) => {
+              const t = triageOf(a);
+              const n = t.observable_count || 0;
+              if (!n) return '<span class="aq-mut">-</span>';
+              const lvl = t.observable_threat || 'unknown';
+              return `<span class="aq-obs-chip t-${esc(lvl)}"`
+                   + ` title="${n} observable${n === 1 ? '' : 's'}; worst threat level: ${esc(lvl)}">`
+                   + `<i class="aq-obs-dot"></i>${n}</span>`;
+          } },
+
         { k: 'ts', label: 'Timestamp', cls: 'aq-ts', on: true, sort: 'ts',
           cell: (a) => `<span title="${esc(fmtFull(a))}">${fmtStamp(a)}</span>` },
 
@@ -120,10 +134,33 @@
               return `<span class="${m > 240 ? 'aq-hot' : 'aq-mut'}">${fmtAge(m)}</span>`;
           } },
 
+        /* Bob's lean is model output. It renders in the AI colour and always
+           carries its confidence — never as a verdict ION asserts. */
+        { k: 'bob', label: 'Bob', cls: 'aq-bob', on: true, sort: 'bob',
+          cell: (a) => {
+              const t = triageOf(a);
+              if (!t.suggested_verdict) return '<span class="aq-mut">-</span>';
+              const v = String(t.suggested_verdict);
+              const fp = /false[_ ]?positive|benign/i.test(v);
+              const conf = t.suggested_verdict_confidence;
+              return `<span class="aq-bob-v ${fp ? 'is-fp' : 'is-tp'}"`
+                   + ` title="Bob suggests ${esc(v)} — advisory, nothing is suppressed on it">`
+                   + `${fp ? 'FP' : 'TP'}${conf != null ? ' ' + conf + '%' : ''}</span>`;
+          } },
+
         { k: 'status', label: 'Status', cls: 'aq-status', on: true, sort: 'status',
           cell: (a) => {
               const s = statusOf(a);
               return `<span class="aq-st aq-st-${esc(s)}">${esc(s)}</span>`;
+          } },
+
+        { k: 'who', label: 'Assignee', cls: 'aq-who', on: false, sort: 'who',
+          cell: (a) => {
+              const w = triageOf(a).assigned_to;
+              if (!w) return '<span class="aq-un">unassigned</span>';
+              // an alert the auto-case loop owns is not a colleague's work
+              const bot = /^bob$/i.test(w);
+              return `<span class="${bot ? 'aq-bobwho' : 'aq-mut'}">${esc(w)}</span>`;
           } },
 
         // available, off by default
@@ -170,11 +207,26 @@
                                .concat(COLUMNS.filter((c) => c.on && c.last));
 
     /* ── data ────────────────────────────────────────────────────────────── */
+    const THREAT_ORDER = ['critical', 'high', 'medium', 'low', 'benign', 'unknown'];
+
     function sortVal(a, k) {
         if (k === 'sev') return rank(a.severity);
         if (k === 'ts' || k === 'age') return ts(a);
         if (k === 'status') return statusOf(a);
         if (k === 'case') return triageOf(a).case_number || '';
+        if (k === 'who') return triageOf(a).assigned_to || '';
+        // sort observables by how bad they are, then how many — a row with one
+        // critical observable matters more than five unknowns
+        if (k === 'obs') {
+            const t = triageOf(a);
+            const lvl = THREAT_ORDER.indexOf(t.observable_threat || 'unknown');
+            return (lvl < 0 ? 9 : lvl) * 1000 - (t.observable_count || 0);
+        }
+        if (k === 'bob') {
+            const t = triageOf(a);
+            if (!t.suggested_verdict) return 'zzz';
+            return String(t.suggested_verdict) + String(1000 - (t.suggested_verdict_confidence || 0));
+        }
         const v = a[k];
         return v == null ? '' : v;
     }

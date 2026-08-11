@@ -33,7 +33,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ion.core.client_ip import get_client_ip as _trusted_client_ip
 from ion.core.config import (
@@ -3279,6 +3279,67 @@ class BatchTriageRequestWithStatus(BaseModel):
     es_statuses: Optional[Dict[str, str]] = None  # { alert_id: "open"|"acknowledged"|"closed" }
 
 
+# ThreatLevel ordering from models/observable.py. "unknown" is the floor, not a
+# clean bill of health — an observable nobody has enriched yet is not benign.
+_THREAT_ORDER = ["critical", "high", "medium", "low", "benign", "unknown"]
+
+
+def _worst_observable_threat(observables: list, levels: Optional[Dict[str, str]] = None) -> str:
+    """Highest threat level among an alert's observables.
+
+    AlertTriage.observables is a free-form JSON snapshot written by several
+    producers (triage extraction, the AI extractor, manual entry). In practice it
+    stores only ``{"type", "value"}`` — enrichment lives on the Observable
+    registry, not here — so the level is looked up by normalised value via
+    ``levels``. Reading only the snapshot returns "unknown" for every alert,
+    which renders as a column that never changes.
+
+    A row may still be a bare string or carry its own threat_level. Malformed
+    input must not decide the answer, and must not raise on a list endpoint.
+    """
+    worst = len(_THREAT_ORDER) - 1
+    for o in observables:
+        if not isinstance(o, dict):
+            continue
+        level = o.get("threat_level")
+        if not level and levels:
+            level = levels.get(str(o.get("value", "")).strip().lower())
+        level = str(level or "unknown").lower()
+        if level in _THREAT_ORDER:
+            worst = min(worst, _THREAT_ORDER.index(level))
+    return _THREAT_ORDER[worst]
+
+
+def _observable_threat_levels(session: Session, triages: list) -> Dict[str, str]:
+    """Map normalised observable value -> threat level, in ONE query per batch.
+
+    Looked up by value alone rather than (type, value): the snapshot's type
+    strings come from a different vocabulary than ObservableType in places
+    ("ip" vs "ipv4"), and a value collision across types would at worst
+    over-report severity, which is the safe direction for a triage queue.
+    """
+    from ion.models.observable import Observable
+
+    wanted = set()
+    for t in triages:
+        obs = t.observables if isinstance(t.observables, list) else []
+        for o in obs:
+            if isinstance(o, dict) and o.get("value"):
+                wanted.add(str(o["value"]).strip().lower())
+    if not wanted:
+        return {}
+    rows = (
+        session.query(Observable.normalized_value, Observable.threat_level)
+        .filter(Observable.normalized_value.in_(wanted))
+        .all()
+    )
+    out: Dict[str, str] = {}
+    for value, level in rows:
+        lvl = level.value if hasattr(level, "value") else str(level or "")
+        out[str(value).strip().lower()] = lvl.split(".")[-1].lower()
+    return out
+
+
 @router.post("/elasticsearch/alerts-triage/batch")
 async def get_batch_triage(
     data: BatchTriageRequestWithStatus,
@@ -3297,8 +3358,16 @@ async def get_batch_triage(
     # Wrapped in to_thread — multiple DB queries + potential writes per alert
     # in the batch would block the event loop for the entire batch duration.
     def _batch_triage():
+        # case and assigned_to are both read for every row below. Lazy-loading
+        # them issues one SELECT per alert, and this endpoint is called with up
+        # to 500 ids — the same shape as the alert_triage seq scan that was half
+        # of production response time at v0.79.4.
         triages = (
             session.query(AlertTriage)
+            .options(
+                joinedload(AlertTriage.case),
+                joinedload(AlertTriage.assigned_to),
+            )
             .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
             .all()
         )
@@ -3333,14 +3402,28 @@ async def get_batch_triage(
                 session.rollback()
                 logger.warning("Failed to sync ES statuses to ION triage")
 
+        # one lookup for the whole batch, not one per alert
+        threat_levels = _observable_threat_levels(session, list(triage_map.values()))
+
         result = {}
         for t in triage_map.values():
+            # Observables can be long; the queue only needs the count and the
+            # worst threat level, so the list is summarised rather than shipped
+            # 500 times over. The detail panel already fetches the full set.
+            obs = t.observables if isinstance(t.observables, list) else []
             result[t.es_alert_id] = {
                 "status": t.status.value if hasattr(t.status, "value") else t.status,
                 "priority": t.priority,
                 "case_id": t.case_id,
                 "case_number": t.case.case_number if t.case else None,
                 "case_title": t.case.title if t.case else None,
+                "assigned_to": t.assigned_to.username if t.assigned_to else None,
+                # advisory only — the queue renders it as model output, never as
+                # a verdict ION asserts
+                "suggested_verdict": t.suggested_verdict,
+                "suggested_verdict_confidence": t.suggested_verdict_confidence_int,
+                "observable_count": len(obs),
+                "observable_threat": _worst_observable_threat(obs, threat_levels),
             }
 
         return {"triage": result}

@@ -7071,6 +7071,23 @@ const AQ_VIEWS = [
                 && (Date.now() - Date.parse(a.timestamp)) > 4 * 3600 * 1000 },
     { k: 'uncased',  label: 'Not in a case',
       f: (a, t) => (t.status || a.status) !== 'closed' && !t.case_number },
+    // unblocked by the batch endpoint now returning assignee and Bob's verdict
+    // currentUserData is loaded by app.js; it can be null on a cold start, in
+    // which case this view is empty rather than matching everyone
+    { k: 'mine',     label: 'Mine',
+      f: (a, t) => (t.status || a.status) !== 'closed'
+                && !!t.assigned_to
+                && t.assigned_to === (typeof currentUserData !== 'undefined'
+                                      && currentUserData ? currentUserData.username : null) },
+    { k: 'unassigned', label: 'Unassigned',
+      f: (a, t) => (t.status || a.status) !== 'closed' && !t.assigned_to },
+    // where the model and the severity disagree — Bob calls it benign on a
+    // critical or high alert. Advisory: it surfaces the row, never hides it.
+    { k: 'disagree', label: 'Bob disagreed',
+      f: (a, t) => (a.severity === 'critical' || a.severity === 'high')
+                && /false[_ ]?positive|benign/i.test(t.suggested_verdict || '') },
+    { k: 'autocase', label: 'Auto-cased',
+      f: (a, t) => /^\[Auto\]/.test(t.case_title || '') },
     { k: 'all',      label: 'Everything', f: () => true },
 ];
 
@@ -7345,21 +7362,17 @@ function _filtersNarrow() {
 
 function renderSidePanels() {
     const source = _aggregationSource();
-
-    // Hosts
-    const hostCounts = {};
-    source.forEach(a => { if (a.host) hostCounts[a.host] = (hostCounts[a.host] || 0) + 1; });
-    renderSideList('top-hosts-list', 'hosts-count', hostCounts, 'host');
-
-    // Rules
-    const ruleCounts = {};
-    source.forEach(a => { if (a.rule_name) ruleCounts[a.rule_name] = (ruleCounts[a.rule_name] || 0) + 1; });
-    renderSideList('top-rules-list', 'rules-count', ruleCounts, 'rule');
-
-    // Users
-    const userCounts = {};
-    source.forEach(a => { if (a.user) userCounts[a.user] = (userCounts[a.user] || 0) + 1; });
-    renderSideList('top-users-list', 'users-count', userCounts, 'user');
+    // Group the alerts themselves rather than counting them: the panels now show
+    // what each entity is MADE of, which a bare total cannot say. Ten alerts on a
+    // host read very differently when one is critical.
+    const by = (key) => {
+        const m = {};
+        source.forEach(a => { const v = a[key]; if (v) (m[v] = m[v] || []).push(a); });
+        return m;
+    };
+    renderSideList('top-hosts-list', 'hosts-count', by('host'), 'host');
+    renderSideList('top-rules-list', 'rules-count', by('rule_name'), 'rule');
+    renderSideList('top-users-list', 'users-count', by('user'), 'user');
 }
 
 function updateStatsBar() {
@@ -7437,25 +7450,56 @@ function quickFilterBySeverity(severity) {
     applyFilters();
 }
 
-function renderSideList(containerId, countBadgeId, counts, entityType) {
+const _AQ_SEVS = ['critical', 'high', 'medium', 'low'];
+
+function renderSideList(containerId, countBadgeId, groups, entityType) {
     const container = document.getElementById(containerId);
     const badge = document.getElementById(countBadgeId);
-    const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const entries = Object.entries(groups)
+        // worst severity first, then biggest — a single critical host outranks a
+        // noisy one, which a pure count ordering buries
+        .sort((a, b) => _worstSev(a[1]) - _worstSev(b[1]) || b[1].length - a[1].length)
+        .slice(0, 10);
 
-    badge.textContent = Object.keys(counts).length;
+    badge.textContent = Object.keys(groups).length;
 
     if (entries.length === 0) {
         container.innerHTML = '<div class="empty-state">None</div>';
         return;
     }
 
-    container.innerHTML = entries.map(([name, count]) => `
-        <div class="list-item" data-click-action="filterByEntity" data-args='["${entityType}", "${escapeHtml(name)}"]' title="Filter by ${entityType}: ${escapeHtml(name)}">
+    container.innerHTML = entries.map(([name, items]) => {
+        const on = entityFilter && entityFilter.type === entityType && entityFilter.value === name;
+        const worst = _AQ_SEVS[_worstSev(items)] || 'low';
+        return `
+        <div class="list-item aq-facet${on ? ' is-on' : ''} sev-${worst}"
+             data-click-action="${on ? 'clearEntityFilter' : 'filterByEntity'}"
+             data-args='${on ? '[]' : `["${entityType}", "${escapeHtml(name)}"]`}'
+             title="${on ? 'Clear this filter' : `Filter by ${entityType}: ${escapeHtml(name)}`}">
             <span class="_ion-s-1a3ecb21b1">${escapeHtml(name)}</span>
-            <span class="list-item-count">${count}</span>
-        </div>
-    `).join('');
+            <span class="list-item-count">${items.length}</span>
+            ${_sevMixBar(items)}
+        </div>`;
+    }).join('');
+    // widths are a property write, never an inline style attribute
+    container.querySelectorAll('[data-aq-w]').forEach(el => {
+        el.style.setProperty('width', el.dataset.aqW + '%');
+    });
 }
+
+function _worstSev(items) {
+    return items.reduce((w, a) => Math.min(w, _AQ_SEVS.indexOf(a.severity) < 0 ? 9
+                                             : _AQ_SEVS.indexOf(a.severity)), 9);
+}
+
+function _sevMixBar(items) {
+    const total = items.length || 1;
+    return '<span class="aq-mix">' + _AQ_SEVS.map(s => {
+        const n = items.filter(a => a.severity === s).length;
+        return n ? `<i class="sev-${s}" data-aq-w="${(n / total * 100).toFixed(2)}"></i>` : '';
+    }).join('') + '</span>';
+}
+
 
 function renderThreatBanner() {
     const total = allAlerts.length;
