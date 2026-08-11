@@ -1,13 +1,25 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.4 -->
-<!-- ion-doc:version=0.79.4 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.5 -->
+<!-- ion-doc:version=0.79.5 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-08-10 -->
+<!-- ion-doc:date=2026-08-11 -->
 
 # Changelog
+
+## v0.79.5 — 2026-08-11
+
+**The shared alert-detail component works on `/cases` — it never has.**
+
+- v0.77.0 extracted `alert-detail.js` out of `alerts.html` but left it referencing **fourteen helpers that only that page declares** (`triageCache`, `calculateSimilarity`, `renderTimeline`, `_alertExtractedValuesBlock`, `ALERT_KEY_PREFIXES`, `_alertParsedKeyFields`, …). On `/cases` they were undefined, so every section that touched one threw `ReferenceError` and stuck on "Loading…" — triage, fields, related, timeline, comments. `loadAlertParsedFields`' **catch handler called one of them too**, so the error handler threw while handling the error: an "Uncaught (in promise)" and a spinner that never resolved, rather than a visible failure. `/alerts` was unaffected, which is why it survived three releases.
+- **The reported "Timeline doesn't work and you can't scroll" was the same bug.** In the stacked layout those headings are jump-links. With every section collapsed to a one-line spinner the whole stack fitted in one viewport, so `scrollIntoView` had nowhere to go and the control read as dead.
+- The component now **owns its helpers**, preferring the host page's richer implementation where one exists. Probing is `try { return X } catch` around a bare reference — these are top-level `let`/`const`, so they are in the global *lexical* scope and never on `window`, and a string `typeof` would need `eval`, which CSP forbids.
+- **`/cases` switches to tabs with per-tab lazy loading: nine requests on open → two.** Related and Timeline share one `/related` response; Comments loads from `GET /triage` (where the list actually lives — `/comments` is POST-only) only when opened. A host now **declares which sections it can populate**, so the alert triage bar — whose loader is genuinely `alerts.html`-shaped — is no longer rendered where nothing can fill it.
+- **The investigation guide moves to a side panel** beside the tabs, with the process tree and pin action. It shares the coalesced `/raw` request, so it costs nothing. This was also forced: `_appendCaseOnlySections` emitted stacked-layout markup that had no stack left to belong to. Three columns collapse to two at ≤1400px and one at ≤1100px, with a `@supports` fallback for browsers without `:has()`.
+- **Two CSP violations fixed** (`style-src-attr 'none'`, strict since v0.31.21): the case-rail severity stripe — which rendered colourless because its inline `style` was refused — and an inline `padding-top` the v0.79.0 `/documents` rebuild had reintroduced into a surface that was already clean.
+- Raw Data never rendered: its guard skipped when `raw_data` was already present, so once hydration or the Fields tab had populated it the tab sat on its placeholder **holding the document it was refusing to show**. `_loadRawInto` had the same inversion. Found by a live render, not by review — as was `_alertParsedKeyFields`, which a static sweep missed because it is an assignment target rather than a call.
 
 ## v0.79.4 — 2026-08-10
 
