@@ -1,13 +1,32 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.80.3 -->
-<!-- ion-doc:version=0.80.3 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.81.0 -->
+<!-- ion-doc:version=0.81.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-11 -->
 
 # Changelog
+
+## v0.81.0 — 2026-08-11
+
+**The alert list becomes a triage queue.**
+
+The page was shaped for reading one alert; the job is disposing of many. Rows are grouped **critical-first** with a keyboard cursor that is **independent of selection** — `e` with nothing ticked acts on the cursor row, with a selection on the selection, and a row's own buttons always act on that row. `j/k` move, `x` selects, `shift+j` extends, `z` collapses a group, `enter` opens. Saved views sit above the queue as tabs with live counts, and every active narrowing shows as a removable chip.
+
+- **Built as `static/js/alerts-queue.js`, not more script in a 10,200-line template.** Every dependency arrives through `mount()` — data, triage, selection, actions, even the system badge. `alert-detail.js` reached for fourteen of this page's top-level `let`s, was undefined on `/cases`, and hung every section it touched on a spinner for three releases; a queue that silently rendered nothing would be that failure with a bigger blast radius. A test asserts the module reads none of twelve named host globals.
+- **Four CSS accent tokens did not exist under the names used** — it is `--color-ion-cyan`, not `--ion-cyan`. The `var()` fallbacks masked it completely: correct-looking colours that would never track a theme change. 31 references repointed, and a test now fails on any `var()` in this stylesheet that no CSS file or `setProperty` call defines.
+- **Replacing the `<thead>` removed `#header-select-all`**, which `updateBulkActionsUI()` dereferences without a null check — every selection change would have thrown. The queue re-emits the page's existing hooks (`header-select-all`, `.alert-checkbox`, `.alert-row`, `.selected`, `data-alert-id`) alongside its own, and a paired test checks the page still uses them before that guarantee can be relaxed.
+- **The page already had a row cursor.** `selectedRowIndex` + `navigateAlerts` bound `j/k/Enter` too, so one keypress moved two cursors that knew nothing about each other. Retired, with the unreachable code removed; the module stands down whenever a modal is open.
+- **Filter chips replace `#active-filter-banner`**, which only ever described the *entity* filter — narrowing by severity **and** host showed one of the two and hid the other silently. The element remains, hidden, because seven call sites still write to it; retiring those is a separate change.
+- **The queue's Obs column would have been permanently grey.** `AlertTriage.observables` is a snapshot of `{"type","value"}` — the threat level lives on the `Observable` registry, not the snapshot, so summarising the snapshot alone returns "unknown" for every alert. The batch endpoint now resolves levels through **one `IN` query per batch**, never one per alert. `unknown` is the floor, not a clean bill of health.
+- Batch triage additionally returns assignee, Bob's suggested verdict and confidence, and an observable count, with `case` and `assigned_to` **eager-loaded** — both are read per row on an endpoint called with up to 500 ids, the same shape that was half of production response time at v0.79.4.
+- **Built-in views are limited to what the data can answer honestly.** "Mine" and "Bob disagreed" were absent until this release because assignee and verdict were not in the batch response; a permanently-empty tab is worse than no tab.
+- The rail's Top Hosts / Rules / Users were **already** clickable filters — the mockup was wrong about that. What they could not say is what an entity is *made of*, so each now carries a severity mix bar, sorts worst-severity-first rather than by raw count, and highlights when it is the active filter.
+- Page-scoped stylesheets are now possible: `base.html` gained a `head_css` block rather than loading a ninth global sheet that one route uses.
+
+**Verified in a browser against the real module and CSS**, not by reading: grouping, cursor movement, shift-extend to three rows, actions receiving the selection, the column picker keeping header and cells in step, sort both directions, density, timezone, and severity edges resolving to the ION tokens. View predicates and chip rendering were exercised against fixtures in node — including that filter text is escaped before it reaches `innerHTML`. The batch query was run against the live database. `z` pressed twice collapsed two groups instead of collapsing then expanding, because the cursor leaves the group it just closed; fixed.
 
 ## v0.80.3 — 2026-08-11
 
