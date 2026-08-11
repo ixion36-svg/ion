@@ -1,13 +1,22 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.80.0 -->
-<!-- ion-doc:version=0.80.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.80.2 -->
+<!-- ion-doc:version=0.80.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-11 -->
 
 # Changelog
+
+## v0.80.2 — 2026-08-11
+
+**The change history moves out of the source and into this file, and a sweep for one defect class finds the single real instance of it.**
+
+- **511 leading `# vX.Y.Z:` annotations removed across 113 files.** They recorded *when* a line changed — which git already knows — not the constraint a future reader needs, and they had accumulated to the point where the version prefix was the most prominent thing in the comment. `CLAUDE.md` previously mandated them as "permanent markers"; that rule is replaced with the opposite one. **68 mid-sentence references survive deliberately**: `pre-v0.49.6 deploys need the ALTER` names a real deployment boundary, so it stays.
+- The first strip rule was too greedy and turned `removed in v0.9.76 with the notifications feature` into `removed in with the notifications feature`. Caught in a dry run, narrowed to leading annotations and parentheticals only, and every file checked with a **non-comment signature comparison** — code before and after is byte-identical in all 113.
+- **`/alerts` analytics took two clicks to open.** `toggleAnalytics` decided which way to toggle from `dashboard.style.display`, which reads the **inline** style only. The panel is hidden by a class the v0.31.21 CSP migration generated, so the inline value was the empty string — never `'none'` — and the first click always took the close branch and did nothing visible. Three further render guards read the same property and so never ran on the first open. All four now go through one `analyticsIsOpen()` helper that asks `getComputedStyle`.
+- **The corresponding sweep is the useful part**: all 22 class-hidden elements were checked against every `.style.display` read in the app, and this was the only true instance. The other 17 reads pair with elements whose inline style is written on open, so they work — but they are one refactor away from the same failure, which is why the helper exists rather than a local fix.
 
 ## v0.80.0 — 2026-08-11
 
