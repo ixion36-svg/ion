@@ -59,7 +59,7 @@ class AlertPromptTemplate(Base, TimestampMixin):
     severity_hint: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
     expected_outputs_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # v0.21.0: per-template circuit-breaker threshold override. When set,
+    # per-template circuit-breaker threshold override. When set,
     # overrides ION_BOB_CONFIDENCE_THRESHOLD for alerts matched by this
     # template. NULL = use the global env-var default.
     confidence_threshold_override: Mapped[Optional[int]] = mapped_column(

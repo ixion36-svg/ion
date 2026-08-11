@@ -33,7 +33,7 @@ async def analyze_pcap(
         raise HTTPException(400, f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
 
     # Read file content.
-    # v0.19.18: was `await file.read()` followed by a post-hoc size
+    # was `await file.read()` followed by a post-hoc size
     # check, which buffered the entire upload (potentially multi-GB)
     # into memory before the 100 MB cap was evaluated. Stream-read
     # with a running cap so oversize uploads are rejected before the

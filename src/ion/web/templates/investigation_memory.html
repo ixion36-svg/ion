@@ -404,7 +404,7 @@
       const r = await res.json();
       const actions = r.recommended_actions ? JSON.stringify(r.recommended_actions, null, 2) : '(none)';
       const iocs = r.ioc_snapshot ? JSON.stringify(r.ioc_snapshot, null, 2) : '(none)';
-      // v0.10.12: grounded evidence bullets — each cites a specific field
+      // grounded evidence bullets — each cites a specific field
       // from the alert payload, so verdicts are auditable rather than
       // opaque. Falls back to an empty state when the list is null/empty
       // (investigations from before v0.10.11 won't have this).

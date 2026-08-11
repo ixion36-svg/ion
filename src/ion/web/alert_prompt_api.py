@@ -62,7 +62,7 @@ class AlertPromptCreate(BaseModel):
     investigation_checklist_text: Optional[str] = None
     severity_hint: Optional[str] = None
     expected_outputs: Optional[List[str]] = None
-    # v0.21.0: per-template circuit-breaker threshold (0-100, NULL = use global)
+    # per-template circuit-breaker threshold (0-100, NULL = use global)
     confidence_threshold_override: Optional[int] = Field(
         default=None, ge=0, le=100
     )
@@ -82,7 +82,7 @@ class AlertPromptUpdate(BaseModel):
     investigation_checklist_text: Optional[str] = None
     severity_hint: Optional[str] = None
     expected_outputs: Optional[List[str]] = None
-    # v0.21.0: per-template circuit-breaker threshold (0-100, NULL = use global)
+    # per-template circuit-breaker threshold (0-100, NULL = use global)
     confidence_threshold_override: Optional[int] = Field(
         default=None, ge=0, le=100
     )
@@ -140,7 +140,7 @@ def get_all_scorecards(
     # ai_feedback_dedupe. Without it a pending (circuit-breaker) row and a later
     # resolved row for the same alert both count, inflating sample_size.
     #
-    # v0.69.0: this reader had DRIFTED from the other three. It counted any row
+    # this reader had DRIFTED from the other three. It counted any row
     # with a non-null `agreement`, including `auto_escalated` circuit-breaker
     # abstentions, so its denominator was wider than detection-health /
     # de-metrics / de-bob and the agreement % correspondingly different for the
@@ -191,7 +191,7 @@ def get_all_scorecards(
         agreement_pct = _pct(b["agreed"], b["evaluated"])
         scorecards[tpl_id] = {
             "sample_size": n,
-            # v0.71.0: exposed so callers can aggregate an EXACT overall
+            # exposed so callers can aggregate an EXACT overall
             # agreement. /ai-scorecard used to reverse-engineer this from the
             # percentage with `evaluated = sample_size  // good enough for KPI`,
             # which is wrong whenever some rows were unscored (abstentions).
@@ -315,7 +315,7 @@ def update_alert_prompt(
     if not tmpl:
         raise HTTPException(status_code=404, detail="Alert prompt template not found")
 
-    # v0.22.1 (L6): gate is now incoming-vs-stored, so an explicit null that
+    # (L6): gate is now incoming-vs-stored, so an explicit null that
     # would clear a non-null override is treated as a change and requires
     # system:settings. Must run AFTER tmpl is loaded so current_value is known.
     _check_confidence_threshold_permission(

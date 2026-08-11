@@ -1,5 +1,5 @@
 /**
- * ION - shared alert-detail component  (v0.77.0)
+ * ION - shared alert-detail component
  * =============================================================================
  * ONE renderer for an alert, used by BOTH /alerts and /cases.
  *
@@ -63,12 +63,8 @@
   // Related + Timeline share ONE /related request; this stops the two tabs
   // issuing it twice.
   var _relatedLoaded = false;
-  // Well-known fields captured at render time so "add fields as evidence" can
-  // post them without re-parsing. v0.79.5: declared HERE. It is written by
-  // renderAlertParsedFields and read by addAlertFieldsAsEvidence — both in this
-  // file — but the only declaration lived in alerts.html, so on /cases the
-  // Fields tab threw ReferenceError on render. The static sweep missed this one
-  // because it is an assignment target, not a call; the live mockup caught it.
+  // Captured at render time so "add fields as evidence" can post without
+  // re-parsing. Written and read only in this file.
   var _alertParsedKeyFields = [];
 
   // The two page copies differed ONLY in these class names. Parameterising is
@@ -86,25 +82,11 @@
   function escapeHtml(s) { return window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s); }
   function showToast(m, k) { if (window.showToast) window.showToast(m, k); }
 
-  // ── host adapter (v0.79.5) ───────────────────────────────────────────────
-  //
-  // v0.77.0 extracted this component out of alerts.html but left it reaching
-  // for helpers that ONLY that page defines. On /cases they were undefined, so
-  // every section that touched one threw ReferenceError and stuck on
-  // "Loading..." forever. Worse, loadAlertParsedFields' catch handler called
-  // one of them, so the error handler threw while handling the error — which is
-  // why it surfaced as "Uncaught (in promise)" and a spinner that never
-  // resolved rather than an error message.
-  //
-  // Everything is now owned here, with the host page's version PREFERRED where
-  // it exists: alerts.html's implementations read its live caches, and
-  // shadowing them would silently change that page's behaviour.
-  //
-  // Why try/catch and not `window.X`: these are top-level `let`/`const` in the
-  // page, so they live in the global LEXICAL scope and never become properties
-  // of `window`. A bare reference is the only thing that can see them, and an
-  // undeclared identifier throws ReferenceError — exactly the probe we want.
-  // (`typeof X` by string would need eval, which CSP forbids: no 'unsafe-eval'.)
+  // ── host adapter ─────────────────────────────────────────────────────────
+  // These helpers are declared only in alerts.html, so a bare reference throws
+  // on any other host page. Prefer the page's version where it exists, else use
+  // the local fallback. try/catch rather than `window.X` because top-level
+  // let/const never land on window, and a string typeof would need eval.
   function _page(probe) { try { return probe(); } catch (e) { return null; } }
   function _pageTriageCache()   { return _page(function () { return triageCache; }); }
   function _pageSimilarity()    { return _page(function () { return calculateSimilarity; }); }
@@ -132,8 +114,8 @@
     return (c && c[alertId]) || null;
   }
 
-  // Field-name allowlist for the "well-known fields" table. Component-owned so
-  // the Fields section works on a host that has no such list.
+  // Field allowlist for the well-known-fields table; owned here so the section
+  // works on a host that has no such list.
   var _KEY_PREFIXES = [
     '@timestamp', 'message',
     'rule.name', 'rule.description',
@@ -167,9 +149,7 @@
     }).join(' ');
   }
 
-  // The observables ION extracted at triage time. On /cases the alert row
-  // already CARRIES them (see _fromObservables), so no triage cache is needed —
-  // which is the whole reason this section can work there at all.
+  // On /cases the alert row already carries these, so no triage cache is needed.
   function _extractedObs(alertId) {
     var t = _triageFor(alertId);
     if (t && t.observables && t.observables.length) return t.observables;
@@ -400,7 +380,7 @@
       }
   }
 
-  // ── coalesced raw fetch (v0.79.2) ───────────────────────────────────────
+  // ── coalesced raw fetch ───────────────────────────────────────
   //
   // The stacked layout opens every section at once, and THREE of them want the
   // same `/raw` document: the Fields section, the Raw Data section, and (on
@@ -466,15 +446,8 @@
       }
   }
 
-  // ── comments (v0.79.5) ───────────────────────────────────────────────────
-  //
-  // The comments for an alert arrive on GET /triage — the response is
-  // {triage, comments}; /comments is POST-only, for adding. alerts.html reads
-  // them there as a side effect of loading its triage bar, which is why /cases
-  // (no triage bar) never had them and sat on "Loading comments...".
-  //
-  // One GET, on first click, is the whole cost — which is why this is worth
-  // having rather than dropping.
+  // Comments arrive on GET /triage as {triage, comments}; /comments is
+  // POST-only. One GET, on first click.
   var _commentsLoaded = false;
 
   function _renderComments(alertId, comments) {
@@ -516,8 +489,7 @@
       });
   }
 
-  // Distinct action name: alerts.html declares its own top-level addComment(),
-  // and whichever script loaded last would win if both claimed `window.addComment`.
+  // Distinct name: alerts.html has its own top-level addComment().
   function ionAlertAddComment(alertId) {
     var input = document.getElementById('comment-input');
     var content = input && input.value.trim();
@@ -893,19 +865,16 @@
                   .catch(() => { seqEl.innerHTML = '<div class="error">Failed to load sequence</div>'; });
           }
       }
-      // Lazy-load raw data on first click.
-      // v0.79.5: the guard used to be `&& !_current.raw_data`, which meant that
-      // once anything else had populated raw_data (the Fields tab, or the
-      // v0.79.2 hydration that runs on mount) this branch was skipped entirely
-      // and the tab sat on "Click to load raw data..." forever — holding the
-      // document it was refusing to show. Render from cache when we have it.
+      // Render from cache when we already have the document, otherwise fetch.
+      // Guarding on `!raw_data` would strand the tab on its placeholder once
+      // hydration or the Fields tab had populated it.
       if (tabId === 'rawdata' && _current) {
           const container = document.getElementById('raw-data-content');
           if (container && container.querySelector('.loading') && _current.raw_data) {
               container.innerHTML = syntaxHighlightJSON(_current.raw_data);
           } else if (container && container.querySelector('.loading')) {
               container.innerHTML = '<div class="loading">Loading raw data...</div>';
-              // v0.79.2: through the coalescer like every other consumer. On
+              // through the coalescer like every other consumer. On
               // /alerts this is the tab-click path, so it also benefits: opening
               // Raw Data after Fields now reuses the document already fetched.
               fetchRawOnce(_current.id)
@@ -925,17 +894,12 @@
               loadAlertParsedFields(_current.id, container);
           }
       }
-      // v0.79.5: Related and Timeline are filled by the SAME request, so one
-      // fetch covers both tabs. Previously nothing lazy-loaded them at all —
-      // /alerts called loadRelatedAlerts() itself and /cases relied on the
-      // stacked layout loading everything up front. In tabs mode neither
-      // happened, so both tabs sat on their placeholder.
+      // Related and Timeline share one /related response.
       if ((tabId === 'related' || tabId === 'timeline') && _current && !_relatedLoaded) {
           _relatedLoaded = true;
           loadRelatedAlerts(_current);
       }
-      // Comments: only /alerts filled these, as a side effect of its triage-bar
-      // load. Fetched here on first click so a case gets them too.
+      // Fetched on first click; previously only /alerts filled this.
       if (tabId === 'comments' && _current && !_commentsLoaded) {
           _commentsLoaded = true;
           loadAlertComments(_current.id);
@@ -943,11 +907,8 @@
   }
 
   function _renderHead(alert) {
-    // Triage bar placeholder. v0.79.5: only rendered when the host page can
-    // actually fill it — renderTriageBar() lives in alerts.html and nowhere
-    // else, so on /cases this was a permanent "Loading triage..." with nothing
-    // behind it. /cases carries case status, assignee and notes in the case
-    // panel above, which is the same information one level up.
+    // Only rendered when the host can fill it; renderTriageBar lives in
+    // alerts.html and nowhere else.
     let html = _opts.triageBar === false
         ? ''
         : `<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage...</span></div>`;
@@ -1052,16 +1013,8 @@
   }
 
   // -- section shell: the ONLY thing that differs between the two layouts ----
-  // v0.79.5: a host declares which sections it can populate. Default is all, so
-  // /alerts is untouched.
-  //
-  // The triage bar and Comments are loaded by alerts.html and by nothing else —
-  // renderTriageBar() and the comments loader live in that page and reach into
-  // its own state (currentDetailAlert, TRIAGE_STATUSES, PRIORITIES, plus half a
-  // dozen page actions). On /cases the component rendered both and neither was
-  // ever filled, so they were permanent "Loading..." spinners — and duplicates
-  // of case status, notes and Kibana comments that the case panel already
-  // provides. Rendering nothing beats rendering a spinner that never resolves.
+  // A host declares which sections it can populate; default is all. Rendering a
+  // section the host cannot fill leaves a spinner that never resolves.
   function _visibleSections() {
     var allow = _opts.sections;
     if (!allow || !allow.length) return SECTIONS;
@@ -1134,7 +1087,7 @@
     return _renderHead(alert) + _sectionsHtml(alert);
   }
 
-  // ── hydrate thin alerts from the raw document (v0.79.2) ─────────────────
+  // ── hydrate thin alerts from the raw document ─────────────────
   //
   // /alerts hands this component a full Elasticsearch document. /cases hands it
   // a row from /api/cases/{id}, which carries only es_alert_id, rule_name,
@@ -1203,7 +1156,7 @@
     }).catch(function () { /* the grid keeps its dashes */ });
   }
 
-  // ── fill from the observables ION already extracted (v0.79.2) ───────────
+  // ── fill from the observables ION already extracted ───────────
   //
   // ION extracts hostname/user from the alert at triage time
   // (services/observable_extractor.py) and stores them on AlertTriage
@@ -1253,16 +1206,12 @@
       _observeSections();
       return;
     }
-    // Tabs: load ONLY the section that is actually on screen. This is what
-    // takes case-open from nine requests down to two — every other section
-    // fetches when its tab is first opened, and a section nobody opens costs
-    // nothing. See switchDetailTab for the per-tab loaders.
+    // Load only the section on screen; the rest fetch when first opened.
     var first = _visibleSections()[0];
     if (first) _loadSection(first.id, alert);
   }
 
-  // Load whichever section is showing on first paint. Mirrors switchDetailTab's
-  // lazy branches so the first tab behaves exactly like a clicked one.
+  // Mirrors switchDetailTab's lazy branches for the initially-visible tab.
   function _loadSection(id, alert) {
     if (id === 'related' || id === 'timeline') {
       _relatedLoaded = true;
@@ -1286,8 +1235,6 @@
 
   function _loadRawInto(el, alert) {
     if (!el) return;
-    // Same trap as the rawdata tab branch: having the document is a reason to
-    // RENDER it, not a reason to skip.
     if (alert.raw_data) { el.innerHTML = syntaxHighlightJSON(alert.raw_data); return; }
     // Shares the in-flight request with the Fields section and (on /cases) the
     // rule guide instead of issuing a third identical one.

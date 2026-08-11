@@ -1,5 +1,5 @@
 /*
- * event-delegation.js (v0.31.4)
+ * event-delegation.js
  *
  * Migration target for inline `onclick="foo()"` handlers. ION's CSP
  * (set in src/ion/web/server.py:SecurityHeadersMiddleware) is moving
@@ -63,7 +63,7 @@
     keyup: 'data-keyup-action',
     blur: 'data-blur-action',
     focus: 'data-focus-action',
-    // v0.31.5: drag and drop for the Kanban + Workbench surfaces.
+    // drag and drop for the Kanban + Workbench surfaces.
     dragstart: 'data-dragstart-action',
     dragend: 'data-dragend-action',
     dragover: 'data-dragover-action',
@@ -91,7 +91,7 @@
       'closeTarget', 'closeOnSelfClick', 'args',
       'removeTarget', 'removeSelfOnSelfClick', 'scriptOnerrorFlag',
       'removeParent', 'removeClosest',
-      // v0.31.19: simple-pattern data-attributes for the P11 final-mile cleanup.
+      // simple-pattern data-attributes for the P11 final-mile cleanup.
       'windowPrint', 'clickTarget', 'toggleParentClass',
       'enterKeyAction', 'escapeKeyAction',
       'validatingSubmitAction', 'clearTarget', 'toggleNextDisplay',
@@ -121,7 +121,7 @@
     });
   }
 
-  // v0.31.23 (code review): action-name dispatch hardening. The function
+  // (code review): action-name dispatch hardening. The function
   // name comes from a DOM attribute, so stored-XSS that lands inside or
   // adjacent to a real element could inject `data-click-action="eval"` or
   // `data-validating-submit-action="fetch"` to redirect dispatch onto a
@@ -384,7 +384,7 @@
   // Built-in: data-validating-submit-action — fire the named function on form
   // submit; if it returns falsy, call event.preventDefault(). Replaces the
   // legacy `onsubmit="return canSubmit(event)"` pattern from form validators.
-  // v0.31.23: name goes through resolveAction() so the regex + denylist
+  // name goes through resolveAction() so the regex + denylist
   // applies here too.
   document.addEventListener('submit', function (event) {
     var trigger = event.target.closest('[data-validating-submit-action]');

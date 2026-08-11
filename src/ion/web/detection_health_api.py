@@ -67,7 +67,7 @@ class TuningProposalCreate(BaseModel):
 
 @router.post(
     "/tuning-proposal",
-    # v0.72.0: this now files a DetectionProposal into the DE module's queue, so
+    # this now files a DetectionProposal into the DE module's queue, so
     # it is gated by that module's write permission rather than the retired
     # tuning:review. de:propose is held by the same reviewer tier.
     dependencies=[Depends(require_any_permission(["de:propose"]))],
@@ -89,7 +89,7 @@ def create_tuning_proposal(
     if not change:
         raise HTTPException(status_code=400, detail="suggested_change is required")
 
-    # v0.72.0: files into the DE module's governed queue (route audit phase 8).
+    # files into the DE module's governed queue (route audit phase 8).
     proposal = DetectionProposal(
         rule_name=rule,
         change_type=DetectionProposalChangeType.OTHER,

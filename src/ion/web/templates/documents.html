@@ -5,7 +5,7 @@
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-{# v0.30.1: Reference tab strip reordered — Notes is now last. #}
+{# Reference tab strip reordered — Notes is now last. #}
 {% set tabs = [
     {"label": "Templates", "href": "/templates"},
     {"label": "Documents", "href": "/documents"},
@@ -122,7 +122,7 @@
 
 <!-- Document View Modal -->
 {#
-  v0.79.0 — the document view is the same inset overlay /cases got at v0.77.0,
+  the document view is the same inset overlay /cases got at v0.77.0,
   not a modal.
 
   What changed and why: opening a document used to mean a centred modal whose
@@ -608,7 +608,7 @@ function initDocQuillEditor(content, format) {
 async function loadDocuments() {
     try {
         allDocuments = await api.get('/api/documents');
-        // v0.79.0: the Knowledge Base is no longer hidden here. It used to be
+        // the Knowledge Base is no longer hidden here. It used to be
         // filtered out of both the document list and the folder tree, which
         // meant the ~600 KB articles had NO browsing surface anywhere in ION —
         // reachable only by searching from the SOC workspace, and this page
@@ -622,7 +622,7 @@ async function loadDocuments() {
 async function loadCollections() {
     try {
         allCollections = await api.get('/api/collections?flat=true');
-        // v0.79.0: the Knowledge Base tree is shown rather than filtered out.
+        // the Knowledge Base tree is shown rather than filtered out.
         // kbCollectionIds is still populated — it marks which folders are KB so
         // the tree can label them — but it no longer removes them.
         const kbParent = allCollections.find(c => c.name === 'Knowledge Base');
@@ -1021,13 +1021,13 @@ async function deleteDocument(id, name) {
 }
 
 function closeModal() {
-    // v0.79.0: the panel is shown/hidden with a class, not display — the
+    // the panel is shown/hidden with a class, not display — the
     // .open transition is what gives it the scale-in the cases panel has.
     document.getElementById('document-modal').classList.remove('open');
     document.getElementById('doc-panel-overlay').classList.remove('open');
 }
 
-// v0.79.0: switchTab is gone. The four views it hid behind tabs — Rendered,
+// switchTab is gone. The four views it hid behind tabs — Rendered,
 // Raw, Edit, Version history — are now stacked sections that are all open at
 // once, and `docJumpTo` SCROLLS to one rather than hiding the other three.
 // Same decision as the /cases jump-links at v0.77.0: a jump-link that hides
@@ -1387,7 +1387,7 @@ async function confirmAmendment() {
     }
 }
 
-// v0.79.0: the .content-tab-btn wiring is gone with the tabs themselves.
+// the .content-tab-btn wiring is gone with the tabs themselves.
 // The jump-links are delegated via data-click-action, so there is nothing to
 // bind here.
 
@@ -1478,7 +1478,7 @@ document.getElementById('delete-doc-btn').addEventListener('click', async functi
     }
 });
 
-// v0.79.0: click-outside is the overlay's job now (it carries
+// click-outside is the overlay's job now (it carries
 // data-click-action="closeModal"). The old handler fired when the click
 // landed on #document-modal itself — which used to be the dimmed backdrop,
 // but is now the PANEL. Left in place it would close the panel whenever the
@@ -1677,7 +1677,7 @@ function updateTagFilter() {
     }
 }
 
-// v0.79.0: open the document named in the URL fragment.
+// open the document named in the URL fragment.
 // The SOC workspace KB panel has always linked its search results to
 // /documents#doc-<id>, but this page had NO hash handling of any kind — so
 // every result dropped the analyst on the unfiltered document list and the

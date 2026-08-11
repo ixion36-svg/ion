@@ -161,7 +161,7 @@ async def get_integration_status(
 
     results = []
     for connector in registry.get_all():
-        # v0.76.0: per-connector isolation. This endpoint aggregates 6+
+        # per-connector isolation. This endpoint aggregates 6+
         # INDEPENDENT integrations and backs the whole /integrations page. One
         # connector raising used to 500 the entire response, so a single
         # misconfigured integration blanked the page that exists to tell you
@@ -213,7 +213,7 @@ def _status_for(connector, latest_checks) -> IntegrationStatusResponse:
 
     # Merge health-check metadata (carries version_compatibility) into the row.
     #
-    # v0.76.0: this was `{**(response.metadata or {}), **latest_check.check_metadata}`.
+    # this was `{**(response.metadata or {}), **latest_check.check_metadata}`.
     # check_metadata is the `details` JSON column, which is typed Optional[dict]
     # but is a JSON column shared by every IntegrationEvent kind — nothing at the
     # DB level constrains it to an object. Any non-mapping JSON value there (a

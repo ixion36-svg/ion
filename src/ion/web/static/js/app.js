@@ -163,7 +163,7 @@ function updateUserMenu() {
             currentUserData.roles.forEach(r => {
                 opts.push('<option value="' + r + '"' + (activeRole === r ? ' selected' : '') + '>' + r.charAt(0).toUpperCase() + r.slice(1) + '</option>');
             });
-            // v0.39.1: classes + data-change-action instead of inline style/onchange
+            // classes + data-change-action instead of inline style/onchange
             // (CSP style-src-attr / script-src-attr 'none'). This HTML is injected
             // on every page load, so the violations fired on most navigations.
             focusHtml = `
@@ -229,7 +229,7 @@ function updateNavForPermissions() {
         forensicsLink.style.display = perms.has('forensic:read') ? '' : 'none';
     }
 
-    // GRC group (v0.79.0) — five surfaces, five DIFFERENT permissions. They
+    // GRC group — five surfaces, five DIFFERENT permissions. They
     // were gathered into one menu so there is a single answer to "where is the
     // audit evidence", NOT to give anyone new access: each item is shown only
     // to a user who already holds its page permission, and the routes enforce

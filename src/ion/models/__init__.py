@@ -11,7 +11,7 @@ from ion.models.ai_preferences import (
     AIUserPreference,
 )
 
-# v0.10.3: alert_prompt, ticker, tuning proposals, AI feedback ledger.
+# alert_prompt, ticker, tuning proposals, AI feedback ledger.
 # Imported eagerly here so Base.metadata registers the tables at startup;
 # otherwise create_all() misses them because callers lazy-import.
 # Order matters: alert_prompt MUST come before tuning_proposal and
@@ -36,7 +36,7 @@ from ion.models.analytics import (
 )
 from ion.models.base import Base
 
-# v0.21.0: Bob Prompt Evaluation Harness — per-template P/R/F1 runs.
+# Bob Prompt Evaluation Harness — per-template P/R/F1 runs.
 from ion.models.bob_eval import BobEvalRun, BobEvalRunSample  # noqa: F401
 from ion.models.bob_tuning_proposal import (  # noqa: F401
     BobTuningProposal,
@@ -44,10 +44,10 @@ from ion.models.bob_tuning_proposal import (  # noqa: F401
 )
 from ion.models.canary import Canary, CanaryHit, CanaryStatus, CanaryType
 
-# v0.10.4: case-similarity embeddings (pgvector-backed).
+# case-similarity embeddings (pgvector-backed).
 from ion.models.case_embedding import CaseEmbedding  # noqa: F401
 
-# v0.20.0: Workbench — pinned evidence + tamper-evident ledger.
+# Workbench — pinned evidence + tamper-evident ledger.
 from ion.models.case_evidence import (  # noqa: F401
     CaseEvidenceLedger,
     CaseEvidencePin,
@@ -56,7 +56,7 @@ from ion.models.case_evidence import (  # noqa: F401
     PinSourceType,
 )
 
-# v0.11.2: L1/L2/L3/L4 SOC analyst training course subsystem.
+# L1/L2/L3/L4 SOC analyst training course subsystem.
 from ion.models.course import (  # noqa: F401
     Course,
     CourseLevel,
@@ -82,7 +82,7 @@ from ion.models.detection_proposal import (  # noqa: F401
 from ion.models.document import Document, DocumentVersion
 from ion.models.emulation import EmulationPlan, EmulationPlanStatus, EmulationStep, StepResult
 
-# v0.20.1: ForensicCase Workbench — parallel ledger + pins for forensic cases.
+# ForensicCase Workbench — parallel ledger + pins for forensic cases.
 from ion.models.forensic_workbench import (  # noqa: F401
     ForensicCaseLedger,
     ForensicCasePin,
@@ -117,17 +117,17 @@ from ion.models.integration import (
 )
 from ion.models.investigation import Investigation  # noqa: F401
 
-# v0.10.6: KB article embeddings for Bob's RAG grounding.
-# v0.51.0: chunk-level (KBChunkEmbedding) replaced the whole-doc vector.
+# KB article embeddings for Bob's RAG grounding.
+# chunk-level (KBChunkEmbedding) replaced the whole-doc vector.
 from ion.models.kb_document_embedding import KBChunkEmbedding  # noqa: F401
 
-# v0.79.1: CISA KEV catalog, shipped as a build-time snapshot (air-gapped —
+# CISA KEV catalog, shipped as a build-time snapshot (air-gapped —
 # nothing fetches it at runtime).
 from ion.models.kev import KevEntry  # noqa: F401
 from ion.models.log_source import LogSource, LogSourceCategory
 from ion.models.maturity import MaturityAssessment
 
-# v0.49.3 live-boot fix: these two were missing from the registry, so the
+# live-boot fix: these two were missing from the registry, so the
 # entrypoint's single-process create_all never made their tables and the N
 # uvicorn workers raced to create them — 3 of 4 crashed on a pg_type
 # UniqueViolation on the first boot of a fresh Postgres. Every model module
@@ -165,7 +165,7 @@ from ion.models.playbook import (
     StepType,
 )
 
-# v0.51.0: playbook embeddings — similarity fallback of the Playbook RAG layer.
+# playbook embeddings — similarity fallback of the Playbook RAG layer.
 from ion.models.playbook_embedding import PlaybookEmbedding  # noqa: F401
 from ion.models.saved_search import (
     SavedSearch,
@@ -217,13 +217,13 @@ from ion.models.social import (
     SocialReaction,
 )
 
-# v0.11.0: JSON-DAG playbook automation (Tines-inspired).
+# JSON-DAG playbook automation (Tines-inspired).
 from ion.models.story import Story, StoryRun  # noqa: F401
 from ion.models.system_quirk import SystemQuirk, SystemQuirkStatus  # noqa: F401
 from ion.models.template import Collection, Tag, Template, Variable, template_tags
 from ion.models.threat_intel import ThreatIntelWatch
 
-# v0.53.0: TI-report RAG — local OpenCTI report cache + chunk embeddings.
+# TI-report RAG — local OpenCTI report cache + chunk embeddings.
 from ion.models.ti_report import TIReport, TIReportChunkEmbedding  # noqa: F401
 from ion.models.ticker import (  # noqa: F401
     Ticker,
@@ -247,7 +247,7 @@ from ion.models.user import (
 from ion.models.version import TemplateVersion
 from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeverity, VulnStatus
 
-# v0.43.0: daily-work tracking — manual work-log entries + admin task taxonomy.
+# daily-work tracking — manual work-log entries + admin task taxonomy.
 from ion.models.worklog import (  # noqa: F401
     DEFAULT_TASK_TYPES,
     WorkLogEntry,
@@ -362,7 +362,7 @@ __all__ = [
     "ForensicPlaybookStep",
     "ForensicCaseStep",
     "ForensicTimelineEntry",
-    # v0.20.1: ForensicCase Workbench
+    # ForensicCase Workbench
     "ForensicCasePin",
     "ForensicCaseLedger",
     # CyAB models

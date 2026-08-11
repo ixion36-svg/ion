@@ -52,7 +52,7 @@ def wallboard_page(
     )
 
 
-# v0.19.17: gated on alert:read to match the wallboard page route. The
+# gated on alert:read to match the wallboard page route. The
 # JSON endpoints previously only required get_current_user, so a user
 # whose role had been revoked (but session still valid) could still
 # pull the wall data via the API.

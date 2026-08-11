@@ -72,7 +72,7 @@ def list_bug_reports(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
-    # v0.49.6: object-level scoping. Anyone can file a bug, but only a
+    # object-level scoping. Anyone can file a bug, but only a
     # privileged user (system:settings — the CAB/admin surface) may see
     # everyone's; a normal analyst is scoped to their own submissions.
     can_see_all = current_user.has_permission("system:settings")

@@ -578,11 +578,11 @@ class AuthService:
             ("de:verify", "de", "verify", "Verify and revert system quirks (separation of duties)"),
             # Detection Engineering module (Phase 3 — approve/apply Bob-tuning changes to the prompt-stack)
             ("de:approve", "de", "approve", "Approve, apply and revert Bob-tuning prompt-stack changes"),
-            # v0.49.6: removed 5 seeded-but-never-enforced permissions
+            # removed 5 seeded-but-never-enforced permissions
             # (discover:read, alert:comment, case:comment, case:link,
             # investigation:run) — no route gated on them (audit finding, same
             # class as the v0.32.1 ticker:* cleanup).
-            # v0.72.0 (route audit phase 8): tuning:read + tuning:review removed
+            # (route audit phase 8): tuning:read + tuning:review removed
             # WITH their enforcement, not before it. The legacy TuningProposal
             # queue was retired into the DE module's DetectionProposal queue;
             # tuning_proposal_api is gone and detection-health's file-proposal

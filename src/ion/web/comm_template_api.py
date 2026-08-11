@@ -41,7 +41,7 @@ def get_template(template_id: int, session: Session = Depends(get_db_session)):
     return result
 
 
-# v0.19.17: was alert:read (matched the GET listings); creating
+# was alert:read (matched the GET listings); creating
 # templates is a write action and now requires alert:triage to match
 # the read/write split applied across the rest of the API.
 @router.post("", dependencies=[Depends(require_permission("alert:triage"))])

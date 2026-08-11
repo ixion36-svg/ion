@@ -248,7 +248,7 @@ class ForensicRepository:
         return case
 
     def get_case_by_id(self, case_id: int) -> Optional[ForensicCase]:
-        # v0.9.81: selectinload for every *-to-many collection — previous
+        # selectinload for every *-to-many collection — previous
         # chained joinedload produced a 6-dimensional cartesian
         # (case_steps × evidence_items × custody_log × timeline_entries × …).
         stmt = (

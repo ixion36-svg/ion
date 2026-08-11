@@ -918,7 +918,7 @@ class TideService:
         if applied is None:
             return None
 
-        # v0.10.14: also pull the literal rule_ids applied to this system so
+        # also pull the literal rule_ids applied to this system so
         # we can decorate each playbook-step's detection with applied=True/False.
         # The baseline view shows TIDE's recommended rules per step; flagging
         # which are actually live here is what makes "why is this covered"
@@ -985,7 +985,7 @@ class TideService:
                         state = "covered"
                     else:
                         state = "partial"
-                # v0.10.14: surface the TIDE-recommended detections per step
+                # surface the TIDE-recommended detections per step
                 # plus the analyst note (the "why") and a flag for whether
                 # the rule is actually applied to this system. The frontend
                 # baseline view renders these instead of just the technique

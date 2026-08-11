@@ -215,7 +215,7 @@ class PcapResult:
     tcp_streams: list = field(default_factory=list)  # follow-stream previews
     base64_payloads: list = field(default_factory=list)
     network_graph: dict = field(default_factory=dict)
-    # v0.39.0 enhanced analyzers
+    # enhanced analyzers
     tls_certificates: list = field(default_factory=list)
     os_fingerprints: list = field(default_factory=list)
     beacons: list = field(default_factory=list)
@@ -250,7 +250,7 @@ CLEARTEXT_PORTS = {21, 23, 80, 110, 143, 161, 25, 587}
 
 
 # ---------------------------------------------------------------------------
-# MITRE ATT&CK mapping (v0.39.0)
+# MITRE ATT&CK mapping
 #
 # Each PCAP finding category maps to one or more ATT&CK technique IDs so network
 # evidence lands in the same taxonomy as the rest of ION's triage. The mapping
@@ -605,7 +605,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     except Exception:
         pass  # Non-fatal
 
-    # v0.39.0 — OS fingerprints + RITA-style beacon scoring (each independently fail-safe)
+    # OS fingerprints + RITA-style beacon scoring (each independently fail-safe)
     try:
         result.os_fingerprints = _compute_os_fingerprints(syn_sigs)
     except Exception:
@@ -700,7 +700,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     findings.extend(dcerpc_findings)
     findings.extend(dns_port_findings)
     findings.extend(email_findings)
-    # v0.39.0 — TLS certificate + RITA beacon findings (additive, fail-safe)
+    # TLS certificate + RITA beacon findings (additive, fail-safe)
     try:
         findings.extend(_tls_cert_findings(result.tls_certificates))
     except Exception:
@@ -710,7 +710,7 @@ def parse_pcap(file_bytes: bytes, filename: str) -> PcapResult:
     except Exception:
         pass
 
-    # v0.39.0 — map findings to MITRE ATT&CK techniques (fail-safe)
+    # map findings to MITRE ATT&CK techniques (fail-safe)
     try:
         _attach_mitre(findings)
         result.mitre_techniques = _build_mitre_summary(findings)
@@ -1317,7 +1317,7 @@ def _compute_ja4s(tls_server_hellos: list[dict]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# 2c. TLS certificate analysis (v0.39.0)
+# 2c. TLS certificate analysis
 #
 # The TLS Certificate handshake message (type 0x0b) is normally larger than one
 # TCP segment, so it fragments across both TCP segments AND TLS records. We walk
@@ -1532,7 +1532,7 @@ def _tls_cert_findings(certs: list[dict]) -> list[Finding]:
 
 
 # ---------------------------------------------------------------------------
-# 2d. p0f-style passive OS fingerprinting (v0.39.0)
+# 2d. p0f-style passive OS fingerprinting
 # ---------------------------------------------------------------------------
 
 def _syn_signature(ip_pkt, tcp) -> dict:
@@ -1601,7 +1601,7 @@ def _compute_os_fingerprints(syn_sigs: dict) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
-# 2e. RITA-style beacon scoring (v0.39.0)
+# 2e. RITA-style beacon scoring
 #
 # Beyond the simple coefficient-of-variation check in `_detect_beaconing`, this
 # scores each connection tuple on the *dispersion* and *skew* of both its

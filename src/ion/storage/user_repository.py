@@ -80,7 +80,7 @@ class UserRepository:
 
     def list_all(self, include_inactive: bool = False) -> List[User]:
         """List all users."""
-        # v0.9.82: selectinload for M2M — was joinedload, producing a users × roles cartesian.
+        # selectinload for M2M — was joinedload, producing a users × roles cartesian.
         stmt = select(User).options(selectinload(User.roles))
 
         if not include_inactive:
@@ -190,7 +190,7 @@ class RoleRepository:
 
     def get_by_id(self, role_id: int) -> Optional[Role]:
         """Get a role by ID."""
-        # v0.9.82: selectinload — Role.permissions is M2M
+        # selectinload — Role.permissions is M2M
         stmt = (
             select(Role)
             .options(selectinload(Role.permissions))

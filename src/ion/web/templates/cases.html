@@ -82,7 +82,7 @@
         <option value="medium">Medium</option>
         <option value="low">Low</option>
     </select>
-    {# v0.79.0: status filter. /api/cases already returns open, acknowledged
+    {# status filter. /api/cases already returns open, acknowledged
        AND closed — the board just had no way to narrow to one of them, so a
        closed case could only be found by scrolling past the live ones. #}
     <select id="filter-status" class="cases-filter-select" data-change-action="filterCases">
@@ -2208,7 +2208,7 @@ let teamMetricsCache = null;
 let attentionDismissed = false;
 let casesLoaded = false;
 
-// v0.59.0 widget-grid board: sort + page-size + progressive load-more cap.
+// widget-grid board: sort + page-size + progressive load-more cap.
 let boardSort = 'newest';
 let boardPageSize = 24;
 let boardShown = 24;
@@ -2405,7 +2405,7 @@ function sortCases(list) {
     return arr;
 }
 
-// v0.59.0 — render the responsive grid of case widgets (replaces the 3-column
+// render the responsive grid of case widgets (replaces the 3-column
 // drag-drop Kanban). Progressive cap: render up to boardShown widgets; the
 // rest stay virtualized behind the load-more button so a queue of hundreds of
 // cases paints instantly.
@@ -2484,7 +2484,7 @@ function asCount(v) {
     return 0;
 }
 
-// v0.59.0 — a single case widget. Every region maps to a real AlertCase field
+// a single case widget. Every region maps to a real AlertCase field
 // from /api/cases; blocks render only when their data is
 // present so the widget degrades gracefully on lighter rows.
 function renderCaseWidget(c) {
@@ -2569,7 +2569,7 @@ function renderCaseWidget(c) {
 // Case Status Updates
 // =============================================================================
 async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
-    // v0.23.2: returns true on success, false on failure so callers can
+    // returns true on success, false on failure so callers can
     // decide whether to close the panel / clear pendingClosure. Previously
     // the function swallowed the result, which made it impossible to keep
     // the closure modal open when the PATCH failed.
@@ -2592,7 +2592,7 @@ async function updateCaseStatus(caseId, status, closureReason, closureNotes) {
         showToast('Case status updated', 'success');
         await loadAllCases();
 
-        // v0.23.2 (panel-close bug): the v0.23.x conditional gated the
+        // (panel-close bug): the v0.23.x conditional gated the
         // panel refresh on `openCase` being present in allCases. allCases
         // could be momentarily empty (network race or list-endpoint
         // failure), which made the gate silently fail and leave the panel
@@ -2704,7 +2704,7 @@ async function confirmClosure() {
     const caseId = pendingClosure.caseId;
     const targetStatus = pendingClosure.targetStatus;
 
-    // v0.23.2: await the PATCH and only hide the modal + clear pendingClosure
+    // await the PATCH and only hide the modal + clear pendingClosure
     // when it succeeds. If the PATCH errors (e.g., server returns 400 on a
     // bad closure_reason, or a 5xx), the modal stays open so the analyst
     // can fix the issue and retry, instead of silently losing the close
@@ -2718,14 +2718,14 @@ async function confirmClosure() {
 }
 
 function cancelClosure() {
-    // v0.23.2: reset the panel's status <select> back to the case's actual
+    // reset the panel's status <select> back to the case's actual
     // status. Without this, the select stays stuck on "closed" after
     // cancel, and a subsequent re-pick of "closed" does NOT fire onchange
     // (same-value transitions don't dispatch). That bug presented as
     // "closing via dropdown sometimes does nothing" — the user thought
     // they were starting a new close, but the browser ignored the click.
     //
-    // v0.31.5: the panel's selects no longer carry an inline onchange=
+    // the panel's selects no longer carry an inline onchange=
     // attribute (CSP migration); they carry data-args='[caseId,"field","$value"]'
     // instead. Match the status select by parsing that.
     if (pendingClosure) {
@@ -2769,22 +2769,22 @@ async function openCaseDetail(caseId) {
 
         document.getElementById('panel-case-number').textContent = c.case_number || '';
         document.getElementById('panel-case-title').textContent = c.title || '';
-        // v0.23.2: stash the open case id on the panel itself so subsequent
+        // stash the open case id on the panel itself so subsequent
         // status changes can identify "this is the case the panel is on"
         // without round-tripping through allCases (which may be momentarily
         // empty during loadAllCases / load failures).
         panel.dataset.caseId = String(c.id);
 
         body.innerHTML = renderPanelContent(c);
-        // v0.59.0: paint the alert-widget confidence meters (CSSOM width;
+        // paint the alert-widget confidence meters (CSSOM width;
         // inline style attrs are blocked by the strict CSP).
         applyConfidenceMeters(body);
-        // v0.31.0: apply the active tab after each render so panel
+        // apply the active tab after each render so panel
         // re-renders (status change, severity change, note add)
         // don't bump the analyst back to Overview.
         switchPanelTab(_currentPanelTab);
 
-        // v0.77.0: open the case with its first alert already rendered. The
+        // open the case with its first alert already rendered. The
         // right-hand column exists to show an alert; making the analyst click
         // one before seeing anything would just reintroduce the click this
         // rework removed.
@@ -2797,17 +2797,17 @@ async function openCaseDetail(caseId) {
         if (c.kibana_case_id) {
             loadKibanaComments(c.kibana_case_id);
         }
-        // v0.10.20: attack story timeline
+        // attack story timeline
         loadCaseTimeline(c.id);
         // Attack Path (Bob Pathfinding) Phase 1 — kill-chain graph
         loadAttackPath(c.id);
         // Similar cases sidebar — best-effort async load
         loadSimilarCases(c.id);
-        // v0.10.19: cross-case observable sightings (deterministic sibling)
+        // cross-case observable sightings (deterministic sibling)
         loadSimilarObservables(c.id);
-        // v0.20.0: Workbench — pinned evidence + ledger verify
+        // Workbench — pinned evidence + ledger verify
         loadWorkbench(c.id);
-        // v0.22.0: Timeline annotations
+        // Timeline annotations
         loadAnnotations(c.id);
     } catch (e) {
         body.innerHTML = '<p class="_ion-s-263eca2cbb">Failed to load case details</p>';
@@ -2829,7 +2829,7 @@ const statusColors = {
 };
 
 
-// v0.77.0 — the case-detail alert workspace.
+// the case-detail alert workspace.
 // Alerts keyed by es_alert_id, stashed while the panel renders so selecting a
 // row in the rail can hand the whole alert object straight to the shared
 // component with no refetch.
@@ -2867,17 +2867,9 @@ function selectCaseAlert(alertId, idx, caseId) {
         title: alert.rule_name || alert.title || String(alertId).substring(0, 24)
     });
 
-    // v0.79.5: tabs, not stacked, and only the sections /cases can populate.
-    //
-    // Stacked opened every section at once, which is what made one click fan
-    // out to nine requests — and it meant every broken section was on screen
-    // simultaneously. Tabs load on demand: two requests on open, the rest when
-    // a tab is first clicked.
-    //
-    // `comments` and the triage bar are omitted because their loaders live in
-    // alerts.html and nothing here fills them; the case panel above already
-    // shows case status, notes and Kibana comments. `case` is omitted for the
-    // same reason — we ARE in the case.
+    // Tabs load on demand: two requests on open rather than nine. The triage
+    // bar is omitted because its loader lives in alerts.html and nothing here
+    // fills it; case status and notes are in the case panel above.
     window.ionAlertDetail.mount(host, forDetail, {
         layout: 'tabs',
         sections: ['related', 'timeline', 'comments', 'sequence', 'autoinvestigate', 'fields', 'rawdata'],
@@ -2902,9 +2894,7 @@ function _appendCaseOnlySections(host, alertId, caseId, alert) {
     const pinTitle = alert.rule_name || String(alertId).substring(0, 24);
     const pinSev = alert.priority || '';
 
-    // v0.79.5: renders into the side panel, NOT appended after the component.
-    // Falls back to appending only if the aside is missing, so a stale cached
-    // template cannot leave the guide with nowhere to go.
+    // Renders into the side panel; falls back to appending if it is absent.
     const aside = document.getElementById('cpanel-alert-guide');
     const target = aside || host;
 
@@ -2930,8 +2920,7 @@ function _appendCaseOnlySections(host, alertId, caseId, alert) {
         while (extra.firstChild) host.appendChild(extra.firstChild);
     }
 
-    // The guide shares the component's coalesced /raw request, so showing it
-    // beside the tabs costs no extra round trip (v0.79.2).
+    // Shares the component's coalesced /raw request — no extra round trip.
     if (typeof loadRuleGuideInto === 'function') loadRuleGuideInto(alertId, rgId);
     if (typeof loadProcessTreeInto === 'function') loadProcessTreeInto(alertId, ptId, caseId);
 }
@@ -2939,7 +2928,7 @@ let _railSeq = 0;
 
 // Flatten a nested alert _source into dot-path key:value pairs (arrays of
 // scalars are joined; arrays of objects are indexed).
-// v0.77.0 — the linked-alert parsed-fields dropdown lived here: flattenAlertFields,
+// the linked-alert parsed-fields dropdown lived here: flattenAlertFields,
 // _alertFieldsTable, _extractedValuesBlock, renderFlatAlertFields,
 // toggleAllAlertFields, addFieldsAsEvidence, toggleAlertFields.
 //
@@ -2975,12 +2964,12 @@ function renderRuleGuide(raw) {
 }
 
 async function loadRuleGuideInto(alertId, rgId) {
-    // v0.77.0: was toggleRuleGuide() — an accordion. Nothing on the case-detail
+    // was toggleRuleGuide() — an accordion. Nothing on the case-detail
     // alert workspace is behind a toggle any more, so this only loads.
     const el = document.getElementById(rgId);
     if (!el || el.dataset.loaded === '1') return;
     try {
-        // v0.79.2: share the component's coalesced /raw request. This used to
+        // share the component's coalesced /raw request. This used to
         // issue its own, so selecting an alert fetched the SAME document three
         // times — here, in the Fields section and in Raw Data — all at once,
         // all against Elasticsearch. That was the /cases slowness.
@@ -3071,7 +3060,7 @@ function renderProcessTree(data, caseId) {
 // Toggle (and lazy-load) a linked alert's process tree. No leading event param
 // (event-delegation.js applies data-args directly).
 async function loadProcessTreeInto(alertId, ptId, caseId) {
-    // v0.77.0: was toggleProcessTree() — an accordion. See loadRuleGuideInto.
+    // was toggleProcessTree() — an accordion. See loadRuleGuideInto.
     const el = document.getElementById(ptId);
     if (!el || el.dataset.loaded === '1') return;
     try {
@@ -3125,7 +3114,7 @@ function copyProcCmd(key) {
 // process/registry) render as a plain typed chip.
 const _enrichableObsTypes = { ip: 1, ipv4: 1, ipv6: 1, domain: 1, url: 1, sha256: 1, sha1: 1, md5: 1, hash: 1, email: 1 };
 
-// Render one observable as a typed chip. Data contract (v0.59.0):
+// Render one observable as a typed chip. Data contract:
 //   o = { type, value, threat_level, score, source }
 // Enrichable types get a colored threat-level badge + score; others get a
 // plain chip. Degrades gracefully when threat_level/score are null/missing.
@@ -3158,7 +3147,7 @@ function _cfRow(k, v, extraClass) {
         + '<span class="awx-cfv mono' + (extraClass ? ' ' + extraClass : '') + '">' + esc(v) + '</span></div>';
 }
 
-// v0.59.0 — the alert-widget body appended to each linked-alert card:
+// the alert-widget body appended to each linked-alert card:
 // common ES fields, enriched observables (threat badges), Bob suggested
 // verdict + confidence meter (or an amber auto-escalated badge), and an
 // analyst-note preview. Every block is optional; a lighter alert row that
@@ -3247,7 +3236,7 @@ function renderPanelContent(c) {
         + '<span class="cpanel-sev-detail">' + alertCount + ' alert' + (alertCount !== 1 ? 's' : '') + ' &middot; ' + obsCount + ' observable' + (obsCount !== 1 ? 's' : '') + ' &middot; ' + ageLabel(c.created_at) + ' old</span>'
         + '</div>';
 
-    // v0.31.0: tab nav. Sections below carry data-tab="…" attributes
+    // tab nav. Sections below carry data-tab="…" attributes
     // so switchPanelTab(tabName) can show/hide them. Default tab is
     // overview. Counts on Alerts and Observables reflect the data at
     // panel-open time. Action buttons + severity strip stay outside
@@ -3440,7 +3429,7 @@ function renderPanelContent(c) {
     html += '<div class="_ion-s-65382d79e2" id="similar-observables-container">Loading…</div>';
     html += '</div>';
 
-    // ── Linked Alerts — the two-column workspace (v0.77.0) ───────────
+    // ── Linked Alerts — the two-column workspace ───────────
     // Was: one stacked card per alert, each hiding its parsed fields, rule
     // guide and process tree behind a separate toggle, inside a 560px panel.
     // Seeing one alert fully cost up to eight clicks and still showed less
@@ -3449,7 +3438,7 @@ function renderPanelContent(c) {
     // Now: a rail of alerts on the left, and on the right the SAME
     // alert-detail component /alerts uses — in its stacked layout, so every
     // section is already open. Selecting an alert is the only click.
-    // v0.77.1: order the rail by severity so the alert that auto-renders is the
+    // order the rail by severity so the alert that auto-renders is the
     // one worth looking at first, not whichever the API happened to return
     // first. Sorted IN PLACE on c.alerts, deliberately: openCaseDetail reads
     // c.alerts[0] after this function returns and passes index 0 to
@@ -3505,12 +3494,7 @@ function renderPanelContent(c) {
             +   '<div class="loading">Loading alert…</div>'
             + '</div>';
 
-        // ── right: reference material, beside the tabs rather than below them.
-        // The rule guide, process tree and pin action used to append as further
-        // STACKED sections under the component. Two problems with that: they
-        // are reference you want visible WHILE reading a tab, not something to
-        // scroll past to reach anything else; and once the component switched
-        // to tabs (v0.79.5) that markup had no stack left to belong to.
+        // Reference material sits beside the tabs rather than below them.
         html += '<aside class="cpanel-guide" id="cpanel-alert-guide"></aside>';
 
         html += '</div>';
@@ -3548,7 +3532,7 @@ function renderPanelContent(c) {
             } else {
                 rendered = esc(raw);
             }
-            // v0.17.0: each note gets a Translate toggle that swaps the
+            // each note gets a Translate toggle that swaps the
             // rendered markdown with a plain-text translation.
             const noteId = 'cnote-' + (n.id != null ? n.id : Math.random().toString(36).slice(2,9));
             html += '<div class="cpanel-note">'
@@ -3610,7 +3594,7 @@ function renderPanelContent(c) {
         + '</div>'
         + '</div>';
 
-    // v0.23.1 — On-demand Bob analysis panel (rendered into when analyst clicks
+    // On-demand Bob analysis panel (rendered into when analyst clicks
     // "Get Bob's Analysis"). Empty until then.
     html += '<div id="bob-analysis-panel-' + c.id + '" class="cpanel-section _ion-s-c8be1ccba6" data-tab="notes">'
         +   '<div class="cpanel-section-title _ion-s-c2e70fe5d0">'
@@ -3626,7 +3610,7 @@ function renderPanelContent(c) {
         +   '</div>'
         + '</div>';
 
-    // v0.46.0 — Auto-Investigate panel (cited multi-source verdict). Empty/hidden
+    // Auto-Investigate panel (cited multi-source verdict). Empty/hidden
     // until the analyst clicks "Auto-Investigate".
     html += '<div id="autoinv-panel-' + c.id + '" class="cpanel-section _ion-s-c8be1ccba6" data-tab="notes">'
         +   '<div class="cpanel-section-title _ion-s-c2e70fe5d0">'
@@ -4171,10 +4155,10 @@ async function loadKibanaComments(kibanaId) {
     }
 }
 
-// v0.31.0: panel tab state. Persisted across panel re-renders (e.g.
+// panel tab state. Persisted across panel re-renders (e.g.
 // panelUpdateField → openCaseDetail) so changing severity / status
 // doesn't bump the analyst back to Overview. Reset on panel close.
-// v0.77.0: default tab is Alerts. Opening a case to a metadata form was a
+// default tab is Alerts. Opening a case to a metadata form was a
 // wasted click — the analyst came to look at the alerts.
 let _currentPanelTab = 'alerts';
 
@@ -4187,7 +4171,7 @@ function switchPanelTab(tabName) {
         s.classList.toggle('tab-hidden', s.dataset.tab !== tabName);
     });
 
-    // v0.77.0: the Alerts tab hosts the two-column workspace, which scrolls its
+    // the Alerts tab hosts the two-column workspace, which scrolls its
     // own columns. The body must drop its own scroll+padding for that tab or
     // the analyst gets two nested scrollbars.
     const body = document.getElementById('case-panel-body');
@@ -4204,13 +4188,13 @@ function closeCasePanel() {
     const panel = document.getElementById('case-panel');
     panel.classList.remove('open');
     document.getElementById('case-panel-overlay').classList.remove('open');
-    // v0.23.2: clear the tracked case id so a subsequent updateCaseStatus
+    // clear the tracked case id so a subsequent updateCaseStatus
     // for a different case doesn't mistakenly think the panel is showing
     // it (panel is closed, dataset would be stale).
     delete panel.dataset.caseId;
-    // v0.31.0: reset the panel tab so the NEXT case opened lands on the
+    // reset the panel tab so the NEXT case opened lands on the
     // default rather than wherever the previous case left off.
-    // v0.77.0: that default is now Alerts.
+    // that default is now Alerts.
     _currentPanelTab = 'alerts';
     _selectedRailAlert = null;
     const body = document.getElementById('case-panel-body');
@@ -4266,7 +4250,7 @@ async function panelUpdateField(caseId, field, value) {
 // =============================================================================
 // Add Note from Panel
 // =============================================================================
-// v0.17.0 — Translate any case note in place. Second click toggles back
+// Translate any case note in place. Second click toggles back
 // to the original rendered markdown. Stored on the element via data-*.
 async function translateCaseNote(noteId) {
     const el = document.getElementById(noteId);
@@ -4322,7 +4306,7 @@ async function addPanelNote(caseId) {
 }
 
 // =============================================================================
-// v0.23.1 — On-demand Bob case analysis (replaces v0.22.x auto-comment)
+// On-demand Bob case analysis (replaces v0.22.x auto-comment)
 // =============================================================================
 // `_bobAnalysisCache` keeps the most recent generation per case so "Save as
 // note" can post the exact text the analyst saw without re-running the LLM.
@@ -4396,7 +4380,7 @@ function hideBobAnalysis(caseId) {
 }
 
 // =============================================================================
-// Bob Auto-Investigate (v0.46.0) — cited multi-source verdict for a case.
+// Bob Auto-Investigate — cited multi-source verdict for a case.
 // Citations validated server-side; rendered CSP-safe (esc only).
 // =============================================================================
 const _autoinvCache = {};
@@ -5122,7 +5106,7 @@ document.addEventListener('keydown', function(e) {
 });
 
 // =============================================================================
-// v0.20.0 Workbench — pinned evidence + tamper-evident ledger
+// Workbench — pinned evidence + tamper-evident ledger
 // =============================================================================
 // All Workbench DOM lives inside cpanel-section#workbench-section-{caseId}
 // so the openCaseDetail rerender (which replaces case-panel-body innerHTML)
@@ -5333,7 +5317,7 @@ async function dismissWorkbenchPin(caseId, pinId) {
 
 
 // =============================================================================
-// v0.22.0 Timeline Annotations
+// Timeline Annotations
 // =============================================================================
 
 async function loadAnnotations(caseId) {
@@ -5462,7 +5446,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (chevron) chevron.classList.add('collapsed');
     }
 
-    // v0.31.0: deep-link support — `?selected=<case_number>` (or numeric
+    // deep-link support — `?selected=<case_number>` (or numeric
     // id) auto-opens that case's detail panel. Drives the
     // /cases/{row_id} redirect from `_observable_link` AND the alerts
     // page's cases-sidebar "open in /cases" links so the analyst lands

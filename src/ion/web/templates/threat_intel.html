@@ -129,7 +129,7 @@
       <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Search OpenCTI for threat actors and campaigns, manage your watchlist, and monitor enrichment matches.</p>
     </section>
 
-    <!-- v0.27.0: global search bar — hits /api/threat-intel/unified-search.
+    <!-- global search bar — hits /api/threat-intel/unified-search.
          Fans out to actors + campaigns (OpenCTI) + IOCs + cases. Results
          grouped by kind under the bar. Press Enter or click Search. -->
     <div class="ti-search-bar _ion-s-8b9688e6e0">
@@ -151,7 +151,7 @@
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="reports">Reports</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge _ion-s-c8be1ccba6">0</span></button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="stories">Attack Stories</button>
-        {# v0.79.1: CISA KEV, shipped as a snapshot inside the image. Lives here
+        {# CISA KEV, shipped as a snapshot inside the image. Lives here
            rather than under Reporting because "is this being exploited right
            now" is a triage question, not a metric. #}
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="kev">KEV Catalog</button>
@@ -160,7 +160,7 @@
     <!-- Overview Panel -->
     <div class="ti-panel active" id="panel-overview">
 
-        <!-- v0.27.0: AI Threat Briefing — ported from /threat-landscape.
+        <!-- AI Threat Briefing — ported from /threat-landscape.
              Hits POST /api/threat-landscape/ai-summary; sources the
              OpenCTI overview snapshot, returns a Bob-authored prose
              summary. Manual trigger so we don't burn Ollama on every
@@ -184,7 +184,7 @@
           </div>
         </section>
 
-        <!-- v0.27.0: KPI cards — coloured. Stat values keep the
+        <!-- KPI cards — coloured. Stat values keep the
              existing ids so the original ``loadOverview`` JS keeps
              working unchanged. -->
         <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -210,7 +210,7 @@
             </div>
         </section>
 
-        <!-- v0.27.0: Top 5 Threat Actors + Top 5 High-Score IOCs —
+        <!-- Top 5 Threat Actors + Top 5 High-Score IOCs —
              ported from /threat-landscape Overview. JS-populated. -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           <div>
@@ -233,7 +233,7 @@
           </div>
         </section>
 
-        <!-- v0.27.0: Recently Active in Cases — coloured, last 30d of
+        <!-- Recently Active in Cases — coloured, last 30d of
              case + triage data. Fed by /api/threat-intel/recently-active. -->
         <section class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
@@ -301,7 +301,7 @@
         </table>
     </div>
 
-    <!-- v0.27.0: IOC Feed Panel — ported from /threat-landscape. -->
+    <!-- IOC Feed Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-ioc">
         <div class="ti-search-bar">
             <select id="ti-ioc-min-score" class="ti-search-input _ion-s-f9e27e828c" data-change-action="tiLoadIOCFeed">
@@ -318,7 +318,7 @@
         </table>
     </div>
 
-    <!-- v0.27.0: Reports Panel — ported from /threat-landscape. -->
+    <!-- Reports Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-reports">
         <div class="ti-search-bar">
             <input type="text" class="ti-search-input" id="ti-report-filter" placeholder="Filter reports by title…">
@@ -329,7 +329,7 @@
         </div>
     </div>
 
-    <!-- v0.27.0: ATT&CK technique drill-down side panel.
+    <!-- ATT&CK technique drill-down side panel.
          Opened by clicking a technique on the Overview's Recently Seen
          MITRE list. Closed by the X button or clicking the backdrop. -->
     <div class="_ion-s-f054d745af" id="ti-drill-panel"
@@ -361,7 +361,7 @@ data-click-action="tiCloseReport">&times;</button>
     <div class="_ion-s-b26cdbb562" id="ti-report-backdrop"
 data-click-action="tiCloseReport"></div>
 
-    <!-- v0.27.0: Attack Stories Panel — ported from /attack-stories. -->
+    <!-- Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
         <div class="ti-search-bar">
             <select id="ti-stories-hours" class="ti-search-input _ion-s-f9e27e828c" data-change-action="tiLoadStories">
@@ -378,7 +378,7 @@ data-click-action="tiCloseReport"></div>
         </div>
     </div>
 
-    {# ── KEV Catalog (v0.79.1) ─────────────────────────────────────────
+    {# ── KEV Catalog ─────────────────────────────────────────
        A snapshot, not a feed. The staleness banner is not decoration: an
        absent CVE only means "not in KEV" relative to the catalog actually
        loaded, so the version and its age are stated on every view. #}
@@ -422,14 +422,14 @@ data-click-action="tiCloseReport"></div>
 
         if (tab.dataset.panel === 'overview') loadOverview();
         if (tab.dataset.panel === 'watchlist') { loadWatches(); loadMatches(); }
-        // v0.27.0: lazy-load the merged tabs.
+        // lazy-load the merged tabs.
         if (tab.dataset.panel === 'ioc' && !window._tiIOCLoaded) { tiLoadIOCFeed(); window._tiIOCLoaded = true; }
         if (tab.dataset.panel === 'reports' && !window._tiReportsLoaded) { tiLoadReports(); window._tiReportsLoaded = true; }
         if (tab.dataset.panel === 'stories' && !window._tiStoriesLoaded) { tiLoadStories(); window._tiStoriesLoaded = true; }
         if (tab.dataset.panel === 'kev' && !window._tiKevLoaded) { kevSearch(); window._tiKevLoaded = true; }
     });
 
-    // ── KEV catalog (v0.79.1) ──────────────────────────────────────────
+    // ── KEV catalog ──────────────────────────────────────────
     // The catalog is a snapshot shipped in the image, so its AGE is part of
     // every answer: "CVE-X is not in KEV" means nothing without "…according
     // to a catalog from N days ago".
@@ -529,7 +529,7 @@ data-click-action="tiCloseReport"></div>
 
             renderMatchRows('overview-matches-body', matches.matches || [], true);
 
-            // v0.27.0: populate the additional Overview surfaces.
+            // populate the additional Overview surfaces.
             loadRecentlyActive();
             loadOverviewActors();
             loadOverviewIOCs();
@@ -850,7 +850,7 @@ data-click-action="tiCloseReport"></div>
             if (!d.techniques.length) {
                 techEl.innerHTML = '<em>No MITRE techniques tagged in the last 30 days.</em>';
             } else {
-                // v0.27.0: each technique chip is now click-to-drill.
+                // each technique chip is now click-to-drill.
                 techEl.innerHTML = '<ul class="_ion-s-e7184d9d11">' +
                     d.techniques.map(t =>
                         `<li class="_ion-s-a0850f2f6f">
@@ -982,7 +982,7 @@ data-click-action="tiCloseReport"></div>
                     </td>
                 </tr>`;
             }).join('');
-            // v0.27.0: lazy-load sparklines AFTER the table renders so the
+            // lazy-load sparklines AFTER the table renders so the
             // initial paint isn't blocked by N parallel requests. Batched
             // to 6 at a time to keep the OpenCTI backend honest.
             tiLoadSparklines();
@@ -1168,7 +1168,7 @@ data-click-action="tiCloseReport"></div>
                 const watchBtn = isWatched
                     ? `<button class="ti-btn-outline ti-btn-sm ti-btn-watched" disabled>Watched</button>`
                     : `<button class="ti-btn ti-btn-sm ti-btn-watch" data-click-action="watchActor" data-args='[${idx}]'>Watch</button>`;
-                // v0.27.0: open the deep-dive profile page for this actor.
+                // open the deep-dive profile page for this actor.
                 // entity_class param tells the profile endpoint which
                 // OpenCTI lookup path to use (most APTs are intrusion sets).
                 const klass = (a.threat_actor_types || []).includes('intrusion-set') ? 'intrusion_set' : 'threat_actor';

@@ -55,7 +55,7 @@ _last_run_lock = threading.Lock()
 _last_run_at: Optional[datetime] = None
 _last_result: Optional[Dict[str, Any]] = None
 
-# v0.51.0 chunking parameters. Target ≈1600 chars (≈400 tokens) sits well
+# chunking parameters. Target ≈1600 chars (≈400 tokens) sits well
 # inside nomic-embed-text's window so no chunk is ever end-truncated, while
 # staying passage-sized (a topic section, not a whole article). The overlap
 # only applies when a single paragraph exceeds the target and must be

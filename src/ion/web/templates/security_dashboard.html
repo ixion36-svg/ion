@@ -596,7 +596,7 @@ let currentEventId = null;
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', function() {
     refreshDashboard();
-    // v0.39.9: SSE-backed live updates (single connection) with a 30s polling
+    // SSE-backed live updates (single connection) with a 30s polling
     // fallback when SSE is unavailable.
     ionLiveUpdates('dashboard', refreshDashboard, 30000);
 });

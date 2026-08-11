@@ -36,7 +36,7 @@ DEFAULT_MODEL = "nomic-embed-text"
 DEFAULT_DIM = 768
 
 
-# Task-instruction prefixes for nomic-embed-text (v0.38.0).
+# Task-instruction prefixes for nomic-embed-text.
 #
 # nomic-embed-text(-v1.5) is an *asymmetric* retrieval model: it was trained
 # with a task instruction prepended to every input. Stored corpus text wants

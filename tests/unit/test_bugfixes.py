@@ -132,7 +132,7 @@ class TestBuildCaseDescription:
             assert expected in desc, f"Missing section: {expected}"
 
     def test_empty_inputs_return_non_empty_placeholder(self):
-        # v0.49.3: an empty description is NOT valid for Kibana >= 8.19 (400:
+        # an empty description is NOT valid for Kibana >= 8.19 (400:
         # "The description field cannot be an empty string"), which looped the
         # 60s case sync forever. build_case_description must never return "".
         out = build_case_description()

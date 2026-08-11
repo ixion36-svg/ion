@@ -297,7 +297,7 @@ class TestReasoningStorage:
     def test_reasoning_stored_by_default(
         self, session, bob_user, alert_triage, monkeypatch
     ):
-        # v0.36.0: ION_BOB_STORE_REASONING defaults ON — unset env stores.
+        # ION_BOB_STORE_REASONING defaults ON — unset env stores.
         monkeypatch.setenv("ION_BOB_CONFIDENCE_THRESHOLD", "60")
         monkeypatch.delenv("ION_BOB_STORE_REASONING", raising=False)
         from ion.models.investigation import Investigation

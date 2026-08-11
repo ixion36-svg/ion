@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/daily-standup", tags=["daily-standup"])
 
 
-# ── Log-source health config (v0.10.18) ───────────────────────────────────
+# ── Log-source health config ───────────────────────────────────
 #
 # The DC/WEF checks were originally hard-coded to query winlogbeat-* for
 # host.hostname.keyword matching the literal substrings DCS / WEF. Real
@@ -227,7 +227,7 @@ async def _check_stale_cases() -> Dict[str, Any]:
                     "title": c.title,
                     "severity": c.severity,
                     "status": c.status.value if hasattr(c.status, "value") else str(c.status),
-                    # v0.19.14: surface the rules the case was built from
+                    # surface the rules the case was built from
                     # so analysts can see "what fired" at a glance,
                     # without opening each case. Falls back to [] for
                     # legacy rows that pre-date the field.
@@ -440,7 +440,7 @@ async def _check_case_status_counts() -> Dict[str, Any]:
             .filter(AlertCase.closed_at >= cutoff)
             .count()
         )
-        # v0.31.1: severity breakdown for cases created in the last
+        # severity breakdown for cases created in the last
         # 24h. Drives the Section 2b "Cases" KPI card's bottom row.
         severity_rows = (
             session.query(AlertCase.severity, func.count(AlertCase.id))
@@ -579,7 +579,7 @@ async def _check_log_source_health(
 
     try:
         # Last 24 h event count per host matching pattern
-        # v0.15.1: terms.size dropped 500→100. WEF estates rarely have
+        # terms.size dropped 500→100. WEF estates rarely have
         # >100 forwarders in scope, and the 500-host fan-out (×24 hourly
         # buckets) was the dominant cost causing timeouts on busy estates.
         # Operators with more hosts than that can override via
@@ -588,7 +588,7 @@ async def _check_log_source_health(
             terms_size = int(os.environ.get("ION_STANDUP_TERMS_SIZE", "100"))
         except Exception:
             terms_size = 100
-        # v0.15.1: heavy aggregations get a 60 s per-request timeout
+        # heavy aggregations get a 60 s per-request timeout
         # (vs the 30 s ION_ES_TIMEOUT default). Without this override the
         # WEF check on a busy estate raced the global default and timed
         # out before ES could finish the rollup.
@@ -768,7 +768,7 @@ async def _check_rule_failures() -> Dict[str, Any]:
                     "POST", f"/{index}/_search?ignore_unavailable=true", json=body
                 )
                 for bucket in result.get("aggregations", {}).get("rules", {}).get("buckets", []):
-                    # v0.19.14: was emitting {rule_name, failure_count,
+                    # was emitting {rule_name, failure_count,
                     # last_failure} but the slide deck + PPTX reader
                     # expected {name, last_status, ...}, so the
                     # rule-failures slide showed blank rows. Renamed
@@ -827,16 +827,16 @@ async def get_daily_checks(
         "dc_log_health":      _safe(dc_health),
         "wef_log_health":     _safe(wef_health),
         "rule_failures":      _safe(rule_failures),
-        # v0.17.1 additions
+        # additions
         "open_alerts_30d":    _safe(alerts_30d),
         "case_status_counts": _safe(case_status),
         "triage_throughput":  _safe(triage_throughput),
-        # v0.31.1: 24h alerts breakdown — replaces the 30d KPI on the
+        # 24h alerts breakdown — replaces the 30d KPI on the
         # standup page. 30d data above stays in the response because
         # the pptx export still references it.
         "alerts_24h":         _safe(alerts_24h),
     }
-    # v0.31.1: standup is a real-time operator panel — never let a
+    # standup is a real-time operator panel — never let a
     # browser or proxy show stale numbers. The "critical alerts from
     # days ago" symptom the user reported was at least partly a cache
     # artefact; this header rules that out as a cause.
@@ -1012,7 +1012,7 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
 
     # -- Case status counts — v0.17.1 ----------------------------------------
     cs = checks.get("case_status_counts") or {}
-    # v0.19.16: was reading {total, acknowledged, closed,
+    # was reading {total, acknowledged, closed,
     # opened_last_7d, closed_last_7d} — the v0.19.14 rewrite of
     # _check_case_status_counts dropped or renamed all of those.
     # The slide deck and PPTX builder were updated in v0.19.14;
@@ -1108,7 +1108,7 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
         out.append("<table><tr><th>Rule</th><th>Failures</th><th>Last Failure</th></tr>")
         for r in rf.get("rules", []):
             out.append(
-                # v0.19.16: was reading rule_name/failure_count —
+                # was reading rule_name/failure_count —
                 # both renamed in v0.19.14's follow-up fix. Slide and
                 # PPTX got the rename; this saved-doc renderer was
                 # missed. Dual-read for rolling-deploy compat.
@@ -1207,7 +1207,7 @@ async def save_daily_standup(
         session.commit()
         return {"ok": True, "document_id": doc.id, "name": doc.name}
     except Exception as e:
-        # v0.19.17: was raising with detail=str(e), which leaked
+        # was raising with detail=str(e), which leaked
         # SQLAlchemy table/column names + stack frames in the response.
         # Internal trace stays in the application log.
         session.rollback()
@@ -1249,7 +1249,7 @@ async def export_standup_pdf(
 
 
 
-# ── PPTX export (v0.19.9) ────────────────────────────────────────────────
+# ── PPTX export ────────────────────────────────────────────────
 
 
 def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
@@ -1376,7 +1376,7 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
     _eyebrow(s, "Section 2 · Critical Alerts (Last 24h)")
     _title(s, "Critical Alerts", color=CORAL)
     _kpi(s, 0.6, "Critical", a.get("critical_count", 0), color=CORAL, value_size=80)
-    # v0.19.20: pptx Rule column was blank for ES alerts without a
+    # pptx Rule column was blank for ES alerts without a
     # rule.name — fall back to title, then id, so the slide is never
     # mysteriously empty. Matches the standup page and HTML deck.
     rows = [
@@ -1394,7 +1394,7 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
         _table_block(s, rows, ["Time", "Severity", "Rule", "Host"])
 
     # --- Stale cases ---
-    # v0.19.14: shows top 12 stale (most-stale-first per the API
+    # shows top 12 stale (most-stale-first per the API
     # ORDER BY created_at ASC), plus a "+N more" line if there are
     # additional cases that wouldn't fit on a single slide.
     sc = checks.get("stale_cases") or {}
@@ -1468,7 +1468,7 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
     _kpi(s, 10.2, "Intake (24h)", cs.get("intake_24h", 0), value_size=64)
 
     # --- Log health ---
-    # v0.19.16: was reading silent_count/total but the API returns
+    # was reading silent_count/total but the API returns
     # hosts_with_gaps/host_count. The slide quietly showed 0 / 0 to
     # everyone since v0.19.10 — caught in the v0.19.4..HEAD review.
     dc = checks.get("dc_log_health") or {}
@@ -1486,7 +1486,7 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
          value_size=56)
 
     # --- Rule failures ---
-    # v0.19.14: API renamed rule_name→name, failure_count→failures.
+    # API renamed rule_name→name, failure_count→failures.
     # Old code only showed name+last_status (and last_status was
     # never emitted, so columns rendered blank). Now: name +
     # failure count + last failure timestamp + status.
@@ -1512,7 +1512,7 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
             ["Rule", "Failures (24h)", "Last failure", "Status"],
         )
 
-    # --- AI Threat Summary (v0.19.11) ---
+    # --- AI Threat Summary ---
     ai_summary = checks.get("_ai_summary") or ""
     if ai_summary:
         s = prs.slides.add_slide(blank)
@@ -1534,7 +1534,7 @@ def _build_standup_pptx(checks: Dict[str, Any]) -> bytes:
             r.font.size = Pt(16)
             r.font.color.rgb = SLATE_900
 
-    # --- Any Other Business (v0.19.11) ---
+    # --- Any Other Business ---
     aob = checks.get("_aob") or ""
     s = prs.slides.add_slide(blank)
     _eyebrow(s, "Section 9 · Any Other Business")

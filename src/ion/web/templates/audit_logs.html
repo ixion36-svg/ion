@@ -113,7 +113,7 @@ async function loadLogs() {
             <tr>
                 <td>${new Date(log.timestamp).toLocaleString()}</td>
                 <td>${log.username ? escapeHtml(log.username) : '<em>System</em>'}</td>
-                <!-- v0.19.17: action and resource fields are normally
+                <!-- action and resource fields are normally
                      internal strings, but a future audit producer that
                      stores user-supplied resource names (case titles,
                      custom checklist items, etc.) could land attacker-

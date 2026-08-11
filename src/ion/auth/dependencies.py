@@ -337,7 +337,7 @@ class PermissionChecker:
         return user
 
 
-# get_client_ip is centralised in ion.core.client_ip (v0.39.3) and imported at
+# get_client_ip is centralised in ion.core.client_ip and imported at
 # the top of this module, then re-exported for the call sites that historically
 # imported it from ion.auth.dependencies. The previous local implementation
 # blindly trusted the first X-Forwarded-For value (spoofable); the shared one

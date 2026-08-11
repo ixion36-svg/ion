@@ -2,7 +2,7 @@
 {% block title %}Daily Standup — Slides{% endblock %}
 
 {% block content %}
-{# v0.19.9 + v0.19.10 polish: presentation-mode standup deck.
+{# + v0.19.10 polish: presentation-mode standup deck.
 
    Pulls /api/daily-standup/checks (the same endpoint the live page
    hits), renders one panel per slide with ION brand chrome.
@@ -382,7 +382,7 @@
   function slideCriticals(d) {
     const a = d.critical_alerts || {};
     const list = a.alerts || [];
-    // v0.19.15: surface the ION-local fallback so analysts know
+    // surface the ION-local fallback so analysts know
     // the source has degraded — different from a clean empty state.
     const isFallback = a.source === 'ion_fallback';
     const fallback = isFallback
@@ -397,7 +397,7 @@
     } else if (!list.length) {
       body = `<div class="deck-empty">✓ No critical alerts in the last 24 hours.</div>`;
     } else {
-      // v0.19.20: final fallback to alert id so the Rule cell is
+      // final fallback to alert id so the Rule cell is
       // never blank on the slide — matches the standup page change.
       const rows = list.slice(0, 10).map(r => {
         const ruleLabel = r.rule_name || r.title || r.id || '(unnamed)';
@@ -435,7 +435,7 @@
     if (!list.length) {
       body = `<div class="deck-empty">✓ No stale cases.</div>`;
     } else {
-      // v0.19.14: render every stale case (no .slice cap) and wrap
+      // render every stale case (no .slice cap) and wrap
       // the table in a scrollable container so 50+ rows don't blow
       // out the slide. Added a Triggered Rules column so analysts
       // can see which detection rules backed each case.
@@ -508,7 +508,7 @@
 
   function slideCaseStatus(d) {
     const cs = d.case_status_counts || {};
-    // v0.19.14: API field names changed in v0.19.14 — open/in_progress
+    // API field names changed in v0.19.14 — open/in_progress
     // are now "created in last 24h, currently in this state",
     // closed_24h is "closed in last 24h regardless of created date".
     return {
@@ -531,7 +531,7 @@
   }
 
   function slideLogHealth(d) {
-    // v0.19.16: was reading silent_count/total but the API actually
+    // was reading silent_count/total but the API actually
     // returns hosts_with_gaps/host_count. The slide quietly showed
     // 0 / 0 to everyone since v0.19.10 — caught in the v0.19.4..HEAD
     // review. Aligned to the API.
@@ -567,7 +567,7 @@
     if (!list.length) {
       body = `<div class="deck-empty">✓ No detection-rule execution failures.</div>`;
     } else {
-      // v0.19.14: was reading x.name + x.last_status but API was
+      // was reading x.name + x.last_status but API was
       // emitting rule_name + failure_count, so every row rendered
       // blank. Aligned now — name + failures + last_failure shown.
       const rows = list.map(x => `<tr>
@@ -596,7 +596,7 @@
     };
   }
 
-  // v0.19.11: load AI threat summary + AOB notes from localStorage,
+  // load AI threat summary + AOB notes from localStorage,
   // populated by the live /daily-standup page. Both stale after 12 h.
   function _readLS(key) {
     try {
@@ -666,7 +666,7 @@
     };
   }
 
-  // v0.19.11: .pptx button now POSTs localStorage values so the
+  // .pptx button now POSTs localStorage values so the
   // download includes the AI summary + AOB. Falls back to the GET
   // endpoint behaviour (no AI/AOB) if both keys are empty.
   window.dsDownloadPptx = async function (ev) {

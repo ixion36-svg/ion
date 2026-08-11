@@ -632,7 +632,7 @@ def delete_schedule_entry(
 
 
 # =============================================================================
-# Capability staffing thresholds + roster export (v0.41.0)
+# Capability staffing thresholds + roster export
 # =============================================================================
 
 

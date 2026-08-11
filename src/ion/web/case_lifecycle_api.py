@@ -333,7 +333,7 @@ async def _background_ai_case_summary(case_id: int, user_id: int) -> None:
                 for n in notes:
                     context += f"- {n.content[:200]}\n"
 
-            # v0.66.0 (P3b): analyst persona + explicit anti-fabrication
+            # (P3b): analyst persona + explicit anti-fabrication
             # grounding, and fence the case/notes context in the untrusted
             # trust boundary (it carries observable values + free-text notes).
             from ion.services.prompt_safety import (
@@ -631,7 +631,7 @@ async def _build_pcap_flows(
         if isinstance(rd, dict) and rd:
             cid, node = _extract_community_and_node(rd)
             if cid:
-                # v0.29.1: also carry IPs + timestamp for the IP-fallback
+                # also carry IPs + timestamp for the IP-fallback
                 # path that fires when Arkime's community_id index misses.
                 src_ip, dst_ip, ts = _extract_ip_and_timestamp(rd)
                 flows.append({
@@ -715,7 +715,7 @@ async def create_case(
     # Link alert IDs if provided
     linked = 0
     if data.alert_ids:
-        # v0.19.3 (Bug 2): build a lookup of alert_id -> rule_name from
+        # (Bug 2): build a lookup of alert_id -> rule_name from
         # the supplied raw_data so newly-created triage rows carry a
         # human-readable name. Falls through to None where raw_data
         # wasn't sent or doesn't expose rule.name.
@@ -741,7 +741,7 @@ async def create_case(
                 session.add(triage)
                 session.flush()
             else:
-                # v0.19.3 (Bug 3): if the alert was already linked to a
+                # (Bug 3): if the alert was already linked to a
                 # different case, the previous case's source_alert_ids
                 # JSON still references it. That divergence is what made
                 # "linked cases" displays disagree with the FK-driven
@@ -768,7 +768,7 @@ async def create_case(
                     triage.rule_name = rule_name_by_alert[alert_id]
             triage.case_id = new_case.id
             linked += 1
-            # v0.24.0: emit alert_linked audit row keyed on the triage PK so
+            # emit alert_linked audit row keyed on the triage PK so
             # the adaptive lab grader's linked_to_case evaluator can match
             # via lab_session_fixtures (which stores materialised_row_id =
             # AlertTriage.id). Best-effort — failure logs and proceeds, the
@@ -786,7 +786,7 @@ async def create_case(
                     "alert_linked audit write failed (case-create path, non-fatal)"
                 )
 
-    # v0.15.3: harvest observables from EVERY linked AlertTriage rather
+    # harvest observables from EVERY linked AlertTriage rather
     # than only those the client supplied alert_contexts for. The earlier
     # path was lossy — if the frontend linked 5 alerts but only sent
     # raw_data for 2 of them, the remaining 3 alerts contributed zero
@@ -836,7 +836,7 @@ async def create_case(
     from ion.services.observable_service import get_observable_service
     obs_service = get_observable_service(session)
 
-    # v0.25.0: snapshot ObservableLink.id BEFORE the extract calls so the
+    # snapshot ObservableLink.id BEFORE the extract calls so the
     # audit pass below knows which links are genuinely new. Feeds the
     # adaptive lab-grading observable_created evaluator.
     from sqlalchemy import func as _func
@@ -875,7 +875,7 @@ async def create_case(
         new_case.observables = case_observables
         session.commit()
 
-    # v0.25.0: emit observable_linked audit rows for new ObservableLink rows
+    # emit observable_linked audit rows for new ObservableLink rows
     # created by the extract calls above. Best-effort; never blocks the
     # response. Feeds the adaptive lab-grading observable_created evaluator.
     try:
@@ -965,7 +965,7 @@ async def create_case(
 
     await _sync_case_to_es(new_case, session)
 
-    # v0.59.0 Cases redesign: summarize enriched observables into a case Note.
+    # Cases redesign: summarize enriched observables into a case Note.
     # Gated / air-gap safe — a no-op when there's no enrichment to report
     # (OpenCTI unconfigured), so nothing is written for air-gapped deployments.
     try:
@@ -1066,7 +1066,7 @@ async def create_case(
             auto_closed_kfp = fp
             break
 
-    # v0.78.0: run Bob on the freshly-created case (single OR multi alert) and
+    # run Bob on the freshly-created case (single OR multi alert) and
     # post its analysis as a case comment — same as auto-grouped cases, so
     # manually-created cases get Bob too. Fire-and-forget; gated by the unified
     # case auto-investigate switch, skipped for auto-closed FP cases.
@@ -1458,7 +1458,7 @@ async def get_case_similar_observables(
         .filter(Observable.id.in_(case_observable_ids))
         .filter(Observable.ignore_similarity.is_(False))
         .filter(Observable.is_whitelisted.is_(False))
-        # v0.49.3: analyst-ignored indicators must not drive cross-case
+        # analyst-ignored indicators must not drive cross-case
         # correlation either (baseline F1 — this path was never filtered).
         .filter(Observable.is_ignored.is_(False))
         .all()
@@ -1537,7 +1537,7 @@ async def get_case_detail(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
-    # v0.49.3: never serve analyst-ignored observables, even if this case
+    # never serve analyst-ignored observables, even if this case
     # hasn't been re-investigated since the flag was set (baseline F1).
     from ion.services.investigation_service import (
         _ignored_normalized_values,
@@ -1561,7 +1561,7 @@ async def get_case_detail(
     # mapping is filled in. This means the FIRST read after an external
     # Kibana assignment is enough to bind the ION user to its Kibana profile.
     #
-    # v0.9.82 — SYNC RACE GRACE WINDOW: v0.9.81 moved the Kibana case sync
+    # SYNC RACE GRACE WINDOW: v0.9.81 moved the Kibana case sync
     # off the request path into a BackgroundTask, which introduced a ~1s
     # race where a PATCH returns success and the UI refreshes faster than
     # Kibana has accepted the new assignee. During that window the mismatch
@@ -1679,7 +1679,7 @@ async def get_case_detail(
         "alerts": [
             {
                 "es_alert_id": t.es_alert_id,
-                # v0.19.3 (Bug 2): rule_name surfaced so the case detail
+                # (Bug 2): rule_name surfaced so the case detail
                 # card shows "Suspicious PowerShell Execution" instead
                 # of an opaque ES alert id. Falls back null on legacy
                 # rows; template handles by showing id-substring.
@@ -1761,7 +1761,7 @@ async def update_case(
             case.closed_by_id = current_user.id
             case.closed_at = datetime.utcnow()
 
-            # v0.25.0: audit the transition for the adaptive lab-grading
+            # audit the transition for the adaptive lab-grading
             # case_closed_with_reason evaluator. Best-effort; never blocks
             # the close. The guard at line 5269 ensures we only fire on a
             # real OPEN→CLOSED transition (not re-PATCHing closure_notes

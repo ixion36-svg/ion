@@ -111,11 +111,11 @@ from ion.web.soc_health_api import router as soc_health_router
 from ion.web.social_api import router as social_router
 from ion.web.story_api import router as story_router
 
-# v0.27.0: threat_hunt_api removed; see /threat-hunting handler note below.
+# threat_hunt_api removed; see /threat-hunting handler note below.
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
 
-# v0.26.1: ticker service + API removed (was crashing every tick on an
+# ticker service + API removed (was crashing every tick on an
 # enum-case mismatch; the auto-flagging design also conflicted with
 # investigation queue ownership). Model + table kept dormant for any
 # future redesign — see _backlog_v0_27.md.
@@ -186,9 +186,9 @@ app = FastAPI(
 # Security Headers Middleware
 # =============================================================================
 
-# v0.31.3: per-request CSP nonce. The middleware seeds _csp_nonce_var at
+# per-request CSP nonce. The middleware seeds _csp_nonce_var at
 # request start; templates read it via the `csp_nonce` Jinja global.
-# Moved to _csp_nonce.py (v0.33.1) so API modules with private templates
+# Moved to _csp_nonce.py so API modules with private templates
 # instances can register the same proxy without circular imports.
 import secrets as _secrets
 
@@ -238,30 +238,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Browsers now block any attempt to add an inline event handler
         # (defence-in-depth against stored-XSS injection of a malicious
         # `onerror=` etc).
-        # v0.31.21: `style-src-attr 'none'` flipped on after
+        # `style-src-attr 'none'` flipped on after
         # tools/migrate_inline_styles.py retired every inline `style=""`
         # attribute (1,820 instances → 993 unique hashed CSS classes in
         # static/css/ion-migrated-styles.css, loaded via base.html). With
-        # strict `script-src-attr 'none'` (v0.31.20) AND strict
-        # `style-src-attr 'none'` (v0.31.21) AND strict nonce on inline
-        # `<script>` / `<style>` (v0.31.3), the only CSS that can apply to
+        # strict `script-src-attr 'none'` AND strict
+        # `style-src-attr 'none'` AND strict nonce on inline
+        # `<script>` / `<style>`, the only CSS that can apply to
         # an ION page is from same-origin stylesheets, nonced `<style>`
         # blocks, and programmatic CSSOM (`el.style.setProperty(...)`).
         #
-        # v0.80.0: "P11 is now fully closed" stood here from v0.31.21 and was
-        # NOT true — 22 inline `style=` attributes survived the migration
-        # across 11 templates and scripts. The policy was doing its job; the
-        # markup was not. Each was refused at render time, which produces no
-        # error and no log line, only an unstyled element — so /pcap bars drew
-        # at zero width and the /cases severity stripe drew colourless for
-        # three releases. Swept to zero at v0.80.0 and now held there by
-        # tests/test_v080_csp_inline_styles.py, which fails the build on any
-        # inline `style=` outside templates/emails/ and *_pdf.html (both
-        # correctly exempt — neither is served under this policy).
-        #
-        # Dynamic values use `data-ion-style="width:${pct}%"`, applied by
-        # static/js/ion-dynamic-styles.js via setProperty. If you are adding a
-        # computed style, that is the route — not an exception here.
+        # 22 inline `style=` attributes had survived that migration;
+        # swept to zero and held there by tests/test_v080_csp_inline_styles.py
+        # (templates/emails/ and *_pdf.html are exempt — not served under this
+        # policy). Computed styles use `data-ion-style`, applied via
+        # setProperty by static/js/ion-dynamic-styles.js.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"script-src 'self' 'nonce-{nonce}'; "
@@ -283,7 +274,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         )
 
         # Replace the default "Server: uvicorn" disclosure with a generic value
-        # (v0.39.3) — denies an external scanner a free server/version
+        #  — denies an external scanner a free server/version
         # fingerprint. Purely cosmetic; no functional impact.
         response.headers["Server"] = "ION"
 
@@ -381,7 +372,7 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 templates.env.bytecode_cache = _J2Cache(str(_bytecode_cache_dir))
 templates.env.auto_reload = _debug_mode  # Only reload in debug
 templates.env.globals["ion_version"] = ion.__version__
-# v0.31.3: CSP nonce as a global proxy. Templates read it as `{{ csp_nonce }}`
+# CSP nonce as a global proxy. Templates read it as `{{ csp_nonce }}`
 # (no parens) inside `<script nonce="...">` and `<style nonce="...">` tags.
 # The proxy reads the per-request value from `_csp_nonce_var`; outside a
 # request (e.g. CLI template rendering, if any) it resolves to "" which
@@ -409,14 +400,14 @@ app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
 app.include_router(arkime_router, prefix="/api")
 app.include_router(forensics_router, prefix="/api/forensics")
-# v0.20.1: ForensicCase Workbench — pinned evidence + tamper-evident ledger
+# ForensicCase Workbench — pinned evidence + tamper-evident ledger
 app.include_router(forensic_workbench_router, prefix="/api/forensics")
 app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 app.include_router(cyab_router, prefix="/api/cyab")
 app.include_router(wallboard_router, prefix="")
-# v0.17.0: translator — page route + /api/translator/* routes share the
+# translator — page route + /api/translator/* routes share the
 # same router so it owns its own prefixes internally.
 app.include_router(translator_router, prefix="")
 app.include_router(threat_intel_router, prefix="/api/threat-intel")
@@ -425,7 +416,7 @@ app.include_router(shift_handover_router, prefix="/api")
 app.include_router(entity_timeline_router, prefix="/api")
 app.include_router(analyst_efficiency_router, prefix="/api")
 app.include_router(soc_health_router, prefix="/api")
-# v0.47.0 — Detection Health (per-rule IR→detection feedback analytics)
+# Detection Health (per-rule IR→detection feedback analytics)
 app.include_router(detection_health_router, prefix="/api")
 # Detection Engineering module — Phase 0 (read-only noise campaigns + DE metrics)
 app.include_router(de_router, prefix="/api")
@@ -438,7 +429,7 @@ app.include_router(playbook_analytics_router, prefix="/api")
 app.include_router(alert_pattern_router, prefix="/api")
 app.include_router(d3fend_router, prefix="/api")
 app.include_router(canary_router, prefix="/api")
-# v0.20.0: Workbench — pinned evidence + tamper-evident ledger
+# Workbench — pinned evidence + tamper-evident ledger
 app.include_router(workbench_router, prefix="/api")
 app.include_router(log_source_router, prefix="/api")
 app.include_router(briefing_router, prefix="/api")
@@ -457,35 +448,35 @@ app.include_router(compliance_router, prefix="/api")
 app.include_router(comm_template_router, prefix="/api")
 app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
-# v0.27.0: threat_hunt_router removed alongside the half-built page.
+# threat_hunt_router removed alongside the half-built page.
 app.include_router(cyber_range_router, prefix="/api")
 app.include_router(enrichment_router, prefix="/api/enrichment")
 app.include_router(alert_prompt_router, prefix="")
-# v0.11.0 — JSON-DAG playbook automation (Stories). The router declares
+# JSON-DAG playbook automation (Stories). The router declares
 # its own /api/ + page paths internally, so prefix="" here.
 app.include_router(story_router, prefix="")
-# v0.11.2 — L1/L2/L3 SOC training course subsystem
+# L1/L2/L3 SOC training course subsystem
 app.include_router(course_router, prefix="")
-# v0.21.0 — Lab fixture launch/complete lifecycle
+# Lab fixture launch/complete lifecycle
 app.include_router(labs_router, prefix="")
 # Service desk — user bug reports (→ GitLab) + CAB change requests.
 app.include_router(bug_report_router, prefix="")
 app.include_router(change_request_router, prefix="")
 # AI document analysis — large-PDF map-reduce via the internal LLM (toggle-gated).
 app.include_router(large_doc_router, prefix="")
-# v0.26.1: ticker_router removed alongside the service.
+# ticker_router removed alongside the service.
 app.include_router(investigation_memory_router)
 app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
-# v0.23.1 — on-demand Bob case analysis (replaces auto-comment)
+# on-demand Bob case analysis (replaces auto-comment)
 app.include_router(bob_analysis_router, prefix="/api")
-# v0.46.0 — Bob Auto-Investigate (agentic multi-source investigation)
+# Bob Auto-Investigate (agentic multi-source investigation)
 app.include_router(auto_investigate_router, prefix="/api")
 app.include_router(arkime_traffic_router, prefix="/api")
 app.include_router(case_grouper_router, prefix="")
 app.include_router(webhook_router, prefix="/api")
 app.include_router(daily_standup_router, prefix="/api")
-# v0.21.0: Bob Prompt Evaluation Harness — /api/bob-eval/* + /bob-eval page
+# Bob Prompt Evaluation Harness — /api/bob-eval/* + /bob-eval page
 app.include_router(bob_eval_router, prefix="")
 
 # Prometheus scrape endpoint at the root (/metrics). The route itself is
@@ -639,7 +630,7 @@ async def _startup_event():
     deadlocks, and duplicate background loops). Only one worker per restart
     actually runs each hook; the rest skip cleanly.
     """
-    # v0.9.82 — event-loop lag tripwire. Python asyncio will auto-log a
+    # event-loop lag tripwire. Python asyncio will auto-log a
     # warning any time a callback (read: a sync function called from an
     # async handler) blocks the event loop longer than this threshold.
     # 250ms is aggressive enough to surface the real offenders without
@@ -730,7 +721,7 @@ async def _startup_event():
     run_locked(engine, LOCK_SEED_KNOWLEDGE_BASE, "seed_knowledge_base", _seed_kb)
 
     # ---------------------------------------------------------------
-    # v0.79.1: seed the bundled CISA KEV snapshot.
+    # seed the bundled CISA KEV snapshot.
     #
     # Idempotent on the catalog VERSION, and deliberately one-way: if an
     # operator has imported a catalog NEWER than the one in this image, the
@@ -783,7 +774,7 @@ async def _startup_event():
     run_locked(engine, LOCK_SEED_CAPABILITY_KB, "seed_capability_articles", _seed_capability_articles)
 
     # ---------------------------------------------------------------
-    # v0.12.0: Seed CyAB Onboarding Studio catalogue (6 pillars + 14
+    # Seed CyAB Onboarding Studio catalogue (6 pillars + 14
     # sub-profiles) and backfill cyab_data_sources.subprofile_id from
     # legacy data_source_type. Idempotent — operator-edited
     # sub-profiles (is_custom=true) are preserved.
@@ -959,7 +950,7 @@ async def _startup_event():
                hold_until_close=True)
 
     # ---------------------------------------------------------------
-    # Arkime auto-case background loop (v0.34.0).
+    # Arkime auto-case background loop.
     # For every new ES alert that carries network.community_id + arkime_node,
     # automatically creates an AlertCase and enqueues PCAP analysis.
     # Honours ION_ARKIME_AUTO_CASE_ENABLED (default true).
@@ -975,7 +966,7 @@ async def _startup_event():
                hold_until_close=True)
 
     # ---------------------------------------------------------------
-    # Realtime Arkime IOC monitor (v0.45.0) — watches live traffic for
+    # Realtime Arkime IOC monitor — watches live traffic for
     # known-bad IPs and auto-cases + grabs the PCAP while it's still in
     # Arkime's full-retention window. Opt-in: ION_ARKIME_RTMON_ENABLED.
     # ---------------------------------------------------------------
@@ -1033,7 +1024,7 @@ async def _startup_event():
         logger.warning("Failed to start KB-embedding loop: %s", exc)
 
     # ---------------------------------------------------------------
-    # Playbook embedding background producer (v0.51.0) — embeds the active
+    # Playbook embedding background producer — embeds the active
     # playbook catalogue for the Playbook RAG layer's similarity fallback.
     # Honours ION_PLAYBOOK_RAG_ENABLED / ION_PLAYBOOK_EMBEDDING_INTERVAL_S.
     # ---------------------------------------------------------------
@@ -1049,7 +1040,7 @@ async def _startup_event():
         logger.warning("Failed to start playbook-embedding loop: %s", exc)
 
     # ---------------------------------------------------------------
-    # TI-report cache sync + chunk-embedding loop (v0.53.0) — caches recent
+    # TI-report cache sync + chunk-embedding loop — caches recent
     # OpenCTI reports locally and embeds them for Bob's TI-report RAG layer.
     # Honours ION_TI_REPORT_RAG_ENABLED / ION_TI_REPORT_SYNC_INTERVAL_S.
     # No-ops phase-by-phase when OpenCTI or Ollama is unavailable.
@@ -1203,7 +1194,7 @@ async def briefings_page(
             "pdf": "/static/briefings/ION_Secure_by_Design.pdf",
             "pptx": "/static/briefings/ION_Secure_by_Design.pptx",
         },
-        # v0.48.0: analyst knowledge-transfer decks (SVG slides, no PDF/PPTX).
+        # analyst knowledge-transfer decks (SVG slides, no PDF/PPTX).
         "ad-attacks": {
             "dir": "ad-attacks",
             "label": "AD Attacks (L1)",
@@ -1397,7 +1388,7 @@ async def threat_intel_actor_profile_page(
     )
 
 
-# v0.27.0: /threat-landscape page removed; content folded into /threat-intel
+# /threat-landscape page removed; content folded into /threat-intel
 # as new IOC Feed + Reports + Analytics tabs. The /api/threat-landscape/*
 # router still exists — the unified page calls it for IOC + reports data.
 # Redirect old bookmarks rather than 404'ing them.
@@ -2224,7 +2215,7 @@ async def cyber_range_page(request: Request, user: User = Depends(require_page_a
     return templates.TemplateResponse(request=request, name="cyber_range.html")
 
 
-# v0.27.0: /attack-stories page removed; content folded into the
+# /attack-stories page removed; content folded into the
 # /threat-intel "Attack Stories" tab. The /api/attack-stories endpoint
 # still exists — the unified page calls it.
 
@@ -2241,7 +2232,7 @@ async def executive_report_page(request: Request, user: User = Depends(require_p
     return templates.TemplateResponse(request=request, name="executive_report.html")
 
 
-# v0.27.0: /threat-hunting page + threat_hunt_api router + ThreatHunt
+# /threat-hunting page + threat_hunt_api router + ThreatHunt
 # model + threat_hunts table removed. The half-built CRUD shell never
 # integrated with /discover (where hunt queries actually run) or /cases
 # (where findings get recorded), so it was deleted rather than fleshed

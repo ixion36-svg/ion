@@ -145,7 +145,7 @@ def launch_lab(
 
     enr = _require_enrollment(session, current_user.id, lesson.module.course_id)
 
-    # v0.23.0: open or resume a lab session before seeding fixtures so the
+    # open or resume a lab session before seeding fixtures so the
     # materialised rows can be back-correlated by the grader.
     sess_id = lab_session_service.start_or_resume(
         session, enrollment_id=enr.id, lesson_id=lesson_id
@@ -195,7 +195,7 @@ def complete_lab(
 
     enr = _require_enrollment(session, current_user.id, lesson.module.course_id)
 
-    # v0.23.0: grade BEFORE teardown so the grader can read the
+    # grade BEFORE teardown so the grader can read the
     # lab_session_fixtures rows that still point at the materialised data.
     sess_id = lab_session_service.current_for(
         session, enrollment_id=enr.id, lesson_id=lesson_id
@@ -215,7 +215,7 @@ def complete_lab(
 
     # Mark lesson progress and persist the cached score.
     #
-    # v0.26.0: pass-threshold enforcement. Until v0.25.x the lab path
+    # pass-threshold enforcement. Until v0.25.x the lab path
     # always set status='completed' regardless of score, which mirrored
     # the v0.23.0 first-cut grader's "rubric is informational" stance.
     # Now that v0.24/0.25.x have populated rubrics on the major LAB

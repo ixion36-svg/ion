@@ -1684,7 +1684,7 @@ class TestFindingModel:
         from dataclasses import asdict
         f = Finding("Cat", "high", "Title", "Detail")
         d = asdict(f)
-        # v0.39.0: Finding gained a `mitre` field (ATT&CK technique IDs), default [].
+        # Finding gained a `mitre` field (ATT&CK technique IDs), default [].
         assert d == {
             "category": "Cat", "severity": "high", "title": "Title",
             "detail": "Detail", "mitre": [],

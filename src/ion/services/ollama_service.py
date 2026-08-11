@@ -843,7 +843,7 @@ def get_ollama_service() -> OllamaService:
         _ollama_service = OllamaService(
             base_url=getattr(config, 'ollama_url', 'http://localhost:11434'),
             default_model=getattr(config, 'ollama_model', 'hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF'),
-            # v0.17.3: bumped default 120 → 300 to match the investigation
+            # bumped default 120 → 300 to match the investigation
             # gate. Long prompts on an 8B model regularly need 130-180s warm;
             # the inner httpx timeout firing first cancelled responses
             # mid-stream. Override via `ollama_timeout` in config.

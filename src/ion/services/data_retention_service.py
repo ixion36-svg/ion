@@ -82,7 +82,7 @@ RETENTION_RULES: List[RetentionRule] = [
         timestamp_column="created_at",
         label="security_events",
     ),
-    # G4 closure (v0.31.15) — AI chat retention. Targets messages (not
+    # G4 closure — AI chat retention. Targets messages (not
     # sessions); CASCADE delete on session removal already handles the
     # session lifecycle. Deleting messages without their session leaves
     # the session row referencing an empty conversation, which is
@@ -192,7 +192,7 @@ async def _loop(engine: Engine) -> None:
                         logger.error(
                             "Retention sweep for %s failed: %s", rule.label, e,
                         )
-                        # v0.31.23 (code review): on SQLAlchemy 2.x the
+                        # (code review): on SQLAlchemy 2.x the
                         # session's autobegin behaviour opens a fresh
                         # implicit transaction after rollback so the
                         # remaining rules in this sweep get clean state.

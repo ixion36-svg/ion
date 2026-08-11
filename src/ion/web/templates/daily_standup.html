@@ -30,7 +30,7 @@
         <button data-click-action="runChecks" id="btn-run-checks" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
           <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg> Run Checks
         </button>
-        {# v0.19.9: presentation-mode + pptx download — same data the
+        {# presentation-mode + pptx download — same data the
            live page shows, but stripped down for a meeting screen. #}
         <a href="/daily-standup/slides" target="_blank" rel="noopener"
            class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"
@@ -80,7 +80,7 @@
             <span class="text-ion-coral font-semibold">Critical: <span id="kpi-critical">--</span></span>
           </div>
         </div>
-        <!-- v0.19.15: shown only when the API falls back to ION-local data -->
+        <!-- shown only when the API falls back to ION-local data -->
         <div id="alerts-fallback-banner" class="mb-3 px-3 py-2 rounded-md text-[11px] bg-ion-amber/8 text-ion-amber border-l-2 border-ion-amber _ion-s-c8be1ccba6"></div>
         <div id="alerts-table-wrap" class="overflow-x-auto">
           <table class="w-full text-[12px]">
@@ -96,12 +96,12 @@
       </div>
     </div>
 
-    <!-- S2b: KPI strip — Open alerts 30d / case status / triage MTTA (v0.17.1) -->
+    <!-- S2b: KPI strip — Open alerts 30d / case status / triage MTTA -->
     <div class="mb-6">
       <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-3">Section 2b · KPIs</div>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-        <!-- v0.31.1: Alerts in the last 24h — replaces the v0.17.1 30d
+        <!-- Alerts in the last 24h — replaces the v0.17.1 30d
              backlog card. Severity row (Critical / High / Medium / Low)
              + status row (Open / Ack / Closed). Source = ES via
              _check_alerts_24h; falls back to ION-local AlertTriage
@@ -129,7 +129,7 @@
           </div>
         </div>
 
-        <!-- v0.31.1: Cases card — expanded with a severity breakdown row.
+        <!-- Cases card — expanded with a severity breakdown row.
              Top row remains status (Open / In Progress / Closed). -->
         <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
           <div class="flex items-baseline justify-between mb-3">
@@ -527,11 +527,11 @@ function renderAlerts(data) {
   const tbody = document.getElementById('alerts-tbody');
   if (!alerts.length) { tbody.innerHTML = '<tr><td colspan="5" class="px-3 py-8 text-center text-slate-500">No critical alerts in last 24h</td></tr>'; return; }
   const rows = alerts.slice(0, 15);
-  // v0.19.20: fall back through rule_name → title → id so the cell is
+  // fall back through rule_name → title → id so the cell is
   // never blank — analysts complained the panel was hard to decipher
   // when ES alerts had no rule.name (older Sigma exports, custom feeds).
   tbody.innerHTML = rows.map(a => {
-    // v0.31.1: rule-name column. Drop the previous `a.id` fallback —
+    // rule-name column. Drop the previous `a.id` fallback —
     // the raw ES document id (a UUID like `abcd-1234…`) was leaking
     // into the column whenever rule_name/title were missing, which
     // analysts read as "ID instead of rule name". Prefer rule_name,
@@ -550,7 +550,7 @@ function renderAlerts(data) {
 
 /* ── S3: Stale Cases ── */
 function renderStaleCases(data) {
-  // v0.19.14: API now returns ALL stale cases (no .limit(20)) and
+  // API now returns ALL stale cases (no .limit(20)) and
   // each row carries a triggered_rules JSON list. New column added.
   const caseData = data || {};
   const cases = caseData.cases || [];
@@ -771,7 +771,7 @@ function fmtN(n) {
   if (n >= 10000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   return Number(n).toLocaleString();
 }
-// v0.31.1: 24h alerts breakdown (replaces renderOpenAlerts30d on the
+// 24h alerts breakdown (replaces renderOpenAlerts30d on the
 // page — the 30d data is still computed server-side for pptx export
 // but no longer rendered as a KPI card).
 function renderAlerts24h(d) {
@@ -797,9 +797,9 @@ function renderAlerts24h(d) {
   }
 }
 function renderCaseStatusCounts(d) {
-  // v0.19.14: API switched to a 24h-scoped view (intake_24h /
+  // API switched to a 24h-scoped view (intake_24h /
   // closed_24h / open / in_progress).
-  // v0.31.1: added by_severity_24h breakdown on the same window.
+  // added by_severity_24h breakdown on the same window.
   d = d || {};
   const setIf = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = fmtN(val); };
   setIf('ds-cs-total',  d.intake_24h);
@@ -832,7 +832,7 @@ async function loadChecks() {
     if (el) el.innerHTML = spinner(id === 'rules-tbody' ? 3 : 5);
   });
   try {
-    // v0.31.1: bypass browser cache. Backend also sends
+    // bypass browser cache. Backend also sends
     // Cache-Control: no-store; this is belt-and-braces so analysts
     // don't see "critical alerts from days ago" when ES has nothing
     // fresh and the previous response is sitting in disk cache.
@@ -846,7 +846,7 @@ async function loadChecks() {
     if (data.dc_log_health) renderLogHealth('dc', data.dc_log_health);
     if (data.wef_log_health) renderLogHealth('wef', data.wef_log_health);
     renderRuleFailures(data.rule_failures);
-    // v0.17.1 / v0.31.1 KPI cards
+    // / v0.31.1 KPI cards
     renderAlerts24h(data.alerts_24h);
     renderCaseStatusCounts(data.case_status_counts);
     renderTriageThroughput(data.triage_throughput);
@@ -1108,7 +1108,7 @@ async function runChecks() {
 
 /* ── Collect form state ──
  *
- * v0.15.2: field names match StandupSaveRequest in daily_standup_api.py
+ * field names match StandupSaveRequest in daily_standup_api.py
  * exactly. The earlier shape (threat_summary / servicenow_incidents /
  * signoff_analyst / signoff_confirmed) was silently dropped by pydantic
  * so the AI summary, ServiceNow notes, sign-off and meetings checklist

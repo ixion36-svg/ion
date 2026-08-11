@@ -147,7 +147,7 @@ def get_run_samples(
         BobEvalRunSample.eval_run_id == run_id
     ).scalar() or 0
 
-    # L5 (v0.22.1): reasoning_text is only emitted when ION_BOB_STORE_REASONING
+    # L5: reasoning_text is only emitted when ION_BOB_STORE_REASONING
     # is true at request time. v0.36.0 flips the default ON. Setting it back to
     # false stops emitting reasoning at the response layer even for rows that
     # were persisted while it was enabled — no back-fill purge required.
@@ -193,7 +193,7 @@ def bob_eval_page(
     )
     recent_runs = list_eval_runs(template_id=None, limit=20, session=session)
 
-    # v0.26.1: rewrote from the legacy positional form
+    # rewrote from the legacy positional form
     # ``TemplateResponse("bob_eval.html", {...})`` which collided with
     # Starlette's modern signature ``TemplateResponse(request, name,
     # context, ...)`` — the dict was being interpreted as the ``name``

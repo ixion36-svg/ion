@@ -151,7 +151,7 @@ class DocAnalysisJob(Base, TimestampMixin):
     __table_args__ = (
         Index("ix_doc_analysis_jobs_status", "status"),
         Index("ix_doc_analysis_jobs_created_at", "created_at"),
-        # v0.49.3 audit: the single-job guarantee is enforced by the DB, not
+        # audit: the single-job guarantee is enforced by the DB, not
         # by check-then-insert (two uvicorn workers under READ COMMITTED can
         # otherwise both win). At most ONE row may be status='running'.
         Index(

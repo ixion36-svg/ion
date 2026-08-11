@@ -67,7 +67,7 @@ def test_rewrite_polishes_draft(client, monkeypatch):
     assert "host pwned, fp, closing" in stub.last_prompt
     assert "false positive" in stub.last_prompt
     assert "Suspicious PowerShell on WS-01" in stub.last_prompt
-    # v0.44.0: output is length-capped (prompt instruction + a token ceiling).
+    # output is length-capped (prompt instruction + a token ceiling).
     assert "paragraph" in stub.last_prompt.lower()
     assert stub.last_max_tokens == 400
     # No case_id supplied → no precedents were gathered.

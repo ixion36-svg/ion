@@ -170,7 +170,7 @@
                             <textarea id="prompt-outputs" class="ion-textarea" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
                         </div>
                     </div>
-                    <!-- v0.22.1 (L6): row hidden for users without system:settings; -->
+                    <!-- (L6): row hidden for users without system:settings; -->
                     <!-- backend also enforces the gate so this is defence-in-depth. -->
                     <div class="form-row _ion-s-c8be1ccba6" id="prompt-confidence-threshold-row">
                         <div class="form-group _ion-s-ee3d55bf99">
@@ -433,7 +433,7 @@ async function saveTemplate() {
         severity_hint: document.getElementById('prompt-severity').value || null,
         expected_outputs: linesToArray(document.getElementById('prompt-outputs').value),
     };
-    // v0.22.1 (L6): only include confidence_threshold_override when the user
+    // (L6): only include confidence_threshold_override when the user
     // can change it. Backend now treats explicit-null-when-stored-non-null as
     // a change requiring system:settings, so omitting the field entirely is
     // the only way for a non-system:settings user to save other edits.

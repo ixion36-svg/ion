@@ -344,7 +344,7 @@ def list_my_courses(
     return {"courses": out, "count": len(out)}
 
 
-# ── Course-completion certificate (v0.13.0) ──────────────────────────────
+# ── Course-completion certificate ──────────────────────────────
 
 
 def _render_certificate_html(
@@ -530,7 +530,7 @@ def get_course_certificate(
         )
 
 
-# ── Lesson PDF export (v0.20.1) ──────────────────────────────────────────
+# ── Lesson PDF export ──────────────────────────────────────────
 
 
 @router.get("/api/courses/{slug}/lessons/{lesson_id}/export.pdf")
@@ -783,7 +783,7 @@ def submit_quiz(
     }
 
 
-# ── Authoring CRUD (v0.11.4) ─────────────────────────────────────────────
+# ── Authoring CRUD ─────────────────────────────────────────────
 #
 # Permission model: read uses `playbook:read`, mutating ops use
 # `playbook:create`/`playbook:update`/`playbook:delete` (mirroring the
@@ -1121,7 +1121,7 @@ def delete_question(
     return None
 
 
-# ── JSON import / export (v0.11.4) ───────────────────────────────────────
+# ── JSON import / export ───────────────────────────────────────
 
 
 def _course_to_full_dict(course: Course) -> dict:
@@ -1272,7 +1272,7 @@ def import_course(
     return {"id": course.id, "slug": course.slug, "imported": True}
 
 
-# ── Image upload (v0.11.3) ───────────────────────────────────────────────
+# ── Image upload ───────────────────────────────────────────────
 
 
 _ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".svg", ".webp", ".gif"}
@@ -1367,7 +1367,7 @@ async def upload_course_image(
     except HTTPException:
         raise
     except Exception as exc:
-        # v0.19.17: was f"Upload failed: {exc}", which could leak
+        # was f"Upload failed: {exc}", which could leak
         # filesystem paths from PermissionError / FileNotFoundError.
         from ion.core.safe_errors import safe_error
         target.unlink(missing_ok=True)
@@ -1391,7 +1391,7 @@ def courses_page(request: Request, _user: User = Depends(require_page_auth)):
     return _templates.TemplateResponse(request=request, name="courses.html")
 
 
-# v0.52.0 — SOC roles & daily duties reference page (/soc-roles).
+# SOC roles & daily duties reference page (/soc-roles).
 #
 # Static first-party training content rendered fully server-side (the hover
 # expansion is pure CSS — no JS on the page). Each role declares the
@@ -1628,7 +1628,7 @@ def lesson_page(
     )
 
 
-# v0.13.2 — analyst's "My Courses" enrolment dashboard
+# analyst's "My Courses" enrolment dashboard
 # (was referenced in nav since v0.11.x but the page route + template
 # were never built — fixing the gap as part of the labs ship)
 @router.get("/my-courses")
@@ -1644,7 +1644,7 @@ async def my_courses_redirect():
     return RedirectResponse(url="/courses", status_code=302)
 
 
-# v0.11.4 — admin authoring pages
+# admin authoring pages
 @router.get("/admin/courses", response_class=HTMLResponse)
 def admin_courses_page(request: Request, _user: User = Depends(require_page_auth)):
     return _templates.TemplateResponse(request=request, name="admin_courses.html")

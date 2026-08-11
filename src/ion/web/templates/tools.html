@@ -18,7 +18,7 @@
 
 <!-- Tool Tabs -->
 <div class="tools-tabs">
-    <!-- v0.75.0 (route audit phase 7f): /translator was a 277-line page whose
+    <!-- (route audit phase 7f): /translator was a 277-line page whose
          only sibling in its tab strip was this page. It is a tool; it now sits
          with the tools. -->
     <button class="tool-tab" data-click-action="switchToolTab" data-args='["translator"]'>Translator</button>
@@ -427,7 +427,7 @@ d41d8cd98f00b204e9800998ecf8427e"></textarea>
 <script nonce="{{ csp_nonce }}">
 // ==================== TAB SWITCHING ====================
 function switchToolTab(tabName) {
-    // v0.75.0: was `event.target.classList.add('active')`, which relies on the
+    // was `event.target.classList.add('active')`, which relies on the
     // implicit global `window.event` — undefined when this is called
     // programmatically (deep link, tests), so the button state silently
     // desynced from the panel. Derive the button from the tab name instead.
@@ -1180,7 +1180,7 @@ function escapeHtml(text) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TRANSLATOR  (was /translator — merged v0.75.0, route audit phase 7f)
+// TRANSLATOR (was /translator — merged v0.75.0, route audit phase 7f)
 // ═══════════════════════════════════════════════════════════════
 const T = {
   langs: [],

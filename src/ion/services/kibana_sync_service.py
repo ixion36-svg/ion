@@ -195,7 +195,7 @@ class KibanaSyncService:
 
             current_status = case.status.value if hasattr(case.status, "value") else case.status
 
-            # v0.30.1: "closed" is terminal in ION. The bidirectional sync
+            # "closed" is terminal in ION. The bidirectional sync
             # used to flip ION back to "acknowledged" when the 60s loop fired
             # before the ION→Kibana close had propagated (Kibana still showed
             # "in-progress"), causing the Kanban-close flap the user
@@ -324,7 +324,7 @@ class KibanaSyncService:
                     kibana_updated = kibana_case.get("updated_at") or kibana_case.get("created_at")
                     ion_updated = case.updated_at or case.created_at
 
-                    # v0.30.1: "closed" is a terminal state and gets eager
+                    # "closed" is a terminal state and gets eager
                     # bidirectional propagation regardless of the timestamp
                     # gate, so close events can't be defeated by clock skew
                     # or async-push latency. Pre-fix:

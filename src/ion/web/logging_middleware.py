@@ -69,7 +69,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 user_agent=request.headers.get("User-Agent"),
             )
 
-            # v0.9.82 — slow-request tripwire. Any request above the soft
+            # slow-request tripwire. Any request above the soft
             # threshold gets a warning, anything above the hard threshold
             # gets an error (visible in alerting). Thresholds are tuned to
             # the current perf budget; tighten once p99 drops below them.

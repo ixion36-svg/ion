@@ -45,7 +45,7 @@ class ObservableResponse(BaseModel):
     watched_at: Optional[str] = None
     # Auto-enrich
     auto_enrich: bool = True
-    # v0.10.19 — TheHive-style IOC handling
+    # TheHive-style IOC handling
     tlp: str = "amber"
     pap: str = "amber"
     is_ioc: bool = False
@@ -69,7 +69,7 @@ class ObservableUpdate(BaseModel):
     notes: Optional[str] = None
     is_whitelisted: Optional[bool] = None
     threat_level: Optional[str] = None
-    # v0.10.19 — TheHive-style IOC handling
+    # TheHive-style IOC handling
     tlp: Optional[str] = None  # "red" | "amber" | "green" | "clear"
     pap: Optional[str] = None  # "red" | "amber" | "green" | "white"
     is_ioc: Optional[bool] = None
@@ -604,7 +604,7 @@ async def update_observable(
     if not observable:
         raise HTTPException(status_code=404, detail="Observable not found")
 
-    # v0.10.19 — direct attribute set for the new TheHive-style fields. The
+    # direct attribute set for the new TheHive-style fields. The
     # service.update signature predates these and we don't want to expand
     # it for a minor addition; setting on the row works the same once we
     # commit. Validation is light: enum-ish strings normalised to lower.

@@ -170,7 +170,7 @@ class UserSession(Base):
     user_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=False
     )
-    # G5 closure (v0.31.17): session_token is hashed at rest. The DB
+    # G5 closure: session_token is hashed at rest. The DB
     # only ever sees SHA-256 hex digests; the plaintext token lives
     # exclusively in the client cookie. Server-side lookups hash the
     # incoming cookie value and match against this column. SHA-256

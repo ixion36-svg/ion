@@ -55,7 +55,7 @@ class CyabSystem(Base):
     version: Mapped[Optional[str]] = mapped_column(String(16), nullable=True, default="1.0")
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="DRAFT")
 
-    # v0.10.17: onboarding metadata. All nullable so existing rows stay
+    # onboarding metadata. All nullable so existing rows stay
     # valid; the wizard captures these on system creation but the legacy
     # quick-create modal still works without setting them.
     business_unit: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
@@ -69,7 +69,7 @@ class CyabSystem(Base):
     stakeholder_distribution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ir_runbook_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
 
-    # v0.12.0: containment authority paragraph captured on the
+    # containment authority paragraph captured on the
     # Onboarding Pack approval flow. Free-text — references a runbook,
     # names the on-call team, etc.
     containment_authority: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
@@ -179,7 +179,7 @@ class CyabDataSource(Base):
     # ES alert mapping (data_stream.namespace value for this system)
     data_namespace: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
-    # v0.12.0: Onboarding Studio sub-profile tag. Nullable so legacy
+    # Onboarding Studio sub-profile tag. Nullable so legacy
     # rows stay valid until backfilled. The catalogue lives in
     # cyab_subprofiles (see ion.models.cyab_subprofile).
     subprofile_id: Mapped[Optional[str]] = mapped_column(
@@ -239,7 +239,7 @@ class CyabSnapshot(Base):
 
 
 # ---------------------------------------------------------------------------
-# v0.10.15: Assessment models — discovery questionnaire results
+# Assessment models — discovery questionnaire results
 #
 # Two granularities:
 #   - CyabAssessment           (org-wide, no FK to a system)

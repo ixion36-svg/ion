@@ -85,9 +85,9 @@ class Investigation(Base):
     recommended_actions_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     ioc_snapshot_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # v0.21.0: numeric confidence score (0-100) from _compute_confidence.
+    # numeric confidence score (0-100) from _compute_confidence.
     confidence_int: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    # v0.64.0: True when the confidence-gated escalation "deep pass" ran for
+    # True when the confidence-gated escalation "deep pass" ran for
     # this investigation (low-confidence + high/critical → try harder before
     # abstaining). Telemetry only — advisory, the human still decides.
     escalation_attempted: Mapped[bool] = mapped_column(
@@ -96,7 +96,7 @@ class Investigation(Base):
     # Analyst explanation text — stored when ION_BOB_STORE_REASONING=true.
     reasoning_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # v0.10.11: training-loop foundation. Every investigation persists the
+    # training-loop foundation. Every investigation persists the
     # rendered user prompt + the model's raw output + the grounded evidence
     # bullets. Without these, AIFeedback disagreements are uncountable but
     # undebuggable — you know Bob was wrong, not what he saw.

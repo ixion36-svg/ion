@@ -440,7 +440,7 @@ def _render_bob_alert_note(parsed: Dict[str, Any]) -> str:
     if analyst:
         lines.extend(["", analyst])
 
-    # v0.10.12: grounded evidence bullets. Each cites a specific field from
+    # grounded evidence bullets. Each cites a specific field from
     # the alert payload so the verdict is auditable, not opaque.
     if observations:
         lines.extend(["", "**Key observations:**"])
@@ -573,8 +573,8 @@ def _write_bob_outputs(
         )
         return
 
-    # v0.21.0: compute numeric confidence + resolve circuit-breaker threshold.
-    # v0.66.0 (P2b): pass the alert so ungrounded key_observations deduct.
+    # compute numeric confidence + resolve circuit-breaker threshold.
+    # (P2b): pass the alert so ungrounded key_observations deduct.
     confidence_int = _compute_confidence(parsed, alert=alert)
     threshold = _get_bob_confidence_threshold(template)
     above_threshold = confidence_int >= threshold
@@ -584,10 +584,10 @@ def _write_bob_outputs(
     inv_row = db.get(_Investigation, investigation_id)
     if inv_row is not None:
         inv_row.confidence_int = confidence_int
-        # v0.64.0: record whether the escalation deep pass ran for this alert.
+        # record whether the escalation deep pass ran for this alert.
         if escalation_attempted:
             inv_row.escalation_attempted = True
-        # v0.36.0: default ON. Bob's analyst-explanation is persisted on the
+        # default ON. Bob's analyst-explanation is persisted on the
         # Investigation row so memory + few-shot exemplar RAG can draw on it.
         # Disable with ION_BOB_STORE_REASONING=false (data-minimisation opt-out).
         if _bob_store_reasoning_enabled():
@@ -619,7 +619,7 @@ def _write_bob_outputs(
         if above_threshold:
             # Happy path: write verdict when it is a VALID CaseClosureReason,
             # non-inconclusive, at medium+ confidence.
-            # v0.39.5: the enum-membership check is defence-in-depth against
+            # the enum-membership check is defence-in-depth against
             # prompt injection. Bob's analysis prompt already frames alert content
             # as hostile (<input_data> tags + sanitiser + instruction defence), but
             # if adversary-controlled alert content ever hijacks Bob into emitting
@@ -652,7 +652,7 @@ def _write_bob_outputs(
                 alert_id, confidence_int, threshold,
             )
 
-    # v0.21.0: write AIFeedback row at fire time so circuit-breaker events
+    # write AIFeedback row at fire time so circuit-breaker events
     # are captured independently of case-close (which may never happen for
     # escalated alerts). This is a SECOND write point; record_case_close_feedback
     # remains the primary path for normal case-close events.
@@ -687,7 +687,7 @@ def _write_bob_outputs(
         and tuning.get("rule_needs_tuning")
         and (tuning.get("suggested_change") or "").strip()
     ):
-        # v0.72.0 (route audit phase 8): Bob's per-alert tuning recommendation
+        # (route audit phase 8): Bob's per-alert tuning recommendation
         # now lands in DetectionProposal, the DE module's governed queue, instead
         # of the retired TuningProposal table whose review page was unreachable
         # — proposals accumulated unreviewed. Still a DRAFT requiring a human
@@ -788,7 +788,7 @@ _FIRST_JSON_RE = re.compile(r"\{.*\}", re.DOTALL)
 # in the Integration Checklist.
 _DEFAULT_MAX_PER_SWEEP = 50
 _DEFAULT_SWEEP_INTERVAL_S = 900
-# v0.17.3: bumped 120 → 300. Real investigation prompts on an 8B model
+# bumped 120 → 300. Real investigation prompts on an 8B model
 # (full alert context + observables + history + MITRE chain) routinely
 # take 130-180s warm (longer cold / on CPU); the previous 120s gate was firing in the middle of a
 # legitimate response. Chat prompts are shorter and weren't affected.
@@ -796,7 +796,7 @@ _DEFAULT_SWEEP_INTERVAL_S = 900
 # matching config attribute.
 _DEFAULT_LLM_TIMEOUT_S = 300
 
-# v0.19.3: memory-context guards. The v0.18.1 sanity sweep rescued a
+# memory-context guards. The v0.18.1 sanity sweep rescued a
 # silent NameError that had been zeroing memory_ctx_md since v0.10.x;
 # once the fix landed, accumulated investigation history started bloating
 # the prompt. On 7-8B models that bloat tipped the balance and the model
@@ -1586,7 +1586,7 @@ class InvestigationService:
         are consumed only when ``write_comment`` is set; per-alert callers pass
         them for callsite compatibility. Never raises out of this method.
         """
-        # v0.78.0: when ``write_comment`` is set (per-case investigation at case
+        # when ``write_comment`` is set (per-case investigation at case
         # creation), Bob posts a summary Note on the case. Per-alert callers leave
         # it False, so single-alert investigations don't spam duplicate comments.
         try:
@@ -1787,7 +1787,7 @@ class InvestigationService:
         factory = get_session_factory(get_engine())
         db = factory()
         try:
-            # v0.23.1: include "cancelled" so cancelled investigations count
+            # include "cancelled" so cancelled investigations count
             # as "existing" for the purposes of sweep dedup — the analyst
             # cancelled this alert's investigation deliberately, the sweep
             # should not re-queue it on the next iteration.
@@ -2105,7 +2105,7 @@ class InvestigationService:
         injection defense: see the helper for what the sanitiser
         scrubs and what it lets through (it's conservative).
         """
-        # v0.19.19: track sanitiser activity for telemetry. A non-zero
+        # track sanitiser activity for telemetry. A non-zero
         # count at the end means a value contained injection-prone
         # content — log a WARNING after the body is assembled so the
         # operator can audit alerts with suspicious payloads.
@@ -2139,7 +2139,7 @@ class InvestigationService:
             return ("\n".join(lines) + "\n") if lines else f"{indent}(none)\n"
 
         out: List[str] = [
-            # v0.19.19: opening wrapper. The system prompt is told that
+            # opening wrapper. The system prompt is told that
             # content between these tags is hostile-controlled alert
             # metadata, so any embedded directive is to be ignored.
             "<input_data>",
@@ -2180,7 +2180,7 @@ class InvestigationService:
                 out.append(f"- `{_safe(d['field'])}` decodes to: {_safe(d['decoded'])}")
             out.append("")
 
-        # v0.79.1: KEV membership, resolved in code against the shipped catalog.
+        # KEV membership, resolved in code against the shipped catalog.
         # Same reasoning as the decode above — a model asked whether a CVE is
         # known-exploited will answer from half-remembered numbering and be
         # confidently wrong either way. A miss is stated as absence-from-a-
@@ -2243,7 +2243,7 @@ class InvestigationService:
             out.append("## Investigation memory")
             out.append(mem_clean + "\n")
 
-        # v0.19.19: closing wrapper.
+        # closing wrapper.
         out.append("</input_data>")
 
         if dropped_total > 0:
@@ -2297,7 +2297,7 @@ class InvestigationService:
             "system_prompt": system_prompt,
             "context_type": "security",
             "user_id": 0,
-            # v0.10.11: deterministic-ish sampling. Same alert+seed in =
+            # deterministic-ish sampling. Same alert+seed in =
             # roughly the same verdict out (small variance). Earlier this
             # was temperature=0.0 + top_p=0.1 + top_k=1 + response_format=
             # "json" — that combo over-constrained the decoder, causing
@@ -2306,7 +2306,7 @@ class InvestigationService:
             # bug report). Relaxed to 0.2 / 0.9 / 40, with `seed` still
             # supplied per call below for cross-run reproducibility.
             "temperature": 0.2,
-            # v0.19.3: 2048 -> 4096. With memory context now actually
+            # 2048 -> 4096. With memory context now actually
             # populated (v0.18.1 fixed the silent NameError that had been
             # zeroing it out), the prompt is bigger and 7-8B models were
             # running out of generation budget mid-JSON, leaving the parser
@@ -2656,7 +2656,7 @@ class InvestigationService:
                 except Exception as exc:
                     logger.debug("resolve_template_for_alert failed: %s", exc)
                     template = None
-                # v0.37.0: surface MITRE tags + TI enrichment to render's RAG
+                # surface MITRE tags + TI enrichment to render's RAG
                 # query vector (similar-case / KB lookup embeds this alert).
                 # Merge into a copy so the original `alert` stays clean for the
                 # downstream alert_summary build and PII tokenisation.
@@ -3058,7 +3058,7 @@ class InvestigationService:
                 tpl = svc.resolve_template_for_alert(rep_alert)
                 if tpl is not None:
                     prompt_template_id = tpl.id
-                # v0.37.0: surface the cluster's union MITRE tags + enrichment
+                # surface the cluster's union MITRE tags + enrichment
                 # to render's RAG query vector (merged copy; rep_alert stays
                 # clean for memory/summary use elsewhere in this path).
                 _rag_alert = {**rep_alert, "mitre_tags": mitre_tags, "enrichment": enrichment}
@@ -3075,7 +3075,7 @@ class InvestigationService:
                 system_prompt = ""
 
         # Build cluster prompt
-        # v0.19.19: cluster path also wrapped in <input_data> + every
+        # cluster path also wrapped in <input_data> + every
         # value passed through _sanitize_alert_value. dropped_total is
         # surfaced in a WARNING after assembly so operators can spot
         # alerts containing injection-prone content.
@@ -3120,7 +3120,7 @@ class InvestigationService:
             for d in _decoded_cmds[:20]:
                 brief_lines.append(f"- {_safe_cluster(d)}")
 
-        # v0.79.1: KEV membership across the whole cluster, resolved in code.
+        # KEV membership across the whole cluster, resolved in code.
         # Built from the same per-alert blobs the decode uses, so a CVE named
         # anywhere in the case is checked once.
         _cluster_blob = "\n".join(_alert_to_text_blob(a) for a in alerts)
@@ -3129,7 +3129,7 @@ class InvestigationService:
             brief_lines.append("")
             brief_lines.extend(_kev_block)
 
-        # v0.19.12: was emitting json.dumps(extracted_iocs) and
+        # was emitting json.dumps(extracted_iocs) and
         # json.dumps(enrichment summary), which qwen2.5:7b mirrored back
         # under format="json" instead of producing the analyst envelope.
         # Render as labeled markdown so there's no JSON shape to mimic.
@@ -3293,7 +3293,7 @@ class InvestigationService:
             "paused": False,
         }
 
-        # v0.23.1: respect the pause flag set by the queue-control UI.
+        # respect the pause flag set by the queue-control UI.
         # Checked once per sweep iteration — cheap (single indexed query
         # at the default 60s interval, ~once/minute), and the analyst
         # gains the ability to halt new investigations without restarting

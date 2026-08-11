@@ -384,7 +384,7 @@ async def arkime_preview(
             f"No community_id on this alert — searched Arkime by IP "
             f"({search_ip}) instead. Results may include unrelated sessions."
         )
-        # v0.10.13: anchor the Arkime search window on the alert timestamp,
+        # anchor the Arkime search window on the alert timestamp,
         # not on "now". Non-24/7 SOCs investigate alerts hours after they
         # fire; a now-anchored window would miss the traffic. Falls through
         # to a now-anchored window inside the service if no timestamp.

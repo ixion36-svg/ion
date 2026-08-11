@@ -120,7 +120,7 @@ def _collect_alerts(session: Session) -> Dict[str, Any]:
         ) or 0)
         histogram_24h.append({"hour": bucket_start.isoformat(), "count": count})
 
-    # v0.39.6: prior 24h (24–48h ago) so the wall can show a momentum delta.
+    # prior 24h (24–48h ago) so the wall can show a momentum delta.
     cutoff_48h = datetime.utcnow() - timedelta(hours=48)
     prev_24h_total = int(session.scalar(
         select(func.count()).select_from(AlertTriage)
@@ -167,7 +167,7 @@ def _collect_cases(session: Session) -> Dict[str, Any]:
     closures_24h = {str(k): int(v) for k, v in rows if k}
     closures_24h_total = sum(closures_24h.values())
 
-    # v0.39.6: open critical/high counts drive the wall's attention state, and
+    # open critical/high counts drive the wall's attention state, and
     # the prior-24h closure count gives a momentum delta. Severity keys are
     # lowercase strings; tolerate title-case defensively.
     def _sev(name: str) -> int:
@@ -222,7 +222,7 @@ def _collect_bob(session: Session) -> Dict[str, Any]:
         select(func.count()).select_from(Investigation)
     ) or 0)
 
-    # v0.39.6: prior 24h for a momentum delta on the wall.
+    # prior 24h for a momentum delta on the wall.
     cutoff_48h = datetime.utcnow() - timedelta(hours=48)
     investigations_prev_24h = int(session.scalar(
         select(func.count()).select_from(Investigation)
@@ -489,12 +489,12 @@ _LEAKAGE_LINE_PATTERNS = [
         re.IGNORECASE,
     ),
     re.compile(r"^\s*(?:```|~~~)"),  # code fences
-    # v0.39.6: echoed <placeholder> templates from the OUTPUT shape.
+    # echoed <placeholder> templates from the OUTPUT shape.
     re.compile(
         r"<[^>\n]*?(?:sentence|bullet|trend|observation|plain[\s-]?english|actionable)[^>\n]*?>",
         re.IGNORECASE,
     ),
-    # v0.39.6: echoed RULES text.
+    # echoed RULES text.
     re.compile(
         r"\b(?:under \d+ words|words total|no preamble|nothing (?:before|after)|"
         r"exactly this shape|do not (?:write|say|repeat|address|reference|use)|"
@@ -541,7 +541,7 @@ def _sanitize_landscape_text(text: str) -> str:
     for line in text.split("\n"):
         if any(p.search(line) for p in _LEAKAGE_LINE_PATTERNS):
             continue
-        # v0.39.6: drop duplicate lines (case/space/punct-insensitive) — the
+        # drop duplicate lines (case/space/punct-insensitive) — the
         # model sometimes repeats a bullet or sentence verbatim.
         norm = re.sub(r"[^a-z0-9]+", " ", line.lower()).strip()
         if norm and norm in seen_lines:
@@ -554,7 +554,7 @@ def _sanitize_landscape_text(text: str) -> str:
     # Collapse triple+ blank lines.
     out = re.sub(r"\n{3,}", "\n\n", out).strip()
 
-    # v0.39.6: sentence-level dedup (intra-line repetition) + a tighter word-cap
+    # sentence-level dedup (intra-line repetition) + a tighter word-cap
     # so the wall blurb stays genuinely glanceable.
     out = _dedup_sentences(out)
     words = out.split()
@@ -612,7 +612,7 @@ def _generate_landscape_text(prompt: str, *, timeout: Optional[float] = None) ->
                     "prompt": prompt,
                     "stream": False,
                     "options": {
-                        # v0.39.6: tighten the wall summary.
+                        # tighten the wall summary.
                         # - lower temp + top_p → less drift/rambling.
                         # - repeat_penalty/repeat_last_n → stop the model looping
                         #   the same sentence or bullet (the "repeats itself" bug).
@@ -646,7 +646,7 @@ def _collect_threat_landscape(session: Session) -> Dict[str, Any]:
     stats = _gather_threat_stats(session)
     prompt = _build_threat_summary_prompt(stats)
     text = _generate_landscape_text(prompt)
-    # v0.19.21: scrub instruction leakage and markdown emphasis before
+    # scrub instruction leakage and markdown emphasis before
     # the wallboard renders. If the model returned nothing but leakage,
     # the sanitiser collapses to "" and we degrade to summary_kind=stats.
     if text:
@@ -758,7 +758,7 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-# v0.39.6: unattended-wall attention thresholds. Env-overridable so an estate
+# unattended-wall attention thresholds. Env-overridable so an estate
 # can tune what flips the wall amber. Critical is event-driven (any open
 # critical case), not threshold-driven.
 def _warn_backlog_threshold() -> int:

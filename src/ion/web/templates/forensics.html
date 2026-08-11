@@ -260,7 +260,7 @@
             <div class="_ion-s-c8be1ccba6" id="cd-tab-report">
                 <div class="_ion-s-22e6642774" id="cd-report-content"></div>
             </div>
-            <!-- v0.22.0 Annotations Tab — separate from ForensicTimelineEntry items (spec 4.7) -->
+            <!-- Annotations Tab — separate from ForensicTimelineEntry items (spec 4.7) -->
             <div class="_ion-s-c8be1ccba6" id="cd-tab-annotations">
                 <div class="_ion-s-e4ad4a163b" id="forensic-annotations-body">
                     <div class="_ion-s-4d90051488">Loading annotations...</div>
@@ -1582,7 +1582,7 @@ function addPlaybookStepRow(data){
     div.appendChild(row);
 }
 function renumberSteps(){document.querySelectorAll('#pb-steps-list .pb-step-num').forEach((el,i)=>el.textContent=i+1)}
-// v0.31.19: data-click-action wrapper for the playbook-step delete button
+// data-click-action wrapper for the playbook-step delete button
 // (replaces inline onclick="this.parentElement.remove();renumberSteps();").
 window.removeStepAndRenumber = function(event) {
     var btn = event.target.closest('button');
@@ -1622,7 +1622,7 @@ function simpleMarkdown(md){
 
 init();
 
-// v0.22.0 ForensicCase Timeline Annotations
+// ForensicCase Timeline Annotations
 // Separate section — does NOT interleave with ForensicTimelineEntry items (spec 4.7)
 
 var _forensicAnnCaseId = null;

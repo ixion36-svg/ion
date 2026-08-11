@@ -61,7 +61,7 @@ _last_run_lock = threading.Lock()
 _last_run_at: Optional[datetime] = None
 _last_result: Optional[Dict[str, Any]] = None
 
-# Chunking parameters — mirrors the KB corpus (v0.51.0). _CHUNK_SCHEME is
+# Chunking parameters — mirrors the KB corpus. _CHUNK_SCHEME is
 # folded into the staleness hash; bump it (t2, …) if these change so the
 # corpus re-chunks exactly once.
 _CHUNK_TARGET_CHARS = 1600

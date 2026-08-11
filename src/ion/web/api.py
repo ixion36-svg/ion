@@ -53,7 +53,7 @@ from ion.services.observable_extractor import extract_observables_from_raw
 
 _rate_limit_enabled = _os.environ.get("ION_RATE_LIMIT_ENABLED", "true").lower() not in ("false", "0", "no")
 
-# v0.20.0: kill switch for the multi-alert pattern detector's auto-start
+# kill switch for the multi-alert pattern detector's auto-start
 # branch in /alerts/host-patterns. Defaults to OFF — analysts asked for
 # explicit "Start Playbook" clicks instead of surprise executions
 # appearing on the case timeline. Flip ION_AUTO_PLAYBOOK_ENABLED=true
@@ -711,7 +711,7 @@ async def oidc_callback(
 
         validator = OIDCValidator(oidc_config)
         token_data = await validator.validate_token_async(tokens["access_token"])
-        # v0.19.17: scrubbed email out of the INFO message — every login
+        # scrubbed email out of the INFO message — every login
         # was emitting the user's email to the log index, which under ECS
         # log shipping ends up in long-term storage. Username alone is
         # enough for trace correlation; email is logged at DEBUG only.
@@ -1698,7 +1698,7 @@ async def render_template(
         if render_request.content_override and document:
             document.content = render_request.content_override
             content = render_request.content_override
-        # v0.79.0: rendering a template is a create path too — stamp the author
+        # rendering a template is a create path too — stamp the author
         # so the person who produced the document can remove it again.
         if document:
             document.created_by_id = current_user.id
@@ -1802,7 +1802,7 @@ async def batch_render_template(
             validate=batch_request.validate_data,
             stop_on_error=batch_request.stop_on_error,
         )
-        # v0.79.0: a batch is still authored work — stamp every document it
+        # a batch is still authored work — stamp every document it
         # saved, or the person who ran it could not delete any of them.
         from ion.models.document import Document
 
@@ -1912,7 +1912,7 @@ async def upload_document(
         rendered_content=text_content,
         output_format=output_format,
     )
-    # v0.79.0: stamp the author. This is what later lets them delete it again
+    # stamp the author. This is what later lets them delete it again
     # without holding document:delete.
     document.created_by_id = current_user.id
 
@@ -2037,7 +2037,7 @@ async def get_document(document_id: int, services: Services = Depends(get_servic
         "tags": [t.name for t in document.tags] if document.tags else [],
         "created_at": document.created_at.isoformat() if document.created_at else None,
         "updated_at": document.updated_at.isoformat() if document.updated_at else None,
-        # v0.79.0: the list endpoint returns these two, the detail endpoint did
+        # the list endpoint returns these two, the detail endpoint did
         # not — so anything opening a document directly (the KB deep-link, the
         # rebuilt panel) could not say which folder it was in or who wrote it.
         "collection_id": document.collection_id,
@@ -2781,7 +2781,7 @@ _case_es_logger = logging.getLogger(__name__)
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Case-update background sync helpers (v0.9.81)
+# Case-update background sync helpers
 #
 # Every helper opens its OWN DB session — request-scoped sessions are
 # closed by the time FastAPI schedules these, so they cannot borrow the
@@ -3492,14 +3492,14 @@ async def get_alert_triage(
             "observables": triage.observables,
             "mitre_techniques": triage.mitre_techniques,
             "source_system": triage.source_system,
-            # v0.21.0: Bob confidence scoring + circuit breaker
+            # Bob confidence scoring + circuit breaker
             "suggested_verdict": getattr(triage, "suggested_verdict", None),
             "suggested_verdict_confidence": getattr(triage, "suggested_verdict_confidence", None),
             "suggested_verdict_confidence_int": getattr(triage, "suggested_verdict_confidence_int", None),
             "bob_escalation_badge": getattr(triage, "bob_escalation_badge", None),
         }
 
-        # v0.23.0: emit an alert_view audit event keyed on the triage PK so
+        # emit an alert_view audit event keyed on the triage PK so
         # the adaptive lab grader can back-correlate via lab_session_fixtures
         # (which stores materialised_row_id = AlertTriage.id). Cheap insert;
         # the existing (user_id, action) index covers the grader's lookup.
@@ -3684,7 +3684,7 @@ async def update_alert_triage(
     if data.priority is not None:
         triage.priority = data.priority
     if data.case_id is not None:
-        # v0.24.0: track whether the case link actually changed so the audit
+        # track whether the case link actually changed so the audit
         # row only fires on a real transition (not a no-op re-PATCH).
         _case_id_changed = triage.case_id != data.case_id
         triage.case_id = data.case_id
@@ -5241,7 +5241,7 @@ async def get_host_patterns(
 
         if playbook and pattern.auto_execute and _auto_playbook_enabled:
             # Auto-start: pick the first matched alert as the representative.
-            # v0.20.0: gated on ION_AUTO_PLAYBOOK_ENABLED (default false).
+            # gated on ION_AUTO_PLAYBOOK_ENABLED (default false).
             # When the flag is off the matched playbook is still surfaced in
             # `pattern_data["playbook"]` so the analyst can click Start
             # Playbook themselves — no surprise executions on the timeline.
@@ -5433,7 +5433,7 @@ async def search_analyst_knowledge_base(
 
     # Search documents in those collections.
     #
-    # v0.79.0: this filtered on Document.name ONLY, despite the docstring
+    # this filtered on Document.name ONLY, despite the docstring
     # promising title-or-content — so an analyst searching for a command, a
     # registry key or an event ID found nothing unless it happened to be in a
     # title. Body text is searched too now.

@@ -45,7 +45,7 @@ class SLABreachLog(Base, TimestampMixin):
     exceeded_by_minutes: Mapped[float] = mapped_column(Float, nullable=False)
 
 
-# v0.27.0: ThreatHunt model removed alongside the half-built
+# ThreatHunt model removed alongside the half-built
 # /threat-hunting page + threat_hunt_api. The threat_hunts table is
 # dropped via the migration in storage/database.py. Hunt workflow
 # now lives in /discover (queries) + /cases (findings); the parallel

@@ -1357,7 +1357,7 @@ function switchTab(tab) {
 function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
 
 
-// v0.71.0: the v0.31.21 inline-style migration hashed `width:${pct}%` into the
+// the v0.31.21 inline-style migration hashed `width:${pct}%` into the
 // STATIC class ._ion-s-95aea49e0e, leaving a literal `${pct}` in the CSS. That
 // rule is invalid so browsers drop it — every bar on this page has rendered at
 // zero width since. Apply the width from data-pct instead (CSP-safe: no inline

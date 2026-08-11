@@ -442,7 +442,7 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
         if agreement is None:
             abstentions += 1
         else:
-            # v0.69.0: real confusion matrix against the analyst's verdict.
+            # real confusion matrix against the analyst's verdict.
             #
             # This previously did `tp += 1` on agreement and `fp += 1; fn += 1`
             # on disagreement, which made fp == fn ALWAYS — so precision ==

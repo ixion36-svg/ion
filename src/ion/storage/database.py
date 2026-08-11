@@ -254,7 +254,7 @@ def get_engine(db_path: Optional[Path] = None) -> Engine:
                 pool_timeout=5,
                 pool_pre_ping=True,
                 pool_recycle=900,
-                # v0.9.82 safety nets:
+                # safety nets:
                 # - statement_timeout: Postgres server-side kill any query
                 #   that runs longer than 10s. Converts "ION frozen" into
                 #   a clean 500 with a clear error in the log.
@@ -335,7 +335,7 @@ def _run_migrations(engine: Engine) -> None:
     # Use TIMESTAMP for PostgreSQL, DATETIME for SQLite
     dt_type = "TIMESTAMP" if _is_postgres(engine) else "DATETIME"
 
-    # v0.10.4: enable pgvector for case-similarity embeddings. Idempotent.
+    # enable pgvector for case-similarity embeddings. Idempotent.
     # Runs BEFORE the CREATE TABLE sweep so new tables can use VECTOR columns.
     if _is_postgres(engine):
         try:
@@ -350,13 +350,13 @@ def _run_migrations(engine: Engine) -> None:
         # Create the HNSW index on case_embeddings — needs the table to
         # exist, so we defer to after create_all (see _finalize_migrations).
 
-    # v0.9.76: drop the notifications table — feature removed. Safe & idempotent.
+    # drop the notifications table — feature removed. Safe & idempotent.
     if insp.has_table("notifications"):
         with engine.begin() as conn:
             conn.execute(text("DROP TABLE notifications"))
             logger.info("Migrated: dropped notifications table (v0.9.76)")
 
-    # v0.27.0: drop the threat_hunts table — feature removed. The
+    # drop the threat_hunts table — feature removed. The
     # half-built /threat-hunting page never integrated with /discover
     # (where hunt queries actually run) or /cases (where findings get
     # recorded). Workflow now lives in those existing surfaces.
@@ -365,7 +365,7 @@ def _run_migrations(engine: Engine) -> None:
             conn.execute(text("DROP TABLE threat_hunts"))
             logger.info("Migrated: dropped threat_hunts table (v0.27.0)")
 
-    # v0.51.0: KB RAG moved from whole-document vectors to chunk-level
+    # KB RAG moved from whole-document vectors to chunk-level
     # (kb_chunk_embeddings — created by create_all). The retired per-doc
     # table is dropped without preserving data: embeddings are regenerable,
     # and the background loop re-embeds the whole KB into the chunk table
@@ -437,7 +437,7 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON")
                 )
                 logger.info("Migrated: alert_triage.mitre_techniques")
-        # v0.10.3: Bob's suggested verdict hint on triage rows
+        # Bob's suggested verdict hint on triage rows
         if "suggested_verdict" not in existing:
             with engine.begin() as conn:
                 conn.execute(
@@ -450,7 +450,7 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE alert_triage ADD COLUMN suggested_verdict_confidence VARCHAR(20)")
                 )
                 logger.info("Migrated: alert_triage.suggested_verdict_confidence")
-        # v0.19.3: rule_name denormalized for case detail rendering
+        # rule_name denormalized for case detail rendering
         if "rule_name" not in existing:
             with engine.begin() as conn:
                 conn.execute(
@@ -458,7 +458,7 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: alert_triage.rule_name")
 
-    # v0.10.3: users.is_service_account for Bob + other service users
+    # users.is_service_account for Bob + other service users
     if insp.has_table("users"):
         existing = {col["name"] for col in insp.get_columns("users")}
         if "is_service_account" not in existing:
@@ -473,7 +473,7 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: users.is_service_account")
 
-    # v0.49.6: planned_date (CAB date-only field) on an existing
+    # planned_date (CAB date-only field) on an existing
     # change_requests table. create_all only creates missing tables, not
     # missing columns, so pre-v0.49.6 deploys need the ALTER. Nullable DATE,
     # no default — existing rows stay valid.
@@ -482,7 +482,7 @@ def _run_migrations(engine: Engine) -> None:
         if "planned_date" not in existing:
             _add_column_tolerant(engine, "change_requests", "planned_date", "DATE")
 
-    # v0.79.0: documents.created_by_id — ownership, so "delete only what you
+    # documents.created_by_id — ownership, so "delete only what you
     # made" can be expressed at all. create_all() only creates missing TABLES,
     # never missing columns, so an existing deploy needs the explicit ALTER.
     # Nullable on purpose: documents that predate this column have no known
@@ -492,7 +492,7 @@ def _run_migrations(engine: Engine) -> None:
         if "created_by_id" not in existing:
             _add_column_tolerant(engine, "documents", "created_by_id", "INTEGER")
 
-    # v0.72.0 (route audit phase 8): DetectionProposal absorbs the retired
+    # (route audit phase 8): DetectionProposal absorbs the retired
     # TuningProposal pipeline. Bob wrote tuning proposals unattended off a
     # false-positive verdict, but DetectionProposal had nowhere to put the
     # per-alert provenance, so these columns are added and the legacy rows are
@@ -571,7 +571,7 @@ def _run_migrations(engine: Engine) -> None:
             except Exception as exc:  # never block startup on a backfill
                 logger.warning("Legacy tuning-proposal backfill skipped: %s", exc)
 
-    # v0.31.17: G5 (data-min audit closure) — session_token hash-at-rest.
+    # G5 (data-min audit closure) — session_token hash-at-rest.
     # If the user_sessions table still carries the plaintext session_token
     # column, migrate it: add session_token_hash, backfill SHA-256 digests
     # from the plaintext rows, add a UNIQUE index on the hash, ENFORCE
@@ -582,7 +582,7 @@ def _run_migrations(engine: Engine) -> None:
     # deterministic — their cookie value still maps to the same row, just
     # via the new column.
     #
-    # v0.31.23 hardening (from code review): make the migration
+    # hardening (from code review): make the migration
     # multi-worker-safe (IF NOT EXISTS on Postgres; tolerate duplicate-
     # column OperationalError on SQLite — caller pattern is "every worker
     # runs this on startup", so two workers may race the ADD COLUMN) AND
@@ -640,7 +640,7 @@ def _run_migrations(engine: Engine) -> None:
                             "ON user_sessions(session_token_hash)"
                         )
                     )
-                    # Step 4 (v0.31.23): enforce NOT NULL at the DB level
+                    # Step 4: enforce NOT NULL at the DB level
                     # on Postgres. SQLite has no ALTER COLUMN — the
                     # backfill guarantees no NULLs exist and the ORM
                     # nullable=False covers new inserts from this point
@@ -681,7 +681,7 @@ def _run_migrations(engine: Engine) -> None:
                 else:
                     raise
 
-    # v0.10.3: MITRE columns on alert_prompt_templates
+    # MITRE columns on alert_prompt_templates
     if insp.has_table("alert_prompt_templates"):
         existing = {
             col["name"] for col in insp.get_columns("alert_prompt_templates")
@@ -771,7 +771,7 @@ def _run_migrations(engine: Engine) -> None:
                     )
                     logger.info("Migrated: forensic_cases.%s", col_name)
 
-    # v0.20.1: ForensicCase Workbench tables (pins + tamper-evident ledger).
+    # ForensicCase Workbench tables (pins + tamper-evident ledger).
     # Base.metadata.create_all() (called in init_db) creates these tables on
     # fresh databases with correct per-dialect DDL. The blocks below add
     # idempotent indexes for upgrade scenarios where the tables are newly
@@ -851,7 +851,7 @@ def _run_migrations(engine: Engine) -> None:
                     text("ALTER TABLE users ADD COLUMN elastic_uid VARCHAR(255)")
                 )
                 logger.info("Migrated: users.elastic_uid")
-        # v0.9.28: elastic_username and keycloak_sub for identity mapping
+        # elastic_username and keycloak_sub for identity mapping
         if "elastic_username" not in existing:
             with engine.begin() as conn:
                 conn.execute(
@@ -930,13 +930,13 @@ def _run_migrations(engine: Engine) -> None:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN data_namespace VARCHAR(128)"))
                 logger.info("Migrated: cyab_data_sources.data_namespace")
-        # v0.12.0: Onboarding Studio sub-profile tag.
+        # Onboarding Studio sub-profile tag.
         if "subprofile_id" not in existing:
             with engine.begin() as conn:
                 conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN subprofile_id VARCHAR(64)"))
                 logger.info("Migrated: cyab_data_sources.subprofile_id")
 
-    # v0.12.0: Onboarding Pack containment_authority field on cyab_systems.
+    # Onboarding Pack containment_authority field on cyab_systems.
     if insp.has_table("cyab_systems"):
         existing = {col["name"] for col in insp.get_columns("cyab_systems")}
         if "containment_authority" not in existing:
@@ -960,11 +960,11 @@ def _run_migrations(engine: Engine) -> None:
         ("ix_alert_triage_case_id", "alert_triage", "case_id"),
         ("ix_alert_triage_assigned", "alert_triage", "assigned_to_id"),
         ("ix_alert_triage_status_created", "alert_triage", "status, created_at"),
-        # v0.49.3: the v0.47 detection-health dedup GROUP BY declared this on
+        # the v0.47 detection-health dedup GROUP BY declared this on
         # the model only — create_all skips pre-existing tables, so upgraded
         # deployments never got it and full-scanned the dashboard query.
         ("ix_ai_feedback_alert_template", "ai_feedback", "alert_id, alert_prompt_template_id"),
-        # v0.49.3 audit: is_ignored is filtered on every case-detail GET and
+        # audit: is_ignored is filtered on every case-detail GET and
         # investigation merge (analyst-suppression lookups).
         ("ix_observables_is_ignored", "observables", "is_ignored"),
     ]
@@ -976,28 +976,12 @@ def _run_migrations(engine: Engine) -> None:
                 except Exception:
                     pass  # Index might already exist under a different name
 
-    # v0.79.4: the lab-fixture lookup in `_fixture_alert_dicts`
-    # (web/elasticsearch_api.py) runs on EVERY return path of the alerts-list
-    # endpoint — the hottest read in ION. It filters `es_alert_id LIKE
-    # 'lab-fixture-%'`, and a prefix LIKE CANNOT use the plain btree on
-    # es_alert_id under a non-C collation (en_US.utf8 here); that needs
-    # text_pattern_ops. So it planned as a Seq Scan over a table that grows one
-    # row per triaged alert, forever.
-    #
-    # Measured at 200k rows: Parallel Seq Scan 73.1 ms -> Index Scan 0.197 ms.
-    # Production APM on v0.78.0 attributed ~50% of response time to repeated
-    # alert_triage selects (6 executions, 807 ms) — ~135 ms each, the right
-    # order for this scan at a few hundred thousand rows.
-    #
-    # A partial index rather than text_pattern_ops: it holds ONLY the handful of
-    # fixture rows, so it is 16 kB against 7 MB and costs almost nothing on
-    # write. Postgres proves the query predicate implies the index predicate
-    # because the LIKE expression is IDENTICAL.
-    #
-    # !! That identity is load-bearing. Change the prefix string in either place
-    # !! and the planner silently reverts to the Seq Scan — no error, no test
-    # !! failure, just the slowness back. tests/test_v079_4_lab_fixture_index.py
-    # !! asserts the plan to catch exactly that.
+    # the lab-fixture lookup runs on every alerts-list request and its
+    # prefix LIKE cannot use the plain btree under a non-C collation, so it
+    # planned as a Seq Scan (73 ms at 200k rows -> 0.2 ms with this index).
+    # Partial rather than text_pattern_ops: 16 kB vs 7 MB, and negligible on
+    # write. The WHERE clause must stay identical to the query in
+    # web/elasticsearch_api.py or the planner silently stops using it.
     if insp.has_table("alert_triage"):
         try:
             with engine.begin() as conn:
@@ -1012,7 +996,7 @@ def _run_migrations(engine: Engine) -> None:
                 "will Seq Scan): %s", type(exc).__name__,
             )
 
-    # v0.49.3 audit: at most ONE doc-analysis job may be status='running' —
+    # audit: at most ONE doc-analysis job may be status='running' —
     # the single-job guard is enforced by this partial UNIQUE index (valid on
     # both Postgres and SQLite >= 3.8), not by check-then-insert. Tolerant:
     # creation fails only if a deployment currently has 2+ running rows (the
@@ -1069,7 +1053,7 @@ def _run_migrations(engine: Engine) -> None:
                 ))
                 logger.info("Migrated: ix_alert_triage_source_system")
 
-    # AI chat messages: index session_id for count+cleanup queries (v0.9.64)
+    # AI chat messages: index session_id for count+cleanup queries
     if insp.has_table("ai_chat_messages"):
         existing_idx = {idx["name"] for idx in insp.get_indexes("ai_chat_messages")}
         if "ix_ai_chat_messages_session_id" not in existing_idx:
@@ -1080,7 +1064,7 @@ def _run_migrations(engine: Engine) -> None:
                 ))
                 logger.info("Migrated: ix_ai_chat_messages_session_id")
 
-    # AI chat sessions: composite (user_id, updated_at) for list+order (v0.9.64)
+    # AI chat sessions: composite (user_id, updated_at) for list+order
     if insp.has_table("ai_chat_sessions"):
         existing_idx = {idx["name"] for idx in insp.get_indexes("ai_chat_sessions")}
         if "ix_ai_chat_sessions_user_updated" not in existing_idx:
@@ -1091,7 +1075,7 @@ def _run_migrations(engine: Engine) -> None:
                 ))
                 logger.info("Migrated: ix_ai_chat_sessions_user_updated")
 
-    # Notifications: composite (user_id, created_at) for list+order (v0.9.64)
+    # Notifications: composite (user_id, created_at) for list+order
     if insp.has_table("notifications"):
         existing_idx = {idx["name"] for idx in insp.get_indexes("notifications")}
         if "ix_notifications_user_created" not in existing_idx:
@@ -1112,7 +1096,7 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: post_incident_reviews.linked_controls")
 
-    # v0.10.19: Observable gains TheHive-style IOC handling — TLP/PAP
+    # Observable gains TheHive-style IOC handling — TLP/PAP
     # classification, is_ioc flag, and ignore_similarity escape hatch for
     # high-noise values (8.8.8.8, internal DNS resolvers). All defaults
     # match the model so existing rows stay valid after migration.
@@ -1129,10 +1113,10 @@ def _run_migrations(engine: Engine) -> None:
         }
         for col_name, col_def in new_cols.items():
             if col_name not in existing:
-                # v0.49.3: race-tolerant — every worker runs this on boot.
+                # race-tolerant — every worker runs this on boot.
                 _add_column_tolerant(engine, "observables", col_name, col_def)
 
-    # v0.10.17: CyAB system gains onboarding metadata (contacts + business
+    # CyAB system gains onboarding metadata (contacts + business
     # context). All nullable; pre-v0.10.17 rows stay valid. Idempotent —
     # checks for column existence before each ALTER.
     if insp.has_table("cyab_systems"):
@@ -1157,7 +1141,7 @@ def _run_migrations(engine: Engine) -> None:
                     )
                     logger.info("Migrated: cyab_systems.%s", col_name)
 
-    # v0.10.11: Investigation gains prompt snapshot + raw response + key
+    # Investigation gains prompt snapshot + raw response + key
     # observations so AIFeedback rows are debuggable (see what Bob saw, not
     # just whether he was right). Idempotent — checks for column existence
     # before attempting the ALTER. Nullable — pre-v0.10.11 rows stay NULL.
@@ -1176,7 +1160,7 @@ def _run_migrations(engine: Engine) -> None:
                     )
                     logger.info("Migrated: investigations.%s", col_name)
 
-    # v0.21.0: lab_fixtures + lab_session_fixtures for replayable labs.
+    # lab_fixtures + lab_session_fixtures for replayable labs.
     # lab_fixtures holds the template rows (what to seed for a lesson).
     # lab_session_fixtures tracks which rows were materialised per-enrolment
     # so teardown only removes the session's own data.
@@ -1199,7 +1183,7 @@ def _run_migrations(engine: Engine) -> None:
             logger.info("Migrated: CREATE TABLE lab_fixtures")
 
     if not insp.has_table("lab_session_fixtures"):
-        # v0.23.0: session_id ships in the initial CREATE on fresh deploys.
+        # session_id ships in the initial CREATE on fresh deploys.
         # The ALTER block below remains the upgrade path for v0.21/v0.22
         # databases that already have the table without the column.
         with engine.begin() as conn:
@@ -1230,11 +1214,11 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info("Migrated: CREATE TABLE lab_session_fixtures")
 
-    # v0.21.0: Bob confidence scoring + circuit breakers.
+    # Bob confidence scoring + circuit breakers.
     # Adds numeric confidence columns and circuit-breaker fields.
     if insp.has_table("investigations"):
         existing = {col["name"] for col in insp.get_columns("investigations")}
-        # v0.64.0: escalation_attempted needs a NOT NULL DEFAULT 0 (dialect-aware).
+        # escalation_attempted needs a NOT NULL DEFAULT 0 (dialect-aware).
         _bool_default = "FALSE" if _is_postgres(engine) else "0"
         for col_name, col_type in {
             "confidence_int": "INTEGER",
@@ -1279,7 +1263,7 @@ def _run_migrations(engine: Engine) -> None:
                     )
                 )
                 logger.info("Migrated: ai_feedback.auto_escalated")
-        # v0.64.0: escalation deep-pass telemetry.
+        # escalation deep-pass telemetry.
         if "escalation_attempted" not in existing:
             with engine.begin() as conn:
                 conn.execute(
@@ -1300,7 +1284,7 @@ def _run_migrations(engine: Engine) -> None:
                 )
                 logger.info("Migrated: alert_prompt_templates.confidence_threshold_override")
 
-    # v0.21.0: Bob Prompt Evaluation Harness — eval run + sample tables.
+    # Bob Prompt Evaluation Harness — eval run + sample tables.
     # Base.metadata.create_all creates these on fresh deployments. The blocks
     # below add them idempotently on upgrades and ensure indexes exist.
     if not insp.has_table("bob_eval_runs"):
@@ -1365,7 +1349,7 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info("Migrated: CREATE TABLE bob_eval_run_samples")
 
-    # v0.21.0 Fix 2: add skipped_count to bob_eval_runs for missing-alert tracking.
+    # Fix 2: add skipped_count to bob_eval_runs for missing-alert tracking.
     if insp.has_table("bob_eval_runs"):
         existing = {col["name"] for col in insp.get_columns("bob_eval_runs")}
         if "skipped_count" not in existing:
@@ -1376,7 +1360,7 @@ def _run_migrations(engine: Engine) -> None:
                 logger.info("Migrated: bob_eval_runs.skipped_count")
 
 
-    # v0.22.0 Feature B: alert_case_annotations -- timestamped timeline annotations.
+    # Feature B: alert_case_annotations -- timestamped timeline annotations.
     # Base.metadata.create_all() handles fresh deploys; this block upgrades
     # existing databases idempotently.
     if not insp.has_table('alert_case_annotations'):
@@ -1408,7 +1392,7 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info('Migrated: CREATE TABLE alert_case_annotations')
 
-    # v0.22.0 Feature B: forensic_case_annotations -- mirror for ForensicCase.
+    # Feature B: forensic_case_annotations -- mirror for ForensicCase.
     if not insp.has_table('forensic_case_annotations'):
         dt = 'TIMESTAMP' if _is_postgres(engine) else 'DATETIME'
         pk_def = 'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'
@@ -1438,7 +1422,7 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info('Migrated: CREATE TABLE forensic_case_annotations')
 
-    # v0.23.0: adaptive lab grading — promote the implicit lab session state
+    # adaptive lab grading — promote the implicit lab session state
     # (via lab_session_fixtures.torn_down_at) to a first-class lab_sessions
     # parent row carrying score + attempt metadata, add per-lesson rubric
     # table, and a criterion-result audit-trail table.
@@ -1520,7 +1504,7 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info("Migrated: CREATE TABLE lab_criterion_results")
 
-    # v0.23.1: system_runtime_flags — small key/value bag for runtime
+    # system_runtime_flags — small key/value bag for runtime
     # toggles that must be visible across all workers (e.g. the leader
     # worker that owns the investigation sweep loop AND the request-
     # handling worker that toggles a pause flag from the UI). In-process
@@ -1538,7 +1522,7 @@ def _run_migrations(engine: Engine) -> None:
             """))
             logger.info("Migrated: CREATE TABLE system_runtime_flags")
 
-    # v0.23.0: link existing lab_session_fixtures rows to their parent session.
+    # link existing lab_session_fixtures rows to their parent session.
     # NULL is permitted for legacy rows persisted before this version.
     if insp.has_table("lab_session_fixtures"):
         existing = {col["name"] for col in insp.get_columns("lab_session_fixtures")}
@@ -1612,7 +1596,7 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
 
     engine = get_engine(db_path)
 
-    # v0.10.8 FIX: enable pgvector BEFORE create_all. Several models carry
+    # FIX: enable pgvector BEFORE create_all. Several models carry
     # VECTOR columns (case_embeddings, kb_document_embeddings) that cannot
     # be created on a fresh database unless the `vector` type exists.
     # _run_migrations also runs CREATE EXTENSION, but that happens AFTER
@@ -1631,27 +1615,27 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
     def _create_schema() -> None:
         Base.metadata.create_all(engine)
         _run_migrations(engine)
-        # v0.10.4: HNSW index on case_embeddings.embedding needs the table to
+        # HNSW index on case_embeddings.embedding needs the table to
         # exist first — runs after create_all and the column migrations.
         try:
             from ion.models.case_embedding import ensure_hnsw_index
             ensure_hnsw_index(engine)
         except Exception as exc:  # pragma: no cover
             logger.debug("HNSW index creation skipped: %s", exc)
-        # v0.10.6: HNSW index on the KB embedding table (v0.51.0: now the
+        # HNSW index on the KB embedding table (v0.51.0: now the
         # chunk-level kb_chunk_embeddings — same helper name).
         try:
             from ion.models.kb_document_embedding import ensure_kb_hnsw_index
             ensure_kb_hnsw_index(engine)
         except Exception as exc:  # pragma: no cover
             logger.debug("KB HNSW index creation skipped: %s", exc)
-        # v0.51.0: HNSW index on playbook_embeddings.embedding.
+        # HNSW index on playbook_embeddings.embedding.
         try:
             from ion.models.playbook_embedding import ensure_playbook_hnsw_index
             ensure_playbook_hnsw_index(engine)
         except Exception as exc:  # pragma: no cover
             logger.debug("Playbook HNSW index creation skipped: %s", exc)
-        # v0.53.0: HNSW index on ti_report_chunk_embeddings.embedding.
+        # HNSW index on ti_report_chunk_embeddings.embedding.
         try:
             from ion.models.ti_report import ensure_ti_report_hnsw_index
             ensure_ti_report_hnsw_index(engine)
@@ -1659,7 +1643,7 @@ def init_db(db_path: Optional[Path] = None) -> Engine:
             logger.debug("TI-report HNSW index creation skipped: %s", exc)
 
     if _is_postgres(engine):
-        # v0.49.3: serialize schema init across the N uvicorn workers with a
+        # serialize schema init across the N uvicorn workers with a
         # BLOCKING advisory lock. create_all's inspect-then-create races when
         # several workers boot against the same fresh DB — live-reproduced:
         # 3 of 4 workers crashed on a pg_type UniqueViolation creating the

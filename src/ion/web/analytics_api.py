@@ -333,7 +333,7 @@ async def get_system_overview(
         "total_systems": len(enriched),
         "mapped_systems": mapped_count,
         "avg_tide_coverage": avg_coverage,
-        # v0.71.0 (route audit phase 7): carried over from the retired
+        # (route audit phase 7): carried over from the retired
         # /engineering-analytics page, which rendered an "Index Breakdown" from
         # this same get_system_analytics() payload. It was that page's only
         # unique section, so it moves here rather than being lost.

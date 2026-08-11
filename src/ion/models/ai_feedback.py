@@ -30,7 +30,7 @@ class AIFeedback(Base, TimestampMixin):
         Index("ix_ai_feedback_template", "alert_prompt_template_id"),
         Index("ix_ai_feedback_agreement", "agreement"),
         Index("ix_ai_feedback_created_at", "created_at"),
-        # v0.47.0: supports the detection-health dedup GROUP BY
+        # supports the detection-health dedup GROUP BY
         # (MAX(id) per alert_id, template) over the lookback window.
         Index("ix_ai_feedback_alert_template", "alert_id", "alert_prompt_template_id"),
     )
@@ -63,14 +63,14 @@ class AIFeedback(Base, TimestampMixin):
     # Optional free-text delta reason supplied by the closer
     delta_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # v0.21.0: numeric confidence score (0-100) alongside the legacy string tier
+    # numeric confidence score (0-100) alongside the legacy string tier
     bob_confidence_int: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # True when circuit breaker fired — Bob's confidence was below threshold so
     # no verdict was written to triage; a human must resolve this alert manually.
     auto_escalated: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0"
     )
-    # v0.64.0: True when Bob's confidence-gated escalation "deep pass" ran for
+    # True when Bob's confidence-gated escalation "deep pass" ran for
     # this alert before the verdict/abstention was recorded (Attack Path Phase 4).
     escalation_attempted: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="0"

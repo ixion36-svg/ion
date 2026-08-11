@@ -22,7 +22,7 @@ logger = get_structured_logger(__name__)
 
 # _peer_ip / _is_trusted_proxy / get_client_ip now live in ion.core.client_ip
 # (imported above) — a single trusted-proxy-aware source of truth shared with
-# the auth layer, audit logging, and the login rate-limiter (v0.39.3).
+# the auth layer, audit logging, and the login rate-limiter.
 
 
 class SecurityMonitoringMiddleware(BaseHTTPMiddleware):

@@ -286,7 +286,7 @@ async def get_job(
 
 
 # ---------------------------------------------------------------------------
-# Queue control (v0.23.1) — pause/resume + cancel-pending + per-row cancel
+# Queue control — pause/resume + cancel-pending + per-row cancel
 # ---------------------------------------------------------------------------
 
 

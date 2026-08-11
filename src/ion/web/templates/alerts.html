@@ -55,7 +55,7 @@
   <div id="alert-stats-bar" class="flex flex-wrap gap-x-8 gap-y-4 px-5 py-4 rounded-[12px] border border-white/5 bg-ink-900/50 mb-6 rise d-3">
     <div class="flex flex-col gap-1 min-w-[70px]">
       <span class="label-tiny text-slate-500 flex items-center gap-1.5">Total
-        {# v0.79.0: these counts follow the active filter, so the bar has to
+        {# these counts follow the active filter, so the bar has to
            say when it is showing a subset — otherwise a filtered total is
            indistinguishable from the estate total. #}
         <span id="stats-filtered-badge"
@@ -268,7 +268,7 @@
         <option value="info">Info</option>
     </select>
     <select id="alert-status-filter" data-change-action="handleStatusFilterChange">
-        <!-- v0.31.0: "Open Only" is the page-load default per user
+        <!-- "Open Only" is the page-load default per user
              direction. The Active (Open + Ack) option remains
              selectable, but new analyst eyes land on Open. -->
         <option value="open" selected>Open Only</option>
@@ -547,7 +547,7 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- v0.16.1: topojson decoder for the rotating globe's country outlines -->
+<!-- topojson decoder for the rotating globe's country outlines -->
 <script nonce="{{ csp_nonce }}" src="/static/js/topojson-client.min.js"></script>
 <style nonce="{{ csp_nonce }}">
 /* Full-width override for alerts page */
@@ -3362,7 +3362,7 @@ kbd {
 // State
 // =========================================================================
 
-// v0.31.6: small delegated-action helpers for patterns the generic
+// small delegated-action helpers for patterns the generic
 // event-delegation.js can't express directly. Exposed as window.* so
 // the delegation dispatcher (which looks functions up by name) finds them.
 window.__tagChipRemove = function(event, dataset) {
@@ -3397,7 +3397,7 @@ window.__switchDetailTabBySelector = function(event, dataset) {
 
 let allAlerts = [];
 let filteredAlerts = [];
-// v0.79.0: the same set as filteredAlerts but WITHOUT the status filter —
+// the same set as filteredAlerts but WITHOUT the status filter —
 // what the Open/Acknowledged/Closed tiles count, so they stay usable as the
 // quick-filter buttons they also are.
 let alertsIgnoringStatus = [];
@@ -3623,7 +3623,7 @@ async function loadAlerts() {
         const data = await response.json();
 
         // Handle graceful error responses (ES not enabled, not configured, or unreachable).
-        // v0.30.0: when the API still returns alerts despite a degraded-ES
+        // when the API still returns alerts despite a degraded-ES
         // message (lab-fixture rows always surface regardless of ES state),
         // render them instead of wiping the table. Only short-circuit to the
         // error banner if there is genuinely nothing to show.
@@ -3814,7 +3814,7 @@ async function loadTriageBatch() {
         updateStatsBar();
         computeAlertAttention();
         // Refresh triage-dependent analytics panels
-        if (document.getElementById('analytics-dashboard').style.display !== 'none') {
+        if (analyticsIsOpen()) {
             renderKeyMetrics();
             renderTriageStatusDonut();
         }
@@ -3972,7 +3972,7 @@ function renderCasesSummary() {
     container.innerHTML = casesData.slice(0, 10).map(c => {
         const statusColor = c.status === 'open' ? '#1976d2' : c.status === 'acknowledged' ? '#f57c00' : '#616161';
         const closureBadge = c.closure_reason ? `<span class="closure-reason-badge reason-${c.closure_reason} _ion-s-6cfc37a0ef">${closureLabels[c.closure_reason] || c.closure_reason}</span>` : '';
-        // v0.31.0: open the slide-out case panel on /alerts so the
+        // open the slide-out case panel on /alerts so the
         // analyst can work the case without leaving the alerts page.
         return `
             <div class="list-item _ion-s-63d058f849" data-click-action="openCasePanel" data-args='[${c.id}]' title="${escapeHtml(c.title)}">
@@ -4204,7 +4204,7 @@ function renderCaseManagementModal(caseData) {
 }
 
 function closeCaseWithAlerts(caseId, closureType) {
-    // v0.31.0: closureType is now a CaseClosureReason enum value directly
+    // closureType is now a CaseClosureReason enum value directly
     // (full 6-reason set), matching /cases tab options. Legacy aliases
     // (`benign` → benign_true_positive, `escalated` → true_positive) kept
     // for backward compatibility with any callers that haven't migrated.
@@ -4280,7 +4280,7 @@ async function confirmCloseCaseWithAlerts(caseId, closureType) {
             }
         } else {
             // No alerts — close case directly via PATCH
-            // v0.31.0: closureType is now a CaseClosureReason value
+            // closureType is now a CaseClosureReason value
             // directly. Legacy aliases stay for callers that haven't
             // migrated yet.
             const closureReasonMap = {
@@ -5294,7 +5294,7 @@ function renderTriageBar(alertId, triage) {
     const analystNotes = triage ? (triage.analyst_notes || '') : '';
     const observables = triage ? (triage.observables || []) : [];
     const mitreTechniques = triage ? (triage.mitre_techniques || []) : [];
-    // v0.21.0: Bob confidence badge + auto-escalated pill
+    // Bob confidence badge + auto-escalated pill
     const bobConfidenceInt = triage ? triage.suggested_verdict_confidence_int : null;
     const bobEscalationBadge = triage ? triage.bob_escalation_badge : null;
     const bobSuggestedVerdict = triage ? triage.suggested_verdict : null;
@@ -5896,7 +5896,7 @@ async function saveMitreTechniques(alertId, techniques) {
         }
 
         // Refresh heatmap if visible
-        if (document.getElementById('analytics-dashboard').style.display !== 'none') {
+        if (analyticsIsOpen()) {
             renderMitreHeatmap();
         }
     } catch (e) {
@@ -6436,7 +6436,7 @@ async function updateTriage(alertId, field, value) {
 }
 
 // =========================================================================
-// Inline Translate (v0.17.0) — translates the alert message in place via
+// Inline Translate — translates the alert message in place via
 // the /api/translator endpoint. Used by the Translate button rendered
 // alongside the alert-message-box.
 // =========================================================================
@@ -6517,7 +6517,7 @@ function renderCommentsTab(alertId, comments) {
         html += '<div class="empty-state">No comments yet</div>';
     } else {
         comments.forEach(c => {
-            // v0.16.0: render comment content as markdown (mirrors cases.html
+            // render comment content as markdown (mirrors cases.html
             // line 2491). Falls back to escaped plain text when marked or
             // DOMPurify isn't loaded for some reason. Both are loaded by
             // base.html so this should always hit the markdown path.
@@ -6532,7 +6532,7 @@ function renderCommentsTab(alertId, comments) {
             } else {
                 rendered = escapeHtml(raw);
             }
-            // v0.17.0: wrap each comment-body so it can be translated in place.
+            // wrap each comment-body so it can be translated in place.
             const cmtId = 'cmt-' + (c.id != null ? c.id : Math.random().toString(36).slice(2,9));
             const safeOriginalRaw = escapeHtml(raw);
             html += `
@@ -6861,7 +6861,7 @@ function applyFilters() {
     // Track whether we loaded with closed alerts
     _lastIncludedClosed = (statusFilter === 'closed' || statusFilter === 'all');
 
-    // v0.79.0: the predicate is split in two so the aggregations can follow the
+    // the predicate is split in two so the aggregations can follow the
     // filter WITHOUT the status tiles cannibalising themselves.
     //
     // The status tiles (Open / Acknowledged / Closed) are also the quick-filter
@@ -7070,7 +7070,7 @@ function renderAlerts() {
     `}).join('');
 }
 
-// v0.79.0: the aggregations follow the filter.
+// the aggregations follow the filter.
 //
 // These deliberately read allAlerts ("so panels always show full picture"),
 // which meant that narrowing the table to one host still showed Top Hosts for
@@ -7261,10 +7261,19 @@ let _adActiveTab = 'overview';
 let _tideMitreCoverage = null;
 let _tideMitreFetched = false;
 
+// The drawer is hidden by a CSS class, so `el.style.display` (the inline
+// style) reads '' and misreports it as visible. That cost two clicks to open
+// and made the render guards fire while collapsed. Always ask the computed
+// style here.
+function analyticsIsOpen() {
+    const dash = document.getElementById('analytics-dashboard');
+    return !!dash && getComputedStyle(dash).display !== 'none';
+}
+
 function toggleAnalytics() {
     const dash = document.getElementById('analytics-dashboard');
     const icon = document.getElementById('analytics-toggle-icon');
-    if (dash.style.display === 'none') {
+    if (!analyticsIsOpen()) {
         dash.style.display = 'block';
         icon.innerHTML = '<i class="icon-chevron-down"></i>';
         renderAnalytics();
@@ -7276,7 +7285,7 @@ function toggleAnalytics() {
 }
 
 function renderAnalytics() {
-    if (document.getElementById('analytics-dashboard').style.display === 'none') return;
+    if (!analyticsIsOpen()) return;
     renderAdKeyMetrics();
     renderTrendChart();
     renderSeverityDonut();
@@ -7807,7 +7816,7 @@ function renderTriageStatusDonut() {
 
 // --- Geo points extraction (cached) ---
 function extractGeoPoints() {
-    // v0.16.1: read from the flattened `a.geo_data` (always populated by
+    // read from the flattened `a.geo_data` (always populated by
     // ElasticsearchAlert.to_dict) first. The list endpoint sends
     // `include_raw=False` to cut payload, so `a.raw_data` is empty for
     // most alerts on this page; the previous code only walked raw_data
@@ -7878,7 +7887,7 @@ function extractGeoPoints() {
 }
 
 // =========================================================================
-// Attack Origin Map — orthographic rotating globe (v0.16.1)
+// Attack Origin Map — orthographic rotating globe
 //
 // Switched from the equirectangular flat map to a pure-canvas globe with
 // auto-rotation. Lat/lon are projected via the orthographic formula
@@ -8286,7 +8295,7 @@ function mapAnimLoop() {
 function startMap() {
     cachedGeoPoints = extractGeoPoints();
     buildMapArcs();
-    // v0.16.1: lazy-load country outlines once; renderMap() will pick them
+    // lazy-load country outlines once; renderMap() will pick them
     // up as soon as they arrive — until then, the globe still renders with
     // sphere + graticule + dots, just no continents.
     ensureCountryOutlines();
@@ -8503,7 +8512,7 @@ function renderHBarChart(containerId, alerts, field, color) {
 // Alert Detail Modal
 // =========================================================================
 async function showAlertDetail(alertId) {
-    // v0.77.0: the body of this function moved to static/js/alert-detail.js so
+    // the body of this function moved to static/js/alert-detail.js so
     // /cases renders an alert exactly the same way. What stays here is the
     // page-specific part: finding the alert in this page's list, showing the
     // modal, and starting the investigation timer.
@@ -8629,7 +8638,7 @@ let _alertParsedKeyFields = [];
 // it once if the Raw Data tab hasn't already pulled it.
 
 // =========================================================================
-// Bob Auto-Investigate (v0.46.0) — agentic multi-source investigation.
+// Bob Auto-Investigate — agentic multi-source investigation.
 // Server gathers a numbered evidence ledger, Bob synthesises a cited verdict,
 // citations are validated server-side. Rendered CSP-safe (escapeHtml only).
 // =========================================================================
@@ -8818,7 +8827,7 @@ function renderTimeline(container, alerts) {
 // Auto-Refresh
 // =========================================================================
 function startAutoRefresh() {
-    // v0.39.9: SSE-backed live updates (one connection) with a 5-min
+    // SSE-backed live updates (one connection) with a 5-min
     // setInterval fallback if SSE is unavailable. autoRefreshTimer now holds
     // the live-updates stop() handle rather than a numeric interval id.
     if (typeof autoRefreshTimer === 'function') autoRefreshTimer();
@@ -9446,7 +9455,7 @@ function showCreateCaseFromSelected() {
     const selectedAlerts = allAlerts.filter(a => selectedAlertIds.has(a.id));
 
     // Auto-populate from multiple alerts.
-    // v0.23.1: multi-alert title now carries the lead alert's rule name so
+    // multi-alert title now carries the lead alert's rule name so
     // the case is recognisable at a glance from the cases list, rather than
     // a generic "N related alerts" placeholder.
     const _leadName = (selectedAlerts[0] && (selectedAlerts[0].rule_name || selectedAlerts[0].title))
@@ -9919,7 +9928,7 @@ function showKeyboardShortcutsHelp() {
 document.addEventListener('DOMContentLoaded', initKeyboardShortcuts);
 
 // =============================================================================
-// v0.31.0: Case Detail Slide-out Panel (alerts page)
+// Case Detail Slide-out Panel (alerts page)
 // =============================================================================
 // Slim version of the /cases panel. Wired from the cases-sidebar items in
 // renderSideList. Status dropdown → closure modal with the full

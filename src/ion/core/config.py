@@ -187,7 +187,7 @@ class Config:
     investigation_loop_enabled: bool = True
     investigation_sweep_interval_s: int = 900
     investigation_max_per_sweep: int = 50
-    # v0.19.9: was 120; the v0.17.3 fix-pack bumped the module default
+    # was 120; the v0.17.3 fix-pack bumped the module default
     # in investigation_service to 300 (real prompts on an 8B model take
     # 130-180s warm — longer cold/CPU) but missed this config-dataclass copy.
     # Resolution order
@@ -345,7 +345,7 @@ class Config:
             ollama_enabled=data.get("ollama_enabled", True),
             ollama_url=data.get("ollama_url", "http://localhost:11434"),
             ollama_model=data.get("ollama_model", "hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF"),
-            # v0.17.3 upgrade migration: silently bump the historical 120s
+            # upgrade migration: silently bump the historical 120s
             # default to 300s so existing deployments pick up the longer
             # investigation timeout without an operator edit. Anyone who
             # explicitly chose 120 (rare — that's just the old default)

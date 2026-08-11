@@ -35,7 +35,7 @@ _ICON = "[network]"
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Verdict → case severity (v0.39.0)
+# Verdict → case severity
 # ──────────────────────────────────────────────────────────────────────────
 #
 # The packet-level analysis produces a deterministic verdict (findings +
@@ -291,7 +291,7 @@ def _render_pcap_markdown(
         parts.append(_top_list(pcap_result.http_requests, "host"))
         parts.append("")
 
-    # v0.39.0 enhanced analyzers — TLS certs, OS fingerprints, RITA beacons
+    # enhanced analyzers — TLS certs, OS fingerprints, RITA beacons
     tls_certs = getattr(pcap_result, "tls_certificates", None) or []
     if tls_certs:
         parts.append("**TLS certificates:**")
@@ -339,7 +339,7 @@ def _render_pcap_markdown(
             parts.append(f"- **{sev}**: {msg}{mitre_str}")
         parts.append("")
 
-    # v0.39.0 — MITRE ATT&CK technique rollup
+    # MITRE ATT&CK technique rollup
     techniques = getattr(pcap_result, "mitre_techniques", None) or []
     if techniques:
         parts.append("**MITRE ATT&CK techniques observed:**")
@@ -690,17 +690,17 @@ async def _runner(
                 )
             md += footer
             _post_case_note(case_id, md)
-            # v0.30.1: also surface PCAP findings as Observable rows linked
+            # also surface PCAP findings as Observable rows linked
             # to the case so they participate in enrichment / watchlist /
             # correlation. Best-effort — never blocks the Note write.
             _link_pcap_observables(case_id, r["pcap_result"])
-            # v0.39.0: let the verdict drive case severity (two-way auto).
+            # let the verdict drive case severity (two-way auto).
             sev = pcap_case_severity(r["pcap_result"])
             if sev and severity_rank(sev) > severity_rank(best_severity):
                 best_severity = sev
                 verdict = getattr(r["pcap_result"], "verdict", None) or {}
                 best_reasons = list(verdict.get("reasons") or [])
-            # v0.39.0: accumulate the MITRE technique union across all flows.
+            # accumulate the MITRE technique union across all flows.
             for t in (getattr(r["pcap_result"], "mitre_techniques", None) or []):
                 if t.get("id"):
                     case_techniques.setdefault(t["id"], {"id": t["id"], "name": t.get("name", "")})
@@ -765,8 +765,8 @@ def enqueue_pcap_analysis_for_case(
             "community_id": cid,
             "node_hint": flow.get("node_hint"),
             "alert_id": flow.get("alert_id"),
-            # v0.39.1: preserve the IP + timestamp fields so _analyze_one's
-            # IP-fallback path (v0.29.1) survives the dedup. Dropping them here
+            # preserve the IP + timestamp fields so _analyze_one's
+            # IP-fallback path survives the dedup. Dropping them here
             # silently disabled the fallback for the auto-case flow — when
             # Arkime's community_id index missed, the analysis found no sessions
             # and posted an empty note.

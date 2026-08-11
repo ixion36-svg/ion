@@ -43,7 +43,7 @@ class DetectionProposalStatus(str, Enum):
     DRAFT = "draft"
     APPLIED = "applied"
     REJECTED = "rejected"
-    # v0.72.0: carried over from the retired TuningProposalStatus so a reviewer
+    # carried over from the retired TuningProposalStatus so a reviewer
     # can still triage a proposal as a duplicate of one already filed.
     DUPLICATE = "duplicate"
 
@@ -112,7 +112,7 @@ class DetectionProposal(Base, TimestampMixin):
     created_by_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("users.id"), nullable=True
     )
-    # v0.72.0 — absorbed from the retired TuningProposal model so Bob's
+    # absorbed from the retired TuningProposal model so Bob's
     # per-alert tuning recommendations have somewhere to land. A campaign-driven
     # proposal leaves all three NULL.
     source: Mapped[str] = mapped_column(
@@ -157,7 +157,7 @@ class DetectionProposal(Base, TimestampMixin):
             "campaign_snapshot": self.campaign_snapshot,
             "mitre_techniques": self.mitre_techniques or [],
             "status": self.status,
-            # v0.72.0 — provenance absorbed from the retired TuningProposal.
+            # provenance absorbed from the retired TuningProposal.
             # Exposed so a reviewer can tell a Bob-authored draft (inferred from
             # a single alert, unattended) from one a human drafted off a noise
             # campaign, and so the /de-proposals source filter has something to

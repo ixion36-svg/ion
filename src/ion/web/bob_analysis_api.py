@@ -594,14 +594,14 @@ def _build_user_prompt(
             )
     parts.append("")
 
-    # v0.62.0: structured attack path — the deterministic kill-chain graph Bob
+    # structured attack path — the deterministic kill-chain graph Bob
     # must reason over (and cite) instead of inventing one from prose. Omitted
     # entirely when empty (air-gap / no-graph fallback → prior behaviour).
     if path_block and path_block.strip():
         parts.append(path_block.strip())
         parts.append("")
 
-    # v0.54.0: investigation memory — FP signatures, prior verdicts (most
+    # investigation memory — FP signatures, prior verdicts (most
     # confident first) and analyst-disagreement history for the lead rule.
     if memory_block and memory_block.strip():
         parts.append(memory_block.strip())
@@ -664,14 +664,14 @@ async def generate_bob_analysis(
     similar = _gather_similar_cases(session, case_id)
     alert_summaries, first_raw_alert = await _gather_alert_field_summaries(alert_ids)
 
-    # v0.54.0 (RAG P4): align this endpoint to the full prompt stack —
+    # (RAG P4): align this endpoint to the full prompt stack —
     # per-rule template guide + KB/exemplar/playbook/TI/skills layers in
     # the system prompt, investigation memory in the user prompt.
     rep_alert = _build_representative_alert(case, linked_triages, first_raw_alert)
     system_prompt, stack_meta = _augment_system_prompt(session, rep_alert)
     memory_block = _gather_memory_context(rep_alert)
 
-    # v0.62.0 (Attack Path Phase 2): build the deterministic path graph and
+    # (Attack Path Phase 2): build the deterministic path graph and
     # inject a compact structured rendering so Bob reasons over the explicit
     # kill-chain (nodes/edges/reachability) rather than narrating one from
     # prose. Best-effort + air-gap safe: any failure or empty graph → the
@@ -721,7 +721,7 @@ async def generate_bob_analysis(
             detail="Bob returned an empty response — please retry.",
         )
 
-    # v0.63.0 (Attack Path Phase 3): adversarial verifier pass. Fork E — only
+    # (Attack Path Phase 3): adversarial verifier pass. Fork E — only
     # medium-confidence *decisive* verdicts are checked against the deterministic
     # attack path; high-confidence + abstentions are skipped (cheap). Advisory
     # only + air-gap safe: any skip/failure leaves the analysis untouched and
@@ -759,15 +759,15 @@ async def generate_bob_analysis(
             "observables_count": len(case.observables or []),
             "similar_cases_count": len(similar),
             "alert_fields_present": len(alert_summaries),
-            # v0.54.0: prompt-stack alignment telemetry
+            # prompt-stack alignment telemetry
             "prompt_template": stack_meta.get("template"),
             "rag_blocks": stack_meta.get("rag_blocks", 0),
             "memory_context_present": bool(memory_block and memory_block.strip()),
-            # v0.62.0: attack-path Phase 2 telemetry
+            # attack-path Phase 2 telemetry
             "attack_path_present": bool(path_block and path_block.strip()),
             "reachability_band": reachability.get("band"),
             "reachability_score": reachability.get("score"),
-            # v0.63.0: attack-path Phase 3 recurrence hint + verifier telemetry
+            # attack-path Phase 3 recurrence hint + verifier telemetry
             "path_recurrence": (
                 ((attack_path.get("stats") or {}).get("recurrence") or {})
                 if attack_path else {}

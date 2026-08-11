@@ -22,7 +22,7 @@
             <option value="rejected">Rejected</option>
             <option value="duplicate">Duplicate</option>
         </select>
-        {# v0.72.0: Bob files proposals unattended off a false-positive verdict
+        {# Bob files proposals unattended off a false-positive verdict
            (previously into the unreachable /tuning-proposals queue). Provenance
            matters on review, so it is filterable rather than flattened. #}
         <select id="dp-source" class="ion-select" data-change-action="dpLoad">
@@ -138,7 +138,7 @@ async function dpLoad(){
     }
 }
 
-// v0.72.0: Bob files proposals unattended off a false-positive verdict (they
+// Bob files proposals unattended off a false-positive verdict (they
 // used to go to the unreachable /tuning-proposals queue). Flag that on review —
 // an inference from ONE alert is weaker evidence than a noise campaign, and the
 // reviewer should weigh it accordingly.

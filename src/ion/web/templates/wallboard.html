@@ -67,7 +67,7 @@
       </div>
     </header>
 
-    <!-- ═══════════ ATTENTION BANNER (v0.39.6) — shouts when the estate needs attention ═══════════ -->
+    <!-- ═══════════ ATTENTION BANNER — shouts when the estate needs attention ═══════════ -->
     <div id="wb-attention" class="wb-att-ok rounded-[12px] border px-6 py-3 flex items-center gap-4">
       <span id="wb-att-dot" class="wb-att-dot bg-ion-lime"></span>
       <span id="wb-att-headline" class="font-sans font-semibold text-[18px] tracking-tight text-white leading-none">Monitoring…</span>
@@ -259,7 +259,7 @@
 
     </main>
 
-    <!-- v0.19.21: ticker strip removed from the wallboard. Critical
+    <!-- ticker strip removed from the wallboard. Critical
          alerts are already on the alerts panel; the dedicated ticker
          feature still renders inside the main app shell. -->
 
@@ -623,11 +623,11 @@ function renderThreatLandscape(t) {
   }
 }
 
-// v0.19.21: renderTicker removed with the footer strip. Snapshot still
+// renderTicker removed with the footer strip. Snapshot still
 // carries `ticker` for the rest of the app's ticker UI; we just don't
 // render it on the wallboard.
 
-// ── Attention banner + trend deltas (v0.39.6) ────────────────
+// ── Attention banner + trend deltas ────────────────
 // Compact ▲/▼ delta vs the prior 24h. goodDown=true means a falling number
 // is the good direction (e.g. fewer alerts) → coloured lime when it drops.
 function deltaHtml(curr, prev, goodDown) {

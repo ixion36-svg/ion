@@ -32,7 +32,7 @@
     </div>
   </section>
 
-  <!-- v0.23.1: loop pause banner -->
+  <!-- loop pause banner -->
   <div id="iq-pause-banner" class="rounded-[12px] border border-amber-500/30 bg-amber-500/10 p-3 mb-4 text-amber-300 text-[12px] _ion-s-c8be1ccba6">
     Sweep loop is <strong>paused</strong>. New investigations will not be auto-queued until you resume. Existing pending rows remain — click <em>Cancel all pending</em> if you want to clear the backlog.
   </div>
@@ -242,7 +242,7 @@
   }
 
   function iqRenderRow_active(inv) {
-    // v0.23.1: per-row cancel for pending/running investigations.
+    // per-row cancel for pending/running investigations.
     const cancelBtn = (inv.status === 'pending' || inv.status === 'running')
       ? `<button data-click-action="iqCancelOne" data-args='[${inv.id}]' class="text-[11px] text-red-300 hover:text-red-200 hover:underline">Cancel</button>`
       : '';
@@ -368,7 +368,7 @@
 
   function iqRefresh() { iqLoad(); iqLoadLoopStatus(); }
 
-  // v0.23.1 — queue control: pause/resume + bulk-cancel + per-row cancel.
+  // queue control: pause/resume + bulk-cancel + per-row cancel.
 
   async function iqLoadLoopStatus() {
     try {
@@ -452,7 +452,7 @@
   document.addEventListener('DOMContentLoaded', function() {
     iqLoad();
     iqLoadLoopStatus();
-    // v0.39.9: SSE live updates — emits only when a job changes state, with a
+    // SSE live updates — emits only when a job changes state, with a
     // 10s polling fallback. refreshTimer holds the live-updates stop() handle.
     refreshTimer = ionLiveUpdates('investigations', function() { iqLoad(); iqLoadLoopStatus(); }, refreshMs);
   });

@@ -40,7 +40,7 @@ class KibanaCasesService:
                     "kbn-xsrf": "true",
                     "Content-Type": "application/json",
                 },
-                # v0.9.82: 5s read, 3s connect (was 30s). Kibana case sync
+                # 5s read, 3s connect (was 30s). Kibana case sync
                 # now runs in BackgroundTasks, so a slow Kibana never blocks
                 # a user-facing request — but the tighter timeout still
                 # matters to keep the background pool from stalling too.

@@ -2293,7 +2293,7 @@ def bulk_apply_settings(
 
 
 # ===========================================================================
-# v0.10.15 — Assessment questionnaire endpoints
+# Assessment questionnaire endpoints
 #
 # Two granularities (mirrors the model layer):
 #   /api/cyab/assessment            org-wide questionnaire
@@ -2543,7 +2543,7 @@ def get_latest_system_assessment(
 
 
 # ===========================================================================
-# v0.10.17 — Onboarding wizard: full system creation in one transaction
+# Onboarding wizard: full system creation in one transaction
 #
 # POST /api/cyab/onboarding accepts a single JSON body that fully describes
 # a new CyAB system: identity, contacts, governance, an inline per-system
@@ -4329,11 +4329,11 @@ async def cyab_systems_bulk(
             },
         )
 
-    # v0.19.7: bulk delete. Reuses _delete_system_row from
+    # bulk delete. Reuses _delete_system_row from
     # cyab_api (migrated from cyab_studio_api in v0.20.0) so the
     # data_sources / snapshots cascade is identical to the
     # single-row endpoint.
-    # v0.19.16: privilege gate. The enclosing endpoint is
+    # privilege gate. The enclosing endpoint is
     # require_page_permission("alert:read") because the read-ish
     # actions (mark-reviewed/export-csv/rerun-health) are fine for
     # any analyst. delete-selected is destructive and must match
@@ -4341,7 +4341,7 @@ async def cyab_systems_bulk(
     # enforces — which is case:close, not case:update. (Fixed: these
     # had drifted apart, letting case:update-only users bulk-delete
     # systems they could not delete one at a time.)
-    # v0.19.16: also catches IntegrityError per-row so a single
+    # also catches IntegrityError per-row so a single
     # FK-violation doesn't poison the shared session for the rest
     # of the user's selection.
     if action == "delete-selected":

@@ -54,7 +54,7 @@ _last_result: Optional[Dict[str, Any]] = None
 # ---------------------------------------------------------------------------
 
 
-# v0.50.1: bounds for the symmetry sections. MITRE capped by technique count
+# bounds for the symmetry sections. MITRE capped by technique count
 # (IDs are tiny — 20 is far beyond any real case's union); the enrichment
 # digest reuses the query side's 400-char default. The lookback bounds how
 # many recent IOC snapshots we scan for a non-empty enrichment digest — the
@@ -174,7 +174,7 @@ def _case_source_text(session: Session, case: AlertCase) -> str:
     if case.evidence_summary:
         parts.append(f"Evidence: {_clip(case.evidence_summary, 1200)}")
 
-    # v0.50.1 symmetry sections — same labels/format as the query vector.
+    # symmetry sections — same labels/format as the query vector.
     techniques = _case_mitre_techniques(session, case)
     if techniques:
         parts.append("MITRE: " + ", ".join(techniques))
@@ -186,7 +186,7 @@ def _case_source_text(session: Session, case: AlertCase) -> str:
     # case adds strong signal — two cases with similar Bob-analyses are likely
     # similar in substance even when titles differ.
     #
-    # v0.37.0: filter to a decisive verdict (not NULL, not "inconclusive").
+    # filter to a decisive verdict (not NULL, not "inconclusive").
     # An inconclusive run's summary is boilerplate ("insufficient evidence to
     # determine …") that is near-identical across unrelated alerts — embedding
     # it pulls dissimilar cases together and dilutes the vector. ``verdict`` is
@@ -362,7 +362,7 @@ def stop_case_embedding_loop() -> None:
 
 
 def start_case_embedding_if_enabled(engine=None) -> bool:
-    # Default ON (v0.36.0) — disable with ION_EMBEDDING_ENABLED=false. MUST
+    # Default ON — disable with ION_EMBEDDING_ENABLED=false. MUST
     # match EmbeddingService.is_enabled's default so the loop gate and the
     # per-call gate agree; otherwise the loop spins up while embed() no-ops
     # (or vice-versa). Loop work is a cheap no-op when Ollama is unreachable.

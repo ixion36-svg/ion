@@ -32,7 +32,7 @@ class Document(Base):
     output_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     current_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")  # active, archived
-    # v0.79.0: who created this document. Everyone can read and add documents;
+    # who created this document. Everyone can read and add documents;
     # delete is limited to your own work (or a document:delete holder). Nullable
     # because the ~600 documents that predate this column have no known author —
     # they are owned by nobody, so only document:delete can remove them, which

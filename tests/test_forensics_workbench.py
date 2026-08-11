@@ -511,7 +511,7 @@ class TestForensicWorkbench:
 
 
 # =============================================================================
-# v0.22.0 ForensicCase Annotation Tests (spec §6.2 mirrored to forensic)
+# ForensicCase Annotation Tests (spec §6.2 mirrored to forensic)
 # =============================================================================
 
 

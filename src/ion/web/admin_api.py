@@ -1031,7 +1031,7 @@ async def create_database_backup(request: Request, current_user: User = Depends(
     try:
         shutil.copy2(config.db_path, backup_path)
 
-        # Best-effort activity log (v0.39.5). The backup file is already written
+        # Best-effort activity log. The backup file is already written
         # at this point, so the audit-log write must never be able to fail the
         # operation: use the IntegrationLogService API and swallow any error.
         try:
@@ -1164,7 +1164,7 @@ async def cleanup_old_data(
 
     from ion.storage.database import get_engine, get_session
 
-    # v0.39.5: bound days_to_keep so the timedelta(days=...) computation below
+    # bound days_to_keep so the timedelta(days=...) computation below
     # stays well within range. 36500 days (~100 years) is far beyond any real
     # retention window.
     if days_to_keep < 1 or days_to_keep > 36500:
@@ -1221,7 +1221,7 @@ async def cleanup_old_data(
 
             db.commit()
 
-            # Best-effort activity log (v0.39.5). The cleanup is already
+            # Best-effort activity log. The cleanup is already
             # committed by this point, so the audit-log write must never be able
             # to fail the operation.
             try:

@@ -83,7 +83,7 @@ async function loadLesson() {
     _courseSlug = _lesson.course_id ? await slugForCourse(_lesson.course_id) : '';
     document.getElementById('ln-back').href = _courseSlug ? `/courses/${_courseSlug}` : '/courses';
     render();
-    // v0.26.0: populate the lab attempt history subpanel after render
+    // populate the lab attempt history subpanel after render
     // injects the placeholder div. No-op for non-lab lessons.
     if (_lesson && _lesson.lesson_type === 'lab') {
       _loadLabHistory();
@@ -128,7 +128,7 @@ function render() {
            </button>
          </div>
          <div class="_ion-s-e9c02e2a09" id="ln-lab-links"></div>
-         <!-- v0.26.0: lab attempt history. JS-populated by _loadLabHistory(). -->
+         <!-- lab attempt history. JS-populated by _loadLabHistory(). -->
          <div class="_ion-s-d4c3d39ab0" id="ln-lab-history">
            <div class="_ion-s-eccba22010">Lab attempt history</div>
            <div id="ln-lab-history-list"></div>
@@ -331,7 +331,7 @@ async function completeLab() {
     _renderLabCriteria(d);
     const linksEl = document.getElementById('ln-lab-links');
     if (linksEl) linksEl.innerHTML = '';
-    // v0.26.0: refresh history subpanel so the just-completed attempt appears.
+    // refresh history subpanel so the just-completed attempt appears.
     _loadLabHistory();
     if (d.lesson_status === 'failed') {
       showToast(`Lab failed (score ${d.score ?? '—'}% < pass mark ${d.pass_threshold ?? 70}%)`, 'error');
@@ -345,7 +345,7 @@ async function completeLab() {
 window.completeLab = completeLab;
 
 function _renderLabCriteria(d) {
-  // v0.23.0: render per-criterion grading results inside the lab panel.
+  // render per-criterion grading results inside the lab panel.
   const host = document.getElementById('ln-lab-links');
   if (!host) return;
   const criteria = d.criteria || [];
@@ -368,7 +368,7 @@ function _renderLabCriteria(d) {
 }
 
 async function _loadLabHistory() {
-  // v0.26.0: populate the "Lab attempt history" subpanel.
+  // populate the "Lab attempt history" subpanel.
   // Renders one card per past attempt with status badge + score, plus
   // an expandable per-criterion breakdown re-using _renderLabCriteria.
   const host = document.getElementById('ln-lab-history');

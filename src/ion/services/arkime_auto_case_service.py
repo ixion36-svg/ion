@@ -97,7 +97,7 @@ async def _run_pass(engine: Engine) -> None:
         if a.network_community_id and a.arkime_node
     ]
     if not arkime_alerts:
-        # Diagnostic funnel (v0.39.1): "no auto-cases" was previously silent,
+        # Diagnostic funnel: "no auto-cases" was previously silent,
         # giving no clue whether the cause was zero alerts, missing
         # community_id, or a missing/unrecognised Arkime node field. Log the
         # breakdown once per pass when there are alerts but none qualify.
@@ -120,7 +120,7 @@ async def _run_pass(engine: Engine) -> None:
 
     factory = get_session_factory(engine)
     session = factory()
-    # v0.49.3: all sync work below (SQLAlchemy + the blocking Kibana HTTP in
+    # all sync work below (SQLAlchemy + the blocking Kibana HTTP in
     # _create_case_for_alert — up to 2 sync round-trips per alert, 5s timeout)
     # runs via asyncio.to_thread. This pass lives on the uvicorn event loop; a
     # slow Kibana used to freeze every request/SSE stream on the worker for up

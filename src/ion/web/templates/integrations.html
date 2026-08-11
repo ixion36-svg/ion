@@ -20,7 +20,7 @@
     </div>
 </section>
 
-<!-- v0.74.0 (route audit phase 7e): the retired /topology page is now the
+<!-- (route audit phase 7e): the retired /topology page is now the
      second tab here. Both pages already read /api/integrations/status and
      /api/integrations/healthcheck — same service set, two renderings. -->
 <div class="int-tabs">
@@ -1470,7 +1470,7 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 // ═══════════════════════════════════════════════════════════════
-// Fetch helper (v0.75.0)
+// Fetch helper
 // ═══════════════════════════════════════════════════════════════
 // Every loader on this page used to do `if (!response.ok) throw new
 // Error('Failed to load X')`, which collapsed session-expiry, permission
@@ -1540,7 +1540,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadMetrics();
 });
 
-// v0.39.9: SSE-backed live updates (single connection) with a 30s polling
+// SSE-backed live updates (single connection) with a 30s polling
 // fallback when SSE is unavailable.
 ionLiveUpdates('integrations', loadMetrics, 30000);
 
@@ -3040,7 +3040,7 @@ function flowUpdateControls() {
 
 
 // ═══════════════════════════════════════════════════════════════
-// v0.74.0 (route audit phase 7e) — deferred init
+// (route audit phase 7e) — deferred init
 // ═══════════════════════════════════════════════════════════════
 // This block used to be the standalone /topology page and bootstrapped on
 // DOMContentLoaded. As a tab it starts display:none, and both diagrams place

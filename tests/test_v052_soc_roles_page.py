@@ -18,7 +18,7 @@ from ion.models.user import User
 from ion.web.api import get_db_session
 from ion.web.server import app
 
-# v0.54.1: +3 engineering seats (Security Platform Engineer, Automation
+# +3 engineering seats (Security Platform Engineer, Automation
 # Engineer (SOAR), Network Security Engineer) grouped with Detection
 # Engineer under the "Engineering" tier.
 ROLE_NAMES = [

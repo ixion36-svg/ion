@@ -8,35 +8,35 @@
     <link rel="stylesheet" href="/static/css/lucide.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/style.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/design-system.css?v={{ ion_version }}">
-    <!-- v0.43.0: consolidated ion-* component layer (full re-skin, Phase 0).
+    <!-- consolidated ion-* component layer (full re-skin, Phase 0).
          Additive — pages opt in by using ion-* classes; existing pages are
          unaffected until migrated. See concepts/reskin-scope.md. -->
     <link rel="stylesheet" href="/static/css/ion-ui.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/ai-chat.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <link rel="stylesheet" href="/static/css/tailwind.css?v={{ ion_version }}">
-    <!-- v0.31.21: previously-inline `style="..."` attributes migrated to hashed
+    <!-- previously-inline `style="..."` attributes migrated to hashed
          CSS classes by tools/migrate_inline_styles.py. Loading this file
          here means the styles apply before paint (no FOUC). Same-origin so
          no nonce needed under `style-src 'self' 'nonce-XXX'`. After this
          landed, `style-src-attr` flipped from `'unsafe-inline'` to `'none'`. -->
     <link rel="stylesheet" href="/static/css/ion-migrated-styles.css?v={{ ion_version }}">
-    <!-- v0.77.0: styles for the shared alert-detail component's STACKED layout
+    <!-- styles for the shared alert-detail component's STACKED layout
          (used by /cases). The tabs layout on /alerts reuses that page's own
          existing .detail-tab* classes, so this cannot alter /alerts. -->
     <link rel="stylesheet" href="/static/css/alert-detail.css?v={{ ion_version }}">
-    {# v0.79.0: the inset-overlay workspace chrome shared by /cases and
+    {# the inset-overlay workspace chrome shared by /cases and
        /documents. Moved out of cases.html so the second page to use it does
        not render unstyled — the v0.77.0 lesson. #}
     <link rel="stylesheet" href="/static/css/ion-workspace.css?v={{ ion_version }}">
-    <!-- v0.31.3: tell HTMX not to inject its indicator <style> block at runtime.
+    <!-- tell HTMX not to inject its indicator <style> block at runtime.
          Inline-injected styles can't carry our per-request CSP nonce, so they'd
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
          .htmx-indicator class anywhere, so disabling it has no UI impact. -->
     <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
     <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
-    <!-- v0.31.4: delegated event listener so templates can move off
+    <!-- delegated event listener so templates can move off
          `data-click-action="foo"` (which is blocked by strict CSP once
          `script-src-attr` drops `'unsafe-inline'`). Templates declare
          `data-click-action="foo"` and the helper dispatches. See
@@ -46,11 +46,11 @@
          `style="width:${pct}%"` into a STATIC class containing the literal
          ${pct}, which browsers drop as invalid CSS. See the file header. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/ion-dynamic-styles.js?v={{ ion_version }}"></script>
-    <!-- v0.39.9: SSE-backed live updates (window.ionLiveUpdates) with a
+    <!-- SSE-backed live updates (window.ionLiveUpdates) with a
          setInterval polling fallback. Loaded early so page scripts can call
          it from their DOMContentLoaded handlers. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/live-updates.js?v={{ ion_version }}"></script>
-    <!-- v0.31.20: page-specific data-click-action wrappers needed to retire
+    <!-- page-specific data-click-action wrappers needed to retire
          the last few multi-statement inline handlers. Living here in base.html
          so every page has them in scope. Kept tiny so the global namespace
          doesn't bloat. -->
@@ -152,7 +152,7 @@
                 <svg class="w-3 h-3 ml-0.5"><use href="#i-chevron-down"/></svg>
               </button>
               <div class="tw-drop-menu">
-                <!-- v0.27.0: dropdown shrunk 6 → 3. /threat-landscape +
+                <!-- dropdown shrunk 6 → 3. /threat-landscape +
                      /attack-stories folded into /threat-intel as new
                      tabs (now 7 tabs total); /threat-hunting deleted
                      as a half-built CRUD shell (workflow now lives in
@@ -164,7 +164,7 @@
               </div>
             </div>
 
-            <!-- v0.28.0: Engineering nav condensed 9 → 5 items.
+            <!-- Engineering nav condensed 9 → 5 items.
                  * Topology + Network Map + Data Flow  →  one entry "Infrastructure" (default route: /network-map)
                    The pages share an in-page sibling tab strip so users can
                    swap between them once inside.
@@ -193,7 +193,7 @@
                 <a href="/network-map" class="tw-drop-item {% if p.startswith('/network-map') or p.startswith('/data-flow') %}is-active{% endif %}">Infrastructure</a>
                 <a href="/log-sources" class="tw-drop-item {% if p.startswith('/log-sources') %}is-active{% endif %}">Platform Health</a>
                 <a href="/architecture" id="nav-architecture-link" class="tw-drop-item {% if p.startswith('/architecture') %}is-active{% endif %} _ion-s-c8be1ccba6">Workflow Orchestrator</a>
-                {# v0.79.0: "Security" (ION's own posture assessment) moved to
+                {# "Security" (ION's own posture assessment) moved to
                    the GRC group — it is an assurance surface, not an
                    engineering tool. Same security:read gate, same id. #}
               </div>
@@ -218,7 +218,7 @@
               </div>
             </div>
 
-            <!-- GRC — governance, risk & compliance (v0.79.0).
+            <!-- GRC — governance, risk & compliance.
                  These five surfaces were scattered across Reporting,
                  Engineering and Administration, so the question "what do I
                  show an auditor?" had no single answer. Each carries a
@@ -238,7 +238,7 @@
               </div>
             </div>
 
-            <!-- v0.29.0: Operations condensed 9 → 5 items via shared
+            <!-- Operations condensed 9 → 5 items via shared
                  sibling-tab strips (same pattern as v0.28.0 Engineering).
                  Briefing/Handover/Standup → Shift Operations group
                  (default route /briefing). Alert Prompts + Bob Eval →
@@ -258,7 +258,7 @@
               </div>
             </div>
 
-            <!-- v0.29.0: Knowledge condensed 9 → 3 items.
+            <!-- Knowledge condensed 9 → 3 items.
                  Guide/Sim/Range/Skills/Courses → Training group
                  (default route /guide). Notes/Templates/Documents →
                  Reference group (default /notes).
@@ -288,7 +288,7 @@
                 <a href="/settings" class="tw-drop-item {% if p.startswith('/settings') %}is-active{% endif %}">Settings</a>
                 <a href="/users" class="tw-drop-item {% if p.startswith('/users') %}is-active{% endif %}">Users</a>
                 <a href="/integrations" class="tw-drop-item {% if p.startswith('/integrations') %}is-active{% endif %}">Integrations</a>
-                {# v0.79.0: Service Desk + Audit Logs moved to GRC (change
+                {# Service Desk + Audit Logs moved to GRC (change
                    governance and the audit evidence trail). Gates unchanged. #}
                 <a href="/gitlab" class="tw-drop-item {% if p.startswith('/gitlab') %}is-active{% endif %}">GitLab</a>
                 <a href="/service-accounts" class="tw-drop-item {% if p.startswith('/service-accounts') %}is-active{% endif %}">Service Accounts</a>
@@ -350,7 +350,7 @@
       </div>
     </header>
 
-    <!-- v0.26.1: ticker strip removed alongside the broken ticker service.
+    <!-- ticker strip removed alongside the broken ticker service.
          The /api/ticker/* endpoints are gone, so the previous polling
          block 404'd on every page load. See _backlog_v0_27.md for the
          design rethink on the replacement surface. -->
@@ -574,7 +574,7 @@
     <!-- Markdown parser + sanitizer -->
     <script nonce="{{ csp_nonce }}" src="/static/js/marked.min.js"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/purify.min.js"></script>
-    <!-- v0.11.2 / v0.11.3: Mermaid diagrams for course lessons (and any
+    <!-- / v0.11.3: Mermaid diagrams for course lessons (and any
          markdown content that wants attack-chain / flowchart visuals).
          Vendored at ~3.3 MB so air-gap deployments work out of the box.
          Consumers guard on `typeof mermaid !== 'undefined'` so a missing
@@ -584,7 +584,7 @@
       if (typeof mermaid !== 'undefined' && mermaid.initialize) {
         mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'strict' });
       }
-      // v0.11.3: configure marked.js to convert ```mermaid fenced blocks
+      // configure marked.js to convert ```mermaid fenced blocks
       // into <div class="mermaid"> so mermaid.run() can pick them up.
       // Without this hook, mermaid blocks would render as plain
       // <pre><code class="language-mermaid"> and never become diagrams.
@@ -620,7 +620,7 @@
       }
     </script>
     <script nonce="{{ csp_nonce }}" src="/static/js/app.js?v={{ ion_version }}"></script>
-    <!-- v0.77.0: ONE alert-detail renderer for /alerts and /cases. Loaded after
+    <!-- ONE alert-detail renderer for /alerts and /cases. Loaded after
          app.js because it calls escapeHtml()/showToast() from there. Both pages
          previously rendered an alert their own way, and three field-rendering
          helpers had already been copy-pasted into both templates. -->

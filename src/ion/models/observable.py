@@ -87,7 +87,7 @@ class Observable(Base, TimestampMixin):
         Index("ix_observables_first_seen", "first_seen"),
         Index("ix_observables_last_seen", "last_seen"),
         Index("ix_observables_is_watched", "is_watched"),
-        # v0.49.3 audit: _ignored_normalized_values filters on is_ignored on
+        # audit: _ignored_normalized_values filters on is_ignored on
         # every case-detail GET and every investigation merge — unindexed this
         # is a Postgres seq scan per view.
         Index("ix_observables_is_ignored", "is_ignored"),
@@ -113,7 +113,7 @@ class Observable(Base, TimestampMixin):
     tags: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # v0.10.19 — TheHive-style IOC handling
+    # TheHive-style IOC handling
     # TLP (Traffic Light Protocol) classifies the sensitivity of sharing the
     # observable: red (do not share), amber, green, clear (formerly white).
     # PAP (Permissible Actions Protocol) classifies what actions are allowed

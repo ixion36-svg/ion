@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 _es_client: Optional[httpx.AsyncClient] = None
 _es_client_creds: Optional[str] = None  # fingerprint of (headers, auth) used at creation
 _es_client_loop: Optional[asyncio.AbstractEventLoop] = None  # loop the client is bound to
-# v0.49.3: guards every read-check-create-assign of the slot above. Without it
+# guards every read-check-create-assign of the slot above. Without it
 # a background thread's asyncio.run() cycle could rebind the global between a
 # web-loop caller's creation and its `return`, handing that caller a client
 # bound to a throwaway loop — the exact "Event loop is closed" crash the
@@ -726,7 +726,7 @@ class ElasticsearchService:
         ]
 
         if severity:
-            # v0.19.5: was case-sensitive `term` queries on a single
+            # was case-sensitive `term` queries on a single
             # casing — Kibana indices store severity lowercase but
             # other producers (Wazuh, custom rules) ship "Critical" or
             # "CRITICAL". The single-casing match silently dropped
@@ -1097,7 +1097,7 @@ class ElasticsearchService:
                 network_community_id.get("community_id")
                 or network_community_id.get("id")
             )
-        # v0.39.1: broadened — `source.get("node")` only matched a flat
+        # broadened — `source.get("node")` only matched a flat
         # top-level key, missing the nested form ({"node": {...}} / dotted)
         # and the common ECS capture-appliance field `observer.hostname`.
         arkime_node = (
