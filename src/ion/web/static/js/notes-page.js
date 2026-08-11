@@ -149,7 +149,7 @@
             const isActive = selectedFolderId === f.id;
             const isHidden = !isFolderVisible(f, flat);
 
-            html += `<div class="folder-item${isActive ? ' active' : ''}" data-folder="${f.id}" data-depth="${f.depth}" ${isHidden ? 'style="display:none"' : ''}>
+            html += `<div class="folder-item${isActive ? ' active' : ''}${isHidden ? ' ion-u-hidden' : ''}" data-folder="${f.id}" data-depth="${f.depth}" >
                 <span class="folder-expand${hasChildren ? (isExpanded ? ' expanded' : '') : ' empty'}" data-toggle="${f.id}">&#9654;</span>
                 <span class="folder-icon">${f.icon || '&#128193;'}</span>
                 <span class="folder-name">${escHtml(f.name)}</span>
@@ -376,8 +376,8 @@
                 ${preview ? `<div class="note-card-preview">${escHtml(preview)}</div>` : ''}
                 <div class="note-card-meta">
                     <span class="note-card-time">${timeAgo(n.updated_at)}</span>
-                    <div style="display:flex;align-items:center;gap:6px">
-                        ${n.color ? `<span class="note-card-color" style="background:${colorHex}"></span>` : ''}
+                    <div class="ion-u-inline-row">
+                        ${n.color ? `<span class="note-card-color" data-ion-style="background:${colorHex}"></span>` : ''}
                         <div class="note-card-actions">
                             <button class="note-card-btn" data-pin="${n.id}" title="${n.is_pinned ? 'Unpin' : 'Pin'}">&#128204;</button>
                             <button class="note-card-btn danger" data-del="${n.id}" title="Delete">&times;</button>
@@ -628,7 +628,7 @@
             <span class="notes-color-option${!c.value ? ' active' : ''}"
                   data-color="${c.value || ''}"
                   title="${c.label}"
-                  style="background:${c.hex};${!c.value ? 'background:var(--bg-secondary,#161b22);border:1px dashed var(--border-color,#30363d)' : ''}">
+                  data-ion-style="background:${c.hex};${!c.value ? 'background:var(--bg-secondary,#161b22);border:1px dashed var(--border-color,#30363d)' : ''}">
             </span>
         `).join('');
 

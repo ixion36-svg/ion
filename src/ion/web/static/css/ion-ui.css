@@ -108,3 +108,31 @@
 .ion-table th, .table th, .data-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); font-weight: 700; padding: 9px 12px; border-bottom: 1px solid var(--border); }
 .ion-table td, .table td, .data-table td { padding: 10px 12px; border-top: 1px solid var(--border); color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .ion-table tbody tr:hover td, .table tbody tr:hover td, .data-table tbody tr:hover td { background: var(--bg-secondary); }
+
+/* ==========================================================================
+   v0.80.0 P1 — utilities replacing static inline style attributes.
+
+   CSP sets `style-src-attr 'none'`, so an inline `style=""` is refused at
+   render time: the element just draws unstyled, with no error and no log line.
+   These cover the STATIC cases from the sweep. Dynamic values (width:${pct}%,
+   background:${colour}) are NOT handled here — they use `data-ion-style`, which
+   ion-dynamic-styles.js applies via el.style.setProperty.
+
+   `.ion-u-hidden` sets the INITIAL state only. Every site using it is toggled
+   afterwards with `el.style.display = ...`, a CSSOM write that is CSP-legal and
+   overrides the class, so the toggles keep working unchanged.
+   ========================================================================== */
+.ion-u-hidden     { display: none; }
+.ion-u-inline-row { display: flex; align-items: center; gap: 6px; }
+.ion-u-mt-3       { margin-top: 3px; }
+.ion-u-mt-4       { margin-top: 4px; }
+.ion-u-mt-16      { margin-top: 16px; }
+.ion-u-mr-auto    { margin-right: auto; }
+.ion-u-mr-sm      { margin-right: 0.5rem; }
+
+/* Ransomware badge on /threat-intel — was a literal rgba triple inline. */
+.ti-badge-ransomware {
+    background: rgba(248, 113, 113, .15);
+    color: #f87171;
+    border-color: rgba(248, 113, 113, .35);
+}

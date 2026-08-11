@@ -139,7 +139,7 @@ function qkRender(items){
         } else { actions = '<span class="qk-muted">—</span>'; }
         const nudge = q.priority_nudge ? ' · nudge ' + q.priority_nudge : '';
         html += '<tr>'
-            + '<td><strong>' + qkEsc(q.title) + '</strong><div class="qk-muted" style="margin-top:3px">' + qkEsc(q.annotation) + nudge + '</div></td>'
+            + '<td><strong>' + qkEsc(q.title) + '</strong><div class="qk-muted ion-u-mt-3">' + qkEsc(q.annotation) + nudge + '</div></td>'
             + '<td>' + qkScope(q) + '</td>'
             + '<td>' + qkPill(q) + '</td>'
             + '<td class="qk-muted">raised: ' + qkEsc(q.raised_by_username || '—')

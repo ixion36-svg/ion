@@ -225,7 +225,7 @@ def test_no_inline_style_attributes(path):
     src = path.read_text(encoding="utf-8")
     src = re.sub(r"<!--.*?-->", "", src, flags=re.S)
     src = re.sub(r"^\s*(//|/\*).*$", "", src, flags=re.M)
-    hits = re.findall(r"""style=["'][^"']*["']""", src)
+    hits = re.findall(r"""(?<![-\w])style=["'][^"']*["']""", src)
     assert not hits, f"{path.name} reintroduced inline style attributes: {hits[:3]}"
 
 

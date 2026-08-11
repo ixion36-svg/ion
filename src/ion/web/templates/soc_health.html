@@ -131,7 +131,7 @@ function renderScorecard(d) {
         for (const [k, v] of Object.entries(details)) {
             if (v != null) detailHtml += `<div><strong>${k.replace(/_/g,' ')}:</strong> ${v}</div>`;
         }
-        html += `<div class="sh-dim" data-ion-style="--dim-color:${dc}">
+        html += `<div class="sh-dim" data-ion-data-ion-style="--dim-color:${dc}">
             <div class="_ion-s-8900584d48" data-ion-style="background:${dc}"></div>
             <div class="sh-dim-header">
                 <span class="sh-dim-label"><i class="icon-${dimIcons[key] || 'circle'}"></i> ${esc(dim.label)}</span>

@@ -195,7 +195,7 @@ function bbRenderProposals(items){
             actions = '<button class="bb-act bb-act-danger" data-click-action="bbRevert" data-args=\'[' + p.id + ']\'>Revert</button>';
         } else { actions = '<span class="bb-muted">—</span>'; }
         html += '<tr>'
-            + '<td><strong>' + bbEsc(p.title) + '</strong>' + (p.problem_statement ? '<div class="bb-muted" style="margin-top:3px">' + bbEsc(p.problem_statement) + '</div>' : '') + '</td>'
+            + '<td><strong>' + bbEsc(p.title) + '</strong>' + (p.problem_statement ? '<div class="bb-muted ion-u-mt-3">' + bbEsc(p.problem_statement) + '</div>' : '') + '</td>'
             + '<td class="bb-muted">' + bbEsc(p.rule_name || '—') + '</td>'
             + '<td>' + bbPill(p) + '</td>'
             + '<td class="bb-muted">drafted: ' + bbEsc(p.created_by_username || '—')

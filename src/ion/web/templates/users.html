@@ -277,7 +277,7 @@ function renderRoleCheckboxes() {
       const caps = permissionCapabilities(role.permissions || []);
       const permCount = (role.permissions || []).length;
       return `
-        <label class="role-widget" data-ion-style="--role-color:${meta.color}">
+        <label class="role-widget" data-ion-data-ion-style="--role-color:${meta.color}">
           <input type="checkbox" value="${role.name}" name="${containerId}" class="role-widget-input">
           <div class="role-widget-card">
             <div class="role-widget-header">

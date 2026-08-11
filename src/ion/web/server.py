@@ -247,7 +247,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         # `<script>` / `<style>` (v0.31.3), the only CSS that can apply to
         # an ION page is from same-origin stylesheets, nonced `<style>`
         # blocks, and programmatic CSSOM (`el.style.setProperty(...)`).
-        # P11 is now fully closed.
+        #
+        # v0.80.0: "P11 is now fully closed" stood here from v0.31.21 and was
+        # NOT true — 22 inline `style=` attributes survived the migration
+        # across 11 templates and scripts. The policy was doing its job; the
+        # markup was not. Each was refused at render time, which produces no
+        # error and no log line, only an unstyled element — so /pcap bars drew
+        # at zero width and the /cases severity stripe drew colourless for
+        # three releases. Swept to zero at v0.80.0 and now held there by
+        # tests/test_v080_csp_inline_styles.py, which fails the build on any
+        # inline `style=` outside templates/emails/ and *_pdf.html (both
+        # correctly exempt — neither is served under this policy).
+        #
+        # Dynamic values use `data-ion-style="width:${pct}%"`, applied by
+        # static/js/ion-dynamic-styles.js via setProperty. If you are adding a
+        # computed style, that is the route — not an exception here.
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
             f"script-src 'self' 'nonce-{nonce}'; "

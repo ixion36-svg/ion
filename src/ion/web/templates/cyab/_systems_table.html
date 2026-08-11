@@ -50,7 +50,7 @@
             {% set pct = (r.progress.done / r.progress.total * 100) | round(0) | int if r.progress.total else 0 %}
             <div class="flex items-center gap-1">
               <div class="h-1 w-16 bg-slate-800 rounded">
-                <div class="h-full bg-cyan-400 rounded" style="width: {{ pct }}%"></div>
+                <div class="h-full bg-cyan-400 rounded" data-ion-style="width: {{ pct }}%"></div>
               </div>
               <span class="text-cyan-300 text-[10.5px]">{{ r.progress.done }}/{{ r.progress.total }}</span>
             </div>

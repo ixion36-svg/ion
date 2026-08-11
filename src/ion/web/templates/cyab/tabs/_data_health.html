@@ -41,7 +41,7 @@
           {% else %}
             {% set pct = (r.completeness * 100) | round(0) | int %}
             <div class="h-1 w-20 bg-slate-800 rounded">
-              <div class="h-full bg-cyan-400 rounded" style="width: {{ pct }}%"></div>
+              <div class="h-full bg-cyan-400 rounded" data-ion-style="width: {{ pct }}%"></div>
             </div>
             <span class="text-cyan-300 text-[11px]">{{ pct }}%</span>
           {% endif %}
@@ -62,7 +62,7 @@
         <div class="flex items-center gap-2">
           <span class="flex-1 text-slate-300">{{ label }}</span>
           <div class="h-1 w-20 bg-slate-800 rounded">
-            <div class="h-full bg-emerald-400 rounded" style="width: {{ pct }}%"></div>
+            <div class="h-full bg-emerald-400 rounded" data-ion-style="width: {{ pct }}%"></div>
           </div>
           <span class="text-emerald-300 text-[11px]">{{ pct }}%</span>
         </div>

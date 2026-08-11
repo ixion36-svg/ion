@@ -539,7 +539,7 @@
         const max = Math.max(...top.map(i => i.count), 1);
         let rows = top.map(i => {
             const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td class="_ion-s-72126da263">${esc(i.ip)}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
+            return `<tr><td class="_ion-s-72126da263">${esc(i.ip)}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
         }).join('');
         return `<table class="pcap-table"><thead><tr><th>IP Address</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
@@ -550,7 +550,7 @@
         const max = Math.max(...top.map(i => i.count), 1);
         let rows = top.map(i => {
             const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td>${i.port}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
+            return `<tr><td>${i.port}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
         }).join('');
         return `<table class="pcap-table"><thead><tr><th>Port</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
@@ -617,7 +617,7 @@
             const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) + ':1' : '∞';
             return `<div class="dt-row">
                 <div class="dt-ip" title="${esc(i.ip)}">${esc(i.ip)}</div>
-                <div class="dt-track"><div class="dt-sent" style="width:${sentPct}%"></div><div class="dt-recv" style="width:${recvPct}%"></div></div>
+                <div class="dt-track"><div class="dt-sent" data-ion-style="width:${sentPct}%"></div><div class="dt-recv" data-ion-style="width:${recvPct}%"></div></div>
                 <div class="dt-vals">${fmtBytes(total)} · <span class="${exfil ? 'dt-exfil' : ''}">${ratio}</span></div>
             </div>`;
         }).join('');
@@ -637,7 +637,7 @@
             `<p class="_ion-s-18b8744731">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
             `<div class="dt-legend"><span class="dt-l-sent">Sent (outbound)</span><span class="dt-l-recv">Received (inbound)</span></div>` +
             bars +
-            `<table class="pcap-table" style="margin-top:16px"><thead><tr><th>IP</th><th class="_ion-s-54c2afb7ba">Sent</th><th class="_ion-s-54c2afb7ba">Received</th><th class="_ion-s-54c2afb7ba">Total</th><th class="_ion-s-54c2afb7ba">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<table class="pcap-table ion-u-mt-16"><thead><tr><th>IP</th><th class="_ion-s-54c2afb7ba">Sent</th><th class="_ion-s-54c2afb7ba">Received</th><th class="_ion-s-54c2afb7ba">Total</th><th class="_ion-s-54c2afb7ba">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderIsakmp(d) {
@@ -1178,7 +1178,7 @@
             </div>
             ${rollup}
             <div id="findings-list">${cards}</div>
-            <div class="findings-empty-filter" style="display:none">No findings at this severity.</div>`;
+            <div class="findings-empty-filter ion-u-hidden">No findings at this severity.</div>`;
 
         panel.querySelectorAll('.triage-chip').forEach(ch => {
             if (ch.classList.contains('zero')) return;

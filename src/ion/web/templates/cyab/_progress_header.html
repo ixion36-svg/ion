@@ -4,7 +4,7 @@
   <div class="flex items-center gap-2 flex-1 max-w-md">
     <div class="h-1.5 flex-1 bg-slate-800 rounded-full overflow-hidden">
       <div class="h-full bg-gradient-to-r from-cyan-400 to-emerald-500"
-           style="width: {{ progress.completion_pct }}%"></div>
+           data-ion-style="width: {{ progress.completion_pct }}%"></div>
     </div>
     <span class="text-cyan-300 font-medium">{{ progress.done }} / {{ progress.total }}</span>
   </div>

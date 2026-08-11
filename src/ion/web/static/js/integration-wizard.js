@@ -426,7 +426,7 @@ function renderConfigureStep() {
             <div class="wizard-form-container">
                 ${formContent}
             </div>
-            <div id="wizard-diagnosis-panel" class="diagnosis-panel" style="display: none;"></div>
+            <div id="wizard-diagnosis-panel" class="diagnosis-panel ion-u-hidden"></div>
         </div>
     `;
 
@@ -451,7 +451,7 @@ function renderConfigureStep() {
     footer.innerHTML = `
         <button class="btn btn-secondary" onclick="wizardDispatch('${backAction}')">Back</button>
         <div class="footer-spacer"></div>
-        <button class="btn" onclick="skipIntegration()" style="margin-right: auto;">Skip This Integration</button>
+        <button class="btn ion-u-mr-auto" onclick="skipIntegration()">Skip This Integration</button>
         <button class="btn btn-primary" onclick="saveSubStepAndContinue('${nextAction}')">${nextLabel}</button>
     `;
 }

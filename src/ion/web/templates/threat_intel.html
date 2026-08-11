@@ -459,7 +459,7 @@ data-click-action="tiCloseReport"></div>
 
     function kevRow(e) {
         const ransom = e.known_ransomware
-            ? '<span class="ti-badge" style="background:rgba(248,113,113,.15);color:#f87171;border-color:rgba(248,113,113,.35)">ransomware</span>'
+            ? '<span class="ti-badge ti-badge-ransomware">ransomware</span>'
             : '';
         return `<tr>
             <td class="ti-name-cell">${escapeHtml(e.cve_id)}</td>
