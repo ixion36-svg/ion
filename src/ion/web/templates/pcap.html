@@ -859,7 +859,7 @@
         document.getElementById('panel-certs').innerHTML = `<h3>TLS Certificates (${certs.length})</h3>
         <p class="_ion-s-0648c015b2">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
         <table class="pcap-table"><thead><tr><th>Server</th><th>Subject</th><th>Issuer</th><th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead><tbody>
-        ${certs.map(c => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
+        ${certs.map(c => `<tr>
             <td>${esc(c.server_ip || '-')}</td>
             <td class="_ion-s-72126da263">${esc(c.subject || '-')}</td>
             <td class="_ion-s-72126da263">${esc(c.issuer || '-')}</td>
@@ -883,7 +883,7 @@
         document.getElementById('panel-hosts').innerHTML = `<h3>Host Profiles (${hosts.length})</h3>
         <p class="_ion-s-0648c015b2">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
         <table class="pcap-table"><thead><tr><th>Host</th><th>OS</th><th>Role</th><th>Sent</th><th>Received</th><th>SNIs</th><th>Beacons</th><th>Findings</th></tr></thead><tbody>
-        ${hosts.map(h => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
+        ${hosts.map(h => `<tr>
             <td><strong>${esc(h.ip)}</strong></td>
             <td>${esc(h.os || '-')}${h.os_evidence ? ` <span class="_ion-s-f63147b2ed">(${esc(h.os_evidence)})</span>` : ''}</td>
             <td>${(h.role || []).map(r => esc(r)).join(', ')}</td>
