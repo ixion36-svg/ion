@@ -1,13 +1,23 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.79.5 -->
-<!-- ion-doc:version=0.79.5 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.80.0 -->
+<!-- ion-doc:version=0.80.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-11 -->
 
 # Changelog
+
+## v0.80.0 — 2026-08-11
+
+**Inline `style=` attributes are gone, and the claim that they already were is corrected.**
+
+- `server.py` has asserted since v0.31.21 that *"P11 is now fully closed"* after that migration retired 1,820 inline styles. It was not closed: **22 survived across 11 first-party templates and scripts**, each refused by the browser at render time. The policy was working; the markup was not. A refused inline style produces no error, no log line and no failed request — only an unstyled element — which is why `/pcap` bars drew at zero width and the `/cases` severity stripe drew colourless for three releases.
+- Swept to **zero**, and held there by `tests/test_v080_csp_inline_styles.py`, which fails the build on any inline `style=` outside `templates/emails/` and `*_pdf.html` (both correctly exempt — neither is served under ION's CSP, and HTML email requires inline styles).
+- Static sites become classes (`.ion-u-hidden`, `.ion-u-mt-*`, `.ion-u-mr-*`, `.ion-u-inline-row`, `.ti-badge-ransomware`); dynamic ones become `data-ion-style`, applied by the existing `ion-dynamic-styles.js` via `el.style.setProperty` — a DOM property write, CSP-legal without `unsafe-inline`. The three `display:none` sites are toggled afterwards with `el.style.display`, a CSSOM write that overrides the class, so those toggles are untouched.
+- **A counting error is recorded in the plan rather than quietly fixed.** The first sweep reported 163 violations and scoped six phases; the real number was 22. The regex `style\s*=` also matches the tail of `data-ion-style=`, the sanctioned replacement, so 141 already-migrated sites read as violations. It surfaced by arithmetic — a phase removed 14 sites and the total fell by 12 — not by review. The corrected pattern carries a `(?<![-\w])` lookbehind. The v0.31.21 migration had in fact worked well; the debt was a short tail.
+- Verified by live render rather than by counting, since counting cannot prove a style *applied*: percent widths, Jinja spacing, hex backgrounds, custom properties and two-declaration overrides all confirmed through the `MutationObserver` path.
 
 ## v0.79.5 — 2026-08-11
 
