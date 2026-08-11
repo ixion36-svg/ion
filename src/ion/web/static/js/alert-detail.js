@@ -60,6 +60,16 @@
 
   var _current = null;
   var _opts = {};
+  // Related + Timeline share ONE /related request; this stops the two tabs
+  // issuing it twice.
+  var _relatedLoaded = false;
+  // Well-known fields captured at render time so "add fields as evidence" can
+  // post them without re-parsing. v0.79.5: declared HERE. It is written by
+  // renderAlertParsedFields and read by addAlertFieldsAsEvidence — both in this
+  // file — but the only declaration lived in alerts.html, so on /cases the
+  // Fields tab threw ReferenceError on render. The static sweep missed this one
+  // because it is an assignment target, not a call; the live mockup caught it.
+  var _alertParsedKeyFields = [];
 
   // The two page copies differed ONLY in these class names. Parameterising is
   // what let the two functions become one.
@@ -75,6 +85,174 @@
   // Both host pages load static/js/app.js, which defines these globally.
   function escapeHtml(s) { return window.escapeHtml ? window.escapeHtml(s) : String(s == null ? '' : s); }
   function showToast(m, k) { if (window.showToast) window.showToast(m, k); }
+
+  // ── host adapter (v0.79.5) ───────────────────────────────────────────────
+  //
+  // v0.77.0 extracted this component out of alerts.html but left it reaching
+  // for helpers that ONLY that page defines. On /cases they were undefined, so
+  // every section that touched one threw ReferenceError and stuck on
+  // "Loading..." forever. Worse, loadAlertParsedFields' catch handler called
+  // one of them, so the error handler threw while handling the error — which is
+  // why it surfaced as "Uncaught (in promise)" and a spinner that never
+  // resolved rather than an error message.
+  //
+  // Everything is now owned here, with the host page's version PREFERRED where
+  // it exists: alerts.html's implementations read its live caches, and
+  // shadowing them would silently change that page's behaviour.
+  //
+  // Why try/catch and not `window.X`: these are top-level `let`/`const` in the
+  // page, so they live in the global LEXICAL scope and never become properties
+  // of `window`. A bare reference is the only thing that can see them, and an
+  // undeclared identifier throws ReferenceError — exactly the probe we want.
+  // (`typeof X` by string would need eval, which CSP forbids: no 'unsafe-eval'.)
+  function _page(probe) { try { return probe(); } catch (e) { return null; } }
+  function _pageTriageCache()   { return _page(function () { return triageCache; }); }
+  function _pageSimilarity()    { return _page(function () { return calculateSimilarity; }); }
+  function _pageExtractedBlock(){ return _page(function () { return _alertExtractedValuesBlock; }); }
+  function _pageTimeline()      { return _page(function () { return renderTimeline; }); }
+  function _pageAlertPayload()  { return _page(function () { return getAlertPayload; }); }
+  function _pageAIContent()     { return _page(function () { return formatAIContent; }); }
+  function _pageNotify()        { return _page(function () { return showNotification; }); }
+  function _pageFormatDate()    { return _page(function () { return formatDate; }); }
+
+  function _notify(msg, kind) {
+    var fn = _pageNotify();
+    if (fn) { fn(msg, kind); return; }
+    showToast(msg, kind);
+  }
+
+  function _fmtDate(ts) {
+    var fn = _pageFormatDate();
+    if (fn) return fn(ts);
+    return ts ? new Date(ts).toLocaleString() : '-';
+  }
+
+  function _triageFor(alertId) {
+    var c = _pageTriageCache();
+    return (c && c[alertId]) || null;
+  }
+
+  // Field-name allowlist for the "well-known fields" table. Component-owned so
+  // the Fields section works on a host that has no such list.
+  var _KEY_PREFIXES = [
+    '@timestamp', 'message',
+    'rule.name', 'rule.description',
+    'event.action', 'event.category', 'event.outcome', 'event.severity',
+    'event.kind', 'event.type', 'event.reason',
+    'kibana.alert.severity', 'kibana.alert.workflow_status',
+    'kibana.alert.rule.name', 'kibana.alert.reason', 'kibana.alert.risk_score',
+    'host.name', 'host.hostname', 'host.ip', 'host.os',
+    'user.', 'source.', 'destination.', 'client.', 'server.',
+    'process.', 'file.', 'url.', 'dns.', 'network.', 'tls.', 'http.',
+    'registry.', 'email.', 'threat.', 'observer.', 'related.', 'winlog.event_data.'
+  ];
+  function _keyPrefixes() {
+    return _page(function () { return ALERT_KEY_PREFIXES; }) || _KEY_PREFIXES;
+  }
+
+  var _VERDICT_CLASS = {
+    true_positive: 'autoinv-v-tp', false_positive: 'autoinv-v-fp',
+    benign_true_positive: 'autoinv-v-btp', inconclusive: 'autoinv-v-inc'
+  };
+  function _verdictClass(v) {
+    var m = _page(function () { return _AUTOINV_VERDICT_CLASS; }) || _VERDICT_CLASS;
+    return m[v] || 'autoinv-v-inc';
+  }
+  function _refBadges(refs) {
+    var fn = _page(function () { return _autoinvRefBadges; });
+    if (fn) return fn(refs);
+    if (!refs || !refs.length) return '';
+    return ' ' + refs.map(function (r) {
+      return '<span class="autoinv-ref">' + escapeHtml(String(r)) + '</span>';
+    }).join(' ');
+  }
+
+  // The observables ION extracted at triage time. On /cases the alert row
+  // already CARRIES them (see _fromObservables), so no triage cache is needed —
+  // which is the whole reason this section can work there at all.
+  function _extractedObs(alertId) {
+    var t = _triageFor(alertId);
+    if (t && t.observables && t.observables.length) return t.observables;
+    if (_current && _current.id === alertId && Array.isArray(_current.observables)) {
+      return _current.observables;
+    }
+    return [];
+  }
+
+  function _extractedValuesBlock(alertId) {
+    var host = _pageExtractedBlock();
+    if (host) return host(alertId);
+    var obs = _extractedObs(alertId);
+    if (!obs.length) return '';
+    var h = '<div class="alert-parsed-extracted">'
+          + '<div class="alert-parsed-extracted-title">Extracted values (' + obs.length + ')</div>'
+          + '<table class="alert-parsed-fields-table"><tbody>';
+    obs.forEach(function (o) {
+      if (!o) return;
+      h += '<tr><td class="apf-key">' + escapeHtml(String(o.type || 'unknown')) + '</td>'
+         + '<td class="apf-val">' + escapeHtml(String(o.value || '')) + '</td></tr>';
+    });
+    return h + '</tbody></table></div>';
+  }
+
+  function _similarity(a, b, primary) {
+    var host = _pageSimilarity();
+    if (host) return host(a, b, primary);
+    if (!a || !b) return { score: 0, level: 'low', reasons: [] };
+    var score = 0, reasons = [];
+    function add(n, why) { score += n; reasons.push(why); }
+    if (primary === 'host' && a.host === b.host) add(30, 'Same host');
+    if (primary === 'user' && a.user === b.user) add(30, 'Same user');
+    if (primary === 'rule' && a.rule_name === b.rule_name) add(40, 'Same rule');
+    if (primary !== 'host' && a.host && a.host === b.host) add(20, 'Same host');
+    if (primary !== 'user' && a.user && a.user === b.user) add(15, 'Same user');
+    if (primary !== 'rule' && a.rule_name && a.rule_name === b.rule_name) add(25, 'Same rule');
+    if (a.severity === b.severity) add(10, 'Same severity');
+    if (a.mitre_technique_id && a.mitre_technique_id === b.mitre_technique_id) add(15, 'Same MITRE technique');
+    if (Math.abs(new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()) < 3600000) {
+      add(10, 'Within 1 hour');
+    }
+    score = Math.min(score, 100);
+    return { score: score, level: score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low', reasons: reasons };
+  }
+
+  function _timelineInto(container, alerts) {
+    var host = _pageTimeline();
+    if (host) return host(container, alerts);
+    if (!container) return;
+    if (!alerts || !alerts.length) {
+      container.innerHTML = '<div class="empty-state">No timeline data</div>';
+      return;
+    }
+    var h = '<div class="timeline">';
+    alerts.forEach(function (a) {
+      h += '<div class="timeline-item' + (a._isCurrent ? ' current' : '') + ' severity-' + escapeHtml(String(a.severity || '')) + '">'
+         + '<div class="timeline-time">' + escapeHtml(_fmtDate(a.timestamp)) + '</div>'
+         + '<div class="timeline-content">'
+         + '<span class="severity-badge severity-' + escapeHtml(String(a.severity || '')) + '">'
+         + escapeHtml(String(a.severity || '')) + '</span> '
+         + '<span class="timeline-title">' + escapeHtml(String(a.title || a.rule_name || '')) + '</span>'
+         + '</div></div>';
+    });
+    container.innerHTML = h + '</div>';
+  }
+
+  function _alertPayload(alertId) {
+    var host = _pageAlertPayload();
+    if (host) return host(alertId);
+    if (!_current || _current.id !== alertId) return null;
+    var t = _triageFor(alertId) || {};
+    return {
+      id: _current.id, rule_name: _current.rule_name, severity: _current.severity,
+      host: _current.host, user: _current.user, message: _current.message,
+      timestamp: _current.timestamp, status: t.status, priority: t.priority
+    };
+  }
+
+  function _aiContent(text) {
+    var fn = _pageAIContent();
+    return fn ? fn(text) : String(text == null ? '' : text);
+  }
 
   function renderSystemBadge(a) {
       if (!a.source_system && !a.cyab_system_name && !a.tide_system_name) {
@@ -144,13 +322,13 @@
   }
 
   function renderAlertParsedFields(alertId, raw) {
-      const extracted = _alertExtractedValuesBlock(alertId);
+      const extracted = _extractedValuesBlock(alertId);
       const flat = flattenAlertFields(raw);
       const allKeys = Object.keys(flat).sort();
       if (!allKeys.length) {
           return extracted || '<div class="alert-parsed-empty">No fields available for this alert.</div>';
       }
-      const isKey = k => ALERT_KEY_PREFIXES.some(p => k === p || k.startsWith(p));
+      const isKey = k => _keyPrefixes().some(p => k === p || k.startsWith(p));
       let keyKeys = allKeys.filter(isKey);
       let otherKeys = allKeys.filter(k => !isKey(k));
       // Fallback: a non-ECS alert that matches nothing should still show its data.
@@ -168,7 +346,7 @@
              + _alertFieldsTable(flat, otherKeys) + '</div>';
       }
       // Offer the evidence-note action only when this alert is linked to a case.
-      const caseId = (triageCache[alertId] || {}).case_id;
+      const caseId = (_triageFor(alertId) || {}).case_id;
       if (caseId) {
           h += '<button type="button" class="alert-parsed-evidence" '
              + 'data-click-action="addAlertFieldsAsEvidence" data-args=\'["' + escapeHtml(String(caseId)) + '"]\'>'
@@ -193,7 +371,7 @@
   async function addAlertFieldsAsEvidence(caseId) {
       if (!caseId) { showToast('This alert is not linked to a case', 'warning'); return; }
       const alertId = _current ? _current.id : null;
-      const obs = alertId ? _alertExtractedObs(alertId) : [];
+      const obs = alertId ? _extractedObs(alertId) : [];
       const fields = _alertParsedKeyFields || [];
       if (!fields.length && !obs.length) { showToast('No fields to add', 'warning'); return; }
       const lines = ['**Alert fields (evidence)**', ''];
@@ -273,7 +451,7 @@
           const r = { ok: !!raw };
           if (!r.ok || !data.raw_data) {
               // Still surface extracted values even when the raw _source is gone.
-              container.innerHTML = _alertExtractedValuesBlock(alertId)
+              container.innerHTML = _extractedValuesBlock(alertId)
                   || '<div class="alert-parsed-empty">No raw data available for this alert.</div>';
               return;
           }
@@ -282,14 +460,81 @@
           }
           container.innerHTML = renderAlertParsedFields(alertId, data.raw_data);
       } catch (e) {
-          container.innerHTML = _alertExtractedValuesBlock(alertId)
+          container.innerHTML = _extractedValuesBlock(alertId)
               + '<div class="alert-parsed-empty">Failed to load fields: '
               + escapeHtml(String((e && e.message) || e)) + '</div>';
       }
   }
 
+  // ── comments (v0.79.5) ───────────────────────────────────────────────────
+  //
+  // The comments for an alert arrive on GET /triage — the response is
+  // {triage, comments}; /comments is POST-only, for adding. alerts.html reads
+  // them there as a side effect of loading its triage bar, which is why /cases
+  // (no triage bar) never had them and sat on "Loading comments...".
+  //
+  // One GET, on first click, is the whole cost — which is why this is worth
+  // having rather than dropping.
+  var _commentsLoaded = false;
+
+  function _renderComments(alertId, comments) {
+    var host = _page(function () { return renderCommentsTab; });
+    if (host) { host(alertId, comments); return; }        // /alerts: richer, markdown + translate
+    var el = document.getElementById('detail-tab-comments');
+    if (!el) return;
+    var h = '<div class="comments-list">';
+    if (!comments || !comments.length) {
+      h += '<div class="empty-state">No comments yet</div>';
+    } else {
+      comments.forEach(function (c) {
+        h += '<div class="comment-item">'
+           + '<div class="comment-header">'
+           +   '<span class="comment-user">' + escapeHtml(String(c.user || 'Unknown')) + '</span>'
+           +   '<span class="comment-time">' + escapeHtml(_fmtDate(c.created_at)) + '</span>'
+           + '</div>'
+           + '<div class="comment-body">' + escapeHtml(String(c.content || '')) + '</div>'
+           + '</div>';
+      });
+    }
+    h += '</div>'
+       + '<div class="comment-form">'
+       +   '<textarea id="comment-input" placeholder="Add a comment..."></textarea>'
+       +   '<button class="btn btn-primary" data-click-action="ionAlertAddComment" '
+       +     'data-args=\'["' + escapeHtml(String(alertId)) + '"]\'>Submit</button>'
+       + '</div>';
+    el.innerHTML = h;
+  }
+
+  function loadAlertComments(alertId) {
+    var el = document.getElementById('detail-tab-comments');
+    if (!el) return;
+    fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/triage')
+      .then(function (r) { return r.json(); })
+      .then(function (data) { _renderComments(alertId, (data && data.comments) || []); })
+      .catch(function () {
+        el.innerHTML = '<div class="error">Failed to load comments</div>';
+      });
+  }
+
+  // Distinct action name: alerts.html declares its own top-level addComment(),
+  // and whichever script loaded last would win if both claimed `window.addComment`.
+  function ionAlertAddComment(alertId) {
+    var input = document.getElementById('comment-input');
+    var content = input && input.value.trim();
+    if (!content) return;
+    fetch('/api/elasticsearch/alerts/' + encodeURIComponent(alertId) + '/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: content })
+    }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (input) input.value = '';
+      loadAlertComments(alertId);
+    }).catch(function () { _notify('Failed to add comment', 'error'); });
+  }
+
   function renderRelatedSection(title, alerts, matchType) {
-      const currentCase = _current && triageCache[_current.id]?.case_id;
+      const currentCase = _current && (_triageFor(_current.id) || {}).case_id;
 
       return `
           <div class="related-section">
@@ -298,10 +543,10 @@
                   ${currentCase ? `<button class="btn btn-sm btn-secondary" data-click-action="linkAllToCase" data-args='["${matchType}", ${currentCase}]'>Link all to case</button>` : ''}
               </div>
               ${alerts.slice(0, 10).map(a => {
-                  const triage = triageCache[a.id];
+                  const triage = _triageFor(a.id);
                   const inSameCase = triage && currentCase && triage.case_id === currentCase;
                   const hasCase = triage && triage.case_id;
-                  const similarity = calculateSimilarity(_current, a, matchType);
+                  const similarity = _similarity(_current, a, matchType);
 
                   return `
                   <div class="related-alert-item ${inSameCase ? 'same-case' : ''}">
@@ -309,7 +554,7 @@
                           <span class="severity-badge severity-${a.severity}">${a.severity}</span>
                           <span class="similarity-badge similarity-${similarity.level}" title="${similarity.reasons.join(', ')}">${similarity.score}%</span>
                           <span class="related-alert-title" title="${escapeHtml(a.title)}">${escapeHtml(a.title)}</span>
-                          <span class="related-alert-meta">${formatDate(a.timestamp)}</span>
+                          <span class="related-alert-meta">${_fmtDate(a.timestamp)}</span>
                       </div>
                       <div class="related-alert-actions">
                           ${hasCase
@@ -385,7 +630,7 @@
           // Sort chronologically
           timelineAlerts.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-          renderTimeline(timelineContainer, timelineAlerts);
+          _timelineInto(timelineContainer, timelineAlerts);
 
       } catch (error) {
           console.error('Error loading related alerts:', error);
@@ -399,7 +644,7 @@
       const ev = data.evidence || [];
       const counts = data.counts || {};
       const verdict = String(rep.verdict || 'inconclusive');
-      const vClass = _AUTOINV_VERDICT_CLASS[verdict] || 'autoinv-v-inc';
+      const vClass = _verdictClass(verdict);
       let h = '<div class="autoinv-report">';
 
       // Header: verdict + confidence + severity.
@@ -428,7 +673,7 @@
       if ((rep.findings || []).length) {
           h += '<div class="autoinv-section-title">Findings</div><ul class="autoinv-findings">';
           for (const f of rep.findings) {
-              h += '<li>' + escapeHtml(String(f.claim || '')) + _autoinvRefBadges(f.evidence_refs) + '</li>';
+              h += '<li>' + escapeHtml(String(f.claim || '')) + _refBadges(f.evidence_refs) + '</li>';
           }
           h += '</ul>';
       }
@@ -439,7 +684,7 @@
           for (const o of rep.key_observations) {
               h += '<tr><td class="autoinv-obs-k">' + escapeHtml(String(o.field || '')) + '</td>'
                  + '<td>' + escapeHtml(String(o.value || '')) + ' <span class="autoinv-sig">' + escapeHtml(String(o.significance || '')) + '</span>'
-                 + _autoinvRefBadges(o.evidence_refs) + '</td></tr>';
+                 + _refBadges(o.evidence_refs) + '</td></tr>';
           }
           h += '</tbody></table>';
       }
@@ -521,7 +766,7 @@
   async function aiAnalyzeAlert(alertId) {
       const container = document.getElementById('ai-analysis-result');
       if (!container) return;
-      const payload = getAlertPayload(alertId);
+      const payload = _alertPayload(alertId);
       if (!payload) return;
 
       container.className = 'ai-analysis-result visible';
@@ -540,7 +785,7 @@
                   <span>AI Analysis</span>
                   <span class="ai-model-tag">${escapeHtml(data.model || '')}</span>
               </div>
-              <div class="ai-result-body">${formatAIContent(escapeHtml(data.analysis || ''))}</div>
+              <div class="ai-result-body">${_aiContent(escapeHtml(data.analysis || ''))}</div>
           `;
       } catch (e) {
           container.innerHTML = `<div class="ai-error">AI analysis failed: ${escapeHtml(e.message)}</div>`;
@@ -549,11 +794,11 @@
 
   function openAIChatWithContext(alertId) {
       if (!_opts.aiAvailable) {
-          showNotification('AI service is not available', 'error');
+          _notify('AI service is not available', 'error');
           return;
       }
 
-      const payload = getAlertPayload(alertId);
+      const payload = _alertPayload(alertId);
       if (!payload) return;
 
       // Build context message
@@ -591,7 +836,7 @@
       // Open chat panel if closed
       const panel = document.getElementById('chat-panel');
       if (!panel || !panel.classList.contains('open')) {
-          toggleChat();
+          if (typeof window.toggleChat === 'function') window.toggleChat();
       }
 
       // Open AI chat, set analyst context, and send
@@ -648,10 +893,17 @@
                   .catch(() => { seqEl.innerHTML = '<div class="error">Failed to load sequence</div>'; });
           }
       }
-      // Lazy-load raw data on first click
-      if (tabId === 'rawdata' && _current && !_current.raw_data) {
+      // Lazy-load raw data on first click.
+      // v0.79.5: the guard used to be `&& !_current.raw_data`, which meant that
+      // once anything else had populated raw_data (the Fields tab, or the
+      // v0.79.2 hydration that runs on mount) this branch was skipped entirely
+      // and the tab sat on "Click to load raw data..." forever — holding the
+      // document it was refusing to show. Render from cache when we have it.
+      if (tabId === 'rawdata' && _current) {
           const container = document.getElementById('raw-data-content');
-          if (container && container.querySelector('.loading')) {
+          if (container && container.querySelector('.loading') && _current.raw_data) {
+              container.innerHTML = syntaxHighlightJSON(_current.raw_data);
+          } else if (container && container.querySelector('.loading')) {
               container.innerHTML = '<div class="loading">Loading raw data...</div>';
               // v0.79.2: through the coalescer like every other consumer. On
               // /alerts this is the tab-click path, so it also benefits: opening
@@ -673,11 +925,32 @@
               loadAlertParsedFields(_current.id, container);
           }
       }
+      // v0.79.5: Related and Timeline are filled by the SAME request, so one
+      // fetch covers both tabs. Previously nothing lazy-loaded them at all —
+      // /alerts called loadRelatedAlerts() itself and /cases relied on the
+      // stacked layout loading everything up front. In tabs mode neither
+      // happened, so both tabs sat on their placeholder.
+      if ((tabId === 'related' || tabId === 'timeline') && _current && !_relatedLoaded) {
+          _relatedLoaded = true;
+          loadRelatedAlerts(_current);
+      }
+      // Comments: only /alerts filled these, as a side effect of its triage-bar
+      // load. Fetched here on first click so a case gets them too.
+      if (tabId === 'comments' && _current && !_commentsLoaded) {
+          _commentsLoaded = true;
+          loadAlertComments(_current.id);
+      }
   }
 
   function _renderHead(alert) {
-    // Triage bar placeholder
-    let html = `<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage...</span></div>`;
+    // Triage bar placeholder. v0.79.5: only rendered when the host page can
+    // actually fill it — renderTriageBar() lives in alerts.html and nowhere
+    // else, so on /cases this was a permanent "Loading triage..." with nothing
+    // behind it. /cases carries case status, assignee and notes in the case
+    // panel above, which is the same information one level up.
+    let html = _opts.triageBar === false
+        ? ''
+        : `<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage...</span></div>`;
 
     // Metadata grid
     html += `<div class="alert-meta-grid">
@@ -779,8 +1052,25 @@
   }
 
   // -- section shell: the ONLY thing that differs between the two layouts ----
+  // v0.79.5: a host declares which sections it can populate. Default is all, so
+  // /alerts is untouched.
+  //
+  // The triage bar and Comments are loaded by alerts.html and by nothing else —
+  // renderTriageBar() and the comments loader live in that page and reach into
+  // its own state (currentDetailAlert, TRIAGE_STATUSES, PRIORITIES, plus half a
+  // dozen page actions). On /cases the component rendered both and neither was
+  // ever filled, so they were permanent "Loading..." spinners — and duplicates
+  // of case status, notes and Kibana comments that the case panel already
+  // provides. Rendering nothing beats rendering a spinner that never resolves.
+  function _visibleSections() {
+    var allow = _opts.sections;
+    if (!allow || !allow.length) return SECTIONS;
+    return SECTIONS.filter(function (s) { return allow.indexOf(s.id) !== -1; });
+  }
+
   function _sectionsHtml(alert) {
     var stacked = _opts.layout === 'stacked';
+    var SECTIONS = _visibleSections();
     var h = '';
 
     if (stacked) {
@@ -946,6 +1236,8 @@
 
   function mount(container, alert, opts) {
     if (!container) return;
+    _relatedLoaded = false;           // new alert — the shared fetch must re-run
+    _commentsLoaded = false;
     _fromObservables(alert);          // free — the data is already in hand
     container.innerHTML = render(alert, opts);
     _hydrateFromRaw(alert);           // only for what observables cannot supply
@@ -953,16 +1245,50 @@
     // lazy - load the ones that would otherwise wait for a click the analyst
     // is never going to make.
     if (_opts.layout === 'stacked') {
+      _relatedLoaded = true;
       loadRelatedAlerts(alert);
       var f = document.getElementById('alert-fields-content');
       if (f) loadAlertParsedFields(alert.id, f);
       _loadRawInto(document.getElementById('raw-data-content'), alert);
       _observeSections();
+      return;
+    }
+    // Tabs: load ONLY the section that is actually on screen. This is what
+    // takes case-open from nine requests down to two — every other section
+    // fetches when its tab is first opened, and a section nobody opens costs
+    // nothing. See switchDetailTab for the per-tab loaders.
+    var first = _visibleSections()[0];
+    if (first) _loadSection(first.id, alert);
+  }
+
+  // Load whichever section is showing on first paint. Mirrors switchDetailTab's
+  // lazy branches so the first tab behaves exactly like a clicked one.
+  function _loadSection(id, alert) {
+    if (id === 'related' || id === 'timeline') {
+      _relatedLoaded = true;
+      loadRelatedAlerts(alert);
+      return;
+    }
+    if (id === 'fields') {
+      var f = document.getElementById('alert-fields-content');
+      if (f) loadAlertParsedFields(alert.id, f);
+      return;
+    }
+    if (id === 'comments') {
+      _commentsLoaded = true;
+      loadAlertComments(alert.id);
+      return;
+    }
+    if (id === 'rawdata') {
+      _loadRawInto(document.getElementById('raw-data-content'), alert);
     }
   }
 
   function _loadRawInto(el, alert) {
-    if (!el || alert.raw_data) return;
+    if (!el) return;
+    // Same trap as the rawdata tab branch: having the document is a reason to
+    // RENDER it, not a reason to skip.
+    if (alert.raw_data) { el.innerHTML = syntaxHighlightJSON(alert.raw_data); return; }
     // Shares the in-flight request with the Fields section and (on /cases) the
     // rule guide instead of issuing a third identical one.
     fetchRawOnce(alert.id)
@@ -1013,6 +1339,8 @@
   // working while making them available to /cases for the first time.
   window.ionAlertDetailJump = function (event, dataset) { showSection(dataset && dataset.section); };
   window.switchDetailTab = switchDetailTab;
+  window.ionAlertAddComment = ionAlertAddComment;
+  window.loadAlertComments = loadAlertComments;
   window.toggleAllAlertFields = toggleAllAlertFields;
   window.addAlertFieldsAsEvidence = addAlertFieldsAsEvidence;
   window.runAutoInvestigate = runAutoInvestigate;

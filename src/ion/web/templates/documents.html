@@ -983,7 +983,7 @@ function renderDocRail(activeId) {
           <div class="ion-ws-rail-item-sub">${escapeHtml(d.output_format || '')} · v${d.current_version || 1}</div>
         </div>`).join('')
         + (hiddenCount
-            ? `<div class="ion-ws-rail-item-sub" style="padding-top:.6rem;">${hiddenCount} more — narrow the folder or filters to see them</div>`
+            ? `<div class="ion-ws-rail-item-sub ion-ws-rail-overflow">${hiddenCount} more — narrow the folder or filters to see them</div>`
             : '');
 
     const sel = rail.querySelector('.ion-ws-rail-item.selected');

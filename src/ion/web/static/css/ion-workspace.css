@@ -119,6 +119,21 @@
     position: absolute; inset: 0 auto 0 0; width: 3px;
 }
 
+/* v0.79.5: severity colour by CLASS, not `style="background:var(--sev-x)"`.
+   CSP has enforced `style-src-attr 'none'` since v0.31.21, so the inline
+   attribute was refused outright and every rail dot rendered colourless —
+   visible as the "Refused to apply inline style" console error on /cases. */
+.rail-sev-critical { background: var(--sev-critical); }
+.rail-sev-high     { background: var(--sev-high); }
+.rail-sev-medium   { background: var(--sev-medium); }
+.rail-sev-low      { background: var(--sev-low); }
+.rail-sev-info     { background: var(--sev-info); }
+
+/* v0.79.5: the rail overflow note carried an inline `style="padding-top:.6rem"`
+   introduced by the v0.79.0 /documents rebuild — a CSP violation on a surface
+   that had been fully cleaned at v0.31.21. */
+.ion-ws-rail-overflow { padding-top: .6rem; }
+
 .ion-ws-rail-item.selected,
 .cpanel-rail-alert.selected {
     border-color: var(--primary);
@@ -165,8 +180,8 @@
     padding: 1rem 1rem 1.5rem;
 }
 
-/* Two-column alert workspace: the case's alerts on the left, the SHARED
-   alert-detail component (stacked layout) on the right. */
+/* Alert workspace: the case's alerts on the left, the SHARED alert-detail
+   component (tabs, v0.79.5) in the middle, reference material on the right. */
 .ion-ws-grid,
 .cpanel-workspace {
     display: grid;
@@ -174,6 +189,70 @@
     gap: 0;
     flex: 1;
     min-height: 0;
+}
+
+/* v0.79.5: the guide column. Only .cpanel-workspace gains a third column —
+   /documents uses .ion-ws-grid and has no aside. */
+.cpanel-workspace:has(> .cpanel-guide) {
+    grid-template-columns: 300px 1fr 340px;
+}
+
+.cpanel-workspace > .cpanel-guide {
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    min-height: 0;
+    padding: 1rem 1rem 1.5rem;
+}
+
+.cpanel-guide-sec { margin-bottom: 1.1rem; }
+
+.cpanel-guide-title {
+    font-size: 0.68rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin: 0 0 0.5rem;
+}
+
+/* Below ~1400px three columns squeeze the guide to an unreadable strip, so it
+   becomes a full-width row under the rail + detail instead. Capped, because a
+   long investigation guide must not push the tabs off screen. */
+@media (max-width: 1400px) {
+    .cpanel-workspace:has(> .cpanel-guide) {
+        grid-template-columns: 280px 1fr;
+        grid-template-rows: minmax(0, 1fr) auto;
+    }
+    .cpanel-workspace > .cpanel-guide {
+        grid-column: 1 / -1;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        max-height: 34vh;
+    }
+}
+
+/* Browsers without :has() keep two columns and the guide simply stacks last —
+   degraded, not broken. */
+@supports not selector(:has(*)) {
+    .cpanel-workspace > .cpanel-guide {
+        grid-column: 1 / -1;
+        border-left: none;
+        border-top: 1px solid var(--border);
+        max-height: 34vh;
+    }
+}
+
+/* MUST come after the :has() rules above. The existing 1100px collapse targets
+   plain `.cpanel-workspace`, which is LOWER specificity than
+   `.cpanel-workspace:has(> .cpanel-guide)` and appears earlier in the file — so
+   without this the guide variant would stay two-column below 1100px and the
+   rail would keep a 280px column it no longer has room for. */
+@media (max-width: 1100px) {
+    .cpanel-workspace:has(> .cpanel-guide) {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto minmax(0, 1fr) auto;
+    }
+    .cpanel-workspace > .cpanel-guide { max-height: 40vh; }
 }
 
 /* Below ~900px an inset overlay wastes screen — go edge to edge. */

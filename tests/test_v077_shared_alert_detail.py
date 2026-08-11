@@ -243,10 +243,26 @@ def test_both_pages_get_the_shared_sheet(base):
     assert "/static/css/ion-workspace.css" in base
 
 
-def test_cases_uses_the_stacked_layout(cases):
+def test_cases_uses_the_tabbed_layout(cases):
+    """SUPERSEDED at v0.79.5 — was test_cases_uses_the_stacked_layout.
+
+    v0.77.0 chose stacked so that seeing an alert fully cost one click instead
+    of eight. In production that turned out to have two costs the design did not
+    anticipate: opening every section at once made ONE case-alert click fan out
+    to nine requests, and — because the component was throwing ReferenceError on
+    /cases (see test_v079_5_case_alert_detail.py) — it put every broken section
+    on screen simultaneously, as a wall of spinners that could not be scrolled
+    past because the collapsed stack fitted in one viewport.
+
+    Tabs with per-tab lazy loading keep the fix (nothing is behind an accordion;
+    the first tab is populated on open) while showing one section at a time.
+    The click-count win is preserved by _visibleSections + the first-tab loader,
+    not by rendering everything.
+    """
     js = _inline_js(cases)
     assert "window.ionAlertDetail.mount(" in js
-    assert "layout: 'stacked'" in js
+    assert "layout: 'tabs'" in js
+    assert "layout: 'stacked'" not in js
 
 
 def test_selecting_an_alert_needs_no_refetch(cases):

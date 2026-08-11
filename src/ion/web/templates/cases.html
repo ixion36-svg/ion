@@ -2867,8 +2867,21 @@ function selectCaseAlert(alertId, idx, caseId) {
         title: alert.rule_name || alert.title || String(alertId).substring(0, 24)
     });
 
+    // v0.79.5: tabs, not stacked, and only the sections /cases can populate.
+    //
+    // Stacked opened every section at once, which is what made one click fan
+    // out to nine requests — and it meant every broken section was on screen
+    // simultaneously. Tabs load on demand: two requests on open, the rest when
+    // a tab is first clicked.
+    //
+    // `comments` and the triage bar are omitted because their loaders live in
+    // alerts.html and nothing here fills them; the case panel above already
+    // shows case status, notes and Kibana comments. `case` is omitted for the
+    // same reason — we ARE in the case.
     window.ionAlertDetail.mount(host, forDetail, {
-        layout: 'stacked',
+        layout: 'tabs',
+        sections: ['related', 'timeline', 'comments', 'sequence', 'autoinvestigate', 'fields', 'rawdata'],
+        triageBar: false,
         aiAvailable: true,
         arkimeEnabled: !!window.__ionArkimeEnabled,
         classPrefix: 'cpanel-alert',
@@ -2889,24 +2902,36 @@ function _appendCaseOnlySections(host, alertId, caseId, alert) {
     const pinTitle = alert.rule_name || String(alertId).substring(0, 24);
     const pinSev = alert.priority || '';
 
-    const extra = document.createElement('div');
-    extra.innerHTML =
-        '<section class="iad-section"><h4 class="iad-section-title">Rule guide</h4>'
+    // v0.79.5: renders into the side panel, NOT appended after the component.
+    // Falls back to appending only if the aside is missing, so a stale cached
+    // template cannot leave the guide with nowhere to go.
+    const aside = document.getElementById('cpanel-alert-guide');
+    const target = aside || host;
+
+    const html =
+        '<section class="cpanel-guide-sec"><h4 class="cpanel-guide-title">Investigation guide</h4>'
       +   '<div class="cpanel-rule-guide-box" id="' + rgId + '"><div class="loading">Loading rule guide…</div></div>'
       + '</section>'
-      + '<section class="iad-section"><h4 class="iad-section-title">Process tree</h4>'
+      + '<section class="cpanel-guide-sec"><h4 class="cpanel-guide-title">Process tree</h4>'
       +   '<div class="cpanel-proc-tree" id="' + ptId + '"><div class="loading">Loading process tree…</div></div>'
       + '</section>'
-      + '<section class="iad-section">'
+      + '<section class="cpanel-guide-sec">'
       +   '<button class="cpanel-pin-btn" type="button" '
       +     'data-click-action="pinAlertToCase" data-args=\'[' + caseId + ',"' + esc(alertId) + '","'
       +       esc(pinTitle) + '","' + esc(pinSev) + '"]\'>'
       +     '<i class="icon-bookmark _ion-s-782b602101"></i>Pin as evidence</button>'
       + '</section>';
-    while (extra.firstChild) host.appendChild(extra.firstChild);
 
-    // These were behind toggles; nothing is behind a toggle any more, so load
-    // them straight away.
+    if (aside) {
+        aside.innerHTML = html;           // replaces the previous alert's guide
+    } else {
+        const extra = document.createElement('div');
+        extra.innerHTML = html;
+        while (extra.firstChild) host.appendChild(extra.firstChild);
+    }
+
+    // The guide shares the component's coalesced /raw request, so showing it
+    // beside the tabs costs no extra round trip (v0.79.2).
     if (typeof loadRuleGuideInto === 'function') loadRuleGuideInto(alertId, rgId);
     if (typeof loadProcessTreeInto === 'function') loadProcessTreeInto(alertId, ptId, caseId);
 }
@@ -3465,7 +3490,7 @@ function renderPanelContent(c) {
             html += '<div class="cpanel-rail-alert' + (idx === 0 ? ' selected' : '') + '" '
                 +   'id="rail-alert-' + idx + '" '
                 +   'data-click-action="selectCaseAlert" data-args=\'["' + esc(alertId) + '",' + idx + ',' + c.id + ']\'>'
-                +   '<span class="rail-sev" style="background:var(--sev-' + esc(sev) + ')"></span>'
+                +   '<span class="rail-sev rail-sev-' + esc(sev) + '"></span>'
                 +   '<div class="cpanel-rail-alert-head">'
                 +     '<span class="cpanel-rail-alert-name">' + esc(displayName) + '</span>'
                 +     '<span class="cpanel-alert-badge _ion-s-19fdfcbae6">' + esc(st) + '</span>'
@@ -3475,10 +3500,18 @@ function renderPanelContent(c) {
         });
         html += '</div>';
 
-        // ── right: the shared alert-detail component mounts here ──
+        // ── middle: the shared alert-detail component mounts here ──
         html += '<div class="cpanel-detail" id="cpanel-alert-workspace">'
             +   '<div class="loading">Loading alert…</div>'
             + '</div>';
+
+        // ── right: reference material, beside the tabs rather than below them.
+        // The rule guide, process tree and pin action used to append as further
+        // STACKED sections under the component. Two problems with that: they
+        // are reference you want visible WHILE reading a tab, not something to
+        // scroll past to reach anything else; and once the component switched
+        // to tabs (v0.79.5) that markup had no stack left to belong to.
+        html += '<aside class="cpanel-guide" id="cpanel-alert-guide"></aside>';
 
         html += '</div>';
     } else {
