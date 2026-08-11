@@ -1,13 +1,26 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.80.2 -->
-<!-- ion-doc:version=0.80.2 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.80.3 -->
+<!-- ion-doc:version=0.80.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-11 -->
 
 # Changelog
+
+## v0.80.3 — 2026-08-11
+
+**Two `/pcap` panels have never rendered when they had data.**
+
+- `renderCerts` and `renderHosts` map over `certs`/`hosts` but dereference **`f`** — the binder of the JA3/JA4/HASSH fingerprint tables directly above, copied down with the row markup. Both threw `ReferenceError: f is not defined`. It fires only for a capture that actually contains TLS certificates or host profiles, so a thin PCAP looked fine and the two panels simply stayed empty; there was no failed request and no server-side error to notice.
+- The field never existed on either type. Certificates carry `subject, issuer, self_signed, not_before, not_after, validity_days, serial, sans, sig_algorithm`; host profiles carry `ip, os, role, sent, received, snis, beacons, findings`. Neither has `known_malware` — that lives on fingerprints. So the highlight is removed rather than repointed at a substitute the data cannot support.
+- **Proved by execution, not by reading.** Both functions were extracted and run against sample cert and host data: the shipped v0.79.5 template throws on each, the fixed template renders both tables. Reading the diff cannot distinguish "fixed" from "differently broken" here.
+- The v0.80.0 CSP sweep rewrote these two lines from `style=` to `data-ion-style=` and did not notice `f` was undefined — a mechanical migration cannot see a scope error. The bug predates it.
+- **A general scope-analysis test was written and deliberately discarded.** It passed on the broken code, because `f` *is* bound — in a sibling callback higher up the file — and the heuristic accepted that as in scope. Removing that allowance made it flag 24 legitimate closures over outer variables. A check that misses the real defect and invents two dozen false ones is worse than none; the shipped tests pin the two panels by shape, and the limitation is recorded in the test file.
+- Also pinned: `/pcap` carries no inline `style=`. The assertion uses a `(?<![-\w])` lookbehind because `data-ion-style=` ends in `style=` — the same substring collision that made the v0.80.0 sweep report 163 violations against a true count of 22. A naive grep still reports 15 on this file; the real number is 0.
+
+**Arkime auto-case creation verified against the live database**, since the fix sits on the page that flow feeds. Driving the real service with a synthetic Arkime-linked alert: the both-fields filter admits only the alert carrying `network.community_id` *and* `arkime_node`; the case is created as `[Auto] <title> [<node>]`, owned by Bob, numbered, with a triage row linking alert to case and PCAP analysis enqueued with the full flow. A second pass creates nothing. No change was needed — recorded because it had not been exercised end-to-end before.
 
 ## v0.80.2 — 2026-08-11
 
