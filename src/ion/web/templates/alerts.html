@@ -2,6 +2,10 @@
 
 {% block title %}Alerts · ION{% endblock %}
 
+{% block head_css %}
+<link rel="stylesheet" href="/static/css/alerts-queue.css?v={{ ion_version }}">
+{% endblock %}
+
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-10 md:py-12">
@@ -386,39 +390,60 @@
     <!-- Alert Table -->
     <div class="card card-wide">
         <div class="card-body">
-            <table class="data-table" id="alerts-table">
-                <thead>
-                    <tr>
-                        <th class="checkbox-col _ion-s-907a32b95c"><input type="checkbox" id="header-select-all" data-change-action="toggleSelectAll" title="Select all visible alerts"></th>
-                        <th class="_ion-s-5aec6ffae3"></th>
-                        <th class="sortable" data-click-action="sortBy" data-args='["severity"]'>
-                            Severity <span class="sort-arrow" id="sort-severity"></span>
-                        </th>
-                        <th class="sortable" data-click-action="sortBy" data-args='["title"]'>
-                            Title <span class="sort-arrow" id="sort-title"></span>
-                        </th>
-                        <th class="sortable" data-click-action="sortBy" data-args='["host"]'>
-                            Host <span class="sort-arrow" id="sort-host"></span>
-                        </th>
-                        <th class="sortable" data-click-action="sortBy" data-args='["user"]'>
-                            User <span class="sort-arrow" id="sort-user"></span>
-                        </th>
-                        <th>Rule</th>
-                        <th class="sortable" data-click-action="sortBy" data-args='["source_system"]'>
-                            System <span class="sort-arrow" id="sort-source_system"></span>
-                        </th>
-                        <th>Case</th>
-                        <th>Status</th>
-                        <th class="sortable" data-click-action="sortBy" data-args='["timestamp"]'>
-                            Time <span class="sort-arrow" id="sort-timestamp"></span>
-                        </th>
-                        <th class="_ion-s-1a91ef9eca">Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="alerts-tbody">
-                    <tr><td colspan="12" class="loading">Loading alerts...</td></tr>
-                </tbody>
-            </table>
+            <!-- The queue's header and rows are rendered by static/js/alerts-queue.js.
+                 Columns, grouping and sort live there, so this is deliberately an
+                 empty shell — a hardcoded <thead> here would silently disagree with
+                 the module's column set the moment either changed. -->
+            <!-- Saved views. The built-ins are the four questions an analyst opens
+                 this page to ask; anything saved with the existing Save View control
+                 appears alongside them. Counts are live so an empty view is visible
+                 before it is clicked. -->
+            <div class="aq-views" id="aq-views"></div>
+            <div class="aq-chips" id="aq-chips"></div>
+            <div class="aq-toolbar">
+                <label class="aq-tool">Group
+                    <select id="aq-group">
+                        <option value="sev">by severity</option>
+                        <option value="status">by status</option>
+                        <option value="rule_name">by rule</option>
+                        <option value="host">by host</option>
+                        <option value="user">by user</option>
+                        <option value="none">off</option>
+                    </select>
+                </label>
+                <div class="aq-seg" id="aq-density">
+                    <button type="button" data-aq-d="dense" class="is-on">Compact</button>
+                    <button type="button" data-aq-d="roomy">Roomy</button>
+                </div>
+                <div class="aq-seg" id="aq-tz">
+                    <button type="button" data-aq-tz="local" class="is-on">Local</button>
+                    <button type="button" data-aq-tz="utc">UTC</button>
+                </div>
+                <div class="aq-colwrap">
+                    <button type="button" class="aq-tool-btn" id="aq-cols-btn">Columns</button>
+                    <div class="aq-colmenu" id="aq-cols"></div>
+                </div>
+                <span class="aq-count" id="aq-count"></span>
+            </div>
+            <div class="aq-wrap">
+                <table class="aq" id="alerts-table">
+                    <thead><tr></tr></thead>
+                    <tbody id="alerts-tbody">
+                        <tr><td colspan="9" class="aq-empty">Loading alerts…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="aq-keys">
+                <span><kbd>j</kbd><kbd>k</kbd> move</span>
+                <span><kbd>x</kbd> select</span>
+                <span><kbd>shift</kbd>+<kbd>j</kbd> extend</span>
+                <span><kbd>enter</kbd> open</span>
+                <span><kbd>e</kbd> acknowledge</span>
+                <span><kbd>c</kbd> case</span>
+                <span><kbd>a</kbd> assign to me</span>
+                <span><kbd>z</kbd> collapse group</span>
+                <span><kbd>esc</kbd> clear</span>
+            </div>
         </div>
     </div>
 
@@ -549,6 +574,9 @@
 {% block scripts %}
 <!-- topojson decoder for the rotating globe's country outlines -->
 <script nonce="{{ csp_nonce }}" src="/static/js/topojson-client.min.js"></script>
+<!-- the triage queue. Takes every dependency through mount() rather than reading
+     this page's globals, so it cannot repeat the v0.79.5 ambient-global failure. -->
+<script nonce="{{ csp_nonce }}" src="/static/js/alerts-queue.js?v={{ ion_version }}"></script>
 <style nonce="{{ csp_nonce }}">
 /* Full-width override for alerts page */
 .container:has(.alerts-grid) {
@@ -6897,13 +6925,20 @@ function applyFilters() {
         return effectiveStatus === statusFilter;
     };
 
-    alertsIgnoringStatus = allAlerts.filter(matchesNonStatus);
+    // The saved view narrows both sets, so the aggregates keep describing exactly
+    // the rows in the table — an aggregate that ignores the active filter looks
+    // like an answer to the question you just asked.
+    const matchesView = _viewPredicate(queueView);
+
+    alertsIgnoringStatus = allAlerts.filter(a => matchesNonStatus(a) && matchesView(a));
     filteredAlerts = alertsIgnoringStatus.filter(matchesStatus);
 
     applySorting();
     renderAlerts();
     renderSidePanels();
     updateStatsBar();
+    renderQueueViews();
+    renderFilterChips();
 }
 
 function filterByEntity(type, value) {
@@ -7018,7 +7053,214 @@ function populateSystemFilterFromAlerts(alerts) {
 }
 
 
+// ── Saved views ───────────────────────────────────────────────────────────
+// A view is one extra predicate over the same pipeline, never a second one:
+// two filter paths would eventually disagree about what the table is showing.
+// Built-ins are limited to what the loaded data can answer honestly — "my open"
+// and "Bob disagreed" need assignee and verdict, which the batch triage endpoint
+// does not return yet, so they are deliberately absent rather than always empty.
+let queueView = 'active';
+
+const AQ_VIEWS = [
+    { k: 'active',   label: 'Active',
+      f: (a, t) => (t.status || a.status) !== 'closed' },
+    { k: 'critical', label: 'Critical & high',
+      f: (a) => a.severity === 'critical' || a.severity === 'high' },
+    { k: 'ageing',   label: 'Ageing > 4h',
+      f: (a, t) => (t.status || a.status) !== 'closed'
+                && (Date.now() - Date.parse(a.timestamp)) > 4 * 3600 * 1000 },
+    { k: 'uncased',  label: 'Not in a case',
+      f: (a, t) => (t.status || a.status) !== 'closed' && !t.case_number },
+    { k: 'all',      label: 'Everything', f: () => true },
+];
+
+function _viewPredicate(key) {
+    const v = AQ_VIEWS.find(x => x.k === key);
+    if (v) return (a) => v.f(a, triageCache[a.id] || {});
+    const saved = getSavedFilters().find(f => f.id === key);
+    return saved ? () => true : () => true;   // a saved view sets the controls instead
+}
+
+function setQueueView(key) {
+    const saved = getSavedFilters().find(f => f.id === key);
+    if (saved) {
+        // a saved view IS a control state — apply it and stay on "Everything"
+        queueView = 'all';
+        applyFilterState(saved.state);
+        renderQueueViews();
+        return;
+    }
+    queueView = key;
+    applyFilters();
+}
+
+function renderQueueViews() {
+    const el = document.getElementById('aq-views');
+    if (!el) return;
+    const count = (v) => allAlerts.filter(a => v.f(a, triageCache[a.id] || {})).length;
+    const builtins = AQ_VIEWS.map(v =>
+        `<button type="button" class="aq-view${queueView === v.k ? ' is-on' : ''}" data-aq-view="${v.k}">`
+        + `${escapeHtml(v.label)}<span class="n">${count(v)}</span></button>`).join('');
+    const saved = getSavedFilters().map(f =>
+        `<button type="button" class="aq-view aq-view-saved" data-aq-view="${escapeHtml(f.id)}"`
+        + ` title="${escapeHtml(f.description || '')}">${escapeHtml(f.name)}</button>`).join('');
+    el.innerHTML = builtins + saved
+        + '<button type="button" class="aq-view aq-view-add" data-click-action="saveCurrentFilter">+ Save current</button>';
+}
+
+// ── Active-filter chips ───────────────────────────────────────────────────
+// Every narrowing in one place, each removable on its own. The legacy
+// #active-filter-banner only ever described the entity filter, so an analyst
+// filtered by severity AND host saw one of the two.
+function renderFilterChips() {
+    const el = document.getElementById('aq-chips');
+    if (!el) return;
+    const chips = [];
+    const sev = document.getElementById('alert-severity-filter').value;
+    const st = document.getElementById('alert-status-filter').value;
+    const search = document.getElementById('alert-search').value.trim();
+    const sys = document.getElementById('alert-system-filter')?.value;
+
+    if (sev) chips.push(['sev', 'Severity', sev]);
+    if (st) chips.push(['status', 'Status', st]);
+    if (sys) chips.push(['system', 'System', sys]);
+    if (entityFilter) chips.push(['entity', entityFilter.type, entityFilter.value]);
+    if (search) chips.push(['search', 'Text', `"${search}"`]);
+
+    el.innerHTML = !chips.length ? '' : chips.map(([k, lab, val]) =>
+        `<span class="aq-chip">${escapeHtml(lab)} <b>${escapeHtml(String(val))}</b>`
+        + `<button type="button" class="x" data-aq-chip="${k}" title="Remove">&#10005;</button></span>`
+    ).join('') + '<button type="button" class="aq-chip-all" data-aq-chip="__all">Clear all</button>';
+}
+
+function _clearChip(k) {
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+    if (k === 'sev' || k === '__all') set('alert-severity-filter', '');
+    if (k === 'status' || k === '__all') set('alert-status-filter', '');
+    if (k === 'system' || k === '__all') set('alert-system-filter', '');
+    if (k === 'search' || k === '__all') set('alert-search', '');
+    if (k === 'entity' || k === '__all') entityFilter = null;
+    // the system filter is applied server-side, so it needs a reload
+    if (k === 'system' || k === '__all') { loadAlerts(); return; }
+    applyFilters();
+}
+
+// ── Triage queue ──────────────────────────────────────────────────────────
+// The table is rendered by static/js/alerts-queue.js. This page still owns the
+// data, the filters and the actions; the module owns columns, grouping, the
+// keyboard cursor and the rows. Everything it needs is passed in explicitly.
+let _aqMounted = false;
+
+function _aqMount() {
+    if (_aqMounted || !window.ionAlertQueue) return;
+    _aqMounted = true;
+    window.ionAlertQueue.mount({
+        table: document.getElementById('alerts-table'),
+        getAlerts: () => filteredAlerts,
+        getTriage: (id) => triageCache[id],
+        selection: selectedAlertIds,
+        arkimeEnabled: arkimeEnabled,
+        systemBadge: (a) => renderSystemBadge(a),
+        // a modal owns the keyboard while it is open, or j/k would scroll the
+        // queue behind an open alert
+        isBlocked: () => !!document.querySelector(
+            '.modal.show, .acp-panel.open, #acp-closure-overlay.open'),
+        onSelectionChange: () => { updateBulkActionsBar(); syncSelectAllCheckbox(); },
+        onRender: (n) => {
+            const el = document.getElementById('aq-count');
+            if (el) el.textContent = `${n} of ${allAlerts.length}`;
+        },
+        actions: {
+            open:    (ids) => showAlertDetail(ids[0]),
+            ack:     (ids) => ids.forEach(id => quickStatusChange(id, 'acknowledged')),
+            assign:  (ids) => ids.forEach(id => quickAssignToMe(id)),
+            case:    (ids) => (ids.length > 1 ? showCreateCaseFromSelected() : showCreateCaseForm(ids[0])),
+            fp:      (ids) => showAlertClosureModal(ids[0], 'false_positive'),
+            bob:     (ids) => showAlertDetail(ids[0]),
+            pcap:    (ids) => { window.location.href = `/alerts/${encodeURIComponent(ids[0])}/arkime`; },
+            context: (ev, id) => showContextMenu(ev, id),
+        },
+    });
+    _aqBindToolbar();
+}
+
+function _aqBindToolbar() {
+    const q = window.ionAlertQueue;
+    const group = document.getElementById('aq-group');
+    if (group) group.addEventListener('change', (e) => q.setGroupBy(e.target.value));
+
+    const seg = (id, attr, fn) => {
+        const wrap = document.getElementById(id);
+        if (!wrap) return;
+        wrap.addEventListener('click', (e) => {
+            const b = e.target.closest('button'); if (!b) return;
+            wrap.querySelectorAll('button').forEach(x => x.classList.toggle('is-on', x === b));
+            fn(b.dataset[attr]);
+        });
+    };
+    seg('aq-density', 'aqD', (v) => q.setDensity(v));
+    seg('aq-tz', 'aqTz', (v) => q.setTimezone(v));
+
+    const views = document.getElementById('aq-views');
+    if (views) views.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-aq-view]');
+        if (b) setQueueView(b.dataset.aqView);
+    });
+    const chips = document.getElementById('aq-chips');
+    if (chips) chips.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-aq-chip]');
+        if (b) _clearChip(b.dataset.aqChip);
+    });
+
+    // sort is bound here rather than in the module: the header is rebuilt on every
+    // column change, so a listener attached to a <th> would not survive it
+    const table = document.getElementById('alerts-table');
+    table.addEventListener('click', (e) => {
+        const th = e.target.closest('th[data-aq-sort]');
+        if (th) q.setSort(th.dataset.aqSort);
+    });
+
+    const menu = document.getElementById('aq-cols');
+    const paint = () => {
+        menu.innerHTML = q.columns().filter(c => !c.fixed).map(c =>
+            `<label class="aq-colrow"><input type="checkbox" data-aq-col="${c.k}"${c.on ? ' checked' : ''}>`
+            + `<span>${escapeHtml(c.label)}</span></label>`).join('');
+    };
+    paint();
+    document.getElementById('aq-cols-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('is-open');
+    });
+    menu.addEventListener('click', (e) => e.stopPropagation());
+    menu.addEventListener('change', (e) => {
+        const cb = e.target.closest('[data-aq-col]');
+        if (cb) q.setColumn(cb.dataset.aqCol, cb.checked);
+    });
+    document.addEventListener('click', () => menu.classList.remove('is-open'));
+
+    // the sticky header sits directly under the page chrome; measuring beats
+    // hardcoding, because that height moves with wrapping and font size
+    const syncStick = () => {
+        const t = document.getElementById('alerts-table');
+        const top = t.getBoundingClientRect().top + window.scrollY;
+        const nav = document.querySelector('.tw-nav, nav');
+        const h = nav ? Math.round(nav.getBoundingClientRect().height) : 0;
+        document.documentElement.style.setProperty('--aq-stick', h + 'px');
+        void top;
+    };
+    window.addEventListener('resize', syncStick);
+    syncStick();
+}
+
 function renderAlerts() {
+    _aqMount();
+    if (window.ionAlertQueue) { window.ionAlertQueue.render(); return; }
+    // module missing (cache miss on a stale page): fall back to the plain list so
+    // the queue degrades to something readable rather than to nothing
+    _renderAlertsFallback();
+}
+
+function _renderAlertsFallback() {
     const tbody = document.getElementById('alerts-tbody');
 
     if (filteredAlerts.length === 0) {
@@ -9744,7 +9986,6 @@ document.addEventListener('DOMContentLoaded', loadBulkAssignOptions);
 // =========================================================================
 // Keyboard Shortcuts
 // =========================================================================
-let selectedRowIndex = -1;
 
 function initKeyboardShortcuts() {
     document.addEventListener('keydown', handleKeyboardShortcut);
@@ -9774,45 +10015,13 @@ function handleKeyboardShortcut(e) {
             } else {
                 // Clear selection
                 clearSelection();
-                selectedRowIndex = -1;
-                updateSelectedRow();
             }
             break;
 
-        case 'j':
-        case 'ArrowDown':
-            if (!anyModalOpen) {
-                e.preventDefault();
-                navigateAlerts(1);
-            }
-            break;
-
-        case 'k':
-        case 'ArrowUp':
-            if (!anyModalOpen) {
-                e.preventDefault();
-                navigateAlerts(-1);
-            }
-            break;
-
-        case 'Enter':
-            if (!anyModalOpen && selectedRowIndex >= 0 && filteredAlerts[selectedRowIndex]) {
-                e.preventDefault();
-                showAlertDetail(filteredAlerts[selectedRowIndex].id);
-            }
-            break;
-
-        case ' ': // Space to toggle selection
-            if (!anyModalOpen && selectedRowIndex >= 0 && filteredAlerts[selectedRowIndex]) {
-                e.preventDefault();
-                const alertId = filteredAlerts[selectedRowIndex].id;
-                const isSelected = selectedAlertIds.has(alertId);
-                toggleAlertSelection(alertId, !isSelected);
-                // Update checkbox visual
-                const checkbox = document.querySelector(`.alert-checkbox[data-alert-id="${alertId}"]`);
-                if (checkbox) checkbox.checked = !isSelected;
-            }
-            break;
+        // j/k/Enter/x over the queue belong to alerts-queue.js, which owns the
+        // cursor. Handling them here as well gave two cursors moving on one
+        // keypress, each unaware of the other. Its shortcuts that act on an OPEN
+        // MODAL stay below — the module stands down whenever one is open.
 
         case 'a':
             if (detailModalOpen && currentDetailAlert) {
@@ -9848,34 +10057,6 @@ function handleKeyboardShortcut(e) {
                 showKeyboardShortcutsHelp();
             }
             break;
-    }
-}
-
-function navigateAlerts(direction) {
-    if (filteredAlerts.length === 0) return;
-
-    selectedRowIndex += direction;
-
-    // Wrap around
-    if (selectedRowIndex < 0) selectedRowIndex = filteredAlerts.length - 1;
-    if (selectedRowIndex >= filteredAlerts.length) selectedRowIndex = 0;
-
-    updateSelectedRow();
-}
-
-function updateSelectedRow() {
-    // Remove previous selection
-    document.querySelectorAll('.alert-row.keyboard-selected').forEach(row => {
-        row.classList.remove('keyboard-selected');
-    });
-
-    if (selectedRowIndex >= 0 && filteredAlerts[selectedRowIndex]) {
-        const alertId = filteredAlerts[selectedRowIndex].id;
-        const row = document.querySelector(`.alert-row[data-alert-id="${alertId}"]`);
-        if (row) {
-            row.classList.add('keyboard-selected');
-            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-        }
     }
 }
 

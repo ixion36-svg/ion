@@ -25,6 +25,9 @@
          (used by /cases). The tabs layout on /alerts reuses that page's own
          existing .detail-tab* classes, so this cannot alter /alerts. -->
     <link rel="stylesheet" href="/static/css/alert-detail.css?v={{ ion_version }}">
+    {# page-scoped stylesheets. Everything above loads on every page whether it is
+       used or not; a sheet only one route needs belongs here instead. #}
+    {% block head_css %}{% endblock %}
     {# the inset-overlay workspace chrome shared by /cases and
        /documents. Moved out of cases.html so the second page to use it does
        not render unstyled — the v0.77.0 lesson. #}

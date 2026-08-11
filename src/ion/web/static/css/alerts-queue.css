@@ -1,0 +1,423 @@
+/* Alert triage queue — table styling for the /alerts rebuild.
+ *
+ * Colours come from ION's tokens, never from hand-picked hexes. The mockup this
+ * was built from invented all eight of its colours and made severity LOW cyan;
+ * --sev-low is grey on purpose so low severity cannot read as an accent.
+ */
+
+/* No overflow:hidden on the wrapper. An ancestor with non-visible overflow becomes
+   the scroll container for position:sticky, so the column header silently stops
+   sticking and scrolls away under the page chrome. Corners are rounded on the
+   cells instead. border-collapse must stay separate — collapse drops sticky th
+   borders in Chrome. */
+.aq-wrap {
+    border: 1px solid var(--ion-border, #212b38);
+    border-radius: 8px;
+    background: var(--ion-surface, #0f141b);
+}
+
+table.aq {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 12.5px;
+}
+
+table.aq thead tr:first-child th:first-child { border-top-left-radius: 7px; }
+table.aq thead tr:first-child th:last-child  { border-top-right-radius: 7px; }
+table.aq tbody tr:last-child td:first-child  { border-bottom-left-radius: 7px; }
+table.aq tbody tr:last-child td:last-child   { border-bottom-right-radius: 7px; }
+
+table.aq th {
+    text-align: left;
+    font-size: 10px;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+    color: var(--ion-text-muted, #94a3b8);
+    font-weight: 600;
+    padding: 7px 8px;
+    background: var(--ion-surface-2, #11141c);
+    box-shadow: inset 0 -1px 0 var(--ion-border, #222c39);
+    position: sticky;
+    top: var(--aq-stick, 0px);
+    z-index: 20;
+    user-select: none;
+}
+table.aq th[data-aq-sort] { cursor: pointer; }
+table.aq th[data-aq-sort]:hover { color: var(--ion-text, #e6e9ef); }
+table.aq th .aq-ar { color: var(--color-ion-cyan, #6de4ff); font-size: 9px; margin-left: 3px; }
+
+table.aq td {
+    padding: 6px 8px;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, .05);
+    vertical-align: middle;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* group headers draw their own padding inside .aq-ghead and must stay flush in
+   both densities */
+table.aq.aq-roomy tbody tr:not(.aq-grp) td { padding: 10px 8px; }
+
+table.aq tbody tr.aq-row { cursor: pointer; }
+table.aq tbody tr.aq-row td:first-child { border-left: 3px solid transparent; }
+
+/* Severity is carried by the whole row, not only the pill. These must precede the
+   hover / picked / cursor rules, which share their specificity and have to win. */
+tr.sv-critical td { background: color-mix(in srgb, var(--sev-critical) 7%, transparent); }
+tr.sv-high     td { background: color-mix(in srgb, var(--sev-high)     6%, transparent); }
+tr.sv-medium   td { background: color-mix(in srgb, var(--sev-medium)   5%, transparent); }
+tr.sv-low      td { background: color-mix(in srgb, var(--sev-low)      5%, transparent); }
+
+/* same selector depth as the transparent base rule above, or that one wins on
+   specificity and the edge stays invisible */
+table.aq tbody tr.sv-critical td:first-child { border-left-color: var(--sev-critical); }
+table.aq tbody tr.sv-high     td:first-child { border-left-color: var(--sev-high); }
+table.aq tbody tr.sv-medium   td:first-child { border-left-color: var(--sev-medium); }
+table.aq tbody tr.sv-low      td:first-child { border-left-color: var(--sev-low); }
+
+table.aq tbody tr.aq-row:hover td { background: rgba(255, 255, 255, .04); }
+table.aq tbody tr.aq-picked td { background: color-mix(in srgb, var(--color-ion-cyan) 10%, transparent); }
+
+/* The cursor reads as a focus ring across the row, so it never competes with the
+   severity edge for the same 3px. */
+table.aq tbody tr.aq-cur td {
+    background: color-mix(in srgb, var(--color-ion-cyan) 15%, transparent);
+    box-shadow: inset 0 1px 0 var(--color-ion-cyan), inset 0 -1px 0 var(--color-ion-cyan);
+}
+table.aq tbody tr.aq-cur td:last-child {
+    box-shadow: inset 0 1px 0 var(--color-ion-cyan), inset 0 -1px 0 var(--color-ion-cyan),
+                inset -1px 0 0 var(--color-ion-cyan);
+}
+
+/* ── columns ─────────────────────────────────────────────────────────────── */
+.aq-chk { width: 26px; }
+.aq-sev { width: 74px; }
+.aq-ts { width: 152px; }
+.aq-host { width: 118px; }
+.aq-user { width: 96px; }
+.aq-src { width: 92px; }
+.aq-age { width: 54px; }
+.aq-status { width: 96px; }
+.aq-case { width: 92px; }
+.aq-rule { width: 150px; }
+.aq-tactic { width: 130px; }
+.aq-ip { width: 116px; }
+.aq-node { width: 116px; }
+.aq-act { width: 104px; text-align: right; }
+
+.aq-mut { color: var(--ion-text-muted, #94a3b8); }
+.aq-mono { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; }
+.aq-hot { color: var(--color-ion-amber, #f8b33a); font-weight: 600; }
+.aq-ts, .aq-age { font-variant-numeric: tabular-nums; }
+.aq-ts { color: var(--ion-text-muted, #94a3b8); font-family: ui-monospace, Consolas, monospace; }
+.aq-ts .aq-d { color: #63728a; }
+
+/* the title is what the analyst reads first, so it gets full contrast; the
+   identifying columns sit one step down */
+.aq-title .aq-t { color: var(--ion-text, #e6e9ef); font-weight: 500; }
+.aq-host, .aq-user { color: var(--color-ink-500, #cbd5e1); }
+
+.aq-sev-pill {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .04em;
+}
+.aq-sev-pill.sev-critical { background: color-mix(in srgb, var(--sev-critical) 20%, #0d1117); color: var(--sev-critical); }
+.aq-sev-pill.sev-high     { background: color-mix(in srgb, var(--sev-high)     20%, #0d1117); color: var(--sev-high); }
+.aq-sev-pill.sev-medium   { background: color-mix(in srgb, var(--sev-medium)   20%, #0d1117); color: var(--sev-medium); }
+.aq-sev-pill.sev-low      { background: color-mix(in srgb, var(--sev-low)      18%, #0d1117); color: var(--sev-low); }
+
+.aq-st {
+    font-size: 10.5px;
+    padding: 1px 7px;
+    border-radius: 9px;
+    border: 1px solid var(--ion-border-strong, #2b3746);
+    color: var(--ion-text-muted, #94a3b8);
+}
+.aq-st-open { border-color: #3a4d66; color: #a8c0da; }
+.aq-st-acknowledged, .aq-st-in_progress { border-color: #3f5340; color: var(--color-ion-lime, #86f0a0); }
+.aq-st-closed { border-color: #3a3f47; color: #7b8794; }
+
+.aq-tag {
+    display: inline-block;
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    border-radius: 8px;
+    padding: 0 6px;
+    margin-left: 6px;
+    vertical-align: 1px;
+}
+/* iris marks model-derived or automation-owned values, so they never read as
+   something ION asserts */
+.aq-tag.aq-auto, .aq-tag.aq-autocase {
+    color: var(--color-ion-iris, #9a8cff);
+    border: 1px solid color-mix(in srgb, var(--color-ion-iris) 40%, transparent);
+    background: color-mix(in srgb, var(--color-ion-iris) 12%, transparent);
+}
+.aq-tag.aq-mitre {
+    color: var(--color-ion-iris, #9a8cff);
+    border: 1px solid color-mix(in srgb, var(--color-ion-iris) 30%, transparent);
+    background: color-mix(in srgb, var(--color-ion-iris) 8%, transparent);
+    font-weight: 600;
+}
+.aq-tag.aq-lab {
+    color: var(--color-ion-amber, #f8b33a);
+    border: 1px solid color-mix(in srgb, var(--color-ion-amber) 40%, transparent);
+    background: color-mix(in srgb, var(--color-ion-amber) 10%, transparent);
+}
+.aq-tag.aq-caseref {
+    color: var(--color-ion-cyan, #6de4ff);
+    border: 1px solid color-mix(in srgb, var(--color-ion-cyan) 35%, transparent);
+    background: color-mix(in srgb, var(--color-ion-cyan) 10%, transparent);
+    margin-left: 0;
+    font-weight: 600;
+}
+
+/* ── group headers ───────────────────────────────────────────────────────── */
+tr.aq-grp td {
+    background: var(--ion-surface-2, #131a24);
+    box-shadow: inset 0 -1px 0 var(--ion-border, #222c39);
+    padding: 0;
+}
+tr.aq-grp:hover td { background: rgba(255, 255, 255, .05); }
+.aq-ghead {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    border-left: 3px solid transparent;
+    cursor: pointer;
+}
+.aq-ghead.sev-critical { border-left-color: var(--sev-critical); background: linear-gradient(90deg, color-mix(in srgb, var(--sev-critical) 8%, transparent), transparent 55%); }
+.aq-ghead.sev-high     { border-left-color: var(--sev-high);     background: linear-gradient(90deg, color-mix(in srgb, var(--sev-high)     7%, transparent), transparent 55%); }
+.aq-ghead.sev-medium   { border-left-color: var(--sev-medium);   background: linear-gradient(90deg, color-mix(in srgb, var(--sev-medium)   6%, transparent), transparent 55%); }
+.aq-ghead.sev-low      { border-left-color: var(--sev-low);      background: linear-gradient(90deg, color-mix(in srgb, var(--sev-low)      6%, transparent), transparent 55%); }
+.aq-ghead .aq-gc { color: var(--ion-text-muted, #94a3b8); font-size: 10px; width: 9px; display: inline-block; transition: transform .15s; }
+.aq-ghead.aq-closed .aq-gc { transform: rotate(-90deg); }
+.aq-ghead .aq-gn { color: var(--ion-text, #e6e9ef); font-weight: 600; text-transform: capitalize; }
+.aq-ghead .aq-gct { color: var(--ion-text-muted, #94a3b8); font-variant-numeric: tabular-nums; }
+.aq-ghead .aq-gsel {
+    margin-left: auto;
+    background: color-mix(in srgb, var(--color-ion-cyan) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-ion-cyan) 35%, transparent);
+    color: var(--color-ink-500, #cbd5e1);
+    border-radius: 5px;
+    padding: 1px 8px;
+    font-size: 10.5px;
+    cursor: pointer;
+    font-family: inherit;
+}
+.aq-ghead .aq-gsel:hover { background: color-mix(in srgb, var(--color-ion-cyan) 22%, transparent); }
+
+/* severity mix bar, used on non-severity group headers */
+.aq-mix { display: flex; height: 5px; width: 64px; border-radius: 3px; overflow: hidden; background: rgba(255,255,255,.06); flex: none; }
+.aq-mix i { display: block; height: 100%; }
+.aq-mix i.sev-critical { background: var(--sev-critical); }
+.aq-mix i.sev-high     { background: var(--sev-high); }
+.aq-mix i.sev-medium   { background: var(--sev-medium); }
+.aq-mix i.sev-low      { background: var(--sev-low); }
+
+/* ── row actions ─────────────────────────────────────────────────────────── */
+/* dimmed until hover or cursor, so the column is not a wall of icons */
+.aq-acts { display: inline-flex; gap: 3px; opacity: .28; transition: opacity .12s; }
+tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
+.aq-ra {
+    width: 22px;
+    height: 20px;
+    border-radius: 5px;
+    border: 1px solid var(--ion-border-strong, #2a3644);
+    background: var(--ion-surface-2, #161d27);
+    color: var(--ion-text-muted, #94a3b8);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    padding: 0;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+.aq-ra:hover { border-color: var(--color-ion-cyan, #6de4ff); color: var(--ion-text, #e6e9ef); }
+.aq-ra[disabled] { opacity: .35; cursor: default; }
+.aq-ra[disabled]:hover { border-color: var(--ion-border-strong, #2a3644); color: var(--ion-text-muted, #94a3b8); }
+.aq-ra-ack:hover { color: var(--color-ion-lime, #86f0a0); border-color: color-mix(in srgb, var(--color-ion-lime) 45%, transparent); }
+.aq-ra-pcap { color: var(--color-ion-iris, #9a8cff); }
+.aq-ra-pcap:hover { color: var(--color-ion-iris, #9a8cff); border-color: color-mix(in srgb, var(--color-ion-iris) 55%, transparent); }
+
+.aq-empty { padding: 34px; text-align: center; color: var(--ion-text-muted, #94a3b8); font-size: 12.5px; }
+
+/* Browsers without color-mix get flat token colours rather than nothing. */
+@supports not (color: color-mix(in srgb, red 50%, transparent)) {
+    tr.sv-critical td, tr.sv-high td, tr.sv-medium td, tr.sv-low td { background: transparent; }
+    table.aq tbody tr.aq-cur td { background: rgba(109, 228, 255, .14); }
+    table.aq tbody tr.aq-picked td { background: rgba(109, 228, 255, .09); }
+}
+
+/* ── toolbar + keyboard legend ───────────────────────────────────────────── */
+.aq-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+}
+.aq-tool { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ion-text-muted, #94a3b8); }
+.aq-tool select,
+.aq-tool-btn {
+    background: var(--ion-surface, #0f151d);
+    border: 1px solid var(--ion-border-strong, #26313f);
+    border-radius: 6px;
+    color: var(--color-ink-500, #a8bacf);
+    padding: 4px 9px;
+    font-size: 11.5px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.aq-tool select:focus, .aq-tool-btn:focus { outline: none; border-color: var(--color-ion-cyan); }
+.aq-tool-btn:hover { border-color: var(--color-ion-cyan); color: var(--ion-text, #e6e9ef); }
+
+.aq-seg { display: flex; border: 1px solid var(--ion-border-strong, #26313f); border-radius: 6px; overflow: hidden; }
+.aq-seg button {
+    background: var(--ion-surface, #0f151d);
+    border: none;
+    color: var(--ion-text-muted, #7f92a8);
+    padding: 4px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 600;
+}
+.aq-seg button.is-on {
+    background: color-mix(in srgb, var(--color-ion-cyan) 18%, transparent);
+    color: var(--ion-text, #e6e9ef);
+}
+
+.aq-colwrap { position: relative; }
+/* absolute, not fixed: this popover belongs to its button */
+.aq-colmenu {
+    position: absolute;
+    top: 30px;
+    left: 0;
+    z-index: 60;
+    display: none;
+    min-width: 172px;
+    background: var(--ion-surface-2, #111721);
+    border: 1px solid var(--ion-border-strong, #2a3644);
+    border-radius: 8px;
+    padding: 5px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, .55);
+}
+.aq-colmenu.is-open { display: block; }
+.aq-colrow {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 5px 9px;
+    border-radius: 5px;
+    font-size: 12px;
+    color: var(--color-ink-500, #bccbdb);
+    cursor: pointer;
+}
+.aq-colrow:hover { background: color-mix(in srgb, var(--color-ion-cyan) 12%, transparent); }
+.aq-colrow input { margin: 0; }
+
+.aq-count { margin-left: auto; font-size: 11.5px; color: var(--ion-text-muted, #94a3b8); font-variant-numeric: tabular-nums; }
+
+.aq-keys {
+    display: flex;
+    gap: 13px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    background: var(--ion-surface, #0f151d);
+    border: 1px solid var(--ion-border, #1f2937);
+    border-radius: 7px;
+    margin-top: 10px;
+    font-size: 11.5px;
+    color: var(--ion-text-muted, #8ea3bb);
+}
+.aq-keys kbd {
+    background: var(--ion-surface-2, #1b2430);
+    border: 1px solid var(--ion-border-strong, #33415a);
+    border-bottom-width: 2px;
+    border-radius: 4px;
+    padding: 0 5px;
+    font-size: 10px;
+    font-family: ui-monospace, Consolas, monospace;
+    color: var(--color-ink-500, #b9cbe0);
+    line-height: 16px;
+    display: inline-block;
+}
+
+/* ── saved views ─────────────────────────────────────────────────────────── */
+.aq-views { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-bottom: 9px; }
+.aq-view {
+    background: var(--ion-surface, #141b24);
+    border: 1px solid var(--ion-border-strong, #26313f);
+    color: var(--ion-text-muted, #93a5bb);
+    padding: 5px 12px;
+    border-radius: 14px;
+    font-size: 11.5px;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+}
+.aq-view:hover { border-color: var(--color-ion-cyan); color: var(--ion-text, #cfe0f2); }
+.aq-view.is-on {
+    background: color-mix(in srgb, var(--color-ion-cyan) 16%, transparent);
+    border-color: var(--color-ion-cyan);
+    color: var(--ion-text, #dbeafe);
+}
+.aq-view .n { opacity: .65; margin-left: 5px; font-variant-numeric: tabular-nums; }
+.aq-view-saved { border-style: dashed; }
+.aq-view-add { border-style: dashed; color: #6d7f96; }
+
+/* ── filter chips ────────────────────────────────────────────────────────── */
+.aq-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 9px; }
+.aq-chips:empty { display: none; }
+.aq-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: color-mix(in srgb, var(--color-ion-cyan) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--color-ion-cyan) 35%, transparent);
+    border-radius: 13px;
+    padding: 3px 5px 3px 11px;
+    font-size: 11.5px;
+    color: var(--color-ink-500, #a8c0da);
+}
+.aq-chip b { color: var(--ion-text, #dbeafe); font-weight: 600; }
+.aq-chip .x {
+    background: color-mix(in srgb, var(--color-ion-cyan) 20%, transparent);
+    border: none;
+    color: var(--ion-text-muted, #8ea3bb);
+    cursor: pointer;
+    font-family: inherit;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    line-height: 1;
+    font-size: 10px;
+    padding: 0;
+}
+.aq-chip .x:hover { background: var(--color-ion-cyan); color: #04080d; }
+.aq-chip-all {
+    background: none;
+    border: none;
+    color: var(--color-ion-cyan);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11.5px;
+}
+
+/* The chips row supersedes #active-filter-banner, which only ever described the
+   entity filter — so a severity + host narrowing showed one of the two. The
+   element stays because seven call sites still write to it; retiring those is a
+   separate change. Hidden here so the page does not show the same state twice. */
+#active-filter-banner { display: none !important; }
