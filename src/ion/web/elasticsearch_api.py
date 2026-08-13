@@ -298,6 +298,15 @@ async def get_es_alerts(
         except Exception:
             logger.debug("quirk annotation skipped", exc_info=True)
 
+        # KEV status, same contract: additive, best-effort, one query for the
+        # page. Bob has had this as ground truth since v0.79.1 while the analyst
+        # reading the same alert had not — the model knew more than the human.
+        try:
+            from ion.services.kev_service import annotate_alerts as annotate_kev
+            annotate_kev(session, out_alerts)
+        except Exception:
+            logger.debug("kev annotation skipped", exc_info=True)
+
         return {
             "alerts": out_alerts,
             "total": len(out_alerts),

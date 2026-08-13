@@ -7088,6 +7088,12 @@ const AQ_VIEWS = [
                 && /false[_ ]?positive|benign/i.test(t.suggested_verdict || '') },
     { k: 'autocase', label: 'Auto-cased',
       f: (a, t) => /^\[Auto\]/.test(t.case_title || '') },
+    // Known-exploited CVEs. A view, not a sort: KEV membership is triage
+    // context, never an automatic severity or verdict.
+    { k: 'kev',      label: 'Known exploited',
+      f: (a) => Array.isArray(a.kev) && a.kev.length > 0 },
+    { k: 'quirked',  label: 'Has a quirk',
+      f: (a) => Array.isArray(a.quirks) && a.quirks.length > 0 },
     { k: 'all',      label: 'Everything', f: () => true },
 ];
 

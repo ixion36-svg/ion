@@ -421,3 +421,26 @@ tr.aq-row:hover .aq-acts, tr.aq-cur .aq-acts { opacity: 1; }
    element stays because seven call sites still write to it; retiring those is a
    separate change. Hidden here so the page does not show the same state twice. */
 #active-filter-banner { display: none !important; }
+
+/* ── KEV + quirk advisories ──────────────────────────────────────────────── */
+/* Both are context the server has attached for releases with nothing rendering
+   them. Neither suppresses, hides or reorders an alert — they explain a row. */
+.aq-tag.aq-kev {
+    color: var(--sev-critical);
+    border: 1px solid color-mix(in srgb, var(--sev-critical) 45%, transparent);
+    background: color-mix(in srgb, var(--sev-critical) 14%, transparent);
+}
+/* ransomware-linked entries earn a filled badge — this is the one KEV fact that
+   changes what an analyst does first */
+.aq-tag.aq-kev.is-ransomware {
+    color: #0d1117;
+    background: var(--sev-critical);
+    border-color: var(--sev-critical);
+}
+/* --sev-info violet: advisory context, deliberately not a severity colour, so a
+   quirk can never be misread as a statement about how bad the alert is */
+.aq-tag.aq-quirk {
+    color: var(--sev-info);
+    border: 1px solid color-mix(in srgb, var(--sev-info) 40%, transparent);
+    background: color-mix(in srgb, var(--sev-info) 12%, transparent);
+}

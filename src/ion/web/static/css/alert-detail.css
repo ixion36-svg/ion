@@ -421,3 +421,39 @@
 }
 
 .ai-analysis-result.visible { display: block; }
+
+/* ── advisories (KEV, System Quirk) ──────────────────────────────────────── */
+/* Server-attached context that had nothing rendering it: quirks since v0.57.0,
+   KEV since v0.79.1. Sits above the metadata grid because both change what an
+   analyst does first. Neither suppresses, hides or reorders an alert. */
+.iad-advisories { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.iad-adv { border-radius: 8px; padding: 10px 13px; font-size: 12.5px; line-height: 1.55; }
+.iad-adv-t { font-weight: 600; margin-bottom: 6px; }
+.iad-adv-row { margin-bottom: 4px; }
+.iad-adv-row b { font-weight: 600; }
+.iad-adv-a { color: var(--ion-text-muted, #94a3b8); margin-top: 2px; }
+.iad-adv-m { color: var(--ion-text-muted, #94a3b8); font-size: 11.5px; margin-left: 9px; }
+.iad-adv-note {
+    margin-top: 7px;
+    padding-top: 7px;
+    font-size: 11.5px;
+    color: var(--ion-text-muted, #94a3b8);
+    border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.iad-adv-kev {
+    color: var(--sev-critical);
+    border: 1px solid color-mix(in srgb, var(--sev-critical) 40%, transparent);
+    background: color-mix(in srgb, var(--sev-critical) 8%, transparent);
+}
+.iad-adv-kev.is-ransomware {
+    border-color: var(--sev-critical);
+    background: color-mix(in srgb, var(--sev-critical) 15%, transparent);
+}
+/* violet, deliberately not a severity colour: a quirk explains an alert, it
+   does not say how bad it is */
+.iad-adv-quirk {
+    color: var(--sev-info);
+    border: 1px solid color-mix(in srgb, var(--sev-info) 38%, transparent);
+    background: color-mix(in srgb, var(--sev-info) 8%, transparent);
+}

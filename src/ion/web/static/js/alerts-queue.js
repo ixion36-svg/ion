@@ -99,6 +99,28 @@
               if (t.case_number && /^\[Auto\]/.test(t.case_title || '')) {
                   h += '<span class="aq-tag aq-auto" title="Auto-cased from Arkime PCAP linkage">auto</span>';
               }
+              /* KEV: the alerts API attaches this from the CISA catalogue that
+                 ships in the image. Bob has had it as ground truth since
+                 v0.79.1 while the analyst reading the same alert had not. */
+              const kev = Array.isArray(a.kev) ? a.kev : [];
+              if (kev.length) {
+                  const ransom = kev.some((k) => k.known_ransomware);
+                  const ids = kev.map((k) => k.cve_id).join(', ');
+                  h += `<span class="aq-tag aq-kev${ransom ? ' is-ransomware' : ''}"`
+                     + ` title="On the CISA Known Exploited Vulnerabilities catalogue: ${esc(ids)}`
+                     + `${ransom ? ' — linked to known ransomware campaigns' : ''}">`
+                     + `KEV${kev.length > 1 ? ' ×' + kev.length : ''}</span>`;
+              }
+              /* Advisory quirk annotation. The API has attached this since
+                 v0.57.0 and nothing ever rendered it. It explains an alert; it
+                 never suppresses, hides or down-ranks one. */
+              const quirks = Array.isArray(a.quirks) ? a.quirks : [];
+              if (quirks.length) {
+                  const note = quirks.map((q) => q.title).filter(Boolean).join('; ');
+                  h += `<span class="aq-tag aq-quirk"`
+                     + ` title="System quirk — advisory only, nothing is suppressed: ${esc(note)}">`
+                     + `quirk${quirks.length > 1 ? ' ×' + quirks.length : ''}</span>`;
+              }
               return h;
           } },
 

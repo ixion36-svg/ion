@@ -318,6 +318,68 @@ def kev_prompt_block(session: Session, text: str, limit: int = 12) -> List[str]:
         return []
 
 
+def annotate_alerts(session: Session, alerts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Attach advisory KEV status to a list of alert dicts, IN PLACE.
+
+    Bob has been told which CVEs are actively exploited since v0.79.1, via
+    ``kev_prompt_block``. The analyst reading the same alert was not: KEV
+    appeared only on /threat-intel, so the model had ground truth the human
+    lacked. This closes that asymmetry.
+
+    Additive only — sets ``d["kev"] = [...]`` on matches and touches nothing
+    else. Never removes, reorders, or filters an alert, and never raises: a KEV
+    lookup failing must not empty the alerts view.
+
+    ONE query for the whole page, not one per alert. Absence of a CVE from the
+    catalog is NOT recorded as safety — a snapshot cannot know about a CVE
+    published after it was cut, so only hits are attached.
+    """
+    if not alerts:
+        return alerts
+
+    # scan the text an analyst would read; raw_data is excluded from list
+    # payloads, so a CVE only in the raw document is found on the detail view
+    per_alert: Dict[int, List[str]] = {}
+    wanted: set = set()
+    for idx, d in enumerate(alerts):
+        if not isinstance(d, dict):
+            continue
+        blob = " ".join(
+            str(d.get(k) or "")
+            for k in ("title", "message", "rule_name", "description",
+                      "mitre_technique_name", "vulnerability")
+        )
+        cves = extract_cve_ids(blob)
+        if cves:
+            per_alert[idx] = cves
+            wanted.update(cves)
+    if not wanted:
+        return alerts
+
+    try:
+        found = lookup_many(session, sorted(wanted))
+    except Exception:  # noqa: BLE001 - advisory annotation, never fatal
+        logger.debug("kev annotation skipped", exc_info=True)
+        return alerts
+
+    for idx, cves in per_alert.items():
+        hits = []
+        for cve in cves:
+            entry = found.get(cve.upper())
+            if not entry:
+                continue
+            hits.append({
+                "cve_id": entry.cve_id,
+                "known_ransomware": bool(entry.known_ransomware),
+                "vulnerability_name": entry.vulnerability_name,
+                "date_added": entry.date_added.isoformat() if entry.date_added else None,
+                "due_date": entry.due_date.isoformat() if entry.due_date else None,
+            })
+        if hits:
+            alerts[idx]["kev"] = hits
+    return alerts
+
+
 def search(session: Session, q: str = "", ransomware_only: bool = False,
            limit: int = 50) -> List[KevEntry]:
     query = session.query(KevEntry)

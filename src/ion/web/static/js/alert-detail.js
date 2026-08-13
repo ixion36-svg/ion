@@ -906,12 +906,63 @@
       }
   }
 
+  /* KEV status and System-Quirk annotations.
+   *
+   * Both have been attached to the alerts API for releases with nothing
+   * rendering them: quirks since v0.57.0, KEV as Bob prompt ground truth since
+   * v0.79.1. Bob was told which CVEs are actively exploited; the analyst
+   * reading the same alert was not.
+   *
+   * Placed above the metadata grid because both change what you do first. A
+   * KEV miss is NOT rendered — a snapshot cannot know about a CVE published
+   * after it was cut, and "not in KEV" reads as safety.
+   */
+  function _advisoriesHtml(alert) {
+    var kev = Array.isArray(alert.kev) ? alert.kev : [];
+    var quirks = Array.isArray(alert.quirks) ? alert.quirks : [];
+    if (!kev.length && !quirks.length) return '';
+
+    var h = '<div class="iad-advisories">';
+
+    if (kev.length) {
+      var ransom = kev.some(function (k) { return k.known_ransomware; });
+      h += '<div class="iad-adv iad-adv-kev' + (ransom ? ' is-ransomware' : '') + '">'
+         + '<div class="iad-adv-t">Known exploited vulnerability'
+         + (ransom ? ' — linked to ransomware campaigns' : '') + '</div>';
+      kev.forEach(function (k) {
+        h += '<div class="iad-adv-row"><b>' + escapeHtml(k.cve_id) + '</b>'
+           + (k.vulnerability_name ? ' — ' + escapeHtml(k.vulnerability_name) : '')
+           + (k.date_added ? '<span class="iad-adv-m">added ' + escapeHtml(k.date_added) + '</span>' : '')
+           + (k.due_date ? '<span class="iad-adv-m">remediate by ' + escapeHtml(k.due_date) + '</span>' : '')
+           + '</div>';
+      });
+      h += '<div class="iad-adv-note">On CISA\'s catalogue of vulnerabilities with '
+         + 'evidence of active exploitation. This is triage context, not an automatic '
+         + 'severity or verdict.</div></div>';
+    }
+
+    if (quirks.length) {
+      h += '<div class="iad-adv iad-adv-quirk"><div class="iad-adv-t">System quirk</div>';
+      quirks.forEach(function (q) {
+        h += '<div class="iad-adv-row"><b>' + escapeHtml(q.title || '') + '</b>'
+           + (q.annotation ? '<div class="iad-adv-a">' + escapeHtml(q.annotation) + '</div>' : '')
+           + '</div>';
+      });
+      h += '<div class="iad-adv-note"><b>Advisory only.</b> The alert is shown in full '
+         + 'and is not down-ranked; a quirk never suppresses anything.</div></div>';
+    }
+
+    return h + '</div>';
+  }
+
   function _renderHead(alert) {
     // Only rendered when the host can fill it; renderTriageBar lives in
     // alerts.html and nowhere else.
     let html = _opts.triageBar === false
         ? ''
         : `<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage...</span></div>`;
+
+    html += _advisoriesHtml(alert);
 
     // Metadata grid
     html += `<div class="alert-meta-grid">
