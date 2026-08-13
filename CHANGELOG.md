@@ -1,13 +1,28 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.81.0 -->
-<!-- ion-doc:version=0.81.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.81.1 -->
+<!-- ion-doc:version=0.81.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-11 -->
 
 # Changelog
+
+## v0.81.1 — 2026-08-13
+
+**Bob knew which CVEs were being actively exploited. The analyst reading the same alert did not.**
+
+Two advisory annotations have been attached to every alerts-list response for releases, with nothing on the client rendering them. The server did the work and the browser dropped it — no error, no failed request, just absent context.
+
+- **System quirks, unrendered since v0.57.0.** `elasticsearch_api` calls `annotate_alerts()`, which sets `alert.quirks` on every match. `grep quirks` across every template and first-party script returned **zero hits**. DE Phase 2 shipped the model, the service, the API, the registry page and the audit trail; the one step that put the annotation in front of the person triaging was the half that did not land.
+- **KEV, unrendered since v0.79.1.** `kev_prompt_block` injects known-exploited status into Bob's prompts as ground truth, precisely so the model does not guess. That reasoning applies at least as strongly to the human: KEV appeared only on `/threat-intel`, so **the model was better informed than the analyst about the same alert**. The alerts list now carries `alert.kev` from the CISA catalogue that ships in the image.
+- Both render as a badge on the row and a block above the metadata grid in the detail panel, and both have a saved view — a badge you cannot filter to only helps on the row you happen to be looking at.
+- **A KEV miss is never recorded.** Only hits are attached. A snapshot cannot know about a CVE published after it was cut, and an explicit "not in KEV" invites reading absence as safety — exactly backwards for a CVE published last week. This mirrors the wording rule already applied to Bob's prompt block.
+- **Neither annotation suppresses, hides, down-ranks or reorders anything.** The quirk block states that in the panel where the analyst reads it, not only in a design document. Quirks use `--sev-info` violet, deliberately not a severity colour, so "this host does that nightly" can never be misread as a claim about how bad the alert is. Ransomware-linked KEV entries get a filled badge, because that is the one KEV fact that changes what you do first.
+- One `IN` query per page, not one per alert, and the annotation is additive and non-fatal: a failing lookup leaves the alerts view intact rather than emptying it.
+
+14 tests, including that a CVE absent from the catalogue is not recorded as safe, that a failing lookup does not empty the view, and — the one that would have caught the original defect — that the client actually reads each annotation. Verified by deleting the read and watching it fail.
 
 ## v0.81.0 — 2026-08-11
 
