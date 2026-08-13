@@ -136,3 +136,68 @@
     color: #f87171;
     border-color: rgba(248, 113, 113, .35);
 }
+
+/* KEV catalogue detail on /threat-intel.
+   Every entry carries a description, a required action and (usually) CWEs, and
+   the five-column table showed none of it — the data was already in the API
+   response and the renderer discarded it. */
+.ti-badge-unknown {
+    background: rgba(148, 163, 184, .12);
+    color: var(--ion-text-muted, #94a3b8);
+    border-color: rgba(148, 163, 184, .3);
+}
+.ti-badge-cwe {
+    background: color-mix(in srgb, var(--sev-info) 12%, transparent);
+    color: var(--sev-info);
+    border-color: color-mix(in srgb, var(--sev-info) 35%, transparent);
+}
+
+.ti-kev-row { cursor: pointer; }
+.ti-kev-caret {
+    display: inline-block;
+    width: 10px;
+    color: var(--ion-text-muted, #94a3b8);
+    font-size: 10px;
+    transition: transform .15s;
+}
+.ti-kev-caret.is-open { transform: rotate(90deg); }
+
+/* collapsed by default: 1,662 entries expanded at once is not a page */
+.ti-kev-detail { display: none; }
+.ti-kev-detail.is-open { display: table-row; }
+.ti-kev-body {
+    padding: 12px 14px 14px 26px;
+    background: rgba(255, 255, 255, .02);
+    font-size: 12.5px;
+    line-height: 1.6;
+}
+.ti-kev-f { margin-bottom: 11px; }
+.ti-kev-k {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--ion-text-muted, #94a3b8);
+    margin-bottom: 3px;
+    font-weight: 600;
+}
+/* the mandated action, next to the due date already in the row above */
+.ti-kev-action {
+    border-left: 3px solid var(--sev-high);
+    padding-left: 10px;
+}
+/* references are URLs; shown as selectable text rather than links because ION
+   ships to air-gapped sites where an external anchor is a dead end */
+.ti-kev-notes {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--color-ink-500, #cbd5e1);
+    word-break: break-all;
+    user-select: all;
+}
+.ti-kev-prov {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, .07);
+    font-size: 11px;
+    color: var(--ion-text-muted, #94a3b8);
+}

@@ -13,6 +13,7 @@ it" is the first question anyone asks of vulnerability data they did not fetch
 themselves.
 """
 
+import json
 from datetime import date, datetime
 from typing import Optional
 
@@ -63,6 +64,17 @@ class KevEntry(Base):
         DateTime, default=func.now(), onupdate=func.now(), nullable=False
     )
 
+    def cwe_list(self) -> list:
+        """CWE ids as a list. Stored as JSON text; a malformed value must not
+        break a catalogue page over a nice-to-have field."""
+        if not self.cwes:
+            return []
+        try:
+            parsed = json.loads(self.cwes)
+        except (ValueError, TypeError):
+            return []
+        return [str(c) for c in parsed] if isinstance(parsed, list) else []
+
     def to_dict(self) -> dict:
         return {
             "cve_id": self.cve_id,
@@ -76,8 +88,10 @@ class KevEntry(Base):
             "due_date": self.due_date.isoformat() if self.due_date else None,
             "known_ransomware": self.known_ransomware,
             "known_ransomware_raw": self.known_ransomware_raw,
+            "cwes": self.cwe_list(),
             "catalog_version": self.catalog_version,
             "source": self.source,
+            "synced_at": self.synced_at.isoformat() if self.synced_at else None,
         }
 
     def __repr__(self) -> str:

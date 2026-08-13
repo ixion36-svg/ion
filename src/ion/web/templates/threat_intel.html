@@ -457,18 +457,72 @@ data-click-action="tiCloseReport"></div>
            </div>`;
     }
 
-    function kevRow(e) {
-        const ransom = e.known_ransomware
-            ? '<span class="ti-badge ti-badge-ransomware">ransomware</span>'
-            : '';
-        return `<tr>
-            <td class="ti-name-cell">${escapeHtml(e.cve_id)}</td>
+    // CISA publishes "Known" / "Unknown", never "No". Unknown means NOT
+    // ESTABLISHED, so rendering it the same as a definitive negative — which a
+    // bare "no badge" does — asserts something the catalogue does not. 1,324 of
+    // the 1,662 entries are Unknown, so this is the common case, not an edge one.
+    function kevRansomware(e) {
+        const raw = e.known_ransomware_raw || (e.known_ransomware ? 'Known' : 'Unknown');
+        if (e.known_ransomware) {
+            return '<span class="ti-badge ti-badge-ransomware" title="CISA records use by known ransomware campaigns">ransomware: known</span>';
+        }
+        return `<span class="ti-badge ti-badge-unknown" title="CISA has not established ransomware use. This is not the same as ruling it out.">ransomware: ${escapeHtml(raw.toLowerCase())}</span>`;
+    }
+
+    function kevRow(e, i) {
+        return `<tr class="ti-kev-row" data-click-action="kevToggle" data-args='[${i}]'
+                    title="Click for the description, required action and CWEs">
+            <td class="ti-name-cell"><span class="ti-kev-caret" id="kev-caret-${i}">&#9656;</span> ${escapeHtml(e.cve_id)}</td>
             <td>${escapeHtml(e.vendor_project || '')} ${escapeHtml(e.product || '')}</td>
-            <td>${escapeHtml(e.vulnerability_name || '')} ${ransom}</td>
+            <td>${escapeHtml(e.vulnerability_name || '')} ${kevRansomware(e)}</td>
             <td>${escapeHtml(e.date_added || '')}</td>
             <td>${escapeHtml(e.due_date || '')}</td>
-        </tr>`;
+        </tr>
+        <tr class="ti-kev-detail" id="kev-detail-${i}"><td colspan="5">${kevDetail(e)}</td></tr>`;
     }
+
+    // Everything the catalogue carries that the five columns cannot show. All of
+    // it was already in the API response and was being discarded by the renderer.
+    function kevDetail(e) {
+        const cwes = Array.isArray(e.cwes) ? e.cwes : [];
+        let h = '<div class="ti-kev-body">';
+        if (e.short_description) {
+            h += `<div class="ti-kev-f"><div class="ti-kev-k">Description</div>
+                  <div>${escapeHtml(e.short_description)}</div></div>`;
+        }
+        if (e.required_action) {
+            // The actionable field: what CISA mandates, with a due date already
+            // in the row above it.
+            h += `<div class="ti-kev-f ti-kev-action"><div class="ti-kev-k">Required action</div>
+                  <div>${escapeHtml(e.required_action)}</div></div>`;
+        }
+        if (cwes.length) {
+            h += `<div class="ti-kev-f"><div class="ti-kev-k">Weaknesses</div><div>`
+               + cwes.map(c => `<span class="ti-badge ti-badge-cwe">${escapeHtml(c)}</span>`).join(' ')
+               + '</div></div>';
+        }
+        if (e.notes) {
+            // Rendered as selectable text, not links. ION ships to air-gapped
+            // sites where an external anchor is a dead end that looks broken;
+            // the reference is still worth having to hand.
+            h += `<div class="ti-kev-f"><div class="ti-kev-k">References</div>
+                  <div class="ti-kev-notes">${escapeHtml(e.notes)}</div></div>`;
+        }
+        h += `<div class="ti-kev-prov">Catalog ${escapeHtml(e.catalog_version || 'unknown')}`
+           + ` &#183; ${e.source === 'imported' ? 'operator import' : 'shipped in the image'}`
+           + (e.synced_at ? ` &#183; loaded ${escapeHtml(String(e.synced_at).slice(0, 10))}` : '')
+           + '</div>';
+        return h + '</div>';
+    }
+
+    function kevToggle(i) {
+        const row = document.getElementById('kev-detail-' + i);
+        const caret = document.getElementById('kev-caret-' + i);
+        if (!row) return;
+        const open = row.classList.toggle('is-open');
+        if (caret) caret.classList.toggle('is-open', open);
+    }
+    window.kevToggle = kevToggle;
 
     async function kevSearch() {
         const box = document.getElementById('kev-search');

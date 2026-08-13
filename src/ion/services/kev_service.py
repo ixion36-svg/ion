@@ -385,11 +385,17 @@ def search(session: Session, q: str = "", ransomware_only: bool = False,
     query = session.query(KevEntry)
     if q:
         term = f"%{q.strip().lower()}%"
+        # short_description widens the match modestly — the technique is usually
+        # already in vulnerability_name ("... Command Injection Vulnerability"),
+        # so this adds the entries that describe a behaviour without naming it:
+        # +7 on "command injection", +7 on "deserialization", +2 on "buffer
+        # overflow" against the 1,662-entry catalogue.
         query = query.filter(
             KevEntry.cve_id.ilike(term)
             | KevEntry.vendor_project.ilike(term)
             | KevEntry.product.ilike(term)
             | KevEntry.vulnerability_name.ilike(term)
+            | KevEntry.short_description.ilike(term)
         )
     if ransomware_only:
         query = query.filter(KevEntry.known_ransomware.is_(True))
