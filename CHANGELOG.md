@@ -1,13 +1,27 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.81.1 -->
-<!-- ion-doc:version=0.81.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.81.2 -->
+<!-- ion-doc:version=0.81.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-11 -->
 
 # Changelog
+
+## v0.81.2 — 2026-08-13
+
+**The KEV catalogue page showed five columns of a record that carries eleven fields.**
+
+Clicking an entry did nothing, and the page rendered CVE, vendor/product, vulnerability name and two dates. Every one of the **1,662 entries also carries a description, a required action and references**, and 1,491 carry CWEs. All of it was already in the API response and was being discarded by the row renderer.
+
+- Rows now expand. The detail shows **CISA's description**, the **required action** (the mandated remediation, sitting next to the due date already in the row), **CWE ids**, **references**, and provenance — which catalogue version the row came from and whether it shipped in the image or arrived by operator import.
+- **`cwes` and `synced_at` were on the model but missing from `to_dict()`**, so no client could render them however it tried. CWE ids are stored as JSON text and are now parsed defensively: a malformed value yields an empty list rather than breaking a catalogue page over a nice-to-have field.
+- **"Unknown" is not "no", and it is the majority case.** CISA publishes ransomware use as `Known` / `Unknown` — never `No` — because Unknown means *not established*. The page showed a badge only for `Known`, so **1,324 of 1,662 entries rendered identically to a definitive negative**. Unknown now has its own badge saying what it means. The model has carried a comment warning about exactly this collapse since the field was added; the UI was doing it anyway.
+- References render as **selectable text, not links**: ION ships to air-gapped sites where an external anchor is a dead end that looks broken, and the URL is still worth having to hand.
+- Search additionally matches the description. **The first version of this note claimed those terms previously matched nothing — they did not.** "command injection" already returned 109 hits and "deserialization" 54, because the technique is usually in the vulnerability name. The real widening is +7, +7 and +2: entries that describe a behaviour without naming it. The comment in the source was corrected to say so, and a test pins the accurate wording.
+
+21 tests, including CWE parsing against seven malformed inputs, that Unknown is rendered distinctly from Known, that every catalogue value is escaped before reaching `innerHTML`, and that detail rows start collapsed — 1,662 entries expanded at once is not a page.
 
 ## v0.81.1 — 2026-08-13
 
