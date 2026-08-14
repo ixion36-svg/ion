@@ -146,7 +146,10 @@ def _worst():
     i = api.index("_THREAT_ORDER = [")
     j = api.index('@router.post("/elasticsearch/alerts-triage/batch")')
     ns: dict = {}
-    exec(api[i:j], ns)  # noqa: S102 - executing our own source, not user input
+    # Lazy annotations: the window carries defs whose annotations name types
+    # (Optional, Session, ...) that are imported at api.py's top, far outside
+    # this window. PEP 563 stops exec evaluating them in the bare namespace.
+    exec("from __future__ import annotations\n" + api[i:j], ns)  # noqa: S102 - executing our own source, not user input
     return ns["_worst_observable_threat"]
 
 

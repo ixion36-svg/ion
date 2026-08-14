@@ -208,7 +208,15 @@ def test_the_two_sets_are_built_from_one_predicate_split(alerts):
     js = _inline_js(alerts)
     fn = js[js.index("function applyFilters()"):]
     fn = fn[:fn.index("\n}")]
-    assert "alertsIgnoringStatus = allAlerts.filter(matchesNonStatus)" in fn
+    # The invariant is the SPLIT, not the exact predicate expression: the first
+    # set must apply the non-status filters (v0.81 composes the saved-view
+    # predicate in as well) and must not apply the status filter, and the
+    # second set must derive from the first via matchesStatus only.
+    first = re.search(r"alertsIgnoringStatus = allAlerts\.filter\((.*?)\);", fn)
+    assert first, "first set is no longer built from allAlerts.filter(...)"
+    assert "matchesNonStatus" in first.group(1)
+    assert not re.search(r"(?<!Non)matchesStatus", first.group(1)), \
+        "status filter leaked into the set the status tiles count"
     assert "filteredAlerts = alertsIgnoringStatus.filter(matchesStatus)" in fn
 
 
