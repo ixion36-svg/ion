@@ -254,17 +254,23 @@ class AuthService:
         if not user_session.user.is_active:
             return None
 
-        # Sliding session: extend expiry when less than half the lifetime remains
-        # This avoids writing to the DB on every single request (SQLite lock contention)
-        now = datetime.utcnow()
-        remaining = (user_session.expires_at - now).total_seconds()
-        half_lifetime = (self.session_lifetime_hours * 3600) / 2
-        if remaining < half_lifetime:
-            user_session.expires_at = now + timedelta(hours=self.session_lifetime_hours)
-            try:
-                self.session_repo.session.commit()
-            except Exception:
-                self.session_repo.session.rollback()
+        # Sliding session: extend expiry when less than half the lifetime remains.
+        # Service-account tokens are excluded — they must expire exactly at
+        # their minted --ttl-days bound. Without this guard an actively-polling
+        # integration (e.g. AEGIS) would never hit that bound: every call inside
+        # the second half of the window would push expires_at forward again,
+        # turning a supposedly-bounded token into a perpetual rolling session.
+        if not getattr(user_session.user, "is_service_account", False):
+            # This avoids writing to the DB on every single request (SQLite lock contention)
+            now = datetime.utcnow()
+            remaining = (user_session.expires_at - now).total_seconds()
+            half_lifetime = (self.session_lifetime_hours * 3600) / 2
+            if remaining < half_lifetime:
+                user_session.expires_at = now + timedelta(hours=self.session_lifetime_hours)
+                try:
+                    self.session_repo.session.commit()
+                except Exception:
+                    self.session_repo.session.rollback()
 
         user = user_session.user
 
@@ -923,12 +929,20 @@ class AuthService:
         (SessionRepository.create), so this call cannot be used to recover
         a previously minted token.
 
+        Rotation: any existing sessions for the user are revoked first, same
+        pattern as the OIDC callback's session rotation. Re-minting is the
+        account's recovery path for a leaked token, so it must not be purely
+        additive — a stale token has to stop working the moment a new one is
+        issued, not stay valid indefinitely alongside it.
+
         Raises:
             ValueError: if user_id does not belong to a service account.
         """
         user = self.user_repo.get_by_id(user_id)
         if user is None or not getattr(user, "is_service_account", False):
             raise ValueError("mint_service_account_token requires a service account user")
+
+        revoked_count = self.session_repo.delete_all_for_user(user.id)
 
         token = self._generate_session_token()
         expires_at = datetime.utcnow() + timedelta(days=ttl_days)
@@ -937,6 +951,15 @@ class AuthService:
             session_token=token,
             expires_at=expires_at,
         )
+
+        self.audit_repo.create(
+            user_id=user.id,
+            action="service_token_minted",
+            resource_type="user",
+            resource_id=user.id,
+            details={"ttl_days": ttl_days, "revoked_previous_sessions": revoked_count},
+        )
+
         return token
 
     def seed_admin_user(

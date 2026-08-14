@@ -675,6 +675,10 @@ def seed_aegis(
     from ion.core.config import get_config
     from ion.storage.database import get_engine, get_session_factory
 
+    if ttl_days < 1:
+        console.print("[red]Error: --ttl-days must be at least 1[/red]")
+        raise typer.Exit(code=1)
+
     config = get_config()
 
     if not config.db_path.exists():
@@ -723,7 +727,9 @@ def seed_aegis(
         console.print(f"  {token}")
         console.print(
             "\n[yellow]This token cannot be retrieved later — only its hash is "
-            "stored. If lost, re-run this command to mint a new one.[/yellow]"
+            "stored. If lost, re-run this command: minting a new token revokes "
+            "any previous AEGIS token, so the old one stops working "
+            "immediately.[/yellow]"
         )
         console.print(f"\n  Expires: {expiry.date().isoformat()} ({ttl_days} days)")
         console.print("  Scopes (aegis role permissions):")

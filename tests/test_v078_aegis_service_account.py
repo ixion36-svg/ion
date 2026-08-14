@@ -11,11 +11,13 @@ de:approve (Bob-tuning apply) — those stay reserved for human reviewers.
 """
 
 import hashlib
+import json
+from datetime import datetime, timedelta
 
 import pytest
 
 from ion.auth.service import AuthService
-from ion.models.user import Role, User, UserSession
+from ion.models.user import AuditLog, Role, User, UserSession
 
 AEGIS_PERMS = {"alert:read", "de:read", "de:propose", "case:read"}
 
@@ -116,3 +118,105 @@ def test_mint_token_stores_hash_not_plaintext(session):
     row = session.query(UserSession).filter_by(user_id=aegis.id).one()
     assert row.session_token_hash != token
     assert row.session_token_hash == hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+# ---------------------------------------------------------------------------
+# Security-review fix wave: audit trail, rotation, hard expiry
+# ---------------------------------------------------------------------------
+def test_mint_token_writes_an_audit_entry(session):
+    """Minting must be audited exactly like login() and the OIDC callback are."""
+    svc = _seeded(session)
+    aegis = svc.user_repo.get_by_username("aegis")
+
+    svc.mint_service_account_token(aegis.id, ttl_days=365)
+    session.commit()
+
+    entries = (
+        session.query(AuditLog)
+        .filter_by(user_id=aegis.id, action="service_token_minted")
+        .all()
+    )
+    assert len(entries) == 1
+    details = json.loads(entries[0].details)
+    assert details["ttl_days"] == 365
+
+
+def test_reminting_revokes_the_previous_token(session):
+    """A leaked token must stop working the moment a new one is minted —
+    re-minting is the documented recovery path, so it can't be purely
+    additive (that would leave the leaked token live forever)."""
+    svc = _seeded(session)
+    aegis = svc.user_repo.get_by_username("aegis")
+
+    first_token = svc.mint_service_account_token(aegis.id, ttl_days=365)
+    session.commit()
+    assert svc.validate_session(first_token) is not None
+
+    second_token = svc.mint_service_account_token(aegis.id, ttl_days=365)
+    session.commit()
+
+    assert svc.validate_session(first_token) is None
+    validated = svc.validate_session(second_token)
+    assert validated is not None
+    assert validated.username == "aegis"
+
+    # Exactly one live session for aegis — the old one was deleted, not left
+    # alongside the new one.
+    assert session.query(UserSession).filter_by(user_id=aegis.id).count() == 1
+
+
+def test_remint_audit_entry_records_revoked_count(session):
+    svc = _seeded(session)
+    aegis = svc.user_repo.get_by_username("aegis")
+
+    svc.mint_service_account_token(aegis.id, ttl_days=365)
+    session.commit()
+    svc.mint_service_account_token(aegis.id, ttl_days=365)
+    session.commit()
+
+    entries = (
+        session.query(AuditLog)
+        .filter_by(user_id=aegis.id, action="service_token_minted")
+        .order_by(AuditLog.id)
+        .all()
+    )
+    assert len(entries) == 2
+    first_details = json.loads(entries[0].details)
+    second_details = json.loads(entries[1].details)
+    assert first_details["revoked_previous_sessions"] == 0
+    assert second_details["revoked_previous_sessions"] == 1
+
+
+def test_service_account_session_is_not_slid_near_expiry(session):
+    """validate_session()'s sliding-window extension exists for interactive
+    humans. A service-account token must expire exactly at its minted
+    expiry — otherwise an actively-polling integration like AEGIS never
+    hits the --ttl-days bound and the token becomes a perpetual rolling
+    session, defeating the whole point of a bounded TTL."""
+    svc = _seeded(session)
+    aegis = svc.user_repo.get_by_username("aegis")
+    human, err = svc.create_user(
+        username="carol", email="carol@x.test", password="Str0ngPassw0rd!42"
+    )
+    assert err is None
+
+    # Inside the sliding-window threshold (half of the 24h default = 12h).
+    near_expiry = datetime.utcnow() + timedelta(hours=1)
+
+    svc_token = svc._generate_session_token()
+    svc.session_repo.create(user_id=aegis.id, session_token=svc_token, expires_at=near_expiry)
+
+    human_token = svc._generate_session_token()
+    svc.session_repo.create(user_id=human.id, session_token=human_token, expires_at=near_expiry)
+    session.commit()
+
+    assert svc.validate_session(svc_token) is not None
+    assert svc.validate_session(human_token) is not None
+
+    svc_row = svc.session_repo.get_by_token(svc_token)
+    human_row = svc.session_repo.get_by_token(human_token)
+
+    # Service-account session: unchanged (not extended).
+    assert abs((svc_row.expires_at - near_expiry).total_seconds()) < 5
+    # Human session: extended out to ~session_lifetime_hours from now.
+    assert human_row.expires_at - near_expiry > timedelta(hours=1)
