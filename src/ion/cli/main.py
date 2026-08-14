@@ -662,5 +662,83 @@ def seed_users(
         session.close()
 
 
+@app.command("seed-aegis")
+def seed_aegis(
+    ttl_days: int = typer.Option(
+        365, "--ttl-days", help="Bearer token lifetime in days"
+    ),
+) -> None:
+    """Seed the AEGIS service account (scoped role) and mint it a bearer token."""
+    from datetime import datetime, timedelta
+
+    from ion.auth.service import AuthService
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+
+    config = get_config()
+
+    if not config.db_path.exists():
+        console.print("[yellow]ION not initialized.[/yellow]")
+        console.print("Run 'ion init' first, then 'ion upgrade'.")
+        return
+
+    console.print("[bold]Seeding AEGIS service account...[/bold]")
+
+    engine = get_engine(config.db_path)
+    factory = get_session_factory(engine)
+    session = factory()
+
+    try:
+        auth_service = AuthService(session)
+
+        # Seed permissions
+        console.print("  Creating permissions...")
+        auth_service.seed_permissions()
+
+        # Seed roles (includes the aegis role)
+        console.print("  Creating roles...")
+        auth_service.seed_roles()
+
+        # Seed the aegis service account
+        console.print("  Creating aegis service account...")
+        aegis = auth_service.seed_aegis_user()
+        session.commit()
+
+        if aegis is None:
+            console.print("[red]Error: failed to seed aegis user[/red]")
+            raise typer.Exit(code=1)
+
+        console.print(f"    Service account: {aegis.username}")
+        console.print(f"    Email: {aegis.email}")
+
+        # Mint the bearer token
+        console.print("  Minting bearer token...")
+        token = auth_service.mint_service_account_token(aegis.id, ttl_days=ttl_days)
+        session.commit()
+
+        expiry = datetime.utcnow() + timedelta(days=ttl_days)
+
+        console.print("\n[green]OK[/green] AEGIS service account seeded successfully.")
+        console.print("\n[bold]Bearer token (save this now):[/bold]")
+        console.print(f"  {token}")
+        console.print(
+            "\n[yellow]This token cannot be retrieved later — only its hash is "
+            "stored. If lost, re-run this command to mint a new one.[/yellow]"
+        )
+        console.print(f"\n  Expires: {expiry.date().isoformat()} ({ttl_days} days)")
+        console.print("  Scopes (aegis role permissions):")
+        console.print("    - alert:read")
+        console.print("    - de:read")
+        console.print("    - de:propose")
+        console.print("    - case:read")
+
+    except Exception as e:
+        session.rollback()
+        console.print(f"\n[red]Error seeding AEGIS service account: {e}[/red]")
+        raise
+    finally:
+        session.close()
+
+
 if __name__ == "__main__":
     app()

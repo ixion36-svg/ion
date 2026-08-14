@@ -691,6 +691,11 @@ async def _startup_event():
             # Seed Bob — the AI analyst service account. Must run after
             # seed_roles so the ai_analyst role exists for assignment.
             auth_service.seed_bob_user()
+            # Seed AEGIS — the threat-modelling integration service account.
+            # Same idempotent shape as Bob; no token is minted here (that
+            # would rotate AEGIS's credential on every restart) — operators
+            # run `ion seed-aegis` once to mint the bearer token out-of-band.
+            auth_service.seed_aegis_user()
             session.commit()
         finally:
             session.close()

@@ -144,6 +144,32 @@ class TestRenderCommands:
         assert "test" in output_file.read_text()
 
 
+class TestSeedAegisCommand:
+    """Tests for the seed-aegis CLI command."""
+
+    def test_seed_aegis_creates_account_and_prints_token(self, runner, temp_project):
+        """Seeding prints the token once plus the four scoped permissions."""
+        result = runner.invoke(app, ["seed-aegis"])
+        assert result.exit_code == 0
+        assert "aegis" in result.output
+        assert "alert:read" in result.output
+        assert "de:read" in result.output
+        assert "de:propose" in result.output
+        assert "case:read" in result.output
+        # least-privilege: verify/approve must never be listed as granted
+        assert "de:verify" not in result.output
+        assert "de:approve" not in result.output
+
+    def test_seed_aegis_second_run_does_not_crash(self, runner, temp_project):
+        """Re-running seed-aegis is idempotent — tops up, never errors."""
+        first = runner.invoke(app, ["seed-aegis"])
+        assert first.exit_code == 0
+
+        second = runner.invoke(app, ["seed-aegis"])
+        assert second.exit_code == 0
+        assert "aegis" in second.output
+
+
 class TestVersionCommands:
     """Tests for version commands."""
 

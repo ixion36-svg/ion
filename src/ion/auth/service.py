@@ -776,6 +776,21 @@ class AuthService:
                     "ai:chat",
                 ],
             ),
+            (
+                # Assigned to the AEGIS service account (companion threat-
+                # modelling app, calls ION's API over a minted bearer token).
+                # Scoped to read + propose only — NOT de:verify (system-quirk
+                # revert) or de:approve (Bob-tuning apply); those stay
+                # reserved for human reviewers (SECURE_BY_DESIGN P6).
+                "aegis",
+                "AEGIS threat modelling integration (service)",
+                True,
+                [
+                    "alert:read",
+                    "de:read", "de:propose",
+                    "case:read",
+                ],
+            ),
         ]
 
         roles = []
@@ -852,6 +867,77 @@ class AuthService:
             self.user_repo.add_role(user, ai_role)
 
         return user
+
+    def seed_aegis_user(
+        self,
+        username: str = "aegis",
+        email: str = "aegis@ion.local",
+        display_name: str = "AEGIS Threat Modelling",
+    ) -> Optional[User]:
+        """Create (or top-up) the AEGIS service user.
+
+        Idempotent, same shape as seed_bob_user(). Ensures:
+          - aegis user exists, flagged is_service_account=True, is_active=True.
+          - aegis has the aegis role.
+          - If aegis already exists but is missing the flag or the role, fix it.
+        """
+        aegis_role = self.role_repo.get_by_name("aegis")
+
+        existing = self.user_repo.get_by_username(username)
+        if existing:
+            changed = False
+            if not getattr(existing, "is_service_account", False):
+                existing.is_service_account = True
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if aegis_role and not existing.has_role("aegis"):
+                self.user_repo.add_role(existing, aegis_role)
+                changed = True
+            if changed:
+                self.db_session.flush()
+            return existing
+
+        user = self.user_repo.create(
+            username=username,
+            email=email,
+            password_hash=self._SERVICE_ACCOUNT_HASH_SENTINEL,
+            display_name=display_name,
+            must_change_password=False,
+        )
+        user.is_service_account = True
+        self.db_session.flush()
+
+        if aegis_role:
+            self.user_repo.add_role(user, aegis_role)
+
+        return user
+
+    def mint_service_account_token(self, user_id: int, ttl_days: int) -> str:
+        """Mint a bearer token for a service account by creating a session directly.
+
+        Mirrors the OIDC callback's session creation (session.py bypasses
+        login(), which correctly refuses service accounts). The plaintext
+        token is returned exactly once — only its SHA-256 hash is persisted
+        (SessionRepository.create), so this call cannot be used to recover
+        a previously minted token.
+
+        Raises:
+            ValueError: if user_id does not belong to a service account.
+        """
+        user = self.user_repo.get_by_id(user_id)
+        if user is None or not getattr(user, "is_service_account", False):
+            raise ValueError("mint_service_account_token requires a service account user")
+
+        token = self._generate_session_token()
+        expires_at = datetime.utcnow() + timedelta(days=ttl_days)
+        self.session_repo.create(
+            user_id=user.id,
+            session_token=token,
+            expires_at=expires_at,
+        )
+        return token
 
     def seed_admin_user(
         self,
