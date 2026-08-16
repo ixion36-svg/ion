@@ -144,6 +144,45 @@ class TestRenderCommands:
         assert "test" in output_file.read_text()
 
 
+class TestSeedAegisCommand:
+    """Tests for the seed-aegis CLI command."""
+
+    def test_seed_aegis_creates_account_and_prints_token(self, runner, temp_project):
+        """Seeding prints the token once plus the four scoped permissions."""
+        result = runner.invoke(app, ["seed-aegis"])
+        assert result.exit_code == 0
+        assert "aegis" in result.output
+        assert "alert:read" in result.output
+        assert "de:read" in result.output
+        assert "de:propose" in result.output
+        assert "case:read" in result.output
+        # least-privilege: verify/approve must never be listed as granted
+        assert "de:verify" not in result.output
+        assert "de:approve" not in result.output
+
+    def test_seed_aegis_second_run_does_not_crash(self, runner, temp_project):
+        """Re-running seed-aegis is idempotent — tops up, never errors."""
+        first = runner.invoke(app, ["seed-aegis"])
+        assert first.exit_code == 0
+
+        second = runner.invoke(app, ["seed-aegis"])
+        assert second.exit_code == 0
+        assert "aegis" in second.output
+
+    def test_seed_aegis_second_run_states_previous_token_revoked(self, runner, temp_project):
+        """Re-minting is a rotation, not an addition — the CLI must say so,
+        since that's the account's recovery path for a leaked token."""
+        runner.invoke(app, ["seed-aegis"])
+        second = runner.invoke(app, ["seed-aegis"])
+
+        assert second.exit_code == 0
+        assert "revoke" in second.output.lower()
+
+    def test_seed_aegis_rejects_non_positive_ttl(self, runner, temp_project):
+        result = runner.invoke(app, ["seed-aegis", "--ttl-days", "0"])
+        assert result.exit_code != 0
+
+
 class TestVersionCommands:
     """Tests for version commands."""
 

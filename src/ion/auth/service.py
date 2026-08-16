@@ -254,17 +254,23 @@ class AuthService:
         if not user_session.user.is_active:
             return None
 
-        # Sliding session: extend expiry when less than half the lifetime remains
-        # This avoids writing to the DB on every single request (SQLite lock contention)
-        now = datetime.utcnow()
-        remaining = (user_session.expires_at - now).total_seconds()
-        half_lifetime = (self.session_lifetime_hours * 3600) / 2
-        if remaining < half_lifetime:
-            user_session.expires_at = now + timedelta(hours=self.session_lifetime_hours)
-            try:
-                self.session_repo.session.commit()
-            except Exception:
-                self.session_repo.session.rollback()
+        # Sliding session: extend expiry when less than half the lifetime remains.
+        # Service-account tokens are excluded — they must expire exactly at
+        # their minted --ttl-days bound. Without this guard an actively-polling
+        # integration (e.g. AEGIS) would never hit that bound: every call inside
+        # the second half of the window would push expires_at forward again,
+        # turning a supposedly-bounded token into a perpetual rolling session.
+        if not getattr(user_session.user, "is_service_account", False):
+            # This avoids writing to the DB on every single request (SQLite lock contention)
+            now = datetime.utcnow()
+            remaining = (user_session.expires_at - now).total_seconds()
+            half_lifetime = (self.session_lifetime_hours * 3600) / 2
+            if remaining < half_lifetime:
+                user_session.expires_at = now + timedelta(hours=self.session_lifetime_hours)
+                try:
+                    self.session_repo.session.commit()
+                except Exception:
+                    self.session_repo.session.rollback()
 
         user = user_session.user
 
@@ -776,6 +782,21 @@ class AuthService:
                     "ai:chat",
                 ],
             ),
+            (
+                # Assigned to the AEGIS service account (companion threat-
+                # modelling app, calls ION's API over a minted bearer token).
+                # Scoped to read + propose only — NOT de:verify (system-quirk
+                # revert) or de:approve (Bob-tuning apply); those stay
+                # reserved for human reviewers (SECURE_BY_DESIGN P6).
+                "aegis",
+                "AEGIS threat modelling integration (service)",
+                True,
+                [
+                    "alert:read",
+                    "de:read", "de:propose",
+                    "case:read",
+                ],
+            ),
         ]
 
         roles = []
@@ -852,6 +873,94 @@ class AuthService:
             self.user_repo.add_role(user, ai_role)
 
         return user
+
+    def seed_aegis_user(
+        self,
+        username: str = "aegis",
+        email: str = "aegis@ion.local",
+        display_name: str = "AEGIS Threat Modelling",
+    ) -> Optional[User]:
+        """Create (or top-up) the AEGIS service user.
+
+        Idempotent, same shape as seed_bob_user(). Ensures:
+          - aegis user exists, flagged is_service_account=True, is_active=True.
+          - aegis has the aegis role.
+          - If aegis already exists but is missing the flag or the role, fix it.
+        """
+        aegis_role = self.role_repo.get_by_name("aegis")
+
+        existing = self.user_repo.get_by_username(username)
+        if existing:
+            changed = False
+            if not getattr(existing, "is_service_account", False):
+                existing.is_service_account = True
+                changed = True
+            if not existing.is_active:
+                existing.is_active = True
+                changed = True
+            if aegis_role and not existing.has_role("aegis"):
+                self.user_repo.add_role(existing, aegis_role)
+                changed = True
+            if changed:
+                self.db_session.flush()
+            return existing
+
+        user = self.user_repo.create(
+            username=username,
+            email=email,
+            password_hash=self._SERVICE_ACCOUNT_HASH_SENTINEL,
+            display_name=display_name,
+            must_change_password=False,
+        )
+        user.is_service_account = True
+        self.db_session.flush()
+
+        if aegis_role:
+            self.user_repo.add_role(user, aegis_role)
+
+        return user
+
+    def mint_service_account_token(self, user_id: int, ttl_days: int) -> str:
+        """Mint a bearer token for a service account by creating a session directly.
+
+        Mirrors the OIDC callback's session creation (session.py bypasses
+        login(), which correctly refuses service accounts). The plaintext
+        token is returned exactly once — only its SHA-256 hash is persisted
+        (SessionRepository.create), so this call cannot be used to recover
+        a previously minted token.
+
+        Rotation: any existing sessions for the user are revoked first, same
+        pattern as the OIDC callback's session rotation. Re-minting is the
+        account's recovery path for a leaked token, so it must not be purely
+        additive — a stale token has to stop working the moment a new one is
+        issued, not stay valid indefinitely alongside it.
+
+        Raises:
+            ValueError: if user_id does not belong to a service account.
+        """
+        user = self.user_repo.get_by_id(user_id)
+        if user is None or not getattr(user, "is_service_account", False):
+            raise ValueError("mint_service_account_token requires a service account user")
+
+        revoked_count = self.session_repo.delete_all_for_user(user.id)
+
+        token = self._generate_session_token()
+        expires_at = datetime.utcnow() + timedelta(days=ttl_days)
+        self.session_repo.create(
+            user_id=user.id,
+            session_token=token,
+            expires_at=expires_at,
+        )
+
+        self.audit_repo.create(
+            user_id=user.id,
+            action="service_token_minted",
+            resource_type="user",
+            resource_id=user.id,
+            details={"ttl_days": ttl_days, "revoked_previous_sessions": revoked_count},
+        )
+
+        return token
 
     def seed_admin_user(
         self,
