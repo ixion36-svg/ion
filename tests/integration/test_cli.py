@@ -1,7 +1,8 @@
 """Integration tests for CLI commands."""
 
-import pytest
 from pathlib import Path
+
+import pytest
 from typer.testing import CliRunner
 
 from ion.cli.main import app
@@ -181,6 +182,47 @@ class TestSeedAegisCommand:
     def test_seed_aegis_rejects_non_positive_ttl(self, runner, temp_project):
         result = runner.invoke(app, ["seed-aegis", "--ttl-days", "0"])
         assert result.exit_code != 0
+
+
+class TestCliCommandsOnAnExternalDatabase:
+    """With ION_DATABASE_URL set the database is external and the SQLite file
+    at `config.db_path` is never created — which is every Docker deployment.
+    Guarding these commands on that file's existence refused all of them in
+    the mode ION actually ships in; `seed-aegis` was unreachable in the
+    container it is meant to be run from.
+    """
+
+    def test_an_external_database_url_counts_as_initialized(self, tmp_path, monkeypatch):
+        """The bug: `ion seed-aegis` in the ION container answered "ION not
+        initialized. Run 'ion init' first" against a perfectly healthy
+        Postgres, because /data/.ion/ion.db does not exist and never will."""
+        from ion.cli.main import _database_is_ready
+
+        monkeypatch.setenv("ION_DATABASE_URL", "postgresql://ion:pw@postgres:5432/ion")
+        assert _database_is_ready(tmp_path / ".ion" / "ion.db") is True
+
+    def test_without_a_database_url_the_sqlite_file_still_decides(self, tmp_path,
+                                                                  monkeypatch):
+        """The SQLite path must keep its guard — `ion init` is still the
+        first step for a local install, and that message is right there."""
+        from ion.cli.main import _database_is_ready
+
+        monkeypatch.delenv("ION_DATABASE_URL", raising=False)
+        missing = tmp_path / ".ion" / "ion.db"
+        assert _database_is_ready(missing) is False
+
+        missing.parent.mkdir(parents=True)
+        missing.touch()
+        assert _database_is_ready(missing) is True
+
+    def test_an_empty_database_url_is_not_a_database(self, tmp_path, monkeypatch):
+        """`ION_DATABASE_URL=` in a .env file reads as an empty string, and
+        get_engine treats that as unset — so this guard must too, or the two
+        disagree about which database is in play."""
+        from ion.cli.main import _database_is_ready
+
+        monkeypatch.setenv("ION_DATABASE_URL", "")
+        assert _database_is_ready(tmp_path / ".ion" / "ion.db") is False
 
 
 class TestVersionCommands:

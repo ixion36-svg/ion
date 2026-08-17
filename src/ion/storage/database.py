@@ -544,8 +544,13 @@ def _run_migrations(engine: Engine) -> None:
                                     " rationale, status, created_by_id, source, alert_id, "
                                     " investigation_id, legacy_tuning_proposal_id, "
                                     " created_at, updated_at) "
-                                    "VALUES (:rule, 'other', :title, :change, :rationale, "
-                                    " 'draft', :by, 'bob', :alert, :inv, :legacy, "
+                                    # Enum NAMEs, not values. SQLEnum
+                                    # (native_enum=False) stores the name and
+                                    # raw text() SQL bypasses the bind
+                                    # processor, so lowercase literals here
+                                    # write rows the ORM cannot read back.
+                                    "VALUES (:rule, 'OTHER', :title, :change, :rationale, "
+                                    " 'DRAFT', :by, 'BOB', :alert, :inv, :legacy, "
                                     " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
                                 ),
                                 {
@@ -1541,6 +1546,57 @@ def _run_migrations(engine: Engine) -> None:
 
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
+
+    # Repair detection_proposals rows written as enum values by raw SQL. One
+    # bad row 500s the whole list endpoint, so this runs before anything reads
+    # the table.
+    try:
+        with engine.begin() as conn:
+            repaired = repair_detection_proposal_enums(conn)
+        if repaired:
+            logger.info("Repaired %d detection_proposal row(s) storing an enum "
+                        "value where the name belongs", repaired)
+    except Exception as exc:  # never block startup on a backfill
+        logger.warning("Detection-proposal enum repair skipped: %s", exc)
+
+
+def repair_detection_proposal_enums(conn) -> int:
+    """Rewrite `detection_proposals` enum columns holding a VALUE to its NAME.
+
+    Rows written by raw `text()` SQL bypassed the bind processor and stored
+    e.g. 'human' where the ORM expects 'HUMAN'. One such row raises LookupError
+    at hydration, which fails the whole `GET /api/de/proposals` query — and
+    that endpoint is AEGIS's ION health probe, so it reads as "ION is down".
+
+    Idempotent: rows already holding a name do not match. A value that matches
+    no member is left alone rather than guessed at.
+    """
+    from ion.models.detection_proposal import (
+        DetectionProposalChangeType,
+        DetectionProposalSource,
+        DetectionProposalStatus,
+    )
+
+    repaired_ids: set[int] = set()
+    for column, enum_cls in (("status", DetectionProposalStatus),
+                             ("source", DetectionProposalSource),
+                             ("change_type", DetectionProposalChangeType)):
+        for member in enum_cls:
+            if member.value == member.name:
+                continue
+            rows = conn.execute(
+                text(f"SELECT id FROM detection_proposals WHERE {column} = :v"),
+                {"v": member.value},
+            ).fetchall()
+            if not rows:
+                continue
+            repaired_ids.update(row[0] for row in rows)
+            conn.execute(
+                text(f"UPDATE detection_proposals SET {column} = :n "  # noqa: S608
+                     f"WHERE {column} = :v"),
+                {"n": member.name, "v": member.value},
+            )
+    return len(repaired_ids)
 
 
 def _migrate_status_values(engine: Engine) -> None:

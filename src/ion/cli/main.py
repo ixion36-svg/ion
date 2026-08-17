@@ -1,5 +1,8 @@
 """Main CLI entry point for ION."""
 
+import os
+from pathlib import Path
+
 import typer
 from rich.console import Console
 
@@ -16,6 +19,19 @@ app = typer.Typer(
 )
 
 console = Console()
+
+
+def _database_is_ready(db_path: Path) -> bool:
+    """Whether there is a database for a command to act on.
+
+    Must agree with `ion.storage.database.get_engine`, which prefers
+    ION_DATABASE_URL and only falls back to the SQLite file. Checking the
+    file alone refuses every guarded command on a Postgres deployment, where
+    that file is never created — which is every Docker install.
+    """
+    if os.environ.get("ION_DATABASE_URL"):
+        return True
+    return db_path.exists()
 
 # Add sub-commands
 app.add_typer(template_app, name="template", help="Template management commands")
@@ -87,7 +103,7 @@ def status() -> None:
 
     config = get_config()
 
-    if not config.db_path.exists():
+    if not _database_is_ready(config.db_path):
         console.print("[yellow]ION not initialized.[/yellow]")
         console.print("Run 'ion init' to initialize.")
         return
@@ -126,7 +142,7 @@ def upgrade() -> None:
 
     config = get_config()
 
-    if not config.db_path.exists():
+    if not _database_is_ready(config.db_path):
         console.print("[yellow]ION not initialized.[/yellow]")
         console.print("Run 'ion init' to initialize.")
         return
@@ -612,7 +628,7 @@ def seed_users(
 
     config = get_config()
 
-    if not config.db_path.exists():
+    if not _database_is_ready(config.db_path):
         console.print("[yellow]ION not initialized.[/yellow]")
         console.print("Run 'ion init' first, then 'ion upgrade'.")
         return
@@ -681,7 +697,7 @@ def seed_aegis(
 
     config = get_config()
 
-    if not config.db_path.exists():
+    if not _database_is_ready(config.db_path):
         console.print("[yellow]ION not initialized.[/yellow]")
         console.print("Run 'ion init' first, then 'ion upgrade'.")
         return
