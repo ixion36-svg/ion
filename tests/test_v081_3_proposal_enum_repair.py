@@ -11,10 +11,10 @@ VALUES — so the rows it created cannot be read back:
 
 One such row 500s `GET /api/de/proposals` for everyone, because the failure is
 at row hydration and takes the whole query with it. That endpoint is also the
-health probe AEGIS's ION connector uses, so a single bad row reads as "ION is
+health probe METIS's ION connector uses, so a single bad row reads as "ION is
 down" from the other product.
 
-Found running AEGIS against a real ION container, not by a test — both suites
+Found running METIS against a real ION container, not by a test — both suites
 mock the other side, so neither could see it.
 
 **Postgres, not SQLite.** This is a storage-layer contract about how an enum

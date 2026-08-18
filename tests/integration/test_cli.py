@@ -145,14 +145,14 @@ class TestRenderCommands:
         assert "test" in output_file.read_text()
 
 
-class TestSeedAegisCommand:
-    """Tests for the seed-aegis CLI command."""
+class TestSeedMetisCommand:
+    """Tests for the seed-metis CLI command."""
 
-    def test_seed_aegis_creates_account_and_prints_token(self, runner, temp_project):
+    def test_seed_metis_creates_account_and_prints_token(self, runner, temp_project):
         """Seeding prints the token once plus the four scoped permissions."""
-        result = runner.invoke(app, ["seed-aegis"])
+        result = runner.invoke(app, ["seed-metis"])
         assert result.exit_code == 0
-        assert "aegis" in result.output
+        assert "metis" in result.output
         assert "alert:read" in result.output
         assert "de:read" in result.output
         assert "de:propose" in result.output
@@ -161,26 +161,26 @@ class TestSeedAegisCommand:
         assert "de:verify" not in result.output
         assert "de:approve" not in result.output
 
-    def test_seed_aegis_second_run_does_not_crash(self, runner, temp_project):
-        """Re-running seed-aegis is idempotent — tops up, never errors."""
-        first = runner.invoke(app, ["seed-aegis"])
+    def test_seed_metis_second_run_does_not_crash(self, runner, temp_project):
+        """Re-running seed-metis is idempotent — tops up, never errors."""
+        first = runner.invoke(app, ["seed-metis"])
         assert first.exit_code == 0
 
-        second = runner.invoke(app, ["seed-aegis"])
+        second = runner.invoke(app, ["seed-metis"])
         assert second.exit_code == 0
-        assert "aegis" in second.output
+        assert "metis" in second.output
 
-    def test_seed_aegis_second_run_states_previous_token_revoked(self, runner, temp_project):
+    def test_seed_metis_second_run_states_previous_token_revoked(self, runner, temp_project):
         """Re-minting is a rotation, not an addition — the CLI must say so,
         since that's the account's recovery path for a leaked token."""
-        runner.invoke(app, ["seed-aegis"])
-        second = runner.invoke(app, ["seed-aegis"])
+        runner.invoke(app, ["seed-metis"])
+        second = runner.invoke(app, ["seed-metis"])
 
         assert second.exit_code == 0
         assert "revoke" in second.output.lower()
 
-    def test_seed_aegis_rejects_non_positive_ttl(self, runner, temp_project):
-        result = runner.invoke(app, ["seed-aegis", "--ttl-days", "0"])
+    def test_seed_metis_rejects_non_positive_ttl(self, runner, temp_project):
+        result = runner.invoke(app, ["seed-metis", "--ttl-days", "0"])
         assert result.exit_code != 0
 
 
@@ -188,12 +188,12 @@ class TestCliCommandsOnAnExternalDatabase:
     """With ION_DATABASE_URL set the database is external and the SQLite file
     at `config.db_path` is never created — which is every Docker deployment.
     Guarding these commands on that file's existence refused all of them in
-    the mode ION actually ships in; `seed-aegis` was unreachable in the
+    the mode ION actually ships in; `seed-metis` was unreachable in the
     container it is meant to be run from.
     """
 
     def test_an_external_database_url_counts_as_initialized(self, tmp_path, monkeypatch):
-        """The bug: `ion seed-aegis` in the ION container answered "ION not
+        """The bug: `ion seed-metis` in the ION container answered "ION not
         initialized. Run 'ion init' first" against a perfectly healthy
         Postgres, because /data/.ion/ion.db does not exist and never will."""
         from ion.cli.main import _database_is_ready

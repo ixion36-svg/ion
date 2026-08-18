@@ -3,7 +3,7 @@
 TIDE is ION's detection-rule warehouse and the only source of MITRE coverage
 (`tide_service.get_global_mitre_coverage`). It is a licensed external service,
 so nothing in a dev environment can produce coverage data — which means the
-ATT&CK coverage overlay, the single feature the AEGIS integration exists for,
+ATT&CK coverage overlay, the single feature the METIS integration exists for,
 could not be exercised end to end. This stub closes that gap, in the same
 spirit as the other `test-*/` harnesses.
 
@@ -19,10 +19,10 @@ queries ION actually sends, not a SQL engine. When ION grows a new TIDE query
 this stub will answer `{"rows": []}` and the caller will read that as "no
 data", which is the safe direction.
 
-The fixture is chosen so every coverage state AEGIS can render appears at
-once, against AEGIS's real rule->technique mappings:
+The fixture is chosen so every coverage state METIS can render appears at
+once, against METIS's real rule->technique mappings:
 
-  T1190  5 rules  -> covered   (its 10 AEGIS rules all read green)
+  T1190  5 rules  -> covered   (its 10 METIS rules all read green)
   T1552  4 rules  -> covered   and T1552.001 / .005 roll up to it
   T1078  2 rules  -> partial
   T1505  1 rule   -> partial   and T1505.003 rolls up to it
@@ -141,7 +141,7 @@ def answer(sql: str) -> list[dict]:
         return [{"total": len({rule_id for rule_id, *_ in RULES})}]
 
     # A CTE the posture dashboard builds. Deliberately unanswered: its shape is
-    # a moving target and nothing in the AEGIS integration reads it, so an
+    # a moving target and nothing in the METIS integration reads it, so an
     # empty result (ION degrades to "no posture data") beats a wrong one.
     if flat.startswith("with "):
         return []

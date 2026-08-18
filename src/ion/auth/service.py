@@ -257,7 +257,7 @@ class AuthService:
         # Sliding session: extend expiry when less than half the lifetime remains.
         # Service-account tokens are excluded — they must expire exactly at
         # their minted --ttl-days bound. Without this guard an actively-polling
-        # integration (e.g. AEGIS) would never hit that bound: every call inside
+        # integration (e.g. METIS) would never hit that bound: every call inside
         # the second half of the window would push expires_at forward again,
         # turning a supposedly-bounded token into a perpetual rolling session.
         if not getattr(user_session.user, "is_service_account", False):
@@ -783,13 +783,13 @@ class AuthService:
                 ],
             ),
             (
-                # Assigned to the AEGIS service account (companion threat-
+                # Assigned to the METIS service account (companion threat-
                 # modelling app, calls ION's API over a minted bearer token).
                 # Scoped to read + propose only — NOT de:verify (system-quirk
                 # revert) or de:approve (Bob-tuning apply); those stay
                 # reserved for human reviewers (SECURE_BY_DESIGN P6).
-                "aegis",
-                "AEGIS threat modelling integration (service)",
+                "metis",
+                "METIS threat modelling integration (service)",
                 True,
                 [
                     "alert:read",
@@ -874,20 +874,20 @@ class AuthService:
 
         return user
 
-    def seed_aegis_user(
+    def seed_metis_user(
         self,
-        username: str = "aegis",
-        email: str = "aegis@ion.local",
-        display_name: str = "AEGIS Threat Modelling",
+        username: str = "metis",
+        email: str = "metis@ion.local",
+        display_name: str = "METIS Threat Modelling",
     ) -> Optional[User]:
-        """Create (or top-up) the AEGIS service user.
+        """Create (or top-up) the METIS service user.
 
         Idempotent, same shape as seed_bob_user(). Ensures:
-          - aegis user exists, flagged is_service_account=True, is_active=True.
-          - aegis has the aegis role.
-          - If aegis already exists but is missing the flag or the role, fix it.
+          - metis user exists, flagged is_service_account=True, is_active=True.
+          - metis has the metis role.
+          - If metis already exists but is missing the flag or the role, fix it.
         """
-        aegis_role = self.role_repo.get_by_name("aegis")
+        metis_role = self.role_repo.get_by_name("metis")
 
         existing = self.user_repo.get_by_username(username)
         if existing:
@@ -898,8 +898,8 @@ class AuthService:
             if not existing.is_active:
                 existing.is_active = True
                 changed = True
-            if aegis_role and not existing.has_role("aegis"):
-                self.user_repo.add_role(existing, aegis_role)
+            if metis_role and not existing.has_role("metis"):
+                self.user_repo.add_role(existing, metis_role)
                 changed = True
             if changed:
                 self.db_session.flush()
@@ -915,8 +915,8 @@ class AuthService:
         user.is_service_account = True
         self.db_session.flush()
 
-        if aegis_role:
-            self.user_repo.add_role(user, aegis_role)
+        if metis_role:
+            self.user_repo.add_role(user, metis_role)
 
         return user
 

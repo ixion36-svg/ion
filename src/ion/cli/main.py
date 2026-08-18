@@ -678,13 +678,13 @@ def seed_users(
         session.close()
 
 
-@app.command("seed-aegis")
-def seed_aegis(
+@app.command("seed-metis")
+def seed_metis(
     ttl_days: int = typer.Option(
         365, "--ttl-days", help="Bearer token lifetime in days"
     ),
 ) -> None:
-    """Seed the AEGIS service account (scoped role) and mint it a bearer token."""
+    """Seed the METIS service account (scoped role) and mint it a bearer token."""
     from datetime import datetime, timedelta
 
     from ion.auth.service import AuthService
@@ -702,7 +702,7 @@ def seed_aegis(
         console.print("Run 'ion init' first, then 'ion upgrade'.")
         return
 
-    console.print("[bold]Seeding AEGIS service account...[/bold]")
+    console.print("[bold]Seeding METIS service account...[/bold]")
 
     engine = get_engine(config.db_path)
     factory = get_session_factory(engine)
@@ -715,40 +715,40 @@ def seed_aegis(
         console.print("  Creating permissions...")
         auth_service.seed_permissions()
 
-        # Seed roles (includes the aegis role)
+        # Seed roles (includes the metis role)
         console.print("  Creating roles...")
         auth_service.seed_roles()
 
-        # Seed the aegis service account
-        console.print("  Creating aegis service account...")
-        aegis = auth_service.seed_aegis_user()
+        # Seed the metis service account
+        console.print("  Creating metis service account...")
+        metis = auth_service.seed_metis_user()
         session.commit()
 
-        if aegis is None:
-            console.print("[red]Error: failed to seed aegis user[/red]")
+        if metis is None:
+            console.print("[red]Error: failed to seed metis user[/red]")
             raise typer.Exit(code=1)
 
-        console.print(f"    Service account: {aegis.username}")
-        console.print(f"    Email: {aegis.email}")
+        console.print(f"    Service account: {metis.username}")
+        console.print(f"    Email: {metis.email}")
 
         # Mint the bearer token
         console.print("  Minting bearer token...")
-        token = auth_service.mint_service_account_token(aegis.id, ttl_days=ttl_days)
+        token = auth_service.mint_service_account_token(metis.id, ttl_days=ttl_days)
         session.commit()
 
         expiry = datetime.utcnow() + timedelta(days=ttl_days)
 
-        console.print("\n[green]OK[/green] AEGIS service account seeded successfully.")
+        console.print("\n[green]OK[/green] METIS service account seeded successfully.")
         console.print("\n[bold]Bearer token (save this now):[/bold]")
         console.print(f"  {token}")
         console.print(
             "\n[yellow]This token cannot be retrieved later — only its hash is "
             "stored. If lost, re-run this command: minting a new token revokes "
-            "any previous AEGIS token, so the old one stops working "
+            "any previous METIS token, so the old one stops working "
             "immediately.[/yellow]"
         )
         console.print(f"\n  Expires: {expiry.date().isoformat()} ({ttl_days} days)")
-        console.print("  Scopes (aegis role permissions):")
+        console.print("  Scopes (metis role permissions):")
         console.print("    - alert:read")
         console.print("    - de:read")
         console.print("    - de:propose")
@@ -756,7 +756,7 @@ def seed_aegis(
 
     except Exception as e:
         session.rollback()
-        console.print(f"\n[red]Error seeding AEGIS service account: {e}[/red]")
+        console.print(f"\n[red]Error seeding METIS service account: {e}[/red]")
         raise
     finally:
         session.close()

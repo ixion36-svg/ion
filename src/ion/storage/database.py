@@ -1559,6 +1559,66 @@ def _run_migrations(engine: Engine) -> None:
     except Exception as exc:  # never block startup on a backfill
         logger.warning("Detection-proposal enum repair skipped: %s", exc)
 
+    # The companion threat-modelling product was renamed AEGIS -> METIS. Its
+    # ION identity is two rows, not a string in the source, so the rename has
+    # to reach the database or `seed-metis` silently creates a second account
+    # beside the first and the estate ends up with both.
+    try:
+        with engine.begin() as conn:
+            renamed = rename_aegis_identities(conn)
+        if renamed:
+            logger.info("Migrated: renamed %d aegis identity row(s) to metis", renamed)
+    except Exception as exc:  # never block startup on a rename
+        logger.warning("AEGIS -> METIS identity rename skipped: %s", exc)
+
+
+def rename_aegis_identities(conn) -> int:
+    """Rename the `aegis` service user and role to `metis`, in place.
+
+    In place, keeping the row ids, because the bearer token METIS authenticates
+    with is bound to the user id and only its hash is stored — deleting and
+    re-seeding would silently revoke a token nobody can reissue without going
+    back to the air-gapped instance.
+
+    Skips either row if a `metis` one already exists, which is the case where
+    an operator ran `seed-metis` before upgrading: renaming on top of it would
+    collide with the unique constraint and take the whole startup down. Leaving
+    the stale `aegis` row is the lesser problem and is visible in the user list.
+
+    Idempotent: after the first run neither row matches.
+    """
+    renamed = 0
+    for table, column in (("roles", "name"), ("users", "username")):
+        exists = conn.execute(
+            text(f"SELECT 1 FROM {table} WHERE {column} = 'metis'")  # noqa: S608
+        ).first()
+        if exists:
+            continue
+        result = conn.execute(
+            text(f"UPDATE {table} SET {column} = 'metis' "  # noqa: S608
+                 f"WHERE {column} = 'aegis'")
+        )
+        renamed += result.rowcount or 0
+
+    # The display strings are cosmetic, but a user list reading "AEGIS Threat
+    # Modelling" after the rename is the kind of loose end that outlives
+    # everyone who knows why.
+    for table, column, old, new in (
+        ("users", "email", "aegis@ion.local", "metis@ion.local"),
+        ("users", "display_name", "AEGIS Threat Modelling", "METIS Threat Modelling"),
+        ("roles", "description",
+         "AEGIS threat modelling integration (service)",
+         "METIS threat modelling integration (service)"),
+    ):
+        try:
+            conn.execute(
+                text(f"UPDATE {table} SET {column} = :new WHERE {column} = :old"),  # noqa: S608
+                {"new": new, "old": old},
+            )
+        except Exception:  # a column this deployment does not have
+            continue
+    return renamed
+
 
 def repair_detection_proposal_enums(conn) -> int:
     """Rewrite `detection_proposals` enum columns holding a VALUE to its NAME.
@@ -1566,7 +1626,7 @@ def repair_detection_proposal_enums(conn) -> int:
     Rows written by raw `text()` SQL bypassed the bind processor and stored
     e.g. 'human' where the ORM expects 'HUMAN'. One such row raises LookupError
     at hydration, which fails the whole `GET /api/de/proposals` query — and
-    that endpoint is AEGIS's ION health probe, so it reads as "ION is down".
+    that endpoint is METIS's ION health probe, so it reads as "ION is down".
 
     Idempotent: rows already holding a name do not match. A value that matches
     no member is left alone rather than guessed at.
