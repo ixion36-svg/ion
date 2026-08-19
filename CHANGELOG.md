@@ -1,13 +1,26 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.81.2 -->
-<!-- ion-doc:version=0.81.2 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.82.0 -->
+<!-- ion-doc:version=0.82.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-08-11 -->
+<!-- ion-doc:date=2026-08-18 -->
 
 # Changelog
+
+## v0.82.0 — 2026-08-18
+
+**METIS — the companion threat-modelling product, until now called AEGIS — gets a service account, and the first time it was pointed at a real ION container it found two bugs neither suite could see.**
+
+- **A scoped service identity, not a shared admin.** New least-privilege `metis` RBAC role carrying exactly four permissions — `alert:read`, `de:read`, `de:propose`, `case:read` — and deliberately **not** `de:verify` or `de:approve` (SECURE_BY_DESIGN P6: METIS may read and draft detection proposals, never verify quirks or approve Bob-tuning changes). Seeded idempotently at startup; the token is minted out-of-band by `ion seed-metis --ttl-days`, never at boot, because a credential that rotates on every restart is one nobody can deploy against.
+- **The token now actually expires.** ION has no separate API-token model — sessions are the auth primitive — so the token *is* a `UserSession`, SHA-256-hashed at rest like every other. `validate_session()`'s sliding window reset `expires_at` to now+24h whenever half the lifetime had gone, so an actively-polling caller renewed forever and `--ttl-days` meant nothing. Service-account sessions skip the slide and expire exactly when minted to; human sessions are unaffected. Re-minting rotates rather than accumulates — the old token stops working the moment a new one is issued — and the mint is audited.
+- **AEGIS is renamed METIS, and its ION identity is two database rows, not a text substitution.** The service user and role are renamed **in place at startup keeping their row ids**, because deleting and re-seeding would revoke a bearer token that cannot be reissued without going back to the air-gapped instance to read it out. The rename skips either row if a `metis` one already exists — the operator who ran `seed-metis` before upgrading — since renaming on top violates the unique constraint and takes startup down with it; a stale `aegis` row is the lesser problem and is visible in the user list. `ion seed-aegis` is now `ion seed-metis`.
+- **`ion seed-metis` was unreachable in the container it is meant to be run from.** Four commands guarded on `config.db_path.exists()`, a SQLite file a Postgres deployment never creates, so the documented setup step answered "ION not initialized. Run 'ion init' first" against a perfectly healthy database. `_database_is_ready` now agrees with `get_engine`, which has always preferred `ION_DATABASE_URL` and only falls back to the file.
+- **A single row 500'd `GET /api/de/proposals` for every caller.** The legacy-tuning carry-over built its INSERT with `text()` and wrote enum *values*; `SQLEnum(native_enum=False)` stores the NAME and raw SQL bypasses the bind processor — the trap `tests/test_v032_sqlenum_name_storage.py` has documented since v0.32. Hydration raised `LookupError` and failed the whole query. That endpoint is also METIS's health probe, so one bad row read as "ION is down" from the other product. The INSERT now writes names and `repair_detection_proposal_enums` rewrites existing rows at startup — idempotent, and it leaves a value it cannot place rather than guessing at provenance that was never recorded.
+- **`test-tide/mock_tide.py`.** TIDE is licensed and external, so no dev environment could produce MITRE coverage — meaning the ATT&CK coverage overlay, the entire reason the METIS integration exists, had never once run on real data. The stub answers ION's actual queries with a fixture that puts every coverage state on screen at once, and it confirmed the behaviour METIS was built around: ION files rules under the **parent** technique, so T1552.005 comes back covered by T1552's four rules while T1195.002 is a genuine gap.
+
+The enum-repair tests run against **Postgres, not SQLite** — this is a claim about how an enum column round-trips, and the deployment holding the bad rows runs Postgres. Set `ION_TEST_DATABASE_URL`; they create and drop their own scratch database and skip when it is unset.
 
 ## v0.81.2 — 2026-08-13
 
