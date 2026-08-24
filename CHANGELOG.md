@@ -1,13 +1,34 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.82.0 -->
-<!-- ion-doc:version=0.82.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.83.0 -->
+<!-- ion-doc:version=0.83.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-08-18 -->
+<!-- ion-doc:date=2026-08-24 -->
 
 # Changelog
+
+## v0.83.0 — 2026-08-24
+
+**The "About ION" decks catch up 43 releases, and become part of the codebase.**
+
+- **/about refreshed to the current product.** The Executive Brief, Full
+  Overview and Secure by Design decks were pre-rendered PNGs authored at
+  v0.39.8 whose PowerPoint sources were never in the repo. All three are now
+  authored SVG slides in the same house style as the AD and AI-airgap decks —
+  diffable, reviewed like code, refreshed at release time. Overview slimmed
+  23 → 13 denser slides; Secure by Design 12 → 11 with the live audit standing
+  (19 Met / 1 Mostly Met) and a receipts slide mapping principles to actual
+  code decisions; Executive Brief carries the Guarded Glass attribution.
+- **Fixed: the AI-airgap deck had no tab.** The deck strip was hardcoded, so
+  the deck shipped at v0.51 reachable only by typed URL. Tabs now render from
+  the decks dict; a test pins every dict entry to a tab.
+- **Removed: 38 stale PNGs and six v0.39-era PDF/PPTX downloads** (~5.8 MB out
+  of the image). The three refreshed decks ship no downloads; AI-airgap keeps
+  its HLD PDF. Header copy updated to match.
+- Tests: three new-deck SVG assertions (no slide-count pins, so decks can grow
+  at release time) + the tab-strip pin. Traversal-safety suite untouched.
 
 ## v0.82.0 — 2026-08-18
 
