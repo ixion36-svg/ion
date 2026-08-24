@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -18,6 +19,24 @@ from ion.services.observable_extractor import extract_observables_from_raw
 from ion.storage.database import get_engine, get_session_factory
 
 logger = logging.getLogger(__name__)
+
+# Loop cadence. 15s keeps ION and Kibana cases visibly in step for analysts
+# working both tools at once (60s left a window where a case edited on one
+# side looked stale on the other). Floor of 5s protects Kibana from a
+# mis-set env var; the circuit breaker already handles Kibana being down.
+DEFAULT_SYNC_INTERVAL_SECONDS = 15
+_MIN_SYNC_INTERVAL_SECONDS = 5
+
+
+def kibana_sync_interval_seconds() -> int:
+    """Sync-loop cadence: ION_KIBANA_SYNC_INTERVAL_SECONDS, default 15, floor 5."""
+    raw = os.environ.get(
+        "ION_KIBANA_SYNC_INTERVAL_SECONDS", str(DEFAULT_SYNC_INTERVAL_SECONDS)
+    )
+    try:
+        return max(_MIN_SYNC_INTERVAL_SECONDS, int(float(raw)))
+    except (TypeError, ValueError):
+        return DEFAULT_SYNC_INTERVAL_SECONDS
 
 
 def _observables_for_kibana(session: Session, observables) -> list:
@@ -868,7 +887,7 @@ class KibanaSyncService:
             "errors": errors if errors else None,
         }
 
-    async def _background_sync_loop(self, interval_seconds: int = 60):
+    async def _background_sync_loop(self, interval_seconds: int = DEFAULT_SYNC_INTERVAL_SECONDS):
         """Background loop to periodically sync between ION and Kibana.
 
         Skips the full sync when Kibana is unreachable (circuit breaker open)
@@ -926,11 +945,13 @@ class KibanaSyncService:
 
             await asyncio.sleep(interval_seconds)
 
-    def start_background_sync(self, interval_seconds: int = 60):
-        """Start the background sync task."""
+    def start_background_sync(self, interval_seconds: Optional[int] = None):
+        """Start the background sync task (default cadence from env, 15s)."""
         if self._running:
             return
 
+        if interval_seconds is None:
+            interval_seconds = kibana_sync_interval_seconds()
         self._running = True
         self._task = asyncio.create_task(self._background_sync_loop(interval_seconds))
 

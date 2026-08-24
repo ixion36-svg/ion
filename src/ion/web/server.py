@@ -805,8 +805,10 @@ async def _startup_event():
         registry = get_connector_registry()
         kibana = registry.get("kibana_cases")
         if kibana and kibana.is_configured:
-            kibana.start_background_sync(interval_seconds=60)
-            logger.info("Kibana bidirectional sync started (60s interval)")
+            from ion.services.kibana_sync_service import kibana_sync_interval_seconds
+            interval = kibana_sync_interval_seconds()
+            kibana.start_background_sync(interval_seconds=interval)
+            logger.info("Kibana bidirectional sync started (%ss interval)", interval)
     run_locked(engine, LOCK_KIBANA_BG_SYNC, "kibana_bg_sync", _start_kibana_sync,
                hold_until_close=True)
 

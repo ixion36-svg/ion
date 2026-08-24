@@ -3,7 +3,7 @@
 Wraps KibanaCasesService and KibanaSyncService to provide a unified connector interface.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ion.services.connectors.base import BaseConnector
 from ion.services.connectors.version_compat import KIBANA_VERSIONS
@@ -62,7 +62,7 @@ class KibanaCasesConnector(BaseConnector):
 
         # Restart background sync if enabled
         if self._cases_service.enabled:
-            self.start_background_sync(interval_seconds=60)
+            self.start_background_sync()
 
         return True
 
@@ -101,7 +101,7 @@ class KibanaCasesConnector(BaseConnector):
                 "error": str(e),
             }
 
-    def start_background_sync(self, interval_seconds: int = 60):
+    def start_background_sync(self, interval_seconds: Optional[int] = None):
         """Start the background sync task."""
         self._sync_service.start_background_sync(interval_seconds=interval_seconds)
 

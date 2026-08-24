@@ -210,6 +210,8 @@ def _render_pcap_markdown(
     arkime_url_root: Optional[str] = None,
     pcap_error: Optional[str] = None,
     fallback_warning: Optional[str] = None,
+    threat_intel: Optional[Dict[str, Any]] = None,
+    seen_before: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """Render the full markdown report for one community_id.
 
@@ -337,6 +339,51 @@ def _render_pcap_markdown(
             else:
                 sev, msg, mitre_str = "info", str(f), ""
             parts.append(f"- **{sev}**: {msg}{mitre_str}")
+        parts.append("")
+
+    # OpenCTI enrichment of the extracted observables. Only passed in when
+    # OpenCTI is configured, so "no matches" genuinely means checked-and-clean.
+    if threat_intel is not None:
+        parts.append("**Threat intel (OpenCTI):**")
+        flagged = [
+            e for e in (threat_intel.get("observables") or [])
+            if (e.get("enrichment") or {}).get("is_malicious")
+            or ((e.get("enrichment") or {}).get("score") or 0) >= 75
+        ]
+        if flagged:
+            for e in flagged[:8]:
+                enr = e.get("enrichment") or {}
+                extras = []
+                if enr.get("labels"):
+                    extras.append(f"labels: {', '.join(enr['labels'][:5])}")
+                if enr.get("threat_actors"):
+                    extras.append(f"actors: {', '.join(enr['threat_actors'][:3])}")
+                extra_str = f" · {' · '.join(extras)}" if extras else ""
+                verdict_word = "**MALICIOUS**" if enr.get("is_malicious") else "suspicious"
+                parts.append(
+                    f"- `{e.get('value', '?')}` — {verdict_word} "
+                    f"(score {enr.get('score', '?')}){extra_str}"
+                )
+        else:
+            parts.append(
+                f"- No matches — {threat_intel.get('ips_checked', 0)} IP(s) and "
+                f"{threat_intel.get('domains_checked', 0)} domain(s) checked."
+            )
+        parts.append("")
+
+    # "Have we seen this before?" — ION's own observable→case history.
+    if seen_before is not None:
+        parts.append("**Seen before in ION:**")
+        if seen_before:
+            for s in seen_before:
+                last = f", most recent {s['last_case_number']}" if s.get("last_case_number") else ""
+                flag = " ⚠" if s.get("malicious") else ""
+                parts.append(
+                    f"- `{s.get('value', '?')}`{flag} — "
+                    f"{s['prior_case_count']} prior case(s){last}"
+                )
+        else:
+            parts.append("- None of the extracted observables appear in an earlier case.")
         parts.append("")
 
     # MITRE ATT&CK technique rollup
@@ -638,6 +685,77 @@ def _post_case_note(case_id: int, content: str) -> None:
             logger.warning("pcap_analysis: Kibana note sync failed: %s", exc)
 
 
+async def _ti_and_history(
+    case_id: int, pcap_result: Optional[Any],
+) -> tuple[Optional[Dict[str, Any]], Optional[List[Dict[str, Any]]]]:
+    """OpenCTI enrichment + prior-case history for one flow's parsed PCAP.
+
+    Returns ``(threat_intel, seen_before)`` for ``_render_pcap_markdown``;
+    either may be ``None`` (section omitted from the note) when the input is
+    unusable, OpenCTI is unconfigured, or the pass fails. Known-bad TI
+    matches are also appended to ``pcap_result.findings`` so they surface in
+    the Findings block and drive the case severity, mirroring the manual
+    ``/api/pcap/analyze`` escalation. Must run BEFORE
+    ``_link_pcap_observables`` writes this case's own links, or seen-before
+    would report the current case as history. Best-effort: never raises.
+    """
+    if pcap_result is None:
+        return None, None
+    ti: Optional[Dict[str, Any]] = None
+    seen: Optional[List[Dict[str, Any]]] = None
+    try:
+        from ion.services.opencti_service import get_opencti_service
+        from ion.services.pcap_enrichment_service import (
+            enrich_pcap_observables,
+            seen_before_for_case,
+            ti_findings,
+        )
+        from ion.services.pcap_service import _is_private
+
+        enr = await enrich_pcap_observables(pcap_result, _is_private)
+        seen = seen_before_for_case(enr.get("observables") or [], case_id)
+        try:
+            opencti_up = get_opencti_service().is_configured
+        except Exception:
+            opencti_up = False
+        if opencti_up:
+            ti = enr
+            extra = ti_findings(enr)
+            if extra:
+                pcap_result.findings = (pcap_result.findings or []) + extra
+                # Recompute verdict + MITRE rollup over the combined findings
+                # (mirrors _apply_ti_findings on the manual path) so the note
+                # can't show a benign verdict above a known-bad IOC.
+                try:
+                    from ion.services.pcap_service import (
+                        Finding,
+                        _attach_mitre,
+                        _build_mitre_summary,
+                        _compute_verdict,
+                    )
+                    fobjs = [
+                        Finding(
+                            category=f.get("category", ""),
+                            severity=f.get("severity", "info"),
+                            title=f.get("title", ""),
+                            detail=f.get("detail", ""),
+                            mitre=f.get("mitre") or [],
+                        )
+                        for f in pcap_result.findings
+                        if isinstance(f, dict)
+                    ]
+                    _attach_mitre(fobjs)
+                    pcap_result.verdict = _compute_verdict(fobjs)
+                    pcap_result.mitre_techniques = _build_mitre_summary(fobjs)
+                except Exception as exc:
+                    logger.debug(
+                        "pcap_analysis: TI verdict recompute failed: %s", exc
+                    )
+    except Exception as exc:
+        logger.warning("pcap_analysis: TI/seen-before enrichment failed: %s", exc)
+    return ti, seen
+
+
 async def _runner(
     case_id: int,
     flows: List[Dict[str, Optional[str]]],
@@ -674,6 +792,10 @@ async def _runner(
                 destination_ip=flow.get("destination_ip"),
                 alert_timestamp=flow.get("alert_timestamp"),
             )
+            # OpenCTI + seen-before annotate the note AND (via appended
+            # findings) the severity below. Runs before the note render and
+            # before _link_pcap_observables writes this case's links.
+            ti, seen = await _ti_and_history(case_id, r["pcap_result"])
             md = _render_pcap_markdown(
                 community_id=cid,
                 sessions=r["sessions"],
@@ -681,6 +803,8 @@ async def _runner(
                 arkime_url_root=r["arkime_url_root"],
                 pcap_error=r["pcap_error"],
                 fallback_warning=r.get("fallback_warning"),
+                threat_intel=ti,
+                seen_before=seen,
             )
             footer = f"\n\n_Generated by Bob · {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}_"
             if alert_id:
