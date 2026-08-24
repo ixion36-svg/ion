@@ -194,9 +194,8 @@ After the commit, the release-checker walks:
 Then build + push:
 
 ```bash
-docker build --pull --no-cache -t ixion36/ion:X.Y.Z -t ixion36/ion:latest .
-docker push ixion36/ion:X.Y.Z
-docker push ixion36/ion:latest
+docker build --pull --no-cache -t fubsxploitapps/ion:X.Y.Z .
+docker push fubsxploitapps/ion:X.Y.Z
 ```
 
 The `--pull --no-cache` is load-bearing — without it, the base

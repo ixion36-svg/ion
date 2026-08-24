@@ -2,13 +2,13 @@
 
 ## Air-Gapped / Secure Environment Deployment
 
-This guide covers deploying ION v0.9.43 in environments with restricted or no internet access.
+This guide covers deploying ION in environments with restricted or no internet access.
 
 ---
 
 ## What's in the Docker Image
 
-The `ixion36/ion` image contains:
+The `fubsxploitapps/ion` image contains:
 
 - ION web application (FastAPI + Jinja2)
 - PostgreSQL client libraries
@@ -31,7 +31,7 @@ The image does **NOT** contain:
 │                  Docker Compose                       │
 │  ┌──────────────┐     ┌──────────────┐               │
 │  │ ion-postgres  │◄────│     ion      │               │
-│  │ PostgreSQL 16 │     │  ION v0.9.43 │               │
+│  │ PostgreSQL 16 │     │  ION v<VERSION> │               │
 │  │  (database)   │     │  port 8000   │               │
 │  └──────────────┘     └──────┬───────┘               │
 │         ion-net network       │                       │
@@ -52,20 +52,23 @@ The image does **NOT** contain:
 
 On a machine with internet access:
 
+The repo is private: `docker login -u fubsxploitapps` first, with an
+organization access token as the password.
+
 ```bash
 # Pull images
-docker pull ixion36/ion:0.9.43
+docker pull fubsxploitapps/ion:<VERSION>
 docker pull postgres:16-alpine
 
 # Save to a tar file
-docker save ixion36/ion:0.9.43 postgres:16-alpine -o ion-0.9.43-bundle.tar
+docker save fubsxploitapps/ion:<VERSION> postgres:16-alpine -o ion-<VERSION>-bundle.tar
 
 # Gather config files
 # You need: docker-compose.yml, .env.deploy
 ```
 
 Transfer to your secure environment:
-- `ion-0.9.43-bundle.tar` (~400MB)
+- `ion-<VERSION>-bundle.tar` (~400MB)
 - `docker-compose.yml`
 - `.env.deploy`
 
@@ -77,7 +80,7 @@ On the secure/air-gapped machine:
 
 ```bash
 # Load images
-docker load -i ion-0.9.43-bundle.tar
+docker load -i ion-<VERSION>-bundle.tar
 
 # Configure
 cp .env.deploy .env
@@ -135,8 +138,8 @@ ION_BASE_URL=https://ion.yourdomain.com
 
 ```bash
 # On internet-connected machine:
-docker pull ixion36/ion:latest
-docker save ixion36/ion:latest -o ion-latest.tar
+docker pull fubsxploitapps/ion:latest
+docker save fubsxploitapps/ion:latest -o ion-latest.tar
 
 # Transfer and load on air-gapped machine:
 docker load -i ion-latest.tar
