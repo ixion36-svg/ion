@@ -32,7 +32,7 @@ CANONICAL_FILES: list[tuple[str, str, str]] = [
     ("src/ion/__init__.py",    r'__version__\s*=\s*"([0-9.]+)"',                    "single"),
     ("README.md",              r'version-([0-9.]+)-blue',                           "single"),
     ("Dockerfile",             r'org\.opencontainers\.image\.version="([0-9.]+)"',  "single"),
-    ("docker-compose.yml",     r'ixion36/ion:\$\{ION_VERSION:-([0-9.]+)\}',         "all"),
+    ("docker-compose.yml",     r'fubsxploitapps/ion:\$\{ION_VERSION:-([0-9.]+)\}',         "all"),
     (".env.deploy",            r'^ION_VERSION=([0-9.]+)',                           "single"),
     ("CHANGELOG.md",           r'^## v([0-9.]+)',                                   "first"),
     # ION shipping docs all carry an `<!-- ion-doc:version=X.Y.Z -->` stamp

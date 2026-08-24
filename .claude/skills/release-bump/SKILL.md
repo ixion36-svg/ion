@@ -35,7 +35,7 @@ ION's version string lives in 8 files. Past releases rotted them (`src/ion/__ini
    - `src/ion/__init__.py` line 3 → `__version__ = "X.Y.Z"`
    - `README.md` → shields badge `version-X.Y.Z-blue`
    - `Dockerfile` → `org.opencontainers.image.version="X.Y.Z"`
-   - `docker-compose.yml` → **both** `ixion36/ion:${ION_VERSION:-X.Y.Z}` occurrences
+   - `docker-compose.yml` → **both** `fubsxploitapps/ion:${ION_VERSION:-X.Y.Z}` occurrences
    - `.env.deploy` → `ION_VERSION=X.Y.Z` (plus header comment if present)
    - `CHANGELOG.md` → new `## vX.Y.Z — YYYY-MM-DD` heading at top + entries
    - `SECURITY_ASSESSMENT.md` → bump `<!-- ion-doc:version=X.Y.Z -->` + `Assessment Date` + `Application Version`, update the compact **current-posture** table's `(vX.Y.Z)` version header (single cell — the values stay 0 unless a finding lands), and add a "Net-New Surfaces" paragraph if material. (The old 70-column per-version trend table was retired at v0.40.0; the checker only anchors on the `ion-doc:version` stamp.)
@@ -55,17 +55,18 @@ ION's version string lives in 8 files. Past releases rotted them (`src/ion/__ini
    ```
    Applied at the very end of the release ritual, after feature commits land. Touches all 8 files.
 
-8. **Image pushes — BOTH registries** (after the tag lands and the image is
-   built). The public repo stays canonical — deployed compose files reference
-   it — and every release also goes to the org's private repo:
+8. **Image push** (after the tag lands and the image is built). ION is a
+   Guarded Glass product: distribution is the org's PRIVATE repo only, since
+   2026-08-20 (the public `ixion36/ion` was retired the same day; dual-push
+   lasted exactly one release, v0.82.0). Any pulling host needs `docker login`;
+   air-gapped installs keep using `docker save`/`load` tarballs.
    ```
-   docker push ixion36/ion:X.Y.Z
-   docker tag ixion36/ion:X.Y.Z fubsxploitapps/ion:X.Y.Z
+   docker build -t fubsxploitapps/ion:X.Y.Z .
    docker push fubsxploitapps/ion:X.Y.Z
    ```
-   Dual-push started at v0.82.0 (2026-08-20). Skipping the push is how three
-   releases (0.80.3, 0.81.0, 0.81.2) once shipped as tags with no image — the
-   push is part of the release, not an afterthought.
+   Skipping the push is how three releases (0.80.3, 0.81.0, 0.81.2) once
+   shipped as tags with no image — the push is part of the release, not an
+   afterthought.
 
 ## What NOT to bump
 

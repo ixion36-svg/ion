@@ -128,7 +128,7 @@ the Similar-Cases sidebar all quietly return nothing.
 
 | Artefact | Why |
 |---|---|
-| `ixion36/ion:<VERSION>` | Application |
+| `fubsxploitapps/ion:<VERSION>` | Application (private repo — `docker login` required to pull) |
 | `pgvector/pgvector:<PG_VERSION>` | Postgres **with pgvector** (not plain postgres) |
 | `ollama/ollama:latest` | LLM host |
 | Chat model (default `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF`) | Bob's reasoning |
