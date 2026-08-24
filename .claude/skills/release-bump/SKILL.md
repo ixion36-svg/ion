@@ -55,6 +55,18 @@ ION's version string lives in 8 files. Past releases rotted them (`src/ion/__ini
    ```
    Applied at the very end of the release ritual, after feature commits land. Touches all 8 files.
 
+8. **Image pushes — BOTH registries** (after the tag lands and the image is
+   built). The public repo stays canonical — deployed compose files reference
+   it — and every release also goes to the org's private repo:
+   ```
+   docker push ixion36/ion:X.Y.Z
+   docker tag ixion36/ion:X.Y.Z fubsxploitapps/ion:X.Y.Z
+   docker push fubsxploitapps/ion:X.Y.Z
+   ```
+   Dual-push started at v0.82.0 (2026-08-20). Skipping the push is how three
+   releases (0.80.3, 0.81.0, 0.81.2) once shipped as tags with no image — the
+   push is part of the release, not an afterthought.
+
 ## What NOT to bump
 
 Historical annotations in source comments like `# v0.29.1: added IP-fallback path` in `src/ion/services/pcap_analysis_service.py` are permanent feature markers, NOT version stamps. The drift checker ignores them; you should too.
