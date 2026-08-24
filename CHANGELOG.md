@@ -1,13 +1,39 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.83.0 -->
-<!-- ion-doc:version=0.83.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.84.0 -->
+<!-- ion-doc:version=0.84.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-24 -->
 
 # Changelog
+
+## v0.84.0 — 2026-08-24
+
+**Auto-PCAP cases explain themselves: OpenCTI verdicts and "have we seen this
+before?" land in the case note, and Kibana sync tightens to 15 seconds.**
+
+- **Threat intel on auto-case notes.** The Arkime auto-case pipeline now
+  enriches the PCAP's external IPs and domains via OpenCTI and renders the
+  verdicts in the note (`MALICIOUS`, score, labels, actors). Known-bad
+  matches become findings, the verdict is recomputed over the combined set,
+  and the case severity escalates — mirroring the manual analyzer, so a C2
+  hit can no longer sit under a "Likely Benign" headline. With OpenCTI
+  unconfigured the section is omitted entirely rather than reading as a
+  false clean.
+- **"Seen before in ION."** Each note now answers whether the extracted
+  observables appeared in earlier cases, from ION's own observable→case
+  links (count + most recent case number), computed before the current
+  case's own links are written so it never counts itself. An empty history
+  renders an explicit "none", not silence.
+- **One enrichment implementation.** The OpenCTI extraction/enrichment logic
+  moved from the manual `/api/pcap/analyze` route into
+  `services/pcap_enrichment_service.py`, shared by both paths.
+- **Kibana case sync every 15s (was 60s).** Analysts working ION and Kibana
+  side by side saw stale cases inside the old window. Tunable via
+  `ION_KIBANA_SYNC_INTERVAL_SECONDS` (floor 5s); the circuit breaker still
+  skips passes while Kibana is unreachable.
 
 ## v0.83.0 — 2026-08-24
 
