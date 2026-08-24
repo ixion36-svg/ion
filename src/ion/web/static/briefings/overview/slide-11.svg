@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .pane{fill:#0c1322;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">GRC &amp; KNOWLEDGE</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Governance next to the evidence</text>
+  <text x="64" y="142" class="s" font-size="17">Compliance, documents and the knowledge base share the SOC's home — with ownership that means something.</text>
+
+  <!-- document stack motif right -->
+  <g opacity="0.8">
+    <rect x="1010" y="205" width="170" height="110" rx="8" fill="#0f1729" stroke="#26405a" stroke-width="1.5" transform="rotate(-4 1095 260)"/>
+    <rect x="1020" y="215" width="170" height="110" rx="8" fill="#0f1729" stroke="#26405a" stroke-width="1.5" transform="rotate(2 1105 270)"/>
+    <rect x="1015" y="228" width="176" height="112" rx="8" fill="#0d233a" stroke="#34d3ee" stroke-width="1.8"/>
+    <line x1="1035" y1="258" x2="1160" y2="258" stroke="#26405a" stroke-width="2"/>
+    <line x1="1035" y1="280" x2="1160" y2="280" stroke="#26405a" stroke-width="2"/>
+    <line x1="1035" y1="302" x2="1120" y2="302" stroke="#26405a" stroke-width="2"/>
+    <text x="1103" y="366" text-anchor="middle" class="s" font-size="12">owner · audit trail · version</text>
+  </g>
+
+  <rect class="pane" x="64" y="190" width="560" height="160" rx="12"/>
+  <text x="88" y="224" class="c" font-size="14" font-weight="800">DOCUMENTS, OWNED</text>
+  <g class="s" font-size="15">
+    <text x="88" y="254">Every document carries an <tspan class="t" font-weight="700">owner</tspan>; only the owner</text>
+    <text x="88" y="278">deletes, and every action lands in the audit log.</text>
+    <text x="88" y="302">The library shares the case workspace's chrome —</text>
+    <text x="88" y="326">reading a runbook feels like working a case.</text>
+  </g>
+
+  <rect class="pane" x="64" y="370" width="560" height="156" rx="12"/>
+  <text x="88" y="404" class="c" font-size="14" font-weight="800">A KNOWLEDGE BASE THE SOC READS</text>
+  <g class="s" font-size="15">
+    <text x="88" y="434">Hundreds of articles, browsable and searched by</text>
+    <text x="88" y="458">content — and the same corpus grounds Bob's</text>
+    <text x="88" y="482">answers, so what the AI cites is what the</text>
+    <text x="88" y="506">analyst can open and verify.</text>
+  </g>
+
+  <rect class="pane" x="656" y="370" width="560" height="156" rx="12"/>
+  <text x="680" y="404" class="c" font-size="14" font-weight="800">COMPLIANCE VIEWS</text>
+  <g class="s" font-size="15">
+    <text x="680" y="434">A GRC group in the navigation proper: compliance</text>
+    <text x="680" y="458">posture, audit logs, canaries and change control</text>
+    <text x="680" y="482">in one place — evidence for the assessor without</text>
+    <text x="680" y="506">a screenshot safari.</text>
+  </g>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">What the numbers show is what the page shows — filters drive the aggregates, everywhere.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Full Overview</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">11 / 13</text>
+</svg>

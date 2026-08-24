@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .pane{fill:#0c1322;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE AI IS IN SCOPE TOO</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">The same principles, applied to Bob</text>
+  <text x="64" y="142" class="s" font-size="17">An LLM in a SOC is attack surface. ION treats it that way, with a dedicated hardening programme.</text>
+
+  <!-- LLM in trust boundary motif -->
+  <g transform="translate(1040,370)">
+    <rect x="-140" y="-115" width="280" height="230" rx="14" fill="none" stroke="#34d3ee" stroke-width="2" stroke-dasharray="8 6"/>
+    <rect x="-70" y="-60" width="140" height="80" rx="10" fill="#0d233a" stroke="#26405a" stroke-width="1.5"/>
+    <text y="-22" text-anchor="middle" class="c mono" font-size="15" font-weight="700">BOB</text>
+    <text y="0" text-anchor="middle" class="s" font-size="11">local LLM</text>
+    <text y="55" text-anchor="middle" class="s" font-size="12">retrieved text stays data —</text>
+    <text y="73" text-anchor="middle" class="s" font-size="12">never instructions</text>
+    <text y="-128" text-anchor="middle" class="c" font-size="12" font-weight="700">TRUST BOUNDARY</text>
+  </g>
+
+  <rect class="pane" x="64" y="190" width="840" height="106" rx="12"/>
+  <text x="88" y="222" class="c mono" font-size="14" font-weight="800">PHASE 1 · THE ON-DEMAND SURFACES</text>
+  <g class="s" font-size="15">
+    <text x="88" y="252">Every place a user can point Bob at content got hardened: prompt-safety checks are</text>
+    <text x="88" y="276">shared, not re-implemented per feature — one gate, reused, tested once and everywhere.</text>
+  </g>
+
+  <rect class="pane" x="64" y="316" width="840" height="106" rx="12"/>
+  <text x="88" y="348" class="c mono" font-size="14" font-weight="800">PHASE 2 · GROUNDING AND THE RAG TRUST BOUNDARY</text>
+  <g class="s" font-size="15">
+    <text x="88" y="378">Retrieved documents are quoted, attributed, and treated as data. A KB article or TI report</text>
+    <text x="88" y="402">that says "ignore your instructions" is a finding about the document, not a command.</text>
+  </g>
+
+  <rect class="pane" x="64" y="442" width="840" height="100" rx="12"/>
+  <text x="88" y="474" class="c mono" font-size="14" font-weight="800">DETERMINISM BEFORE INFERENCE</text>
+  <g class="s" font-size="15">
+    <text x="88" y="504">Where a right answer exists, the model never guesses: encoded commands are decoded</text>
+    <text x="88" y="528">by code, technique IDs validated against the catalogue, actions gated behind humans.</text>
+  </g>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">Nothing Bob writes becomes a record without a human accept — the review tray is the gate.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Secure by Design</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">09 / 11</text>
+</svg>

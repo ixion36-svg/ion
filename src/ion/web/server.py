@@ -1165,11 +1165,12 @@ async def briefings_page(
     deck: str = "executive",
     user: User = Depends(require_page_auth),
 ):
-    """Render the in-app ION briefing decks (per-slide PNGs + PDF/PPTX downloads).
+    """Render the in-app ION briefing decks.
 
-    Decks are pre-rendered to images under ``static/briefings/<deck>/`` and
-    served as plain ``<img>`` — keeping the page within ION's strict CSP
-    (``img-src 'self'``; no framing, no inline styles).
+    Slides are authored SVGs under ``static/briefings/<deck>/``, served as
+    plain ``<img>`` — keeping the page within ION's strict CSP
+    (``img-src 'self'``; no framing, no inline styles). Refresh the SVGs at
+    release time; the sources ARE the deck.
     """
     # Map the (untrusted) ``deck`` query value through a fixed lookup table.
     # Every field used downstream — including the on-disk subdirectory — comes
@@ -1181,23 +1182,17 @@ async def briefings_page(
         "executive": {
             "dir": "executive",
             "label": "Executive Brief",
-            "blurb": "A 3-slide brief for leadership — the problem, the value, and the proof.",
-            "pdf": "/static/briefings/ION_Executive_Brief.pdf",
-            "pptx": "/static/briefings/ION_Executive_Brief.pptx",
+            "blurb": "A 3-slide brief for leadership — what ION does, and why it's trusted.",
         },
         "overview": {
             "dir": "overview",
             "label": "Full Overview",
-            "blurb": "The complete capability & architecture deck — what ION does, every integration, and how Bob's AI works.",
-            "pdf": "/static/briefings/ION_Overview.pdf",
-            "pptx": "/static/briefings/ION_Overview.pptx",
+            "blurb": "The complete capability tour — cases, Bob's AI, Attack Path, detection engineering, GRC, and how it all deploys air-gapped.",
         },
         "secure-by-design": {
             "dir": "secure-by-design",
             "label": "Secure by Design",
-            "blurb": "How ION's 20 secure-by-design principles shape every line of code and every release.",
-            "pdf": "/static/briefings/ION_Secure_by_Design.pdf",
-            "pptx": "/static/briefings/ION_Secure_by_Design.pptx",
+            "blurb": "The 20 principles and the current audit — 19 Met, 1 Mostly Met, and why the exception is stated openly.",
         },
         # analyst knowledge-transfer decks (SVG slides, no PDF/PPTX).
         "ad-attacks": {
@@ -1239,7 +1234,8 @@ async def briefings_page(
     return templates.TemplateResponse(
         request=request,
         name="briefings.html",
-        context={"deck": deck, "slides": slides, "current": current},
+        context={"deck": deck, "slides": slides, "current": current,
+                 "decks": decks},
     )
 
 

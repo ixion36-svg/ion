@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE VALUE</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">What ION does for the SOC</text>
+  <text x="64" y="142" class="s" font-size="17">One platform for the analyst's whole day — investigation, detection engineering, and running the room.</text>
+
+  <!-- three value columns -->
+  <rect x="64" y="178" width="368" height="356" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="88" y="216" class="c mono" font-size="15" font-weight="800">INVESTIGATE</text>
+  <rect x="88" y="228" width="60" height="3" fill="#34d3ee"/>
+  <g class="s" font-size="15.5">
+    <text x="88" y="262"><tspan class="t" font-weight="700">Cases as widgets</tspan> — observables</text>
+    <text x="88" y="284">auto-extracted and enriched.</text>
+    <text x="88" y="318"><tspan class="t" font-weight="700">One alert renderer</tspan> everywhere;</text>
+    <text x="88" y="340">case open in one click, not eight.</text>
+    <text x="88" y="374"><tspan class="t" font-weight="700">Attack Path</tspan> — the kill chain as</text>
+    <text x="88" y="396">an evidence-linked graph per case.</text>
+    <text x="88" y="430"><tspan class="t" font-weight="700">Bob investigates the cluster</tspan> —</text>
+    <text x="88" y="452">one AI deep-dive per case, local,</text>
+    <text x="88" y="474">grounded, and always reviewable.</text>
+  </g>
+
+  <rect x="456" y="178" width="368" height="356" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="480" y="216" class="c mono" font-size="15" font-weight="800">ENGINEER</text>
+  <rect x="480" y="228" width="60" height="3" fill="#34d3ee"/>
+  <g class="s" font-size="15.5">
+    <text x="480" y="262"><tspan class="t" font-weight="700">Detection Health</tspan> — a per-rule</text>
+    <text x="480" y="284">dashboard that closes the loop</text>
+    <text x="480" y="306">from incident back to detection.</text>
+    <text x="480" y="340"><tspan class="t" font-weight="700">Detection Engineering</tspan> module —</text>
+    <text x="480" y="362">metrics, proposals, Bob drafting.</text>
+    <text x="480" y="396"><tspan class="t" font-weight="700">System Quirks</tspan> — known-benign</text>
+    <text x="480" y="418">behaviour, human-verified, scoped,</text>
+    <text x="480" y="440">expiring, and advisory-only: never</text>
+    <text x="480" y="462">hides, closes, or suppresses.</text>
+  </g>
+
+  <rect x="848" y="178" width="368" height="356" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="872" y="216" class="c mono" font-size="15" font-weight="800">OPERATE</text>
+  <rect x="872" y="228" width="60" height="3" fill="#34d3ee"/>
+  <g class="s" font-size="15.5">
+    <text x="872" y="262"><tspan class="t" font-weight="700">My Day / Team Day</tspan> — daily work</text>
+    <text x="872" y="284">and standup, in the portal.</text>
+    <text x="872" y="318"><tspan class="t" font-weight="700">Traffic Analytics</tspan> with a realtime</text>
+    <text x="872" y="340">IOC monitor and AI traffic review.</text>
+    <text x="872" y="374"><tspan class="t" font-weight="700">GRC &amp; documents</tspan> — ownership,</text>
+    <text x="872" y="396">audit trail, and a knowledge base</text>
+    <text x="872" y="418">the SOC actually reads.</text>
+    <text x="872" y="452"><tspan class="t" font-weight="700">Labs &amp; cyber range</tspan> — train on</text>
+    <text x="872" y="474">the same console you work in.</text>
+  </g>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">Every AI feature is assistive by design — ION drafts and measures; the analyst decides and acts.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Executive Brief</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">02 / 03</text>
+</svg>

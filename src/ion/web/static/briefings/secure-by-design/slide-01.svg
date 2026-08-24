@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <!-- 4-quadrant shield motif -->
+  <g transform="translate(1020,340)">
+    <path d="M0 -170 C 70 -140, 120 -130, 150 -128 C 150 20, 90 120, 0 170 C -90 120, -150 20, -150 -128 C -120 -130, -70 -140, 0 -170 Z"
+          fill="#0f1729" stroke="#26405a" stroke-width="2"/>
+    <line x1="0" y1="-170" x2="0" y2="170" stroke="#1f2b40" stroke-width="2"/>
+    <line x1="-150" y1="-10" x2="150" y2="-10" stroke="#1f2b40" stroke-width="2"/>
+    <text x="-72" y="-70" text-anchor="middle" class="c mono" font-size="14" font-weight="700">GOVERN</text>
+    <text x="72" y="-70" text-anchor="middle" class="c mono" font-size="14" font-weight="700">DESIGN</text>
+    <text x="-72" y="60" text-anchor="middle" class="c mono" font-size="13" font-weight="700">BUILD</text>
+    <text x="72" y="60" text-anchor="middle" class="c mono" font-size="13" font-weight="700">OPERATE</text>
+  </g>
+
+  <text x="90" y="240" class="c" font-size="15" font-weight="700" letter-spacing="4">SECURE BY DESIGN</text>
+  <text x="90" y="302" class="t" font-size="58" font-weight="800">Twenty principles,</text>
+  <text x="90" y="366" class="c" font-size="58" font-weight="800">audited every release</text>
+  <rect x="92" y="388" width="150" height="4" fill="#34d3ee"/>
+  <text x="90" y="438" class="s" font-size="20">Four groups — Govern, Design, Build &amp; Verify, Operate —</text>
+  <text x="90" y="468" class="s" font-size="20">applied to every line of code and re-audited in the doc.</text>
+
+  <rect x="90" y="510" width="300" height="34" rx="6" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="106" y="533" class="c mono" font-size="14" font-weight="700">STANDING: 19 MET · 1 MOSTLY MET</text>
+  <text x="406" y="533" class="s" font-size="15">The one exception is stated openly — see Govern</text>
+
+  <text x="90" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Secure by Design</text>
+  <text x="1190" y="688" class="s mono" font-size="13" text-anchor="end">01 / 11</text>
+</svg>

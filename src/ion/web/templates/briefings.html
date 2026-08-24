@@ -13,23 +13,18 @@
       <span class="label-tiny text-ion-cyan uppercase tracking-[0.2em] text-[11px] font-semibold">About ION</span>
     </div>
     <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-[1.05] text-white tracking-[-0.02em]">Briefing &amp; Overview decks</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Ready-to-present decks explaining what ION does, how it works, and the integrations behind it. Hit <span class="text-ion-cyan font-medium">Present</span> for a full-screen, single-slide show (or click any slide below), and download as PDF or PowerPoint.</p>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Ready-to-present decks explaining what ION does, how it works, and the integrations behind it. Hit <span class="text-ion-cyan font-medium">Present</span> for a full-screen, single-slide show (or click any slide below). Downloads appear where a deck has a companion document.</p>
   </section>
 
   <!-- Deck toggle + downloads -->
   <section class="flex flex-wrap items-center justify-between gap-4 mb-8 rise d-2">
     <div class="flex items-center gap-1 bg-slate-900/60 border border-slate-700 rounded-lg p-1" role="tablist">
-      <a href="/about?deck=executive"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'executive' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">Executive Brief
-        <span class="ml-1 opacity-70 text-[11px]">3 slides</span></a>
-      <a href="/about?deck=overview"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'overview' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">Full Overview</a>
-      <a href="/about?deck=secure-by-design"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'secure-by-design' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">Secure by Design</a>
-      <a href="/about?deck=ad-attacks"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'ad-attacks' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">AD Attacks (L1)</a>
-      <a href="/about?deck=ad-advanced"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == 'ad-advanced' %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">AD Advanced (L2)</a>
+      {# One tab per decks-dict entry — hardcoding this list is how the
+         ai-airgap deck shipped unreachable from the UI. #}
+      {% for key, d in decks.items() %}
+      <a href="/about?deck={{ key }}"
+         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == key %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">{{ d.label }}</a>
+      {% endfor %}
     </div>
     <div class="flex items-center gap-2">
       {% if slides %}

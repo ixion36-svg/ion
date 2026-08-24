@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .spoke{fill:#0f1729;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE STACK</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Everything local, everything integrated</text>
+  <text x="64" y="142" class="s" font-size="17">ION sits at the centre of the SOC's tooling — every connection stays inside the boundary.</text>
+
+  <!-- hub and spoke -->
+  <g opacity="0.6" stroke="#1f2b40" stroke-width="1.5">
+    <line x1="640" y1="400" x2="330" y2="255"/><line x1="640" y1="400" x2="640" y2="230"/><line x1="640" y1="400" x2="950" y2="255"/>
+    <line x1="640" y1="400" x2="255" y2="400"/><line x1="640" y1="400" x2="1025" y2="400"/>
+    <line x1="640" y1="400" x2="330" y2="545"/><line x1="640" y1="400" x2="640" y2="570"/><line x1="640" y1="400" x2="950" y2="545"/>
+  </g>
+  <circle cx="640" cy="400" r="58" fill="#0d233a" stroke="#34d3ee" stroke-width="2.5"/>
+  <text x="640" y="396" text-anchor="middle" class="c mono" font-size="19" font-weight="800">ION</text>
+  <text x="640" y="416" text-anchor="middle" class="s" font-size="11">portal + Postgres</text>
+
+  <g>
+    <rect class="spoke" x="240" y="228" width="180" height="54" rx="10"/>
+    <text x="330" y="251" text-anchor="middle" class="t" font-size="15" font-weight="700">Elasticsearch</text>
+    <text x="330" y="270" text-anchor="middle" class="s" font-size="12">alerts &amp; telemetry</text>
+
+    <rect class="spoke" x="550" y="176" width="180" height="54" rx="10"/>
+    <text x="640" y="199" text-anchor="middle" class="t" font-size="15" font-weight="700">Kibana</text>
+    <text x="640" y="218" text-anchor="middle" class="s" font-size="12">dashboards, note sync</text>
+
+    <rect class="spoke" x="860" y="228" width="180" height="54" rx="10"/>
+    <text x="950" y="251" text-anchor="middle" class="t" font-size="15" font-weight="700">TIDE</text>
+    <text x="950" y="270" text-anchor="middle" class="s" font-size="12">detection rules</text>
+
+    <rect class="spoke" x="120" y="373" width="180" height="54" rx="10"/>
+    <text x="210" y="396" text-anchor="middle" class="t" font-size="15" font-weight="700">OpenCTI</text>
+    <text x="210" y="415" text-anchor="middle" class="s" font-size="12">threat intel + TI RAG</text>
+
+    <rect class="spoke" x="980" y="373" width="180" height="54" rx="10"/>
+    <text x="1070" y="396" text-anchor="middle" class="t" font-size="15" font-weight="700">Arkime</text>
+    <text x="1070" y="415" text-anchor="middle" class="s" font-size="12">PCAP &amp; sessions</text>
+
+    <rect class="spoke" x="240" y="518" width="180" height="54" rx="10"/>
+    <text x="330" y="541" text-anchor="middle" class="t" font-size="15" font-weight="700">Keycloak</text>
+    <text x="330" y="560" text-anchor="middle" class="s" font-size="12">OIDC RS256 SSO</text>
+
+    <rect class="spoke" x="550" y="566" width="180" height="54" rx="10"/>
+    <text x="640" y="589" text-anchor="middle" class="t" font-size="15" font-weight="700">Ollama</text>
+    <text x="640" y="608" text-anchor="middle" class="s" font-size="12">Bob's local LLM</text>
+
+    <rect class="spoke" x="860" y="518" width="180" height="54" rx="10"/>
+    <text x="950" y="541" text-anchor="middle" class="t" font-size="15" font-weight="700">GitLab</text>
+    <text x="950" y="560" text-anchor="middle" class="s" font-size="12">bug reports, CAB</text>
+  </g>
+
+  <!-- METIS callout -->
+  <rect x="1075" y="176" width="140" height="80" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="1145" y="206" text-anchor="middle" class="c" font-size="15" font-weight="700">METIS</text>
+  <text x="1145" y="226" text-anchor="middle" class="s" font-size="11">threat modelling —</text>
+  <text x="1145" y="242" text-anchor="middle" class="s" font-size="11">scoped service account</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Full Overview</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">02 / 13</text>
+</svg>

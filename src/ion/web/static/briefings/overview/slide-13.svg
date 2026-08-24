@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <!-- forward chevrons -->
+  <g fill="none" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M950 260 L1030 360 L950 460" stroke="#1f2b40"/>
+    <path d="M1020 260 L1100 360 L1020 460" stroke="#26405a"/>
+    <path d="M1090 260 L1170 360 L1090 460" stroke="#34d3ee"/>
+  </g>
+
+  <text x="90" y="240" class="c" font-size="15" font-weight="700" letter-spacing="4">WHERE ION GOES</text>
+  <text x="90" y="302" class="t" font-size="58" font-weight="800">Shipped quietly,</text>
+  <text x="90" y="366" class="c" font-size="58" font-weight="800">improved constantly</text>
+  <rect x="92" y="388" width="150" height="4" fill="#34d3ee"/>
+  <g class="s" font-size="19">
+    <text x="90" y="440">ION is a <tspan class="t" font-weight="700">Guarded Glass</tspan> product — distributed privately,</text>
+    <text x="90" y="470">released often, with a software bill of materials</text>
+    <text x="90" y="500">(SBOM) generated into every image.</text>
+  </g>
+
+  <g class="s" font-size="16">
+    <text x="90" y="556">Keep exploring: <tspan class="c mono" font-weight="700">/guide</tspan> for the manual · <tspan class="c mono" font-weight="700">/soc-roles</tspan> for the team ·</text>
+    <text x="90" y="584">the <tspan class="t" font-weight="700">AD field guides</tspan> and <tspan class="t" font-weight="700">AI air-gap briefing</tspan> on this page's other tabs.</text>
+  </g>
+
+  <text x="90" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Full Overview</text>
+  <text x="1190" y="688" class="s mono" font-size="13" text-anchor="end">13 / 13</text>
+</svg>

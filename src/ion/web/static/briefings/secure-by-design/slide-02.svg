@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .pane{fill:#0c1322;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">GOVERN · P1–P3</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Security as an organisational property</text>
+  <text x="64" y="142" class="s" font-size="17">Before any control: who owns security, who answers for it, and whether the truth is told about it.</text>
+
+  <rect class="pane" x="64" y="190" width="1152" height="102" rx="12"/>
+  <text x="88" y="222" class="c mono" font-size="14" font-weight="800">P1 · SECURITY IS EVERYONE'S CONCERN</text>
+  <rect x="960" y="204" width="120" height="26" rx="13" fill="#2b2413" stroke="#e5a33d" stroke-width="1.3"/>
+  <text x="1020" y="222" text-anchor="middle" font-size="12" font-weight="700" fill="#e5a33d">MOSTLY MET</text>
+  <g class="s" font-size="15">
+    <text x="88" y="250">Not the security team's job — every review's job. <tspan class="t" font-weight="700">The honest caveat:</tspan> ION has a single maintainer,</text>
+    <text x="88" y="274">so with six review artifacts in place it structurally cannot reach Met without a second human reviewer.</text>
+  </g>
+
+  <rect class="pane" x="64" y="312" width="1152" height="102" rx="12"/>
+  <text x="88" y="344" class="c mono" font-size="14" font-weight="800">P2 · SENIOR ACCOUNTABILITY FOR PRODUCT SECURITY</text>
+  <rect x="960" y="326" width="70" height="26" rx="13" fill="#122b1a" stroke="#7dd66b" stroke-width="1.3"/>
+  <text x="995" y="344" text-anchor="middle" font-size="12" font-weight="700" fill="#7dd66b">MET</text>
+  <g class="s" font-size="15">
+    <text x="88" y="372">Someone with authority answers for security outcomes — not a working group, not a policy PDF.</text>
+    <text x="88" y="396">Ownership is named, and the release ritual makes the security assessment part of every version.</text>
+  </g>
+
+  <rect class="pane" x="64" y="434" width="1152" height="102" rx="12"/>
+  <text x="88" y="466" class="c mono" font-size="14" font-weight="800">P3 · RADICAL TRANSPARENCY</text>
+  <rect x="960" y="448" width="70" height="26" rx="13" fill="#122b1a" stroke="#7dd66b" stroke-width="1.3"/>
+  <text x="995" y="466" text-anchor="middle" font-size="12" font-weight="700" fill="#7dd66b">MET</text>
+  <g class="s" font-size="15">
+    <text x="88" y="494">Weaknesses are documented where users can read them: a per-release security assessment, named</text>
+    <text x="88" y="518">open gaps with closure records, and a changelog that reports regressions instead of burying them.</text>
+  </g>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">A "Mostly Met" published in our own deck is P3 doing its job.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Secure by Design</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">02 / 11</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .layer{fill:#0f1729;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE COPILOT</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Bob — local AI, on a leash</text>
+  <text x="64" y="142" class="s" font-size="17">Runs on Ollama inside the boundary. Assistive everywhere, autonomous nowhere.</text>
+
+  <!-- prompt stack, left -->
+  <text x="64" y="196" class="t" font-size="18" font-weight="700">The five-layer prompt stack</text>
+  <g>
+    <rect class="layer" x="64" y="214" width="520" height="52" rx="8"/>
+    <text x="86" y="240" class="t" font-size="15" font-weight="700">1 · Alert prompt templates</text>
+    <text x="86" y="258" class="s" font-size="12.5">matched rule → regex → technique → tactic → group</text>
+    <rect class="layer" x="64" y="272" width="520" height="52" rx="8"/>
+    <text x="86" y="298" class="t" font-size="15" font-weight="700">2 · Knowledge base RAG</text>
+    <text x="86" y="316" class="s" font-size="12.5">chunk-level embeddings over the KB</text>
+    <rect class="layer" x="64" y="330" width="520" height="52" rx="8"/>
+    <text x="86" y="356" class="t" font-size="15" font-weight="700">3 · Playbook RAG</text>
+    <text x="86" y="374" class="s" font-size="12.5">the SOC's own procedures, retrieved in context</text>
+    <rect class="layer" x="64" y="388" width="520" height="52" rx="8"/>
+    <text x="86" y="414" class="t" font-size="15" font-weight="700">4 · Investigation memory</text>
+    <text x="86" y="432" class="s" font-size="12.5">what this SOC decided before, and why</text>
+    <rect class="layer" x="64" y="446" width="520" height="52" rx="8"/>
+    <text x="86" y="472" class="t" font-size="15" font-weight="700">5 · Threat-intel reports</text>
+    <text x="86" y="490" class="s" font-size="12.5">RAG over a local OpenCTI report cache</text>
+  </g>
+
+  <!-- behaviours, right -->
+  <rect x="632" y="196" width="584" height="150" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="656" y="228" class="c" font-size="14" font-weight="800">WHAT BOB DOES</text>
+  <g class="s" font-size="15">
+    <text x="656" y="258">One <tspan class="t" font-weight="700">cluster investigation per case</tspan> on auto-run —</text>
+    <text x="656" y="282">a deep-dive on the case, not a sweep over every alert.</text>
+    <text x="656" y="306">Drafts closure notes, reviews traffic, analyses large</text>
+    <text x="656" y="330">documents when an admin turns that surface on.</text>
+  </g>
+
+  <rect x="632" y="366" width="584" height="160" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="656" y="398" class="c" font-size="14" font-weight="800">WHAT BOB IS NOT ALLOWED TO DO</text>
+  <g class="s" font-size="15">
+    <text x="656" y="428">Guess at encodings — PowerShell <tspan class="t mono" font-weight="700">-EncodedCommand</tspan></text>
+    <text x="656" y="452">is decoded deterministically before he ever sees it.</text>
+    <text x="656" y="476">Act on retrieved text as instructions — grounding and a</text>
+    <text x="656" y="500">RAG trust boundary keep prompt injection outside.</text>
+  </g>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">Every Bob output is a draft for a human — hardened on-demand surfaces, grounded answers, no cloud.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Full Overview</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">04 / 13</text>
+</svg>

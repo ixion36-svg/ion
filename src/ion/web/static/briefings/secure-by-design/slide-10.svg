@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .ok{fill:#7dd66b}.warn{fill:#e5a33d}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">THE AUDIT</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Twenty principles, twenty verdicts</text>
+  <text x="64" y="142" class="s" font-size="17">The current standing, re-audited in the doc as the code changes. One column, no spin.</text>
+
+  <!-- two-column scorecard -->
+  <g font-size="14.5">
+    <g class="mono">
+      <text x="70" y="205" class="warn">◐</text><text x="94" y="205" class="s"><tspan class="t mono">P1</tspan>  Everyone's concern</text><text x="480" y="205" class="warn mono" font-size="12" text-anchor="end">MOSTLY</text>
+      <text x="70" y="239" class="ok">✓</text><text x="94" y="239" class="s"><tspan class="t mono">P2</tspan>  Senior accountability</text><text x="480" y="239" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="273" class="ok">✓</text><text x="94" y="273" class="s"><tspan class="t mono">P3</tspan>  Radical transparency</text><text x="480" y="273" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="307" class="ok">✓</text><text x="94" y="307" class="s"><tspan class="t mono">P4</tspan>  Establish context</text><text x="480" y="307" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="341" class="ok">✓</text><text x="94" y="341" class="s"><tspan class="t mono">P5</tspan>  Defence in depth</text><text x="480" y="341" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="375" class="ok">✓</text><text x="94" y="375" class="s"><tspan class="t mono">P6</tspan>  Least privilege</text><text x="480" y="375" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="409" class="ok">✓</text><text x="94" y="409" class="s"><tspan class="t mono">P7</tspan>  Secure defaults</text><text x="480" y="409" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="443" class="ok">✓</text><text x="94" y="443" class="s"><tspan class="t mono">P8</tspan>  Complete mediation</text><text x="480" y="443" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="477" class="ok">✓</text><text x="94" y="477" class="s"><tspan class="t mono">P9</tspan>  Economy of mechanism</text><text x="480" y="477" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="70" y="511" class="ok">✓</text><text x="94" y="511" class="s"><tspan class="t mono">P10</tspan> Open design</text><text x="480" y="511" class="ok mono" font-size="12" text-anchor="end">MET</text>
+    </g>
+    <g class="mono">
+      <text x="560" y="205" class="ok">✓</text><text x="584" y="205" class="s"><tspan class="t mono">P11</tspan> Don't trust input</text><text x="1000" y="205" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="239" class="ok">✓</text><text x="584" y="239" class="s"><tspan class="t mono">P12</tspan> Compromise detection</text><text x="1000" y="239" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="273" class="ok">✓</text><text x="584" y="273" class="s"><tspan class="t mono">P13</tspan> Reduce impact</text><text x="1000" y="273" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="307" class="ok">✓</text><text x="584" y="307" class="s"><tspan class="t mono">P14</tspan> Clean, maintainable code</text><text x="1000" y="307" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="341" class="ok">✓</text><text x="584" y="341" class="s"><tspan class="t mono">P15</tspan> Secure the repository</text><text x="1000" y="341" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="375" class="ok">✓</text><text x="584" y="375" class="s"><tspan class="t mono">P16</tspan> Secure the pipeline</text><text x="1000" y="375" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="409" class="ok">✓</text><text x="584" y="409" class="s"><tspan class="t mono">P17</tspan> Eliminate vuln classes</text><text x="1000" y="409" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="443" class="ok">✓</text><text x="584" y="443" class="s"><tspan class="t mono">P18</tspan> Continually test</text><text x="1000" y="443" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="477" class="ok">✓</text><text x="584" y="477" class="s"><tspan class="t mono">P19</tspan> Plan for flaws</text><text x="1000" y="477" class="ok mono" font-size="12" text-anchor="end">MET</text>
+      <text x="560" y="511" class="ok">✓</text><text x="584" y="511" class="s"><tspan class="t mono">P20</tspan> Continuous risk mgmt</text><text x="1000" y="511" class="ok mono" font-size="12" text-anchor="end">MET</text>
+    </g>
+  </g>
+
+  <rect x="1040" y="190" width="176" height="330" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="1128" y="248" text-anchor="middle" class="ok mono" font-size="44" font-weight="800">19</text>
+  <text x="1128" y="276" text-anchor="middle" class="s" font-size="13">Met</text>
+  <text x="1128" y="340" text-anchor="middle" class="warn mono" font-size="44" font-weight="800">1</text>
+  <text x="1128" y="368" text-anchor="middle" class="s" font-size="13">Mostly Met</text>
+  <text x="1128" y="432" text-anchor="middle" class="s mono" font-size="44" font-weight="800">0</text>
+  <text x="1128" y="460" text-anchor="middle" class="s" font-size="13">Partial · Gap</text>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">P1 stays Mostly Met until a second human reviewer exists — the audit refuses to round up.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Secure by Design</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">10 / 11</text>
+</svg>

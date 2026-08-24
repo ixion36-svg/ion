@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <!-- sealed-glass motif -->
+  <g transform="translate(1040,340)">
+    <rect x="-105" y="-130" width="210" height="260" rx="16" fill="#0f1729" stroke="#26405a" stroke-width="2"/>
+    <rect x="-85" y="-110" width="170" height="220" rx="10" fill="none" stroke="#34d3ee" stroke-width="1.5" opacity="0.8"/>
+    <line x1="-85" y1="-40" x2="85" y2="-70" stroke="#1f2b40" stroke-width="14" opacity="0.6"/>
+    <line x1="-85" y1="10" x2="85" y2="-20" stroke="#1f2b40" stroke-width="8" opacity="0.5"/>
+    <circle cy="70" r="20" fill="#0d233a" stroke="#34d3ee" stroke-width="2"/>
+    <text y="76" text-anchor="middle" class="c mono" font-size="13" font-weight="700">GG</text>
+  </g>
+
+  <text x="90" y="230" class="c" font-size="15" font-weight="700" letter-spacing="4">HOW IT SHIPS</text>
+  <text x="90" y="292" class="t" font-size="58" font-weight="800">Guarded, glass:</text>
+  <text x="90" y="356" class="c" font-size="58" font-weight="800">private and inspectable</text>
+  <rect x="92" y="378" width="150" height="4" fill="#34d3ee"/>
+  <g class="s" font-size="19">
+    <text x="90" y="426">Distribution is a private registry and offline packages —</text>
+    <text x="90" y="456">no public update channel, delivered into the air gap by</text>
+    <text x="90" y="486">tarball, with the SBOM inside the image.</text>
+  </g>
+  <g class="s" font-size="16">
+    <text x="90" y="540">And these decks are now <tspan class="t" font-weight="700">authored SVG in the repo</tspan> — diffable,</text>
+    <text x="90" y="568">reviewed like code, and refreshed as part of the release, so what</text>
+    <text x="90" y="596">this page says can no longer drift 43 versions behind the product.</text>
+  </g>
+
+  <text x="90" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Secure by Design</text>
+  <text x="1190" y="688" class="s mono" font-size="13" text-anchor="end">11 / 11</text>
+</svg>

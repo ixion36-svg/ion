@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .row{fill:#0c1322;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">DESIGN II · P9–P13</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Simple, open, and suspicious of input</text>
+  <text x="64" y="142" class="s" font-size="17">The second half of the design group: assume the input is hostile and the compromise is coming.</text>
+
+  <g>
+    <rect class="row" x="64" y="184" width="1152" height="70" rx="10"/>
+    <text x="88" y="212" class="c mono" font-size="13.5" font-weight="800">P9 · ECONOMY OF MECHANISM  <tspan class="s" font-weight="400">— simplicity is a security control</tspan></text>
+    <text x="88" y="238" class="s" font-size="14.5">Server-rendered HTML, no SPA, one database — a stack small enough that one team can actually audit it.</text>
+
+    <rect class="row" x="64" y="266" width="1152" height="70" rx="10"/>
+    <text x="88" y="294" class="c mono" font-size="13.5" font-weight="800">P10 · OPEN DESIGN  <tspan class="s" font-weight="400">— security never depends on secrecy of design</tspan></text>
+    <text x="88" y="320" class="s" font-size="14.5">Architecture, lifecycle and this principle set are documented and shipped; only credentials are secret.</text>
+
+    <rect class="row" x="64" y="348" width="1152" height="70" rx="10"/>
+    <text x="88" y="376" class="c mono" font-size="13.5" font-weight="800">P11 · DON'T TRUST INPUT  <tspan class="s" font-weight="400">— from users, integrations, or the LLM</tspan></text>
+    <text x="88" y="402" class="s" font-size="14.5">Allowlists over sanitisers, autoescaped templates, strict CSP with zero inline styles or handlers — enforced, not aspired to.</text>
+
+    <rect class="row" x="64" y="430" width="1152" height="70" rx="10"/>
+    <text x="88" y="458" class="c mono" font-size="13.5" font-weight="800">P12 · MAKE COMPROMISE DETECTION EASIER  <tspan class="s" font-weight="400">— assume you'll need the trail</tspan></text>
+    <text x="88" y="484" class="s" font-size="14.5">Audit logs, canaries, and a tamper-evident sha256 evidence ledger — the platform expects to be investigated.</text>
+
+    <rect class="row" x="64" y="512" width="1152" height="70" rx="10"/>
+    <text x="88" y="540" class="c mono" font-size="13.5" font-weight="800">P13 · REDUCE IMPACT OF COMPROMISE  <tspan class="s" font-weight="400">— contain, minimise, expire</tspan></text>
+    <text x="88" y="566" class="s" font-size="14.5">Data-minimisation audited schema-wide; scoped tokens that hard-expire; container isolation per service.</text>
+  </g>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Secure by Design</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">04 / 11</text>
+</svg>

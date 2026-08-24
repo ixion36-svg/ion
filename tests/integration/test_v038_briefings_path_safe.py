@@ -56,3 +56,28 @@ def test_malicious_deck_falls_back_and_never_traverses(authed_client, evil):
     # ...and no rendered asset path escapes the briefings tree.
     assert "/static/briefings/../" not in r.text
     assert "etc/passwd" not in r.text
+
+
+@pytest.mark.parametrize("deck", ["executive", "overview", "secure-by-design"])
+def test_refreshed_decks_serve_authored_svgs(authed_client, deck):
+    # The three product decks were re-authored as in-repo SVGs (the PNG decks'
+    # PowerPoint sources were never in the repo, so they froze at v0.39.8).
+    # First slide asserted by name, no exact-count pin: the deck should be able
+    # to grow at release time without touching this test.
+    r = authed_client.get("/briefings", params={"deck": deck})
+    assert r.status_code == 200
+    assert f"/static/briefings/{deck}/slide-01.svg" in r.text
+    assert f"/static/briefings/{deck}/slide-1.png" not in r.text
+    assert f"/static/briefings/{deck}/slide-01.png" not in r.text
+    # Their v0.39-era PDF/PPTX downloads are gone with their source decks.
+    assert "ION_Overview" not in r.text
+    assert "ION_Executive_Brief" not in r.text
+
+
+def test_every_deck_in_the_dict_gets_a_tab(authed_client):
+    # The strip is rendered from the decks dict. Hardcoding it is how the
+    # ai-airgap deck shipped unreachable from the UI.
+    r = authed_client.get("/briefings")
+    for key in ("executive", "overview", "secure-by-design",
+                "ad-attacks", "ad-advanced", "ai-airgap"):
+        assert f"/about?deck={key}" in r.text, key

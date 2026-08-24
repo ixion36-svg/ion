@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .pn{fill:#0f1828;stroke:#2b4a66;stroke-width:1.5}
+  </style>
+  <marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#34d3ee"/></marker>
+  <marker id="ard" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2b4a66"/></marker>
+  </defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">ATTACK PATH</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">The kill chain as a graph, not a story</text>
+  <text x="64" y="142" class="s" font-size="17">Bob Pathfinding builds a deterministic, directed kill-chain graph per case — every node backed by evidence.</text>
+
+  <!-- kill-chain graph -->
+  <g>
+    <rect class="pn" x="80" y="230" width="170" height="66" rx="10"/>
+    <text x="165" y="258" text-anchor="middle" class="t" font-size="14" font-weight="700">Initial Access</text>
+    <text x="165" y="278" text-anchor="middle" class="s mono" font-size="11">phishing · T1566</text>
+
+    <rect class="pn" x="330" y="230" width="170" height="66" rx="10"/>
+    <text x="415" y="258" text-anchor="middle" class="t" font-size="14" font-weight="700">Execution</text>
+    <text x="415" y="278" text-anchor="middle" class="s mono" font-size="11">powershell · T1059</text>
+
+    <rect class="pn" x="580" y="160" width="170" height="66" rx="10"/>
+    <text x="665" y="188" text-anchor="middle" class="t" font-size="14" font-weight="700">Persistence</text>
+    <text x="665" y="208" text-anchor="middle" class="s mono" font-size="11">run key · T1547</text>
+
+    <rect class="pn" x="580" y="300" width="170" height="66" rx="10"/>
+    <text x="665" y="328" text-anchor="middle" class="t" font-size="14" font-weight="700">Cred. Access</text>
+    <text x="665" y="348" text-anchor="middle" class="s mono" font-size="11">lsass dump · T1003</text>
+
+    <rect class="pn" x="830" y="300" width="170" height="66" rx="10"/>
+    <text x="915" y="328" text-anchor="middle" class="t" font-size="14" font-weight="700">Lateral Move</text>
+    <text x="915" y="348" text-anchor="middle" class="s mono" font-size="11">smb/psexec · T1021</text>
+
+    <rect x="1080" y="300" width="136" height="66" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="2"/>
+    <text x="1148" y="328" text-anchor="middle" class="c" font-size="14" font-weight="700">Objective</text>
+    <text x="1148" y="348" text-anchor="middle" class="s mono" font-size="11">exfil · T1041</text>
+
+    <line x1="252" y1="263" x2="326" y2="263" stroke="#34d3ee" stroke-width="2" marker-end="url(#ar)"/>
+    <line x1="502" y1="250" x2="576" y2="200" stroke="#2b4a66" stroke-width="2" marker-end="url(#ard)"/>
+    <line x1="502" y1="278" x2="576" y2="326" stroke="#34d3ee" stroke-width="2" marker-end="url(#ar)"/>
+    <line x1="752" y1="333" x2="826" y2="333" stroke="#34d3ee" stroke-width="2" marker-end="url(#ar)"/>
+    <line x1="1002" y1="333" x2="1076" y2="333" stroke="#34d3ee" stroke-width="2" marker-end="url(#ar)"/>
+  </g>
+  <text x="640" y="418" text-anchor="middle" class="s" font-size="14">cyan = the evidenced path · slate = a candidate branch the evidence did not support</text>
+
+  <rect x="64" y="448" width="560" height="102" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="88" y="480" class="c" font-size="14" font-weight="800">DETERMINISTIC, NOT GENERATED</text>
+  <g class="s" font-size="15">
+    <text x="88" y="508">The graph is computed from the case's alerts and</text>
+    <text x="88" y="532">techniques — the same case yields the same path.</text>
+  </g>
+
+  <rect x="656" y="448" width="560" height="102" rx="12" fill="#0c1322" stroke="#26405a" stroke-width="1.5"/>
+  <text x="680" y="480" class="c" font-size="14" font-weight="800">EVIDENCE ON EVERY EDGE</text>
+  <g class="s" font-size="15">
+    <text x="680" y="508">Each node links to the alerts that put it there —</text>
+    <text x="680" y="532">click through from the picture to the proof.</text>
+  </g>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">ION traces the path and shows the evidence — the analyst decides.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Full Overview</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">06 / 13</text>
+</svg>

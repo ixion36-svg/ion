@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <!-- hex platform motif, right -->
+  <g opacity="0.6" fill="none" stroke="#1f2b40" stroke-width="1.5">
+    <path d="M1020 180 L1120 238 L1120 354 L1020 412 L920 354 L920 238 Z"/>
+    <path d="M1020 240 L1070 269 L1070 327 L1020 356 L970 327 L970 269 Z" stroke="#26405a"/>
+  </g>
+  <path d="M1020 270 L1045 284 L1045 312 L1020 326 L995 312 L995 284 Z" fill="#0d233a" stroke="#34d3ee" stroke-width="2"/>
+  <g fill="#0f1729" stroke="#26405a" stroke-width="1.5">
+    <circle cx="920" cy="238" r="14"/><circle cx="1120" cy="238" r="14"/>
+    <circle cx="920" cy="354" r="14"/><circle cx="1120" cy="354" r="14"/>
+    <circle cx="1020" cy="180" r="14"/><circle cx="1020" cy="412" r="14"/>
+  </g>
+
+  <!-- title block -->
+  <text x="90" y="240" class="c" font-size="15" font-weight="700" letter-spacing="4">FULL OVERVIEW</text>
+  <text x="90" y="302" class="t" font-size="58" font-weight="800">The complete</text>
+  <text x="90" y="366" class="c" font-size="58" font-weight="800">capability tour</text>
+  <rect x="92" y="388" width="150" height="4" fill="#34d3ee"/>
+  <text x="90" y="438" class="s" font-size="20">Server-rendered, no SPA. Air-gapped by design. Postgres +</text>
+  <text x="90" y="468" class="s" font-size="20">pgvector, Keycloak OIDC, and a local LLM called Bob.</text>
+
+  <rect x="90" y="510" width="256" height="34" rx="6" fill="#0d233a" stroke="#34d3ee" stroke-width="1.5"/>
+  <text x="106" y="533" class="c mono" font-size="14" font-weight="700">PLATFORM DECK · 13 SLIDES</text>
+  <text x="362" y="533" class="s" font-size="15">What ION does, end to end — refreshed at release time</text>
+
+  <text x="90" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Full Overview</text>
+  <text x="1190" y="688" class="s mono" font-size="13" text-anchor="end">01 / 13</text>
+</svg>

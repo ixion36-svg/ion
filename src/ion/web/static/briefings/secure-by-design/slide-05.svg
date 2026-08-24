@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" font-family="'Segoe UI', system-ui, -apple-system, Arial, sans-serif">
+  <defs><style>
+    .t{fill:#f1f5f9}.c{fill:#34d3ee}.s{fill:#93a4bd}.mono{font-family:'JetBrains Mono','Consolas',monospace}
+    .code{fill:#0c1322;stroke:#26405a;stroke-width:1.5}
+  </style></defs>
+  <rect width="1280" height="720" fill="#0a0e1a"/>
+  <text x="64" y="58" class="c" font-size="14" font-weight="700" letter-spacing="3">RECEIPTS</text>
+  <text x="62" y="104" class="t" font-size="40" font-weight="800">Principles in the code, not the poster</text>
+  <text x="64" y="142" class="s" font-size="17">Five concrete places a principle shaped a line of code — each one auditable in the repo.</text>
+
+  <rect class="code" x="64" y="184" width="560" height="112" rx="12"/>
+  <text x="88" y="216" class="c mono" font-size="13" font-weight="800">FIXED-LOOKUP ROUTING  <tspan class="s" font-weight="400">(P11)</tspan></text>
+  <g class="s" font-size="14">
+    <text x="88" y="244">This deck page maps its <tspan class="t mono">?deck=</tspan> value through a</text>
+    <text x="88" y="266">constant table — the filesystem path can never be</text>
+    <text x="88" y="288">influenced by the caller. Traversal is designed out.</text>
+  </g>
+
+  <rect class="code" x="656" y="184" width="560" height="112" rx="12"/>
+  <text x="680" y="216" class="c mono" font-size="13" font-weight="800">ZERO INLINE STYLES  <tspan class="s" font-weight="400">(P11 · P17)</tspan></text>
+  <g class="s" font-size="14">
+    <text x="680" y="244">~1,150 inline handlers and 1,820 inline styles were</text>
+    <text x="680" y="266">retired so the CSP can block script and style</text>
+    <text x="680" y="288">attributes outright — a whole class, eliminated.</text>
+  </g>
+
+  <rect class="code" x="64" y="316" width="560" height="112" rx="12"/>
+  <text x="88" y="348" class="c mono" font-size="13" font-weight="800">SCOPED SERVICE ACCOUNT  <tspan class="s" font-weight="400">(P6 · P13)</tspan></text>
+  <g class="s" font-size="14">
+    <text x="88" y="376">METIS talks to ION through a role scoped to what it</text>
+    <text x="88" y="398">needs, on a bearer token that hard-expires — a leaked</text>
+    <text x="88" y="420">token is a bounded problem, not a skeleton key.</text>
+  </g>
+
+  <rect class="code" x="656" y="316" width="560" height="112" rx="12"/>
+  <text x="680" y="348" class="c mono" font-size="13" font-weight="800">ADVISORY-ONLY QUIRKS  <tspan class="s" font-weight="400">(P7)</tspan></text>
+  <g class="s" font-size="14">
+    <text x="680" y="376">The one feature that could silently hide alerts is</text>
+    <text x="680" y="398">built so it can't: quirks annotate, never suppress,</text>
+    <text x="680" y="420">and expire on their own. The default is safety.</text>
+  </g>
+
+  <rect class="code" x="64" y="448" width="1152" height="92" rx="12"/>
+  <text x="88" y="480" class="c mono" font-size="13" font-weight="800">OWNERSHIP CHECKS INSIDE THE SERVICE  <tspan class="s" font-weight="400">(P8)</tspan></text>
+  <g class="s" font-size="14.5">
+    <text x="88" y="508">Authorisation runs inside the service, immediately before mutation — not in the route handler minutes</text>
+    <text x="88" y="530">earlier. The time-of-check-to-time-of-use gap that once produced a real bug is closed by construction.</text>
+  </g>
+
+  <rect x="64" y="566" width="1152" height="50" rx="10" fill="#0d233a" stroke="#34d3ee" stroke-width="1.3"/>
+  <text x="640" y="597" text-anchor="middle" class="c" font-size="15.5" font-weight="700">Every claim on this slide has a file, a commit, and a test behind it.</text>
+
+  <text x="64" y="688" class="s" font-size="13" font-weight="600"><tspan fill="#f1f5f9">ION</tspan> · Secure by Design</text>
+  <text x="1216" y="688" class="s mono" font-size="13" text-anchor="end">05 / 11</text>
+</svg>
