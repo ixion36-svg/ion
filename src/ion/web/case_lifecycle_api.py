@@ -223,6 +223,154 @@ async def _background_case_sync(case_id: int) -> None:
     finally:
         _session.close()
 
+# Inline-enrichment budget for case creation. Above this many unique
+# observables, creation links them immediately but runs OpenCTI enrichment
+# in a background thread — each enrichment is a sequential HTTP round-trip,
+# and a big multi-select create must not hold its response open past
+# reverse-proxy read timeouts.
+_ENRICH_INLINE_MAX = 25
+
+
+def _resolve_kibana_assignee_uid(session, assigned_to_id) -> Optional[str]:
+    """Elastic UID for a case assignee, caching the lookup on the user row.
+
+    Reads the persisted assignee (not the request body) — the create path
+    falls back to the creator when no assignee is sent, and reading the
+    request produced Kibana cases with no assignee. Best-effort: None when
+    Kibana is disabled or the user cannot be resolved.
+    """
+    if not assigned_to_id:
+        return None
+    assignee_user = session.query(User).filter_by(id=assigned_to_id).first()
+    if not assignee_user:
+        return None
+    if assignee_user.elastic_uid:
+        return assignee_user.elastic_uid
+    try:
+        kb_svc = get_kibana_cases_service()
+        if not kb_svc.enabled:
+            return None
+        # Try elastic_username first, then ION username
+        lookup_name = getattr(assignee_user, 'elastic_username', None) or assignee_user.username
+        uid = kb_svc.resolve_user_uid(lookup_name)
+        if not uid and lookup_name != assignee_user.username:
+            uid = kb_svc.resolve_user_uid(assignee_user.username)
+        if uid:
+            assignee_user.elastic_uid = uid
+            session.commit()
+            return uid
+    except Exception:
+        pass
+    return None
+
+
+def _kibana_create_for_deferred_case(session, case) -> None:
+    """Kibana leg of a deferred (large) case create: create + attach + notes.
+
+    Mirrors what the inline path does for small cases. If the 15s export
+    loop created the Kibana case first, it did so WITHOUT attaching alerts
+    (export_cases_to_kibana has no attach step), so that branch attaches
+    them here. Notes written before the Kibana case existed (e.g. the
+    KFP auto-close note) are pushed as comments on create, matching the
+    export loop's behaviour. Best-effort throughout — never raises.
+    """
+    try:
+        kb_svc = get_kibana_cases_service()
+        if not kb_svc.enabled:
+            return
+        if not case.kibana_case_id:
+            uid = _resolve_kibana_assignee_uid(session, case.assigned_to_id)
+            kibana_result = sync_new_case_to_kibana(
+                case_number=case.case_number,
+                title=case.title,
+                description=case.description,
+                severity=case.severity,
+                affected_hosts=case.affected_hosts,
+                affected_users=case.affected_users,
+                evidence_summary=case.evidence_summary,
+                observables=case.observables,
+                alert_ids=case.source_alert_ids,
+                triggered_rules=case.triggered_rules,
+                assignee_elastic_uid=uid,
+            )
+            if not kibana_result:
+                return
+            case.kibana_case_id = kibana_result["kibana_case_id"]
+            case.kibana_case_version = kibana_result["kibana_case_version"]
+            session.commit()
+            for note in (case.notes or []):
+                if note.content.startswith("[From Kibana"):
+                    continue
+                username = note.user.username if note.user else "unknown"
+                sync_note_to_kibana(case.kibana_case_id, username, note.content)
+        elif case.source_alert_ids and kb_svc.config.get("case_owner") == "securitySolution":
+            space_id = kb_svc.config.get("space_id", "default")
+            kb_svc.attach_alerts_to_case(
+                case_id=case.kibana_case_id,
+                alert_ids=case.source_alert_ids,
+                alert_index=f".alerts-security.alerts-{space_id}",
+            )
+    except Exception as exc:
+        logger.warning(
+            "deferred Kibana create failed for case %s: %s",
+            getattr(case, "case_number", case.id), exc,
+        )
+
+
+def _run_deferred_case_enrichment(
+    case_id: int, user_id: int, username: str,
+    observables: List[Dict[str, Any]],
+) -> None:
+    """Full OpenCTI enrichment for a large case, off the request thread.
+
+    Runs on a daemon thread spawned as the endpoint's final statement —
+    after every commit the request makes — so it never contends with the
+    request's session. Re-runs enrich_and_link (idempotent — links dedup on lookup), persists
+    the enriched list onto ``AlertCase.observables`` (own session: survives
+    multi-worker deployments), posts the enrichment-summary note, and
+    re-indexes the case into ES. Best-effort throughout.
+    """
+    _session = _new_background_session()
+    try:
+        from ion.services.observable_service import get_observable_service
+
+        async def _work() -> None:
+            # Kibana FIRST — before the (potentially minutes-long) OpenCTI
+            # pass — so this create beats the 15s export loop, which would
+            # otherwise create the Kibana case without attaching alerts.
+            case = _session.query(AlertCase).filter_by(id=case_id).first()
+            if case is not None:
+                _kibana_create_for_deferred_case(_session, case)
+
+            svc = get_observable_service(_session)
+            enriched = await svc.enrich_and_link_observables_for_case(
+                case_id=case_id, observables=observables, enrich=True,
+            )
+            case = _session.query(AlertCase).filter_by(id=case_id).first()
+            if case is not None and enriched:
+                case.observables = enriched
+            _session.commit()
+            try:
+                await post_enrichment_note(_session, case_id, user_id, username)
+            except Exception:
+                logger.debug(
+                    "deferred enrichment note skipped for case %s",
+                    case_id, exc_info=True,
+                )
+            await _background_case_sync(case_id)
+
+        asyncio.run(_work())
+        logger.info("deferred enrichment complete for case %s", case_id)
+    except Exception:
+        logger.exception("deferred enrichment failed for case %s", case_id)
+        try:
+            _session.rollback()
+        except Exception:
+            pass
+    finally:
+        _session.close()
+
+
 async def _background_alert_workflow_sync(alert_ids: list, mapped_triage: str) -> None:
     """Push linked alert workflow_status changes to Elasticsearch."""
     if not alert_ids or not mapped_triage:
@@ -730,8 +878,31 @@ async def create_case(
                     if isinstance(rd, dict) else None
                 )
 
+        # Prefetch every triage row (and every prior case they point at) in
+        # two queries. The previous per-alert query-and-flush loop was
+        # quadratic in the session's autoflush scan — a 600-alert bulk
+        # create spent ~52s here alone, which is what pushed large creates
+        # past reverse-proxy read timeouts (case created, client got a
+        # non-JSON 504, modal stuck open).
+        triage_by_alert: Dict[str, AlertTriage] = {
+            t.es_alert_id: t
+            for t in session.query(AlertTriage)
+            .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
+            .all()
+        }
+        prior_case_ids = {
+            t.case_id for t in triage_by_alert.values()
+            if t.case_id is not None and t.case_id != new_case.id
+        }
+        old_case_by_id: Dict[int, AlertCase] = {
+            c.id: c
+            for c in session.query(AlertCase)
+            .filter(AlertCase.id.in_(prior_case_ids))
+            .all()
+        } if prior_case_ids else {}
+
         for alert_id in data.alert_ids:
-            triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+            triage = triage_by_alert.get(alert_id)
             if not triage:
                 triage = AlertTriage(
                     es_alert_id=alert_id,
@@ -739,7 +910,7 @@ async def create_case(
                     rule_name=rule_name_by_alert.get(alert_id),
                 )
                 session.add(triage)
-                session.flush()
+                triage_by_alert[alert_id] = triage
             else:
                 # (Bug 3): if the alert was already linked to a
                 # different case, the previous case's source_alert_ids
@@ -748,7 +919,7 @@ async def create_case(
                 # truth. Strip this alert from the prior case's JSON so
                 # the two views stay consistent.
                 if triage.case_id is not None and triage.case_id != new_case.id:
-                    old_case = session.query(AlertCase).filter_by(id=triage.case_id).first()
+                    old_case = old_case_by_id.get(triage.case_id)
                     if old_case is not None and old_case.source_alert_ids:
                         try:
                             old_ids = list(old_case.source_alert_ids)
@@ -768,23 +939,35 @@ async def create_case(
                     triage.rule_name = rule_name_by_alert[alert_id]
             triage.case_id = new_case.id
             linked += 1
-            # emit alert_linked audit row keyed on the triage PK so
-            # the adaptive lab grader's linked_to_case evaluator can match
-            # via lab_session_fixtures (which stores materialised_row_id =
-            # AlertTriage.id). Best-effort — failure logs and proceeds, the
-            # case link itself has already been set above.
-            try:
-                AuditLogRepository(session).create(
-                    action="alert_linked",
+
+        # One flush assigns PKs to every new triage row; the audit rows are
+        # then built directly (not via AuditLogRepository.create, which
+        # flushes per call — per-row flushes over a large session are the
+        # other half of the quadratic cost this path used to pay). Keyed on
+        # the triage PK so the adaptive lab grader's linked_to_case
+        # evaluator can match via lab_session_fixtures. Best-effort —
+        # failure logs and proceeds, the case links are already set above.
+        session.flush()
+        try:
+            from ion.models.user import AuditLog as _AuditLog
+            for alert_id in data.alert_ids:
+                triage = triage_by_alert.get(alert_id)
+                if triage is None or triage.id is None:
+                    continue
+                session.add(_AuditLog(
                     user_id=current_user.id,
+                    action="alert_linked",
                     resource_type="alert_triage",
                     resource_id=triage.id,
-                    details={"case_id": new_case.id, "es_alert_id": alert_id},
-                )
-            except Exception:
-                logger.exception(
-                    "alert_linked audit write failed (case-create path, non-fatal)"
-                )
+                    details=json.dumps(
+                        {"case_id": new_case.id, "es_alert_id": alert_id}
+                    ),
+                ))
+            session.flush()
+        except Exception:
+            logger.exception(
+                "alert_linked audit write failed (case-create path, non-fatal)"
+            )
 
     # harvest observables from EVERY linked AlertTriage rather
     # than only those the client supplied alert_contexts for. The earlier
@@ -805,7 +988,9 @@ async def create_case(
     raw_data_fallback: List[Dict[str, Any]] = []
 
     for alert_id in (data.alert_ids or []):
-        triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+        # triage_by_alert was prefetched (and kept current) by the linking
+        # loop above — re-querying per alert here doubled the quadratic cost.
+        triage = triage_by_alert.get(alert_id)
         ctx = context_map.get(alert_id)
 
         # Top up triage.observables from raw_data when both are present —
@@ -847,9 +1032,19 @@ async def create_case(
     )
 
     # Primary path — pre-extracted observables from every linked triage.
+    # Above the threshold, link inline but defer the sequential per-
+    # observable OpenCTI round-trips to a background thread: a large
+    # multi-select create otherwise holds the HTTP response open past
+    # reverse-proxy read timeouts (nginx /api/ allows 60s), and the client
+    # then sees a non-JSON 504 for a case that WAS created.
+    unique_enrichable = {
+        (o.get("type"), o.get("value")) for o in harvested_observables
+    }
+    defer_enrichment = len(unique_enrichable) > _ENRICH_INLINE_MAX
     enriched_observables = await obs_service.enrich_and_link_observables_for_case(
         case_id=new_case.id,
         observables=harvested_observables,
+        enrich=not defer_enrichment,
     )
 
     # Fallback path — extract from raw_data for alerts whose triage rows
@@ -975,54 +1170,35 @@ async def create_case(
     except Exception:
         logger.debug("post_enrichment_note skipped for case %s", new_case.id, exc_info=True)
 
-    # Resolve Kibana assignee UID for case creation.
-    # Read the assignee from `new_case.assigned_to_id` (already persisted) rather than
-    # `data.assigned_to_id`. Line 4319 falls back to `current_user.id` when the request
-    # body has no assignee, so reading `data.*` here misses the auto-assigned creator
-    # and produced the symptom: ION case had an assignee but the Kibana case did not.
-    create_assignee_uid = None
-    if new_case.assigned_to_id:
-        assignee_user = session.query(User).filter_by(id=new_case.assigned_to_id).first()
-        if assignee_user:
-            if assignee_user.elastic_uid:
-                create_assignee_uid = assignee_user.elastic_uid
-            else:
-                try:
-                    from ion.services.kibana_cases_service import get_kibana_cases_service
-                    kb_svc = get_kibana_cases_service()
-                    if kb_svc.enabled:
-                        # Try elastic_username first, then ION username
-                        lookup_name = getattr(assignee_user, 'elastic_username', None) or assignee_user.username
-                        uid = kb_svc.resolve_user_uid(lookup_name)
-                        if not uid and lookup_name != assignee_user.username:
-                            uid = kb_svc.resolve_user_uid(assignee_user.username)
-                        if uid:
-                            create_assignee_uid = uid
-                            assignee_user.elastic_uid = uid
-                            session.commit()
-                except Exception:
-                    pass
-
-    # Sync to Kibana Cases if enabled
+    # Sync to Kibana Cases if enabled. For large (deferred) cases the whole
+    # Kibana exchange — assignee resolution, case create, and one attach
+    # call per alert batch — moves into the deferred worker: it is the
+    # network-bound tail of the request, and the worker starts immediately
+    # after the response anyway. kibana_url is then None in the response and
+    # the link appears on the case page moments later.
     kibana_url = None
-    kibana_result = sync_new_case_to_kibana(
-        case_number=case_number,
-        title=data.title,
-        description=data.description,
-        severity=data.severity,
-        affected_hosts=data.affected_hosts,
-        affected_users=data.affected_users,
-        evidence_summary=data.evidence_summary,
-        observables=case_observables,
-        alert_ids=data.alert_ids,
-        triggered_rules=data.triggered_rules,
-        assignee_elastic_uid=create_assignee_uid,
-    )
-    if kibana_result:
-        new_case.kibana_case_id = kibana_result["kibana_case_id"]
-        new_case.kibana_case_version = kibana_result["kibana_case_version"]
-        kibana_url = kibana_result["kibana_url"]
-        session.commit()
+    if not defer_enrichment:
+        create_assignee_uid = _resolve_kibana_assignee_uid(
+            session, new_case.assigned_to_id
+        )
+        kibana_result = sync_new_case_to_kibana(
+            case_number=case_number,
+            title=data.title,
+            description=data.description,
+            severity=data.severity,
+            affected_hosts=data.affected_hosts,
+            affected_users=data.affected_users,
+            evidence_summary=data.evidence_summary,
+            observables=case_observables,
+            alert_ids=data.alert_ids,
+            triggered_rules=data.triggered_rules,
+            assignee_elastic_uid=create_assignee_uid,
+        )
+        if kibana_result:
+            new_case.kibana_case_id = kibana_result["kibana_case_id"]
+            new_case.kibana_case_version = kibana_result["kibana_case_version"]
+            kibana_url = kibana_result["kibana_url"]
+            session.commit()
 
     # Auto-check KFP registry for matches
     fp_suggestions = _match_known_false_positives(
@@ -1083,6 +1259,21 @@ async def create_case(
         logger.debug("enqueue_case_investigation failed for new case %s",
                      getattr(new_case, "id", "?"), exc_info=True)
 
+    # Deferred enrichment starts LAST, after every commit this request will
+    # make, so the worker thread never contends with the request's own
+    # session. Not FastAPI BackgroundTasks: in this middleware stack those
+    # hold the response back until the task finishes (measured: a 1s
+    # endpoint became a 60s+ client wait), which is the exact failure this
+    # deferral exists to prevent.
+    if defer_enrichment:
+        import threading
+        threading.Thread(
+            target=_run_deferred_case_enrichment,
+            args=(new_case.id, current_user.id, current_user.username,
+                  harvested_observables),
+            daemon=True, name=f"case-enrich-{new_case.id}",
+        ).start()
+
     return {
         "id": new_case.id,
         "case_number": new_case.case_number,
@@ -1097,6 +1288,7 @@ async def create_case(
         "fp_suggestions": fp_suggestions,
         "auto_closed": auto_closed,
         "auto_closed_kfp": auto_closed_kfp,
+        "enrichment_deferred": defer_enrichment,
     }
 
 @router.post("/elasticsearch/alerts/cases/{case_id}/notes")

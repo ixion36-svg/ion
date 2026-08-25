@@ -376,6 +376,7 @@ class ObservableService:
         observable_id: int,
         case_id: int,
         context: str,
+        flush: bool = True,
     ) -> Optional[ObservableLink]:
         """Link an observable to a case.
 
@@ -383,6 +384,9 @@ class ObservableService:
             observable_id: Observable ID
             case_id: AlertCase ID
             context: Context of the observable
+            flush: pass False in bulk loops and flush once afterwards — a
+                per-link flush rescans the whole session and turns a large
+                case's link pass quadratic.
 
         Returns:
             Link record or None if observable/case not found
@@ -413,7 +417,8 @@ class ObservableService:
             extracted_from="manual",
         )
         self.session.add(link)
-        self.session.flush()
+        if flush:
+            self.session.flush()
         return link
 
     def unlink_from_alert(
@@ -693,6 +698,7 @@ class ObservableService:
         self,
         case_id: int,
         observables: List[Dict[str, Any]],
+        enrich: bool = True,
     ) -> List[Dict[str, Any]]:
         """Enrich + link a pre-extracted observable list to a case.
 
@@ -766,24 +772,31 @@ class ObservableService:
                 continue
 
             try:
-                self.link_to_case(observable.id, case_id, context=obs_type_str)
+                self.link_to_case(
+                    observable.id, case_id, context=obs_type_str, flush=False,
+                )
             except Exception as e:
                 logger.warning("Failed to link observable %s to case %s: %s", observable.id, case_id, e)
 
+            # ``enrich=False`` links only (fast, DB-only) — used by the
+            # large-case create path, which defers the sequential per-
+            # observable OpenCTI round-trips to a background pass so the
+            # HTTP response isn't held open past proxy read timeouts.
             enrichment_data = None
-            try:
-                enrichment = await self.enrich(observable.id, source="opencti")
-                if enrichment:
-                    enrichment_data = {
-                        "source":         enrichment.source,
-                        "is_malicious":   enrichment.is_malicious,
-                        "score":          enrichment.score,
-                        "labels":         enrichment.labels or [],
-                        "threat_actors":  enrichment.threat_actors or [],
-                        "threat_level":   observable.threat_level.value if observable.threat_level else "unknown",
-                    }
-            except Exception as e:
-                logger.warning("Enrichment failed for %s=%s: %s", obs_type_str, obs_value, e)
+            if enrich:
+                try:
+                    enrichment = await self.enrich(observable.id, source="opencti")
+                    if enrichment:
+                        enrichment_data = {
+                            "source":         enrichment.source,
+                            "is_malicious":   enrichment.is_malicious,
+                            "score":          enrichment.score,
+                            "labels":         enrichment.labels or [],
+                            "threat_actors":  enrichment.threat_actors or [],
+                            "threat_level":   observable.threat_level.value if observable.threat_level else "unknown",
+                        }
+                except Exception as e:
+                    logger.warning("Enrichment failed for %s=%s: %s", obs_type_str, obs_value, e)
 
             results.append({
                 "type":           obs_type_str,

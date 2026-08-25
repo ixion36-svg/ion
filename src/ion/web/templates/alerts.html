@@ -5221,7 +5221,7 @@ async function submitCreateCase(alertId) {
             }),
         });
 
-        if (!response.ok) throw new Error('Failed to create case');
+        if (!response.ok) throw new Error((await caseCreateFailure(response)).detail);
         const result = await response.json();
 
         document.getElementById('case-create-overlay').remove();
@@ -9815,6 +9815,19 @@ function showCreateCaseFromSelected() {
     document.body.appendChild(overlay);
 }
 
+// A failed create may not carry a JSON body: a reverse proxy that hits its
+// read timeout returns an HTML 502/504 while ION keeps working, so the case
+// usually WAS created. Feeding that body to response.json() is what used to
+// throw the raw "Unexpected token" toast and strand the create dialog open.
+async function caseCreateFailure(response) {
+    let detail = `Failed to create case (HTTP ${response.status})`;
+    try {
+        const err = await response.json();
+        if (err && err.detail) detail = err.detail;
+    } catch (e) { /* non-JSON error body (proxy HTML, plain text) */ }
+    return { detail, gatewayTimeout: response.status === 502 || response.status === 504 };
+}
+
 async function submitBulkCreateCase() {
     const title = document.getElementById('bulk-case-title').value.trim();
     const description = document.getElementById('bulk-case-description').value.trim();
@@ -9860,8 +9873,20 @@ async function submitBulkCreateCase() {
         });
 
         if (!response.ok) {
-            const err = await response.json();
-            throw new Error(err.detail || 'Failed to create case');
+            const fail = await caseCreateFailure(response);
+            if (fail.gatewayTimeout) {
+                // The server is almost certainly still creating the case —
+                // close the dialog, refresh, and warn instead of inviting a
+                // duplicate resubmission.
+                document.getElementById('bulk-case-create-overlay')?.remove();
+                showNotification('The server is still processing this case (gateway timeout). It should appear in the case list shortly — do not resubmit.', 'warning');
+                clearSelection();
+                await loadCases();
+                await loadTriageBatch();
+                renderAlerts();
+                return;
+            }
+            throw new Error(fail.detail);
         }
 
         const result = await response.json();
@@ -9875,7 +9900,8 @@ async function submitBulkCreateCase() {
             const fp = result.fp_suggestions[0];
             showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts. Matches known FP "${fp.title}" (${fp.matched_fields.join(', ')}) — open the case to review.`, 'warning');
         } else {
-            showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts`, 'success');
+            const deferredNote = result.enrichment_deferred ? ' — threat-intel enrichment running in background' : '';
+            showNotification(`Case ${result.case_number} created with ${alertIds.length} alerts${deferredNote}`, 'success');
         }
 
         // Clear selection and reload
@@ -9970,8 +9996,12 @@ async function confirmAddToCase() {
         });
 
         if (!resp.ok) {
-            const err = await resp.json();
-            throw new Error(err.detail || 'Failed to add alerts to case');
+            let detail = `Failed to add alerts to case (HTTP ${resp.status})`;
+            try {
+                const err = await resp.json();
+                if (err && err.detail) detail = err.detail;
+            } catch (e) { /* non-JSON error body */ }
+            throw new Error(detail);
         }
 
         const result = await resp.json();

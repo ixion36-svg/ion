@@ -797,6 +797,33 @@ async def _startup_event():
     )
 
     # ---------------------------------------------------------------
+    # Warm the lazily-imported AI stack per worker. The first import of
+    # the investigation chain (skill loader, Ollama request queue, PII
+    # anonymiser) costs ~10s and used to land inside the first
+    # case-create request of each worker, holding that HTTP response
+    # open. Background thread so readiness is not delayed; best-effort.
+    # ---------------------------------------------------------------
+    def _warm_ai_stack():
+        try:
+            import ion.services.investigation_service  # noqa: F401,PLC0415
+            from ion.services.ollama_service import get_request_queue
+            from ion.services.pii_anon_service import get_pii_anon_service
+            from ion.services.skill_loader import list_skills
+            get_request_queue()
+            get_pii_anon_service()
+            list_skills()
+            logger.info("AI stack warmed (investigation deps preloaded)")
+        except Exception as exc:
+            logger.warning(
+                "AI stack warm-up failed — first case create pays the "
+                "import cost instead: %s", exc,
+            )
+    import threading as _threading
+    _threading.Thread(
+        target=_warm_ai_stack, daemon=True, name="ai-stack-warmup"
+    ).start()
+
+    # ---------------------------------------------------------------
     # Start Kibana bidirectional sync (hold_until_close: only one worker
     # in the lifetime of this container instance runs the loop)
     # ---------------------------------------------------------------
