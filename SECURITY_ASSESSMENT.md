@@ -1,7 +1,7 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.84.0 -->
+<!-- ion-doc:version=0.85.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,8 +9,8 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-08-24 (current: v0.84.0). Per-version deltas and history: see CHANGELOG + git history.
-**Application Version:** 0.84.0 — **Net-new surface: none.** No new route, permission, or dependency. Auto-PCAP case notes now include OpenCTI enrichment verdicts and ION-internal prior-case history for the extracted observables; both flow only to existing sinks (the case note and its already-established Kibana mirror) and reuse the existing OpenCTI integration and observable store. One new config knob, `ION_KIBANA_SYNC_INTERVAL_SECONDS`, tunes the existing sync loop (default 15s, floor 5s — the floor exists so a mis-set value cannot hammer Kibana). Prior version: 0.83.0 — **Net-new surface: none** (the /about briefing decks re-authored as in-repo SVGs; six stale PDF/PPTX binaries and 38 PNGs removed from the image). Prior per-version net-new-surface notes: see CHANGELOG + git history.
+**Assessment Date:** 2026-08-25 (current: v0.85.0). Per-version deltas and history: see CHANGELOG + git history.
+**Application Version:** 0.85.0 — **Net-new surface: none.** No new route, permission, or dependency. Large-case creation now defers OpenCTI enrichment and the Kibana create/attach to a post-response worker — the same data flowing to the same existing sinks, just off the request thread; the worker additionally mirrors pre-existing case notes to Kibana on create (parity with the export loop, an existing flow). The AI stack is imported at startup rather than first request (no behavioural change). Prior version: 0.84.0 — **Net-new surface: none** (auto-PCAP notes gained OpenCTI verdicts + prior-case history via existing integrations; one new config knob, `ION_KIBANA_SYNC_INTERVAL_SECONDS`). Prior per-version net-new-surface notes: see CHANGELOG + git history.
 **Previous Assessment Version:** 0.33.0 (2026-05-27)
 **Scope:** Web application security review â€” authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
@@ -24,7 +24,7 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 
 **Current findings posture (v0.54.1): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0** and have stayed at zero since. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
 
-| Severity | Open findings (v0.84.0) |
+| Severity | Open findings (v0.85.0) |
 |----------|:-----------------------:|
 | Critical | 0 |
 | High | 0 |

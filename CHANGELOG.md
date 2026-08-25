@@ -1,13 +1,40 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.84.0 -->
-<!-- ion-doc:version=0.84.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.85.0 -->
+<!-- ion-doc:version=0.85.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-24 -->
 
 # Changelog
+
+## v0.85.0 — 2026-08-25
+
+**Large multi-select case creation responds in seconds — no more "JSON
+error" toast over a case that was actually created.**
+
+- **Root cause fixed.** A bulk create with hundreds of alerts held its HTTP
+  response open past the deployed proxy's 60s read timeout (quadratic
+  per-alert query/flush loops, then sequential OpenCTI round-trips, then the
+  Kibana exchange). The client received an HTML 504 for a case that WAS
+  created; `response.json()` on that body was the raw JSON-error toast, and
+  the stuck-open create dialog invited duplicate submissions. Measured on
+  Postgres with 600 alerts: **81s → 2.4s** handler time.
+- **Batched linking.** Triage rows and prior cases prefetch in two queries;
+  audit rows build in a single flush; observable links flush once per case
+  instead of once per link.
+- **Deferred heavy tail.** Above 25 unique observables, OpenCTI enrichment
+  and the whole Kibana exchange (create, alert attach, assignee) run in a
+  worker spawned after the response. The worker beats the 15s export loop —
+  and when the loop wins the race, attaches the alerts the export path never
+  attaches, and mirrors notes written before the Kibana case existed.
+- **Warm start.** The AI stack (skill loader, Ollama request queue, PII
+  anonymiser) preloads at worker startup, so the first case create per
+  worker no longer pays ~10s of imports inside its own response.
+- **Client hardening.** Non-JSON error bodies are read defensively; gateway
+  timeouts close the dialog, warn "still processing — do not resubmit", and
+  refresh; the success toast notes when enrichment continues in background.
 
 ## v0.84.0 — 2026-08-24
 
