@@ -457,3 +457,101 @@
     border: 1px solid color-mix(in srgb, var(--sev-info) 38%, transparent);
     background: color-mix(in srgb, var(--sev-info) 8%, transparent);
 }
+
+/* Request-tuning modal (shared component — rendered on alerts + cases hosts) */
+.iad-tune-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 6, 10, 0.7);
+    z-index: 10050;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.iad-tune-modal {
+    width: min(560px, 92vw);
+    background: var(--bg-secondary, #0a0c12);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    padding: 24px 26px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+.iad-tune-kicker {
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--primary, #6de4ff);
+}
+.iad-tune-rule {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-primary, #fff);
+    margin: 6px 0 2px;
+    word-break: break-word;
+}
+.iad-tune-sub {
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+    margin-bottom: 16px;
+}
+.iad-tune-label {
+    display: block;
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 12px 0 6px;
+}
+.iad-tune-reasons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.iad-tune-reason {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    font-size: 12px;
+    color: var(--text-secondary, #94a3b8);
+    cursor: pointer;
+    background: transparent;
+}
+.iad-tune-reason.sel {
+    border-color: var(--primary, #6de4ff);
+    color: var(--primary, #6de4ff);
+    background: rgba(109, 228, 255, 0.08);
+}
+.iad-tune-details {
+    width: 100%;
+    min-height: 80px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--text-primary, #e2e8f0);
+    resize: vertical;
+    font-family: inherit;
+}
+.iad-tune-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 18px;
+    gap: 12px;
+}
+.iad-tune-note {
+    font-size: 11px;
+    color: var(--text-secondary, #64748b);
+}
+.iad-tune-actions {
+    display: flex;
+    gap: 8px;
+}
+.iad-tune-status {
+    font-size: 12px;
+    margin-top: 10px;
+}
+.iad-tune-status.ok { color: var(--success, #86f0a0); }
+.iad-tune-status.err { color: var(--danger, #ff6d7e); }

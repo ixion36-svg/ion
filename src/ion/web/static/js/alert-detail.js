@@ -1062,6 +1062,17 @@
         </div>`;
     }
 
+    // Request tuning — any analyst can flag the RULE behind this alert to the
+    // detection team (creates a GitLab-tracked tuning request). Registry keyed
+    // by alert id because rule names can't survive a data-args JSON round-trip.
+    if (alert.rule_name) {
+        _tuneRegistry[alert.id] = { rule_name: alert.rule_name };
+        html += `<div class="ai-analysis-bar">
+            <button class="ai-assist-btn" data-click-action="requestTuningOpen" data-args='["${escapeHtml(alert.id)}"]'>&#9881; Request tuning</button>
+            <span class="_ion-s-e23b35fe83">Rule: ${escapeHtml(alert.rule_name)}</span>
+        </div>`;
+    }
+
     // Arkime PCAP button — shown when Arkime is configured and alert has network context
     if (_opts.arkimeEnabled && (alert.network_community_id || alert.source_ip || alert.destination_ip || alert.arkime_node)) {
         const arkimeHint = alert.network_community_id
@@ -1351,6 +1362,105 @@
   // Delegated actions the rendered markup refers to. These were page-level
   // globals in alerts.html; exposing them here keeps every existing call site
   // working while making them available to /cases for the first time.
+  // ── Request tuning (analyst → DE intake) ─────────────────────────────────
+  var _tuneRegistry = {};
+  var _TUNE_REASONS = [
+    ['false_positive', 'False positive'],
+    ['noisy', 'Too noisy'],
+    ['threshold', 'Threshold wrong'],
+    ['duplicate', 'Duplicate'],
+    ['other', 'Other'],
+  ];
+
+  function requestTuningOpen(alertId) {
+    var ctx = _tuneRegistry[alertId];
+    if (!ctx) return;
+    requestTuningClose();
+    var overlay = document.createElement('div');
+    overlay.className = 'iad-tune-overlay';
+    overlay.id = 'iad-tune-overlay';
+    overlay.setAttribute('data-close-on-self-click', '');
+    var reasons = _TUNE_REASONS.map(function (r, i) {
+      return '<button type="button" class="iad-tune-reason' + (i === 0 ? ' sel' : '') + '"'
+        + ' data-click-action="requestTuningReason" data-reason="' + r[0] + '">' + r[1] + '</button>';
+    }).join('');
+    overlay.innerHTML = '<div class="iad-tune-modal">'
+      + '<div class="iad-tune-kicker">Request tuning</div>'
+      + '<div class="iad-tune-rule">' + escapeHtml(ctx.rule_name) + '</div>'
+      + '<div class="iad-tune-sub">This alert attaches as the example. Creates a tracked ticket for the detection team.</div>'
+      + '<label class="iad-tune-label">Reason</label>'
+      + '<div class="iad-tune-reasons" id="iad-tune-reasons">' + reasons + '</div>'
+      + '<label class="iad-tune-label" for="iad-tune-details">What\'s happening</label>'
+      + '<textarea class="iad-tune-details" id="iad-tune-details" placeholder="What fires, how often, why you believe it needs tuning…"></textarea>'
+      + '<div class="iad-tune-status" id="iad-tune-status"></div>'
+      + '<div class="iad-tune-foot">'
+      + '<span class="iad-tune-note" id="iad-tune-note">Tracked in ION; mirrored to GitLab when configured.</span>'
+      + '<span class="iad-tune-actions">'
+      + '<button type="button" class="ai-assist-btn" data-click-action="requestTuningClose">Cancel</button>'
+      + '<button type="button" class="ai-assist-btn" id="iad-tune-submit" data-click-action="requestTuningSubmit"'
+      + ' data-alert-id="' + escapeHtml(alertId) + '">Submit request</button>'
+      + '</span></div></div>';
+    document.body.appendChild(overlay);
+  }
+
+  function requestTuningReason(event) {
+    var box = document.getElementById('iad-tune-reasons');
+    if (!box) return;
+    box.querySelectorAll('.iad-tune-reason').forEach(function (b) { b.classList.remove('sel'); });
+    event.target.closest('.iad-tune-reason').classList.add('sel');
+  }
+
+  function requestTuningClose() {
+    var el = document.getElementById('iad-tune-overlay');
+    if (el) el.remove();
+  }
+
+  function requestTuningSubmit(event) {
+    var btn = event.target.closest('#iad-tune-submit');
+    var alertId = btn ? btn.getAttribute('data-alert-id') : null;
+    var ctx = alertId ? _tuneRegistry[alertId] : null;
+    if (!ctx) return;
+    var sel = document.querySelector('#iad-tune-reasons .iad-tune-reason.sel');
+    var details = (document.getElementById('iad-tune-details') || {}).value || '';
+    var status = document.getElementById('iad-tune-status');
+    btn.disabled = true;
+    fetch('/api/de/tuning-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rule_name: ctx.rule_name,
+        reason: sel ? sel.getAttribute('data-reason') : 'other',
+        details: details.trim() || null,
+        example_alert_ids: [alertId],
+      }),
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+        return d;
+      });
+    }).then(function (d) {
+      var req = d.request || {};
+      if (status) {
+        status.className = 'iad-tune-status ok';
+        status.textContent = 'Request TR-' + req.id + ' submitted'
+          + (req.gitlab_issue_url ? ' — GitLab #' + req.gitlab_issue_iid : '')
+          + '. The detection team has it.';
+      }
+      setTimeout(requestTuningClose, 1800);
+    }).catch(function (e) {
+      if (status) {
+        status.className = 'iad-tune-status err';
+        status.textContent = 'Submit failed: ' + e.message;
+      }
+      btn.disabled = false;
+    });
+  }
+
+  window.requestTuningOpen = requestTuningOpen;
+  window.requestTuningReason = requestTuningReason;
+  window.requestTuningClose = requestTuningClose;
+  window.requestTuningSubmit = requestTuningSubmit;
+
   window.ionAlertDetailJump = function (event, dataset) { showSection(dataset && dataset.section); };
   window.switchDetailTab = switchDetailTab;
   window.ionAlertAddComment = ionAlertAddComment;

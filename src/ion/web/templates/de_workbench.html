@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}DE Workbench · ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <!-- Header -->
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
+        <span class="label-tiny text-ion-cyan">Detection engineering</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">DE Workbench</h1>
+      <p class="text-[13px] text-slate-500 mt-2">Requests in, proposals out, everything measured.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <a href="/de-metrics" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">DE Metrics</a>
+      <a href="/de-proposals" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Proposals</a>
+      <a href="/de-quirks" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Quirks</a>
+      <a href="/detection-engineering" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">TIDE Intel</a>
+    </div>
+  </section>
+
+  <!-- KPIs -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 rise d-2">
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-ion-coral mb-2">Open requests</div>
+      <div id="kpi-requests" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
+      <div id="kpi-requests-sub" class="text-[11px] text-slate-500 mt-1"></div>
+    </div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-ion-amber mb-2">Addressable hours</div>
+      <div id="kpi-hours" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
+      <div id="kpi-hours-sub" class="text-[11px] text-slate-500 mt-1"></div>
+    </div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-ion-cyan mb-2">Proposals in flight</div>
+      <div id="kpi-proposals" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
+      <div id="kpi-proposals-sub" class="text-[11px] text-slate-500 mt-1"></div>
+    </div>
+    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
+      <div class="label-tiny text-ion-amber mb-2">Quirks due review</div>
+      <div id="kpi-quirks" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
+      <div id="kpi-quirks-sub" class="text-[11px] text-slate-500 mt-1"></div>
+    </div>
+  </div>
+
+  <!-- Tuning Requests queue -->
+  <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 mb-6 rise d-3">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="label-tiny text-slate-400">Tuning requests</h2>
+      <span class="text-[11px] text-slate-500">analyst-raised · GitLab-mirrored</span>
+    </div>
+    <div id="req-empty" class="hidden text-slate-500 text-[13px] text-center py-8">No open tuning requests — the queue is clear.</div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-[12.5px]" id="req-table">
+        <thead>
+          <tr class="text-slate-500 text-left border-b border-white/5">
+            <th class="pb-2 pr-4 font-medium">Rule</th>
+            <th class="pb-2 pr-4 font-medium">Reason</th>
+            <th class="pb-2 pr-4 font-medium">Details</th>
+            <th class="pb-2 pr-4 font-medium">Age</th>
+            <th class="pb-2 pr-4 font-medium">FP/7d</th>
+            <th class="pb-2 pr-4 font-medium">Ticket</th>
+            <th class="pb-2 pr-4 font-medium">Status</th>
+            <th class="pb-2 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody id="req-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Noise campaigns -->
+    <div class="lg:col-span-2 rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 rise d-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="label-tiny text-slate-400">Noise campaigns</h2>
+        <a href="/de-metrics" class="text-[11px] text-ion-cyan hover:brightness-125">all campaigns →</a>
+      </div>
+      <div id="camp-empty" class="hidden text-slate-500 text-[13px] text-center py-8">No active noise campaigns.</div>
+      <table class="w-full text-[12.5px]">
+        <thead>
+          <tr class="text-slate-500 text-left border-b border-white/5">
+            <th class="pb-2 pr-4 font-medium">Rule</th>
+            <th class="pb-2 pr-4 font-medium text-right">FP alerts</th>
+            <th class="pb-2 pr-4 font-medium text-right">Hours</th>
+            <th class="pb-2 font-medium"></th>
+          </tr>
+        </thead>
+        <tbody id="camp-body"></tbody>
+      </table>
+    </div>
+
+    <!-- Quirks due -->
+    <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 rise d-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="label-tiny text-slate-400">Quirks due for review</h2>
+        <a href="/de-quirks" class="text-[11px] text-ion-cyan hover:brightness-125">register →</a>
+      </div>
+      <div id="quirk-body" class="text-[12.5px]"></div>
+      <div class="text-[11px] text-slate-600 mt-3">Advisory only — quirks never hide or close alerts.</div>
+    </div>
+  </div>
+
+  <!-- Proposals board -->
+  <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 mb-6 rise d-5">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="label-tiny text-slate-400">Proposals</h2>
+      <a href="/de-proposals" class="text-[11px] text-ion-cyan hover:brightness-125">full board →</a>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div>
+        <div class="label-tiny text-slate-500 mb-2">Draft <span id="prop-draft-n"></span></div>
+        <div id="prop-draft" class="space-y-2"></div>
+      </div>
+      <div>
+        <div class="label-tiny text-slate-500 mb-2">Applied · measuring <span id="prop-applied-n"></span></div>
+        <div id="prop-applied" class="space-y-2"></div>
+      </div>
+      <div>
+        <div class="label-tiny text-slate-500 mb-2">Rejected <span id="prop-rejected-n"></span></div>
+        <div id="prop-rejected" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+{% raw %}
+(function () {
+  'use strict';
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[<>&"']/g, function (c) {
+      return ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+  function ageOf(iso) {
+    if (!iso) return '—';
+    var d = (Date.now() - new Date(iso).getTime()) / 864e5;
+    return d >= 1 ? Math.floor(d) + 'd' : Math.max(1, Math.round(d * 24)) + 'h';
+  }
+
+  var REASON_LABELS = {
+    false_positive: 'False positive', noisy: 'Too noisy', threshold: 'Threshold wrong',
+    duplicate: 'Duplicate', other: 'Other',
+  };
+  var STATUS_CLS = {
+    open: 'bg-ion-coral/10 text-ion-coral',
+    triaged: 'bg-ion-amber/10 text-ion-amber',
+    linked: 'bg-ion-cyan/10 text-ion-cyan',
+    closed: 'bg-white/5 text-slate-500',
+  };
+
+  function chip(status) {
+    return '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.08em] '
+      + (STATUS_CLS[status] || 'bg-white/5 text-slate-400') + '">' + esc(status) + '</span>';
+  }
+
+  // ── tuning requests ──────────────────────────────────────────────────────
+  function renderRequests(reqs) {
+    var openish = reqs.filter(function (r) { return r.status !== 'closed'; });
+    var body = document.getElementById('req-body');
+    var empty = document.getElementById('req-empty');
+    document.getElementById('kpi-requests').textContent = openish.length;
+    var oldest = openish.length
+      ? Math.max.apply(null, openish.map(function (r) { return Date.now() - new Date(r.created_at).getTime(); }))
+      : 0;
+    document.getElementById('kpi-requests-sub').textContent =
+      openish.length ? 'oldest ' + (oldest >= 864e5 ? Math.floor(oldest / 864e5) + 'd' : Math.round(oldest / 36e5) + 'h') : 'queue clear';
+    if (!openish.length) {
+      empty.classList.remove('hidden');
+      body.innerHTML = '';
+      return;
+    }
+    empty.classList.add('hidden');
+    body.innerHTML = openish.map(function (r) {
+      var ev = r.evidence_json || {};
+      var ticket = r.gitlab_issue_url
+        ? '<a class="text-ion-cyan hover:brightness-125" href="' + esc(r.gitlab_issue_url) + '" target="_blank" rel="noopener">#' + esc(r.gitlab_issue_iid) + ' ↗</a>'
+        : '<span class="text-slate-600">—</span>';
+      var actions = '';
+      if (r.status === 'open') {
+        actions += '<button class="req-act h-7 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold mr-1" data-act="triage" data-id="' + r.id + '">Triage</button>';
+      }
+      if (r.status !== 'closed') {
+        actions += '<button class="req-act h-7 px-2.5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[11px] font-semibold mr-1" data-act="draft" data-id="' + r.id + '" data-rule="' + esc(r.rule_name) + '">Draft proposal</button>';
+        actions += '<button class="req-act h-7 px-2.5 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-[11px] font-semibold" data-act="close" data-id="' + r.id + '">Close</button>';
+      }
+      return '<tr class="border-b border-white/5 align-top">'
+        + '<td class="py-2.5 pr-4 font-mono text-[11.5px] text-slate-200">' + esc(r.rule_name) + '</td>'
+        + '<td class="py-2.5 pr-4">' + esc(REASON_LABELS[r.reason] || r.reason) + '</td>'
+        + '<td class="py-2.5 pr-4 text-slate-400 max-w-[320px]">' + esc((r.details || '').slice(0, 160)) + '</td>'
+        + '<td class="py-2.5 pr-4">' + ageOf(r.created_at) + '</td>'
+        + '<td class="py-2.5 pr-4">' + (ev.fp_alerts_7d != null ? ev.fp_alerts_7d : '—') + '</td>'
+        + '<td class="py-2.5 pr-4">' + ticket + '</td>'
+        + '<td class="py-2.5 pr-4">' + chip(r.status) + '</td>'
+        + '<td class="py-2.5 whitespace-nowrap">' + actions + '</td></tr>';
+    }).join('');
+  }
+
+  function loadRequests() {
+    return fetch('/api/de/tuning-requests').then(function (r) { return r.ok ? r.json() : { requests: [] }; })
+      .then(function (d) { renderRequests(d.requests || []); })
+      .catch(function () {});
+  }
+
+  // Deterministic draft → saved DRAFT proposal (same flow as DE Metrics),
+  // optionally linked back to the originating tuning request.
+  function draftProposal(rule, requestId) {
+    return fetch('/api/de/proposals/draft', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rule_name: rule, days: 90 }),
+    }).then(function (dr) {
+      if (!dr.ok) return dr.json().then(function (d) { throw new Error(d.detail || 'no active campaign for this rule'); });
+      return dr.json();
+    }).then(function (draft) {
+      return fetch('/api/de/proposals', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      }).then(function (cr) {
+        if (!cr.ok) return cr.json().then(function (d) { throw new Error(d.detail || ('HTTP ' + cr.status)); });
+        return cr.json();
+      });
+    }).then(function (p) {
+      var pid = p.id || (p.proposal && p.proposal.id);
+      var after = requestId
+        ? fetch('/api/de/tuning-requests/' + requestId + '/link-proposal', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ proposal_id: pid }),
+          })
+        : Promise.resolve();
+      return Promise.resolve(after).then(function () {
+        if (window.showToast) showToast('Draft proposal #' + pid + ' created for ' + rule + ' — refine & decide it on Detection Proposals.', 'success');
+        return Promise.all([loadRequests(), loadProposals()]);
+      });
+    }).catch(function (e) {
+      if (window.showToast) showToast('Draft failed: ' + e.message, 'error');
+    });
+  }
+
+  function reqAction(act, id, rule) {
+    if (act === 'draft') {
+      draftProposal(rule, id);
+      return;
+    }
+    var url = '/api/de/tuning-requests/' + id + '/' + (act === 'triage' ? 'triage' : 'close');
+    var body = act === 'close'
+      ? JSON.stringify({ resolution: prompt('Resolution (lands on the GitLab ticket):') || 'closed from workbench' })
+      : null;
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body })
+      .then(function (r) {
+        if (!r.ok) return r.json().then(function (d) { throw new Error(d.detail || ('HTTP ' + r.status)); });
+        return loadRequests();
+      })
+      .catch(function (e) { if (window.showToast) showToast('Action failed: ' + e.message, 'error'); });
+  }
+
+  // ── campaigns + KPIs ─────────────────────────────────────────────────────
+  function loadMetrics() {
+    return fetch('/api/de/metrics?days=30').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        var summary = d.summary || {};
+        var campaigns = (d.campaigns || []).slice(0, 6);
+        document.getElementById('kpi-hours').textContent =
+          (summary.addressable_hours != null ? summary.addressable_hours : '—') + 'h';
+        document.getElementById('kpi-hours-sub').textContent =
+          'across ' + (summary.campaign_count != null ? summary.campaign_count : '?') + ' campaigns · 30d';
+        var body = document.getElementById('camp-body');
+        var empty = document.getElementById('camp-empty');
+        if (!campaigns.length) { empty.classList.remove('hidden'); body.innerHTML = ''; return; }
+        empty.classList.add('hidden');
+        body.innerHTML = campaigns.map(function (c) {
+          return '<tr class="border-b border-white/5">'
+            + '<td class="py-2.5 pr-4 font-mono text-[11.5px] text-slate-200">' + esc(c.rule_name) + '</td>'
+            + '<td class="py-2.5 pr-4 text-right">' + c.fp_alerts + '</td>'
+            + '<td class="py-2.5 pr-4 text-right text-ion-amber">' + c.cost_hours + 'h</td>'
+            + '<td class="py-2.5 text-right"><button class="camp-draft text-[11px] text-ion-cyan hover:brightness-125" data-rule="' + esc(c.rule_name) + '">Draft proposal</button></td></tr>';
+        }).join('');
+      })
+      .catch(function () {});
+  }
+
+  // ── proposals board ──────────────────────────────────────────────────────
+  function propCard(p) {
+    var extra = p.status === 'applied' && p.outcome_json && p.outcome_json.fp_reduction_pct != null
+      ? 'measured −' + p.outcome_json.fp_reduction_pct + '% FP'
+      : (p.expected_fp_reduction != null ? 'exp. −' + p.expected_fp_reduction + '% FP' : '');
+    return '<div class="rounded-[10px] bg-white/3 border border-white/5 px-3 py-2.5">'
+      + '<div class="text-[10px] font-semibold uppercase tracking-[0.1em] text-ion-cyan">' + esc(p.change_type) + '</div>'
+      + '<div class="font-mono text-[11.5px] text-slate-200 mt-1">' + esc(p.rule_name || p.title) + '</div>'
+      + (extra ? '<div class="text-[11px] text-slate-500 mt-0.5">' + esc(extra) + '</div>' : '')
+      + '</div>';
+  }
+
+  function loadProposals() {
+    return fetch('/api/de/proposals').then(function (r) { return r.ok ? r.json() : { proposals: [] }; })
+      .then(function (d) {
+        var props = d.proposals || [];
+        var draft = props.filter(function (p) { return p.status === 'draft'; });
+        var applied = props.filter(function (p) { return p.status === 'applied'; });
+        var rejected = props.filter(function (p) { return p.status === 'rejected'; });
+        document.getElementById('kpi-proposals').textContent = draft.length + applied.length;
+        document.getElementById('kpi-proposals-sub').textContent =
+          draft.length + ' draft · ' + applied.length + ' applied/measuring';
+        [['prop-draft', draft], ['prop-applied', applied.slice(0, 4)], ['prop-rejected', rejected.slice(0, 3)]]
+          .forEach(function (pair) {
+            document.getElementById(pair[0]).innerHTML =
+              pair[1].map(propCard).join('') || '<div class="text-[12px] text-slate-600">none</div>';
+          });
+        document.getElementById('prop-draft-n').textContent = '(' + draft.length + ')';
+        document.getElementById('prop-applied-n').textContent = '(' + applied.length + ')';
+        document.getElementById('prop-rejected-n').textContent = '(' + rejected.length + ')';
+      })
+      .catch(function () {});
+  }
+
+  // ── quirks due ───────────────────────────────────────────────────────────
+  function loadQuirks() {
+    return fetch('/api/de/quirks?status=active').then(function (r) { return r.ok ? r.json() : { quirks: [] }; })
+      .then(function (d) {
+        var quirks = d.quirks || [];
+        var now = Date.now();
+        var soon = quirks.filter(function (q) {
+          if (!q.review_date) return false;
+          return new Date(q.review_date).getTime() - now < 7 * 864e5;
+        }).sort(function (a, b) { return new Date(a.review_date) - new Date(b.review_date); });
+        document.getElementById('kpi-quirks').textContent = soon.length;
+        document.getElementById('kpi-quirks-sub').textContent = 'of ' + quirks.length + ' active · 7d window';
+        document.getElementById('quirk-body').innerHTML = soon.slice(0, 6).map(function (q) {
+          var overdue = new Date(q.review_date).getTime() < now;
+          return '<div class="flex items-center justify-between py-2 border-b border-white/5">'
+            + '<span class="font-mono text-[11.5px] text-slate-200">' + esc(q.title) + '</span>'
+            + '<span class="inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-[0.08em] bg-ion-amber/10 text-ion-amber">'
+            + (overdue ? 'overdue' : 'review ' + ageOf(q.review_date).replace('d', 'd out')) + '</span></div>';
+        }).join('') || '<div class="text-[12px] text-slate-600 py-2">Nothing due within 7 days.</div>';
+      })
+      .catch(function () {});
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.getElementById('req-table').addEventListener('click', function (e) {
+      var btn = e.target.closest('.req-act');
+      if (!btn) return;
+      reqAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'), btn.getAttribute('data-rule') || '');
+    });
+    document.getElementById('camp-body').addEventListener('click', function (e) {
+      var btn = e.target.closest('.camp-draft');
+      if (btn) draftProposal(btn.getAttribute('data-rule'), null);
+    });
+    loadRequests();
+    loadMetrics();
+    loadProposals();
+    loadQuirks();
+  });
+})();
+{% endraw %}
+</script>
+{% endblock %}

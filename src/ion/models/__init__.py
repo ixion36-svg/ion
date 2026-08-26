@@ -236,6 +236,7 @@ from ion.models.ticker import (  # noqa: F401
 from ion.models.tide_snapshot import TideSnapshot
 from ion.models.traffic_exclusion import TrafficExclusion  # noqa: F401
 from ion.models.tuning_proposal import TuningProposal, TuningProposalStatus  # noqa: F401
+from ion.models.tuning_request import TuningRequest  # noqa: F401
 from ion.models.user import (
     AuditLog,
     Permission,

@@ -2220,6 +2220,13 @@ async def detection_health_page(request: Request, user: User = Depends(require_p
     )
 
 
+@app.get("/de", response_class=HTMLResponse)
+async def de_workbench_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+    """Render the DE Workbench — the detection team's working surface
+    (tuning-request queue + campaigns + proposals + quirks in one place)."""
+    return templates.TemplateResponse(request=request, name="de_workbench.html")
+
+
 @app.get("/de-metrics", response_class=HTMLResponse)
 async def de_metrics_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
     """Render the Detection-Engineering Metrics page (Phase 0 — noise campaigns)."""

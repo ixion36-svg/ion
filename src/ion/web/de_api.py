@@ -360,6 +360,130 @@ def bob_scorecard(
     return get_bob_scorecard(session, days=days)
 
 
+# ── Tuning requests (analyst intake → GitLab-mirrored DE queue) ──────────────
+# Raising is deliberately alert:read — any analyst can ask; working the queue
+# is de:propose like the rest of the DE write surface.
+
+
+class TuningRequestCreate(BaseModel):
+    rule_name: str
+    rule_id: Optional[str] = None
+    reason: str = "other"
+    details: Optional[str] = None
+    example_alert_ids: Optional[list[str]] = None
+
+
+class TuningRequestClose(BaseModel):
+    resolution: str
+
+
+class TuningRequestLink(BaseModel):
+    proposal_id: int
+
+
+@router.post("/tuning-requests")
+async def create_tuning_request(
+    payload: TuningRequestCreate,
+    user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Raise a tuning request (any analyst). Mirrors to GitLab best-effort."""
+    from ion.services.de_tuning_request_service import create_request
+
+    if not payload.rule_name.strip():
+        raise HTTPException(status_code=400, detail="rule_name is required")
+    try:
+        req = await create_request(
+            session, user,
+            rule_name=payload.rule_name,
+            rule_id=payload.rule_id,
+            reason=payload.reason,
+            details=payload.details,
+            example_alert_ids=payload.example_alert_ids,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"request": req.to_dict()}
+
+
+@router.get("/tuning-requests", dependencies=[Depends(require_permission("de:read"))])
+def list_tuning_requests(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    limit: int = Query(100, ge=1, le=500),
+    session: Session = Depends(get_db_session),
+):
+    from ion.models.tuning_request import TuningRequest
+
+    q = session.query(TuningRequest).order_by(TuningRequest.id.desc())
+    if status:
+        q = q.filter(TuningRequest.status == status)
+    rows = q.limit(limit).all()
+    return {"requests": [r.to_dict() for r in rows]}
+
+
+def _get_request_or_404(session: Session, request_id: int):
+    from ion.models.tuning_request import TuningRequest
+
+    req = session.get(TuningRequest, request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="Tuning request not found")
+    return req
+
+
+@router.post("/tuning-requests/{request_id}/triage")
+async def triage_tuning_request(
+    request_id: int,
+    user: User = Depends(require_permission("de:propose")),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_tuning_request_service import triage_request
+
+    try:
+        req = await triage_request(session, user, _get_request_or_404(session, request_id))
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"request": req.to_dict()}
+
+
+@router.post("/tuning-requests/{request_id}/link-proposal")
+async def link_tuning_request_proposal(
+    request_id: int,
+    payload: TuningRequestLink,
+    user: User = Depends(require_permission("de:propose")),
+    session: Session = Depends(get_db_session),
+):
+    from ion.models.detection_proposal import DetectionProposal
+    from ion.services.de_tuning_request_service import link_proposal
+
+    if session.get(DetectionProposal, payload.proposal_id) is None:
+        raise HTTPException(status_code=404, detail="Detection proposal not found")
+    try:
+        req = await link_proposal(
+            session, user, _get_request_or_404(session, request_id), payload.proposal_id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"request": req.to_dict()}
+
+
+@router.post("/tuning-requests/{request_id}/close")
+async def close_tuning_request(
+    request_id: int,
+    payload: TuningRequestClose,
+    user: User = Depends(require_permission("de:propose")),
+    session: Session = Depends(get_db_session),
+):
+    from ion.services.de_tuning_request_service import close_request
+
+    try:
+        req = await close_request(
+            session, user, _get_request_or_404(session, request_id), payload.resolution
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"request": req.to_dict()}
+
+
 @router.get("/bob-proposals", dependencies=[Depends(require_permission("de:read"))])
 def list_bob_proposals(
     status: str = Query("all", description="draft | approved | rejected | reverted | all"),
