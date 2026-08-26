@@ -2338,6 +2338,14 @@ async def network_map_page(request: Request, user: User = Depends(require_page_a
     return templates.TemplateResponse(request=request, name="network_map.html")
 
 
+@app.get("/network-topology", response_class=HTMLResponse)
+async def network_topology_page(
+    request: Request, user: User = Depends(require_page_permission("alert:read"))
+):
+    """Render the Flow Topology (NSE view) page — Arkime conversation graph."""
+    return templates.TemplateResponse(request=request, name="network_topology.html")
+
+
 def main():
     """Run the web server."""
     import argparse

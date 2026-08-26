@@ -32,6 +32,7 @@ from __future__ import annotations
 import ipaddress
 import logging
 import os
+import re
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -1330,6 +1331,283 @@ class ArkimeService:
             raise
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime per-node error: {type(e).__name__}: {e}") from e
+
+    _CONVO_SAMPLE = 1000  # sessions fetched for edge enrichment / graph fallback
+    _PROTO_NAME_RE = re.compile(r"[a-z0-9._-]{1,32}")
+
+    @classmethod
+    def _clean_endpoint_ip(cls, value: Any) -> str:
+        """Validated IP string for a conversation endpoint, or '' to drop.
+
+        Endpoint values come straight off packet captures; round-tripping
+        through ``ipaddress`` rejects garbage AND guarantees the value is safe
+        to interpolate into Arkime expressions and DOM text downstream.
+        """
+        s = str(value or "").strip()
+        if not s:
+            return ""
+        try:
+            addr = ipaddress.ip_address(s)
+        except ValueError:
+            return ""
+        if addr.is_link_local or addr.is_loopback or addr.is_unspecified:
+            return ""
+        return str(addr)
+
+    @staticmethod
+    def _packet_epoch(val: Any) -> Optional[float]:
+        """firstPacket/lastPacket as float epoch seconds (ms on modern builds,
+        seconds on older ones), or None when unparseable."""
+        try:
+            f = float(val)
+        except (TypeError, ValueError):
+            return None
+        return f / 1000.0 if f > 10_000_000_000 else f
+
+    async def get_conversations(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        expression: Optional[str] = None,
+        limit: int = 200,
+    ) -> Dict[str, Any]:
+        """Host-level conversation graph (src↔dst pairs) for the time window.
+
+        Primary edge weights come from the viewer's ``/api/connections``
+        aggregation — computed server-side over EVERY session in the window,
+        no sample bias. One top-N-by-bytes session sample enriches those edges
+        with dominant protocol / dst port / throughput (connections carries no
+        per-edge protocol detail); when ``/api/connections`` is unavailable the
+        same sample becomes the whole graph. ``method`` says which path
+        produced the edge weights ("connections" | "sample").
+
+        Returns:
+            {
+                "nodes": [{"ip", "bytes", "sessions"}, ...],
+                "edges": [{"src", "dst", "bytes", "sessions", "packets",
+                           "protocol", "port", "throughput_bps"}, ...],
+                "method": "connections" | "sample",
+            }
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        pair_edges = self._pair_edges(
+            await self._conversations_sample(start_ts, stop_ts, expression)
+        )
+        by_pair = {(e["src"], e["dst"]): e for e in pair_edges}
+        conn_edges: List[Dict[str, Any]] = []
+        try:
+            conn_edges = await self._connections_graph(start_ts, stop_ts, expression)
+        except (ArkimeError, httpx.HTTPError) as exc:
+            logger.debug(
+                "Arkime /api/connections failed (%s) — building graph from sample", exc
+            )
+        if conn_edges:
+            merged: List[Dict[str, Any]] = []
+            for e in conn_edges:
+                enr = by_pair.get((e["src"], e["dst"])) or by_pair.get((e["dst"], e["src"]))
+                # Builds whose connections links omit byte sizes report 0 —
+                # borrow the (sampled, byte-biased) figure so sizing still works.
+                merged.append({
+                    **e,
+                    "bytes": e["bytes"] or (enr["bytes"] if enr else 0),
+                    "packets": enr["packets"] if enr else 0,
+                    "protocol": enr["protocol"] if enr else "",
+                    "port": enr["port"] if enr else None,
+                    "throughput_bps": enr["throughput_bps"] if enr else None,
+                })
+            edges, method = merged, "connections"
+        else:
+            edges, method = pair_edges, "sample"
+        edges = sorted(edges, key=lambda x: (x["bytes"], x["sessions"]), reverse=True)[:limit]
+        node_map: Dict[str, Dict[str, int]] = {}
+        for e in edges:
+            for ip in (e["src"], e["dst"]):
+                entry = node_map.setdefault(ip, {"bytes": 0, "sessions": 0})
+                entry["bytes"] += e["bytes"]
+                entry["sessions"] += e["sessions"]
+        nodes = sorted(
+            [{"ip": ip, **stats} for ip, stats in node_map.items()],
+            key=lambda x: (x["bytes"], x["sessions"]),
+            reverse=True,
+        )
+        return {"nodes": nodes, "edges": edges, "method": method}
+
+    async def _connections_graph(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        expression: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Raw src↔dst edges from ``/api/connections``.
+
+        Links reference nodes by integer index on every known build, but some
+        inline the value — read both. Byte volume lives under ``by`` (viewer
+        naming) with ``totBytes``/``size`` fallbacks; session count under
+        ``value``/``count``/``sessions``. Raises ArkimeError on non-200 /
+        non-JSON so the caller can fall back to the session sample.
+        """
+        params = {
+            "srcField": "ip.src",
+            "dstField": "ip.dst",
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "minConn": "1",
+        }
+        if expression:
+            params["expression"] = expression
+        headers = await self._headers()
+        async with await self._client() as client:
+            resp = await client.get(
+                f"{self.url}/api/connections", headers=headers, params=params
+            )
+        if resp.status_code != 200:
+            raise ArkimeError(
+                f"Arkime connections failed: HTTP {resp.status_code}",
+                status_code=resp.status_code,
+            )
+        if "json" not in resp.headers.get("content-type", ""):
+            raise ArkimeError("Arkime returned non-JSON — check auth")
+        payload = resp.json()
+        ids: List[str] = []
+        for n in payload.get("nodes") or []:
+            node_id = n.get("id") if isinstance(n, dict) else n
+            ids.append(str(node_id) if node_id is not None else "")
+
+        def _endpoint(ref: Any) -> str:
+            if isinstance(ref, int):
+                raw = ids[ref] if 0 <= ref < len(ids) else ""
+            else:
+                raw = ref
+            return self._clean_endpoint_ip(raw)
+
+        edges: List[Dict[str, Any]] = []
+        for ln in payload.get("links") or []:
+            if not isinstance(ln, dict):
+                continue
+            src = _endpoint(ln.get("source"))
+            dst = _endpoint(ln.get("target"))
+            if not src or not dst or src == dst:
+                continue
+            try:
+                b = int(ln.get("by") or ln.get("totBytes") or ln.get("size") or 0)
+            except (TypeError, ValueError):
+                b = 0
+            try:
+                sess = int(ln.get("value") or ln.get("count") or ln.get("sessions") or 0)
+            except (TypeError, ValueError):
+                sess = 0
+            edges.append({"src": src, "dst": dst, "bytes": b, "sessions": sess})
+        return edges
+
+    async def _conversations_sample(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        expression: Optional[str] = None,
+    ) -> Dict[Any, Dict[str, Any]]:
+        """Pair-keyed aggregation of the top-``_CONVO_SAMPLE``-by-bytes
+        sessions. Byte-biased and capped — which is why ``/api/connections``
+        supplies the edge weights when available — but it is the only source of
+        per-edge protocol / port / duration. Degrades to {} on any failure so
+        the connections path still renders unenriched.
+        """
+        params = {
+            "length": str(self._CONVO_SAMPLE),
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "order": "totBytes:desc",
+            "fields": "srcIp,dstIp,totBytes,packets,ipProtocol,dstPort,firstPacket,lastPacket",
+        }
+        if expression:
+            params["expression"] = expression
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions", headers=headers, params=params
+                )
+            if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
+                return {}
+            sessions = resp.json().get("data") or []
+        except httpx.HTTPError:
+            return {}
+        pairs: Dict[Any, Dict[str, Any]] = {}
+        for s in sessions:
+            src = self._clean_endpoint_ip(s.get("srcIp") or s.get("source", {}).get("ip", ""))
+            dst = self._clean_endpoint_ip(s.get("dstIp") or s.get("destination", {}).get("ip", ""))
+            if not src or not dst or src == dst:
+                continue
+            try:
+                b = int(s.get("totBytes") or 0)
+            except (TypeError, ValueError):
+                b = 0
+            pk_raw = s.get("packets")
+            if isinstance(pk_raw, (list, tuple)):
+                pk = sum(int(p) for p in pk_raw if isinstance(p, (int, float)))
+            else:
+                try:
+                    pk = int(pk_raw or 0)
+                except (TypeError, ValueError):
+                    pk = 0
+            ipp = s.get("ipProtocol")
+            proto = (
+                self._IPPROTO_NAMES.get(ipp) if isinstance(ipp, int)
+                else (str(ipp).strip().lower() if ipp else "")
+            ) or ""
+            if proto and not self._PROTO_NAME_RE.fullmatch(proto):
+                proto = ""
+            port: Optional[int] = None
+            try:
+                p = int(s.get("dstPort"))
+                if 0 <= p <= 65535:
+                    port = p
+            except (TypeError, ValueError):
+                pass
+            first = self._packet_epoch(s.get("firstPacket"))
+            last = self._packet_epoch(s.get("lastPacket"))
+            entry = pairs.setdefault((src, dst), {
+                "bytes": 0, "sessions": 0, "packets": 0,
+                "protocols": {}, "ports": {}, "first": None, "last": None,
+            })
+            entry["bytes"] += b
+            entry["sessions"] += 1
+            entry["packets"] += pk
+            if proto:
+                entry["protocols"][proto] = entry["protocols"].get(proto, 0) + b
+            if port is not None:
+                entry["ports"][port] = entry["ports"].get(port, 0) + b
+            if first is not None:
+                entry["first"] = first if entry["first"] is None else min(entry["first"], first)
+            if last is not None:
+                entry["last"] = last if entry["last"] is None else max(entry["last"], last)
+        return pairs
+
+    @staticmethod
+    def _pair_edges(pairs: Dict[Any, Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Pair aggregates → edge dicts: dominant protocol/port by byte share,
+        throughput from bytes ÷ observed packet span (None when the span is
+        zero or unknown — never fake a rate)."""
+        edges: List[Dict[str, Any]] = []
+        for (src, dst), st in pairs.items():
+            protocols = st.get("protocols") or {}
+            ports = st.get("ports") or {}
+            span = (
+                st["last"] - st["first"]
+                if st.get("first") is not None and st.get("last") is not None
+                else 0
+            )
+            edges.append({
+                "src": src,
+                "dst": dst,
+                "bytes": st["bytes"],
+                "sessions": st["sessions"],
+                "packets": st["packets"],
+                "protocol": max(protocols, key=protocols.get) if protocols else "",
+                "port": max(ports, key=ports.get) if ports else None,
+                "throughput_bps": round(st["bytes"] / span, 1) if span > 0 else None,
+            })
+        return edges
 
     async def _oldest_session_epoch(
         self, expression: Optional[str], start_ts: int, stop_ts: int

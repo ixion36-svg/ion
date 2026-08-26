@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+{% block title %}Flow Topology · ION{% endblock %}
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+{% set tabs = [
+    {"label": "Topology", "href": "/integrations?tab=topology"},
+    {"label": "Network Map", "href": "/network-map"},
+    {"label": "Flow Topology", "href": "/network-topology"},
+    {"label": "Data Flow", "href": "/data-flow"}
+] %}
+{% set active_label = "Flow Topology" %}
+{% include "_nav_tabs.html" %}
+
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="flex-1 min-w-0">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-ion-cyan"><use href="#i-network"/></svg>
+      <span class="label-tiny text-ion-cyan">NSE view</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Flow Topology</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Who talks to whom, from Arkime capture — nodes sized by volume, coloured by threat and asset context. Grouped by /24 by default; click a subnet to drill into its hosts.</p>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    <div id="nt-range-tabs" class="nt-seg">
+      <button class="nt-seg-btn active" data-click-action="ntSetRange" data-args='["24h"]' data-range="24h">24h</button>
+      <button class="nt-seg-btn" data-click-action="ntSetRange" data-args='["7d"]' data-range="7d">7d</button>
+      <button class="nt-seg-btn" data-click-action="ntSetRange" data-args='["30d"]' data-range="30d">30d</button>
+    </div>
+    <label class="nt-cb"><input type="checkbox" id="nt-group" checked> Group by /24</label>
+    <label class="nt-cb"><input type="checkbox" id="nt-ext"> Hide east-west</label>
+    <button class="btn btn-secondary" data-click-action="ntLoad">Refresh</button>
+  </div>
+</section>
+
+<div id="nt-unconfigured" class="nt-banner hidden">Arkime is not configured — set the <code>ION_ARKIME_*</code> environment family to light this view up.</div>
+
+<div class="nt-meta" id="nt-meta">Loading…</div>
+<div id="nt-canvas" class="nt-canvas">
+  <div class="nt-loading"><span class="nt-spinner"></span> Building graph…</div>
+</div>
+
+<div class="nt-grid">
+  <div id="nt-detail" class="nt-panel nt-detail empty">Select a node or edge for details. Drag to pan, scroll to zoom.</div>
+  <div class="nt-panel">
+    <div class="nt-panel-title">NSE metrics</div>
+    <div id="nt-metrics" class="nt-kv">—</div>
+    <div class="nt-panel-title nt-mt">Top ports by volume</div>
+    <div id="nt-ports">—</div>
+    <a class="nt-link" href="/arkime-traffic">Traffic Analytics →</a>
+  </div>
+  <div class="nt-panel">
+    <div class="nt-panel-title">Not available from current sources</div>
+    <div id="nt-unavailable"></div>
+    <p class="nt-fine">These need a source ION doesn't ingest (air-gap friendly options noted per metric). Shown as unavailable rather than approximated.</p>
+  </div>
+</div>
+
+</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style nonce="{{ csp_nonce }}">
+.nt-seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.nt-seg-btn{background:var(--bg-secondary);color:var(--text-secondary);border:none;padding:7px 14px;font:inherit;font-size:.8rem;cursor:pointer}
+.nt-seg-btn.active{background:var(--primary);color:#0b1220;font-weight:600}
+.nt-cb{display:inline-flex;align-items:center;gap:6px;color:var(--text-secondary);font-size:.78rem}
+.nt-banner{background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.4);color:var(--text-primary);border-radius:var(--radius-lg);padding:12px 16px;font-size:.85rem;margin-bottom:12px}
+.nt-banner.hidden{display:none}
+.nt-banner code{font-family:'JetBrains Mono',monospace;font-size:.78rem}
+
+.nt-meta{font-size:.78rem;color:var(--text-secondary);margin-bottom:10px;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+.nt-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
+.nt-legend{display:inline-flex;align-items:center;gap:14px;margin-left:auto;flex-wrap:wrap}
+.nt-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:.7rem}
+.nt-legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;border:1px solid var(--border)}
+.nt-method{font-size:.66rem;text-transform:uppercase;letter-spacing:1px;border:1px solid var(--border);border-radius:999px;padding:2px 8px}
+
+.nt-canvas{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);height:620px;position:relative;overflow:hidden}
+.nt-loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.nt-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:nt-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
+@keyframes nt-spin{to{transform:rotate(360deg)}}
+
+.nt-grid{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:14px;margin-top:14px}
+.nt-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;color:var(--text-secondary);font-size:.85rem;min-height:60px}
+.nt-panel-title{font-size:.68rem;text-transform:uppercase;letter-spacing:1.5px;color:var(--text-secondary);margin-bottom:8px;font-weight:700}
+.nt-mt{margin-top:14px}
+.nt-detail h3{font-size:1rem;color:var(--text-primary);margin:0 0 6px 0;font-family:'JetBrains Mono',monospace}
+.nt-detail.empty{display:flex;align-items:center;justify-content:center;font-style:italic;font-size:.82rem}
+.nt-detail-meta{font-size:.76rem;color:var(--text-secondary);line-height:1.7}
+.nt-detail-meta b{color:var(--text-primary);font-weight:600}
+.nt-link{display:inline-block;margin-top:10px;color:var(--primary);font-size:.78rem;text-decoration:none}
+.nt-link:hover{text-decoration:underline}
+.nt-kv{display:flex;flex-direction:column;gap:4px;font-size:.8rem}
+.nt-kv strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
+.nt-port-row{display:flex;align-items:center;gap:8px;font-size:.76rem;margin-bottom:4px}
+.nt-port-name{width:64px;font-family:'JetBrains Mono',monospace;color:var(--text-primary)}
+.nt-port-bar{height:6px;border-radius:3px;background:var(--primary);opacity:.75;min-width:2px}
+.nt-port-val{color:var(--text-secondary);font-size:.7rem}
+.nt-unavail-row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:1px dashed var(--border);font-size:.78rem}
+.nt-unavail-row:last-of-type{border-bottom:none}
+.nt-unavail-name{color:var(--text-primary)}
+.nt-unavail-req{color:var(--text-secondary);font-size:.7rem;white-space:nowrap}
+.nt-fine{font-size:.68rem;color:var(--text-secondary);margin:10px 0 0 0;font-style:italic}
+.nt-tag{display:inline-block;font-size:.64rem;border:1px solid var(--border);border-radius:999px;padding:1px 7px;margin-left:6px;text-transform:uppercase;letter-spacing:.5px}
+
+@media (max-width: 1100px){ .nt-grid{grid-template-columns:1fr} }
+@media (max-width: 768px){ .nt-canvas{height:460px} }
+</style>
+<script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
+<script nonce="{{ csp_nonce }}">
+const NT_API = '/api/arkime/traffic/topology';
+let ntNetwork = null;
+let ntData = null;
+let ntRange = '24h';
+const ntExpanded = new Set();
+
+const NT_COLORS = {
+  subnet:   '#79c0ff',
+  internal: '#58a6ff',
+  external: '#d29922',
+  threat:   '#f85149',
+  asset:    '#3fb950',
+};
+
+function ntEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
+function ntFmtBytes(b){
+  b = Number(b) || 0;
+  const units = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (b >= 1024 && i < units.length - 1) { b /= 1024; i++; }
+  return (i === 0 ? b : b.toFixed(1)) + ' ' + units[i];
+}
+
+function ntFmtRate(bps){
+  if (bps == null) return null;
+  return ntFmtBytes(bps) + '/s';
+}
+
+function ntSetRange(r){
+  ntRange = r;
+  document.querySelectorAll('#nt-range-tabs .nt-seg-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.range === r);
+  });
+  ntLoad();
+}
+
+async function ntLoad(){
+  ntExpanded.clear();
+  const ext = document.getElementById('nt-ext').checked ? '&exclude_private=true' : '';
+  document.getElementById('nt-meta').textContent = 'Loading graph…';
+  document.getElementById('nt-canvas').innerHTML = '<div class="nt-loading"><span class="nt-spinner"></span> Building graph…</div>';
+  try {
+    const r = await fetch(`${NT_API}?range=${ntRange}${ext}`);
+    if (r.status === 503) {
+      document.getElementById('nt-unconfigured').classList.remove('hidden');
+      document.getElementById('nt-meta').textContent = 'Arkime not configured.';
+      document.getElementById('nt-canvas').innerHTML = '<div class="nt-loading">No capture source.</div>';
+      return;
+    }
+    if (!r.ok) throw new Error('Topology request failed (HTTP ' + r.status + ')');
+    document.getElementById('nt-unconfigured').classList.add('hidden');
+    ntData = await r.json();
+    ntRender();
+    ntRenderMetrics();
+    ntRenderUnavailable();
+  } catch (e) {
+    document.getElementById('nt-meta').textContent = 'Error loading topology.';
+    document.getElementById('nt-canvas').innerHTML = `<div class="nt-loading">${ntEsc(e.message)}</div>`;
+  }
+}
+
+function ntNodeCategory(n){
+  if (n.threat && n.threat.malicious) return 'threat';
+  if (n.asset) return 'asset';
+  return n.private ? 'internal' : 'external';
+}
+
+// Tooltips are built as DOM elements with textContent — node/edge strings
+// originate from packet capture and must never hit innerHTML.
+function ntTooltip(lines){
+  const el = document.createElement('div');
+  lines.filter(Boolean).forEach(t => {
+    const row = document.createElement('div');
+    row.textContent = t;
+    el.appendChild(row);
+  });
+  return el;
+}
+
+function ntBuildGraph(){
+  const grouped = document.getElementById('nt-group').checked;
+  const hosts = ntData.nodes || [];
+  const rawEdges = ntData.edges || [];
+  const subnetOf = {};
+  hosts.forEach(n => { subnetOf[n.ip] = n.subnet || ''; });
+  const byIp = {};
+  hosts.forEach(n => { byIp[n.ip] = n; });
+
+  const keyFor = ip => {
+    const sn = subnetOf[ip];
+    if (!grouped || !sn || ntExpanded.has(sn)) return 'h:' + ip;
+    return 's:' + sn;
+  };
+
+  const nodes = new Map();
+  hosts.forEach(n => {
+    const k = keyFor(n.ip);
+    if (k.startsWith('h:')) {
+      nodes.set(k, { kind: 'host', host: n });
+    } else {
+      let agg = nodes.get(k);
+      if (!agg) { agg = { kind: 'subnet', subnet: n.subnet, bytes: 0, sessions: 0, hosts: 0, threat: false, assets: 0 }; nodes.set(k, agg); }
+      agg.bytes += n.bytes; agg.sessions += n.sessions; agg.hosts += 1;
+      if (n.threat && n.threat.malicious) agg.threat = true;
+      if (n.asset) agg.assets += 1;
+    }
+  });
+
+  const edgeMap = new Map();
+  rawEdges.forEach(e => {
+    const a = keyFor(e.src), b = keyFor(e.dst);
+    if (a === b) return; // intra-subnet chatter collapses away when grouped
+    const k = a + '|' + b;
+    let agg = edgeMap.get(k);
+    if (!agg) { agg = { from: a, to: b, bytes: 0, sessions: 0, protos: {}, sample: e }; edgeMap.set(k, agg); }
+    agg.bytes += e.bytes; agg.sessions += e.sessions;
+    if (e.protocol) agg.protos[e.protocol] = (agg.protos[e.protocol] || 0) + e.bytes;
+    if (e.bytes > agg.sample.bytes) agg.sample = e;
+  });
+
+  const visNodes = [];
+  nodes.forEach((v, k) => {
+    if (v.kind === 'host') {
+      const n = v.host;
+      const cat = ntNodeCategory(n);
+      const label = n.asset && n.asset.hostname ? `${n.asset.hostname}\n${n.ip}` : n.ip;
+      visNodes.push({
+        id: k, label, value: Math.max(n.bytes, 1), shape: 'dot',
+        color: { background: NT_COLORS[cat], border: cat === 'threat' ? '#ff7b72' : '#30363d' },
+        font: { color: '#c9d1d9', size: 11, face: 'JetBrains Mono, monospace' },
+        title: ntTooltip([
+          n.ip,
+          n.asset ? `asset: ${n.asset.hostname} (${n.asset.criticality})` : null,
+          n.threat ? `threat: ${n.threat.level} · ${n.threat.case_count} case(s)` : null,
+          `${ntFmtBytes(n.bytes)} · ${n.sessions} sessions`,
+        ]),
+      });
+    } else {
+      const hostsLbl = `${v.hosts} host${v.hosts === 1 ? '' : 's'}`;
+      visNodes.push({
+        id: k, label: `${v.subnet}\n${hostsLbl}`, value: Math.max(v.bytes, 1), shape: 'hexagon',
+        color: { background: v.threat ? NT_COLORS.threat : NT_COLORS.subnet, border: '#30363d' },
+        font: { color: '#c9d1d9', size: 11, face: 'JetBrains Mono, monospace' },
+        title: ntTooltip([
+          v.subnet,
+          `${hostsLbl} · ${v.assets} known asset${v.assets === 1 ? '' : 's'}`,
+          `${ntFmtBytes(v.bytes)} · ${v.sessions} sessions`,
+          'Click, then "Drill into subnet" to expand',
+        ]),
+      });
+    }
+  });
+
+  const visEdges = [];
+  let i = 0;
+  edgeMap.forEach(agg => {
+    const protos = Object.keys(agg.protos);
+    const dominant = protos.length ? protos.reduce((a, b) => agg.protos[a] >= agg.protos[b] ? a : b) : '';
+    const port = agg.sample.port;
+    const label = dominant ? (port != null ? `${dominant}:${port}` : dominant) : '';
+    visEdges.push({
+      id: 'e' + (i++), from: agg.from, to: agg.to,
+      value: Math.max(agg.bytes, 1), label,
+      color: { color: '#484f58', highlight: '#58a6ff' },
+      font: { color: '#8b949e', size: 9, align: 'middle' },
+      arrows: { to: { enabled: true, scaleFactor: 0.4 } },
+      smooth: { type: 'continuous' },
+      title: ntTooltip([
+        `${agg.from.slice(2)} → ${agg.to.slice(2)}`,
+        `${ntFmtBytes(agg.bytes)} · ${agg.sessions} sessions`,
+        agg.sample.throughput_bps != null ? `~${ntFmtRate(agg.sample.throughput_bps)} (busiest pair)` : null,
+      ]),
+      _agg: agg,
+    });
+  });
+  return { visNodes, visEdges };
+}
+
+function ntRender(){
+  const meta = document.getElementById('nt-meta');
+  const m = (ntData && ntData.metrics) || {};
+  if (!ntData || !(ntData.nodes || []).length) {
+    meta.textContent = 'No conversations captured in this window.';
+    document.getElementById('nt-canvas').innerHTML = '<div class="nt-loading">Nothing to graph — no Arkime sessions in this range.</div>';
+    return;
+  }
+  const legend = Object.entries({
+    subnet: 'subnet', internal: 'internal host', external: 'external host',
+    asset: 'known asset', threat: 'threat-linked',
+  }).map(([k, lbl]) =>
+    `<span class="nt-legend-item"><span class="nt-legend-dot" data-ion-style="background:${NT_COLORS[k]}"></span>${lbl}</span>`
+  ).join('');
+  meta.innerHTML = `
+    <span><strong>${m.hosts || 0}</strong> hosts</span>
+    <span><strong>${m.active_conversations || 0}</strong> conversations</span>
+    <span class="nt-method">${ntEsc(m.method || '')}</span>
+    <span class="nt-legend">${legend}</span>
+  `;
+
+  const { visNodes, visEdges } = ntBuildGraph();
+  const container = document.getElementById('nt-canvas');
+  container.innerHTML = '';
+  const options = {
+    physics: {
+      forceAtlas2Based: { gravitationalConstant: -70, springLength: 110 },
+      solver: 'forceAtlas2Based',
+      stabilization: { iterations: 220 },
+    },
+    interaction: { hover: true, tooltipDelay: 150 },
+    nodes: { scaling: { min: 8, max: 42 }, borderWidth: 2, borderWidthSelected: 3 },
+    edges: { scaling: { min: 1, max: 8 } },
+  };
+  if (ntNetwork) { ntNetwork.destroy(); ntNetwork = null; }
+  ntNetwork = new vis.Network(container, {
+    nodes: new vis.DataSet(visNodes),
+    edges: new vis.DataSet(visEdges),
+  }, options);
+  ntNetwork.on('selectNode', p => ntShowNode(p.nodes[0]));
+  ntNetwork.on('selectEdge', p => {
+    if (ntNetwork.getSelectedNodes().length) return;
+    const edge = visEdges.find(e => e.id === p.edges[0]);
+    if (edge) ntShowEdge(edge);
+  });
+  ntNetwork.on('deselectNode', ntClearDetail);
+  ntNetwork.on('deselectEdge', () => { if (!ntNetwork.getSelectedNodes().length) ntClearDetail(); });
+}
+
+function ntShowNode(id){
+  const det = document.getElementById('nt-detail');
+  det.classList.remove('empty');
+  if (id.startsWith('s:')) {
+    const subnet = id.slice(2);
+    const members = (ntData.nodes || []).filter(n => n.subnet === subnet);
+    const bytes = members.reduce((a, n) => a + n.bytes, 0);
+    det.innerHTML = `<h3>${ntEsc(subnet)}</h3>
+      <div class="nt-detail-meta"><b>${members.length}</b> host${members.length === 1 ? '' : 's'} · <b>${ntEsc(ntFmtBytes(bytes))}</b> observed</div>
+      <button class="btn btn-secondary nt-mt" data-click-action="ntDrill" data-args='["${ntEsc(subnet)}"]'>Drill into subnet</button>`;
+    return;
+  }
+  const ip = id.slice(2);
+  const n = (ntData.nodes || []).find(x => x.ip === ip);
+  if (!n) return;
+  const rows = [
+    `<b>${ntEsc(ntFmtBytes(n.bytes))}</b> · <b>${n.sessions}</b> sessions`,
+    n.subnet ? `Subnet: <b>${ntEsc(n.subnet)}</b> · ${n.private ? 'internal (RFC-1918)' : 'external'}` : null,
+    n.asset ? `Asset: <b>${ntEsc(n.asset.hostname)}</b> · criticality <b>${ntEsc(n.asset.criticality)}</b> · ${ntEsc(n.asset.environment)}` : 'Not in CMDB',
+    n.threat ? `Threat: <b>${ntEsc(n.threat.level)}</b>${n.threat.is_ioc ? ' · IOC' : ''} · linked to <b>${n.threat.case_count}</b> case(s)` : 'No observable-ledger hits',
+  ].filter(Boolean).map(r => `<div>${r}</div>`).join('');
+  let links = `<a class="nt-link" href="/observables?search=${encodeURIComponent(ip)}">Observables →</a>`;
+  if (n.asset) links += ` <a class="nt-link" href="/network-map?search=${encodeURIComponent(ip)}">Network Map →</a>`;
+  det.innerHTML = `<h3>${ntEsc(ip)}</h3><div class="nt-detail-meta">${rows}</div>${links}`;
+}
+
+function ntShowEdge(edge){
+  const det = document.getElementById('nt-detail');
+  det.classList.remove('empty');
+  const agg = edge._agg;
+  const s = agg.sample;
+  const rows = [
+    `<b>${ntEsc(ntFmtBytes(agg.bytes))}</b> · <b>${agg.sessions}</b> sessions`,
+    s.protocol ? `Dominant: <b>${ntEsc(s.protocol)}${s.port != null ? ':' + s.port : ''}</b>` : 'Protocol detail needs the session sample',
+    s.throughput_bps != null ? `Busiest pair throughput: <b>${ntEsc(ntFmtRate(s.throughput_bps))}</b>` : null,
+    s.packets ? `<b>${s.packets}</b> packets (sampled)` : null,
+  ].filter(Boolean).map(r => `<div>${r}</div>`).join('');
+  let link = '';
+  if (s.arkime_url && /^https?:\/\//.test(s.arkime_url)) {
+    link = `<a class="nt-link" href="${ntEsc(s.arkime_url)}" target="_blank" rel="noopener noreferrer">Open in Arkime →</a>`;
+  }
+  det.innerHTML = `<h3>${ntEsc(agg.from.slice(2))} → ${ntEsc(agg.to.slice(2))}</h3><div class="nt-detail-meta">${rows}</div>${link}`;
+}
+
+function ntDrill(subnet){
+  ntExpanded.add(subnet);
+  ntRender();
+}
+
+function ntClearDetail(){
+  const det = document.getElementById('nt-detail');
+  det.classList.add('empty');
+  det.textContent = 'Select a node or edge for details. Drag to pan, scroll to zoom.';
+}
+
+function ntRenderMetrics(){
+  const m = (ntData && ntData.metrics) || {};
+  document.getElementById('nt-metrics').innerHTML = `
+    <span>Active conversations: <strong>${m.active_conversations || 0}</strong></span>
+    <span>Hosts observed: <strong>${m.hosts || 0}</strong></span>
+    <span>Edge weights: <strong>${ntEsc(m.method === 'connections' ? 'whole-window (connections API)' : 'top-volume sample')}</strong></span>
+  `;
+  const ports = m.port_distribution || [];
+  const el = document.getElementById('nt-ports');
+  if (!ports.length) { el.textContent = 'No port data in this window.'; return; }
+  const max = ports[0].bytes || 1;
+  el.innerHTML = ports.map(p => `
+    <div class="nt-port-row">
+      <span class="nt-port-name">${Number(p.port)}</span>
+      <span class="nt-port-bar" data-ion-style="width:${Math.max(2, Math.round(p.bytes / max * 140))}px"></span>
+      <span class="nt-port-val">${ntEsc(ntFmtBytes(p.bytes))}</span>
+    </div>`).join('');
+}
+
+function ntRenderUnavailable(){
+  const rows = (ntData && ntData.unavailable) || [];
+  document.getElementById('nt-unavailable').innerHTML = rows.map(u => `
+    <div class="nt-unavail-row">
+      <span class="nt-unavail-name">${ntEsc(u.metric)}<span class="nt-tag">unavailable</span></span>
+      <span class="nt-unavail-req">${ntEsc(u.requires)}</span>
+    </div>`).join('');
+}
+
+document.getElementById('nt-group').addEventListener('change', () => { if (ntData) ntRender(); });
+document.getElementById('nt-ext').addEventListener('change', ntLoad);
+document.addEventListener('DOMContentLoaded', ntLoad);
+</script>
+{% endblock %}

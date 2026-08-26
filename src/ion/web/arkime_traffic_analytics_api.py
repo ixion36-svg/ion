@@ -7,6 +7,7 @@ Endpoints under /api/arkime/traffic:
   GET /top-countries   — top source/dest countries by total bytes (GeoIP)
   GET /per-node        — traffic volume broken down per Arkime capture node
   GET /retention       — per-node PCAP retention horizon (oldest capture)
+  GET /topology        — host conversation graph + asset/threat join (NSE view)
   GET /rtmon-summary   — Real-Time Monitor detections (per-detector/severity/day)
 
 All are read-only and require alert:read permission (same level as
@@ -298,6 +299,53 @@ async def traffic_retention(
     }
     _retention_cache["ts"] = now
     _retention_cache["data"] = data
+    return data
+
+
+_topology_cache: Dict[Any, Dict[str, Any]] = {}
+_TOPOLOGY_TTL_S = 60.0
+
+
+@router.get("/topology")
+async def traffic_topology(
+    range: str = "24h",
+    exclude_private: bool = False,
+    user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+) -> Dict[str, Any]:
+    """Host-level conversation graph for the Network Topology (NSE) view.
+
+    ``exclude_private`` drops RFC-1918↔RFC-1918 pairs — default OFF here
+    (unlike top-talkers): internal east-west structure is the point of a
+    topology map. The shared exclusion list still applies. Cached per worker
+    for 60s per (range, exclude_private) — the graph is a multi-call Arkime
+    compute plus two DB joins, and it backs an interactive page.
+    """
+    if range not in _RANGES:
+        raise HTTPException(status_code=400, detail=f"Invalid range '{range}'. Use: 24h, 7d, 30d")
+    svc = get_arkime_service()
+    if not svc.is_configured:
+        raise HTTPException(status_code=503, detail="Arkime is not configured")
+    now = time.time()
+    cached = _topology_cache.get((range, exclude_private))
+    if cached and now - cached["ts"] < _TOPOLOGY_TTL_S:
+        return cached["data"]
+    start_ts, stop_ts = _range_to_epoch(range)
+    expr = _exclusion_expression(session)
+    if exclude_private:
+        no_pp = (
+            f"!(ip.src == {svc._RFC1918_EXPR} && ip.dst == {svc._RFC1918_EXPR})"
+        )
+        expr = f"({expr}) && {no_pp}" if expr else no_pp
+    try:
+        from ion.services.topology_metrics_service import build_topology
+        data = await build_topology(session, start_ts, stop_ts, expression=expr)
+    except ArkimeError as exc:
+        logger.warning("Arkime topology error: %s", exc)
+        raise HTTPException(status_code=502, detail=safe_error(exc))
+    data["range"] = range
+    data["computed_at"] = int(now)
+    _topology_cache[(range, exclude_private)] = {"ts": now, "data": data}
     return data
 
 

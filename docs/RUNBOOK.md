@@ -83,7 +83,7 @@ The alert-to-PCAP workflow uses `ArkimeService.download_pcap_by_community_id(nod
 
 Arkime service-user permissions by feature:
 
-- **Read-only** covers PCAP pull, traffic analytics, RTMON, and the retention-awareness loop.
+- **Read-only** covers PCAP pull, traffic analytics, the Flow Topology view (`/network-topology` — uses `/api/connections` with a session-sample fallback on builds without it), RTMON, and the retention-awareness loop.
 - **Packet hunts** (`/arkime-traffic` Hunts panel) additionally need the `packetSearch` permission on the Arkime user; submitting from ION is lead-gated (`security:read`) and audit-logged.
 - **Tag write-back** (`ION_ARKIME_TAG_WRITEBACK=true`, default off) tags case sessions `ion-<case-number>` and needs a write-enabled Arkime user.
 - **WISE feed**: set `ION_WISE_TOKEN` and point a WISE `json` source at `/api/wise/ion-iocs` so ION IOCs tag sessions at capture time — `wise.ini` snippet in `src/ion/web/wise_api.py`.

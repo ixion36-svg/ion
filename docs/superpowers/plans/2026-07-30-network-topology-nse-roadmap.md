@@ -1,6 +1,6 @@
 # Network Topology (NSE view) — Roadmap
 
-**Status:** Forks decided (2026-07-30) — build queued after the Attack Path roadmap + v0.63.1 security release. A=Arkime+ES (SNMP deferred) · B=subnet /24 + host drill-down · C=label gaps as unavailable · D=vis-network (all recommended).
+**Status:** Phases 0+1 SHIPPED in v0.88.0 (2026-08-26) — `/network-topology` Flow Topology page, `topology_metrics_service`, `/api/arkime/traffic/topology`. Phase 0 deviation: edge weights come primarily from Arkime's `/api/connections` (whole-window, server-side) with the pair-keyed session sample as fallback + per-edge protocol/port/throughput enrichment. Phase 2 (health/anomaly overlays, time-scrub) still open. Forks as decided 2026-07-30: A=Arkime+ES (SNMP deferred) · B=subnet /24 + host drill-down · C=label gaps as unavailable · D=vis-network.
 **Date:** 2026-07-30
 **Type:** Feature on shared rails (Arkime/ES) — lands in the Topology/Network nav
 **Owning principle:** *Show the NSE real flow metrics from data we already ingest; label what we can't source, don't fake it.*
