@@ -1,13 +1,37 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.86.0 -->
-<!-- ion-doc:version=0.86.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.87.0 -->
+<!-- ion-doc:version=0.87.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-08-26 -->
 
 # Changelog
+
+## v0.87.0 — 2026-08-26
+
+**DE Workbench + analyst tuning requests.** The detection team gets a
+dedicated working surface, and any analyst can hand them a tracked ask.
+
+- **Tuning requests.** "Request tuning" in the shared alert detail (alerts
+  queue AND case overlay) captures reason + description, auto-attaches the
+  alert and the rule's FP-closure counts (7d/30d), and files a
+  `tuning_requests` row — any analyst (`alert:read`) can raise one. Status
+  flow open → triaged → linked → closed; queue actions are `de:propose` and
+  audit-logged.
+- **GitLab mirroring (best-effort, never blocking).** When the GitLab
+  integration is configured, each request opens an issue (labels
+  `ion, tuning-request, <reason>`, evidence + analyst text in the
+  description); triage/link post comments, closing comments and closes the
+  issue. GitLab being down or unconfigured leaves the DB row authoritative
+  with an empty ticket link.
+- **DE Workbench (`/de`, Engineering nav).** KPI row (open requests,
+  addressable hours, proposals in flight, quirks due) + the tuning-request
+  queue with inline Triage / Draft proposal / Close, top noise campaigns,
+  proposals board, and quirks-due — deep-linking into the existing DE pages
+  and TIDE. "Draft proposal" reuses the deterministic DE Metrics flow and
+  links the new proposal back to the request.
 
 ## v0.86.0 — 2026-08-26
 

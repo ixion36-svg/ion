@@ -1,7 +1,7 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.86.0 -->
+<!-- ion-doc:version=0.87.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
@@ -9,8 +9,8 @@
 
 # ION Security Assessment Report
 
-**Assessment Date:** 2026-08-26 (current: v0.86.0). Per-version deltas and history: see CHANGELOG + git history.
-**Application Version:** 0.86.0 — **Net-new surfaces (Arkime depth release):** (1) `POST/GET /api/arkime/hunts[/{id}]` — packet-search submission into raw Arkime capture; lead-gated (`security:read`), audit-logged, job state in the new `arkime_hunts` table; the Arkime service user additionally needs `packetSearch`. (2) `GET /api/wise/ion-iocs` — machine endpoint enumerating ION's IOC set for Arkime WISE; static bearer token (`ION_WISE_TOKEN`, `hmac.compare_digest`, header-only), returns 404 while the token is unset (feature off by default). (3) `GET /api/cases/{id}/arkime/pcap` — `case:read`-gated streaming pass-through of Arkime's multi-session PCAP export (nothing stored server-side). (4) `ION_ARKIME_TAG_WRITEBACK` (default **off**) — ION's first write into Arkime: tags case sessions `ion-<case-number>`, best-effort, audit-logged, needs a write-enabled viewer user. (5) A new read-only background loop (retention awareness, advisory lock 1030) that posts case notes and re-enqueues PCAP analysis. **Surface reduction:** the Arkime connector's advertised Keycloak/API-key auth options (dead since the service went Basic-only) were removed from config, admin API, and Settings. Pre-commit security review (P1–P20 walk) drove shared quote-escaping for all communityId-into-expression interpolation, a Community-ID charset gate on note-recovered flow ids, and JA4-charset validation of the env blocklist. Prior version: 0.85.0 — net-new surface: none. Prior per-version net-new-surface notes: see CHANGELOG + git history.
+**Assessment Date:** 2026-08-26 (current: v0.87.0). Per-version deltas and history: see CHANGELOG + git history.
+**Application Version:** 0.87.0 — **Net-new surfaces (DE Workbench release):** (1) `/api/de/tuning-requests` family — create is deliberately `alert:read` (any analyst may raise a request; it writes only ION's own `tuning_requests` row), queue actions (triage/link-proposal/close) are `de:propose`, listing `de:read`; every transition audit-logged. (2) New page `/de` (DE Workbench), `de:read`, read-composition of existing DE endpoints. (3) New OUTBOUND writes to GitLab via the existing integration: issue create/comment/close mirroring a request's lifecycle — best-effort (failure never blocks the analyst flow), no ION data beyond the request's own fields and rule-level FP counts leaves; nothing is read back. No new dependency, no new auth mode, no new table beyond `tuning_requests`. Prior version: 0.86.0 — net-new: Arkime hunts (lead-gated), WISE IOC feed (token-gated, off by default), streaming case-PCAP export, default-off tag write-back; plus the Keycloak/API-key auth-surface removal. Prior per-version net-new-surface notes: see CHANGELOG + git history.
 **Previous Assessment Version:** 0.33.0 (2026-05-27)
 **Scope:** Web application security review â€” authenticated internal-user threat model, prompt-injection from adversary-controlled alert content, privilege escalation, data exfiltration, pivot to backend systems (Elastic, Kibana, TIDE, OpenCTI, Arkime, Keycloak).
 **Previous Assessment:** 2026-04-07 (v0.9.43)
@@ -24,7 +24,7 @@ ION maintains strong security fundamentals: bcrypt password hashing, SQLAlchemy 
 
 **Current findings posture (v0.54.1): no open findings at any severity.** ION has held **0 Critical / 0 High** across every release since the v0.9.43 baseline. The Medium (peak 3) and Low (peak 6) findings carried through the v0.2x-v0.33.x line were all closed by **v0.34.0** and have stayed at zero since. Per-release net-new findings are recorded in each `## vX.Y.Z` entry in `CHANGELOG.md`; the full per-version trend is preserved in this file's git history.
 
-| Severity | Open findings (v0.86.0) |
+| Severity | Open findings (v0.87.0) |
 |----------|:-----------------------:|
 | Critical | 0 |
 | High | 0 |
