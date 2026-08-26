@@ -1,13 +1,66 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.85.0 -->
-<!-- ion-doc:version=0.85.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.86.0 -->
+<!-- ion-doc:version=0.86.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-08-24 -->
+<!-- ion-doc:date=2026-08-26 -->
 
 # Changelog
+
+## v0.86.0 — 2026-08-26
+
+**Arkime depth: ION stops using Arkime as a dumb PCAP tap.** True server-side
+aggregations, indexed-metadata reads, retention-aware analysis rescue,
+executable packet hunts, a WISE intel feed, and a bidirectional pivot.
+
+- **Traffic analytics accuracy.** Top talkers, protocol mix, and per-node
+  volume now aggregate server-side via `/api/spigraph` over every session in
+  the window (the old capped session sample remains as automatic fallback and
+  the UI labels which method produced the numbers).
+- **Indexed SPI depth.** Session lookups request `tls.ja3/ja4`, `http.uri`,
+  `http.useragent` (with a one-shot degrade to the base field list on builds
+  that reject them); JA4/JA3/UA/URI surface in the alert Arkime workspace and
+  auto-analysis notes. RTMON gained a known-bad-JA4 detector fed by
+  `ION_ARKIME_RTMON_JA4_BLOCKLIST` (`ja4=label` pairs; no-op while empty).
+- **PCAP-retention awareness.** A new leader-elected loop computes per-node
+  retention horizons and, for open Arkime-linked cases whose capture window is
+  closing, re-enqueues missing/failed analysis (flows recovered from RTMON
+  markers or failed-analysis notes) or posts a warning note — once per case,
+  Kibana-synced. ION still never stores raw PCAP. Horizons show on
+  `/arkime-traffic` and `GET /api/arkime/traffic/retention`.
+- **Packet hunts.** `POST/GET /api/arkime/hunts` submits and tracks Arkime
+  packet-search jobs (lead-gated `security:read`, audit-logged, persisted in
+  the new `arkime_hunts` table; the Arkime user needs `packetSearch`). Hunts
+  panel on the traffic page; case-linked hunts post a completion note with an
+  open-in-Arkime link for the matched sessions.
+- **WISE intel feed.** `GET /api/wise/ion-iocs` serves ION's IOC set
+  (ip/domain/md5/sha256) in WISE json-source form so Arkime tags matching
+  sessions at capture time. Machine endpoint: static bearer token
+  (`ION_WISE_TOKEN`), header-only, 404 while unset.
+- **Bidirectional pivot.** Optional session tag write-back `ion-<case-number>`
+  (`ION_ARKIME_TAG_WRITEBACK`, default off, audit-logged — ION's first write
+  into Arkime); "Open in Arkime" deep links via `ION_ARKIME_PUBLIC_URL`;
+  streaming merged-PCAP download per case (`GET /api/cases/{id}/arkime/pcap`,
+  pure pass-through).
+- **Arkime auth hygiene.** The connector/config/Settings surface now matches
+  the Basic-only service: dead Keycloak/API-key fields removed everywhere
+  (the Integrations card raised `AttributeError` when configured), docs and
+  `.env.template` corrected.
+- **Alert geo fixed for Arkime alerts.** `_parse_alert` reads
+  `{side}.geo.country_iso_code` (converted via a bundled full ISO-3166 map)
+  and the AS organization from `{side}.as.full` / ECS `as.organization.name`;
+  shown as Src/Dst Geo · Org in the shared alert detail.
+- **Observables page fixed.** The search box was dead (its handler was a
+  top-level `const`, invisible to the CSP event-delegation dispatcher) and
+  filters kept a stale pagination offset (empty results when filtering past
+  page 1). Both fixed.
+- **Hardening (pre-commit security review).** Shared quote-escaping for every
+  communityId interpolated into an Arkime expression, Community-ID charset
+  gate on note-recovered ids, JA4 charset validation on the env blocklist.
+  Fourth `sync_note_to_kibana` offender fixed (Arkime commit endpoint's
+  analysis note).
 
 ## v0.85.0 — 2026-08-25
 
