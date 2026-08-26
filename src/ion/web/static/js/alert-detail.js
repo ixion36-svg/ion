@@ -964,6 +964,21 @@
 
     html += _advisoriesHtml(alert);
 
+    // Geo + AS-org context (Arkime/ECS network alerts) — omitted when the
+    // parser found none, so host-centric alerts keep the compact grid.
+    const gd = alert.geo_data || {};
+    const srcGeoBits = [gd.source_country, gd.source_as_org].filter(Boolean).join(' · ');
+    const dstGeoBits = [gd.destination_country, gd.destination_as_org].filter(Boolean).join(' · ');
+    let geoItems = '';
+    if (srcGeoBits) geoItems += `<div class="alert-meta-item">
+            <div class="alert-meta-label">Src Geo / Org</div>
+            <div class="alert-meta-value">${escapeHtml(srcGeoBits)}</div>
+        </div>`;
+    if (dstGeoBits) geoItems += `<div class="alert-meta-item">
+            <div class="alert-meta-label">Dst Geo / Org</div>
+            <div class="alert-meta-value">${escapeHtml(dstGeoBits)}</div>
+        </div>`;
+
     // Metadata grid
     html += `<div class="alert-meta-grid">
         <div class="alert-meta-item">
@@ -1000,6 +1015,7 @@
                 alert.timestamp ? new Date(alert.timestamp).toLocaleString() : '-'
             }</div>
         </div>
+        ${geoItems}
     </div>`;
 
     // Message — wrap so the v0.17.0 Translate button can replace its body in place.

@@ -1,11 +1,12 @@
 """Arkime Traffic Analytics API — volume histograms + protocol mix + top talkers + geo.
 
-Five endpoints under /api/arkime/traffic:
+Endpoints under /api/arkime/traffic:
   GET /status          — is Arkime configured?
   GET /overview        — time-bucketed ingress/egress bytes + protocol mix
   GET /top-talkers     — top source/dest IPs by total bytes
   GET /top-countries   — top source/dest countries by total bytes (GeoIP)
   GET /per-node        — traffic volume broken down per Arkime capture node
+  GET /retention       — per-node PCAP retention horizon (oldest capture)
   GET /rtmon-summary   — Real-Time Monitor detections (per-detector/severity/day)
 
 All are read-only and require alert:read permission (same level as
@@ -259,6 +260,45 @@ def _rtmon_detector(marker: Optional[str]) -> str:
     if len(parts) >= 2 and parts[0] == "rtmon" and parts[1]:
         return parts[1]
     return "other"
+
+
+_retention_cache: Dict[str, Any] = {"ts": 0.0, "data": None}
+_RETENTION_TTL_S = 60.0
+
+
+@router.get("/retention")
+async def traffic_retention(
+    user: User = Depends(require_permission("alert:read")),
+) -> Dict[str, Any]:
+    """Per-node PCAP retention horizon (oldest available capture, epoch s).
+
+    Cached per worker for 60s — the horizon moves at disk-rotation speed, and
+    computing it costs one query per node. ``"*"`` is the cluster-wide oldest.
+    """
+    svc = get_arkime_service()
+    if not svc.is_configured:
+        raise HTTPException(status_code=503, detail="Arkime is not configured")
+    now = time.time()
+    if (
+        _retention_cache["data"] is not None
+        and now - _retention_cache["ts"] < _RETENTION_TTL_S
+    ):
+        return _retention_cache["data"]
+    try:
+        horizons = await svc.get_retention_horizons()
+    except ArkimeError as exc:
+        logger.warning("Arkime retention-horizon error: %s", exc)
+        raise HTTPException(status_code=502, detail=safe_error(exc))
+    from ion.services.arkime_service import arkime_public_url
+    data = {
+        "horizons": horizons,
+        "computed_at": int(now),
+        # Analyst-browser viewer base for deep links (hunts panel).
+        "web_url": arkime_public_url(),
+    }
+    _retention_cache["ts"] = now
+    _retention_cache["data"] = data
+    return data
 
 
 @router.get("/rtmon-summary")

@@ -67,18 +67,12 @@ class Config:
     opencti_token: str = ""  # API bearer token (UUID)
     opencti_verify_ssl: bool = False
 
-    # Arkime integration (v5.x viewer API — fetch raw PCAPs by session id)
+    # Arkime integration (v5.x viewer API — fetch raw PCAPs by session id).
+    # Auth is HTTP Basic ONLY — ArkimeService dropped Keycloak/Digest/API-key.
     arkime_enabled: bool = False
     arkime_url: str = ""  # e.g., https://viewer.guardedglass.internal
-    # Preferred auth: Keycloak OAuth2 client_credentials grant
-    arkime_keycloak_issuer: str = ""  # e.g., https://keycloak.guardedglass.internal/realms/soc
-    arkime_keycloak_client_id: str = ""
-    arkime_keycloak_client_secret: str = ""
-    arkime_keycloak_scope: str = "openid"  # space-separated scopes
-    # Fallback auth for dev / non-SSO setups
-    arkime_username: str = ""  # HTTP basic auth
+    arkime_username: str = ""
     arkime_password: str = ""
-    arkime_api_key: str = ""  # Digest-style token
     arkime_verify_ssl: bool = False
 
     # Elasticsearch integration
@@ -321,13 +315,8 @@ class Config:
             opencti_verify_ssl=data.get("opencti_verify_ssl", False),
             arkime_enabled=data.get("arkime_enabled", False),
             arkime_url=data.get("arkime_url", ""),
-            arkime_keycloak_issuer=data.get("arkime_keycloak_issuer", ""),
-            arkime_keycloak_client_id=data.get("arkime_keycloak_client_id", ""),
-            arkime_keycloak_client_secret=data.get("arkime_keycloak_client_secret", ""),
-            arkime_keycloak_scope=data.get("arkime_keycloak_scope", "openid"),
             arkime_username=data.get("arkime_username", ""),
             arkime_password=data.get("arkime_password", ""),
-            arkime_api_key=data.get("arkime_api_key", ""),
             arkime_verify_ssl=data.get("arkime_verify_ssl", False),
             # Elasticsearch integration
             elasticsearch_enabled=data.get("elasticsearch_enabled", True),
@@ -497,13 +486,8 @@ class Config:
                     "opencti_verify_ssl": self.opencti_verify_ssl,
                     "arkime_enabled": self.arkime_enabled,
                     "arkime_url": self.arkime_url,
-                    "arkime_keycloak_issuer": self.arkime_keycloak_issuer,
-                    "arkime_keycloak_client_id": self.arkime_keycloak_client_id,
-                    "arkime_keycloak_client_secret": self.arkime_keycloak_client_secret,
-                    "arkime_keycloak_scope": self.arkime_keycloak_scope,
                     "arkime_username": self.arkime_username,
                     "arkime_password": self.arkime_password,
-                    "arkime_api_key": self.arkime_api_key,
                     "arkime_verify_ssl": self.arkime_verify_ssl,
                     # Elasticsearch integration
                     "elasticsearch_enabled": self.elasticsearch_enabled,
@@ -734,28 +718,10 @@ def get_config() -> Config:
             _config.arkime_enabled = _get_env_bool("ION_ARKIME_ENABLED", False)
         if os.environ.get("ION_ARKIME_URL"):
             _config.arkime_url = os.environ.get("ION_ARKIME_URL", "").rstrip("/")
-        if os.environ.get("ION_ARKIME_KEYCLOAK_ISSUER"):
-            _config.arkime_keycloak_issuer = os.environ.get(
-                "ION_ARKIME_KEYCLOAK_ISSUER", ""
-            ).rstrip("/")
-        if os.environ.get("ION_ARKIME_KEYCLOAK_CLIENT_ID"):
-            _config.arkime_keycloak_client_id = os.environ.get(
-                "ION_ARKIME_KEYCLOAK_CLIENT_ID", ""
-            )
-        if os.environ.get("ION_ARKIME_KEYCLOAK_CLIENT_SECRET"):
-            _config.arkime_keycloak_client_secret = os.environ.get(
-                "ION_ARKIME_KEYCLOAK_CLIENT_SECRET", ""
-            )
-        if os.environ.get("ION_ARKIME_KEYCLOAK_SCOPE"):
-            _config.arkime_keycloak_scope = os.environ.get(
-                "ION_ARKIME_KEYCLOAK_SCOPE", "openid"
-            )
         if os.environ.get("ION_ARKIME_USERNAME"):
             _config.arkime_username = os.environ.get("ION_ARKIME_USERNAME", "")
         if os.environ.get("ION_ARKIME_PASSWORD"):
             _config.arkime_password = os.environ.get("ION_ARKIME_PASSWORD", "")
-        if os.environ.get("ION_ARKIME_API_KEY"):
-            _config.arkime_api_key = os.environ.get("ION_ARKIME_API_KEY", "")
         if os.environ.get("ION_ARKIME_VERIFY_SSL"):
             _config.arkime_verify_ssl = _get_env_bool("ION_ARKIME_VERIFY_SSL", False)
 
@@ -1116,21 +1082,14 @@ def get_opencti_config() -> dict:
 def get_arkime_config() -> dict:
     """Get Arkime configuration from the global config.
 
-    Returns a dictionary with Arkime viewer connection details. Includes
-    both Keycloak OAuth2 client_credentials settings (preferred) and
-    HTTP basic / API-key fallbacks for dev environments.
+    Returns Arkime viewer connection details. HTTP Basic auth only.
     """
     config = get_config()
     return {
         "enabled": config.arkime_enabled,
         "url": config.arkime_url,
-        "keycloak_issuer": config.arkime_keycloak_issuer,
-        "keycloak_client_id": config.arkime_keycloak_client_id,
-        "keycloak_client_secret": config.arkime_keycloak_client_secret,
-        "keycloak_scope": config.arkime_keycloak_scope,
         "username": config.arkime_username,
         "password": config.arkime_password,
-        "api_key": config.arkime_api_key,
         "verify_ssl": config.arkime_verify_ssl,
     }
 

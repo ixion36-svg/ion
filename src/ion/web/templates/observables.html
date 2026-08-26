@@ -65,7 +65,7 @@
 <!-- Filters -->
 <div class="observables-filters">
     <input type="text" id="search-input" class="search-input" placeholder="Search observables..." data-input-action="debouncedSearch">
-    <select id="type-filter" data-change-action="loadObservables">
+    <select id="type-filter" data-change-action="applyFilters">
         <option value="">All Types</option>
         <option value="ipv4">IPv4</option>
         <option value="ipv6">IPv6</option>
@@ -81,7 +81,7 @@
         <option value="mac">MAC Address</option>
         <option value="cve">CVE</option>
     </select>
-    <select id="threat-filter" data-change-action="loadObservables">
+    <select id="threat-filter" data-change-action="applyFilters">
         <option value="">All Threat Levels</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -90,17 +90,17 @@
         <option value="benign">Benign</option>
         <option value="unknown">Unknown</option>
     </select>
-    <select id="whitelist-filter" data-change-action="loadObservables">
+    <select id="whitelist-filter" data-change-action="applyFilters">
         <option value="">All</option>
         <option value="true">Whitelisted</option>
         <option value="false">Not Whitelisted</option>
     </select>
-    <select id="enriched-filter" data-change-action="loadObservables">
+    <select id="enriched-filter" data-change-action="applyFilters">
         <option value="">All</option>
         <option value="true">Enriched Only</option>
         <option value="false">Not Enriched</option>
     </select>
-    <select id="ignored-filter" data-change-action="loadObservables" title="Analyst-ignored observables are hidden by default">
+    <select id="ignored-filter" data-change-action="applyFilters" title="Analyst-ignored observables are hidden by default">
         <option value="">Hide ignored</option>
         <option value="include">Include ignored</option>
         <option value="only">Only ignored</option>
@@ -1198,7 +1198,17 @@ let pageSize = 50;
 let totalCount = 0;
 let currentObservable = null;
 
-const debouncedSearch = debounce(() => loadObservables(), 300);
+// Filter/search changes restart from page 1 — a stale offset from earlier
+// pagination otherwise queries past the (smaller) filtered result set and
+// renders "No observables found".
+function applyFilters() {
+    currentPage = 1;
+    loadObservables();
+}
+// window-assigned: a top-level const never lands on window, and the
+// data-*-action dispatcher resolves handler names via window[name] — the
+// search box was silently dead as a const.
+window.debouncedSearch = debounce(applyFilters, 300);
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {

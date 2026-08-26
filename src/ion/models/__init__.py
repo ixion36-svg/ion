@@ -34,6 +34,7 @@ from ion.models.analytics import (
     AnalyticsJobType,
     AnalyticsSnapshot,
 )
+from ion.models.arkime_hunt import ArkimeHunt  # noqa: F401
 from ion.models.base import Base
 
 # Bob Prompt Evaluation Harness — per-template P/R/F1 runs.

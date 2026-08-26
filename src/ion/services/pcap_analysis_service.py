@@ -188,6 +188,52 @@ def _session_table(sessions: List[Dict[str, Any]]) -> str:
     return "\n".join(rows)
 
 
+def _indexed_meta_lines(sessions: List[Dict[str, Any]]) -> List[str]:
+    """Arkime-indexed depth metadata (JA4/JA3 fingerprints, HTTP user-agents /
+    URIs) across the matched sessions, deduped. Empty when the deployment's
+    field list doesn't carry them — the block is simply omitted."""
+    def _vals(s: Dict[str, Any], flat_key: str, parent: str, child: str) -> List[str]:
+        v = s.get(flat_key)
+        if v is None:
+            obj = s.get(parent)
+            if isinstance(obj, dict):
+                v = obj.get(child)
+        if isinstance(v, str):
+            v = [v]
+        return [str(x).strip() for x in (v or []) if x]
+
+    ja4: List[str] = []
+    ja3: List[str] = []
+    agents: List[str] = []
+    uris: List[str] = []
+    for s in sessions[:10]:
+        for x in _vals(s, "tls.ja4", "tls", "ja4"):
+            if x not in ja4:
+                ja4.append(x)
+        for x in _vals(s, "tls.ja3", "tls", "ja3"):
+            if x not in ja3:
+                ja3.append(x)
+        for x in _vals(s, "http.useragent", "http", "useragent"):
+            if x not in agents:
+                agents.append(x)
+        for x in _vals(s, "http.uri", "http", "uri"):
+            if x not in uris:
+                uris.append(x)
+    if not (ja4 or ja3 or agents or uris):
+        return []
+    lines = ["**Arkime-indexed metadata:**"]
+    if ja4:
+        lines.append("- JA4: " + ", ".join(f"`{x}`" for x in ja4[:5]))
+    if ja3:
+        lines.append("- JA3: " + ", ".join(f"`{x}`" for x in ja3[:5]))
+    if agents:
+        lines.append("- User-Agent: " + ", ".join(f"`{x[:80]}`" for x in agents[:3]))
+    if uris:
+        lines.append("- URI: " + ", ".join(f"`{x[:100]}`" for x in uris[:3]))
+    lines.append("")
+    return lines
+
+
 def _top_list(items: List[Dict[str, Any]], key: str, value_key: str = "count", limit: int = 5) -> str:
     """Render a top-N list as markdown bullets."""
     if not items:
@@ -238,6 +284,7 @@ def _render_pcap_markdown(
     parts.append("**Arkime sessions matched:**")
     parts.append(_session_table(sessions))
     parts.append("")
+    parts.extend(_indexed_meta_lines(sessions))
 
     if pcap_error:
         parts.append(f"_PCAP download failed:_ `{pcap_error}`")

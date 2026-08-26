@@ -259,6 +259,9 @@ def _create_case_for_alert(session, alert, bob_id: int, enqueue_fn) -> None:
         }],
     )
 
+    from ion.services.arkime_service import spawn_case_tag_writeback
+    spawn_case_tag_writeback(case.case_number, [alert.network_community_id])
+
 
 async def _loop(engine: Engine) -> None:
     global _running

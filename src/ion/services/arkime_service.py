@@ -88,6 +88,14 @@ class ArkimeError(Exception):
         self.status_code = status_code
 
 
+def escape_arkime_quoted(value: Any) -> str:
+    """Escape a value for interpolation inside a double-quoted Arkime
+    expression term. communityIds and node names originate from ES documents
+    and (worse) from case-note content — a quote must not break out of the
+    term. Same escaping the horizon query applies to node names."""
+    return str(value).replace("\\", "\\\\").replace('"', '\\"')
+
+
 class ArkimeService:
     """Thin async client for the Arkime viewer API.
 
@@ -207,6 +215,38 @@ class ArkimeService:
         "id,node,firstPacket,lastPacket,srcIp,dstIp,srcPort,dstPort,"
         "ipProtocol,protocol,packets,bytes,communityId"
     )
+    # Indexed depth fields (Arkime 5.x): TLS fingerprints + HTTP metadata the
+    # viewer already parsed — reading them is free vs re-deriving from PCAP.
+    # Requested separately because some builds 400 the WHOLE query when an
+    # unknown name appears in fields= (same trap as country.* in fields=);
+    # _fields_param degrades to the base list once a 400 is seen.
+    _DEPTH_FIELDS = "tls.ja3,tls.ja4,http.uri,http.useragent"
+
+    # None = untested, True = extended fields accepted, False = a 400 was seen
+    # and all further requests stick to base fields for this service instance.
+    _depth_fields_ok: Optional[bool] = None
+
+    def _fields_param(self, base: str) -> str:
+        """Base field list plus the depth fields, unless a prior 400 proved
+        this Arkime build rejects them."""
+        if self._depth_fields_ok is False:
+            return base
+        return f"{base},{self._DEPTH_FIELDS}"
+
+    def _note_fields_rejected(self, status_code: int, params: Dict[str, str], base: str) -> bool:
+        """After a 400 on a request that carried depth fields, latch the
+        degrade and tell the caller to retry with base fields."""
+        if (
+            status_code == 400
+            and self._depth_fields_ok is not False
+            and params.get("fields", "") != base
+        ):
+            self._depth_fields_ok = False
+            logger.info(
+                "Arkime rejected extended SPI fields (HTTP 400) — degrading to base field list"
+            )
+            return True
+        return False
 
     async def find_sessions_by_community_id(
         self,
@@ -229,11 +269,11 @@ class ArkimeService:
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
-        expression = f'communityId == "{community_id}"'
+        expression = f'communityId == "{escape_arkime_quoted(community_id)}"'
         params = {
             "expression": expression,
             "length": str(limit),
-            "fields": self._SESSION_FIELDS,
+            "fields": self._fields_param(self._SESSION_FIELDS),
         }
         logger.info(
             "Arkime community_id search: expression=%r (alert node hint=%r)",
@@ -247,6 +287,13 @@ class ArkimeService:
                     headers=headers,
                     params=params,
                 )
+                if self._note_fields_rejected(resp.status_code, params, self._SESSION_FIELDS):
+                    params["fields"] = self._SESSION_FIELDS
+                    resp = await client.get(
+                        f"{self.url}/api/sessions",
+                        headers=headers,
+                        params=params,
+                    )
             if resp.status_code != 200:
                 body_preview = (resp.text or "")[:200]
                 logger.warning(
@@ -344,7 +391,7 @@ class ArkimeService:
             "length": str(limit),
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
-            "fields": self._SESSION_FIELDS,
+            "fields": self._fields_param(self._SESSION_FIELDS),
         }
         logger.info(
             "Arkime IP search: expression=%r window=±%dmin anchor=%s limit=%d",
@@ -358,6 +405,13 @@ class ArkimeService:
                     headers=headers,
                     params=params,
                 )
+                if self._note_fields_rejected(resp.status_code, params, self._SESSION_FIELDS):
+                    params["fields"] = self._SESSION_FIELDS
+                    resp = await client.get(
+                        f"{self.url}/api/sessions",
+                        headers=headers,
+                        params=params,
+                    )
             if resp.status_code != 200:
                 body_preview = (resp.text or "")[:200]
                 logger.warning(
@@ -578,11 +632,31 @@ class ArkimeService:
             graph = payload.get("graph") or {}
             # Protocol mix: the facets `graph.protocols` key is absent on many
             # Arkime builds (it moved / was never populated for this deployment),
-            # which left the doughnut empty. Fall back to a session-sample
-            # aggregation, which is version-independent.
+            # which left the doughnut empty. Next-best is a server-side spigraph
+            # bucket aggregation (whole window, unbiased); the session-sample
+            # count is the last resort.
             protocols = graph.get("protocols") or graph.get("protocolCnt") or {}
+            protocols_method = "facets"
+            if not protocols:
+                try:
+                    buckets = await self._spigraph_buckets(
+                        "protocols", start_ts, stop_ts, expression
+                    )
+                    protocols = {
+                        str(name).strip().lower(): stats["sessions"]
+                        for name, stats in buckets.items()
+                        if str(name).strip() and stats.get("sessions")
+                    }
+                    protocols_method = "spigraph"
+                except (ArkimeError, httpx.HTTPError) as exc:
+                    logger.debug(
+                        "Arkime spigraph protocol aggregation failed (%s) — falling back to sampling",
+                        exc,
+                    )
+                    protocols = {}
             if not protocols:
                 protocols = await self._sample_protocol_mix(start_ts, stop_ts, expression)
+                protocols_method = "sample"
 
             def _first(d, *keys):
                 for k in keys:
@@ -606,6 +680,7 @@ class ArkimeService:
                 "src_histo": _first(graph, "srcDataHisto", "source.bytesHisto", "srcBytesHisto") or [],
                 "dst_histo": _first(graph, "dstDataHisto", "destination.bytesHisto", "dstBytesHisto") or [],
                 "protocols": protocols,
+                "protocols_method": protocols_method,
                 "total_sessions": (
                     payload.get("recordsFiltered")
                     or payload.get("recordsTotal")
@@ -655,13 +730,14 @@ class ArkimeService:
             return []
         now = int(_time.time())
         start = now - max(1, window_minutes) * 60
+        base_fields = fields or self._RTMON_FIELDS
         params = {
             "length": str(max(1, min(limit, 1000))),
             "startTime": str(start),
             "stopTime": str(now),
             "order": order,
             "expression": expr,
-            "fields": fields or self._RTMON_FIELDS,
+            "fields": base_fields if fields else self._fields_param(self._RTMON_FIELDS),
         }
         headers = await self._headers()
         try:
@@ -669,6 +745,11 @@ class ArkimeService:
                 resp = await client.get(
                     f"{self.url}/api/sessions", headers=headers, params=params
                 )
+                if self._note_fields_rejected(resp.status_code, params, base_fields):
+                    params["fields"] = base_fields
+                    resp = await client.get(
+                        f"{self.url}/api/sessions", headers=headers, params=params
+                    )
             if resp.status_code != 200:
                 raise ArkimeError(
                     f"Arkime realtime-monitor query failed: HTTP {resp.status_code}",
@@ -803,6 +884,11 @@ class ArkimeService:
             return out
         return out
 
+    # Expression-side twin of _is_private_ip — keep the two range lists in sync
+    # or the spigraph and sampled top-talker paths disagree on what "internal
+    # east-west" means.
+    _RFC1918_EXPR = "[10.0.0.0/8,172.16.0.0/12,192.168.0.0/16]"
+
     async def get_top_talkers(
         self,
         start_ts: int,
@@ -811,21 +897,75 @@ class ArkimeService:
         exclude_private_to_private: bool = True,
         expression: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetch top sessions by total bytes for the given time window.
+        """Top talkers by byte volume for the given time window.
+
+        Primary path is server-side ``/api/spigraph`` bucket aggregation over
+        every session in the window; falls back to the legacy top-N-by-bytes
+        session sample when spigraph is unavailable. ``method`` in the result
+        says which path produced the numbers ("spigraph" | "sample").
 
         When exclude_private_to_private=True (default), sessions where both
-        source and destination are RFC-1918 addresses are dropped before ranking
-        — this removes internal east-west chatter that floods the top-talker
-        list and obscures external flows of interest.
+        source and destination are RFC-1918 addresses are dropped — this
+        removes internal east-west chatter that floods the top-talker list and
+        obscures external flows of interest. On the spigraph path the drop
+        happens in the Arkime expression itself.
 
         Returns:
             {
                 "by_src": [{"ip": "1.2.3.4", "bytes": N, "sessions": N}, ...],
                 "by_dst": [{"ip": "1.2.3.4", "bytes": N, "sessions": N}, ...],
+                "method": "spigraph" | "sample",
             }
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
+        expr = expression
+        if exclude_private_to_private:
+            no_pp = (
+                f"!(ip.src == {self._RFC1918_EXPR} && ip.dst == {self._RFC1918_EXPR})"
+            )
+            expr = f"({expression}) && {no_pp}" if expression else no_pp
+        try:
+            src_buckets = await self._spigraph_buckets("ip.src", start_ts, stop_ts, expr)
+            dst_buckets = await self._spigraph_buckets("ip.dst", start_ts, stop_ts, expr)
+            if src_buckets or dst_buckets:
+                def _rank_ips(m: Dict[str, Dict[str, int]]) -> List[Dict[str, Any]]:
+                    # Secondary sort on sessions keeps the ranking meaningful on
+                    # builds whose spigraph buckets omit byte sizes (all zero).
+                    return sorted(
+                        [
+                            {"ip": ip, **stats}
+                            for ip, stats in m.items()
+                            if not self._is_noise_ip(ip)
+                        ],
+                        key=lambda x: (x["bytes"], x["sessions"]),
+                        reverse=True,
+                    )[:limit]
+                return {
+                    "by_src": _rank_ips(src_buckets),
+                    "by_dst": _rank_ips(dst_buckets),
+                    "method": "spigraph",
+                }
+            logger.debug("Arkime spigraph returned no talker buckets — falling back to sampling")
+        except (ArkimeError, httpx.HTTPError) as exc:
+            logger.debug("Arkime spigraph talker aggregation failed (%s) — falling back to sampling", exc)
+        out = await self._top_talkers_sampled(
+            start_ts, stop_ts, limit, exclude_private_to_private, expression
+        )
+        out["method"] = "sample"
+        return out
+
+    async def _top_talkers_sampled(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        limit: int = 10,
+        exclude_private_to_private: bool = True,
+        expression: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Legacy fallback: aggregate the top _TALKER_SAMPLE sessions by bytes.
+        Byte-biased and capped — spigraph is preferred; this keeps talkers
+        flowing on builds without a usable /api/spigraph."""
         fetch_len = self._TALKER_SAMPLE if exclude_private_to_private else limit
         params = {
             "length": str(fetch_len),
@@ -933,13 +1073,16 @@ class ArkimeService:
                 return {
                     "by_src": self._rank_countries(src_map, limit),
                     "by_dst": self._rank_countries(dst_map, limit),
+                    "method": "spigraph",
                 }
             # Both empty — spigraph may not be populated on this build; try the
             # sampling method before concluding there's genuinely no geo data.
             logger.debug("Arkime spigraph returned no country buckets — falling back to sampling")
         except (ArkimeError, httpx.HTTPError) as exc:
             logger.debug("Arkime spigraph country aggregation failed (%s) — falling back to sampling", exc)
-        return await self._top_countries_sampled(start_ts, stop_ts, limit, expression)
+        out = await self._top_countries_sampled(start_ts, stop_ts, limit, expression)
+        out["method"] = "sample"
+        return out
 
     async def _spigraph_countries(
         self,
@@ -948,19 +1091,41 @@ class ArkimeService:
         stop_ts: int,
         expression: Optional[str] = None,
     ) -> Dict[str, Dict[str, int]]:
-        """Server-side country buckets for one side via ``/api/spigraph``.
+        """Server-side country buckets for one side — ISO2-normalized keys."""
+        buckets = await self._spigraph_buckets(field, start_ts, stop_ts, expression)
+        out: Dict[str, Dict[str, int]] = {}
+        for name, stats in buckets.items():
+            cc = str(name).strip().upper()
+            if not cc:
+                continue
+            entry = out.setdefault(cc, {"bytes": 0, "sessions": 0})
+            entry["bytes"] += stats.get("bytes", 0)
+            entry["sessions"] += stats.get("sessions", 0)
+        return out
 
-        Returns ``{ISO2: {"bytes": N, "sessions": N}}``. Raises ``ArkimeError``
-        on a non-200 or non-JSON response so the caller can fall back. spigraph
-        buckets carry ``name`` (the field value), ``count`` (session count), and
-        ``size`` (summed byte volume on builds that report it); we read every
-        shape defensively and skip anything unparseable.
+    async def _spigraph_buckets(
+        self,
+        field: str,
+        start_ts: int,
+        stop_ts: int,
+        expression: Optional[str] = None,
+        length: int = 100,
+    ) -> Dict[str, Dict[str, int]]:
+        """Server-side value buckets for any field via ``/api/spigraph``.
+
+        Aggregation runs in the viewer over EVERY session in the window — no
+        sample bias. Returns ``{value: {"bytes": N, "sessions": N}}``. Raises
+        ``ArkimeError`` on a non-200 or non-JSON response so callers can fall
+        back to session sampling. spigraph buckets carry ``name`` (the field
+        value), ``count`` (session count), and ``size`` (summed byte volume on
+        builds that report it); we read every shape defensively and skip
+        anything unparseable.
         """
         params = {
             "field": field,
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
-            "length": "100",  # top-N country buckets
+            "length": str(length),
         }
         if expression:
             params["expression"] = expression
@@ -983,10 +1148,10 @@ class ArkimeService:
         out: Dict[str, Dict[str, int]] = {}
         for item in payload.get("items") or []:
             name = item.get("name")
-            if not name:
-                continue
-            cc = str(name).strip().upper()
-            if not cc:
+            if isinstance(name, (list, tuple)):
+                name = name[0] if name else None
+            key = str(name).strip() if name is not None else ""
+            if not key:
                 continue
             graph = item.get("graph") if isinstance(item.get("graph"), dict) else {}
             try:
@@ -997,7 +1162,7 @@ class ArkimeService:
                 sess = int(item.get("count") or 0)
             except (TypeError, ValueError):
                 sess = 0
-            entry = out.setdefault(cc, {"bytes": 0, "sessions": 0})
+            entry = out.setdefault(key, {"bytes": 0, "sessions": 0})
             entry["bytes"] += b
             entry["sessions"] += sess
         return out
@@ -1080,14 +1245,43 @@ class ArkimeService:
     ) -> Dict[str, Any]:
         """Aggregate traffic volume per Arkime capture node for the time window.
 
+        Primary path is server-side ``/api/spigraph?field=node`` (unbiased,
+        whole-window); falls back to the legacy session sample when spigraph is
+        unavailable. ``method`` says which path produced the numbers.
+
         Returns:
             {
-                "nodes": [{"node": "dc-core-01", "bytes": N, "sessions": N}, ...]
+                "nodes": [{"node": "dc-core-01", "bytes": N, "sessions": N}, ...],
+                "method": "spigraph" | "sample",
             }
             Sorted descending by bytes.
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
+        try:
+            buckets = await self._spigraph_buckets("node", start_ts, stop_ts, expression)
+            if buckets:
+                nodes = sorted(
+                    [{"node": n, **stats} for n, stats in buckets.items()],
+                    key=lambda x: (x["bytes"], x["sessions"]),
+                    reverse=True,
+                )
+                return {"nodes": nodes, "method": "spigraph"}
+            logger.debug("Arkime spigraph returned no node buckets — falling back to sampling")
+        except (ArkimeError, httpx.HTTPError) as exc:
+            logger.debug("Arkime spigraph node aggregation failed (%s) — falling back to sampling", exc)
+        out = await self._per_node_sampled(start_ts, stop_ts, expression)
+        out["method"] = "sample"
+        return out
+
+    async def _per_node_sampled(
+        self,
+        start_ts: int,
+        stop_ts: int,
+        expression: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Legacy fallback: per-node volume from a top-_COUNTRY_SAMPLE session
+        sample. Byte-biased and capped — spigraph is preferred."""
         params = {
             "length": str(self._COUNTRY_SAMPLE),
             "startTime": str(start_ts),
@@ -1136,6 +1330,268 @@ class ArkimeService:
             raise
         except httpx.HTTPError as e:
             raise ArkimeError(f"Arkime per-node error: {type(e).__name__}: {e}") from e
+
+    async def _oldest_session_epoch(
+        self, expression: Optional[str], start_ts: int, stop_ts: int
+    ) -> Optional[int]:
+        """Epoch seconds of the oldest session in the window matching
+        ``expression`` (None = whole capture), or None when nothing matches /
+        the query fails. One length-1 ascending query — cheap on any build."""
+        params = {
+            "length": "1",
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+            "order": "firstPacket:asc",
+            "fields": "node,firstPacket",
+        }
+        if expression:
+            params["expression"] = expression
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(
+                    f"{self.url}/api/sessions", headers=headers, params=params
+                )
+            if resp.status_code != 200 or "json" not in resp.headers.get("content-type", ""):
+                return None
+            data = resp.json().get("data") or []
+            if not data:
+                return None
+            fp = data[0].get("firstPacket")
+            # firstPacket is epoch milliseconds on modern builds; tolerate
+            # second-resolution values from older ones.
+            val = float(fp)
+            return int(val / 1000.0) if val > 10_000_000_000 else int(val)
+        except (httpx.HTTPError, TypeError, ValueError):
+            return None
+
+    async def get_retention_horizons(
+        self, *, lookback_days: int = 60, max_nodes: int = 10
+    ) -> Dict[str, int]:
+        """Oldest-available capture time (epoch seconds) per node, plus ``"*"``
+        for the whole cluster. Sessions older than a node's horizon have aged
+        out of PCAP retention — the analysis window for their cases is closed.
+
+        Empty dict when Arkime is unreachable or holds no sessions in the
+        lookback window; callers must treat that as "horizon unknown", not
+        "everything expired".
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        now = int(time.time())
+        start = now - lookback_days * 86400
+        horizons: Dict[str, int] = {}
+        cluster = await self._oldest_session_epoch(None, start, now)
+        if cluster is not None:
+            horizons["*"] = cluster
+        try:
+            buckets = await self._spigraph_buckets("node", now - 7 * 86400, now)
+        except (ArkimeError, httpx.HTTPError):
+            buckets = {}
+        for node in sorted(buckets)[:max_nodes]:
+            oldest = await self._oldest_session_epoch(
+                f'node == "{escape_arkime_quoted(node)}"', start, now
+            )
+            if oldest is not None:
+                horizons[node] = oldest
+        return horizons
+
+    # ── Hunts (packet search) ─────────────────────────────────────────────
+    _HUNT_SEARCH_TYPES = ("ascii", "asciicase", "hex", "regex", "hexregex")
+
+    async def create_hunt(
+        self,
+        *,
+        name: str,
+        search: str,
+        search_type: str = "ascii",
+        expression: Optional[str] = None,
+        start_ts: int,
+        stop_ts: int,
+        size: int = 1000,
+    ) -> Dict[str, Any]:
+        """Submit a packet-search (hunt) job to the viewer.
+
+        Requires the configured Arkime user to hold the ``packetSearch``
+        permission; without it the viewer returns 403. Returns
+        ``{"id": <arkime hunt id or None>, "raw": <response payload>}``.
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        if search_type not in self._HUNT_SEARCH_TYPES:
+            raise ArkimeError(f"Invalid hunt search type {search_type!r}")
+        body: Dict[str, Any] = {
+            "name": name,
+            "size": max(1, min(int(size), 10_000)),
+            "search": search,
+            "searchType": search_type,
+            "src": True,
+            "dst": True,
+            "type": "reassembled",
+            "query": {
+                "startTime": int(start_ts),
+                "stopTime": int(stop_ts),
+                "expression": expression or "",
+            },
+        }
+        headers = await self._headers({"Content-Type": "application/json"})
+        try:
+            async with await self._client() as client:
+                resp = await client.post(
+                    f"{self.url}/api/hunt", headers=headers, json=body
+                )
+            if resp.status_code == 403:
+                raise ArkimeError(
+                    "Arkime refused the hunt (HTTP 403) — the ION service user "
+                    "needs the packetSearch permission",
+                    status_code=403,
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime hunt submission failed: HTTP {resp.status_code}: "
+                    f"{(resp.text or '')[:200]}",
+                    status_code=resp.status_code,
+                )
+            try:
+                payload = resp.json()
+            except ValueError:
+                raise ArkimeError("Arkime hunt response is not JSON — check auth")
+            if payload.get("success") is False:
+                raise ArkimeError(
+                    f"Arkime rejected the hunt: {payload.get('text') or 'unknown error'}"
+                )
+            hunt_obj = payload.get("hunt") if isinstance(payload.get("hunt"), dict) else {}
+            hunt_id = hunt_obj.get("id") or payload.get("id")
+            return {"id": str(hunt_id) if hunt_id else None, "raw": payload}
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime hunt error: {type(e).__name__}: {e}") from e
+
+    async def list_hunts(self) -> List[Dict[str, Any]]:
+        """All hunt jobs the viewer reports (running + history). Each item
+        carries at least ``id``/``status``; ``matchedSessions`` where the
+        build reports it. Shapes vary across versions — read defensively."""
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        headers = await self._headers()
+        try:
+            async with await self._client() as client:
+                resp = await client.get(f"{self.url}/api/hunts", headers=headers)
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime hunt list failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            if "json" not in resp.headers.get("content-type", ""):
+                raise ArkimeError("Arkime returned non-JSON — check auth")
+            payload = resp.json()
+            hunts = list(payload.get("data") or [])
+            running = payload.get("runningJob")
+            if isinstance(running, dict) and running.get("id") not in {
+                h.get("id") for h in hunts
+            }:
+                hunts.append(running)
+            return hunts
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime hunt list error: {type(e).__name__}: {e}") from e
+
+    async def get_hunt(self, hunt_id: str) -> Optional[Dict[str, Any]]:
+        """One hunt job by Arkime id, or None. List-and-filter — there is no
+        stable per-id endpoint across viewer versions."""
+        for h in await self.list_hunts():
+            if str(h.get("id") or "") == str(hunt_id):
+                return h
+        return None
+
+    async def add_session_tags(
+        self, expression: str, tags: List[str], start_ts: int, stop_ts: int
+    ) -> bool:
+        """Tag every session matching ``expression`` in the window
+        (``POST /api/sessions/addtags``). Requires a write-enabled Arkime
+        user. Returns True on success; raises ArkimeError otherwise."""
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        clean = [t.strip() for t in tags if t and t.strip()]
+        if not clean or not expression:
+            return False
+        body = {
+            "tags": ",".join(clean),
+            "expression": expression,
+            "startTime": int(start_ts),
+            "stopTime": int(stop_ts),
+        }
+        headers = await self._headers({"Content-Type": "application/json"})
+        try:
+            async with await self._client() as client:
+                resp = await client.post(
+                    f"{self.url}/api/sessions/addtags", headers=headers, json=body
+                )
+            if resp.status_code == 403:
+                raise ArkimeError(
+                    "Arkime refused the tag write (HTTP 403) — the ION service "
+                    "user is read-only",
+                    status_code=403,
+                )
+            if resp.status_code != 200:
+                raise ArkimeError(
+                    f"Arkime tag write failed: HTTP {resp.status_code}",
+                    status_code=resp.status_code,
+                )
+            return True
+        except ArkimeError:
+            raise
+        except httpx.HTTPError as e:
+            raise ArkimeError(f"Arkime tag write error: {type(e).__name__}: {e}") from e
+
+    async def stream_sessions_pcap(
+        self, expression: str, start_ts: int, stop_ts: int
+    ):
+        """Open a streaming download of the merged PCAP for every session
+        matching ``expression`` in the window (``/api/sessions/pcap``).
+
+        Returns an async byte iterator that owns the HTTP client/response and
+        closes both when exhausted or dropped. Nothing is buffered server-side
+        beyond httpx's chunk — ION never stores raw PCAP.
+        """
+        if not self.is_configured:
+            raise ArkimeError("Arkime is not configured")
+        params = {
+            "expression": expression,
+            "startTime": str(start_ts),
+            "stopTime": str(stop_ts),
+        }
+        headers = await self._headers({"Accept": "application/vnd.tcpdump.pcap"})
+        client = await self._pcap_client()
+        try:
+            req = client.build_request(
+                "GET", f"{self.url}/api/sessions/pcap", params=params, headers=headers
+            )
+            resp = await client.send(req, stream=True)
+        except httpx.HTTPError as e:
+            await client.aclose()
+            raise ArkimeError(
+                f"Arkime merged-PCAP error: {type(e).__name__}: {e}"
+            ) from e
+        if resp.status_code != 200:
+            await resp.aclose()
+            await client.aclose()
+            raise ArkimeError(
+                f"Arkime merged-PCAP download failed: HTTP {resp.status_code}",
+                status_code=resp.status_code,
+            )
+
+        async def _iter():
+            try:
+                async for chunk in resp.aiter_bytes():
+                    yield chunk
+            finally:
+                await resp.aclose()
+                await client.aclose()
+
+        return _iter()
 
     async def download_pcap(self, node: str, session_id: str) -> bytes:
         """Download the raw PCAP bytes for a single Arkime session.
@@ -1189,6 +1645,93 @@ class ArkimeService:
             raise ArkimeError(
                 f"Arkime PCAP download error: {type(e).__name__}: {e}"
             ) from e
+
+
+def _audit_tag_writeback(case_number: Any, cids: List[str]) -> None:
+    """Best-effort audit_logs row for the Arkime tag write — ION's only
+    outbound mutation into Arkime deserves a forensic trail beyond app logs."""
+    try:
+        from ion.models.user import AuditLog
+        from ion.storage.database import get_session_factory
+
+        session = get_session_factory()()
+        try:
+            session.add(AuditLog(
+                user_id=None, action="arkime_tag_writeback",
+                resource_type="alert_case", resource_id=None,
+                details=f"{case_number}: tagged {len(cids)} flow(s) ion-{str(case_number).strip().lower()}",
+            ))
+            session.commit()
+        finally:
+            session.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("Arkime tag write-back audit row failed: %s", exc)
+
+
+def spawn_case_tag_writeback(case_number: Optional[str], community_ids: List[str]) -> None:
+    """Best-effort: tag the case's Arkime sessions ``ion`` +
+    ``ion-<case-number>`` so the pivot works from the viewer side too.
+
+    Behind ``ION_ARKIME_TAG_WRITEBACK`` (default OFF — this is ION's only
+    write into Arkime, and it needs a write-enabled viewer user). Runs on a
+    daemon thread with its own event loop so sync case-creation paths can
+    fire-and-forget; a failure logs at debug and never touches the case flow.
+    """
+    if os.environ.get("ION_ARKIME_TAG_WRITEBACK", "").strip().lower() not in (
+        "true", "1", "yes", "on"
+    ):
+        return
+    cids = [c.strip() for c in (community_ids or []) if c and c.strip()][:20]
+    if not case_number or not cids:
+        return
+
+    def _worker() -> None:
+        import asyncio
+
+        try:
+            svc = get_arkime_service()
+            if not svc.is_configured:
+                return
+            expression = " || ".join(
+                f'communityId == "{escape_arkime_quoted(c)}"' for c in cids
+            )
+            now = int(time.time())
+            asyncio.run(svc.add_session_tags(
+                expression,
+                ["ion", f"ion-{str(case_number).strip().lower()}"],
+                now - 7 * 86400,
+                now,
+            ))
+            logger.info("Arkime tag write-back: tagged %d flow(s) for %s", len(cids), case_number)
+            _audit_tag_writeback(case_number, cids)
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Arkime tag write-back failed for %s: %s", case_number, exc)
+
+    import threading
+
+    threading.Thread(target=_worker, daemon=True, name="arkime-tag-writeback").start()
+
+
+def arkime_public_url() -> str:
+    """Base viewer URL for analyst-browser deep links.
+
+    ``ION_ARKIME_PUBLIC_URL`` when set (the server-side ``ION_ARKIME_URL`` is
+    often an internal address the analyst's browser can't reach), otherwise
+    the configured service URL. Empty string when Arkime is unconfigured —
+    callers omit the link in that case.
+    """
+    public = os.environ.get("ION_ARKIME_PUBLIC_URL", "").strip().rstrip("/")
+    if public:
+        return public
+    return get_arkime_service().url or ""
+
+
+def arkime_sessions_link(expression: str) -> str:
+    """Deep link into the Arkime sessions view for an expression, or ''."""
+    base = arkime_public_url()
+    if not base:
+        return ""
+    return f"{base}/sessions?expression={quote(expression, safe='')}"
 
 
 # Singleton

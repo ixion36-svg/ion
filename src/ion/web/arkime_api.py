@@ -27,9 +27,12 @@ Auth:
 from __future__ import annotations
 
 import logging
+import re
+import time
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -43,7 +46,8 @@ from ion.models.alert_triage import (
     Note,
     NoteEntityType,
 )
-from ion.models.user import User
+from ion.models.arkime_hunt import ArkimeHunt
+from ion.models.user import AuditLog, User
 from ion.services import pcap_service
 from ion.services.arkime_service import ArkimeError, get_arkime_service
 from ion.services.elasticsearch_service import ElasticsearchService
@@ -91,6 +95,9 @@ class ArkimePreviewResponse(BaseModel):
     observables: List[EnrichedObservable]
     enrichment_enabled: bool
     warnings: List[str] = Field(default_factory=list)
+    # Analyst-browser deep link into the Arkime sessions view ('' when no
+    # public viewer URL is resolvable).
+    arkime_web_url: str = ""
 
 
 class ArkimeCommitRequest(BaseModel):
@@ -449,6 +456,13 @@ async def arkime_preview(
     if enrichment_enabled and observables:
         observables = await _enrich_observables(observables)
 
+    from ion.services.arkime_service import arkime_sessions_link, escape_arkime_quoted
+
+    if community_id:
+        link_expr = f'communityId == "{escape_arkime_quoted(community_id)}"'
+    else:
+        link_expr = f"(ip.src == {search_ip} || ip.dst == {search_ip})" if search_ip else ""
+
     return ArkimePreviewResponse(
         alert_id=alert_id,
         network_community_id=community_id or None,
@@ -462,6 +476,7 @@ async def arkime_preview(
         observables=observables,
         enrichment_enabled=enrichment_enabled,
         warnings=warnings,
+        arkime_web_url=arkime_sessions_link(link_expr) if link_expr else "",
     )
 
 
@@ -606,6 +621,22 @@ async def arkime_commit(
         except Exception as e:
             logger.warning("Failed to sync Arkime case to Kibana: %s", e)
 
+    # The export loop only carries notes for cases it links itself — a case
+    # that already has (or was just given) kibana_case_id needs the explicit
+    # push or the analysis note never reaches Kibana.
+    if note_id and case.kibana_case_id:
+        try:
+            from ion.services.kibana_sync_helpers import sync_note_to_kibana
+            sync_note_to_kibana(case.kibana_case_id, current_user.username, note.content)
+        except Exception as e:
+            logger.warning("Failed to sync Arkime note to Kibana: %s", e)
+
+    # Best-effort viewer-side pivot tag (no-op unless ION_ARKIME_TAG_WRITEBACK).
+    community_id = alert.get("network_community_id")
+    if community_id:
+        from ion.services.arkime_service import spawn_case_tag_writeback
+        spawn_case_tag_writeback(case.case_number, [community_id])
+
     return ArkimeCommitResponse(
         case_id=case.id,
         case_number=case.case_number,
@@ -667,3 +698,180 @@ def _render_arkime_note_markdown(
         lines.append("")
 
     return "\n".join(lines)
+
+
+# ═══════════════════════════ Hunts (packet search) ═══════════════════════
+# Submissions are lead-gated (security:read, same posture as the traffic
+# exclusions) and audit-logged — a hunt scans raw packets on the sensors.
+# Status reads are alert:read like the rest of the Arkime surface.
+
+_HUNT_NAME_SAFE_RE = re.compile(r"[^\w .-]")
+
+
+class HuntCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    search: str = Field(..., min_length=1, max_length=512)
+    search_type: str = Field(default="ascii")
+    expression: Optional[str] = Field(default=None, max_length=1024)
+    hours: int = Field(default=24, ge=1, le=168)
+    case_id: Optional[int] = None
+
+
+@router.post("/arkime/hunts")
+async def create_arkime_hunt(
+    payload: HuntCreateRequest,
+    current_user: User = Depends(require_permission("security:read")),
+    session: Session = Depends(get_db_session),
+) -> Dict[str, Any]:
+    """Submit a packet-search job to Arkime and track it in ION."""
+    svc = get_arkime_service()
+    if not svc.is_configured:
+        raise HTTPException(status_code=503, detail="Arkime is not configured")
+    if payload.case_id is not None and session.get(AlertCase, payload.case_id) is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    name = _HUNT_NAME_SAFE_RE.sub("", payload.name).strip() or "ION hunt"
+    row = ArkimeHunt(
+        name=name,
+        search=payload.search,
+        search_type=payload.search_type,
+        expression=payload.expression,
+        case_id=payload.case_id,
+        created_by_id=current_user.id,
+        status="submitted",
+    )
+    session.add(row)
+    session.add(AuditLog(
+        user_id=current_user.id, action="arkime_hunt_submitted",
+        resource_type="arkime_hunt", resource_id=None,
+        details=f"{name} — search={payload.search[:120]!r} hours={payload.hours}"
+        + (f" case={payload.case_id}" if payload.case_id else ""),
+    ))
+    session.commit()
+    session.refresh(row)
+
+    now = int(time.time())
+    try:
+        result = await svc.create_hunt(
+            name=name,
+            search=payload.search,
+            search_type=payload.search_type,
+            expression=payload.expression,
+            start_ts=now - payload.hours * 3600,
+            stop_ts=now,
+        )
+    except ArkimeError as e:
+        row.status = "failed"
+        session.commit()
+        status = e.status_code if e.status_code in (401, 403) else 502
+        raise HTTPException(status_code=status, detail=safe_error(e))
+
+    row.arkime_hunt_id = result.get("id")
+    row.status = "running"
+    session.commit()
+    session.refresh(row)
+    return {"hunt": row.to_dict()}
+
+
+@router.get("/arkime/hunts")
+async def list_arkime_hunts(
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+) -> Dict[str, Any]:
+    """ION-submitted hunts, newest first, statuses refreshed from the viewer."""
+    svc = get_arkime_service()
+    if svc.is_configured:
+        from ion.services.arkime_hunt_service import refresh_hunts
+        await refresh_hunts(session, svc)
+    rows = session.query(ArkimeHunt).order_by(ArkimeHunt.id.desc()).limit(50).all()
+    return {"hunts": [r.to_dict() for r in rows]}
+
+
+@router.get("/arkime/hunts/{hunt_id}")
+async def get_arkime_hunt(
+    hunt_id: int,
+    current_user: User = Depends(require_permission("alert:read")),
+    session: Session = Depends(get_db_session),
+) -> Dict[str, Any]:
+    svc = get_arkime_service()
+    if svc.is_configured:
+        from ion.services.arkime_hunt_service import refresh_hunts
+        await refresh_hunts(session, svc)
+    row = session.get(ArkimeHunt, hunt_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Hunt not found")
+    return {"hunt": row.to_dict()}
+
+
+# ═══════════════════════ Merged case PCAP (stream-through) ═══════════════
+
+
+def _case_community_ids(session: Session, case: AlertCase) -> List[str]:
+    """Every communityId linked to the case — RTMON triage markers plus the
+    headings of its PCAP-analysis notes. Order-preserving, deduped."""
+    from ion.services.arkime_retention_service import (
+        note_cids,
+        parse_rtmon_marker_flow,
+    )
+
+    cids: List[str] = []
+    markers = (
+        session.query(AlertTriage.es_alert_id)
+        .filter(AlertTriage.case_id == case.id)
+        .all()
+    )
+    for (marker,) in markers:
+        flow = parse_rtmon_marker_flow(marker or "")
+        if flow and flow["community_id"] not in cids:
+            cids.append(flow["community_id"])
+    notes = (
+        session.query(Note.content)
+        .filter(Note.entity_type == NoteEntityType.CASE)
+        .filter(Note.entity_id == str(case.id))
+        .all()
+    )
+    for cid in note_cids([content or "" for (content,) in notes]):
+        if cid not in cids:
+            cids.append(cid)
+    return cids
+
+
+@router.get("/cases/{case_id}/arkime/pcap")
+async def download_case_merged_pcap(
+    case_id: int,
+    current_user: User = Depends(require_permission("case:read")),
+    session: Session = Depends(get_db_session),
+):
+    """Stream the merged PCAP for every Arkime flow linked to a case.
+
+    Pure pass-through from Arkime's multi-session export — nothing is written
+    server-side (ION never stores raw PCAP).
+    """
+    svc = get_arkime_service()
+    if not svc.is_configured:
+        raise HTTPException(status_code=503, detail="Arkime is not configured")
+    case = session.get(AlertCase, case_id)
+    if case is None:
+        raise HTTPException(status_code=404, detail="Case not found")
+    cids = _case_community_ids(session, case)
+    if not cids:
+        raise HTTPException(
+            status_code=404, detail="No Arkime flows are linked to this case"
+        )
+    from ion.services.arkime_service import escape_arkime_quoted
+    expression = " || ".join(
+        f'communityId == "{escape_arkime_quoted(c)}"' for c in cids[:20]
+    )
+    created = case.created_at
+    start_ts = int(created.timestamp()) - 86400 if created else 0
+    try:
+        body = await svc.stream_sessions_pcap(expression, start_ts, int(time.time()))
+    except ArkimeError as e:
+        status = e.status_code if e.status_code in (401, 403, 404) else 502
+        raise HTTPException(status_code=status, detail=safe_error(e))
+    filename = f"{case.case_number or f'case-{case.id}'}-arkime.pcap"
+    return StreamingResponse(
+        body,
+        media_type="application/vnd.tcpdump.pcap",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

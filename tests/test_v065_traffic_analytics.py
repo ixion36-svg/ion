@@ -91,7 +91,35 @@ def test_is_noise_ip_bad_input_is_not_noise():
 # ── #4  get_top_talkers excludes noise endpoints ─────────────────────────
 
 
-def test_top_talkers_excludes_noise_ips():
+def test_top_talkers_spigraph_excludes_noise_ips():
+    src_payload = {"items": [
+        {"name": "203.0.113.5", "count": 1, "size": 1000},
+        {"name": "fe80::1",     "count": 1, "size": 500},   # IPv6 link-local noise
+        {"name": "9.9.9.9",     "count": 1, "size": 700},
+        {"name": "169.254.1.1", "count": 1, "size": 300},   # IPv4 link-local noise
+    ]}
+    dst_payload = {"items": [
+        {"name": "8.8.8.8", "count": 2, "size": 1500},
+        {"name": "::1",     "count": 1, "size": 700},       # loopback noise
+        {"name": "1.1.1.1", "count": 1, "size": 300},
+    ]}
+    svc = _make_service()
+    client = _mock_client([_mock_resp(src_payload), _mock_resp(dst_payload)])
+    with patch.object(svc, "_client", return_value=client):
+        result = _run(svc.get_top_talkers(0, 86400, limit=10))
+
+    assert result["method"] == "spigraph"
+    src_ips = {r["ip"] for r in result["by_src"]}
+    dst_ips = {r["ip"] for r in result["by_dst"]}
+    assert src_ips == {"203.0.113.5", "9.9.9.9"}   # fe80::1 + 169.254.1.1 dropped
+    assert dst_ips == {"8.8.8.8", "1.1.1.1"}        # ::1 dropped
+    dst_8888 = next(r for r in result["by_dst"] if r["ip"] == "8.8.8.8")
+    assert dst_8888["bytes"] == 1500 and dst_8888["sessions"] == 2
+
+
+def test_top_talkers_sample_fallback_excludes_noise_ips():
+    # spigraph 404s → legacy session-sampling path.
+    err = _mock_resp({}, status_code=404)
     payload = {"data": [
         {"srcIp": "203.0.113.5", "dstIp": "8.8.8.8", "totBytes": 1000},
         {"srcIp": "fe80::1",     "dstIp": "8.8.8.8", "totBytes": 500},   # src is noise
@@ -99,10 +127,11 @@ def test_top_talkers_excludes_noise_ips():
         {"srcIp": "169.254.1.1", "dstIp": "1.1.1.1", "totBytes": 300},   # src is noise
     ]}
     svc = _make_service()
-    client = _mock_client([_mock_resp(payload)])
+    client = _mock_client([err, _mock_resp(payload)])
     with patch.object(svc, "_client", return_value=client):
         result = _run(svc.get_top_talkers(0, 86400, limit=10))
 
+    assert result["method"] == "sample"
     src_ips = {r["ip"] for r in result["by_src"]}
     dst_ips = {r["ip"] for r in result["by_dst"]}
     assert src_ips == {"203.0.113.5", "9.9.9.9"}   # fe80::1 + 169.254.1.1 dropped

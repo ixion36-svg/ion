@@ -54,7 +54,12 @@
             <svg class="w-4 h-4 text-ion-cyan"><use href="#i-network"/></svg>
             <span class="label-tiny text-slate-500">Arkime session</span>
           </div>
-          <span id="session-size" class="font-mono text-[11px] text-slate-400"></span>
+          <div class="flex items-center gap-4">
+            <a id="open-in-arkime" href="#" target="_blank" rel="noopener"
+               class="hidden items-center gap-1.5 text-[11px] font-semibold text-ion-cyan hover:brightness-125 transition">
+              <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg>Open in Arkime</a>
+            <span id="session-size" class="font-mono text-[11px] text-slate-400"></span>
+          </div>
         </div>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 text-[12px]">
           <div>
@@ -88,6 +93,10 @@
           <div>
             <div class="label-tiny text-slate-500 mb-1">Community ID</div>
             <div id="sess-cid" class="font-mono text-slate-200 truncate">—</div>
+          </div>
+          <div id="sess-indexed-wrap" class="col-span-2 md:col-span-4 hidden">
+            <div class="label-tiny text-slate-500 mb-1">Indexed metadata</div>
+            <div id="sess-indexed" class="font-mono text-[11px] text-slate-300 break-all"></div>
           </div>
         </div>
       </div>
@@ -301,6 +310,31 @@
     const dst = meta.dstIp ? `${meta.dstIp}:${meta.dstPort ?? '?'}` : '—';
     $('sess-flow').textContent = `${src} → ${dst}`;
     $('session-size').textContent = `${fmtBytes(p.pcap_size_bytes)} · ${fmt(meta.bytes)} raw`;
+    if (p.arkime_web_url) {
+      const link = $('open-in-arkime');
+      link.href = p.arkime_web_url;
+      link.classList.remove('hidden');
+      link.classList.add('inline-flex');
+    }
+
+    // Arkime-indexed depth fields (JA4/JA3/HTTP) — flat or nested shape,
+    // absent entirely on builds that reject the extended field list.
+    const tlsMeta = meta.tls || {};
+    const httpMeta = meta.http || {};
+    const asList = (v) => v == null ? [] : (Array.isArray(v) ? v : [v]);
+    const ja4List = asList(meta['tls.ja4'] ?? tlsMeta.ja4);
+    const ja3List = asList(meta['tls.ja3'] ?? tlsMeta.ja3);
+    const uaList = asList(meta['http.useragent'] ?? httpMeta.useragent);
+    const uriList = asList(meta['http.uri'] ?? httpMeta.uri);
+    const idxParts = [];
+    if (ja4List.length) idxParts.push(`JA4 ${ja4List.slice(0, 3).join(', ')}`);
+    if (ja3List.length) idxParts.push(`JA3 ${ja3List.slice(0, 3).join(', ')}`);
+    if (uaList.length) idxParts.push(`UA ${String(uaList[0]).slice(0, 90)}`);
+    if (uriList.length) idxParts.push(`URI ${uriList.slice(0, 2).map(u => String(u).slice(0, 100)).join(' ')}`);
+    if (idxParts.length) {
+      $('sess-indexed-wrap').classList.remove('hidden');
+      $('sess-indexed').textContent = idxParts.join('  ·  ');
+    }
 
     // Stats
     const analysis = p.analysis || {};

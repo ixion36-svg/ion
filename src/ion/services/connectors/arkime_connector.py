@@ -34,8 +34,7 @@ class ArkimeConnector(BaseConnector):
         return True
 
     async def test_connection(self) -> Dict[str, Any]:
-        """Probe Arkime (and Keycloak, if configured) and return the usual
-        connector status payload."""
+        """Probe the Arkime viewer and return the usual connector status payload."""
         result = await self._service.test_connection()
         return result
 
@@ -44,6 +43,8 @@ class ArkimeConnector(BaseConnector):
         return {"synced": True, "message": "Arkime is pull-only; nothing to sync."}
 
     def get_config_schema(self) -> Dict[str, Any]:
+        # ArkimeService is HTTP Basic only — do not re-add Keycloak/API-key
+        # fields here without restoring them in the service first.
         return {
             "type": "object",
             "properties": {
@@ -53,40 +54,13 @@ class ArkimeConnector(BaseConnector):
                     "description": "Base URL of the Arkime viewer (e.g., https://viewer.example.com)",
                     "format": "uri",
                 },
-                "keycloak_issuer": {
-                    "type": "string",
-                    "title": "Keycloak issuer",
-                    "description": "Keycloak realm base (e.g., https://keycloak.example.com/realms/soc). Leave blank to use HTTP basic or API key auth instead.",
-                    "format": "uri",
-                },
-                "keycloak_client_id": {
-                    "type": "string",
-                    "title": "Keycloak client ID",
-                    "description": "Service account client ID used for the client_credentials grant",
-                },
-                "keycloak_client_secret": {
-                    "type": "string",
-                    "title": "Keycloak client secret",
-                    "format": "password",
-                },
-                "keycloak_scope": {
-                    "type": "string",
-                    "title": "Keycloak scope",
-                    "default": "openid",
-                },
                 "username": {
                     "type": "string",
-                    "title": "HTTP basic username (fallback)",
+                    "title": "HTTP basic username",
                 },
                 "password": {
                     "type": "string",
-                    "title": "HTTP basic password (fallback)",
-                    "format": "password",
-                },
-                "api_key": {
-                    "type": "string",
-                    "title": "API key (fallback)",
-                    "description": "Arkime 5.x Digest-style API key",
+                    "title": "HTTP basic password",
                     "format": "password",
                 },
                 "verify_ssl": {
@@ -95,17 +69,12 @@ class ArkimeConnector(BaseConnector):
                     "default": True,
                 },
             },
-            "required": ["url"],
+            "required": ["url", "username", "password"],
         }
 
     def get_status_info(self) -> Dict[str, Any]:
         info = super().get_status_info()
         if self.is_configured:
             info["url"] = self._service.url
-            info["auth_mode"] = (
-                "keycloak" if self._service._has_keycloak
-                else "api_key" if self._service.api_key
-                else "basic" if self._service._has_basic
-                else "none"
-            )
+            info["auth_mode"] = "basic" if self._service._has_basic else "none"
         return info

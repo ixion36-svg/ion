@@ -128,6 +128,7 @@ LOCK_ARKIME_RTMON_BG        = 1026  # v0.45.0  — realtime Arkime IOC-traffic m
 LOCK_PLAYBOOK_EMBEDDING_BG  = 1027  # v0.51.0  — playbook-embedding background producer
 LOCK_TI_REPORT_BG           = 1028  # v0.53.0  — TI-report cache sync + chunk-embedding loop
 LOCK_SEED_KEV_CATALOG       = 1029  # v0.79.1  — seed the bundled CISA KEV snapshot
+LOCK_ARKIME_RETENTION_BG    = 1030  # v0.86.0  — PCAP-retention awareness / analysis rescue
 
 
 @contextmanager

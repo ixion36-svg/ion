@@ -399,6 +399,10 @@ app.include_router(role_skills_router, prefix="/api/skills")
 app.include_router(notes_router, prefix="/api/notes")
 app.include_router(pcap_router, prefix="/api/pcap")
 app.include_router(arkime_router, prefix="/api")
+# ION → Arkime WISE intel feed (machine client, token-gated, off until
+# ION_WISE_TOKEN is set)
+from ion.web.wise_api import router as wise_router  # noqa: E402, I001
+app.include_router(wise_router, prefix="/api")
 app.include_router(forensics_router, prefix="/api/forensics")
 # ForensicCase Workbench — pinned evidence + tamper-evident ledger
 app.include_router(forensic_workbench_router, prefix="/api/forensics")
@@ -1012,6 +1016,22 @@ async def _startup_event():
         _rtmon_bg(engine)
         logger.info("Arkime realtime IOC monitor background loop started")
     run_locked(engine, LOCK_ARKIME_RTMON_BG, "arkime_rtmon_bg_loop", _start_arkime_rtmon,
+               hold_until_close=True)
+
+    # ---------------------------------------------------------------
+    # Arkime PCAP-retention awareness — re-queues missing/failed PCAP
+    # analysis on open cases before the capture ages out of Arkime's
+    # retention window (ION stores analysis, never raw PCAP).
+    # Honours ION_ARKIME_RETENTION_ENABLED (default true).
+    # ---------------------------------------------------------------
+    from ion.storage.database import LOCK_ARKIME_RETENTION_BG
+    def _start_arkime_retention():
+        from ion.services.arkime_retention_service import (
+            start_background_loop as _ret_bg,
+        )
+        _ret_bg(engine)
+        logger.info("Arkime retention-awareness background loop started")
+    run_locked(engine, LOCK_ARKIME_RETENTION_BG, "arkime_retention_bg_loop", _start_arkime_retention,
                hold_until_close=True)
 
     # ---------------------------------------------------------------

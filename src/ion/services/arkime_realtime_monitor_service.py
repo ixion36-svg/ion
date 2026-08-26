@@ -31,9 +31,15 @@ matcher):
 * ``dns_tunneling`` — DNS sessions whose queried names are long / high-entropy.
   CONFIRM-FIRST: a candidate is verified by pulling its PCAP and re-running the
   pipeline's DNS-tunnel/DGA detector before a case is opened (budget-capped).
+* ``ja4_blocklist`` — TLS sessions whose indexed JA4 fingerprint matches the
+  known-bad set (pcap_service._KNOWN_BAD_JA4 merged with
+  ``ION_ARKIME_RTMON_JA4_BLOCKLIST``, ``ja4=label`` comma-separated). Exact
+  fingerprint match against SPI metadata — zero PCAP cost, no Arkime query at
+  all when the merged set is empty. Opens a case immediately. (low FP)
 * ``ioc_ip`` — LEGACY. The original v0.45.0 behaviour: match live sessions
   against ION's IOC IP set. OFF by default (``…_IOC_ENABLED``); kept so the
-  capability isn't lost.
+  capability isn't lost. Where the ION→WISE feed is deployed, Arkime tags
+  matching sessions at capture time and this detector is redundant.
 
 Dedup: a synthetic ``AlertTriage.es_alert_id`` marker
 (``rtmon:<detector>:<node>:<communityId>`` for per-session detectors, or
@@ -50,6 +56,8 @@ Environment variables:
 * ``ION_ARKIME_RTMON_COMMAND_ENABLED``      (default ``true``)
 * ``ION_ARKIME_RTMON_BEACON_ENABLED``       (default ``true``)
 * ``ION_ARKIME_RTMON_DNS_ENABLED``          (default ``true``)
+* ``ION_ARKIME_RTMON_JA4_ENABLED``          (default ``true`` — no-op while the blocklist is empty)
+* ``ION_ARKIME_RTMON_JA4_BLOCKLIST``        (default empty — ``ja4=label,ja4=label``)
 * ``ION_ARKIME_RTMON_IOC_ENABLED``          (default ``false`` — legacy)
 * ``ION_ARKIME_RTMON_BEACON_MIN_CONN``      (default ``6``)
 * ``ION_ARKIME_RTMON_BEACON_SCORE``         (default ``0.9`` — confirm gate)
@@ -62,6 +70,7 @@ import ipaddress
 import logging
 import math
 import os
+import re
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy.engine import Engine
@@ -358,6 +367,81 @@ def _detect_beacon_shape(sessions: List[Dict[str, Any]]) -> List[Dict[str, Any]]
     return out
 
 
+# ── detector: known-bad JA4 fingerprint (SPI-indexed, zero PCAP cost) ───────
+def _ja4_blocklist() -> Dict[str, str]:
+    """Merged known-bad JA4 map ``{fingerprint: label}``.
+
+    Sources: the shared pcap_service map (kept for note-annotation parity) and
+    the ``ION_ARKIME_RTMON_JA4_BLOCKLIST`` env (``ja4=label`` pairs, comma-
+    separated; a bare fingerprint gets the label "blocklisted"). Empty result
+    disables the detector for the pass — no Arkime query is issued.
+    """
+    merged: Dict[str, str] = {}
+    try:
+        from ion.services.pcap_service import _KNOWN_BAD_JA4
+        merged.update({k: v for k, v in _KNOWN_BAD_JA4.items() if k})
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("rtmon: shared JA4 map import failed: %s", exc)
+    raw = os.environ.get("ION_ARKIME_RTMON_JA4_BLOCKLIST", "")
+    for entry in raw.split(","):
+        entry = entry.strip()
+        if not entry:
+            continue
+        ja4, _, label = entry.partition("=")
+        ja4 = ja4.strip()
+        if ja4:
+            merged[ja4] = label.strip() or "blocklisted"
+    # Fingerprints go into an Arkime expression verbatim — accept only the
+    # JA4 charset (alnum + underscore) so a malformed env entry can't shape
+    # the query.
+    return {
+        k: v for k, v in merged.items() if re.fullmatch(r"[A-Za-z0-9_]+", k)
+    }
+
+
+def _session_ja4(s: Dict[str, Any]) -> List[str]:
+    """JA4 fingerprints from a session doc — flat ``tls.ja4`` key or nested
+    ``tls: {ja4: ...}``; str or list on either shape."""
+    v = s.get("tls.ja4")
+    if v is None:
+        tls = s.get("tls")
+        if isinstance(tls, dict):
+            v = tls.get("ja4")
+    if isinstance(v, str):
+        v = [v]
+    return [str(x).strip() for x in (v or []) if x]
+
+
+def _detect_ja4_blocklist(
+    sessions: List[Dict[str, Any]], blocklist: Dict[str, str]
+) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for s in sessions:
+        cid, node = _community_id(s), (s.get("node") or "")
+        if not cid or not node:
+            continue
+        hit = next((j for j in _session_ja4(s) if j in blocklist), "")
+        if not hit:
+            continue
+        src, dst = s.get("srcIp") or "", s.get("dstIp") or ""
+        label = blocklist[hit]
+        out.append({
+            "detector": "ja4_blocklist",
+            "marker": f"rtmon:ja4:{node}:{cid}",
+            "node": node, "community_id": cid, "src": src, "dst": dst,
+            "dst_port": _dst_port(s), "tot_bytes": int(s.get("totBytes") or 0),
+            "severity": "high", "confirm_first": False,
+            "title": f"[RT-Netmon] Known-bad TLS fingerprint ({label}) {src} → {dst}",
+            "summary": (
+                f"Arkime-indexed JA4 `{hit}` matches the known-bad fingerprint "
+                f"set ({label}). Exact client-fingerprint match — no payload "
+                f"inspection needed."
+            ),
+            "evidence": {"ja4": hit, "label": label},
+        })
+    return out
+
+
 # ── detector: DNS tunneling (confirm-first via PCAP re-analysis) ────────────
 def _detect_dns_tunneling(sessions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     min_qlen = _int_env("ION_ARKIME_RTMON_DNS_MIN_QLEN", 40)
@@ -565,6 +649,8 @@ def _open_case(session, bob_id: int, cand: Dict[str, Any], enqueue_fn) -> None:
                 "source_ip": src, "destination_ip": dst, "alert_timestamp": None,
             }],
         )
+        from ion.services.arkime_service import spawn_case_tag_writeback
+        spawn_case_tag_writeback(case_number, [cid])
 
 
 # ── pass orchestration ──────────────────────────────────────────────────────
@@ -598,6 +684,12 @@ async def _gather_candidates(svc) -> List[Dict[str, Any]]:
 
     if _flag("ION_ARKIME_RTMON_DNS_ENABLED", True):
         cands += _detect_dns_tunneling(await _sweep("protocols == dns", window))
+
+    if _flag("ION_ARKIME_RTMON_JA4_ENABLED", True):
+        blocklist = _ja4_blocklist()
+        if blocklist:
+            expr = "tls.ja4 == [" + ",".join(sorted(blocklist)) + "]"
+            cands += _detect_ja4_blocklist(await _sweep(expr, window), blocklist)
 
     return cands
 

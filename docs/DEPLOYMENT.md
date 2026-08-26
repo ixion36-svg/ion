@@ -186,10 +186,18 @@ All configuration is via `ION_*` environment variables loaded from `.env`. Every
 |----------|---------|-------------|
 | `ION_ARKIME_ENABLED` | `false` | Enable Arkime integration |
 | `ION_ARKIME_URL` | -- | Arkime viewer URL |
-| `ION_ARKIME_KEYCLOAK_ISSUER` | -- | Keycloak issuer URL for Arkime auth |
-| `ION_ARKIME_KEYCLOAK_CLIENT_ID` | -- | Keycloak client ID |
-| `ION_ARKIME_KEYCLOAK_CLIENT_SECRET` | -- | Keycloak client secret |
+| `ION_ARKIME_USERNAME` | -- | HTTP Basic username (the only supported auth) |
+| `ION_ARKIME_PASSWORD` | -- | HTTP Basic password |
 | `ION_ARKIME_VERIFY_SSL` | `false` | Verify Arkime TLS certificate |
+| `ION_ARKIME_PUBLIC_URL` | `ION_ARKIME_URL` | Viewer URL reachable from analyst browsers (deep links) |
+| `ION_ARKIME_RETENTION_ENABLED` | `true` | PCAP-retention awareness loop (analysis rescue before capture expiry) |
+| `ION_ARKIME_RETENTION_INTERVAL_MINUTES` | `60` | Retention loop interval |
+| `ION_ARKIME_RETENTION_MARGIN_HOURS` | `12` | Rescue window before the retention horizon |
+| `ION_ARKIME_RTMON_JA4_ENABLED` | `true` | RTMON known-bad JA4 detector (no-op while the blocklist is empty) |
+| `ION_ARKIME_RTMON_JA4_BLOCKLIST` | -- | `ja4=label,ja4=label` known-bad TLS fingerprints |
+| `ION_ARKIME_TAG_WRITEBACK` | `false` | Tag case sessions `ion-<case>` in Arkime (needs a write-enabled viewer user) |
+| `ION_WISE_TOKEN` | -- | Enables `/api/wise/ion-iocs` (WISE intel feed); endpoint is 404 while unset |
+| `ION_WISE_MAX_IOCS` | `10000` | Cap per WISE feed response |
 
 ### Ollama (AI / LLM — Bob)
 

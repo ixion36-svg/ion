@@ -128,7 +128,10 @@
   <!-- Top talkers -->
   <div class="atf-card lg:col-span-2">
     <div class="atf-card-header">
-      <h2 class="atf-card-title">Top Talkers</h2>
+      <div>
+        <h2 class="atf-card-title">Top Talkers</h2>
+        <p class="text-xs text-slate-500 mt-0.5" id="talkers-method"></p>
+      </div>
       <div class="flex gap-2">
         <button class="atf-talker-tab atf-talker-active text-xs px-3 py-1 rounded" data-dir="src">By Source</button>
         <button class="atf-talker-tab text-xs px-3 py-1 rounded" data-dir="dst">By Destination</button>
@@ -155,8 +158,9 @@
   <div class="atf-card-header">
     <div>
       <h2 class="atf-card-title">Traffic by Sensor</h2>
-      <p class="text-xs text-slate-500 mt-0.5">Volume per Arkime capture node — sampled from top flows</p>
+      <p class="text-xs text-slate-500 mt-0.5" id="node-method-note">Volume per Arkime capture node</p>
     </div>
+    <span class="text-slate-500 text-xs" id="retention-note" title=""></span>
   </div>
   <div class="relative atf-chart-h-220">
     <canvas id="node-chart"></canvas>
@@ -217,6 +221,51 @@
     </div>
   </div>
   <div id="rtmon-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
+</div>
+
+<!-- Packet hunts -->
+<div class="atf-card mb-6" id="hunts-card">
+  <div class="atf-card-header">
+    <div>
+      <h2 class="atf-card-title">Packet Hunts</h2>
+      <p class="text-xs text-slate-500 mt-0.5">Arkime packet-search jobs submitted from ION (submitting requires lead permission; the Arkime service user needs packetSearch)</p>
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 mb-4">
+    <input id="hunt-name" type="text" placeholder="Hunt name" maxlength="120"
+           class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 w-44" />
+    <input id="hunt-search" type="text" placeholder="Packet search (e.g. Mozilla/4.0)" maxlength="512"
+           class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 flex-1 min-w-56" />
+    <select id="hunt-type" class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200">
+      <option value="ascii">ascii</option>
+      <option value="asciicase">ascii (case)</option>
+      <option value="hex">hex</option>
+      <option value="regex">regex</option>
+      <option value="hexregex">hex regex</option>
+    </select>
+    <select id="hunt-hours" class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200">
+      <option value="24">last 24h</option>
+      <option value="72">last 3d</option>
+      <option value="168">last 7d</option>
+    </select>
+    <input id="hunt-expression" type="text" placeholder="Optional Arkime expression (scope)" maxlength="1024"
+           class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 w-72" />
+    <button id="hunt-submit" class="text-xs px-3 py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white disabled:opacity-50">Launch hunt</button>
+  </div>
+  <div id="hunts-empty" class="hidden text-slate-500 text-sm text-center py-6">No hunts submitted yet.</div>
+  <table class="w-full text-sm" id="hunts-table">
+    <thead>
+      <tr class="text-slate-500 text-left border-b border-slate-800">
+        <th class="pb-2 pr-4 font-medium">Name</th>
+        <th class="pb-2 pr-4 font-medium">Search</th>
+        <th class="pb-2 pr-4 font-medium">Status</th>
+        <th class="pb-2 pr-4 font-medium text-right">Matched</th>
+        <th class="pb-2 pr-4 font-medium">Submitted</th>
+        <th class="pb-2 font-medium"></th>
+      </tr>
+    </thead>
+    <tbody id="hunts-body"></tbody>
+  </table>
 </div>
 
 </div><!-- /max-w container -->
@@ -637,6 +686,10 @@
         throw new Error(err.detail || resp.statusText);
       }
       talkersData = await resp.json();
+      var tm = document.getElementById('talkers-method');
+      if (tm) tm.textContent = talkersData.method === 'spigraph'
+        ? 'Server-side aggregation over every session in the range'
+        : 'Sampled from top flows (spigraph unavailable — approximate)';
 
       // Top source IP for stats bar
       const topSrc = (talkersData.by_src || [])[0];
@@ -744,6 +797,10 @@
         throw new Error(err.detail || resp.statusText);
       }
       var data = await resp.json();
+      var nm = document.getElementById('node-method-note');
+      if (nm) nm.textContent = data.method === 'spigraph'
+        ? 'Volume per Arkime capture node — server-side aggregation'
+        : 'Volume per Arkime capture node — sampled from top flows';
       renderNodeChart(data.nodes || []);
       populateNodeSelect(data.nodes || []);
     } catch (e) {
@@ -888,6 +945,97 @@
     await Promise.all([loadOverview(range), loadTopTalkers(range), loadTopCountries(range), loadPerNode(range), loadRtmon(range)]);
   }
 
+  // ── PCAP retention horizon ──────────────────────────────────────────────────
+  var arkimeWebUrl = '';
+  function _relDays(epochS) {
+    var d = (Date.now() / 1000 - epochS) / 86400;
+    return d >= 1 ? d.toFixed(1) + 'd' : Math.max(1, Math.round(d * 24)) + 'h';
+  }
+  function loadRetention() {
+    return fetch('/api/arkime/traffic/retention').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (!d) return;
+        arkimeWebUrl = d.web_url || '';
+        var el = document.getElementById('retention-note');
+        if (!el || !d.horizons) return;
+        var cluster = d.horizons['*'];
+        if (!cluster) return;
+        el.textContent = 'PCAP retention: oldest capture ' + _relDays(cluster) + ' ago';
+        el.title = Object.keys(d.horizons).filter(function (k) { return k !== '*'; })
+          .map(function (k) { return k + ': ' + _relDays(d.horizons[k]) + ' ago'; }).join('\n');
+      })
+      .catch(function () {});
+  }
+
+  // ── Packet hunts ────────────────────────────────────────────────────────────
+  var _HUNT_STATUS_COLORS = { running: 'text-amber-300', submitted: 'text-amber-300', finished: 'text-emerald-400', failed: 'text-rose-400' };
+  function renderHunts(hunts) {
+    var body = document.getElementById('hunts-body');
+    var empty = document.getElementById('hunts-empty');
+    if (!body) return;
+    if (!hunts || !hunts.length) {
+      body.innerHTML = '';
+      if (empty) empty.classList.remove('hidden');
+      return;
+    }
+    if (empty) empty.classList.add('hidden');
+    body.innerHTML = hunts.map(function (h) {
+      var link = '';
+      if (arkimeWebUrl && h.arkime_hunt_id && h.status === 'finished') {
+        var expr = encodeURIComponent('huntId == ' + h.arkime_hunt_id);
+        link = '<a href="' + escHtml(arkimeWebUrl) + '/sessions?expression=' + expr +
+          '" target="_blank" rel="noopener" class="text-ion-cyan hover:brightness-125 text-xs">Open in Arkime ↗</a>';
+      }
+      return '<tr class="border-b border-slate-800/60">' +
+        '<td class="py-2 pr-4 text-slate-200">' + escHtml(h.name) + '</td>' +
+        '<td class="py-2 pr-4 font-mono text-xs text-slate-400">' + escHtml(h.search) + ' <span class="text-slate-600">(' + escHtml(h.search_type) + ')</span></td>' +
+        '<td class="py-2 pr-4 ' + (_HUNT_STATUS_COLORS[h.status] || 'text-slate-400') + '">' + escHtml(h.status) + '</td>' +
+        '<td class="py-2 pr-4 text-right">' + (h.matched_sessions == null ? '—' : fmtNum(h.matched_sessions)) + '</td>' +
+        '<td class="py-2 pr-4 text-slate-500 text-xs">' + escHtml((h.created_at || '').slice(0, 16).replace('T', ' ')) + '</td>' +
+        '<td class="py-2">' + link + '</td></tr>';
+    }).join('');
+  }
+  function loadHunts() {
+    return fetch('/api/arkime/hunts').then(function (r) { return r.ok ? r.json() : { hunts: [] }; })
+      .then(function (d) { renderHunts(d.hunts || []); })
+      .catch(function () {});
+  }
+  function submitHunt() {
+    var name = (document.getElementById('hunt-name').value || '').trim();
+    var search = (document.getElementById('hunt-search').value || '').trim();
+    if (!name || !search) {
+      if (window.showToast) showToast('Hunt needs a name and a packet search term', 'error');
+      return;
+    }
+    var btn = document.getElementById('hunt-submit');
+    btn.disabled = true;
+    fetch('/api/arkime/hunts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name,
+        search: search,
+        search_type: document.getElementById('hunt-type').value,
+        hours: parseInt(document.getElementById('hunt-hours').value, 10) || 24,
+        expression: (document.getElementById('hunt-expression').value || '').trim() || null,
+      }),
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok) {
+          throw new Error(r.status === 403
+            ? 'Lead permission (or Arkime packetSearch) required'
+            : (d.detail || ('HTTP ' + r.status)));
+        }
+        return d;
+      });
+    }).then(function () {
+      document.getElementById('hunt-name').value = '';
+      document.getElementById('hunt-search').value = '';
+      return loadHunts();
+    }).catch(function (e) {
+      if (window.showToast) showToast('Hunt failed: ' + e.message, 'error');
+    }).finally(function () { btn.disabled = false; });
+  }
+
   // ── Demo mode ──────────────────────────────────────────────────────────────
   function _demoOverview(range) {
     var secs = {'24h':86400,'7d':604800,'30d':2592000}[range]||86400;
@@ -1024,6 +1172,9 @@
 
   // ── Init ───────────────────────────────────────────────────────────────────
   async function init() {
+    // Hunt history is ION-side DB state — render it even when Arkime itself
+    // is unreachable/unconfigured (submitting new hunts still needs Arkime).
+    loadHunts();
     if (new URLSearchParams(window.location.search).get('demo') === '1') {
       document.getElementById('atf-unconfigured').classList.remove('hidden');
       loadDemoData(activeRange);
@@ -1042,6 +1193,10 @@
       }
     } catch (_) {}
 
+    // Retention is range-independent — fire once alongside the range-scoped
+    // panels; it also resolves the viewer web URL, then refreshes hunt rows
+    // so they can deep-link.
+    loadRetention().then(loadHunts);
     await loadAll(activeRange);
   }
 
@@ -1185,6 +1340,8 @@
     if (priv) priv.addEventListener('change', function () { loadAll(activeRange); });
     var aiBtn = document.getElementById('ai-review-btn');
     if (aiBtn) aiBtn.addEventListener('click', runAiReview);
+    var huntBtn = document.getElementById('hunt-submit');
+    if (huntBtn) huntBtn.addEventListener('click', submitHunt);
     loadExclusions();
 
     init();

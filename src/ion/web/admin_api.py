@@ -116,9 +116,6 @@ class ArkimeSettingsUpdate(BaseModel):
     arkime_verify_ssl: Optional[bool] = None
     arkime_username: Optional[str] = None
     arkime_password: Optional[str] = None
-    arkime_keycloak_issuer: Optional[str] = None
-    arkime_keycloak_client_id: Optional[str] = None
-    arkime_keycloak_client_secret: Optional[str] = None
 
 
 class OllamaSettingsUpdate(BaseModel):
@@ -288,9 +285,6 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "arkime_verify_ssl": config.arkime_verify_ssl,
             "arkime_username": config.arkime_username,
             "arkime_password_set": bool(config.arkime_password),
-            "arkime_keycloak_issuer": config.arkime_keycloak_issuer,
-            "arkime_keycloak_client_id": config.arkime_keycloak_client_id,
-            "arkime_keycloak_client_secret_set": bool(config.arkime_keycloak_client_secret),
         },
         "ollama": {
             "ollama_enabled": config.ollama_enabled,
@@ -609,12 +603,6 @@ async def update_arkime_settings(
         config.arkime_username = settings.arkime_username
     if settings.arkime_password is not None and not settings.arkime_password.startswith("*"):
         config.arkime_password = settings.arkime_password
-    if settings.arkime_keycloak_issuer is not None:
-        config.arkime_keycloak_issuer = settings.arkime_keycloak_issuer
-    if settings.arkime_keycloak_client_id is not None:
-        config.arkime_keycloak_client_id = settings.arkime_keycloak_client_id
-    if settings.arkime_keycloak_client_secret is not None and not settings.arkime_keycloak_client_secret.startswith("*"):
-        config.arkime_keycloak_client_secret = settings.arkime_keycloak_client_secret
     config.to_file(get_config_path())
     reload_config()
     return {"status": "updated", "section": "arkime"}

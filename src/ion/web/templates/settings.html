@@ -465,12 +465,8 @@
                 <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_enabled" name="arkime_enabled"> Enable Arkime Integration</label></div>
                 <div class="form-group"><label for="arkime_url">Arkime URL</label><input type="url" id="arkime_url" name="arkime_url" placeholder="https://viewer.guardedglass.internal"></div>
                 <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_verify_ssl" name="arkime_verify_ssl"> Verify SSL Certificate</label></div>
-                <h3 class="_ion-s-0cf8f93b0e">Authentication (Keycloak preferred)</h3>
-                <div class="form-group"><label for="arkime_keycloak_issuer">Keycloak Issuer URL</label><input type="url" id="arkime_keycloak_issuer" name="arkime_keycloak_issuer" placeholder="https://keycloak.guardedglass.internal/realms/soc"></div>
-                <div class="form-group"><label for="arkime_keycloak_client_id">Keycloak Client ID</label><input type="text" id="arkime_keycloak_client_id" name="arkime_keycloak_client_id" placeholder="arkime"></div>
-                <div class="form-group"><label for="arkime_keycloak_client_secret">Keycloak Client Secret</label><input type="password" id="arkime_keycloak_client_secret" name="arkime_keycloak_client_secret" placeholder="Leave blank to keep current"></div>
-                <h3 class="_ion-s-0cf8f93b0e">Basic Auth Fallback</h3>
-                <div class="form-group"><label for="arkime_username">Username</label><input type="text" id="arkime_username" name="arkime_username" placeholder="Optional basic auth fallback"></div>
+                <h3 class="_ion-s-0cf8f93b0e">Authentication (HTTP Basic)</h3>
+                <div class="form-group"><label for="arkime_username">Username</label><input type="text" id="arkime_username" name="arkime_username" placeholder="admin"></div>
                 <div class="form-group"><label for="arkime_password">Password</label><input type="password" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
                 <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
@@ -2040,8 +2036,6 @@ function populateForms(config) {
         document.getElementById('arkime_url').value = config.arkime.arkime_url || '';
         document.getElementById('arkime_verify_ssl').checked = config.arkime.arkime_verify_ssl !== false;
         document.getElementById('arkime_username').value = config.arkime.arkime_username || '';
-        document.getElementById('arkime_keycloak_issuer').value = config.arkime.arkime_keycloak_issuer || '';
-        document.getElementById('arkime_keycloak_client_id').value = config.arkime.arkime_keycloak_client_id || '';
     }
 
     // Ollama
@@ -2165,9 +2159,6 @@ async function saveSettings(event, section) {
         data.arkime_verify_ssl = form.arkime_verify_ssl.checked;
         data.arkime_username = form.arkime_username.value;
         if (form.arkime_password.value) data.arkime_password = form.arkime_password.value;
-        data.arkime_keycloak_issuer = form.arkime_keycloak_issuer.value;
-        data.arkime_keycloak_client_id = form.arkime_keycloak_client_id.value;
-        if (form.arkime_keycloak_client_secret.value) data.arkime_keycloak_client_secret = form.arkime_keycloak_client_secret.value;
     } else if (section === 'ollama') {
         data.ollama_enabled = form.ollama_enabled.checked;
         data.ollama_url = form.ollama_url.value;

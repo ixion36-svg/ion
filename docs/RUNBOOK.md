@@ -75,12 +75,18 @@ Used for threat intel enrichment on observables and PCAP analysis.
 
 | Variable | Purpose |
 |----------|---------|
-| `ION_ARKIME_URL` | Arkime viewer URL |
-| `ION_ARKIME_AUTH_MODE` | `keycloak`, `basic`, or `apikey` |
-| `ION_ARKIME_USERNAME` | Username (basic/apikey mode) |
-| `ION_ARKIME_PASSWORD` | Password (basic mode) |
+| `ION_ARKIME_URL` | Arkime viewer URL (server-side) |
+| `ION_ARKIME_USERNAME` / `ION_ARKIME_PASSWORD` | HTTP Basic — the only supported auth (front with nginx + Basic for SSO) |
+| `ION_ARKIME_PUBLIC_URL` | Viewer URL for analyst-browser deep links (defaults to `ION_ARKIME_URL`) |
 
 The alert-to-PCAP workflow uses `ArkimeService.download_pcap_by_community_id(node, cid)` to pull full packet captures by community ID.
+
+Arkime service-user permissions by feature:
+
+- **Read-only** covers PCAP pull, traffic analytics, RTMON, and the retention-awareness loop.
+- **Packet hunts** (`/arkime-traffic` Hunts panel) additionally need the `packetSearch` permission on the Arkime user; submitting from ION is lead-gated (`security:read`) and audit-logged.
+- **Tag write-back** (`ION_ARKIME_TAG_WRITEBACK=true`, default off) tags case sessions `ion-<case-number>` and needs a write-enabled Arkime user.
+- **WISE feed**: set `ION_WISE_TOKEN` and point a WISE `json` source at `/api/wise/ion-iocs` so ION IOCs tag sessions at capture time — `wise.ini` snippet in `src/ion/web/wise_api.py`.
 
 ### Ollama (AI)
 

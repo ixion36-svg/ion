@@ -1145,21 +1145,43 @@ class ElasticsearchService:
             if ds_dataset and ds_dataset not in tags:
                 tags.append(ds_dataset)
 
-        # P3a: Extract geo data from source/destination/client/server
+        # P3a: Extract geo data from source/destination/client/server.
+        # Arkime-fed alert docs carry only the 2-letter code
+        # (source.geo.country_iso_code) — convert to a display name via the
+        # static ISO map so geo doesn't silently vanish on those alerts.
+        from ion.services.country_mapper import get_country_name
+
+        # NOT the module-level _first — a later nested def in this method
+        # shadows that name for the whole function scope.
+        def _scalar(v):
+            if isinstance(v, (list, tuple)):
+                return v[0] if v else None
+            return v
+
         geo_data = {}
         for prefix in ("source", "destination", "client", "server"):
-            geo = source.get(prefix, {}).get("geo", {}) if isinstance(source.get(prefix), dict) else {}
-            if isinstance(geo, dict) and geo:
-                country = geo.get("country_name")
-                city = geo.get("city_name")
-                location = geo.get("location")  # {lat, lon}
-                if country:
-                    geo_data[f"{prefix}_country"] = country
-                if city:
-                    geo_data[f"{prefix}_city"] = city
-                if isinstance(location, dict) and location.get("lat") is not None:
-                    geo_data[f"{prefix}_lat"] = location["lat"]
-                    geo_data[f"{prefix}_lon"] = location["lon"]
+            country = _scalar(_proc_field(source, f"{prefix}.geo.country_name"))
+            iso_code = _scalar(_proc_field(source, f"{prefix}.geo.country_iso_code"))
+            city = _scalar(_proc_field(source, f"{prefix}.geo.city_name"))
+            location = _proc_field(source, f"{prefix}.geo.location")  # {lat, lon}
+            if not country and iso_code:
+                country = get_country_name(iso_code)
+            if country:
+                geo_data[f"{prefix}_country"] = country
+            if iso_code:
+                geo_data[f"{prefix}_country_iso_code"] = str(iso_code).upper()
+            if city:
+                geo_data[f"{prefix}_city"] = city
+            if isinstance(location, dict) and location.get("lat") is not None:
+                geo_data[f"{prefix}_lat"] = location["lat"]
+                geo_data[f"{prefix}_lon"] = location["lon"]
+            # AS organization — Arkime writes the combined "AS15169 Google LLC"
+            # in {prefix}.as.full; ECS-standard docs use as.organization.name.
+            as_org = _scalar(_proc_field(
+                source, f"{prefix}.as.full", f"{prefix}.as.organization.name"
+            ))
+            if as_org:
+                geo_data[f"{prefix}_as_org"] = str(as_org)
 
         # Source system from data_stream
         source_system = None
