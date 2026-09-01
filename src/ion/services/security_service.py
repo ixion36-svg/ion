@@ -143,52 +143,60 @@ class SecurityDetectionService:
         """Check if IP is blocked."""
         return self.blocked_repo.is_blocked(ip_address)
 
-    def analyze_request(self, ctx: RequestContext) -> List[DetectionResult]:
-        """Analyze a request for potential attacks."""
+    def analyze_request(
+        self, ctx: RequestContext, scan_content: bool = True
+    ) -> List[DetectionResult]:
+        """Analyze a request for potential attacks.
+
+        `scan_content` gates the payload-pattern checks (SQLi / XSS / command /
+        template) that inspect the query string and body. Those regexes are a
+        WAF for anonymous attackers probing ION itself — but a SOC analyst's job
+        is to handle malicious content (pasting a command into a case note,
+        opening an alert full of exploit strings), so running them on
+        authenticated traffic is almost pure false-positive noise. The caller
+        passes `scan_content=False` for authenticated requests (overridable via
+        ION_SECURITY_SCAN_AUTHENTICATED). Structural checks that signal an attack
+        on ION regardless of who sends them — path traversal in the URL, scanner
+        and suspicious user-agents — always run.
+        """
         results = []
 
-        # Combine all input for scanning
-        scan_targets = [
-            ctx.request_path or "",
-            ctx.query_string or "",
-            ctx.body or "",
-        ]
-        combined_input = " ".join(scan_targets)
-
-        # Check for SQL injection
-        sql_result = self._check_sql_injection(combined_input)
-        if sql_result.detected:
-            results.append(sql_result)
-
-        # Check for XSS
-        xss_result = self._check_xss(combined_input)
-        if xss_result.detected:
-            results.append(xss_result)
-
-        # Check for path traversal
+        # Structural checks — always run (independent of request body/auth).
         traversal_result = self._check_path_traversal(ctx.request_path or "")
         if traversal_result.detected:
             results.append(traversal_result)
 
-        # Check for command injection
-        cmd_result = self._check_command_injection(combined_input)
-        if cmd_result.detected:
-            results.append(cmd_result)
-
-        # Check for template injection
-        template_result = self._check_template_injection(combined_input)
-        if template_result.detected:
-            results.append(template_result)
-
-        # Check for scanner/recon
         scanner_result = self._check_scanner(ctx.user_agent or "")
         if scanner_result.detected:
             results.append(scanner_result)
 
-        # Check for suspicious user agent
         ua_result = self._check_suspicious_user_agent(ctx.user_agent or "")
         if ua_result.detected:
             results.append(ua_result)
+
+        if not scan_content:
+            return results
+
+        # Payload-pattern checks — only for untrusted (unauthenticated) traffic.
+        combined_input = " ".join(
+            [ctx.request_path or "", ctx.query_string or "", ctx.body or ""]
+        )
+
+        sql_result = self._check_sql_injection(combined_input)
+        if sql_result.detected:
+            results.append(sql_result)
+
+        xss_result = self._check_xss(combined_input)
+        if xss_result.detected:
+            results.append(xss_result)
+
+        cmd_result = self._check_command_injection(combined_input)
+        if cmd_result.detected:
+            results.append(cmd_result)
+
+        template_result = self._check_template_injection(combined_input)
+        if template_result.detected:
+            results.append(template_result)
 
         return results
 
@@ -465,6 +473,62 @@ class SecurityDetectionService:
         )
 
         return self.record_event(ctx, result)
+
+    def record_authorization_failure(
+        self,
+        ctx: RequestContext,
+        status_code: int,
+        threshold: int = 5,
+        window_minutes: int = 5,
+    ) -> Tuple[SecurityEvent, bool]:
+        """Record a 401/403 and escalate a burst from one actor.
+
+        403 = an authenticated user hit a resource above their role
+        (privilege probing); 401 = an unauthenticated caller reached a protected
+        resource (access probing / scanning). Each is aggregated per
+        (source_ip, type) so a single expired session stays a low-severity
+        blip, while repeated attempts cross `threshold` within `window_minutes`
+        and escalate to HIGH — the signal an analyst should actually chase.
+        Returns (event, escalated).
+        """
+        if status_code == 403:
+            event_type = SecurityEventType.PRIVILEGE_ESCALATION
+            title = "Forbidden Access Attempt"
+            who = ctx.username or f"user {ctx.user_id}" if ctx.user_id else ctx.source_ip
+            base_desc = f"{who} was denied access to {ctx.request_path}"
+        else:
+            event_type = SecurityEventType.UNAUTHORIZED_ACCESS
+            title = "Unauthenticated Access Attempt"
+            base_desc = f"Unauthenticated request to protected {ctx.request_path} from {ctx.source_ip}"
+
+        result = DetectionResult(
+            detected=True,
+            event_type=event_type,
+            severity=SecurityEventSeverity.LOW,
+            title=title,
+            description=base_desc,
+            confidence_score=40,
+            should_block=False,
+        )
+        event = self.record_event(ctx, result)
+
+        # event_count is the in-window attempt tally (aggregation increments it).
+        escalated = (event.event_count or 1) >= threshold
+        if escalated:
+            actor = ctx.username or (f"user {ctx.user_id}" if ctx.user_id else ctx.source_ip)
+            event.severity = SecurityEventSeverity.HIGH
+            event.title = (
+                "Repeated privilege-escalation attempts"
+                if status_code == 403
+                else "Repeated unauthorized access attempts"
+            )
+            event.description = (
+                f"{actor} produced {event.event_count} {status_code} responses "
+                f"in the last {window_minutes} min (latest: {ctx.request_path})"
+            )
+            event.confidence_score = min(60 + event.event_count * 5, 95)
+
+        return event, escalated
 
     def block_ip(
         self,

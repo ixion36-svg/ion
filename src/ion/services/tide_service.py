@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import re
 import threading
 import time
 from typing import Any, Optional
@@ -13,6 +14,14 @@ from ion.core.circuit_breaker import tide_breaker
 from ion.core.config import get_ssl_verify, get_tide_config
 
 logger = logging.getLogger(__name__)
+
+
+# TIDE queries are hand-built SQL strings shipped to TIDE's /api/external/query
+# executor, so `space` (the only caller-supplied value that reaches a query) MUST
+# be constrained to an identifier charset — it is interpolated into a string
+# literal and, unlike the escaped string params, has no other guard. Rejecting
+# anything outside this set is what keeps `WHERE space = '{self.space}'` safe.
+_SPACE_RE = re.compile(r"^[A-Za-z0-9_.\- ]{1,64}$")
 
 
 # Per-process micro-cache for identical SQL within a short window. Detection
@@ -1084,7 +1093,15 @@ class TideService:
         ]
 
     def set_space(self, space: str) -> None:
-        """Switch the active space filter for all subsequent queries."""
+        """Switch the active space filter for all subsequent queries.
+
+        Raises ValueError if `space` is not a plain identifier — it is
+        interpolated into raw SQL, so anything outside `_SPACE_RE` is refused
+        rather than escaped.
+        """
+        space = (space or "").strip()
+        if not _SPACE_RE.match(space):
+            raise ValueError("Invalid TIDE space")
         self.space = space
         # Clear the query cache since results are space-dependent
         with _CACHE_LOCK:

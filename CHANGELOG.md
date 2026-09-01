@@ -1,13 +1,49 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.87.0 -->
-<!-- ion-doc:version=0.87.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.88.0 -->
+<!-- ion-doc:version=0.88.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-08-26 -->
+<!-- ion-doc:date=2026-09-01 -->
 
 # Changelog
+
+## v0.88.0 — 2026-09-01
+
+**Flow Topology (NSE view) + a security-monitoring tightening pass.**
+
+- **Flow Topology (NSE view).** New network-security-engineer view rendering
+  the Arkime conversation graph, joined to ION's asset and threat context.
+
+- **Audit subsystem: fewer false positives, real behavioural signal.** The
+  request attack-detector no longer runs its payload-pattern checks
+  (SQLi/XSS/command/template) on *authenticated* traffic — a SOC analyst
+  legitimately handles malicious content (pasting a command into a case note,
+  opening an alert full of exploit strings), so those hits were almost pure
+  noise. Structural checks that signal an attack on ION itself (path traversal
+  in the URL, scanner/suspicious user-agents) still run for everyone.
+  Overridable via `ION_SECURITY_SCAN_AUTHENTICATED`.
+
+- **Authorization-failure auditing + alerting.** 401/403 responses are now
+  recorded and attributed to the acting user/IP; a burst from one actor within
+  a rolling window escalates to a HIGH `security_event` (privilege-probing /
+  IDOR enumeration / unauthenticated scanning). Tunable via
+  `ION_AUTHZ_ALERT_ENABLED` / `ION_AUTHZ_ALERT_THRESHOLD` /
+  `ION_AUTHZ_ALERT_WINDOW_MINUTES`. Security events now carry the real user
+  attribution the middleware previously left blank.
+
+- **Hardening pass (defence-in-depth).** Proactive review closed several latent
+  input-validation and access-control items: stricter validation on an optional
+  integration's query path, access-control alignment on the internal assessment
+  module so its data endpoints match their siblings' permission gate, and login
+  responses made uniform to remove a username/account-state enumeration oracle
+  (the specific reason is retained in the audit log, not returned to the
+  caller). Shipped deploy template now enables password-change enforcement and a
+  minimum-password-length policy by default.
+
+- **Net-new findings: 0C / 0H / 0M / 0L** (ION-introduced). The hardening items
+  above are proactive closures, not counted regressions.
 
 ## v0.87.0 — 2026-08-26
 

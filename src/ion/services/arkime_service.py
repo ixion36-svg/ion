@@ -361,6 +361,14 @@ class ArkimeService:
         """
         if not self.is_configured:
             raise ArkimeError("Arkime is not configured")
+        # `ip` originates from adversary-influenceable alert fields
+        # (source_ip / destination_ip), so validate it as a real address before
+        # interpolating into the Arkime expression — otherwise a crafted value
+        # breaks out of the term (node is escaped below; ip must be validated).
+        try:
+            ip = str(ipaddress.ip_address(str(ip).strip()))
+        except ValueError as e:
+            raise ArkimeError(f"Invalid IP for Arkime search: {ip!r}") from e
         expression = f'(ip.src == {ip} || ip.dst == {ip})'
         if node:
             # node originates from an ES alert document; escape quote/backslash

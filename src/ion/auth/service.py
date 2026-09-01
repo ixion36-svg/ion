@@ -27,6 +27,12 @@ class AuthService:
     # Used to ensure constant-time comparison even when user doesn't exist
     _DUMMY_HASH = "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.NTtYB.1NQq1vRi"
 
+    # All pre-auth failures return THIS to the client. A differential message
+    # (disabled / service-account / locked) hands an unauthenticated caller a
+    # user + account-state enumeration oracle. The specific reason is kept in the
+    # audit log via _log_failed_login, never surfaced to the caller.
+    _GENERIC_LOGIN_ERROR = "Invalid username or password"
+
     def __init__(
         self,
         session: Session,
@@ -76,7 +82,7 @@ class AuthService:
             # Verify against dummy hash to consume same time as real verification
             password_hasher.verify(password, self._DUMMY_HASH)
             self._log_failed_login(username, ip_address, "User not found")
-            return None, None, "Invalid username or password"
+            return None, None, self._GENERIC_LOGIN_ERROR
 
         if getattr(user, "is_service_account", False):
             # Service accounts (AI analysts, integration bots) have no
@@ -92,13 +98,13 @@ class AuthService:
             self._log_failed_login(
                 username, ip_address, "Service account login attempt"
             )
-            return None, None, "This account cannot be used for interactive login"
+            return None, None, self._GENERIC_LOGIN_ERROR
 
         if not user.is_active:
             # Still verify password to prevent timing leak for disabled accounts
             password_hasher.verify(password, user.password_hash)
             self._log_failed_login(username, ip_address, "Account disabled")
-            return None, None, "Account is disabled"
+            return None, None, self._GENERIC_LOGIN_ERROR
 
         # Account lockout (opt-in via ION_ACCOUNT_LOCKOUT_ENABLED)
         lockout_enabled = get_config().account_lockout_enabled
@@ -108,7 +114,7 @@ class AuthService:
             password_hasher.verify(password, user.password_hash)
             remaining = int((user.locked_until - now).total_seconds() // 60) + 1
             self._log_failed_login(username, ip_address, "Account locked")
-            return None, None, f"Account is temporarily locked. Try again in {remaining} minute(s)"
+            return None, None, self._GENERIC_LOGIN_ERROR
 
         if not password_hasher.verify(password, user.password_hash):
             if lockout_enabled:
@@ -131,10 +137,10 @@ class AuthService:
                         },
                         ip_address=ip_address,
                     )
-                    return None, None, f"Account is temporarily locked. Try again in {self.LOCKOUT_DURATION_MINUTES} minute(s)"
+                    return None, None, self._GENERIC_LOGIN_ERROR
                 self.db_session.flush()
             self._log_failed_login(username, ip_address, "Invalid password")
-            return None, None, "Invalid username or password"
+            return None, None, self._GENERIC_LOGIN_ERROR
 
         # Successful login — reset failed attempts
         if lockout_enabled and user.failed_login_attempts:

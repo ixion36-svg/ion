@@ -1070,8 +1070,11 @@ def tide_de_set_space(space: str):
     svc = get_tide_service()
     if not svc.enabled:
         return {"ok": False, "error": "TIDE not configured"}
-    svc.set_space(space)
-    return {"ok": True, "active": space}
+    try:
+        svc.set_space(space)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid space value")
+    return {"ok": True, "active": svc.space}
 
 
 @router.get("/tide/de/sync-status", dependencies=[Depends(require_permission("alert:read"))])
@@ -3484,12 +3487,12 @@ class DocChecklistAdd(BaseModel):
 # Catalogue read — pillars + sub-profiles
 # ---------------------------------------------------------------------------
 
-@router.get("/pillars")
+@router.get("/pillars", dependencies=[Depends(require_permission("alert:read"))])
 def get_pillars(session: Session = Depends(get_db_session)):
     return {"pillars": list_pillars(session)}
 
 
-@router.get("/pillars/{pillar_id}/subprofiles")
+@router.get("/pillars/{pillar_id}/subprofiles", dependencies=[Depends(require_permission("alert:read"))])
 def get_subprofiles_in_pillar(
     pillar_id: str,
     session: Session = Depends(get_db_session),
@@ -3509,7 +3512,7 @@ def get_subprofiles_in_pillar(
     }
 
 
-@router.get("/subprofiles/{sub_id}")
+@router.get("/subprofiles/{sub_id}", dependencies=[Depends(require_permission("alert:read"))])
 def get_subprofile(sub_id: str, session: Session = Depends(get_db_session)):
     full = get_subprofile_full(session, sub_id)
     if full is None:
@@ -3587,7 +3590,7 @@ def patch_subprofile_route(
     return updated
 
 
-@router.get("/subprofiles/{sub_id}/use-cases/{uc_id}")
+@router.get("/subprofiles/{sub_id}/use-cases/{uc_id}", dependencies=[Depends(require_permission("alert:read"))])
 def get_use_case_route(
     sub_id: str,
     uc_id: str,
@@ -3684,7 +3687,7 @@ def _get_or_create_studio_assessment(
     return row
 
 
-@router.get("/systems/{sys_id}/answers")
+@router.get("/systems/{sys_id}/answers", dependencies=[Depends(require_permission("alert:read"))])
 def get_system_answers(sys_id: int, session: Session = Depends(get_db_session)):
     sys = session.get(CyabSystem, sys_id)
     if sys is None:
@@ -3751,7 +3754,7 @@ def patch_system_answers(
 # Data-source use-case status
 # ---------------------------------------------------------------------------
 
-@router.get("/systems/{sys_id}/data-sources")
+@router.get("/systems/{sys_id}/data-sources", dependencies=[Depends(require_permission("alert:read"))])
 def list_data_sources_for_system(
     sys_id: int,
     subprofile_id: Optional[str] = None,
@@ -3781,7 +3784,7 @@ def list_data_sources_for_system(
     }
 
 
-@router.get("/data-sources/{ds_id}/use-case-status")
+@router.get("/data-sources/{ds_id}/use-case-status", dependencies=[Depends(require_permission("alert:read"))])
 def get_data_source_uc_status(ds_id: int, session: Session = Depends(get_db_session)):
     ds = session.get(CyabDataSource, ds_id)
     if ds is None:
@@ -3846,7 +3849,7 @@ def patch_data_source_uc_status(
 # Per-system sub-profile coverage
 # ---------------------------------------------------------------------------
 
-@router.get("/systems/{sys_id}/coverage")
+@router.get("/systems/{sys_id}/coverage", dependencies=[Depends(require_permission("alert:read"))])
 def get_system_coverage(sys_id: int, session: Session = Depends(get_db_session)):
     sys = session.get(CyabSystem, sys_id)
     if sys is None:
