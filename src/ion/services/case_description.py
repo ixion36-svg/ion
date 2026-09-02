@@ -15,7 +15,12 @@ def build_case_description(
     """Build a standardized markdown description for a case.
 
     Produces a consistent format regardless of whether the case originated
-    in Kibana or ION.
+    in Kibana or ION. Kept intentionally lean: the observable enrichment and
+    the linked-alert list are NOT rendered here — observables (with any OpenCTI
+    enrichment) post as a separate case Note via ``post_enrichment_note``, and
+    alerts show as first-class links on the case. ``observables``/``alert_ids``
+    stay in the signature for callers; they just no longer render into the
+    description.
     """
     parts = [description] if description else []
 
@@ -30,27 +35,6 @@ def build_case_description(
 
     if evidence_summary:
         parts.append(f"\n**Evidence Summary:**\n{evidence_summary}")
-
-    if observables:
-        parts.append("\n**Observables:**")
-        obs_by_type: dict[str, list[str]] = {}
-        for obs in observables:
-            obs_type = obs.get("type", "unknown")
-            if obs_type not in obs_by_type:
-                obs_by_type[obs_type] = []
-            obs_by_type[obs_type].append(obs.get("value", "?"))
-        for obs_type, values in sorted(obs_by_type.items()):
-            line = f"- **{obs_type}:** {', '.join(values[:5])}"
-            if len(values) > 5:
-                line += f" (+{len(values) - 5} more)"
-            parts.append(line)
-
-    if alert_ids:
-        parts.append(f"\n**Linked Alert IDs ({len(alert_ids)}):**")
-        for aid in alert_ids[:10]:
-            parts.append(f"- `{aid}`")
-        if len(alert_ids) > 10:
-            parts.append(f"- ... and {len(alert_ids) - 10} more")
 
     result = "\n".join(parts).strip()
     # Kibana >= 8.19 rejects an empty case description outright (400: "The

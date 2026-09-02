@@ -3229,7 +3229,18 @@ function renderPanelContent(c) {
     const sev = c.severity || 'medium';
     const sevIcons = { critical: 'icon-alert-octagon', high: 'icon-alert-triangle', medium: 'icon-info', low: 'icon-minus-circle' };
     const alertCount = (c.alerts || []).length;
-    const obsCount = (c.observables || []).length;
+    // Dedup observables (case + linked alerts) by type|value so the count and
+    // the panel never show the same IP/domain twice on a multi-alert case.
+    const _obsKey = o => (o.type || '') + '|' + (o.value || '');
+    const dedupedObs = (() => {
+        const m = new Map();
+        (c.observables || []).forEach(o => { const k = _obsKey(o); if (!m.has(k)) m.set(k, o); });
+        (c.alerts || []).forEach(a => (a.observables || []).forEach(o => {
+            const k = _obsKey(o); if (!m.has(k)) m.set(k, o);
+        }));
+        return [...m.values()];
+    })();
+    const obsCount = dedupedObs.length;
     html += '<div class="cpanel-sev-strip sev-' + esc(sev) + '">'
         + '<span class="cpanel-sev-icon"><i class="' + (sevIcons[sev] || 'icon-info') + '"></i></span>'
         + '<span class="cpanel-sev-text">' + esc(sev) + ' severity</span>'
@@ -3333,22 +3344,9 @@ function renderPanelContent(c) {
     }
 
     // ── Observables Section ────────────────────────────────
-    const observables = c.observables || [];
-    // Also gather observables from linked alerts
-    const alertObs = [];
-    (c.alerts || []).forEach(a => {
-        (a.observables || []).forEach(o => {
-            if (!alertObs.find(x => x.value === o.value && x.type === o.type)) {
-                alertObs.push(o);
-            }
-        });
-    });
-    const allObs = [...observables];
-    alertObs.forEach(o => {
-        if (!allObs.find(x => x.value === o.value && x.type === o.type)) {
-            allObs.push(o);
-        }
-    });
+    // dedupedObs (computed above) already merges case + linked-alert
+    // observables with duplicates removed.
+    const allObs = dedupedObs;
 
     html += '<div class="cpanel-section" data-tab="observables">';
     html += '<div class="cpanel-section-title">Observables (' + allObs.length + ')</div>';

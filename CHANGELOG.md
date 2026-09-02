@@ -9,6 +9,31 @@
 
 # Changelog
 
+## v0.89.0 — 2026-09-02
+
+**Leaner case descriptions + observables as an enrichment note.**
+
+- **Case description trimmed.** The description no longer enumerates linked
+  alert IDs (they show as first-class alert links) or dumps the observable list
+  — on a multi-alert case both dominated the field. It now carries the
+  narrative plus Affected Hosts/Users and Triggered Rules.
+
+- **Observables deduped in the case panel.** The Observables tab and its counts
+  dedup by type+value (case + linked-alert observables merged), so the same
+  IP/domain no longer shows once per alert.
+
+- **Observables post as an enrichment Note (mirrored to Kibana).** A case's
+  enrichable observables are listed in the existing "Observables" case Note —
+  now posted even when nothing is enriched (air-gapped), so IOCs still appear on
+  the case and its Kibana mirror, gaining OpenCTI threat context (level, score,
+  labels, actors) as enrichment lands. Rendered as a bulleted list, not a table:
+  Kibana's case markdown (EUI) does not reliably render GFM tables.
+
+- Tests: `tests/test_v089_case_description_lean.py`; `test_v059_cases_enrichment`
+  updated for the always-list behaviour.
+
+- **Net-new findings: 0C / 0H / 0M / 0L.**
+
 ## v0.88.0 — 2026-09-01
 
 **Flow Topology (NSE view) + a security-monitoring tightening pass.**

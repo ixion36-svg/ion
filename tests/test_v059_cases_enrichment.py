@@ -6,8 +6,9 @@ Pins the shared frontend contract and the air-gap guarantees:
 - (b) auto_enrich_new_observable actually awaits the enrich coroutine (the
   pre-v0.59.0 "never awaited" bug), and is a silent no-op — threat_level stays
   "unknown" — when OpenCTI is unconfigured (air-gapped);
-- (c) post_enrichment_note composes the expected Threat Enrichment Summary Note
-  (entity_type=CASE) and is a no-op when there's nothing enrichable to report.
+- (c) post_enrichment_note lists the case's enrichable observables as a CASE
+  Note (OpenCTI context folded in when present), and is a no-op only when the
+  case has no enrichable observables.
 """
 
 import asyncio
@@ -224,7 +225,8 @@ def test_post_enrichment_note_composes_and_writes(session):
     assert note.entity_type == NoteEntityType.CASE
     assert note.entity_id == str(case.id)
     assert note.user_id == 1
-    assert note.content.startswith("**Threat Enrichment Summary** (OpenCTI, TLP:AMBER)")
+    assert note.content.startswith("**Observables** (TLP:AMBER)")
+    assert "enriched via OpenCTI" in note.content
     assert "1.2.3.4" in note.content
     assert "high" in note.content
     assert "(85)" in note.content
@@ -247,13 +249,13 @@ def test_post_enrichment_note_composes_and_writes(session):
     assert len(stored2) == 1
 
 
-def test_post_enrichment_note_noop_without_enrichable(session):
+def test_post_enrichment_note_lists_unenriched_observables(session):
     _user(session)
     case = _case(session, num="C-2")
 
-    # A display-only observable (hostname) linked to the case — nothing to
-    # report. And an enrichable-but-unenriched IP (air-gap: unknown, no
-    # enrichment) — also nothing to report.
+    # Air-gapped: an enrichable-but-unenriched IP (unknown, no enrichment) is
+    # now LISTED so the observable still appears on the case + Kibana mirror.
+    # A display-only observable (hostname) is not enrichable and stays out.
     host = Observable(type=ObservableType.HOSTNAME, value="web01",
                       normalized_value="web01")
     ip = Observable(type=ObservableType.IPV4, value="8.8.8.8",
@@ -262,6 +264,30 @@ def test_post_enrichment_note_noop_without_enrichable(session):
     session.flush()
     _link_case(session, host.id, case.id, "hostname")
     _link_case(session, ip.id, case.id, "source_ip")
+    session.commit()
+
+    note = asyncio.run(post_enrichment_note(session, case.id, 1, "eng1"))
+    assert note is not None
+    assert "8.8.8.8" in note.content              # enrichable IP is listed
+    assert "web01" not in note.content            # non-enrichable hostname excluded
+    assert "enriched via OpenCTI" not in note.content  # nothing was enriched
+    assert session.query(Note).filter(
+        Note.entity_type == NoteEntityType.CASE,
+        Note.entity_id == str(case.id),
+    ).count() == 1
+
+
+def test_post_enrichment_note_noop_without_any_enrichable(session):
+    _user(session)
+    case = _case(session, num="C-3")
+
+    # Only a display-only observable (hostname) — nothing enrichable, so the
+    # note is skipped entirely.
+    host = Observable(type=ObservableType.HOSTNAME, value="web02",
+                      normalized_value="web02")
+    session.add(host)
+    session.flush()
+    _link_case(session, host.id, case.id, "hostname")
     session.commit()
 
     note = asyncio.run(post_enrichment_note(session, case.id, 1, "eng1"))
