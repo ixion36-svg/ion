@@ -9,6 +9,37 @@
 
 # Changelog
 
+## v0.89.2 — 2026-09-07
+
+**Two clipping bugs that hid content on anything narrower than a wide desktop.**
+
+- **The alert queue painted through its own border.** `.aq-wrap` carried a
+  border, radius and background but never set `overflow-x`, so it defaulted to
+  `visible` and a table wider than the wrapper rendered straight through the
+  frame — the right-hand end of every row ran off past the card and off the
+  viewport, and the wrapper's border never closed. The nearest scroll context
+  was `.card-body` one level up, which scrolls the card rather than the table,
+  so the border was overrun either way. The table now scrolls inside its own
+  frame.
+
+- **The header nav was clipped between 768px and 1280px.** `base.html` gates
+  the horizontal nav on Tailwind's `md`, but the nav's content needs ~1150px
+  and the header ~1186px, so the header overflowed by 77px and the right-hand
+  links were cut off with no way to reach them. Corrected with a hand-written
+  media query rather than by moving the classes to `xl:` — `tailwind.css` is
+  prebuilt and carries no `xl:flex` / `xl:hidden` utilities, and there is no
+  Tailwind toolchain in the repo to regenerate it, so that edit would have
+  hidden the nav at every width instead. The override also moves the mobile
+  toggle and panel in step; moving the nav alone would leave no navigation at
+  all across that range.
+
+  Verified at 1400 / 1279 / 1119 / 700: header overflow is 0 at every width,
+  the full nav returns at 1280 and up, and the hamburger covers everything
+  below it.
+
+Note for anyone upgrading: stylesheets are cache-busted on `?v=<version>`, so
+browsers holding 0.89.1 CSS need this version bump to pick the fixes up.
+
 ## v0.89.1 — 2026-09-07
 
 **Integration health told the truth about itself.**
