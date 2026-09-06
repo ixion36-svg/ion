@@ -9,6 +9,60 @@
 
 # Changelog
 
+## v0.89.1 — 2026-09-07
+
+**Integration health told the truth about itself.**
+
+Eight defects, all found by exercising ION against a live Elastic / Kibana /
+OpenCTI / TIDE / Arkime / GitLab stack rather than against mocks. Every one of
+them reported a healthy system as broken, or hid working data behind an empty
+panel — none was a connectivity fault.
+
+- **TIDE could never report healthy.** `BaseConnector.healthcheck()` gates on
+  `connected`, but `TideService.test_connection()` answers with `ok`. The key
+  never matched, so the check fell to its error branch and surfaced the base
+  class's fallback string "Connection failed" — the service's own `error` key
+  being absent on the success path. `TIDEConnector` now translates the payload
+  the way `KibanaCasesConnector` already did.
+
+- **Arkime's health was filed under the wrong integration.** `ARKIME` was
+  missing from `IntegrationType`, so `IntegrationType("arkime")` raised and
+  every probe was recorded as `CUSTOM`. `/api/integrations/status` then found no
+  arkime row and returned `status: null` forever — the card read "Configured"
+  and never "healthy".
+
+- **Selecting an alert could not open a case.** The alert queue's
+  `onSelectionChange` called `updateBulkActionsBar()` and
+  `syncSelectAllCheckbox()`; neither function exists (the real one is
+  `updateBulkActionsUI`, which already syncs the header checkbox itself). Every
+  tick threw ReferenceError before the toolbar could be shown, so the counter
+  stuck at "0 alerts selected" and Create Case / Add to Case stayed unreachable
+  behind `display: none`.
+
+- **Alert stats 500'd on any ECS-conformant index.** `get_alert_stats` asked for
+  a `"missing": "unknown"` bucket on `event.severity`, which ECS types as a
+  long. Elasticsearch answered `number_format_exception` / "all shards failed".
+  The missing-bucket is gone; documents without the field are simply not
+  bucketed.
+
+- **The integration log viewer was permanently empty.** `to_dict()` emits
+  `created_at` while `IntegrationLogResponse` requires `timestamp`, so every row
+  failed validation — and the handler swallowed it into an empty 200, which
+  renders as "No logs found" no matter how much data exists. The Optional fields
+  also lacked defaults, which in Pydantic v2 still means required.
+
+- **The wallboard reported two healthy services as down.** It imported
+  `OpenctiService` (the class is `OpenCTIService`), raising ImportError on every
+  snapshot; and it probed TIDE via `getattr(tide, "is_configured", lambda:
+  False)()` when `TideService` exposes `enabled`, so the default fired every
+  time and a configured TIDE always rendered "off".
+
+- **"GitLab is not configured" was a 500.** The not-configured raise carried no
+  `status_code`, and the API layer maps `e.status_code or 500`, turning an
+  operator configuration state into a server error on `/gitlab/issues`,
+  `/labels`, `/members` and `/milestones`. It is now 503, matching how TIDE
+  reports the same condition.
+
 ## v0.89.0 — 2026-09-02
 
 **Leaner case descriptions + observables as an enrichment note.**

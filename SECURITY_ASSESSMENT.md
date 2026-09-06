@@ -1,7 +1,7 @@
 ﻿<!-- ion-doc:type=SECURITY ASSESSMENT -->
 <!-- ion-doc:title=ION Security Assessment Report -->
 <!-- ion-doc:subtitle=Per-release security audit with severity-trend table; OWASP Top 10 + AI safety + supply chain -->
-<!-- ion-doc:version=0.89.0 -->
+<!-- ion-doc:version=0.89.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) + Security Audit Agent -->
 <!-- ion-doc:audience=Customer security, ITHC supplier, compliance, design authority -->
