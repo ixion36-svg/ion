@@ -709,15 +709,21 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
     try:
         from ion.services.tide_service import get_tide_service
         tide = get_tide_service()
-        configured = tide is not None and getattr(tide, "is_configured", lambda: False)()
+        # TideService exposes `enabled`, not `is_configured`. The old getattr
+        # fell through to its `lambda: False` default on every call, so a fully
+        # configured and healthy TIDE always rendered as "off".
+        configured = tide is not None and bool(getattr(tide, "enabled", False))
         health["tide"] = {"status": "up" if configured else "off", "details": "configured" if configured else "not configured"}
     except Exception as exc:
         health["tide"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}
 
     # OpenCTI — connector state.
     try:
-        from ion.services.opencti_service import OpenctiService
-        oc = OpenctiService()
+        # The class is OpenCTIService — the misspelled import raised ImportError
+        # on every snapshot, so the wallboard reported OpenCTI as "down" even
+        # when the integration was healthy.
+        from ion.services.opencti_service import OpenCTIService
+        oc = OpenCTIService()
         configured = bool(getattr(oc, "url", None))
         health["opencti"] = {"status": "up" if configured else "off", "details": "configured" if configured else "not configured"}
     except Exception as exc:

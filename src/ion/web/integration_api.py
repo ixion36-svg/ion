@@ -127,9 +127,11 @@ class IntegrationLogResponse(BaseModel):
     level: str
     action: str
     message: str
-    details: Optional[dict]
-    user_id: Optional[int]
-    timestamp: Optional[str]
+    # Optional without a default is still *required* in Pydantic v2 — these
+    # need explicit defaults, or a row missing any of them fails validation.
+    details: Optional[dict] = None
+    user_id: Optional[int] = None
+    timestamp: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -596,7 +598,17 @@ async def get_integration_logs(
             offset=offset,
             session=session,
         )
-        return [IntegrationLogResponse(**log.to_dict()) for log in logs]
+        # IntegrationEvent.to_dict() names the time field `created_at`; this
+        # response model calls it `timestamp`. Passing the dict straight in
+        # raised ValidationError on every row, and the except below swallowed
+        # it into an empty 200 — so the log viewer showed "No logs found"
+        # however much data was there.
+        rows = []
+        for log in logs:
+            d = log.to_dict()
+            d["timestamp"] = d.pop("created_at", None)
+            rows.append(IntegrationLogResponse(**d))
+        return rows
     except Exception as e:
         # Return an empty list with a 200 instead of 500 — the frontend
         # treats non-200 as "failed to load" and shows no fallback.

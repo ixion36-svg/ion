@@ -7188,7 +7188,14 @@ function _aqMount() {
         // queue behind an open alert
         isBlocked: () => !!document.querySelector(
             '.modal.show, .acp-panel.open, #acp-closure-overlay.open'),
-        onSelectionChange: () => { updateBulkActionsBar(); syncSelectAllCheckbox(); },
+        // updateBulkActionsUI() is the real function, and it already syncs the
+        // header select-all checkbox itself. The two names previously called
+        // here — updateBulkActionsBar and syncSelectAllCheckbox — never existed,
+        // so every checkbox tick threw ReferenceError before the toolbar could
+        // be shown: the selection Set updated, but the bar stayed display:none
+        // and the counter stayed "0 alerts selected", putting Create Case out
+        // of reach for the whole queue.
+        onSelectionChange: () => updateBulkActionsUI(),
         onRender: (n) => {
             const el = document.getElementById('aq-count');
             if (el) el.textContent = `${n} of ${allAlerts.length}`;

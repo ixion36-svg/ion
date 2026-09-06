@@ -1653,10 +1653,14 @@ class ElasticsearchService:
                 }
             },
             "aggs": {
+                # No `missing` bucket here: ECS types event.severity as a
+                # long, and a string default makes Elasticsearch fail the
+                # whole search with number_format_exception / "all shards
+                # failed" — a 500 on every ECS-conformant alert index.
+                # Documents without the field are simply not bucketed.
                 "by_severity": {
                     "terms": {
-                        "field": "event.severity",
-                        "missing": "unknown"
+                        "field": "event.severity"
                     }
                 },
                 "by_status": {

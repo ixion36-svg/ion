@@ -34,6 +34,7 @@ class IntegrationType(str, Enum):
     DFIR_IRIS = "dfir_iris"
     KIBANA_CASES = "kibana_cases"
     TIDE = "tide"
+    ARKIME = "arkime"
     SLACK = "slack"      # Future
     JIRA = "jira"        # Future
     CUSTOM = "custom"

@@ -202,7 +202,11 @@ class GitLabService:
                        The API token must belong to a GitLab admin.
         """
         if not self.is_configured:
-            raise GitLabError("GitLab integration is not configured")
+            # 503, not a bare raise. The API layer maps `e.status_code or 500`,
+            # so leaving this unset turned "the operator has not configured
+            # GitLab" into a 500 server error on /gitlab/issues, /labels,
+            # /members and /milestones. TIDE reports the same condition as 503.
+            raise GitLabError("GitLab integration is not configured", 503)
 
         headers = self._get_headers()
         if sudo_user and self.sudo_enabled:

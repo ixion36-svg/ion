@@ -25,7 +25,23 @@ class TIDEConnector(BaseConnector):
         return True
 
     async def test_connection(self) -> Dict[str, Any]:
-        return self._service.test_connection()
+        """Test the TIDE connection.
+
+        Adapts TideService.test_connection() to the connector format
+        expected by BaseConnector.healthcheck(). The service reports
+        success as `ok`; the base class gates health on `connected`.
+        Without this translation a reachable TIDE that answered the
+        probe was still reported as ERROR "Connection failed" — the
+        base class's fallback string, reached because the service's
+        own `error` key is absent on the success path.
+        """
+        result = self._service.test_connection()
+        return {
+            "connected": result.get("ok", False),
+            "rule_count": result.get("rule_count"),
+            "space": result.get("space"),
+            "error": result.get("error"),
+        }
 
     async def sync(self, **kwargs) -> Dict[str, Any]:
         if not self.is_configured:
