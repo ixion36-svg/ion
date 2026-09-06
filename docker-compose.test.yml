@@ -39,7 +39,7 @@ services:
 
   ion:
     build: .
-    image: ixion36/ion:${ION_VERSION:-latest}
+    image: fubsxploitapps/ion:${ION_VERSION:-latest}
     container_name: ion
     restart: unless-stopped
     ports:

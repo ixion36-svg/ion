@@ -178,7 +178,7 @@ def cab_markdown(cr: ChangeRequest) -> str:
 def default_backout_plan(current: Optional[str]) -> str:
     return (
         f"Roll back by redeploying the previous ION image tag "
-        f"(`ixion36/ion:{current or 'PREVIOUS'}`): set `ION_VERSION={current or 'PREVIOUS'}` "
+        f"(`fubsxploitapps/ion:{current or 'PREVIOUS'}`): set `ION_VERSION={current or 'PREVIOUS'}` "
         f"and `docker compose up -d`. The database schema is additive across this "
         f"upgrade (new tables/columns only), so the prior image runs against the "
         f"current database without migration. Verify login + dashboard load post-rollback."

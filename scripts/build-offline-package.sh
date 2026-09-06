@@ -13,12 +13,12 @@
 #   ./scripts/build-offline-package.sh 0.44.1 hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF pg17
 #
 # What this bundles (v0.10.4+ needs these — previous script missed them):
-#   - ixion36/ion:<VERSION>     Application image
-#   - pgvector/pgvector:<PG>    Postgres + pgvector (not plain postgres!)
-#   - ollama/ollama:latest      LLM host
-#   - Chat model                Bob's reasoning (default Foundation-Sec-1.1-8B-Instruct)
-#   - nomic-embed-text          Embeddings for case similarity + KB RAG
-#                               (NEW in v0.10.4 — silent-fail without it)
+#   - fubsxploitapps/ion:<VERSION>      Application image
+#   - pgvector/pgvector:<PG>            Postgres + pgvector (not plain postgres!)
+#   - ollama/ollama:latest              LLM host
+#   - Chat model                        Bob's reasoning (default Foundation-Sec-1.1-8B-Instruct)
+#   - nomic-embed-text                  Embeddings for case similarity + KB RAG
+#                                       (NEW in v0.10.4 — silent-fail without it)
 # =============================================================================
 
 set -e
@@ -50,8 +50,8 @@ mkdir -p "${OUTPUT_DIR}/deploy/ssl"
 # ----- Step 1: ION image -----
 echo ""
 echo "[1/7] Pulling ION application image..."
-docker pull "ixion36/ion:${VERSION}"
-docker save "ixion36/ion:${VERSION}" | gzip > "${OUTPUT_DIR}/images/ion-${VERSION}.tar.gz"
+docker pull "fubsxploitapps/ion:${VERSION}"
+docker save "fubsxploitapps/ion:${VERSION}" | gzip > "${OUTPUT_DIR}/images/ion-${VERSION}.tar.gz"
 
 # ----- Step 2: Postgres (pgvector) image -----
 echo ""
@@ -126,7 +126,7 @@ chmod +x "${OUTPUT_DIR}/load.sh" 2>/dev/null || true
 cat > "${OUTPUT_DIR}/README.txt" << README_EOF
 ================================================================================
 ION Offline Deployment Bundle
-  ION:    ixion36/ion:${VERSION}
+  ION:    fubsxploitapps/ion:${VERSION}
   PG:     pgvector/pgvector:${PG_VERSION}
   Ollama: ollama/ollama:latest  +  ${CHAT_MODEL}  +  ${EMBED_MODEL}
 ================================================================================

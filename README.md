@@ -119,9 +119,9 @@ Every integration follows the `ION_<NAME>_ENABLED` + `_URL` + auth env-var patte
 ## Docker Hub
 
 ```bash
-docker pull ixion36/ion:latest
+docker pull fubsxploitapps/ion:latest
 # or a specific version
-docker pull ixion36/ion:0.62.0
+docker pull fubsxploitapps/ion:0.89.0
 ```
 
 ---

@@ -41,7 +41,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # the syft binary itself is NOT shipped to the runtime image.
 #
 # Verify post-build:
-#   docker run --rm ixion36/ion:vX.Y.Z cat /app/sbom.spdx.json | head -20
+#   docker run --rm fubsxploitapps/ion:vX.Y.Z cat /app/sbom.spdx.json | head -20
 # v0.35.0: syft is sourced from its official Docker Hub image via COPY
 # --from rather than curl-installed from GitHub. The Docker Desktop build
 # VM has intermittent GitHub egress (github.com IPv6 dead-routes, raw
@@ -62,7 +62,7 @@ FROM python:3.14-slim AS runtime
 LABEL org.opencontainers.image.title="ION" \
       org.opencontainers.image.description="Intelligent Operating Network - Security Operations Portal" \
       org.opencontainers.image.version="0.89.0" \
-      org.opencontainers.image.source="https://hub.docker.com/repository/docker/ixion36/ion"
+      org.opencontainers.image.source="https://hub.docker.com/r/fubsxploitapps/ion"
 
 # Install runtime libraries (PostgreSQL client + WeasyPrint deps + fonts)
 RUN apt-get update && apt-get install -y --no-install-recommends \
