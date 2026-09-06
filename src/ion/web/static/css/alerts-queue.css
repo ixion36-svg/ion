@@ -14,6 +14,14 @@
     border: 1px solid var(--ion-border, #212b38);
     border-radius: 8px;
     background: var(--ion-surface, #0f141b);
+    /* The queue is wider than its column on anything below a wide desktop, and
+       without a scroll context here the table painted straight through this
+       element's own border and rounded corners — the right-hand end of every
+       alert row ran off past the card and off the viewport. The nearest
+       scroller was .card-body one level up, which scrolls the card rather
+       than the table, so the border was overrun either way. Scroll the table
+       inside its own frame instead. */
+    overflow-x: auto;
 }
 
 table.aq {

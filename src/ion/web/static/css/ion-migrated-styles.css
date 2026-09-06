@@ -894,3 +894,28 @@ html body ._ion-s-b26cdbb562 { display:none;position:fixed;top:0;left:0;right:0;
 ._ion-s-383082bf69 { opacity:0.7; }._ion-s-dc02658502 { font-family:'JetBrains Mono',monospace; font-size:.72rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
 ._ion-s-5c71f29a29 { color:var(--text-secondary);font-size:.65rem; }._ion-s-ebee7e459c { font-family:'JetBrains Mono',monospace; font-size:.72rem; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
 ._ion-s-bb6a43fd28 { position:absolute; }
+
+/* ---------------------------------------------------------------------------
+   Header nav breakpoint correction.
+
+   base.html gates the horizontal nav on Tailwind's `md` (768px) and pairs it
+   with `md:hidden` on the mobile toggle and panel. The nav's own content needs
+   ~1150px and the whole header ~1186px, so between 768px and roughly 1280px
+   the nav overflowed its container by ~330px: the right-hand links were simply
+   clipped off the header with no way to reach them.
+
+   The obvious fix — moving those three classes to `xl:` — silently breaks the
+   nav outright, because tailwind.css here is prebuilt and contains no
+   `xl:flex` / `xl:hidden` utilities (nothing referenced them, so they were
+   never generated) and there is no Tailwind toolchain in the repo to
+   regenerate it. Hence this hand-written override, which needs no build step.
+
+   Loads after tailwind.css; #id beats Tailwind's single-class rules on
+   specificity, so no !important is required.
+   --------------------------------------------------------------------------- */
+@media (min-width: 768px) and (max-width: 1279.98px) {
+    #tw-nav { display: none; }
+    #tw-mobile-toggle { display: grid; }
+    #tw-mobile-panel.hidden { display: none; }
+    #tw-mobile-panel:not(.hidden) { display: block; }
+}
