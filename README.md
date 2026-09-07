@@ -9,7 +9,7 @@
 
 # ION - Intelligent Operating Network
 
-![Version](https://img.shields.io/badge/version-0.89.3-blue)
+![Version](https://img.shields.io/badge/version-0.90.0-blue)
 ![Python](https://img.shields.io/badge/python-3.14-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Docker](https://img.shields.io/badge/docker-fubsxploitapps%2Fion-blue)
@@ -121,7 +121,7 @@ Every integration follows the `ION_<NAME>_ENABLED` + `_URL` + auth env-var patte
 ```bash
 docker pull fubsxploitapps/ion:latest
 # or a specific version
-docker pull fubsxploitapps/ion:0.89.3
+docker pull fubsxploitapps/ion:0.90.0
 ```
 
 ---

@@ -1,13 +1,45 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.88.0 -->
-<!-- ion-doc:version=0.88.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.90.0 -->
+<!-- ion-doc:version=0.90.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-01 -->
+<!-- ion-doc:date=2026-09-07 -->
 
 # Changelog
+
+## v0.90.0 — 2026-09-07
+
+**Response Actions + Verdict Review — govern Bob's advisory AI into approved,
+audited on-prem response.** All opt-in / permission-gated; inert until enabled.
+
+- **Response Actions.** The pre-existing but dormant SOAR action engine (block
+  IP / block domain / disable AD account / quarantine host / reset password /
+  block sender — 7 adapters) is now operable behind `ION_RESPONSE_ACTIONS_ENABLED`
+  (default off). Every request lands `pending_approval` (human-in-the-loop, no
+  auto-execute); a high-risk action cannot be approved by its requester
+  (separation of duty, new `response:approve` perm); execution is forced dry-run
+  unless `ION_RESPONSE_ACTIONS_LIVE` is also on. API `/api/response/actions/*`
+  (404 when disabled, every transition audit-logged, executed actions posted as a
+  case Note mirrored to Kibana). A case-panel **Actions tab** proposes actions
+  against a case's observables.
+
+- **Verdict Review.** Bob's suggested per-alert verdicts (pending `AIFeedback`
+  rows written at fire-time) get a review surface for the first time: a
+  `/verdict-review` queue (new `verdict:review` perm) shows each pending verdict
+  with its alert context and Bob's confidence; a human accepts or overrides,
+  stamping the AI-feedback ledger (agreement computed) and updating a live
+  agreement-rate.
+
+- **The connect.** Each verdict-review card surfaces the alert's observables with
+  their applicable response actions — a reviewer confirms Bob's verdict and
+  proposes containment (into the same approval queue) as one governed decision.
+
+- New tests `tests/test_response_actions_phase1.py`,
+  `tests/test_verdict_review.py`. No new external dependency or schema.
+
+- **Net new findings: 0C / 0H / 0M / 0L.**
 
 ## v0.89.3 — 2026-09-07
 
