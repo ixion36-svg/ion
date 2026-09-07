@@ -27,6 +27,67 @@
       + '<div class="text-xs uppercase tracking-wide text-slate-400">' + esc(label) + '</div>'
       + '<div class="text-2xl font-bold">' + esc(val) + '</div></div>';
   }
+
+  // ── Phase 3 connect: propose containment from a verdict card ──
+  // Observable type → applicable response action_types (mirrors DEFAULT_ACTIONS).
+  const APPLIES = {
+    ip: ['block_ip'], ipv4: ['block_ip'], ipv6: ['block_ip'],
+    domain: ['block_domain'], url: ['block_domain'],
+    user: ['disable_account', 'reset_password'], username: ['disable_account', 'reset_password'],
+    host: ['quarantine_host'], hostname: ['quarantine_host'], email: ['block_sender']
+  };
+  let responseByType = null;  // null = not yet fetched; {} = disabled/empty
+  async function loadCatalog() {
+    if (responseByType !== null) return;
+    responseByType = {};
+    try {
+      const r = await fetch('/api/response/actions');
+      if (!r.ok) return;  // 404 = response actions disabled → no containment UI
+      const acts = (await r.json()).actions || [];
+      const m = {}; acts.forEach(function (a) { m[a.action_type] = a; });
+      responseByType = m;
+    } catch (e) { /* stays {} */ }
+  }
+  function containmentHtml(v) {
+    if (!responseByType || !Object.keys(responseByType).length) return '';
+    const seen = {}; let rows = '';
+    (v.observables || []).forEach(function (o) {
+      const t = (o && o.type || '').toLowerCase(); const val = o && o.value;
+      if (!t || !val) return;
+      const key = t + '|' + val; if (seen[key]) return; seen[key] = 1;
+      const acts = (APPLIES[t] || []).map(function (x) { return responseByType[x]; }).filter(Boolean);
+      if (!acts.length) return;
+      rows += '<div class="flex flex-wrap gap-2 items-center mt-1">'
+        + '<code class="text-xs text-slate-400">' + esc(o.type) + '</code> '
+        + '<span class="text-xs text-slate-300 font-mono">' + esc(val) + '</span> ';
+      acts.forEach(function (a) {
+        rows += '<button data-act="' + a.id + '" data-target="' + esc(String(val)) + '" '
+          + 'class="vr-propose rounded border border-amber-500/40 text-amber-300 px-2 py-0.5 text-xs hover:bg-amber-500/10">'
+          + esc(a.name) + (a.requires_approval ? ' ⚠' : '') + '</button>';
+      });
+      rows += '</div>';
+    });
+    if (!rows) return '';
+    return '<div class="mt-3 pt-3 border-t border-white/10">'
+      + '<div class="text-xs uppercase tracking-wide text-slate-400 mb-1">Propose containment</div>' + rows + '</div>';
+  }
+  async function proposeAction(btn) {
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/response/actions/request', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action_id: parseInt(btn.dataset.act, 10), target: btn.dataset.target })
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(function () { return {}; });
+        window.alert('Propose failed: ' + (d.detail || r.status)); btn.disabled = false; return;
+      }
+      btn.textContent = '✓ proposed';
+      btn.classList.remove('text-amber-300', 'border-amber-500/40');
+      btn.classList.add('text-emerald-300', 'border-emerald-500/40');
+    } catch (e) { window.alert('Propose failed: ' + e.message); btn.disabled = false; }
+  }
+
   async function loadMetrics() {
     try {
       const r = await fetch('/api/verdict-review/metrics');
@@ -43,6 +104,7 @@
       '<div class="text-slate-400 py-10 text-center">No verdicts awaiting review.</div>';
   }
   async function loadQueue() {
+    await loadCatalog();
     const el = document.getElementById('vr-list');
     let rows;
     try {
@@ -70,10 +132,14 @@
         + '</div>'
         + '<div class="flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400 mr-1">Your verdict:</span>'
         + btns + '</div>'
+        + containmentHtml(v)
         + '</div>';
     }).join('');
     document.querySelectorAll('.vr-resolve').forEach(function (b) {
       b.addEventListener('click', function () { resolveVerdict(b.dataset.fb, b.dataset.hv); });
+    });
+    document.querySelectorAll('.vr-propose').forEach(function (b) {
+      b.addEventListener('click', function () { proposeAction(b); });
     });
   }
   async function resolveVerdict(fbId, hv) {

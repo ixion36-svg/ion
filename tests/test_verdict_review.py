@@ -24,7 +24,10 @@ def _pending(session, alert_id, bob="true_positive", tpl=None):
 
 
 def test_list_pending_with_alert_context(session):
-    session.add(AlertTriage(es_alert_id="es-1", rule_name="T1021 - Remote Services", priority="high"))
+    session.add(AlertTriage(
+        es_alert_id="es-1", rule_name="T1021 - Remote Services", priority="high",
+        observables=[{"type": "ip", "value": "185.22.11.9"}],
+    ))
     fb = _pending(session, "es-1", bob="true_positive")
     session.commit()
     rows = vr.list_pending_verdicts(session)
@@ -34,6 +37,7 @@ def test_list_pending_with_alert_context(session):
     assert r["bob_verdict"] == "true_positive"
     assert r["rule_name"] == "T1021 - Remote Services"
     assert r["priority"] == "high"
+    assert r["observables"] == [{"type": "ip", "value": "185.22.11.9"}]
 
 
 def test_resolve_agreement_true(session):

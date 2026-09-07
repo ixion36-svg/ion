@@ -30,6 +30,8 @@ def _row_to_dict(r: AIFeedback, triage: Optional[AlertTriage]) -> dict:
         "investigation_id": r.investigation_id,
         "rule_name": triage.rule_name if triage else None,
         "priority": triage.priority if triage else None,
+        # Observables feed the Phase 3 containment proposals on the review card.
+        "observables": (triage.observables or []) if triage else [],
         "bob_verdict": r.bob_suggested_verdict,
         "bob_confidence": r.bob_confidence,
         "bob_confidence_int": r.bob_confidence_int,
