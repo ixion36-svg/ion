@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Verdict Review - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1400px] w-full px-4 sm:px-6 lg:px-10 py-10">
+
+  <div class="mb-6">
+    <div class="text-xs uppercase tracking-wider text-cyan-400 font-semibold">Human-in-the-loop</div>
+    <h1 class="text-3xl font-bold">Verdict Review</h1>
+    <p class="text-slate-400">Review Bob's suggested verdicts and record your decision. Your call stamps the AI-feedback ledger.</p>
+  </div>
+
+  <div id="vr-metrics" class="flex flex-wrap gap-4 mb-6"></div>
+  <div id="vr-list">Loading…</div>
+
+</div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+  const VALID = ["true_positive", "false_positive", "benign_true_positive", "inconclusive"];
+  function esc(s) { const d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+  function card(label, val) {
+    return '<div class="rounded-lg border border-white/10 bg-white/5 px-5 py-3">'
+      + '<div class="text-xs uppercase tracking-wide text-slate-400">' + esc(label) + '</div>'
+      + '<div class="text-2xl font-bold">' + esc(val) + '</div></div>';
+  }
+  async function loadMetrics() {
+    try {
+      const r = await fetch('/api/verdict-review/metrics');
+      if (!r.ok) return;
+      const m = await r.json();
+      document.getElementById('vr-metrics').innerHTML =
+        card('Pending', m.pending)
+        + card('Reviewed', m.reviewed)
+        + card('Agreement', m.agreement_rate == null ? '—' : (Math.round(m.agreement_rate * 100) + '%'));
+    } catch (e) { /* metrics are best-effort */ }
+  }
+  function emptyState() {
+    document.getElementById('vr-list').innerHTML =
+      '<div class="text-slate-400 py-10 text-center">No verdicts awaiting review.</div>';
+  }
+  async function loadQueue() {
+    const el = document.getElementById('vr-list');
+    let rows;
+    try {
+      const r = await fetch('/api/verdict-review/pending');
+      if (!r.ok) { el.textContent = 'Could not load the queue (' + r.status + ').'; return; }
+      rows = (await r.json()).pending || [];
+    } catch (e) { el.textContent = 'Could not load the queue.'; return; }
+    if (!rows.length) { emptyState(); return; }
+    el.innerHTML = rows.map(function (v) {
+      const bob = v.bob_verdict ? esc(v.bob_verdict.replace(/_/g, ' ')) : 'escalated (low confidence)';
+      const conf = v.bob_confidence ? ' · ' + esc(v.bob_confidence) : '';
+      const btns = VALID.map(function (hv) {
+        const agree = v.bob_verdict === hv;
+        return '<button data-fb="' + v.id + '" data-hv="' + hv + '" class="vr-resolve rounded-md border px-3 py-1 text-sm '
+          + (agree ? 'border-emerald-500/50 text-emerald-300' : 'border-white/15 text-slate-300')
+          + ' hover:bg-white/10">' + esc(hv.replace(/_/g, ' ')) + '</button>';
+      }).join(' ');
+      return '<div class="vr-card rounded-lg border border-white/10 bg-white/5 p-4 mb-3" data-card="' + v.id + '">'
+        + '<div class="flex justify-between items-start gap-3 mb-3">'
+        +   '<div><div class="font-semibold">' + esc(v.rule_name || '(unnamed rule)') + '</div>'
+        +   '<div class="text-xs text-slate-400 font-mono">alert ' + esc(v.alert_id || '?')
+        +      (v.priority ? ' · ' + esc(v.priority) : '') + '</div></div>'
+        +   '<div class="text-right text-sm"><span class="text-slate-400">Bob:</span> '
+        +      '<span class="font-semibold text-cyan-300">' + bob + '</span>' + conf + '</div>'
+        + '</div>'
+        + '<div class="flex flex-wrap gap-2 items-center"><span class="text-xs text-slate-400 mr-1">Your verdict:</span>'
+        + btns + '</div>'
+        + '</div>';
+    }).join('');
+    document.querySelectorAll('.vr-resolve').forEach(function (b) {
+      b.addEventListener('click', function () { resolveVerdict(b.dataset.fb, b.dataset.hv); });
+    });
+  }
+  async function resolveVerdict(fbId, hv) {
+    try {
+      const r = await fetch('/api/verdict-review/' + fbId + '/resolve', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ human_verdict: hv })
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(function () { return {}; });
+        window.alert('Failed: ' + (d.detail || r.status));
+        return;
+      }
+      const card = document.querySelector('[data-card="' + fbId + '"]');
+      if (card) card.remove();
+      loadMetrics();
+      if (!document.querySelector('.vr-card')) emptyState();
+    } catch (e) { window.alert('Failed: ' + e.message); }
+  }
+  loadMetrics();
+  loadQueue();
+})();
+</script>
+{% endblock %}

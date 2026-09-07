@@ -100,7 +100,6 @@ from ion.web.observable_api import router as observable_router
 from ion.web.pcap_api import router as pcap_router
 from ion.web.playbook_analytics_api import router as playbook_analytics_router
 from ion.web.response_api import router as response_router
-from ion.web.verdict_review_api import router as verdict_review_router
 from ion.web.role_skills_api import router as role_skills_router
 from ion.web.scheduler_api import router as scheduler_router
 from ion.web.security_api import router as security_router
@@ -124,6 +123,7 @@ from ion.web.threat_landscape_api import router as threat_landscape_router
 from ion.web.training_sim_api import router as training_sim_router
 from ion.web.translator_api import router as translator_router
 from ion.web.triage_suggestion_api import router as triage_suggestion_router
+from ion.web.verdict_review_api import router as verdict_review_router
 from ion.web.vulnerability_api import router as vulnerability_router
 from ion.web.wallboard_api import router as wallboard_router
 from ion.web.webhook_api import router as webhook_router
@@ -2229,6 +2229,14 @@ async def de_workbench_page(request: Request, user: User = Depends(require_page_
     """Render the DE Workbench — the detection team's working surface
     (tuning-request queue + campaigns + proposals + quirks in one place)."""
     return templates.TemplateResponse(request=request, name="de_workbench.html")
+
+
+@app.get("/verdict-review", response_class=HTMLResponse)
+async def verdict_review_page(request: Request, user: User = Depends(require_page_permission("verdict:review"))):
+    """Review Bob's suggested per-alert verdicts (the human-in-the-loop queue)."""
+    return templates.TemplateResponse(
+        request=request, name="verdict_review.html", context={"current_user": user},
+    )
 
 
 @app.get("/de-metrics", response_class=HTMLResponse)
