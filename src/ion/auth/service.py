@@ -592,6 +592,8 @@ class AuthService:
             ("de:approve", "de", "approve", "Approve, apply and revert Bob-tuning prompt-stack changes"),
             # Response actions — the irreversible-action gate (separation of duty)
             ("response:approve", "response", "approve", "Approve high-risk response actions (block/isolate/disable)"),
+            # Verdict review — resolve Bob's suggested per-alert verdicts
+            ("verdict:review", "verdict", "review", "Review and resolve Bob's suggested verdicts"),
             # removed 5 seeded-but-never-enforced permissions
             # (discover:read, alert:comment, case:comment, case:link,
             # investigation:run) — no route gated on them (audit finding, same
@@ -636,7 +638,7 @@ class AuthService:
                 "SOC Analyst (L1) — alert triage and basic case management",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read", "case:create", "case:update",
                     "observable:read", "observable:create", "observable:update",
                     "playbook:read", "playbook:execute",
@@ -650,7 +652,7 @@ class AuthService:
                 "Senior SOC Analyst (L2) — case closure, observable enrichment, forensic viewer",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute",
@@ -665,7 +667,7 @@ class AuthService:
                 "Principal SOC Analyst (L3) — playbook creation, forensic cases, security dashboard",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update",
@@ -682,7 +684,7 @@ class AuthService:
                 "SOC Lead with team oversight and operational management",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
@@ -713,7 +715,7 @@ class AuthService:
                 "SOC Engineer (L1) — log onboarding, basic SIEM config, tooling support",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read",
                     "observable:read",
                     "playbook:read", "playbook:execute",
@@ -728,7 +730,7 @@ class AuthService:
                 "Senior SOC Engineer (L2) — detection engineering, pipeline management, Elastic admin",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read", "case:create", "case:update",
                     "observable:read", "observable:create", "observable:update", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update",
@@ -745,7 +747,7 @@ class AuthService:
                 "Platform Engineer (L3) — infrastructure, architecture, security tooling at scale",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:delete", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
@@ -763,7 +765,7 @@ class AuthService:
                 "SOC Engineer with system management and full operational access",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read", "case:create", "case:update", "case:close",
                     "observable:read", "observable:create", "observable:update", "observable:delete", "observable:enrich",
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update", "playbook:delete",
@@ -785,7 +787,7 @@ class AuthService:
                 "AI analyst service role (Bob) — investigation, notes, observables, tuning suggestions",
                 True,
                 [
-                    "alert:read", "alert:triage",
+                    "alert:read", "alert:triage", "verdict:review",
                     "case:read",
                     "observable:read", "observable:create", "observable:enrich",
                     "playbook:read",

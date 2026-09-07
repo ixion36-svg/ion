@@ -100,6 +100,7 @@ from ion.web.observable_api import router as observable_router
 from ion.web.pcap_api import router as pcap_router
 from ion.web.playbook_analytics_api import router as playbook_analytics_router
 from ion.web.response_api import router as response_router
+from ion.web.verdict_review_api import router as verdict_review_router
 from ion.web.role_skills_api import router as role_skills_router
 from ion.web.scheduler_api import router as scheduler_router
 from ion.web.security_api import router as security_router
@@ -435,6 +436,7 @@ app.include_router(alert_pattern_router, prefix="/api")
 app.include_router(d3fend_router, prefix="/api")
 app.include_router(canary_router, prefix="/api")
 app.include_router(response_router, prefix="/api")  # /api/response/* — SOAR response actions (opt-in)
+app.include_router(verdict_review_router, prefix="/api")  # /api/verdict-review/* — Bob verdict queue
 # Workbench — pinned evidence + tamper-evident ledger
 app.include_router(workbench_router, prefix="/api")
 app.include_router(log_source_router, prefix="/api")
