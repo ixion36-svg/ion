@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -59,6 +60,7 @@ class PlaybookExecutorService:
         target_value: str,
         params: Optional[dict[str, Any]] = None,
         db: Optional[Session] = None,
+        force_dry_run: bool = False,
     ) -> ExecutorResult:
         """Run the real adapter for ``action_row`` and (optionally) persist
         the result into ``PlaybookActionLog``.
@@ -83,6 +85,29 @@ class PlaybookExecutorService:
         Returns:
             :class:`ExecutorResult`.
         """
+        # Dry-run-first: when live execution is disabled, never dispatch to a
+        # real adapter — return a synthetic dry-run result the log layer stores
+        # exactly like a real one.
+        if force_dry_run:
+            now = datetime.now(timezone.utc)
+            result = ExecutorResult(
+                success=True,
+                adapter="dry-run",
+                action_type=action_row.action_type,
+                target=target_value,
+                message="dry-run: live execution disabled (ION_RESPONSE_ACTIONS_LIVE off)",
+                started_at=now,
+                completed_at=now,
+                dry_run=True,
+            )
+            logger.info(
+                "Executor forced dry-run: action_type=%s target=%s",
+                action_row.action_type, target_value,
+            )
+            if db is not None:
+                self._write_standalone_log(db, action_row, result)
+            return result
+
         config = get_config()
 
         # Merge action's config_template (if any) with supplied params.

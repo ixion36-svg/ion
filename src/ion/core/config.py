@@ -55,6 +55,8 @@ class Config:
     security_scan_authenticated: bool = False  # Run payload-pattern WAF checks on authenticated traffic too (default off — analysts legitimately handle malicious content)
     authz_alert_enabled: bool = True  # Record 401/403 and alert on repeated unauthorized-access attempts
     authz_alert_threshold: int = 5  # 401/403 responses from one actor within the window that escalate to a HIGH event
+    response_actions_enabled: bool = False  # Expose the response-action surface (request/approve/execute); opt-in, off by default
+    response_actions_live: bool = False  # Dispatch to real firewall/EDR/AD adapters. Off = every execution is forced dry-run
     authz_alert_window_minutes: int = 5  # Rolling window for the authz-failure threshold
 
     # GitLab integration
@@ -308,6 +310,8 @@ class Config:
             security_scan_authenticated=data.get("security_scan_authenticated", False),
             authz_alert_enabled=data.get("authz_alert_enabled", True),
             authz_alert_threshold=data.get("authz_alert_threshold", 5),
+            response_actions_enabled=data.get("response_actions_enabled", False),
+            response_actions_live=data.get("response_actions_live", False),
             authz_alert_window_minutes=data.get("authz_alert_window_minutes", 5),
             # GitLab integration
             gitlab_enabled=data.get("gitlab_enabled", True),
@@ -688,6 +692,10 @@ def get_config() -> Config:
             _config.security_scan_authenticated = _get_env_bool("ION_SECURITY_SCAN_AUTHENTICATED")
         if os.environ.get("ION_AUTHZ_ALERT_ENABLED"):
             _config.authz_alert_enabled = _get_env_bool("ION_AUTHZ_ALERT_ENABLED", True)
+        if os.environ.get("ION_RESPONSE_ACTIONS_ENABLED"):
+            _config.response_actions_enabled = _get_env_bool("ION_RESPONSE_ACTIONS_ENABLED")
+        if os.environ.get("ION_RESPONSE_ACTIONS_LIVE"):
+            _config.response_actions_live = _get_env_bool("ION_RESPONSE_ACTIONS_LIVE")
         if os.environ.get("ION_AUTHZ_ALERT_THRESHOLD"):
             try:
                 _config.authz_alert_threshold = int(os.environ["ION_AUTHZ_ALERT_THRESHOLD"])

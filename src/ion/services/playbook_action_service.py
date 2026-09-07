@@ -2,9 +2,10 @@
 
 Manages SOAR-style response actions (block IP, quarantine host, disable
 account, etc.) that can be triggered from playbook steps.  Actions with
-high risk levels require approval before execution.  In the current
-release all executions are *simulated*; a real deployment would call
-firewall / EDR / Active Directory APIs.
+high risk levels require approval before execution, and a high-risk action
+cannot be approved by its own requester (separation of duty). Execution runs
+through the real adapter layer, but is forced to a dry-run unless
+``ION_RESPONSE_ACTIONS_LIVE`` is enabled.
 """
 
 import json
@@ -14,6 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from ion.core.config import get_config
 from ion.core.safe_errors import safe_error
 from ion.models.sla import PlaybookAction, PlaybookActionLog
 
@@ -133,9 +135,10 @@ def request_action(
 ) -> dict:
     """Request execution of a playbook action.
 
-    If the action requires approval the log entry is created with
-    status ``pending_approval``.  Otherwise it is immediately set to
-    ``approved`` (ready for execution).
+    Every request is created ``pending_approval`` — v1 is human-in-the-loop for
+    all actions (no auto-execute), so nothing runs until a human approves it.
+    ``PlaybookAction.requires_approval`` still governs separation of duty at the
+    approve step (a high-risk action cannot be approved by its requester).
 
     Args:
         session: Database session.
@@ -154,7 +157,7 @@ def request_action(
     if not action.is_active:
         return {"error": "Action is disabled", "status": "error"}
 
-    initial_status = "pending_approval" if action.requires_approval else "approved"
+    initial_status = "pending_approval"
 
     log_entry = PlaybookActionLog(
         action_id=action_id,
@@ -196,6 +199,15 @@ def approve_action(
 
     if log_entry.status != "pending_approval":
         return {"error": f"Cannot approve action in status '{log_entry.status}'", "status": "error"}
+
+    # Separation of duty: a high-risk (approval-required) action cannot be
+    # approved by the same user who requested it.
+    action = session.get(PlaybookAction, log_entry.action_id)
+    if action is not None and action.requires_approval and approved_by_id == log_entry.executed_by_id:
+        return {
+            "error": "Separation of duty: a high-risk action must be approved by a different user than the requester",
+            "status": "error",
+        }
 
     log_entry.approved_by_id = approved_by_id
     log_entry.status = "approved"
@@ -240,11 +252,11 @@ def reject_action(
 
 
 def execute_action(session: Session, log_id: int) -> dict:
-    """Execute (simulate) an approved playbook action.
+    """Execute an approved playbook action via the adapter layer.
 
-    In the current release this records a simulated success.  A real
-    deployment would dispatch to firewall, EDR, Active Directory, or
-    email gateway APIs based on the action's ``target_integration``.
+    Dispatches to the real firewall / EDR / AD / email-gateway adapter for the
+    action's ``target_integration`` — unless ``ION_RESPONSE_ACTIONS_LIVE`` is
+    off, in which case the execution is forced to a dry-run.
 
     Args:
         session: Database session.
@@ -275,12 +287,15 @@ def execute_action(session: Session, log_id: int) -> dict:
 
         executor_service = get_playbook_executor_service()
 
+        _force_dry = not get_config().response_actions_live
+
         async def _run():
             return await executor_service.execute_action(
                 action_row=action,
                 target_value=log_entry.target,
                 params={},
                 db=None,
+                force_dry_run=_force_dry,
             )
 
         try:
@@ -320,6 +335,7 @@ def get_action_log(
     session: Session,
     case_id: int | None = None,
     limit: int = 50,
+    status: str | None = None,
 ) -> list[dict]:
     """Return recent playbook action log entries.
 
@@ -327,6 +343,7 @@ def get_action_log(
         session: Database session.
         case_id: If provided, filter to a specific case.
         limit: Maximum number of entries to return.
+        status: If provided, filter to one status (e.g. ``pending_approval``).
 
     Returns:
         List of log dicts, most recent first.
@@ -335,6 +352,9 @@ def get_action_log(
 
     if case_id is not None:
         stmt = stmt.where(PlaybookActionLog.case_id == case_id)
+
+    if status is not None:
+        stmt = stmt.where(PlaybookActionLog.status == status)
 
     stmt = stmt.order_by(PlaybookActionLog.id.desc()).limit(limit)
 

@@ -590,6 +590,8 @@ class AuthService:
             ("de:verify", "de", "verify", "Verify and revert system quirks (separation of duties)"),
             # Detection Engineering module (Phase 3 — approve/apply Bob-tuning changes to the prompt-stack)
             ("de:approve", "de", "approve", "Approve, apply and revert Bob-tuning prompt-stack changes"),
+            # Response actions — the irreversible-action gate (separation of duty)
+            ("response:approve", "response", "approve", "Approve high-risk response actions (block/isolate/disable)"),
             # removed 5 seeded-but-never-enforced permissions
             # (discover:read, alert:comment, case:comment, case:link,
             # investigation:run) — no route gated on them (audit finding, same
@@ -669,6 +671,7 @@ class AuthService:
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update",
                     "forensic:read", "forensic:create", "forensic:update",
                     "security:read", "de:read", "de:propose", "de:verify", "de:approve",
+                    "response:approve",
                     "ai:chat",
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
@@ -688,6 +691,7 @@ class AuthService:
                     "template:read", "template:create", "template:update",
                     "document:read", "document:create", "document:update",
                     "security:read", "de:read", "de:propose", "de:verify", "de:approve",
+                    "response:approve",
                 ],
             ),
             (
