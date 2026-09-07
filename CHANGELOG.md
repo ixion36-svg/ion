@@ -9,6 +9,47 @@
 
 # Changelog
 
+## v0.89.3 — 2026-09-07
+
+**Follow-up to the v0.89.1 health-reporting pass, from an adversarial review of
+that diff.** Two of these are defects v0.89.1 introduced; one is a pre-existing
+sibling of a bug it fixed.
+
+- **The wallboard called OpenCTI healthy without a token.** `OpenCTIService`
+  treats configuration as url AND token, but the wallboard tested only the url.
+  That line had never run before v0.89.1 — the misspelled import raised
+  ImportError on every snapshot and control jumped to the `except` — so fixing
+  the import made a latent bug reachable for the first time. With a rotated or
+  mistyped token every OpenCTI call answers 401 while the surface whose job is
+  to show what is broken stays green. It now uses `is_configured`, matching the
+  composite check the TIDE branch beside it already used, and goes through
+  `get_opencti_service()` rather than constructing a second service and
+  re-reading config on every render.
+
+- **Alert-stats severity buckets came back as numbers.** v0.89.1 removed a
+  `"missing": "unknown"` bucket from an aggregation on `event.severity` to stop
+  Elasticsearch failing the search — ECS types that field as a long. That
+  cleared the 500 but let the numeric field through, and Kibana's Detection
+  Engine writes severity codes, so callers received `{21: n, 47: n, ...}` where
+  they expect names and `briefing.html` rendered pills reading "47: 8" against
+  CSS classes that exist only for low/medium/high/critical. The aggregation now
+  runs on `kibana.alert.severity` — a keyword carrying those names, already the
+  severity of record in `_parse_alert` and already the field the other severity
+  aggregations in that module use — which fixes the original crash and the
+  numeric keys together.
+
+- **`/webhooks/{id}/logs` 500'd on every delivered webhook.** `WebhookLogResponse`
+  required `processing_time_ms` while `to_dict()` emits `response_time_ms`, and
+  took the discriminator into `event_type` instead of `webhook_event_type`. Its
+  Optional fields also carried no defaults, which in Pydantic v2 still means
+  required — the same rule v0.89.1 fixed on the neighbouring
+  `IntegrationLogResponse` without checking this one.
+
+- README's Docker badge still advertised the retired `ixion36/ion`. It survived
+  the v0.89.1 sweep because the badge URL encodes the slash as `%2F`, so a grep
+  for `ixion36/ion` never matched it. The pull example was also a release
+  behind.
+
 ## v0.89.2 — 2026-09-07
 
 **Two clipping bugs that hid content on anything narrower than a wide desktop.**
