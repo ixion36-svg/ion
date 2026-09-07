@@ -2799,6 +2799,8 @@ async function openCaseDetail(caseId) {
         }
         // attack story timeline
         loadCaseTimeline(c.id);
+        // response actions (opt-in; self-removes the tab when disabled)
+        loadResponseActions(c.id, c.observables || []);
         // Attack Path (Bob Pathfinding) Phase 1 — kill-chain graph
         loadAttackPath(c.id);
         // Similar cases sidebar — best-effort async load
@@ -3259,6 +3261,7 @@ function renderPanelContent(c) {
         + '<button type="button" class="cpanel-tab-btn" data-tab="timeline" data-click-action="switchPanelTab" data-args=\'["timeline"]\'>Timeline</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="attackpath" data-click-action="switchPanelTab" data-args=\'["attackpath"]\'>Attack Path</button>'
         + '<button type="button" class="cpanel-tab-btn" data-tab="notes" data-click-action="switchPanelTab" data-args=\'["notes"]\'>Notes</button>'
+        + '<button type="button" class="cpanel-tab-btn" data-tab="actions" data-click-action="switchPanelTab" data-args=\'["actions"]\' id="cpanel-actions-tab-btn">Actions</button>'
         + '</div>';
 
     // Metadata
@@ -3365,6 +3368,13 @@ function renderPanelContent(c) {
     } else {
         html += '<div class="cpanel-empty-hint"><i class="icon-search"></i> No observables extracted yet</div>';
     }
+    html += '</div>';
+
+    // ── Response Actions (opt-in; loadResponseActions self-removes the
+    // tab + section when ION_RESPONSE_ACTIONS_ENABLED is off) ──
+    html += '<div class="cpanel-section" data-tab="actions">';
+    html += '<div class="cpanel-section-title">Response Actions</div>';
+    html += '<div id="response-actions-container">Loading…</div>';
     html += '</div>';
 
     // ── MITRE Techniques (from alerts) ─────────────────────
@@ -4159,6 +4169,96 @@ async function loadKibanaComments(kibanaId) {
 // default tab is Alerts. Opening a case to a metadata form was a
 // wasted click — the analyst came to look at the alerts.
 let _currentPanelTab = 'alerts';
+
+// ── Response Actions (Phase 1) ─────────────────────────────
+// Observable type → applicable response action_types (mirrors DEFAULT_ACTIONS).
+const _RESPONSE_APPLIES = {
+    ip: ['block_ip'], ipv4: ['block_ip'], ipv6: ['block_ip'],
+    domain: ['block_domain'], url: ['block_domain'],
+    user: ['disable_account', 'reset_password'], username: ['disable_account', 'reset_password'],
+    host: ['quarantine_host'], hostname: ['quarantine_host'],
+    email: ['block_sender']
+};
+
+async function loadResponseActions(caseId, observables) {
+    const container = document.getElementById('response-actions-container');
+    if (!container) return;
+    let catalog;
+    try {
+        const r = await fetch('/api/response/actions');
+        if (r.status === 404) {   // feature disabled — drop the tab + section
+            const btn = document.getElementById('cpanel-actions-tab-btn');
+            if (btn) btn.remove();
+            const sec = document.querySelector('.cpanel-section[data-tab="actions"]');
+            if (sec) sec.remove();
+            return;
+        }
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        catalog = (await r.json()).actions || [];
+    } catch (e) {
+        container.textContent = 'Could not load response actions.';
+        return;
+    }
+    const byType = {};
+    catalog.forEach(function (a) { byType[a.action_type] = a; });
+    const seen = {};
+    const rows = [];
+    (observables || []).forEach(function (o) {
+        const key = (o.type || '') + '|' + (o.value || '');
+        if (seen[key]) return;
+        seen[key] = 1;
+        const acts = (_RESPONSE_APPLIES[(o.type || '').toLowerCase()] || [])
+            .map(function (t) { return byType[t]; }).filter(Boolean);
+        if (acts.length) rows.push({ o: o, acts: acts });
+    });
+    let html = '';
+    if (!rows.length) {
+        html += '<div class="cpanel-empty-hint"><i class="icon-search"></i> No actionable observables on this case</div>';
+    } else {
+        rows.forEach(function (row) {
+            html += '<div class="awx-obsrow"><code>' + esc(row.o.type) + '</code> ' + esc(row.o.value) + ' ';
+            row.acts.forEach(function (a) {
+                html += '<button type="button" class="btn" data-click-action="requestResponseAction" data-args=\'['
+                    + a.id + ',' + JSON.stringify(String(row.o.value)) + ',' + caseId + ']\'>'
+                    + esc(a.name) + (a.requires_approval ? ' ⚠' : '') + '</button> ';
+            });
+            html += '</div>';
+        });
+    }
+    html += '<div class="cpanel-section-title">Action log</div><div id="response-actions-log">…</div>';
+    container.innerHTML = html;
+    loadResponseActionLog(caseId);
+}
+
+async function loadResponseActionLog(caseId) {
+    const el = document.getElementById('response-actions-log');
+    if (!el) return;
+    try {
+        const r = await fetch('/api/response/actions/log?case_id=' + caseId);
+        const rows = r.ok ? ((await r.json()).log || []) : [];
+        if (!rows.length) { el.innerHTML = '<div class="cpanel-empty-hint">No actions requested yet</div>'; return; }
+        el.innerHTML = rows.map(function (l) {
+            return '<div class="awx-obsrow"><code>' + esc(l.status) + '</code> <code>'
+                + esc(l.action_type || '') + '</code> ' + esc(l.target || '')
+                + (l.result && l.result.dry_run ? ' (dry-run)' : '') + '</div>';
+        }).join('');
+    } catch (e) { el.textContent = 'Could not load action log.'; }
+}
+
+async function requestResponseAction(actionId, target, caseId) {
+    try {
+        const r = await fetch('/api/response/actions/request', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action_id: actionId, target: target, case_id: caseId })
+        });
+        if (!r.ok) {
+            const d = await r.json().catch(function () { return {}; });
+            window.alert('Request failed: ' + (d.detail || r.status));
+            return;
+        }
+        loadResponseActionLog(caseId);
+    } catch (e) { window.alert('Request failed: ' + e.message); }
+}
 
 function switchPanelTab(tabName) {
     _currentPanelTab = tabName;
