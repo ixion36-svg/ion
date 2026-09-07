@@ -722,9 +722,17 @@ def _collect_service_health(session: Session) -> Dict[str, Any]:
         # The class is OpenCTIService — the misspelled import raised ImportError
         # on every snapshot, so the wallboard reported OpenCTI as "down" even
         # when the integration was healthy.
-        from ion.services.opencti_service import OpenCTIService
-        oc = OpenCTIService()
-        configured = bool(getattr(oc, "url", None))
+        #
+        # Go through the singleton the rest of the codebase uses rather than
+        # constructing a second service and re-reading config on every render.
+        #
+        # is_configured is url AND token. Testing only the url reported "up"
+        # for a rotated or mistyped token — every API call 401s while the
+        # surface whose job is to show what is broken stays green. The TIDE
+        # branch above already uses its own composite check; this matches it.
+        from ion.services.opencti_service import get_opencti_service
+        oc = get_opencti_service()
+        configured = bool(oc is not None and oc.is_configured)
         health["opencti"] = {"status": "up" if configured else "off", "details": "configured" if configured else "not configured"}
     except Exception as exc:
         health["opencti"] = {"status": "down", "details": safe_error(exc, "wallboard.health")}

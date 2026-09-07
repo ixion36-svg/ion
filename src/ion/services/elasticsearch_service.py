@@ -1653,14 +1653,28 @@ class ElasticsearchService:
                 }
             },
             "aggs": {
-                # No `missing` bucket here: ECS types event.severity as a
-                # long, and a string default makes Elasticsearch fail the
-                # whole search with number_format_exception / "all shards
-                # failed" — a 500 on every ECS-conformant alert index.
-                # Documents without the field are simply not bucketed.
+                # Aggregate on kibana.alert.severity, not event.severity.
+                #
+                # ECS types event.severity as a long, so the old
+                # `"missing": "unknown"` string default failed the whole
+                # search with number_format_exception / "all shards failed" —
+                # a 500 on every ECS-conformant alert index. Dropping the
+                # missing-bucket cleared the 500 but let the numeric field
+                # through, and Kibana's Detection Engine writes severity
+                # codes (21/47/73/99): callers then got integer keys where
+                # they expect names, and briefing.html rendered pills reading
+                # "47: 8" against CSS classes that only exist for
+                # low/medium/high/critical.
+                #
+                # kibana.alert.severity is a keyword carrying those names, is
+                # what _parse_alert already treats as the severity of record,
+                # and is what the other severity aggregations in this file
+                # use — so a string missing-bucket is valid here.
                 "by_severity": {
                     "terms": {
-                        "field": "event.severity"
+                        "field": "kibana.alert.severity",
+                        "size": 10,
+                        "missing": "unknown"
                     }
                 },
                 "by_status": {

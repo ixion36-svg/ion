@@ -94,14 +94,16 @@ class WebhookLogResponse(BaseModel):
     """Response model for a webhook log entry."""
     id: int
     webhook_id: int
-    event_type: Optional[str]
-    payload: Optional[dict]
-    headers: Optional[dict]
-    source_ip: Optional[str]
     status: str
-    error_message: Optional[str]
-    processing_time_ms: Optional[float]
-    created_at: Optional[str]
+    # Same Pydantic v2 rule as IntegrationLogResponse below: Optional without
+    # a default is still required, and every one of these columns is nullable.
+    event_type: Optional[str] = None
+    payload: Optional[dict] = None
+    headers: Optional[dict] = None
+    source_ip: Optional[str] = None
+    error_message: Optional[str] = None
+    processing_time_ms: Optional[float] = None
+    created_at: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -553,7 +555,18 @@ async def get_webhook_logs(
         session=session,
     )
 
-    return [WebhookLogResponse(**log.to_dict()) for log in logs]
+    # IntegrationEvent.to_dict() for WEBHOOK rows emits `response_time_ms` and
+    # puts the discriminator ("webhook") in `event_type`, while the per-delivery
+    # type lives in `webhook_event_type`. Passing the dict straight in left the
+    # required `processing_time_ms` absent, so every call raised ValidationError
+    # and this endpoint 500'd for any webhook that had actually fired.
+    rows = []
+    for log in logs:
+        d = log.to_dict()
+        d["processing_time_ms"] = d.pop("response_time_ms", None)
+        d["event_type"] = d.pop("webhook_event_type", None)
+        rows.append(WebhookLogResponse(**d))
+    return rows
 
 
 # =============================================================================

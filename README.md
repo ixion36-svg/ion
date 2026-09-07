@@ -9,10 +9,10 @@
 
 # ION - Intelligent Operating Network
 
-![Version](https://img.shields.io/badge/version-0.89.2-blue)
+![Version](https://img.shields.io/badge/version-0.89.3-blue)
 ![Python](https://img.shields.io/badge/python-3.14-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Docker](https://img.shields.io/badge/docker-ixion36%2Fion-blue)
+![Docker](https://img.shields.io/badge/docker-fubsxploitapps%2Fion-blue)
 ![Platform](https://img.shields.io/badge/platform-linux%20%7C%20docker-lightgrey)
 
 ION is a server-rendered Security Operations Centre portal for threat detection, investigation, and response. It runs in **air-gapped / siloed** environments (no live external feeds), built on FastAPI + Jinja2 + PostgreSQL (+ pgvector) with a local Ollama LLM — **Bob**, the AI analyst who triages alerts and drafts case findings. It pulls alerts from Elasticsearch and integrates OpenCTI threat intel, TIDE detection engineering, and Arkime PCAP capture into one workspace.
@@ -121,7 +121,7 @@ Every integration follows the `ION_<NAME>_ENABLED` + `_URL` + auth env-var patte
 ```bash
 docker pull fubsxploitapps/ion:latest
 # or a specific version
-docker pull fubsxploitapps/ion:0.89.0
+docker pull fubsxploitapps/ion:0.89.3
 ```
 
 ---
