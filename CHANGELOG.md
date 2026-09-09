@@ -1,13 +1,38 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.90.0 -->
-<!-- ion-doc:version=0.90.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.91.0 -->
+<!-- ion-doc:version=0.91.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-07 -->
+<!-- ion-doc:date=2026-09-09 -->
 
 # Changelog
+
+## v0.91.0 — 2026-09-09
+
+**Alert-detail redesign + Bob custom investigation templates.** All four feature
+flags are opt-in and default **OFF**; the current alert-detail render stays as the
+fallback, so existing deploys are unchanged.
+
+- **Redesigned alert-detail panel** (`ION_ALERT_DETAIL_V2`) — a decision-first
+  header (severity → rule title → identity pills → triage) over a source-badged
+  tab strip that answers *rule-authored vs Bob-AI vs alert* at a glance, plus a
+  Case-context block (Rule ID / Index / First seen / Related-24h). Cross-section
+  dedup so no value is shown twice. The shared component's section engine, lazy
+  loaders and the `/cases` stacked layout are untouched.
+- **Fields tab: Highlighted / All + filter** — Highlighted = the rule's
+  `investigation_fields` (else ION's well-known-ECS set); All = the full alert
+  `_source`; a filter narrows by name or value.
+- **Pin fields to Case context** (`ION_ALERT_FIELD_PINS`) — analysts pin any alert
+  field into the Case-context panel, in-app, persisted per-user and scoped per
+  rule with a global fallback (`AnalystPinnedField`; `/api/alerts/pinned-fields`,
+  every query scoped to the caller).
+- **Bob custom investigation templates** (`ION_BOB_CUSTOM_TEMPLATES`) — the Guide
+  tab shows the rule's authored guide *and* a Bob-generated, evidence-grounded
+  checklist per rule, human-reviewed (pending → approved / rejected) before it is
+  trusted (`RuleInvestigationTemplate`; `/api/alerts/investigation-template`).
+  Generation reuses the auto-investigation evidence path + `prompt_safety`.
 
 ## v0.90.0 — 2026-09-07
 
