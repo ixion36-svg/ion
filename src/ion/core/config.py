@@ -120,6 +120,7 @@ class Config:
     kibana_password: str = ""  # Kibana password
     kibana_space_id: str = "production"  # Kibana space ID
     kibana_case_owner: str = "securitySolution"  # Case owner app (securitySolution, observability, cases)
+    kibana_custom_fields_enabled: bool = False  # Provision + populate native Kibana case custom fields (ION case #, severity, rules, hosts); opt-in
     kibana_verify_ssl: bool = False
 
     # DFIR-IRIS integration
@@ -362,6 +363,7 @@ class Config:
             kibana_password=data.get("kibana_password", ""),
             kibana_space_id=data.get("kibana_space_id", "production"),
             kibana_case_owner=data.get("kibana_case_owner", "securitySolution"),
+            kibana_custom_fields_enabled=data.get("kibana_custom_fields_enabled", False),
             kibana_verify_ssl=data.get("kibana_verify_ssl", False),
             # DFIR-IRIS integration
             dfir_iris_enabled=data.get("dfir_iris_enabled", False),
@@ -811,6 +813,8 @@ def get_config() -> Config:
             _config.kibana_space_id = os.environ.get("ION_KIBANA_SPACE_ID", "production")
         if os.environ.get("ION_KIBANA_CASE_OWNER"):
             _config.kibana_case_owner = os.environ.get("ION_KIBANA_CASE_OWNER", "securitySolution")
+        if os.environ.get("ION_KIBANA_CUSTOM_FIELDS_ENABLED"):
+            _config.kibana_custom_fields_enabled = _get_env_bool("ION_KIBANA_CUSTOM_FIELDS_ENABLED")
         if os.environ.get("ION_KIBANA_VERIFY_SSL"):
             _config.kibana_verify_ssl = _get_env_bool("ION_KIBANA_VERIFY_SSL", False)
 

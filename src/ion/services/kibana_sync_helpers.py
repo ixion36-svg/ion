@@ -7,8 +7,12 @@ clean, reusable function calls.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from ion.core.config import get_config
 from ion.services.case_description import build_case_description
-from ion.services.kibana_cases_service import get_kibana_cases_service
+from ion.services.kibana_cases_service import (
+    build_ion_custom_fields,
+    get_kibana_cases_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -48,12 +52,23 @@ def sync_new_case_to_kibana(
 
         assignees = [{"uid": assignee_elastic_uid}] if assignee_elastic_uid else None
 
+        # Native Kibana case custom fields (opt-in) — map ION's case metadata
+        # onto first-class fields instead of only the description.
+        custom_fields = None
+        if get_config().kibana_custom_fields_enabled:
+            service.ensure_case_custom_fields()
+            custom_fields = build_ion_custom_fields(
+                case_number=case_number, severity=severity,
+                triggered_rules=triggered_rules, affected_hosts=affected_hosts,
+            )
+
         kibana_case = service.create_case(
             title=f"[{case_number}] {title}",
             description=kibana_desc.strip(),
             severity=severity or "low",
             tags=[case_number, "ion"],
             assignees=assignees,
+            custom_fields=custom_fields,
         )
         if not kibana_case:
             return None

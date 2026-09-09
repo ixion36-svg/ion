@@ -10,6 +10,34 @@ from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
 
+# Native Kibana case custom-field DEFINITIONS ION provisions (opt-in via
+# ION_KIBANA_CUSTOM_FIELDS_ENABLED). Kept text-only for portability.
+ION_CASE_CUSTOM_FIELDS = [
+    {"key": "ion_case_number", "label": "ION Case #", "type": "text", "required": False},
+    {"key": "ion_severity", "label": "ION Severity", "type": "text", "required": False},
+    {"key": "ion_rules", "label": "Triggered Rules", "type": "text", "required": False},
+    {"key": "ion_hosts", "label": "Affected Hosts", "type": "text", "required": False},
+]
+
+
+def build_ion_custom_fields(
+    case_number: Optional[str] = None,
+    severity: Optional[str] = None,
+    triggered_rules: Optional[List[str]] = None,
+    affected_hosts: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """Build the ``customFields`` value list for a case create, keyed to the
+    ION_CASE_CUSTOM_FIELDS definitions. Empty values are sent as null (allowed
+    for non-required text fields)."""
+    def _txt(v: Optional[str]) -> Optional[str]:
+        return v if v else None
+    return [
+        {"key": "ion_case_number", "type": "text", "value": _txt(case_number)},
+        {"key": "ion_severity", "type": "text", "value": _txt(severity)},
+        {"key": "ion_rules", "type": "text", "value": _txt(", ".join(triggered_rules) if triggered_rules else None)},
+        {"key": "ion_hosts", "type": "text", "value": _txt(", ".join(affected_hosts) if affected_hosts else None)},
+    ]
+
 
 class KibanaCasesService:
     """Service for interacting with Kibana Cases API."""
@@ -139,6 +167,52 @@ class KibanaCasesService:
             logger.error(f"Error getting Kibana case {case_id}: {e}")
             return None
 
+    def ensure_case_custom_fields(self) -> bool:
+        """Provision ION's case custom-field definitions in Kibana (idempotent).
+
+        Best-effort: creates the case configuration if none exists, or PATCHes
+        it to add ION's fields while preserving any operator-defined ones. Cached
+        per process (only touches Kibana until it succeeds once). Returns True
+        when the fields are known to be defined.
+        """
+        if getattr(self, "_cf_ensured", False):
+            return True
+        if not self.enabled:
+            return False
+        try:
+            owner = self.config.get("case_owner", "securitySolution")
+            none_connector = {"id": "none", "name": "none", "type": ".none", "fields": None}
+            want = {f["key"] for f in ION_CASE_CUSTOM_FIELDS}
+            r = self.client.get(self._get_api_path("/api/cases/configure"), params={"owner": owner})
+            cfgs = r.json() if r.status_code == 200 else []
+            cfg = cfgs[0] if isinstance(cfgs, list) and cfgs else None
+            if cfg is None:
+                self.client.post(self._get_api_path("/api/cases/configure"), json={
+                    "owner": owner,
+                    "closure_type": "close-by-user",
+                    "connector": none_connector,
+                    "customFields": ION_CASE_CUSTOM_FIELDS,
+                })
+            else:
+                have = {c.get("key") for c in cfg.get("customFields", [])}
+                if not want.issubset(have):
+                    # PATCH replaces customFields, so keep operator fields + add ION's.
+                    others = [c for c in cfg.get("customFields", []) if c.get("key") not in want]
+                    self.client.patch(
+                        self._get_api_path(f"/api/cases/configure/{cfg['id']}"),
+                        json={
+                            "version": cfg.get("version"),
+                            "closure_type": cfg.get("closure_type", "close-by-user"),
+                            "connector": cfg.get("connector", none_connector),
+                            "customFields": others + ION_CASE_CUSTOM_FIELDS,
+                        },
+                    )
+            self._cf_ensured = True
+            return True
+        except Exception as e:
+            logger.warning("ensure_case_custom_fields failed: %s", e)
+            return False
+
     def create_case(
         self,
         title: str,
@@ -148,6 +222,7 @@ class KibanaCasesService:
         connector: Optional[Dict] = None,
         settings: Optional[Dict] = None,
         assignees: Optional[List[Dict]] = None,
+        custom_fields: Optional[List[Dict]] = None,
     ) -> Optional[Dict[str, Any]]:
         """Create a new case in Kibana.
 
@@ -182,6 +257,8 @@ class KibanaCasesService:
 
             if assignees:
                 payload["assignees"] = assignees
+            if custom_fields:
+                payload["customFields"] = custom_fields
 
             path = self._get_api_path("/api/cases")
             response = self.client.post(path, json=payload)
