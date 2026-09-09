@@ -308,6 +308,8 @@
       if (!allKeys.length) {
           return extracted || '<div class="alert-parsed-empty">No fields available for this alert.</div>';
       }
+      // V2: Highlighted / All toggle + filter (ION_ALERT_DETAIL_V2).
+      if (_opts.detailV2) return _fieldsV2Html(alertId, flat, allKeys, extracted);
       const isKey = k => _keyPrefixes().some(p => k === p || k.startsWith(p));
       let keyKeys = allKeys.filter(isKey);
       let otherKeys = allKeys.filter(k => !isKey(k));
@@ -333,6 +335,102 @@
              + '&#128278; Add fields as evidence note</button>';
       }
       return h;
+  }
+
+  // ── V2 Fields: Highlighted / All toggle + filter ─────────────────────────
+  // "Highlighted" = the rule's investigation_fields when the alert carries them,
+  // else ION's well-known-ECS allowlist. "All" = the full flattened _source.
+  // State lives here so the toggle and filter re-render without re-fetching.
+  var _fieldsState = null;
+
+  function _investigationFields(raw) {
+    var f = _ecs(raw, 'kibana.alert.rule.parameters.investigation_fields');
+    if (f && f.field_names) f = f.field_names;         // {field_names:[...]} form
+    if (Array.isArray(f) && f.length) return f.map(String);
+    return null;
+  }
+
+  function _fieldsV2Html(alertId, flat, allKeys, extracted) {
+    var inv = _investigationFields(flat);
+    var isHl = inv
+      ? function (k) { return inv.some(function (f) { return k === f || k.indexOf(f + '.') === 0; }); }
+      : function (k) { return _keyPrefixes().some(function (p) { return k === p || k.indexOf(p) === 0; }); };
+    var fields = allKeys.map(function (k) { return { n: k, v: String(flat[k]), hl: isHl(k) }; });
+    var hlCount = fields.filter(function (f) { return f.hl; }).length;
+    if (!hlCount) { fields.forEach(function (f) { f.hl = true; }); hlCount = fields.length; }
+    _fieldsState = {
+      alertId: alertId, fields: fields, view: 'highlighted', filter: '',
+      hlCount: hlCount, allCount: fields.length, investigation: !!inv
+    };
+    // Keep the "add fields as evidence" action fed with the highlighted set.
+    _alertParsedKeyFields = fields.filter(function (f) { return f.hl; })
+      .map(function (f) { return { key: f.n, value: f.v }; });
+    return (extracted || '') + _fieldsShell();
+  }
+
+  function _fieldsShell() {
+    var st = _fieldsState;
+    if (!st) return '';
+    var srcTag = st.view === 'all'
+      ? '<span class="iad2-fsrc alert">alert document</span>'
+      : '<span class="iad2-fsrc rule">' + (st.investigation ? '▸ rule-selected' : 'highlighted') + '</span>'
+        + '<span class="iad2-fsrc alert">alert values</span>';
+    var hint = st.view === 'all'
+      ? 'every field on the alert — filter to find one'
+      : (st.investigation ? 'the rule’s investigation_fields' : 'well-known ECS fields')
+        + ' — the ones that matter for this rule';
+    var h = '<div class="iad2-fields">'
+      + '<div class="iad2-fsrcbar">' + srcTag + '<span class="iad2-fhint">' + escapeHtml(hint) + '</span></div>'
+      + '<div class="iad2-fctl"><div class="iad2-seg">'
+      +   '<button type="button" class="iad2-segbtn' + (st.view === 'highlighted' ? ' on' : '') + '"'
+      +     ' data-click-action="ionFieldsView" data-args=\'["highlighted"]\'>Highlighted'
+      +     ' <span class="c">' + st.hlCount + '</span></button>'
+      +   '<button type="button" class="iad2-segbtn' + (st.view === 'all' ? ' on' : '') + '"'
+      +     ' data-click-action="ionFieldsView" data-args=\'["all"]\'>All'
+      +     ' <span class="c">' + st.allCount + '</span></button>'
+      + '</div>'
+      + '<input type="text" class="iad2-fsearch" placeholder="Filter fields…" autocomplete="off"'
+      +   ' data-input-action="ionFieldsFilter" data-args=\'["$value"]\' value="' + escapeHtml(st.filter) + '">'
+      + '</div>'
+      + '<div id="iad2-fields-body">' + _fieldsRows() + '</div>';
+    var caseId = (_triageFor(st.alertId) || {}).case_id;
+    if (caseId) {
+      h += '<button type="button" class="alert-parsed-evidence" '
+         + 'data-click-action="addAlertFieldsAsEvidence" data-args=\'["' + escapeHtml(String(caseId)) + '"]\'>'
+         + '&#128278; Add fields as evidence note</button>';
+    }
+    return h + '</div>';
+  }
+
+  function _fieldsRows() {
+    var st = _fieldsState;
+    if (!st) return '';
+    var q = st.filter.trim().toLowerCase();
+    var rows = st.fields.filter(function (f) {
+      return (st.view === 'all' || f.hl)
+        && (!q || f.n.toLowerCase().indexOf(q) !== -1 || f.v.toLowerCase().indexOf(q) !== -1);
+    });
+    if (!rows.length) return '<div class="iad2-fempty">No fields match that filter.</div>';
+    var h = '<table class="' + _cls('fields-table') + ' iad2-ftbl"><tbody>';
+    rows.forEach(function (f) {
+      h += '<tr><td class="' + _cls('key') + '">' + escapeHtml(f.n) + '</td>'
+         + '<td class="' + _cls('val') + '">' + escapeHtml(f.v) + '</td></tr>';
+    });
+    return h + '</tbody></table>';
+  }
+
+  function ionFieldsView(view) {
+    if (!_fieldsState) return;
+    _fieldsState.view = (view === 'all') ? 'all' : 'highlighted';
+    var c = document.getElementById('alert-fields-content');
+    if (c) c.innerHTML = (_extractedValuesBlock(_fieldsState.alertId) || '') + _fieldsShell();
+  }
+
+  function ionFieldsFilter(value) {
+    if (!_fieldsState) return;
+    _fieldsState.filter = value || '';
+    var body = document.getElementById('iad2-fields-body');
+    if (body) body.innerHTML = _fieldsRows();   // keeps the input focused
   }
 
   function toggleAllAlertFields(allId) {
@@ -1558,6 +1656,8 @@
   window.ionAlertAddComment = ionAlertAddComment;
   window.loadAlertComments = loadAlertComments;
   window.toggleAllAlertFields = toggleAllAlertFields;
+  window.ionFieldsView = ionFieldsView;
+  window.ionFieldsFilter = ionFieldsFilter;
   window.addAlertFieldsAsEvidence = addAlertFieldsAsEvidence;
   window.runAutoInvestigate = runAutoInvestigate;
   window.aiAnalyzeAlert = aiAnalyzeAlert;
