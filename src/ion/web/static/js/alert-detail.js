@@ -1494,9 +1494,61 @@
   }
 
   function _renderHeadV2(alert) {
-    // _renderHead supplies triage bar, advisories, message, MITRE and action
-    // bars unchanged; its metadata grid is hidden by CSS (pills carry identity).
-    return '<div class="iad2-head">' + _heroV2(alert) + _renderHead(alert) + '</div>';
+    return '<div class="iad2-head">'
+      + _heroV2(alert)
+      + (_opts.triageBar === false ? ''
+          : '<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage…</span></div>')
+      + _headExtrasV2(alert)
+      + '</div>';
+  }
+
+  // Compact, decluttered header extras for v2 — the reason, a tight translate
+  // control, a MITRE chip and ONE action toolbar, instead of _renderHead's four
+  // separately-stacked bars + the redundant "Rule: …" line. Element ids and
+  // data-click-actions are preserved so translate / AI analyze / tuning / Arkime
+  // keep working through the existing handlers.
+  function _headExtrasV2(alert) {
+    var h = '<div class="iad2-reasonrow">'
+      + '<div class="alert-message-box iad2-reason" id="alert-message-box" data-original-message="'
+      +   escapeHtml(alert.message || '') + '">' + escapeHtml(alert.message || '') + '</div>'
+      + '<div class="alert-msg-translate-row iad2-translate">'
+      +   '<button class="btn btn-ghost btn-sm _ion-s-938b812d49" type="button" data-click-action="translateAlertMessage">Translate</button>'
+      +   '<select class="_ion-s-d81e1fcfa4" id="alert-msg-translate-target">'
+      +     '<option value="en" selected>→ EN</option><option value="ru">→ RU</option>'
+      +     '<option value="zh">→ ZH</option><option value="ar">→ AR</option>'
+      +     '<option value="es">→ ES</option><option value="fr">→ FR</option>'
+      +     '<option value="de">→ DE</option></select>'
+      +   '<span class="_ion-s-93e6231cbb" id="alert-msg-translate-status"></span>'
+      +   '<button class="_ion-s-df01b7ca34" id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage">original</button>'
+      + '</div></div>';
+
+    if (alert.tags && alert.tags.length) {
+      h += '<div class="alert-tags iad2-tags">'
+        + alert.tags.map(function (t) { return '<span class="alert-tag">' + escapeHtml(t) + '</span>'; }).join('')
+        + '</div>';
+    }
+
+    var tools = '';
+    if (alert.mitre_technique_id) {
+      tools += '<span class="mitre-badge auto iad2-mitre-chip" data-click-action="__filterMitreAndClose" data-tech-id="'
+        + escapeHtml(alert.mitre_technique_id) + '" title="Filter by this technique"><strong>'
+        + escapeHtml(alert.mitre_technique_id) + '</strong>'
+        + (alert.mitre_technique_name ? ' ' + escapeHtml(alert.mitre_technique_name) : '') + '</span>';
+    }
+    if (_opts.aiAvailable) {
+      tools += '<button class="ai-assist-btn iad2-act" data-click-action="aiAnalyzeAlert" data-args=\'["' + escapeHtml(alert.id) + '"]\'>★ AI Analyze</button>';
+      tools += '<button class="ai-assist-btn iad2-act" data-click-action="openAIChatWithContext" data-args=\'["' + escapeHtml(alert.id) + '"]\'>✉ Discuss</button>';
+    }
+    if (alert.rule_name) {
+      _tuneRegistry[alert.id] = { rule_name: alert.rule_name };
+      tools += '<button class="ai-assist-btn iad2-act" data-click-action="requestTuningOpen" data-args=\'["' + escapeHtml(alert.id) + '"]\'>⚙ Tuning</button>';
+    }
+    if (_opts.arkimeEnabled && (alert.network_community_id || alert.source_ip || alert.destination_ip || alert.arkime_node)) {
+      tools += '<a class="ai-assist-btn iad2-act" href="/alerts/' + encodeURIComponent(alert.id) + '/arkime">Arkime PCAP</a>';
+    }
+    if (tools) h += '<div class="iad2-toolbar">' + tools + '</div>';
+    h += '<div class="ai-analysis-result" id="ai-analysis-result"></div>';
+    return h;
   }
 
   function _sectionsHtmlV2(alert) {

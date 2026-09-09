@@ -563,6 +563,16 @@
 /* Advisories are lifted into the hero; hide the copy _renderHead emits below. */
 .iad2-head > .iad-advisories { display: none; }
 .iad2-hero .iad-advisories { margin-top: 12px; }
+/* Compact, decluttered header extras (reason + one action toolbar). */
+.iad2-reasonrow { margin-top: 14px; }
+.iad2-reason { margin: 0; }
+.iad2-translate { margin-top: 6px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.iad2-translate select { font-size: 11px; padding: 2px 6px; }
+.iad2-tags { margin-top: 8px; }
+.iad2-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.iad2-toolbar .iad2-act { font-size: 11.5px; padding: 5px 10px; margin: 0; }
+.iad2-toolbar .iad2-mitre-chip { font-size: 11px; margin: 0; }
+.iad2-head .ai-analysis-result:empty { display: none; }
 .iad2-hero {
     padding: 2px 0 12px;
     border-bottom: 1px solid var(--border);
