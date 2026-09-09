@@ -88,6 +88,7 @@ class Config:
     elasticsearch_username: str = ""  # Basic auth username
     elasticsearch_password: str = ""  # Basic auth password
     elasticsearch_alert_index: str = ".alerts-security.alerts-production"  # Alert index pattern
+    elasticsearch_esql_enabled: bool = False  # Use ES|QL (/_query) for supported aggregations; opt-in, falls back to the DSL path on any error
     # Optional raw process-events index (Elastic Defend endpoint events) for the
     # full process explorer — resolves named ancestry + child processes by
     # entity-id. Empty = off; the explorer then uses the alert-local tree only.
@@ -337,6 +338,7 @@ class Config:
             elasticsearch_username=data.get("elasticsearch_username", ""),
             elasticsearch_password=data.get("elasticsearch_password", ""),
             elasticsearch_alert_index=data.get("elasticsearch_alert_index", ".alerts-security.alerts-production"),
+            elasticsearch_esql_enabled=data.get("elasticsearch_esql_enabled", False),
             elasticsearch_case_index=data.get("elasticsearch_case_index", "ion-cases"),
             elasticsearch_verify_ssl=data.get("elasticsearch_verify_ssl", False),
             elasticsearch_user_index=data.get("elasticsearch_user_index", "ion-users"),
@@ -768,6 +770,8 @@ def get_config() -> Config:
             _config.elasticsearch_password = os.environ.get("ION_ELASTICSEARCH_PASSWORD", "")
         if os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX"):
             _config.elasticsearch_alert_index = os.environ.get("ION_ELASTICSEARCH_ALERT_INDEX", "")
+        if os.environ.get("ION_ELASTICSEARCH_ESQL_ENABLED"):
+            _config.elasticsearch_esql_enabled = _get_env_bool("ION_ELASTICSEARCH_ESQL_ENABLED")
         if os.environ.get("ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX"):
             _config.elasticsearch_process_events_index = os.environ.get(
                 "ION_ELASTICSEARCH_PROCESS_EVENTS_INDEX", ""

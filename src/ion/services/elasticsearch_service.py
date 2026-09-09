@@ -16,7 +16,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from ion.core.circuit_breaker import es_breaker
-from ion.core.config import get_elasticsearch_config, get_ssl_verify
+from ion.core.config import get_config, get_elasticsearch_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
 
 logger = logging.getLogger(__name__)
@@ -1640,8 +1640,59 @@ class ElasticsearchService:
 
         return alerts
 
+    async def query_esql(self, esql: str, params: Optional[list] = None) -> Dict[str, Any]:
+        """Run an ES|QL query via the /_query endpoint (Elasticsearch 8.11+).
+
+        Returns the raw response ({"columns": [...], "values": [[...]]}); use
+        _esql_rows() to turn it into a list of dicts. ES|QL is opt-in
+        (ION_ELASTICSEARCH_ESQL_ENABLED) and callers keep a DSL fallback.
+        """
+        payload: Dict[str, Any] = {"query": esql}
+        if params:
+            payload["params"] = params
+        return await self._request("POST", "/_query", json=payload)
+
+    @staticmethod
+    def _esql_rows(result: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Turn an ES|QL {columns, values} response into a list of dicts."""
+        cols = [c.get("name") for c in result.get("columns", [])]
+        return [dict(zip(cols, row)) for row in result.get("values", [])]
+
+    async def _get_alert_stats_esql(self, hours: int) -> Dict[str, Any]:
+        """ES|QL implementation of get_alert_stats (STATS COUNT BY field).
+
+        Two /_query calls (severity, status) — one per grouping dimension. ES|QL
+        groups by a text field directly, so no `.keyword` subfield is needed.
+        """
+        def _by(field: str) -> str:
+            return (
+                f"FROM {self.alert_index} "
+                f"| WHERE @timestamp >= NOW() - {int(hours)} hours "
+                f"| STATS count = COUNT(*) BY {field}"
+            )
+        sev = self._esql_rows(await self.query_esql(_by("kibana.alert.severity")))
+        sts = self._esql_rows(await self.query_esql(_by("kibana.alert.status")))
+        by_severity = {(r.get("kibana.alert.severity") or "unknown"): r.get("count", 0) for r in sev}
+        by_status = {(r.get("kibana.alert.status") or "unknown"): r.get("count", 0) for r in sts}
+        return {
+            "total": sum(by_severity.values()),
+            "by_severity": by_severity,
+            "by_status": by_status,
+        }
+
     async def get_alert_stats(self, hours: int = 24) -> Dict[str, Any]:
-        """Get alert statistics."""
+        """Get alert statistics (counts by severity + status over a window).
+
+        Uses ES|QL when ION_ELASTICSEARCH_ESQL_ENABLED is set, otherwise the
+        aggregation DSL. The ES|QL path falls back to the DSL on any error so
+        the endpoint never breaks on an unexpected ES|QL response.
+        """
+        if get_config().elasticsearch_esql_enabled:
+            try:
+                return await self._get_alert_stats_esql(hours)
+            except Exception as e:  # noqa: BLE001 — any ES|QL failure → DSL
+                logger.warning("ES|QL alert-stats failed; falling back to DSL: %s", e)
+
         query = {
             "size": 0,
             "query": {
