@@ -920,6 +920,10 @@
 
           _timelineInto(timelineContainer, timelineAlerts);
 
+          // V2 Case-context: the deduped related-alert count (excludes the current one).
+          const relCount = document.getElementById('iad2-cc-related');
+          if (relCount) relCount.textContent = String(Math.max(0, timelineAlerts.length - 1));
+
       } catch (error) {
           console.error('Error loading related alerts:', error);
           relatedContainer.innerHTML = '<div class="empty-state">Failed to load related alerts</div>';
@@ -1460,6 +1464,27 @@
       + '<div class="iad2-title">' + escapeHtml(title) + '</div>'
       + sub
       + '<div class="iad2-pills">' + pills + '</div>'
+      + _caseContextHtml(alert)
+      + '</div>';
+  }
+
+  // Case context — rule/case metadata (Rule ID, Index, First seen, Related-24h,
+  // Case) plus the pinned-field chips. Rule ID / Index fill from the raw doc in
+  // _hydrateFromRaw; Related-24h fills when loadRelatedAlerts resolves.
+  function _caseContextHtml(alert) {
+    var triage = _triageFor(alert.id) || {};
+    var seen = alert.timestamp ? new Date(alert.timestamp).toLocaleString() : '-';
+    var rows = ''
+      + '<span class="k">Rule ID</span><span class="v" id="iad2-cc-ruleid">-</span>'
+      + '<span class="k">Index</span><span class="v" id="iad2-cc-index">-</span>'
+      + '<span class="k">First seen</span><span class="v">' + escapeHtml(seen) + '</span>'
+      + '<span class="k">Related (24h)</span><span class="v" id="iad2-cc-related">-</span>'
+      + (triage.case_id
+          ? '<span class="k">Case</span><span class="v">' + escapeHtml(String(triage.case_number || triage.case_id)) + '</span>'
+          : '');
+    return '<div class="iad2-context">'
+      + '<div class="iad2-cclabel">Case context</div>'
+      + '<div class="iad2-ccgrid">' + rows + '</div>'
       + (_opts.fieldPins ? '<div class="iad2-pinned" id="iad2-pinned" hidden></div>' : '')
       + '</div>';
   }
@@ -1631,7 +1656,11 @@
 
   function _hydrateFromRaw(alert) {
     if (!alert || !alert.id) return;
-    var needs = !alert.host || !alert.user || !alert.timestamp || !alert.source;
+    // V2 always needs the raw doc for the Case-context Rule ID / Index, even when
+    // identity is already present (the /alerts full-doc case). _setMeta only fills
+    // blanks, so running every fill is idempotent.
+    var needs = !alert.host || !alert.user || !alert.timestamp || !alert.source
+      || (_opts.detailV2 && document.getElementById('iad2-cc-ruleid'));
     if (!needs) return;
     fetchRawOnce(alert.id).then(function (raw) {
       if (!raw) return;
@@ -1656,6 +1685,12 @@
       _setMeta('iad2-meta-user', user);
       _setMeta('iad2-meta-source', src);
       if (ts) _setMeta('iad2-meta-timestamp', new Date(ts).toLocaleString());
+      // V2 Case-context: rule id + index from the raw document.
+      _setMeta('iad2-cc-ruleid', _firstOf(raw, ['kibana.alert.rule.uuid',
+        'signal.rule.id', 'kibana.alert.rule.rule_id', 'rule.uuid']));
+      var _idx = _ecs(raw, 'kibana.alert.rule.parameters.index') || _ecs(raw, 'signal.rule.index');
+      if (Array.isArray(_idx)) _idx = _idx.join(', ');
+      _setMeta('iad2-cc-index', _idx ? String(_idx) : null);
 
       var box = document.getElementById('alert-message-box');
       if (box && msg && !box.textContent.trim()) {

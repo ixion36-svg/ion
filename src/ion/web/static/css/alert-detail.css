@@ -656,7 +656,19 @@
 }
 .iad2-fpin:hover { border-color: var(--info); color: var(--info); }
 .iad2-fpin.on { border-color: rgba(96,165,250,.5); color: var(--info); background: rgba(96,165,250,.1); }
-.iad2-pinned { margin-top: 12px; }
+/* Case-context metadata block in the hero */
+.iad2-context { margin-top: 14px; }
+.iad2-cclabel {
+    font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-muted); font-weight: 600; margin-bottom: 7px;
+}
+.iad2-ccgrid {
+    display: grid; grid-template-columns: auto 1fr; gap: 5px 16px;
+    font-size: 12.5px; align-items: baseline;
+}
+.iad2-ccgrid .k { color: var(--text-muted); }
+.iad2-ccgrid .v { font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace; color: var(--text-primary); word-break: break-all; }
+.iad2-pinned { margin-top: 14px; }
 .iad2-plabel {
     font-size: 9.5px; text-transform: uppercase; letter-spacing: .06em;
     color: var(--text-muted); font-weight: 600; margin-bottom: 7px;
