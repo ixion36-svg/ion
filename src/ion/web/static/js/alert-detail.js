@@ -1090,6 +1090,87 @@
     return html;
   }
 
+  // ── Alert Detail v2 (ION_ALERT_DETAIL_V2) ────────────────────────────────
+  // A decision-first hero (severity → rule title → identity pills) prepended to
+  // the EXISTING head, whose now-duplicate metadata grid is hidden by CSS under
+  // .iad2-head — so the triage bar, advisories, message, MITRE and action bars
+  // all keep working with zero changes to _renderHead. The tab strip is the same
+  // section engine (same ids, same lazy loaders) with a source-provenance dot on
+  // each tab.
+
+  // Where each section's content comes from — the answer to "rule or Bob?".
+  var _SECTION_SRC = {
+    autoinvestigate: 'ai',      // ✦ Bob — AI-derived, this alert
+    comments:        'analyst', // analyst-authored notes
+    related:         'alert', timeline: 'alert', case: 'alert',
+    sequence:        'alert', fields: 'alert', rawdata: 'alert'
+  };
+  var _SRC_TITLE = {
+    ai: 'Bob — AI-derived for this alert',
+    rule: 'Rule-authored — same every time it fires',
+    alert: 'From the alert',
+    analyst: 'Analyst-authored'
+  };
+
+  function _heroPill(k, v, id) {
+    var inner = id
+      ? '<span id="' + id + '">' + escapeHtml(String(v || '-')) + '</span>'
+      : escapeHtml(String(v || '-'));
+    return '<span class="iad2-pill"><span class="k">' + k + '</span>' + inner + '</span>';
+  }
+
+  function _heroV2(alert) {
+    var sev = alert.severity || '';
+    var title = alert.rule_name || alert.title || 'Alert';
+    var seen = alert.timestamp ? new Date(alert.timestamp).toLocaleString() : '';
+    var sub = (alert.rule_name && alert.title && alert.title !== alert.rule_name)
+      ? '<div class="iad2-sub">' + escapeHtml(alert.title) + '</div>' : '';
+    var pills = ''
+      + (alert.status ? _heroPill('status', alert.status) : '')
+      + _heroPill('host', alert.host, 'iad2-meta-host')
+      + _heroPill('user', alert.user, 'iad2-meta-user')
+      + _heroPill('source', alert.source, 'iad2-meta-source')
+      + '<span class="iad2-pill"><span class="k">seen</span>'
+      +   '<span id="iad2-meta-timestamp">' + escapeHtml(seen || '-') + '</span></span>';
+    return '<div class="iad2-hero">'
+      + '<div class="iad2-sevrow"><span class="severity-badge severity-' + escapeHtml(sev) + '">'
+      +   escapeHtml(sev || 'unknown') + '</span></div>'
+      + '<div class="iad2-title">' + escapeHtml(title) + '</div>'
+      + sub
+      + '<div class="iad2-pills">' + pills + '</div>'
+      + '</div>';
+  }
+
+  function _renderHeadV2(alert) {
+    // _renderHead supplies triage bar, advisories, message, MITRE and action
+    // bars unchanged; its metadata grid is hidden by CSS (pills carry identity).
+    return '<div class="iad2-head">' + _heroV2(alert) + _renderHead(alert) + '</div>';
+  }
+
+  function _sectionsHtmlV2(alert) {
+    var SECTIONS = _visibleSections();
+    var legend = '<div class="iad2-legend">'
+      + '<span class="iad2-leg"><span class="iad2-dot iad2-dot-ai"></span>Bob AI</span>'
+      + '<span class="iad2-leg"><span class="iad2-dot iad2-dot-alert"></span>alert</span>'
+      + '<span class="iad2-leg"><span class="iad2-dot iad2-dot-analyst"></span>analyst</span>'
+      + '</div>';
+    var h = '<div class="detail-tabs iad2-tabs">';
+    SECTIONS.forEach(function (s, i) {
+      var src = _SECTION_SRC[s.id] || 'alert';
+      h += '<button class="detail-tab-btn iad2-tab' + (i === 0 ? ' active' : '') + '" data-tab="' + s.id + '"'
+         + ' data-click-action="switchDetailTab" data-args=\'["' + s.id + '", "$target"]\''
+         + ' title="' + escapeHtml(_SRC_TITLE[src] || '') + '">'
+         + '<span class="iad2-dot iad2-dot-' + src + '" aria-hidden="true"></span>'
+         + s.label + '</button>';
+    });
+    h += '</div>' + legend;
+    SECTIONS.forEach(function (s, i) {
+      h += '<div id="detail-tab-' + s.id + '" class="detail-tab-content' + (i === 0 ? ' active' : '') + '">'
+         + _sectionPlaceholder(s.id, alert) + '</div>';
+    });
+    return h;
+  }
+
   // -- section shell: the ONLY thing that differs between the two layouts ----
   // A host declares which sections it can populate; default is all. Rendering a
   // section the host cannot fill leaves a spinner that never resolves.
@@ -1162,6 +1243,12 @@
   function render(alert, opts) {
     _opts = opts || {};
     _current = alert;
+    // V2 (ION_ALERT_DETAIL_V2): decision-first header + source-badged tab strip.
+    // Only the 'tabs' arrangement is reskinned; 'stacked' keeps the v1 render so
+    // the /cases jump-link layout is untouched.
+    if (_opts.detailV2 && _opts.layout !== 'stacked') {
+      return _renderHeadV2(alert) + _sectionsHtmlV2(alert);
+    }
     return _renderHead(alert) + _sectionsHtml(alert);
   }
 
@@ -1225,6 +1312,11 @@
       _setMeta('iad-meta-user', user);
       _setMeta('iad-meta-source', src);
       if (ts) _setMeta('iad-meta-timestamp', new Date(ts).toLocaleString());
+      // V2 pills carry the same identity; fill them too when present on screen.
+      _setMeta('iad2-meta-host', host);
+      _setMeta('iad2-meta-user', user);
+      _setMeta('iad2-meta-source', src);
+      if (ts) _setMeta('iad2-meta-timestamp', new Date(ts).toLocaleString());
 
       var box = document.getElementById('alert-message-box');
       if (box && msg && !box.textContent.trim()) {

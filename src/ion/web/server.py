@@ -1326,7 +1326,11 @@ async def security_dashboard_page(request: Request, user: User = Depends(require
 @app.get("/alerts", response_class=HTMLResponse)
 async def alerts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the alerts investigation page."""
-    return templates.TemplateResponse(request=request, name="alerts.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="alerts.html",
+        context={"alert_detail_v2": get_config().alert_detail_v2},
+    )
 
 
 @app.get("/alerts/{alert_id}/arkime", response_class=HTMLResponse)
@@ -1383,7 +1387,11 @@ async def alert_deeplink(
 @app.get("/cases", response_class=HTMLResponse)
 async def cases_page(request: Request, user: User = Depends(require_page_permission("case:read"))):
     """Render the cases management page."""
-    return templates.TemplateResponse(request=request, name="cases.html")
+    return templates.TemplateResponse(
+        request=request,
+        name="cases.html",
+        context={"alert_detail_v2": get_config().alert_detail_v2},
+    )
 
 
 @app.get("/cases/{row_id:int}")

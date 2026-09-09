@@ -3,7 +3,7 @@
 {% block title %}Cases · ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
   <!-- Header row -->
@@ -2878,6 +2878,7 @@ function selectCaseAlert(alertId, idx, caseId) {
         triageBar: false,
         aiAvailable: true,
         arkimeEnabled: !!window.__ionArkimeEnabled,
+        detailV2: document.querySelector('[data-alert-detail-v2]')?.dataset.alertDetailV2 === '1',
         classPrefix: 'cpanel-alert',
         caseId: caseId
     });

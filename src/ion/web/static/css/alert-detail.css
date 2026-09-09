@@ -555,3 +555,58 @@
 }
 .iad-tune-status.ok { color: var(--success, #86f0a0); }
 .iad-tune-status.err { color: var(--danger, #ff6d7e); }
+
+/* ── Alert Detail v2 (ION_ALERT_DETAIL_V2) ───────────────────────────────────
+   Decision-first hero + source-badged tab strip. The v2 hero carries identity
+   as pills, so the reused v1 metadata grid is hidden to avoid duplication. */
+.iad2-head .alert-meta-grid { display: none; }
+.iad2-hero {
+    padding: 2px 0 12px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+}
+.iad2-sevrow { margin-bottom: 8px; }
+.iad2-title {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: -0.01em;
+    line-height: 1.25;
+}
+.iad2-sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 3px; }
+.iad2-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+.iad2-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 3px 10px;
+}
+.iad2-pill .k {
+    color: var(--text-muted);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+/* Source-provenance dots on the tab strip + legend. */
+.iad2-tab { display: inline-flex; align-items: center; gap: 7px; }
+.iad2-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.iad2-dot-ai { background: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
+.iad2-dot-rule { background: var(--warning); }
+.iad2-dot-alert { background: var(--info); }
+.iad2-dot-analyst { background: var(--info); }
+.iad2-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin: 0 0 12px;
+    padding-bottom: 2px;
+    font-size: 10.5px;
+    color: var(--text-muted);
+}
+.iad2-leg { display: inline-flex; align-items: center; gap: 6px; }

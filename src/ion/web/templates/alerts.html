@@ -7,7 +7,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden" data-alert-detail-v2="{{ '1' if alert_detail_v2 else '0' }}">
 <div class="relative z-10 w-full px-4 sm:px-6 lg:px-8 py-10 md:py-12">
 
   <!-- ── Header row ── -->
@@ -8825,6 +8825,7 @@ async function showAlertDetail(alertId) {
         layout: 'tabs',              // /alerts keeps its tab strip, unchanged
         aiAvailable: aiAvailable,
         arkimeEnabled: arkimeEnabled,
+        detailV2: document.querySelector('[data-alert-detail-v2]')?.dataset.alertDetailV2 === '1',
         classPrefix: 'alert-parsed'
     });
 
