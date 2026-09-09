@@ -1,0 +1,518 @@
+<meta charset="utf-8">
+<title>ION Alert Detail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#161b22; --raised:#1c232c; --raised2:#212a34;
+    --bd:#2a313c; --bd2:#3a424e;
+    --fg:#e6edf3; --mut:#8b949e; --dim:#6b7480;
+    --analyst:#58a6ff;         /* blue  = analyst / interactive */
+    --cyan:#39d0d8;            /* cyan  = AI / Bob */
+    --rule:#c9a24b;           /* amber = rule-authored / deterministic */
+    --crit:#f85149; --critbg:rgba(248,81,73,.14);
+    --benign:#3fb950; --esc:#d29922;
+    --sans:"IBM Plex Sans",system-ui,Segoe UI,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{background:
+      radial-gradient(1200px 500px at 80% -10%,rgba(57,208,216,.05),transparent 60%),
+      var(--bg);
+    color:var(--fg);font-family:var(--sans);font-size:13.5px;line-height:1.5;
+    margin:0;padding:26px 20px;min-height:100vh}
+  .wrap{max-width:760px;margin:0 auto}
+
+  /* intro */
+  .kicker{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--cyan);margin:0 0 6px}
+  .h1{font-size:19px;font-weight:600;margin:0 0 5px;letter-spacing:-.01em;text-wrap:balance}
+  .sub{color:var(--mut);font-size:12.5px;margin:0 0 16px;max-width:60ch}
+  .sub b{color:var(--fg);font-weight:600}
+
+  /* source-badge legend */
+  .legend{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 20px;font-size:11px}
+  .lg{display:inline-flex;align-items:center;gap:6px;padding:5px 9px 5px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--panel);color:var(--mut)}
+  .lg b{font-weight:600}
+  .lg .d{width:8px;height:8px;border-radius:50%;flex:none}
+  .src-ai{color:var(--cyan)} .src-ai b{color:var(--cyan)} .dot-ai{background:var(--cyan)}
+  .src-rule{color:var(--rule)} .src-rule b{color:var(--rule)} .dot-rule{background:var(--rule)}
+  .src-alert{color:var(--analyst)} .src-alert b{color:var(--analyst)} .dot-alert{background:var(--analyst)}
+
+  /* the panel */
+  .card{border:1px solid var(--bd);border-radius:14px;overflow:hidden;background:var(--panel);
+    box-shadow:0 18px 50px -22px rgba(0,0,0,.8)}
+
+  /* decision-first header */
+  .hdr{padding:16px 18px 14px;background:linear-gradient(180deg,var(--raised),var(--panel));border-bottom:1px solid var(--bd)}
+  .hdr .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .sev{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:3px 9px;border-radius:6px;background:var(--critbg);color:#ff7b72;border:1px solid rgba(248,81,73,.35)}
+  .sev .d{width:7px;height:7px;border-radius:50%;background:var(--crit);box-shadow:0 0 0 3px rgba(248,81,73,.2)}
+  .close{color:var(--dim);font-family:var(--mono);font-size:12px}
+  .title{font-size:17px;font-weight:600;margin:11px 0 3px;letter-spacing:-.01em}
+  .rulename{color:var(--mut);font-size:12px;font-family:var(--mono)}
+  .rulename .rid{color:var(--rule)}
+  .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:20px;border:1px solid var(--bd2);color:var(--mut);background:rgba(0,0,0,.2)}
+  .pill .k{color:var(--dim);font-size:9px;text-transform:uppercase;letter-spacing:.05em}
+
+  /* bob verdict strip */
+  .verdict{display:flex;align-items:center;gap:11px;margin-top:14px;padding:10px 12px;border-radius:10px;
+    background:rgba(57,208,216,.06);border:1px solid rgba(57,208,216,.24)}
+  .verdict .mk{font-size:15px;color:var(--cyan);line-height:1}
+  .verdict .vt{font-size:12px}
+  .verdict .vt b{color:var(--cyan);font-weight:600}
+  .verdict .vt .val{color:#56d364;font-weight:600}
+  .verdict .conf{margin-left:auto;font-family:var(--mono);font-size:10.5px;color:var(--dim);text-align:right}
+  .bar{width:72px;height:4px;border-radius:3px;background:var(--bd);margin-top:4px;overflow:hidden}
+  .bar i{display:block;height:100%;width:82%;background:linear-gradient(90deg,var(--cyan),#56d364)}
+
+  /* triage actions */
+  .triage{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}
+  .btn{font-family:var(--sans);font-size:12px;font-weight:500;padding:7px 12px;border-radius:8px;border:1px solid var(--bd2);background:var(--raised2);color:var(--fg);cursor:pointer;transition:.12s}
+  .btn:hover{border-color:var(--analyst);transform:translateY(-1px)}
+  .btn.benign{border-color:rgba(63,185,80,.4);color:#56d364}
+  .btn.esc{border-color:rgba(210,153,34,.4);color:#e3b341}
+  .btn.fp{border-color:rgba(248,81,73,.4);color:#ff7b72}
+  .btn.pri{margin-left:auto;background:var(--analyst);border-color:var(--analyst);color:#08111f;font-weight:600}
+  .btn.pri:hover{filter:brightness(1.08)}
+
+  /* tab strip */
+  .tabs{display:flex;gap:2px;padding:0 10px;background:var(--raised);border-bottom:1px solid var(--bd);overflow-x:auto;scrollbar-width:thin}
+  .tab{flex:none;display:inline-flex;align-items:center;gap:7px;font-family:var(--sans);font-size:12.5px;color:var(--mut);
+    padding:11px 12px 10px;border:none;border-bottom:2px solid transparent;background:none;cursor:pointer;white-space:nowrap;transition:.12s}
+  .tab:hover{color:var(--fg)}
+  .tab.on{color:var(--fg);border-bottom-color:var(--analyst);font-weight:600}
+  .tab.tab-ai.on{border-bottom-color:var(--cyan)}
+  .tab .n{font-family:var(--mono);font-size:10px;color:var(--dim);background:rgba(0,0,0,.3);padding:1px 5px;border-radius:9px}
+  .tab .mk{font-size:12px}
+  .tab.tab-ai .mk{color:var(--cyan)}
+
+  /* tab body */
+  .body{padding:16px 18px 20px;min-height:230px}
+  .pane{display:none;animation:fade .18s ease}
+  .pane.on{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  @media (prefers-reduced-motion:reduce){.pane,.pane.on{animation:none}}
+
+  /* source badge inside a pane */
+  .srcbar{display:flex;align-items:center;gap:8px;margin:-2px 0 13px}
+  .srctag{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-family:var(--mono);letter-spacing:.02em;padding:4px 9px;border-radius:7px;border:1px solid var(--bd)}
+  .srctag .d{width:7px;height:7px;border-radius:50%}
+  .srctag.ai{color:var(--cyan);border-color:rgba(57,208,216,.3);background:rgba(57,208,216,.06)}
+  .srctag.rule{color:var(--rule);border-color:rgba(201,162,75,.3);background:rgba(201,162,75,.07)}
+  .srctag.alert{color:var(--analyst);border-color:rgba(88,166,255,.3);background:rgba(88,166,255,.06)}
+  .srchint{font-size:11px;color:var(--dim)}
+
+  .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--dim);font-weight:600;margin:16px 0 7px}
+  .lbl:first-child{margin-top:0}
+  .reason{color:var(--fg);font-size:12.5px;background:rgba(210,153,34,.06);border-left:2px solid var(--esc);padding:8px 11px;border-radius:0 7px 7px 0;margin:0 0 4px}
+  .desc{color:var(--mut);font-size:12.5px;margin:0}
+  .facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:12.5px;margin:0}
+  .facts .k{color:var(--dim)}
+  .facts .v{font-family:var(--mono);color:var(--fg)}
+
+  /* bob pane */
+  .bobwrap{border:1px solid rgba(57,208,216,.22);border-radius:10px;background:rgba(57,208,216,.04);padding:13px 14px}
+  .reason-list{margin:0;padding-left:18px;color:var(--mut);font-size:12.5px}
+  .reason-list li{margin:5px 0}
+  .reason-list li b{color:var(--fg);font-weight:600}
+  .act{display:flex;align-items:flex-start;gap:9px;padding:8px 0;border-top:1px solid var(--bd)}
+  .act:first-of-type{border-top:none}
+  .act .ai-mk{color:var(--cyan);font-family:var(--mono);font-size:11px;flex:none;margin-top:1px}
+  .act .txt{font-size:12.5px;color:var(--fg)}
+  .act .txt .m{color:var(--mut);display:block;font-size:11.5px;margin-top:1px}
+
+  /* guide pane */
+  .guide{margin:0;padding:0;list-style:none;counter-reset:g}
+  .guide li{counter-increment:g;font-size:12.5px;color:var(--fg);padding:8px 0 8px 30px;position:relative;border-top:1px solid var(--bd)}
+  .guide li:first-child{border-top:none}
+  .guide li::before{content:counter(g);position:absolute;left:0;top:8px;width:20px;height:20px;border-radius:50%;background:rgba(201,162,75,.1);border:1px solid rgba(201,162,75,.4);color:var(--rule);font-family:var(--mono);font-size:10px;font-weight:600;text-align:center;line-height:19px}
+  .guide li .m{display:block;color:var(--mut);font-size:11.5px;margin-top:2px}
+  .note-callout{margin-top:14px;padding:10px 12px;border-radius:9px;border:1px dashed var(--bd2);background:var(--raised);font-size:11.5px;color:var(--mut)}
+  .note-callout b{color:var(--cyan);font-weight:600}
+
+  /* observables table */
+  .tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+  .tbl th{text-align:left;font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);font-weight:600;padding:0 10px 7px 0;border-bottom:1px solid var(--bd)}
+  .tbl td{padding:8px 10px 8px 0;border-bottom:1px solid var(--bd);vertical-align:top}
+  .tbl tr:last-child td{border-bottom:none}
+  .ty{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.03em;color:var(--cyan);background:rgba(57,208,216,.08);padding:2px 7px;border-radius:5px;white-space:nowrap}
+  .val{font-family:var(--mono);color:var(--fg);word-break:break-all}
+  .cnt{font-family:var(--mono);color:var(--dim);text-align:right}
+  .fname{font-family:var(--mono);font-size:11.5px;color:var(--rule);white-space:nowrap;padding-right:16px}
+  .fields-tbl td{vertical-align:top}
+  /* fields controls */
+  .fcontrols{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:13px}
+  .seg{display:inline-flex;border:1px solid var(--bd);border-radius:8px;overflow:hidden;background:var(--raised)}
+  .segbtn{font-family:var(--sans);font-size:11.5px;padding:6px 12px;background:none;border:none;border-right:1px solid var(--bd);color:var(--mut);cursor:pointer}
+  .segbtn:last-child{border-right:none}
+  .segbtn.on{background:var(--raised2);color:var(--fg);font-weight:600}
+  .segbtn .c{font-family:var(--mono);font-size:9.5px;color:var(--dim);margin-left:5px}
+  .segbtn.on .c{color:var(--analyst)}
+  .fsearch{flex:1;min-width:130px;max-width:240px;background:var(--raised);border:1px solid var(--bd);border-radius:8px;padding:6px 11px;color:var(--fg);font-family:var(--sans);font-size:12px}
+  .fsearch::placeholder{color:var(--dim)}
+  .fsearch:focus{outline:none;border-color:var(--analyst)}
+  .pinbtn{font-family:var(--sans);font-size:10.5px;padding:3px 9px;border-radius:6px;border:1px solid var(--bd2);background:var(--raised);color:var(--dim);cursor:pointer;white-space:nowrap;transition:.12s}
+  .pinbtn:hover{border-color:var(--analyst);color:var(--analyst)}
+  .pinbtn.on{border-color:rgba(88,166,255,.5);color:var(--analyst);background:rgba(88,166,255,.1)}
+  .fempty{font-size:12px;color:var(--dim);text-align:center;padding:16px 0}
+  /* pinned fields in case context */
+  .pinned{display:flex;flex-wrap:wrap;gap:7px}
+  .pchip{display:inline-flex;align-items:center;gap:9px;font-size:11.5px;padding:5px 8px 5px 10px;border-radius:8px;border:1px solid rgba(88,166,255,.35);background:rgba(88,166,255,.07)}
+  .pchip .pk{font-family:var(--mono);font-size:10px;color:var(--analyst)}
+  .pchip .pv{font-family:var(--mono);color:var(--fg);word-break:break-all}
+  .pchip .rm{color:var(--dim);cursor:pointer;font-size:12px;line-height:1}
+  .pchip .rm:hover{color:var(--crit)}
+  .pinempty{font-size:11.5px;color:var(--dim);font-style:italic}
+
+  /* mitre */
+  .mitre{border:1px solid var(--bd);border-radius:10px;padding:13px 14px;background:var(--raised)}
+  .mitre .tech{font-family:var(--mono);font-size:14px;color:var(--fg);font-weight:600}
+  .mitre .tid{color:var(--rule)}
+  .chain{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:11px;font-size:11.5px}
+  .chain .step{font-family:var(--mono);padding:4px 9px;border-radius:6px;border:1px solid var(--bd2);color:var(--mut)}
+  .chain .step.hot{border-color:rgba(248,81,73,.4);color:#ff7b72;background:var(--critbg)}
+  .chain .arr{color:var(--dim)}
+
+  /* playbooks */
+  .pb{border:1px solid var(--bd);border-radius:10px;padding:11px 13px;margin-bottom:9px;background:var(--raised)}
+  .pb:last-child{margin-bottom:0}
+  .pb .pn{font-size:12.5px;font-weight:600;color:var(--fg);display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .pb .match{font-family:var(--mono);font-size:10px;color:var(--rule);background:rgba(201,162,75,.08);padding:2px 7px;border-radius:5px}
+  .pb .steps{margin:7px 0 0;padding-left:16px;color:var(--mut);font-size:11.5px}
+  .pb .steps li{margin:3px 0}
+
+  /* notes */
+  .note{border:1px solid var(--bd);border-radius:10px;padding:11px 13px;margin-bottom:9px;background:var(--raised)}
+  .note .nh{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dim);margin-bottom:6px;font-family:var(--mono)}
+  .note .nh .who{color:var(--analyst)}
+  .note .nh .auto{color:var(--cyan)}
+  .note .nb{font-size:12.5px;color:var(--fg)}
+  .note .nb .k{color:var(--dim);font-family:var(--mono);font-size:11px}
+
+  .foot{margin-top:18px;font-size:11.5px;color:var(--dim);line-height:1.6}
+  .foot b{color:var(--fg);font-weight:600}
+  .foot .src-rule{color:var(--rule)} .foot .src-ai{color:var(--cyan)}
+</style>
+
+<div class="wrap">
+  <p class="kicker">ION · SOC Console · Alert Detail</p>
+  <h1 class="h1">Where does each part come from?</h1>
+  <p class="sub">The redesigned alert-detail panel — a decision-first header over a tabbed body. Click the tabs. Each one wears a <b>source badge</b> so it's clear at a glance whether you're reading something the <b>rule author wrote</b>, something <b>Bob inferred for this alert</b>, or <b>raw evidence from the alert</b>.</p>
+
+  <div class="legend">
+    <span class="lg src-rule"><span class="d dot-rule"></span><b>▸ rule-authored</b> · same every time it fires</span>
+    <span class="lg src-ai"><span class="d dot-ai"></span><b>✦ Bob</b> · AI, this alert only</span>
+    <span class="lg src-alert"><span class="d dot-alert"></span><b>alert</b> · raw evidence</span>
+  </div>
+
+  <div class="card">
+    <!-- decision-first header -->
+    <div class="hdr">
+      <div class="top">
+        <span class="sev"><span class="d"></span>Critical</span>
+        <span class="close">CASE-0008 · ✕</span>
+      </div>
+      <div class="title">PowerShell EncodedCommand via Office</div>
+      <div class="rulename">Elastic DE rule · <span class="rid">T1059.001</span> · Suspicious Encoded PowerShell Spawned by Office Application</div>
+      <div class="meta">
+        <span class="pill"><span class="k">status</span>acknowledged</span>
+        <span class="pill"><span class="k">host</span>WIN-DC01</span>
+        <span class="pill"><span class="k">user</span>SYSTEM</span>
+        <span class="pill"><span class="k">src.ip</span>10.0.0.5</span>
+        <span class="pill"><span class="k">seen</span>09:42:17Z</span>
+      </div>
+
+      <div class="verdict">
+        <span class="mk">✦</span>
+        <span class="vt"><b>Bob's verdict:</b> <span class="val">likely true positive</span> — Office app spawning encoded PowerShell is a classic initial-access → execution pivot.</span>
+        <span class="conf">confidence: high<span class="bar"><i></i></span></span>
+      </div>
+
+      <div class="triage">
+        <button class="btn benign">✓ Benign</button>
+        <button class="btn esc">▲ Escalate</button>
+        <button class="btn fp">✕ False positive</button>
+        <button class="btn pri">Triage ▸</button>
+      </div>
+    </div>
+
+    <!-- tab strip -->
+    <div class="tabs" role="tablist">
+      <button class="tab on" data-tab="overview">Overview</button>
+      <button class="tab tab-ai" data-tab="bob"><span class="mk">✦</span> Bob AI</button>
+      <button class="tab" data-tab="fields">Fields <span class="n">9</span></button>
+      <button class="tab" data-tab="guide">Guide</button>
+      <button class="tab" data-tab="obs">Observables <span class="n">4</span></button>
+      <button class="tab" data-tab="mitre">MITRE <span class="n">1</span></button>
+      <button class="tab" data-tab="playbooks">Playbooks <span class="n">2</span></button>
+      <button class="tab" data-tab="notes">Notes <span class="n">2</span></button>
+    </div>
+
+    <div class="body">
+      <!-- OVERVIEW -->
+      <section class="pane on" data-pane="overview">
+        <div class="srcbar">
+          <span class="srctag alert"><span class="d dot-alert"></span>alert signal</span>
+          <span class="srctag rule"><span class="d dot-rule"></span>rule description</span>
+          <span class="srchint">what fired, in one screen</span>
+        </div>
+        <div class="lbl">Why this fired</div>
+        <div class="reason">Encoded PowerShell (<span class="val" style="color:inherit">-enc</span>) spawned by <span class="val" style="color:inherit">winword.exe</span> on WIN-DC01, running as SYSTEM.</div>
+        <div class="lbl">Rule description</div>
+        <p class="desc">Detects a Microsoft Office application (Word, Excel, PowerPoint) launching PowerShell with an encoded command line — the macro-to-payload pattern used to stage execution after a malicious document is opened.</p>
+        <div class="lbl">Case context <span style="text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400">· not repeated below — host / user / process live in the header &amp; Fields tab</span></div>
+        <div class="facts">
+          <span class="k">Rule ID</span><span class="v">a1e2c9…office-encoded-ps</span>
+          <span class="k">Index</span><span class="v">.alerts-security.alerts-default</span>
+          <span class="k">First seen</span><span class="v">2026-09-09 09:42:17Z</span>
+          <span class="k">Related (24h)</span><span class="v">2 alerts · same rule, other hosts</span>
+        </div>
+        <div class="lbl">Pinned fields <span style="text-transform:none;letter-spacing:0;color:var(--dim);font-weight:400">· added in-app from the Fields tab — not hardcoded</span></div>
+        <div class="pinned" id="pinned-wrap"></div>
+      </section>
+
+      <!-- BOB AI -->
+      <section class="pane" data-pane="bob">
+        <div class="srcbar">
+          <span class="srctag ai"><span class="d dot-ai"></span>✦ Bob · AI-derived</span>
+          <span class="srchint">generated for <i>this</i> alert by the auto-investigation service — not stored on the rule</span>
+        </div>
+        <div class="bobwrap">
+          <div class="lbl" style="margin-top:0;color:var(--cyan)">Assessment</div>
+          <ul class="reason-list">
+            <li><b>Initial access → execution pivot.</b> An Office process spawning <span class="val" style="color:inherit">powershell.exe -enc</span> almost always means a weaponised document ran a macro. Benign automation rarely base64-encodes its command line.</li>
+            <li><b>High-value target.</b> WIN-DC01 is a domain controller; SYSTEM-level code execution here is materially worse than on a workstation.</li>
+            <li><b>Decoded payload is suspicious.</b> The <span class="val" style="color:inherit">-enc</span> blob decodes to a download cradle reaching an external host — consistent with second-stage retrieval.</li>
+          </ul>
+          <div class="lbl" style="color:var(--cyan)">Recommended actions</div>
+          <div class="act"><span class="ai-mk">01</span><span class="txt">Isolate WIN-DC01 from the network<span class="m">Containment first — DC compromise has blast radius across the domain.</span></span></div>
+          <div class="act"><span class="ai-mk">02</span><span class="txt">Retrieve the parent document from winword.exe's open handles<span class="m">The lure is the fastest route to scope and IOCs.</span></span></div>
+          <div class="act"><span class="ai-mk">03</span><span class="txt">Run playbook <b>“Office-spawned PowerShell”</b><span class="m">Bob matched this to a predefined response playbook (see Playbooks tab).</span></span></div>
+        </div>
+      </section>
+
+      <!-- HIGHLIGHTED / ALL FIELDS -->
+      <section class="pane" data-pane="fields">
+        <div class="srcbar" id="fields-src"></div>
+        <div class="fcontrols">
+          <div class="seg">
+            <button class="segbtn on" data-view="highlighted">Highlighted <span class="c" id="cnt-hl">9</span></button>
+            <button class="segbtn" data-view="all">All <span class="c" id="cnt-all">24</span></button>
+          </div>
+          <input class="fsearch" id="fields-filter" type="text" placeholder="Filter fields…" autocomplete="off">
+        </div>
+        <table class="tbl fields-tbl">
+          <thead><tr><th>Field</th><th>Value</th><th style="text-align:right">Pin</th></tr></thead>
+          <tbody id="fields-body"></tbody>
+        </table>
+        <div class="fempty" id="fields-empty" hidden>No fields match that filter.</div>
+      </section>
+
+      <!-- GUIDE -->
+      <section class="pane" data-pane="guide">
+        <div class="srcbar">
+          <span class="srctag rule"><span class="d dot-rule"></span>▸ rule-authored</span>
+          <span class="srchint">the checklist an analyst wrote on the rule — <b>identical for every alert this rule fires</b></span>
+        </div>
+        <ol class="guide">
+          <li>Decode the <span class="val" style="color:inherit;font-family:var(--mono)">-EncodedCommand</span> payload and record the resulting script.<span class="m">ION decodes base64 deterministically — don't eyeball it.</span></li>
+          <li>Identify the document winword.exe had open and where it came from (email, share, download).</li>
+          <li>Pivot the destination IPs / domains from the decoded cradle in Arkime.</li>
+          <li>Check for persistence created after the spawn (scheduled tasks, run keys, services).</li>
+          <li>Confirm scope: has the same rule fired on other hosts in the last 24h?</li>
+        </ol>
+        <div class="note-callout">
+          Authored on the rule via <span class="val" style="color:inherit">AlertPromptTemplate.investigation_checklist_text</span>. It's a static SOP — it doesn't know this alert hit a domain controller. <b>Next up:</b> Bob generating a per-rule <i>custom</i> template from the rule + real evidence, kept alongside this predefined one.
+        </div>
+      </section>
+
+      <!-- OBSERVABLES -->
+      <section class="pane" data-pane="obs">
+        <div class="srcbar">
+          <span class="srctag alert"><span class="d dot-alert"></span>extracted IOCs</span>
+          <span class="srchint">deduped by type · value — the pivotable indicators, not repeated from Fields</span>
+        </div>
+        <table class="tbl">
+          <thead><tr><th>Type</th><th>Value</th><th style="text-align:right">×</th></tr></thead>
+          <tbody>
+            <tr><td><span class="ty">ip</span></td><td class="val">185.220.101.44</td><td class="cnt">3</td></tr>
+            <tr><td><span class="ty">domain</span></td><td class="val">cdn-update[.]xyz</td><td class="cnt">1</td></tr>
+            <tr><td><span class="ty">sha256</span></td><td class="val">3f2a9c…e71b (macro.docm)</td><td class="cnt">1</td></tr>
+            <tr><td><span class="ty">url</span></td><td class="val">hxxps://cdn-update[.]xyz/a.ps1</td><td class="cnt">1</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- MITRE -->
+      <section class="pane" data-pane="mitre">
+        <div class="srcbar">
+          <span class="srctag rule"><span class="d dot-rule"></span>▸ from rule.threat</span>
+          <span class="srchint">mapped on the detection rule</span>
+        </div>
+        <div class="mitre">
+          <div class="tech"><span class="tid">T1059.001</span> — PowerShell</div>
+          <p class="desc" style="margin:6px 0 0">Sub-technique of Command and Scripting Interpreter. Adversaries abuse PowerShell for execution; encoding hides intent from casual inspection.</p>
+          <div class="chain">
+            <span class="step">Initial Access</span><span class="arr">→</span>
+            <span class="step hot">Execution</span><span class="arr">→</span>
+            <span class="step">Persistence</span><span class="arr">→</span>
+            <span class="step">C2</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- PLAYBOOKS -->
+      <section class="pane" data-pane="playbooks">
+        <div class="srcbar">
+          <span class="srctag rule"><span class="d dot-rule"></span>▸ matched by rule / tags</span>
+          <span class="srchint">predefined response steps, not AI</span>
+        </div>
+        <div class="pb">
+          <div class="pn">Office-spawned PowerShell <span class="match">match: T1059.001 + parent=office</span></div>
+          <ul class="steps">
+            <li>Isolate the host at the EDR</li>
+            <li>Capture the parent document + decoded script as evidence</li>
+            <li>Block the C2 destination at the perimeter</li>
+          </ul>
+        </div>
+        <div class="pb">
+          <div class="pn">Domain-controller compromise <span class="match">match: host role = DC</span></div>
+          <ul class="steps">
+            <li>Force privileged-credential rotation (krbtgt ×2)</li>
+            <li>Review DC event logs for lateral movement</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- NOTES -->
+      <section class="pane" data-pane="notes">
+        <div class="srcbar">
+          <span class="srctag alert"><span class="d dot-alert"></span>case timeline</span>
+          <span class="srchint">analyst + auto-enrichment</span>
+        </div>
+        <div class="note">
+          <div class="nh"><span class="auto">✦ auto-enrichment</span> · 09:42:31Z</div>
+          <div class="nb"><span class="k">Observables (OpenCTI):</span> 185.220.101.44 — known Tor exit node, 4 prior reports. macro.docm hash matches an internal phishing-sim template <i>and</i> a public malware corpus.</div>
+        </div>
+        <div class="note">
+          <div class="nh"><span class="who">@analyst.jsmith</span> · 09:51:04Z</div>
+          <div class="nb">Confirmed the lure arrived via a spoofed invoice email. Escalating — DC involvement means IR bridge. Isolated per Bob's rec.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <p class="foot">
+    Answer to the question that started this: the <b class="src-rule">Guide</b> is <b>rule-authored</b> — one checklist written on the rule, shown verbatim on every alert it fires. <b class="src-ai">Bob AI</b> is <b>generated per alert</b> from that alert's evidence. They're different sources on purpose — which is exactly why the next feature has Bob write a <i>custom</i>, evidence-grounded template per rule to sit beside the predefined one.
+  </p>
+</div>
+
+<script>
+  // ---- tab switching ----
+  const tabs = document.querySelectorAll('.tab');
+  const panes = document.querySelectorAll('.pane');
+  tabs.forEach(t => t.addEventListener('click', () => {
+    const id = t.dataset.tab;
+    tabs.forEach(x => x.classList.toggle('on', x === t));
+    panes.forEach(p => p.classList.toggle('on', p.dataset.pane === id));
+  }));
+
+  // ---- alert fields (data-driven, not hardcoded markup) ----
+  // h:true = rule's highlighted/investigation field; the rest are the full alert document.
+  const FIELDS = [
+    {n:'host.name', v:'WIN-DC01', h:true},
+    {n:'user.name', v:'NT AUTHORITY\\SYSTEM', h:true},
+    {n:'process.name', v:'powershell.exe', h:true},
+    {n:'process.command_line', v:'powershell.exe -nop -w hidden -enc SQBFAFgAIAAoAE4A…', h:true},
+    {n:'process.parent.name', v:'winword.exe', h:true},
+    {n:'process.parent.command_line', v:'"winword.exe" /n "C:\\Users\\jsmith\\Downloads\\invoice.docm"', h:true},
+    {n:'source.ip', v:'10.0.0.5', h:true},
+    {n:'destination.ip', v:'185.220.101.44', h:true},
+    {n:'event.action', v:'process_creation', h:true},
+    {n:'@timestamp', v:'2026-09-09T09:42:17.412Z'},
+    {n:'event.category', v:'process'},
+    {n:'event.type', v:'start'},
+    {n:'event.dataset', v:'windows.sysmon_operational'},
+    {n:'kibana.alert.rule.name', v:'Suspicious Encoded PowerShell Spawned by Office Application'},
+    {n:'kibana.alert.severity', v:'critical'},
+    {n:'kibana.alert.risk_score', v:'88'},
+    {n:'host.os.name', v:'Windows Server 2022'},
+    {n:'host.os.version', v:'10.0.20348'},
+    {n:'host.ip', v:'10.0.0.5'},
+    {n:'user.domain', v:'CORP'},
+    {n:'process.pid', v:'6284'},
+    {n:'process.parent.pid', v:'4102'},
+    {n:'process.hash.sha256', v:'9f1f2b…c04a'},
+    {n:'destination.port', v:'443'},
+  ];
+  const HL_SRC = '<span class="srctag rule"><span class="d dot-rule"></span>▸ rule-selected</span>'
+    + '<span class="srctag alert"><span class="d dot-alert"></span>alert values</span>'
+    + '<span class="srchint">the rule picks which ECS fields matter — ☆ any field to pin it to Case context</span>';
+  const ALL_SRC = '<span class="srctag alert"><span class="d dot-alert"></span>alert document</span>'
+    + '<span class="srchint">every field on the alert — filter to find one, ☆ to pin it to Case context</span>';
+
+  const pinned = new Set(['kibana.alert.risk_score']); // one pre-pinned, to show it working
+  let view = 'highlighted';
+  let filter = '';
+
+  const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const body = document.getElementById('fields-body');
+  const fEmpty = document.getElementById('fields-empty');
+  const src = document.getElementById('fields-src');
+  const pinnedWrap = document.getElementById('pinned-wrap');
+  document.getElementById('cnt-all').textContent = FIELDS.length;
+  document.getElementById('cnt-hl').textContent = FIELDS.filter(f => f.h).length;
+
+  function renderFields(){
+    const q = filter.trim().toLowerCase();
+    const rows = FIELDS.filter(f => (view === 'all' || f.h)
+      && (!q || f.n.toLowerCase().includes(q) || f.v.toLowerCase().includes(q)));
+    body.innerHTML = rows.map(f => {
+      const on = pinned.has(f.n);
+      return `<tr><td class="fname">${esc(f.n)}</td><td class="val">${esc(f.v)}</td>`
+        + `<td style="text-align:right"><button class="pinbtn${on?' on':''}" data-pin="${esc(f.n)}">`
+        + `${on?'★ pinned':'☆ pin'}</button></td></tr>`;
+    }).join('');
+    fEmpty.hidden = rows.length > 0;
+    src.innerHTML = view === 'all' ? ALL_SRC : HL_SRC;
+  }
+
+  function renderPinned(){
+    if(pinned.size === 0){
+      pinnedWrap.innerHTML = '<span class="pinempty">No pinned fields yet — open the Fields tab and ☆ any field to surface it here.</span>';
+      return;
+    }
+    pinnedWrap.innerHTML = FIELDS.filter(f => pinned.has(f.n)).map(f =>
+      `<span class="pchip"><span class="pk">${esc(f.n)}</span><span class="pv">${esc(f.v)}</span>`
+      + `<span class="rm" data-unpin="${esc(f.n)}" title="Unpin">✕</span></span>`).join('');
+  }
+
+  // segmented toggle
+  document.querySelectorAll('.segbtn').forEach(b => b.addEventListener('click', () => {
+    view = b.dataset.view;
+    document.querySelectorAll('.segbtn').forEach(x => x.classList.toggle('on', x === b));
+    renderFields();
+  }));
+  // filter
+  document.getElementById('fields-filter').addEventListener('input', e => {
+    filter = e.target.value; renderFields();
+  });
+  // pin from the fields table
+  body.addEventListener('click', e => {
+    const b = e.target.closest('[data-pin]'); if(!b) return;
+    const n = b.dataset.pin;
+    pinned.has(n) ? pinned.delete(n) : pinned.add(n);
+    renderFields(); renderPinned();
+  });
+  // unpin from a case-context chip
+  pinnedWrap.addEventListener('click', e => {
+    const x = e.target.closest('[data-unpin]'); if(!x) return;
+    pinned.delete(x.dataset.unpin);
+    renderFields(); renderPinned();
+  });
+
+  renderFields();
+  renderPinned();
+</script>
