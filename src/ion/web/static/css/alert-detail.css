@@ -593,8 +593,20 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
+/* Tab strip stays inside the panel; scrolls horizontally if the tabs overflow. */
+.iad2-tabs {
+    display: flex;
+    max-width: 100%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+}
+.iad2-tabs::-webkit-scrollbar { height: 6px; }
+.iad2-tabs::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
 /* Source-provenance dots on the tab strip + legend. */
-.iad2-tab { display: inline-flex; align-items: center; gap: 7px; }
+.iad2-tab { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; }
 .iad2-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .iad2-dot-ai { background: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
 .iad2-dot-rule { background: var(--warning); }
