@@ -309,7 +309,7 @@
           return extracted || '<div class="alert-parsed-empty">No fields available for this alert.</div>';
       }
       // V2: Highlighted / All toggle + filter (ION_ALERT_DETAIL_V2).
-      if (_opts.detailV2) return _fieldsV2Html(alertId, flat, allKeys, extracted);
+      if (_opts.detailV2) return _fieldsV2Html(alertId, raw, flat, allKeys, extracted);
       const isKey = k => _keyPrefixes().some(p => k === p || k.startsWith(p));
       let keyKeys = allKeys.filter(isKey);
       let otherKeys = allKeys.filter(k => !isKey(k));
@@ -350,7 +350,7 @@
     return null;
   }
 
-  function _fieldsV2Html(alertId, flat, allKeys, extracted) {
+  function _fieldsV2Html(alertId, raw, flat, allKeys, extracted) {
     var inv = _investigationFields(flat);
     var isHl = inv
       ? function (k) { return inv.some(function (f) { return k === f || k.indexOf(f + '.') === 0; }); }
@@ -359,7 +359,7 @@
     var hlCount = fields.filter(function (f) { return f.hl; }).length;
     if (!hlCount) { fields.forEach(function (f) { f.hl = true; }); hlCount = fields.length; }
     _fieldsState = {
-      alertId: alertId, fields: fields, view: 'highlighted', filter: '',
+      alertId: alertId, raw: raw, mode: 'table', fields: fields, view: 'highlighted', filter: '',
       hlCount: hlCount, allCount: fields.length, investigation: !!inv
     };
     // Keep the "add fields as evidence" action fed with the highlighted set.
@@ -371,6 +371,19 @@
   function _fieldsShell() {
     var st = _fieldsState;
     if (!st) return '';
+    // Table / JSON view toggle (JSON replaces the old Raw Data tab, Kibana-style).
+    var modeToggle = '<div class="iad2-seg iad2-fmode">'
+      + '<button type="button" class="iad2-segbtn' + (st.mode !== 'json' ? ' on' : '') + '"'
+      +   ' data-click-action="ionFieldsMode" data-args=\'["table"]\'>Table</button>'
+      + '<button type="button" class="iad2-segbtn' + (st.mode === 'json' ? ' on' : '') + '"'
+      +   ' data-click-action="ionFieldsMode" data-args=\'["json"]\'>JSON</button>'
+      + '</div>';
+    if (st.mode === 'json') {
+      var json = st.raw ? syntaxHighlightJSON(st.raw) : '<div class="iad2-fempty">No raw document for this alert.</div>';
+      return '<div class="iad2-fields">' + modeToggle
+        + '<div class="iad2-fsrcbar"><span class="iad2-fsrc alert">alert document · raw JSON</span></div>'
+        + '<div class="raw-data-container iad2-json">' + json + '</div></div>';
+    }
     var srcTag = st.view === 'all'
       ? '<span class="iad2-fsrc alert">alert document</span>'
       : '<span class="iad2-fsrc rule">' + (st.investigation ? '▸ rule-selected' : 'highlighted') + '</span>'
@@ -379,7 +392,7 @@
       ? 'every field on the alert — filter to find one'
       : (st.investigation ? 'the rule’s investigation_fields' : 'well-known ECS fields')
         + ' — the ones that matter for this rule';
-    var h = '<div class="iad2-fields">'
+    var h = '<div class="iad2-fields">' + modeToggle
       + '<div class="iad2-fsrcbar">' + srcTag + '<span class="iad2-fhint">' + escapeHtml(hint) + '</span></div>'
       + '<div class="iad2-fctl"><div class="iad2-seg">'
       +   '<button type="button" class="iad2-segbtn' + (st.view === 'highlighted' ? ' on' : '') + '"'
@@ -431,6 +444,15 @@
     _fieldsState.view = (view === 'all') ? 'all' : 'highlighted';
     var c = document.getElementById('alert-fields-content');
     if (c) c.innerHTML = (_extractedValuesBlock(_fieldsState.alertId) || '') + _fieldsShell();
+  }
+
+  function ionFieldsMode(mode) {
+    if (!_fieldsState) return;
+    _fieldsState.mode = (mode === 'json') ? 'json' : 'table';
+    var c = document.getElementById('alert-fields-content');
+    // Extracted-IOC block only makes sense over the table view.
+    var extra = _fieldsState.mode === 'json' ? '' : (_extractedValuesBlock(_fieldsState.alertId) || '');
+    if (c) c.innerHTML = extra + _fieldsShell();
   }
 
   function ionFieldsFilter(value) {
@@ -1552,7 +1574,12 @@
   }
 
   function _sectionsHtmlV2(alert) {
-    var SECTIONS = _visibleSections().slice();
+    // v2 consolidations: Raw Data folds into the Fields tab (Table/JSON toggle),
+    // and the separate Case tab is dropped — Comments becomes "Notes" (the
+    // case-synced notes are all an analyst needs here).
+    var SECTIONS = _visibleSections()
+      .filter(function (s) { return s.id !== 'rawdata' && s.id !== 'case'; })
+      .map(function (s) { return s.id === 'comments' ? { id: 'comments', label: 'Notes' } : s; });
     // The Guide tab (predefined rule note + Bob custom template) is a v2-only
     // section, injected right after Bob's Auto-Investigate.
     if (_opts.bobTemplates) {
@@ -1990,6 +2017,7 @@
   window.loadAlertComments = loadAlertComments;
   window.toggleAllAlertFields = toggleAllAlertFields;
   window.ionFieldsView = ionFieldsView;
+  window.ionFieldsMode = ionFieldsMode;
   window.ionFieldsFilter = ionFieldsFilter;
   window.ionFieldPin = ionFieldPin;
   window.ionFieldUnpin = ionFieldPin;   // chip ✕ toggles off the same way

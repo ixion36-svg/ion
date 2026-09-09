@@ -671,6 +671,8 @@
 .iad2-fsearch::placeholder { color: var(--text-muted); }
 .iad2-fsearch:focus { outline: none; border-color: var(--primary); }
 .iad2-fempty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 16px 0; }
+.iad2-fmode { margin-bottom: 12px; }
+.iad2-json { max-height: 460px; overflow: auto; font-size: 11.5px; line-height: 1.5; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--bg-secondary); }
 
 /* v2 field pins — row control + Case-context chips */
 .iad2-fpincell { text-align: right; white-space: nowrap; vertical-align: top; }
