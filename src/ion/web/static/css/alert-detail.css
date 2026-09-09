@@ -672,3 +672,25 @@
 .iad2-pchip .pv { font-family: 'JetBrains Mono', ui-monospace, monospace; color: var(--text-bright); word-break: break-all; }
 .iad2-pchip .rm { color: var(--text-muted); cursor: pointer; font-size: 12px; line-height: 1; }
 .iad2-pchip .rm:hover { color: var(--danger); }
+
+/* v2 investigation guide — predefined (rule note) + Bob custom */
+.iad2-gseg { margin-bottom: 13px; }
+.iad2-gseg-ai.on { color: var(--primary); }
+.iad2-fsrc.ai { color: var(--primary); border-color: rgba(109,228,255,.3); background: rgba(109,228,255,.07); }
+.iad2-gdesc { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 10px; }
+.iad2-gtext { font-size: 13px; color: var(--text-primary); line-height: 1.6; }
+.iad2-gtext ol, .iad2-gtext ul { margin: 4px 0; padding-left: 20px; }
+.iad2-gtext li { margin: 4px 0; }
+.iad2-gpre { font-family: inherit; white-space: pre-wrap; word-break: break-word; margin: 0; color: var(--text-primary); }
+.iad2-gempty { font-size: 12.5px; color: var(--text-muted); padding: 8px 0; }
+.iad2-gactions { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.iad2-gstatus {
+    font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px;
+    text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 6px;
+    color: var(--text-muted); border: 1px solid var(--border);
+}
+.iad2-gstatus.pending { color: var(--warning); border-color: rgba(248,179,58,.3); background: rgba(248,179,58,.07); }
+.iad2-gstatus.approved { color: var(--success); border-color: rgba(134,240,160,.3); background: rgba(134,240,160,.07); }
+.iad2-gstatus.rejected { color: var(--danger); border-color: rgba(255,108,108,.3); background: rgba(255,108,108,.07); }
+.iad2-gok { border-color: rgba(134,240,160,.5); color: var(--success); background: rgba(134,240,160,.08); cursor: pointer; }
+.iad2-gno { border-color: rgba(255,108,108,.5); color: var(--danger); background: rgba(255,108,108,.08); cursor: pointer; }

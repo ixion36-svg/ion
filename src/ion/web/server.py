@@ -102,6 +102,7 @@ from ion.web.pinned_fields_api import router as pinned_fields_router
 from ion.web.playbook_analytics_api import router as playbook_analytics_router
 from ion.web.response_api import router as response_router
 from ion.web.role_skills_api import router as role_skills_router
+from ion.web.rule_template_api import router as rule_template_router
 from ion.web.scheduler_api import router as scheduler_router
 from ion.web.security_api import router as security_router
 from ion.web.security_middleware import RateLimitSecurityMiddleware, SecurityMonitoringMiddleware
@@ -432,6 +433,7 @@ app.include_router(case_similarity_router, prefix="/api")
 app.include_router(case_lifecycle_router, prefix="/api")  # /api/elasticsearch/alerts/cases/* (split from api.py, #14 inc.3)
 app.include_router(triage_suggestion_router, prefix="/api")
 app.include_router(pinned_fields_router, prefix="/api")  # /api/alerts/pinned-fields (ION_ALERT_FIELD_PINS)
+app.include_router(rule_template_router, prefix="/api")  # /api/alerts/investigation-template (ION_BOB_CUSTOM_TEMPLATES)
 app.include_router(mitre_navigator_router, prefix="/api")
 app.include_router(playbook_analytics_router, prefix="/api")
 app.include_router(alert_pattern_router, prefix="/api")
@@ -1334,6 +1336,7 @@ async def alerts_page(request: Request, user: User = Depends(require_page_permis
         context={
             "alert_detail_v2": get_config().alert_detail_v2,
             "alert_field_pins": get_config().alert_field_pins,
+            "bob_custom_templates": get_config().bob_custom_templates,
         },
     )
 
@@ -1398,6 +1401,7 @@ async def cases_page(request: Request, user: User = Depends(require_page_permiss
         context={
             "alert_detail_v2": get_config().alert_detail_v2,
             "alert_field_pins": get_config().alert_field_pins,
+            "bob_custom_templates": get_config().bob_custom_templates,
         },
     )
 

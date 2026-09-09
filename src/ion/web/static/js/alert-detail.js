@@ -518,6 +518,139 @@
     }).catch(function () { _notify('Failed to update pinned fields', 'error'); });
   }
 
+  // ── V2 investigation guide (ION_BOB_CUSTOM_TEMPLATES) ────────────────────
+  // Predefined = the rule's own guide (Kibana rule note), rule-authored, the
+  // same on every alert. Custom = Bob's per-rule template, human-reviewed. The
+  // tab shows both behind a toggle, with generate + approve/reject actions.
+  var _guideState = null;
+
+  function _guideMd(text) {
+    return (typeof window.safeMarkdown === 'function')
+      ? window.safeMarkdown(String(text))
+      : '<pre class="iad2-gpre">' + escapeHtml(String(text)) + '</pre>';
+  }
+
+  function loadInvestigationGuide(alert) {
+    var el = document.getElementById('iad2-guide-content');
+    if (!el) return;
+    var ruleKey = alert.rule_name || '';
+    Promise.all([
+      fetchRawOnce(alert.id).catch(function () { return null; }),
+      fetch('/api/alerts/investigation-template?rule_id=' + encodeURIComponent(ruleKey))
+        .then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; })
+    ]).then(function (res) {
+      var flat = flattenAlertFields(res[0] || {});
+      var desc = flat['kibana.alert.rule.description'] || flat['signal.rule.description']
+        || flat['rule.description'] || '';
+      var guide = flat['kibana.alert.rule.note'] || flat['kibana.alert.rule.parameters.note']
+        || flat['signal.rule.note'] || flat['rule.note'] || '';
+      var d = res[1] || {};
+      _guideState = {
+        alertId: alert.id, ruleKey: ruleKey, desc: String(desc), guide: String(guide),
+        custom: d.template || null, gen: !!d.generation_enabled,
+        view: (d.template && d.template.status === 'approved') ? 'custom' : 'predefined'
+      };
+      el.classList.remove('loading');
+      el.innerHTML = _guideHtml();
+    });
+  }
+
+  function _guideGenBar(hasCustom) {
+    if (!_guideState || !_guideState.gen) return '';
+    return '<div class="iad2-gactions"><button type="button" class="btn btn-primary btn-sm" '
+      + 'data-click-action="ionGenerateGuide">✦ ' + (hasCustom ? 'Regenerate' : 'Generate')
+      + ' custom guide</button></div>';
+  }
+
+  function _guideReviewBar(custom) {
+    if (!custom) return '';
+    if (custom.status === 'pending_review') {
+      return '<div class="iad2-gactions iad2-greview">'
+        + '<span class="iad2-gstatus pending">pending review</span>'
+        + '<button type="button" class="btn btn-sm iad2-gok" data-click-action="ionApproveGuide" data-args=\'[' + custom.id + ']\'>✓ Approve</button>'
+        + '<button type="button" class="btn btn-sm iad2-gno" data-click-action="ionRejectGuide" data-args=\'[' + custom.id + ']\'>✕ Reject</button>'
+        + '</div>';
+    }
+    return '<div class="iad2-gactions"><span class="iad2-gstatus ' + escapeHtml(custom.status) + '">'
+      + escapeHtml(String(custom.status).replace(/_/g, ' ')) + '</span></div>';
+  }
+
+  function _guideHtml() {
+    var st = _guideState;
+    if (!st) return '';
+    var hasCustom = !!st.custom;
+    var custLabel = '✦ Bob' + (hasCustom ? ' <span class="c">' + escapeHtml(String(st.custom.status).replace(/_/g, ' ')) + '</span>' : '');
+    var toggle = '<div class="iad2-seg iad2-gseg">'
+      + '<button type="button" class="iad2-segbtn' + (st.view === 'predefined' ? ' on' : '') + '" data-click-action="ionGuideView" data-args=\'["predefined"]\'>Predefined</button>'
+      + '<button type="button" class="iad2-segbtn iad2-gseg-ai' + (st.view === 'custom' ? ' on' : '') + '" data-click-action="ionGuideView" data-args=\'["custom"]\'>' + custLabel + '</button>'
+      + '</div>';
+    var body;
+    if (st.view === 'custom') {
+      if (hasCustom) {
+        body = '<div class="iad2-fsrcbar"><span class="iad2-fsrc ai">✦ Bob · AI-derived</span>'
+          + '<span class="iad2-fhint">generated for this rule from its evidence'
+          + (st.custom.model ? ' · ' + escapeHtml(st.custom.model) : '') + '</span></div>'
+          + '<div class="iad2-gtext">' + _guideMd(st.custom.checklist_text) + '</div>'
+          + _guideReviewBar(st.custom);
+      } else {
+        body = '<div class="iad2-gempty">No custom guide yet for this rule.'
+          + (st.gen ? ' Generate one from the alert’s evidence.' : ' Generation is disabled.')
+          + '</div>';
+      }
+      body += _guideGenBar(hasCustom);
+    } else {
+      var pre = '';
+      if (st.desc) pre += '<div class="iad2-gdesc">' + escapeHtml(st.desc) + '</div>';
+      if (st.guide) pre += '<div class="iad2-gtext">' + _guideMd(st.guide) + '</div>';
+      if (!st.desc && !st.guide) pre = '<div class="iad2-gempty">This rule ships no description or investigation guide.</div>';
+      body = '<div class="iad2-fsrcbar"><span class="iad2-fsrc rule">▸ rule-authored</span>'
+        + '<span class="iad2-fhint">the rule’s own guide — identical on every alert it fires</span></div>'
+        + pre + _guideGenBar(hasCustom);
+    }
+    return '<div class="iad2-guide">' + toggle + body + '</div>';
+  }
+
+  function _rerenderGuide() {
+    var el = document.getElementById('iad2-guide-content');
+    if (el) el.innerHTML = _guideHtml();
+  }
+
+  function ionGuideView(view) {
+    if (!_guideState) return;
+    _guideState.view = (view === 'custom') ? 'custom' : 'predefined';
+    _rerenderGuide();
+  }
+
+  function ionGenerateGuide() {
+    if (!_guideState) return;
+    var el = document.getElementById('iad2-guide-content');
+    if (el) el.innerHTML = '<div class="loading">Bob is drafting a custom investigation guide from the evidence (15–60s)…</div>';
+    fetch('/api/elasticsearch/alerts/' + encodeURIComponent(_guideState.alertId) + '/investigation-template/generate', { method: 'POST' })
+      .then(async function (r) {
+        if (!r.ok) { var d = await r.json().catch(function () { return {}; }); throw new Error(d.detail || ('HTTP ' + r.status)); }
+        return r.json();
+      })
+      .then(function (d) {
+        _guideState.custom = d.template || null;
+        _guideState.view = 'custom';
+        _rerenderGuide();
+      })
+      .catch(function (e) {
+        if (el) el.innerHTML = '<div class="iad2-gempty">Generation failed: ' + escapeHtml(String((e && e.message) || e)) + '</div>';
+        setTimeout(_rerenderGuide, 1800);
+      });
+  }
+
+  function _reviewGuide(id, action) {
+    if (!_guideState) return;
+    fetch('/api/alerts/investigation-template/' + encodeURIComponent(id) + '/' + action, { method: 'POST' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) { _guideState.custom = d.template || _guideState.custom; _rerenderGuide(); })
+      .catch(function () { _notify('Failed to update the guide', 'error'); });
+  }
+  function ionApproveGuide(id) { _reviewGuide(id, 'approve'); }
+  function ionRejectGuide(id) { _reviewGuide(id, 'reject'); }
+
   function toggleAllAlertFields(allId) {
       const el = document.getElementById(allId);
       if (!el) return;
@@ -1069,6 +1202,11 @@
                   .catch(() => { container.innerHTML = '<div class="error">Failed to load raw data</div>'; });
           }
       }
+      // Lazy-load the investigation guide (predefined rule note + Bob custom).
+      if (tabId === 'guide' && _current) {
+          const g = document.getElementById('iad2-guide-content');
+          if (g && g.classList.contains('loading')) loadInvestigationGuide(_current);
+      }
       // Lazy-load the parsed-fields view on first click (same logic as the
       // /cases linked-alert dropdown: extracted values + well-known fields + show-all).
       if (tabId === 'fields' && _current) {
@@ -1284,6 +1422,7 @@
   // Where each section's content comes from — the answer to "rule or Bob?".
   var _SECTION_SRC = {
     autoinvestigate: 'ai',      // ✦ Bob — AI-derived, this alert
+    guide:           'rule',    // ▸ rule-authored guide (+ Bob custom, in the tab)
     comments:        'analyst', // analyst-authored notes
     related:         'alert', timeline: 'alert', case: 'alert',
     sequence:        'alert', fields: 'alert', rawdata: 'alert'
@@ -1332,9 +1471,24 @@
   }
 
   function _sectionsHtmlV2(alert) {
-    var SECTIONS = _visibleSections();
+    var SECTIONS = _visibleSections().slice();
+    // The Guide tab (predefined rule note + Bob custom template) is a v2-only
+    // section, injected right after Bob's Auto-Investigate.
+    if (_opts.bobTemplates) {
+      var hasGuide = false, aiIdx = -1;
+      for (var gi = 0; gi < SECTIONS.length; gi++) {
+        if (SECTIONS[gi].id === 'guide') hasGuide = true;
+        if (SECTIONS[gi].id === 'autoinvestigate') aiIdx = gi;
+      }
+      if (!hasGuide) {
+        var guideSec = { id: 'guide', label: 'Guide' };
+        if (aiIdx >= 0) SECTIONS.splice(aiIdx + 1, 0, guideSec);
+        else SECTIONS.push(guideSec);
+      }
+    }
     var legend = '<div class="iad2-legend">'
       + '<span class="iad2-leg"><span class="iad2-dot iad2-dot-ai"></span>Bob AI</span>'
+      + (_opts.bobTemplates ? '<span class="iad2-leg"><span class="iad2-dot iad2-dot-rule"></span>rule-authored</span>' : '')
       + '<span class="iad2-leg"><span class="iad2-dot iad2-dot-alert"></span>alert</span>'
       + '<span class="iad2-leg"><span class="iad2-dot iad2-dot-analyst"></span>analyst</span>'
       + '</div>';
@@ -1415,6 +1569,7 @@
           + 'Every finding cites the evidence it rests on.</p>'
           + '<button type="button" class="btn btn-primary" data-click-action="runAutoInvestigate">'
           + '\uD83D\uDD0D Run Auto-Investigate</button></div>';
+      case 'guide':    return '<div id="iad2-guide-content" class="loading">Loading investigation guide…</div>';
       case 'fields':   return '<div id="alert-fields-content"><div class="loading">Click to load parsed fields...</div></div>';
       case 'rawdata':  return '<div class="raw-data-container" id="raw-data-content">'
           + (alert.raw_data ? syntaxHighlightJSON(alert.raw_data)
@@ -1747,6 +1902,11 @@
   window.ionFieldsFilter = ionFieldsFilter;
   window.ionFieldPin = ionFieldPin;
   window.ionFieldUnpin = ionFieldPin;   // chip ✕ toggles off the same way
+  window.ionGuideView = ionGuideView;
+  window.ionGenerateGuide = ionGenerateGuide;
+  window.ionApproveGuide = ionApproveGuide;
+  window.ionRejectGuide = ionRejectGuide;
+  window.loadInvestigationGuide = loadInvestigationGuide;
   window.addAlertFieldsAsEvidence = addAlertFieldsAsEvidence;
   window.runAutoInvestigate = runAutoInvestigate;
   window.aiAnalyzeAlert = aiAnalyzeAlert;

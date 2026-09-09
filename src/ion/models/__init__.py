@@ -169,6 +169,7 @@ from ion.models.playbook import (
 
 # playbook embeddings — similarity fallback of the Playbook RAG layer.
 from ion.models.playbook_embedding import PlaybookEmbedding  # noqa: F401
+from ion.models.rule_investigation_template import RuleInvestigationTemplate  # noqa: F401
 from ion.models.saved_search import (
     SavedSearch,
     SearchType,
@@ -322,6 +323,7 @@ __all__ = [
     "AIUserPreference",
     "AIResponseFeedback",
     # Saved Search models
+    "RuleInvestigationTemplate",
     "SavedSearch",
     "SearchType",
     # Playbook models
