@@ -163,7 +163,7 @@ services:
   # LOG COLLECTION — Filebeat ships range logs to Elasticsearch
   # ===========================================================================
   range-filebeat:
-    image: docker.elastic.co/beats/filebeat:8.11.0
+    image: docker.elastic.co/beats/filebeat:9.0.0
     container_name: ion-range-filebeat
     hostname: range-filebeat
     user: root

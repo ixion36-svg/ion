@@ -10,7 +10,7 @@
 #     -v $PWD/deploy/apm/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro \
 #     -e APM_SECRET_TOKEN=... -e ELASTICSEARCH_HOSTS=http://elasticsearch:9200 \
 #     -e ELASTICSEARCH_USERNAME=elastic -e ELASTICSEARCH_PASSWORD=... \
-#     docker.elastic.co/apm/apm-server:8.19.11   # match your stack version
+#     docker.elastic.co/apm/apm-server:9.0.0   # match your stack version
 # =============================================================================
 
 apm-server:
