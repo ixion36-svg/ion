@@ -413,8 +413,15 @@
     if (!rows.length) return '<div class="iad2-fempty">No fields match that filter.</div>';
     var h = '<table class="' + _cls('fields-table') + ' iad2-ftbl"><tbody>';
     rows.forEach(function (f) {
+      var pinCell = '';
+      if (_opts.fieldPins) {
+        var on = _pinnedSet.has(f.n);
+        pinCell = '<td class="iad2-fpincell"><button type="button" class="iad2-fpin' + (on ? ' on' : '')
+          + '" data-click-action="ionFieldPin" data-args=\'["' + escapeHtml(f.n) + '"]\'>'
+          + (on ? '★ pinned' : '☆ pin') + '</button></td>';
+      }
       h += '<tr><td class="' + _cls('key') + '">' + escapeHtml(f.n) + '</td>'
-         + '<td class="' + _cls('val') + '">' + escapeHtml(f.v) + '</td></tr>';
+         + '<td class="' + _cls('val') + '">' + escapeHtml(f.v) + '</td>' + pinCell + '</tr>';
     });
     return h + '</tbody></table>';
   }
@@ -431,6 +438,84 @@
     _fieldsState.filter = value || '';
     var body = document.getElementById('iad2-fields-body');
     if (body) body.innerHTML = _fieldsRows();   // keeps the input focused
+  }
+
+  // ── V2 field pins (ION_ALERT_FIELD_PINS) ─────────────────────────────────
+  // Per-user pins, scoped to this alert's rule (rule_name), with a global
+  // fallback resolved server-side. The pinned set surfaces as removable chips in
+  // the Case-context area of the v2 hero.
+  var _pinnedSet = new Set();
+  var _pinRuleKey = '';
+
+  function _loadPins(alert) {
+    _pinnedSet = new Set();
+    _pinRuleKey = alert.rule_name || '';
+    fetch('/api/alerts/pinned-fields?rule_id=' + encodeURIComponent(_pinRuleKey))
+      .then(function (r) { return r.ok ? r.json() : { fields: [] }; })
+      .then(function (d) {
+        (d.fields || []).forEach(function (f) { _pinnedSet.add(f); });
+        _refreshPinsUI();
+        // Chips need field values; pull the raw document if it isn't in yet.
+        if (!(_current && _current.raw_data)) {
+          fetchRawOnce(alert.id).then(function () { _renderPinnedChips(); }).catch(function () {});
+        }
+      })
+      .catch(function () { /* pins are a convenience; a failure never blocks triage */ });
+  }
+
+  function _pinnedValue(name) {
+    if (_fieldsState && _fieldsState.fields) {
+      for (var i = 0; i < _fieldsState.fields.length; i++) {
+        if (_fieldsState.fields[i].n === name) return _fieldsState.fields[i].v;
+      }
+    }
+    if (_current && _current.raw_data) {
+      var flat = flattenAlertFields(_current.raw_data);
+      if (flat[name] !== undefined) return String(flat[name]);
+    }
+    return undefined;
+  }
+
+  function _renderPinnedChips() {
+    var el = document.getElementById('iad2-pinned');
+    if (!el) return;
+    var names = [];
+    _pinnedSet.forEach(function (n) { names.push(n); });
+    names.sort();
+    if (!names.length) { el.hidden = true; el.innerHTML = ''; return; }
+    var chips = names.map(function (n) {
+      var v = _pinnedValue(n);
+      return '<span class="iad2-pchip"><span class="pk">' + escapeHtml(n) + '</span>'
+        + (v !== undefined ? '<span class="pv">' + escapeHtml(String(v)) + '</span>' : '')
+        + '<span class="rm" data-click-action="ionFieldUnpin" data-args=\'["' + escapeHtml(n)
+        + '"]\' title="Unpin">✕</span></span>';
+    }).join('');
+    el.innerHTML = '<div class="iad2-plabel">Pinned fields <span class="iad2-pnote">· added in-app</span></div>'
+      + '<div class="iad2-pwrap">' + chips + '</div>';
+    el.hidden = false;
+  }
+
+  function _refreshPinsUI() {
+    var body = document.getElementById('iad2-fields-body');
+    if (body && _fieldsState) body.innerHTML = _fieldsRows();
+    _renderPinnedChips();
+  }
+
+  function ionFieldPin(field) {
+    if (!field) return;
+    var pinned = _pinnedSet.has(field);
+    var url = '/api/alerts/pinned-fields';
+    var opts = { method: pinned ? 'DELETE' : 'POST', headers: { 'Content-Type': 'application/json' } };
+    if (pinned) {
+      url += '?field_name=' + encodeURIComponent(field) + '&rule_id=' + encodeURIComponent(_pinRuleKey);
+    } else {
+      opts.body = JSON.stringify({ field_name: field, rule_id: _pinRuleKey });
+    }
+    fetch(url, opts).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (pinned) _pinnedSet.delete(field); else _pinnedSet.add(field);
+      _refreshPinsUI();
+    }).catch(function () { _notify('Failed to update pinned fields', 'error'); });
   }
 
   function toggleAllAlertFields(allId) {
@@ -1236,6 +1321,7 @@
       + '<div class="iad2-title">' + escapeHtml(title) + '</div>'
       + sub
       + '<div class="iad2-pills">' + pills + '</div>'
+      + (_opts.fieldPins ? '<div class="iad2-pinned" id="iad2-pinned" hidden></div>' : '')
       + '</div>';
   }
 
@@ -1462,6 +1548,7 @@
     _fromObservables(alert);          // free — the data is already in hand
     container.innerHTML = render(alert, opts);
     _hydrateFromRaw(alert);           // only for what observables cannot supply
+    if (_opts.detailV2 && _opts.fieldPins) _loadPins(alert);
     // In stacked layout every section is already on screen, so nothing is
     // lazy - load the ones that would otherwise wait for a click the analyst
     // is never going to make.
@@ -1658,6 +1745,8 @@
   window.toggleAllAlertFields = toggleAllAlertFields;
   window.ionFieldsView = ionFieldsView;
   window.ionFieldsFilter = ionFieldsFilter;
+  window.ionFieldPin = ionFieldPin;
+  window.ionFieldUnpin = ionFieldPin;   // chip ✕ toggles off the same way
   window.addAlertFieldsAsEvidence = addAlertFieldsAsEvidence;
   window.runAutoInvestigate = runAutoInvestigate;
   window.aiAnalyzeAlert = aiAnalyzeAlert;

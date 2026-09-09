@@ -29,6 +29,7 @@ from ion.models.alert_triage import (
     NoteEntityType,
 )
 from ion.models.analyst_note import AnalystNote
+from ion.models.analyst_pinned_field import AnalystPinnedField  # noqa: F401
 from ion.models.analytics import (
     AnalyticsJob,
     AnalyticsJobType,
@@ -345,6 +346,7 @@ __all__ = [
     "RoleAssessment",
     # Analyst notepad
     "AnalystNote",
+    "AnalystPinnedField",
     "NoteFolder",
     # Analytics Engine models
     "AnalyticsJob",
