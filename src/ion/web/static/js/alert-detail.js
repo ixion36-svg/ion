@@ -1464,6 +1464,10 @@
       + '<div class="iad2-title">' + escapeHtml(title) + '</div>'
       + sub
       + '<div class="iad2-pills">' + pills + '</div>'
+      // KEV / System-quirk advisories belong high — they change what you do
+      // first. Rendered here in the hero; the copy _renderHead emits below is
+      // hidden by CSS (.iad2-head > .iad-advisories) so it isn't shown twice.
+      + _advisoriesHtml(alert)
       + _caseContextHtml(alert)
       + '</div>';
   }

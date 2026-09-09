@@ -560,6 +560,9 @@
    Decision-first hero + source-badged tab strip. The v2 hero carries identity
    as pills, so the reused v1 metadata grid is hidden to avoid duplication. */
 .iad2-head .alert-meta-grid { display: none; }
+/* Advisories are lifted into the hero; hide the copy _renderHead emits below. */
+.iad2-head > .iad-advisories { display: none; }
+.iad2-hero .iad-advisories { margin-top: 12px; }
 .iad2-hero {
     padding: 2px 0 12px;
     border-bottom: 1px solid var(--border);
