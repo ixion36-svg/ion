@@ -1878,9 +1878,10 @@ kbd {
 .autoinv-error { color: var(--danger, #ef4444); padding: 0.75rem 0; }
 .autoinv-empty { color: var(--text-secondary); font-size: 0.8125rem; padding: 0.4rem 0; }
 
-/* Modal large for alert detail */
+/* Modal large for alert detail — wide enough for the v2 tab strip + Case context */
 .modal-large {
-    max-width: 900px;
+    max-width: min(1180px, 94vw);
+    width: 100%;
 }
 
 /* Empty state */
