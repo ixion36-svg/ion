@@ -17,6 +17,10 @@ from pathlib import Path
 
 CURRENT = Path("frontend/tailwind.input.css")
 REWRITE = Path("frontend/tailwind-daisy.input.css")
+# The daisyUI slot mapping and collision fixes live here; the rewrite input
+# @imports it. A test that reads only the input file misses everything in it.
+THEME = Path("frontend/ion-daisy-theme.css")
+BUILT = Path("src/ion/web/static/css/ion.css")
 
 
 def _strip_comments(css: str) -> str:
@@ -95,3 +99,39 @@ def test_rewrite_overrides_the_hardcoded_body_background():
     outside .ion-tw-page reads as dark on a light page."""
     css = REWRITE.read_text(encoding="utf-8")
     assert re.search(r'\[data-mode="light"\]\s+body', css)
+
+
+def test_daisyui_loading_spinner_does_not_hijack_ion_loading_text():
+    """daisyUI's `.loading` is a masked spinner; ION's is a text element.
+
+    ION has used `class="loading"` as plain text since long before daisyUI —
+    `<p class="loading">Loading...</p>` in 211 places across 54 templates.
+    daisyUI 5 defines `.loading` as display:inline-block, width 1.5rem,
+    aspect-ratio 1, background-color:currentColor and a spinner mask-image.
+
+    Cascade layers do not save it: daisyUI's rule is in @layer daisyui and ION's
+    is unlayered in style.css, so ION wins only for the four properties it
+    declares (color, text-align, padding, font-size). The mask and the fill
+    still apply. Measured before the fix: the element rendered 32px wide, grey
+    filled, spinner-masked, with its text invisible — on all 114 pages, from the
+    moment ion.css was added to base.html and regardless of any restyle.
+
+    The :not([class*="loading-"]) guard keeps real spinners
+    (`loading loading-spinner`) working.
+    """
+    css = THEME.read_text(encoding="utf-8")
+    assert '.loading:not([class*="loading-"])' in css, (
+        "the .loading reset is gone; 211 'Loading...' text elements across 54 "
+        "templates will render as a masked spinner glyph with no visible text"
+    )
+    reset = css.split('.loading:not([class*="loading-"])', 1)[1].split("}", 1)[0]
+    for prop in ("mask-image", "background-color", "width", "aspect-ratio"):
+        assert prop in reset, f"the reset no longer neutralises {prop}"
+
+    # And confirm it survived into the BUILT stylesheet. Having the rule in
+    # source but not in ion.css would be the same bug with extra steps.
+    if BUILT.is_file():
+        built = BUILT.read_text(encoding="utf-8")
+        assert 'loading:not([class*=loading-])' in built.replace('"', ''), (
+            "the reset is in the source but missing from the built ion.css"
+        )

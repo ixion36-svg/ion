@@ -65,6 +65,45 @@
 }
 
 /*
+ * COLLISION: daisyUI's `.loading` vs ION's `.loading`.
+ *
+ * daisyUI 5 defines `.loading` as a masked spinner glyph: display:inline-block,
+ * width 1.5rem, aspect-ratio 1, background-color:currentColor, and a
+ * mask-image of a rotating SVG. ION has used `class="loading"` since long
+ * before daisyUI existed, as a plain text element — `<p class="loading">
+ * Loading...</p>` — in 211 places across 54 templates.
+ *
+ * Cascade layers do NOT save us here. daisyUI's rule sits in @layer daisyui and
+ * ION's sits unlayered in style.css, so ION wins — but only for the properties
+ * it actually declares, which are color, text-align, padding and font-size.
+ * Every damaging property (the mask, the fill, the 1.5rem width) is left
+ * untouched and still applies.
+ *
+ * Measured before this fix: `<p class="loading">Loading...</p>` rendered 32px
+ * wide with a solid grey fill and the spinner mask over it. The text was still
+ * in the DOM and completely invisible.
+ *
+ * This has been live on all 114 pages since ion.css was added to base.html,
+ * independent of whether a page had been restyled.
+ *
+ * The `:not([class*="loading-"])` guard keeps real daisyUI spinners working:
+ * those are written `class="loading loading-spinner"` (or -dots, -ring, -ball,
+ * -bars, -infinity) and are excluded from the reset.
+ */
+.loading:not([class*="loading-"]) {
+  -webkit-mask-image: none;
+  mask-image: none;
+  background-color: transparent;
+  width: auto;
+  height: auto;
+  aspect-ratio: auto;
+  display: block;
+  pointer-events: auto;
+  vertical-align: baseline;
+  flex-shrink: 1;
+}
+
+/*
  * Light mode. ION flips on [data-mode="light"] (set by static/js/theme-init.js),
  * NOT on daisyUI's own [data-theme] attribute, so the override is keyed to
  * ION's existing mechanism rather than introducing a second one.
