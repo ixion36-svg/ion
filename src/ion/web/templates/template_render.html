@@ -39,20 +39,20 @@
                     </div>
                 </div>
 
-                <div class="_ion-s-c8be1ccba6 border-t-2 border-base-300 pt-4 mt-4" id="sections-area">
-                    <div class="_ion-s-6c510461f1 flex-wrap gap-2">
-                        <h3 class="_ion-s-1da9facb4d card-title text-base">Document Sections</h3>
-                        <div class="_ion-s-33344b8d5b">
+                <div class="hidden border-t-2 border-base-300 pt-4 mt-4" id="sections-area">
+                    <div class="flex items-center justify-between mt-6 mr-0 mb-3 ml-0 flex-wrap gap-2">
+                        <h3 class="m-0 card-title text-base">Document Sections</h3>
+                        <div class="flex gap-2">
                             <button type="button" class="btn btn-ghost btn-sm" id="expand-all-btn" title="Expand all sections">Expand All</button>
                             <button type="button" class="btn btn-ghost btn-sm" id="collapse-all-btn" title="Collapse all sections">Collapse All</button>
                         </div>
                     </div>
-                    <p class="text-sm text-base-content/50 _ion-s-989f425c4c">Click any section to expand it. Use the Edit tab to modify content before saving.</p>
+                    <p class="text-sm text-base-content/50 mt-[-0.5rem] mr-0 mb-3 ml-0 text-[0.8rem]">Click any section to expand it. Use the Edit tab to modify content before saving.</p>
                     <div id="section-cards"></div>
                 </div>
             </div>
 
-            <div id="json-tab" class="tab-content _ion-s-f2892a2e8a">
+            <div id="json-tab" class="tab-content hidden">
                 <h3 class="card-title text-base mb-3">Input Data (JSON)</h3>
                 <fieldset class="fieldset p-0">
                     <textarea id="data-input" rows="15" placeholder='{"name": "John", "company": "Acme"}' class="textarea w-full font-mono text-sm">{}</textarea>
@@ -69,7 +69,7 @@
 
     <div class="card bg-base-200 shadow">
         <div class="card-body">
-            <h3 class="card-title text-base _ion-s-59b87fdbd1">Output Preview</h3>
+            <h3 class="card-title text-base mb-2">Output Preview</h3>
             <div id="output-container" class="bg-base-300 rounded-box p-5 min-h-[300px] overflow-auto font-mono text-sm">
                 <p class="text-base-content/50">Fill in the fields and click "Preview" to see the rendered output</p>
             </div>
@@ -78,14 +78,14 @@
 </div>
 
 <!-- Settings Modal -->
-<div id="settings-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-box _ion-s-72fca94264">
+<div id="settings-modal" class="modal hidden">
+    <div class="modal-box max-w-[500px]">
         <div class="flex items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">User Preferences</h2>
             <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeSettingsModal" aria-label="Close">&times;</button>
         </div>
         <div class="py-4 flex flex-col gap-3">
-            <p class="text-sm text-base-content/50 _ion-s-f267e3ca68">These values will be auto-filled in author/preparer fields.</p>
+            <p class="text-sm text-base-content/50 mb-4">These values will be auto-filled in author/preparer fields.</p>
             <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Your Name / Author</legend>
                 <input type="text" id="pref-author" placeholder="e.g., John Smith" class="input w-full">

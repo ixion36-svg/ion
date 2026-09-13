@@ -249,6 +249,14 @@ def main() -> int:
     css = SRC.read_text(encoding="utf-8")
     rules = re.findall(r"\.(_?ion-s-[a-z0-9]+)\s*\{([^}]*)\}", css)
 
+    # Some rules are not CSS at all. The v0.31.21 migration hashed inline styles
+    # that were built by JavaScript string concatenation, producing rules like
+    #   .ion-s-5245a21b9b { top:' + (cy - r2 - 55) + 'px; }
+    # A naive converter turns that into `top-[' + (cy - r2 - 55) + 'px]`, which
+    # is meaningless. These can only be fixed by rewriting the JS that emits
+    # them, so they are forced unmappable.
+    JS_ARTIFACT = re.compile(r"\+\s*'|'\s*\+|\$\{")
+
     mapping, counts = {}, {"exact": 0, "arbitrary": 0, "manual": 0}
     for name, body in rules:
         utils, kinds, unmapped = [], [], []
@@ -264,6 +272,9 @@ def main() -> int:
                 utils.append(util)
                 kinds.append(kind)
         kind = "manual" if "manual" in kinds else ("arbitrary" if "arbitrary" in kinds else "exact")
+        if JS_ARTIFACT.search(body):
+            kind = "manual"
+            unmapped.append("JS-concatenated value — not real CSS")
         counts[kind] += 1
         # Key on the class name EXACTLY as it appears in templates, underscore
         # included. Stripping it produced a map with zero overlap against the

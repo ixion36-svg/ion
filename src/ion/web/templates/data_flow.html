@@ -293,7 +293,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-[7fr_5fr] gap-8">
             <div>
                 <!-- Pipeline -->
-                <div class="card bg-base-200 shadow mb-6 _ion-s-8d703344e0">
+                <div class="card bg-base-200 shadow mb-6 mb-6">
                     <div class="card-body">
                         <div class="relative flex items-center justify-between px-4">
                             <div class="absolute top-1/2 left-0 w-full h-px bg-base-300 z-0"></div>
@@ -335,28 +335,28 @@
                                 <span>Target User Resolution</span>
                                 <span class="df-metric-status fail" id="df-m1-status">FAILED</span>
                             </div>
-                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m1-bar"></div></div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red w-[0%]" id="df-m1-bar"></div></div>
                         </div>
                         <div class="mb-5">
                             <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
                                 <span>Member SID Preservation</span>
                                 <span class="df-metric-status fail" id="df-m2-status">LOST</span>
                             </div>
-                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m2-bar"></div></div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red w-[0%]" id="df-m2-bar"></div></div>
                         </div>
                         <div class="mb-5">
                             <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
                                 <span>NiFi Overhead</span>
                                 <span class="df-metric-status warn" id="df-m3-status">High</span>
                             </div>
-                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill orange _ion-s-3bc928abb5" id="df-m3-bar"></div></div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill orange w-[80%]" id="df-m3-bar"></div></div>
                         </div>
                         <div>
                             <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
                                 <span>Analyst Readiness</span>
                                 <span class="df-metric-status fail" id="df-m4-status">BLOCKED</span>
                             </div>
-                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red _ion-s-a659372d50" id="df-m4-bar"></div></div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red w-[15%]" id="df-m4-bar"></div></div>
                         </div>
                     </div>
                 </div>
@@ -387,7 +387,7 @@
     </div>
 
     <!-- Comparison view -->
-    <div class="_ion-s-f2892a2e8a" id="df-compare-view">
+    <div class="hidden" id="df-compare-view">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Legacy column -->
             <div>
@@ -395,14 +395,14 @@
                 <div id="df-compare-kibana-legacy"></div>
                 <div class="card bg-base-200 shadow mt-4">
                     <div class="card-body">
-                        <h4 class="card-title text-sm"><i class="icon-eye-off _ion-s-f75d63c1ee"></i> Field Analysis</h4>
+                        <h4 class="card-title text-sm"><i class="icon-eye-off text-[var(--danger)]"></i> Field Analysis</h4>
                         <div class="overflow-x-auto">
                             <table class="table table-sm">
                                 <thead><tr><th>Target Field</th><th class="text-right">Status</th></tr></thead>
                                 <tbody>
-                                    <tr><td class="font-mono _ion-s-a072892b2b">user.target.name</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
-                                    <tr><td class="font-mono _ion-s-a072892b2b">winlog.event_data.MemberSid</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
-                                    <tr><td class="font-mono _ion-s-a072892b2b">group.domain</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+                                    <tr><td class="font-mono text-[rgba(239,68,68,.7)]">user.target.name</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+                                    <tr><td class="font-mono text-[rgba(239,68,68,.7)]">winlog.event_data.MemberSid</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+                                    <tr><td class="font-mono text-[rgba(239,68,68,.7)]">group.domain</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -415,14 +415,14 @@
                 <div id="df-compare-kibana-modern"></div>
                 <div class="card bg-base-200 shadow mt-4">
                     <div class="card-body">
-                        <h4 class="card-title text-sm"><i class="icon-shield-check _ion-s-2ab631d078"></i> Field Analysis</h4>
+                        <h4 class="card-title text-sm"><i class="icon-shield-check text-[var(--success)]"></i> Field Analysis</h4>
                         <div class="overflow-x-auto">
                             <table class="table table-sm">
                                 <thead><tr><th>Target Field</th><th class="text-right">Status</th></tr></thead>
                                 <tbody>
-                                    <tr><td class="font-mono _ion-s-e4aef55874">user.target.name</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
-                                    <tr><td class="font-mono _ion-s-e4aef55874">user.target.id (SID)</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
-                                    <tr><td class="font-mono _ion-s-e4aef55874">winlog.event_data.MemberName</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+                                    <tr><td class="font-mono text-[rgba(16,185,129,.7)]">user.target.name</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+                                    <tr><td class="font-mono text-[rgba(16,185,129,.7)]">user.target.id (SID)</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+                                    <tr><td class="font-mono text-[rgba(16,185,129,.7)]">winlog.event_data.MemberName</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -537,12 +537,12 @@
         return `
         <div class="df-winlog">
             <div class="df-winlog-titlebar">
-                <span><i class="icon-server _ion-s-869d91af1b"></i> Event Viewer - [Event 4728, Security]</span>
+                <span><i class="icon-server mr-1.5"></i> Event Viewer - [Event 4728, Security]</span>
                 <div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot red"></div></div>
             </div>
             <div class="df-winlog-body">
                 <h4>General</h4>
-                <p class="_ion-s-a0612bbb59">A member was added to a security-enabled global group.</p>
+                <p class="mt-0 mr-0 mb-3 ml-0">A member was added to a security-enabled global group.</p>
                 <div class="df-winlog-row"><span class="lbl">Keywords:</span><span class="val">Audit Success</span></div>
                 <div class="df-winlog-row"><span class="lbl">Event ID:</span><span class="val _ion-s-92fb99917f">4728</span></div>
                 <div class="df-winlog-row"><span class="lbl">Task Category:</span><span class="val">Security Group Management</span></div>
@@ -565,9 +565,9 @@
             <table class="df-kib-table">
                 <thead><tr><th>Admin User</th><th>Action</th><th>Target Group</th><th>Target User</th></tr></thead>
                 <tbody><tr>
-                    <td class="_ion-s-0cf2671df2">Admin_Bob</td>
-                    <td class="_ion-s-0f6b1ef9a5">Added Member</td>
-                    <td class="_ion-s-3043802241">Privileged_Admins</td>
+                    <td class="text-[var(--warning)] font-bold">Admin_Bob</td>
+                    <td class="text-[var(--text-secondary)]">Added Member</td>
+                    <td class="text-[var(--info)] font-semibold">Privileged_Admins</td>
                     <td>${isMissing
                         ? '<span class="df-kib-missing"><i class="icon-eye-off"></i> MISSING</span>'
                         : '<span class="df-kib-present">John Doe</span>'

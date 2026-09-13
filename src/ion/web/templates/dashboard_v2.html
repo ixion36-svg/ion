@@ -13,7 +13,7 @@
   " aria-hidden="true"></div>
 
   <!-- Icon definitions for dashboard -->
-  <svg class="_ion-s-6b99de8b69" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <svg class="hidden" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
     <defs>
       <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></symbol>
       <symbol id="i-arrow-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
@@ -66,7 +66,7 @@
         <svg class="w-3 h-3"><use href="#i-settings"/></svg> Customize
       </button>
     </div>
-    <div id="dash-config" class="card bg-base-200 shadow mb-6 _ion-s-6b99de8b69">
+    <div id="dash-config" class="card bg-base-200 shadow mb-6 hidden">
       <div class="card-body py-4">
         <div class="text-xs uppercase tracking-wider text-base-content/50 mb-3">Show/Hide Sections</div>
         <div class="flex flex-wrap gap-3" id="dash-config-items"></div>
@@ -191,7 +191,7 @@
           </div>
           <div class="px-8 pb-6">
             <div class="h-1 w-full rounded-full bg-base-300 overflow-hidden">
-              <div id="kpi-sla-bar" class="h-full rounded-full bg-gradient-to-r from-primary to-success transition-[width] duration-700 _ion-s-d2fba0f353"></div>
+              <div id="kpi-sla-bar" class="h-full rounded-full bg-gradient-to-r from-primary to-success transition-[width] duration-700 w-[0%]"></div>
             </div>
           </div>
         </div>

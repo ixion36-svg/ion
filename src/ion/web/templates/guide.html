@@ -74,7 +74,7 @@
     <div class="g-cards">
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <div class="text-2xl _ion-s-dc2e428fc7"><i class="icon-log-in"></i></div>
+            <div class="text-2xl text-[var(--primary)]"><i class="icon-log-in"></i></div>
             <h3 class="card-title text-base">1. Log In</h3>
             <p class="text-sm text-base-content/70">Navigate to ION and enter your credentials. Your dashboard will load based on your role.</p>
             <div role="alert" class="alert alert-warning text-xs py-2 mt-2">First login? Your credentials are set by your SOC administrator.</div>
@@ -82,14 +82,14 @@
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <div class="text-2xl _ion-s-2b7a4b6404"><i class="icon-layout-dashboard"></i></div>
+            <div class="text-2xl text-[var(--neon-green)]"><i class="icon-layout-dashboard"></i></div>
             <h3 class="card-title text-base">2. Your Dashboard</h3>
             <p class="text-sm text-base-content/70">The dashboard is role-specific. Analysts see alert queues. Leads see team metrics. Engineers see system status.</p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <div class="text-2xl _ion-s-cb40bcf14a"><i class="icon-users"></i></div>
+            <div class="text-2xl text-[var(--neon-purple)]"><i class="icon-users"></i></div>
             <h3 class="card-title text-base">3. Focus Mode</h3>
             <p class="text-sm text-base-content/70">Have multiple roles? Use the <strong>Focus Mode</strong> pill buttons on the dashboard to switch between role views.</p>
             <div role="alert" class="alert alert-warning text-xs py-2 mt-2">Focus mode restricts permissions to one role at a time for clarity.</div>
@@ -97,7 +97,7 @@
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <div class="text-2xl _ion-s-9e62ba231b"><i class="icon-navigation"></i></div>
+            <div class="text-2xl text-[var(--neon-orange)]"><i class="icon-navigation"></i></div>
             <h3 class="card-title text-base">4. Navigation</h3>
             <p class="text-sm text-base-content/70">The top nav has dropdown menus: <strong>Knowledge</strong>, <strong>Analyst</strong>, <strong>Engineering</strong>, <strong>DFIR</strong>, and <strong>Settings</strong>. Items show/hide based on your role.</p>
             </div>
@@ -119,15 +119,15 @@
         <div>
             <div class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 shadow">
                 <div class="stat">
-                    <div class="stat-value font-mono text-error _ion-s-5dd0211252">12</div>
+                    <div class="stat-value font-mono text-error text-[var(--sev-critical)]">12</div>
                     <div class="stat-desc">Critical Alerts</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value font-mono text-warning _ion-s-633a57b5af">28</div>
+                    <div class="stat-value font-mono text-warning text-[var(--sev-high)]">28</div>
                     <div class="stat-desc">High Alerts</div>
                 </div>
                 <div class="stat">
-                    <div class="stat-value font-mono text-success _ion-s-b00112b508">6</div>
+                    <div class="stat-value font-mono text-success text-[var(--mitre-covered)]">6</div>
                     <div class="stat-desc">Cases Open</div>
                 </div>
                 <div class="stat">
@@ -156,8 +156,8 @@
                     <div class="card-body p-3">
                     <h3 class="text-xs font-bold uppercase tracking-wide text-base-content/50 mb-2">My Cases</h3>
                     <div class="flex flex-col gap-1">
-                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">CASE-0042 Ransomware Investigation<span class="badge badge-error badge-sm ml-auto _ion-s-5dd0211252">CRITICAL</span></div>
-                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">CASE-0041 Phishing Campaign<span class="badge badge-warning badge-sm ml-auto _ion-s-633a57b5af">HIGH</span></div>
+                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">CASE-0042 Ransomware Investigation<span class="badge badge-error badge-sm ml-auto text-[var(--sev-critical)]">CRITICAL</span></div>
+                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">CASE-0041 Phishing Campaign<span class="badge badge-warning badge-sm ml-auto text-[var(--sev-high)]">HIGH</span></div>
                     </div>
                     </div>
                 </div>
@@ -200,38 +200,38 @@
             <table class="table table-sm">
                 <thead>
                     <tr>
-                        <th class="_ion-s-5043024f04">Severity</th>
-                        <th class="_ion-s-4b3de78f23">Alert Title</th>
-                        <th class="_ion-s-97445a8d93">Rule</th>
-                        <th class="_ion-s-efc7236c7f">Host</th>
-                        <th class="_ion-s-efc7236c7f">Status</th>
-                        <th class="_ion-s-efc7236c7f">Time</th>
+                        <th class="flex-[0.5]">Severity</th>
+                        <th class="flex-[2]">Alert Title</th>
+                        <th class="flex-1">Rule</th>
+                        <th class="flex-[0.8]">Host</th>
+                        <th class="flex-[0.8]">Status</th>
+                        <th class="flex-[0.8]">Time</th>
                     </tr>
                 </thead>
                 <tbody>
                 <tr class="hover _ion-s-40d92da530">
-                    <td><span class="badge badge-error badge-sm _ion-s-5043024f04">CRIT</span></td>
-                    <td class="_ion-s-4b3de78f23">Credential Dumping via LSASS</td>
-                    <td class="_ion-s-1af4896571">Credential Access</td>
-                    <td class="font-mono _ion-s-ecfa55ff14">SRV-DC01</td>
-                    <td class="_ion-s-efc7236c7f"><span class="badge badge-error badge-sm">OPEN</span></td>
-                    <td class="_ion-s-ec2cddedba">2 min ago</td>
+                    <td><span class="badge badge-error badge-sm flex-[0.5]">CRIT</span></td>
+                    <td class="flex-[2]">Credential Dumping via LSASS</td>
+                    <td class="flex-1 text-[.72rem]">Credential Access</td>
+                    <td class="font-mono flex-[0.8] font-mono text-[.72rem]">SRV-DC01</td>
+                    <td class="flex-[0.8]"><span class="badge badge-error badge-sm">OPEN</span></td>
+                    <td class="flex-[0.8] text-[.72rem] text-[var(--text-muted)]">2 min ago</td>
                 </tr>
                 <tr class="hover _ion-s-2fb8daf4f3">
-                    <td><span class="badge badge-warning badge-sm _ion-s-5043024f04">HIGH</span></td>
-                    <td class="_ion-s-4b3de78f23">Suspicious PowerShell Encoded Command</td>
-                    <td class="_ion-s-1af4896571">Execution</td>
-                    <td class="font-mono _ion-s-ecfa55ff14">WS-042</td>
-                    <td class="_ion-s-efc7236c7f"><span class="badge badge-info badge-sm">ACK</span></td>
-                    <td class="_ion-s-ec2cddedba">15 min ago</td>
+                    <td><span class="badge badge-warning badge-sm flex-[0.5]">HIGH</span></td>
+                    <td class="flex-[2]">Suspicious PowerShell Encoded Command</td>
+                    <td class="flex-1 text-[.72rem]">Execution</td>
+                    <td class="font-mono flex-[0.8] font-mono text-[.72rem]">WS-042</td>
+                    <td class="flex-[0.8]"><span class="badge badge-info badge-sm">ACK</span></td>
+                    <td class="flex-[0.8] text-[.72rem] text-[var(--text-muted)]">15 min ago</td>
                 </tr>
                 <tr class="hover _ion-s-ebd4006129">
-                    <td><span class="badge badge-info badge-sm _ion-s-5043024f04">MED</span></td>
-                    <td class="_ion-s-4b3de78f23">Unusual Login from New Geolocation</td>
-                    <td class="_ion-s-1af4896571">Initial Access</td>
-                    <td class="font-mono _ion-s-ecfa55ff14">-</td>
-                    <td class="_ion-s-efc7236c7f"><span class="badge badge-error badge-sm">OPEN</span></td>
-                    <td class="_ion-s-ec2cddedba">1h ago</td>
+                    <td><span class="badge badge-info badge-sm flex-[0.5]">MED</span></td>
+                    <td class="flex-[2]">Unusual Login from New Geolocation</td>
+                    <td class="flex-1 text-[.72rem]">Initial Access</td>
+                    <td class="font-mono flex-[0.8] font-mono text-[.72rem]">-</td>
+                    <td class="flex-[0.8]"><span class="badge badge-error badge-sm">OPEN</span></td>
+                    <td class="flex-[0.8] text-[.72rem] text-[var(--text-muted)]">1h ago</td>
                 </tr>
                 </tbody>
             </table>
@@ -282,29 +282,29 @@
 
     <div class="card bg-base-100 border border-base-300 overflow-hidden my-4">
         <div class="px-4 py-2 bg-base-200 text-xs font-bold uppercase tracking-wide text-base-content/50 border-b border-base-300">Case Detail View</div>
-        <div class="_ion-s-cc781baac3">
-            <div class="_ion-s-23ad769d3d">
-                <span class="_ion-s-d266b93868">CASE-0042</span>
-                <span class="_ion-s-47e1bff439">Ransomware Precursor Activity on SRV-MAIL01</span>
+        <div class="p-3">
+            <div class="flex gap-3 items-center mb-3">
+                <span class="font-mono text-[var(--primary)] font-bold">CASE-0042</span>
+                <span class="font-bold flex-1">Ransomware Precursor Activity on SRV-MAIL01</span>
                 <span class="badge badge-error badge-sm">CRITICAL</span>
-                <span class="badge badge-warning badge-sm _ion-s-a856045d15">ACKNOWLEDGED</span>
+                <span class="badge badge-warning badge-sm bg-[var(--sev-high-dim)]">ACKNOWLEDGED</span>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2 _ion-s-cb7c5c70a2">
                 <div class="stat bg-base-200 rounded-box border border-base-300 p-2">
-                    <div class="stat-title _ion-s-9d76215db2">ASSIGNED TO</div>
+                    <div class="stat-title text-[.68rem] text-[var(--text-muted)]">ASSIGNED TO</div>
                     <div class="stat-value text-base">analyst1</div>
                 </div>
                 <div class="stat bg-base-200 rounded-box border border-base-300 p-2">
-                    <div class="stat-title _ion-s-9d76215db2">AFFECTED HOSTS</div>
+                    <div class="stat-title text-[.68rem] text-[var(--text-muted)]">AFFECTED HOSTS</div>
                     <div class="stat-value text-base">SRV-MAIL01, WS-042</div>
                 </div>
                 <div class="stat bg-base-200 rounded-box border border-base-300 p-2">
-                    <div class="stat-title _ion-s-9d76215db2">ALERTS</div>
+                    <div class="stat-title text-[.68rem] text-[var(--text-muted)]">ALERTS</div>
                     <div class="stat-value text-base">5 linked</div>
                 </div>
             </div>
-            <div class="_ion-s-b0c83daf84">
-                <strong class="_ion-s-3c6f5e4b4e">Notes:</strong> LSASS dump detected followed by lateral movement to mail server. Checking for data exfiltration...
+            <div class="mt-3 p-2.5 bg-[var(--bg-primary)] rounded-[var(--radius)] text-[.82rem] text-[var(--text-secondary)]">
+                <strong class="text-[var(--text-primary)]">Notes:</strong> LSASS dump detected followed by lateral movement to mail server. Checking for data exfiltration...
             </div>
         </div>
         <div class="px-4 py-3 bg-base-200 border-t border-base-300 flex flex-col gap-2">
@@ -349,25 +349,25 @@
     <div class="g-features">
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-globe text-xl shrink-0 _ion-s-dc2e428fc7"></i>
+                <i class="icon-globe text-xl shrink-0 text-[var(--primary)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Batch Enrichment</strong><br>Select multiple observables and enrich them all from OpenCTI in one click.</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-clock text-xl shrink-0 _ion-s-416321c716"></i>
+                <i class="icon-clock text-xl shrink-0 text-[var(--sev-medium)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Staleness Tracking</strong><br>IOCs not re-enriched in 30+ days are flagged. Check <code>/api/ioc-staleness</code>.</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-shield text-xl shrink-0 _ion-s-b00112b508"></i>
+                <i class="icon-shield text-xl shrink-0 text-[var(--mitre-covered)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Whitelisting</strong><br>Mark known-good observables to prevent false alerting.</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-link text-xl shrink-0 _ion-s-cb40bcf14a"></i>
+                <i class="icon-link text-xl shrink-0 text-[var(--neon-purple)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Case Linking</strong><br>Observables auto-link to cases and alerts where they appear.</div>
             </div>
         </div>
@@ -389,34 +389,34 @@
             <table class="table table-sm">
                 <thead>
                     <tr>
-                        <th class="_ion-s-0ea45ef96f">Name</th>
-                        <th class="_ion-s-97445a8d93">Origin</th>
-                        <th class="_ion-s-97445a8d93">Type</th>
-                        <th class="_ion-s-efc7236c7f">Confidence</th>
-                        <th class="_ion-s-efc7236c7f">Watch</th>
+                        <th class="flex-[1.5]">Name</th>
+                        <th class="flex-1">Origin</th>
+                        <th class="flex-1">Type</th>
+                        <th class="flex-[0.8]">Confidence</th>
+                        <th class="flex-[0.8]">Watch</th>
                     </tr>
                 </thead>
                 <tbody>
                 <tr class="hover">
-                    <td class="_ion-s-bec3a17547">APT28</td>
-                    <td class="_ion-s-97445a8d93">&#x1F1F7;&#x1F1FA; Russia</td>
-                    <td class="_ion-s-5ee28ecf33">Intrusion Set</td>
-                    <td class="_ion-s-efc7236c7f"><span class="badge badge-warning badge-sm">85</span></td>
-                    <td class="_ion-s-efc7236c7f"><span class="badge badge-success badge-sm _ion-s-1b4f657f9e">Watched</span></td>
+                    <td class="flex-[1.5] font-bold">APT28</td>
+                    <td class="flex-1">&#x1F1F7;&#x1F1FA; Russia</td>
+                    <td class="flex-1 text-[.78rem]">Intrusion Set</td>
+                    <td class="flex-[0.8]"><span class="badge badge-warning badge-sm">85</span></td>
+                    <td class="flex-[0.8]"><span class="badge badge-success badge-sm text-[var(--mitre-covered)] font-bold">Watched</span></td>
                 </tr>
                 <tr class="hover">
-                    <td class="_ion-s-bec3a17547">Lazarus Group</td>
-                    <td class="_ion-s-97445a8d93">&#x1F1F0;&#x1F1F5; North Korea</td>
-                    <td class="_ion-s-5ee28ecf33">Intrusion Set</td>
-                    <td class="_ion-s-efc7236c7f"><span class="badge badge-warning badge-sm">80</span></td>
-                    <td class="_ion-s-3c78344d54">+ Watch</td>
+                    <td class="flex-[1.5] font-bold">Lazarus Group</td>
+                    <td class="flex-1">&#x1F1F0;&#x1F1F5; North Korea</td>
+                    <td class="flex-1 text-[.78rem]">Intrusion Set</td>
+                    <td class="flex-[0.8]"><span class="badge badge-warning badge-sm">80</span></td>
+                    <td class="flex-[0.8] text-[.78rem] text-[var(--primary)] cursor-pointer">+ Watch</td>
                 </tr>
                 <tr class="hover">
-                    <td class="_ion-s-bec3a17547">Charming Kitten</td>
-                    <td class="_ion-s-97445a8d93">&#x1F1EE;&#x1F1F7; Iran</td>
-                    <td class="_ion-s-5ee28ecf33">Threat Actor</td>
-                    <td class="_ion-s-efc7236c7f"><span class="badge badge-info badge-sm">65</span></td>
-                    <td class="_ion-s-3c78344d54">+ Watch</td>
+                    <td class="flex-[1.5] font-bold">Charming Kitten</td>
+                    <td class="flex-1">&#x1F1EE;&#x1F1F7; Iran</td>
+                    <td class="flex-1 text-[.78rem]">Threat Actor</td>
+                    <td class="flex-[0.8]"><span class="badge badge-info badge-sm">65</span></td>
+                    <td class="flex-[0.8] text-[.78rem] text-[var(--primary)] cursor-pointer">+ Watch</td>
                 </tr>
                 </tbody>
             </table>
@@ -439,11 +439,11 @@
 
     <div class="card bg-base-100 border border-base-300 overflow-hidden my-4">
         <div class="px-4 py-2 bg-base-200 text-xs font-bold uppercase tracking-wide text-base-content/50 border-b border-base-300">Attack Story: SRV-DC01 (Score: 78/100)</div>
-        <div class="_ion-s-cc781baac3">
-            <div class="_ion-s-b57c922c95">
+        <div class="p-3">
+            <div class="bg-[var(--bg-primary)] border border-[var(--border)] rounded-[var(--radius)] p-2.5 text-[.85rem] mb-3">
                 Entity <strong>SRV-DC01</strong> was targeted across <strong>4 stages</strong> of the kill chain over <strong>2.5 hours</strong>. Starting with <em>initial-access</em>, progressing through <em>execution</em> and <em>credential-access</em>, reaching <em>lateral-movement</em>. 5 unique detection rules fired.
             </div>
-            <div class="_ion-s-023463e7b5">
+            <div class="flex gap-0 items-center flex-wrap">
                 <span class="badge badge-ghost badge-sm">recon</span><span class="text-base-content/40 px-1">&rarr;</span>
                 <span class="badge badge-error badge-sm">initial-access</span><span class="text-base-content/40 px-1">&rarr;</span>
                 <span class="badge badge-error badge-sm">execution</span><span class="text-base-content/40 px-1">&rarr;</span>
@@ -518,25 +518,25 @@
     <div class="g-grid-2">
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base _ion-s-dc2e428fc7">Posture</h4>
+            <h4 class="card-title text-base text-[var(--primary)]">Posture</h4>
             <p class="text-sm text-base-content/70">Rule totals, severity breakdown, quality distribution, MITRE coverage (142/159 techniques)</p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base _ion-s-633a57b5af">Actor Readiness</h4>
+            <h4 class="card-title text-base text-[var(--sev-high)]">Actor Readiness</h4>
             <p class="text-sm text-base-content/70">Per-actor TTP coverage with country flags, readiness gauges, system-specific breakdowns, PDF reports</p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base _ion-s-b00112b508">Kill Chains</h4>
+            <h4 class="card-title text-base text-[var(--mitre-covered)]">Kill Chains</h4>
             <p class="text-sm text-base-content/70">Playbook kill chain visualizations (Insider Threat, Ransomware) with per-step coverage state</p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base _ion-s-416321c716">Gaps</h4>
+            <h4 class="card-title text-base text-[var(--sev-medium)]">Gaps</h4>
             <p class="text-sm text-base-content/70">Blind spots by tactic, unmapped rules, quick wins — disabled critical/high rules to enable</p>
             </div>
         </div>
@@ -582,25 +582,25 @@
     <div class="g-features">
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-shield-check text-xl shrink-0 _ion-s-b00112b508"></i>
+                <i class="icon-shield-check text-xl shrink-0 text-[var(--mitre-covered)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Chain of Custody</strong><br>Every evidence item logged with collection metadata and custody transfers.</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-clock text-xl shrink-0 _ion-s-dc2e428fc7"></i>
+                <i class="icon-clock text-xl shrink-0 text-[var(--primary)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Timeline Builder</strong><br>Reconstruct events chronologically across evidence sources.</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-file-search text-xl shrink-0 _ion-s-cb40bcf14a"></i>
+                <i class="icon-file-search text-xl shrink-0 text-[var(--neon-purple)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">PCAP Analyzer</strong><br>Upload packet captures for automated protocol analysis (12 heuristic detectors).</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-scan text-xl shrink-0 _ion-s-9e62ba231b"></i>
+                <i class="icon-scan text-xl shrink-0 text-[var(--neon-orange)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">IOC Extraction</strong><br>Auto-extract IPs, domains, hashes from investigation notes.</div>
             </div>
         </div>
@@ -618,42 +618,42 @@
     <div class="g-grid-2">
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base"><i class="icon-activity _ion-s-dc2e428fc7"></i> Analytics Engine</h4>
+            <h4 class="card-title text-base"><i class="icon-activity text-[var(--primary)]"></i> Analytics Engine</h4>
             <p class="text-sm text-base-content/70">6 automated analytics jobs: entity risk scoring, repeat offenders, rule noise, observable velocity, case metrics, stale investigations.</p>
             <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/analytics</code></p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base"><i class="icon-users _ion-s-2b7a4b6404"></i> Analyst Efficiency</h4>
+            <h4 class="card-title text-base"><i class="icon-users text-[var(--neon-green)]"></i> Analyst Efficiency</h4>
             <p class="text-sm text-base-content/70">Per-analyst MTTR, FP rates, cases per shift, hourly activity timeline. Find your most efficient analysts.</p>
             <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/analyst-efficiency</code></p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base"><i class="icon-heart-pulse _ion-s-5dd0211252"></i> SOC Health Scorecard</h4>
+            <h4 class="card-title text-base"><i class="icon-heart-pulse text-[var(--sev-critical)]"></i> SOC Health Scorecard</h4>
             <p class="text-sm text-base-content/70">Living maturity assessment: detection coverage, operational efficiency, team readiness, knowledge, integrations. Graded A-F.</p>
             <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/soc-health</code></p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base"><i class="icon-file-text _ion-s-416321c716"></i> Executive Report</h4>
+            <h4 class="card-title text-base"><i class="icon-file-text text-[var(--sev-medium)]"></i> Executive Report</h4>
             <p class="text-sm text-base-content/70">Auto-generated weekly/monthly summary: cases, MTTR trends, notable incidents, team metrics. PDF or HTML.</p>
             <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/executive-report</code></p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base"><i class="icon-clipboard-list _ion-s-9e62ba231b"></i> Shift Handover</h4>
+            <h4 class="card-title text-base"><i class="icon-clipboard-list text-[var(--neon-orange)]"></i> Shift Handover</h4>
             <p class="text-sm text-base-content/70">End-of-shift summary: what was triaged, open cases, active kill chains, pending items for the incoming shift.</p>
             <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/shift-handover</code></p>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body p-4">
-            <h4 class="card-title text-base"><i class="icon-git-commit _ion-s-cb40bcf14a"></i> Entity Timeline</h4>
+            <h4 class="card-title text-base"><i class="icon-git-commit text-[var(--neon-purple)]"></i> Entity Timeline</h4>
             <p class="text-sm text-base-content/70">Search any host/IP/user and see a unified timeline across all data sources: cases, triage, observables, enrichments, audit log.</p>
             <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/entity-timeline</code></p>
             </div>
@@ -720,25 +720,25 @@
     <div class="g-features">
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-users text-xl shrink-0 _ion-s-dc2e428fc7"></i>
+                <i class="icon-users text-xl shrink-0 text-[var(--primary)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">User Management</strong><br>Create/edit users, assign multiple roles, manage focus mode. (<code>/users</code>)</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-plug text-xl shrink-0 _ion-s-2b7a4b6404"></i>
+                <i class="icon-plug text-xl shrink-0 text-[var(--neon-green)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Integrations</strong><br>Configure Elasticsearch, OpenCTI, TIDE, Kibana, GitLab, Ollama connections. (<code>/integrations</code>)</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-shield text-xl shrink-0 _ion-s-5dd0211252"></i>
+                <i class="icon-shield text-xl shrink-0 text-[var(--sev-critical)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Security</strong><br>Active sessions, attack detection, security event timeline. (<code>/security</code>)</div>
             </div>
         </div>
         <div class="card bg-base-100 border border-base-300">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <i class="icon-file-text text-xl shrink-0 _ion-s-416321c716"></i>
+                <i class="icon-file-text text-xl shrink-0 text-[var(--sev-medium)]"></i>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Audit Logs</strong><br>Full action history per user. Every triage, case change, and login. (<code>/audit-logs</code>)</div>
             </div>
         </div>
@@ -785,7 +785,7 @@
         <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
         <div class="card bg-base-100 border-2 border-dashed border-warning">
             <div class="card-body flex-row items-start gap-3 p-3">
-                <span class="btn btn-circle btn-sm pointer-events-none no-animation text-primary-content _ion-s-8c75d59ed6">?</span>
+                <span class="btn btn-circle btn-sm pointer-events-none no-animation text-primary-content bg-[var(--sev-medium)]">?</span>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Decision Point</strong><br><em class="text-warning">True Positive?</em> &rarr; Create Case &rarr; Investigate<br><em class="text-warning">False Positive?</em> &rarr; Close as FP &rarr; Note why</div>
             </div>
         </div>
@@ -830,20 +830,20 @@
     </div>
 
     <h3 class="text-lg font-semibold mt-4 mb-2">Workflow 3: Shift Handover</h3>
-    <div class="flex gap-2 my-3 _ion-s-c861988e89">
-        <div class="card bg-base-100 border border-base-300 _ion-s-7b1dd1f4df">
+    <div class="flex gap-2 my-3 flex-row flex-wrap">
+        <div class="card bg-base-100 border border-base-300 flex-1 min-w-[200px]">
             <div class="card-body flex-row items-start gap-3 p-3">
                 <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">1</span>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Generate Report</strong><br>Go to <code>/shift-handover</code>. Select 8h window. Click Generate.</div>
             </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 _ion-s-7b1dd1f4df">
+        <div class="card bg-base-100 border border-base-300 flex-1 min-w-[200px]">
             <div class="card-body flex-row items-start gap-3 p-3">
                 <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">2</span>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Review Highlights</strong><br>Check the highlights banner for critical items the incoming shift needs.</div>
             </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 _ion-s-7b1dd1f4df">
+        <div class="card bg-base-100 border border-base-300 flex-1 min-w-[200px]">
             <div class="card-body flex-row items-start gap-3 p-3">
                 <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">3</span>
                 <div class="text-sm text-base-content/70"><strong class="text-base-content">Print or Share</strong><br>Click Print for a clean printable version. Walk the incoming shift through it.</div>

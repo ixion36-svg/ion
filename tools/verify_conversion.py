@@ -35,14 +35,14 @@ HASHED = re.compile(r"_ion-s-[a-z0-9]+")
 
 
 def git_show(rel: str) -> str | None:
-    r = subprocess.run(["git", "show", f"HEAD:{rel}"], capture_output=True,
-                       text=True, cwd=REPO)
+    r = subprocess.run(["git", "show", f"HEAD:{rel}"], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace", cwd=REPO)
     return r.stdout if r.returncode == 0 else None
 
 
 def changed_templates() -> list[str]:
     out = subprocess.run(["git", "status", "--porcelain", "src/ion/web/templates/"],
-                         capture_output=True, text=True, cwd=REPO).stdout
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=REPO).stdout
     return [Path(l[3:].strip()).name for l in out.splitlines() if l.strip().endswith(".html")]
 
 

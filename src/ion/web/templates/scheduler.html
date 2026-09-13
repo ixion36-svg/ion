@@ -171,7 +171,7 @@ async function schLoad() {
     schCache = data.jobs || [];
     schRender();
   } catch (e) {
-    c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
+    c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${schEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 
@@ -182,7 +182,7 @@ function schRender() {
       <div class="card-body items-center text-center py-14">
       <h3 class="card-title">No scheduled jobs yet</h3>
       <p>Create a job to run a registered handler on a cron schedule.</p>
-      <button class="btn btn-primary _ion-s-d6f2af6e0a" data-click-action="schOpenForm">+ New Job</button>
+      <button class="btn btn-primary mt-3.5" data-click-action="schOpenForm">+ New Job</button>
     </div></div>`;
     return;
   }
@@ -200,7 +200,7 @@ function schRender() {
             </div>
             <span class="badge ${badge} shrink-0">${schEsc(statusTxt)}</span>
           </div>
-          ${j.description ? `<div class="_ion-s-d027def9f2">${schEsc(j.description)}</div>` : ''}
+          ${j.description ? `<div class="text-[var(--text-secondary)] text-[.78rem] mt-1">${schEsc(j.description)}</div>` : ''}
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-2 text-xs opacity-70">
             <span class="col-span-full font-mono bg-base-300 px-2 py-1 rounded w-fit">${schEsc(j.cron_expr)}</span>
             <span>next: <strong class="font-mono text-base-content">${schFmtTime(j.next_run_at)}</strong></span>
@@ -341,7 +341,7 @@ async function schShowExec(id, name) {
       </div>`;
     }).join('');
   } catch (e) {
-    body.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
+    body.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${schEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 

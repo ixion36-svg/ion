@@ -94,7 +94,7 @@ async function matStartNew() {
         matResponses = {};
         matRenderQuestionnaire();
     } catch (e) {
-        c.innerHTML = `<div class="alert alert-error _ion-s-5dd0211252">${matEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical)]">${matEsc(e.message)}</div>`;
     }
 }
 
@@ -134,7 +134,7 @@ function matRenderQuestionnaire() {
                 <input class="input input-sm w-full" placeholder="Notes (optional)" id="mat-notes-${question.id}">
             </div></div>`;
         }
-        html += `<div class="_ion-s-361f2a66e8">Related ION pages: ${(domain.ion_pages||[]).map(p => `<a class="link link-primary _ion-s-1cdc0f83d3" href="${p}">${p}</a>`).join(', ')}</div>`;
+        html += `<div class="text-[.72rem] text-[var(--text-secondary)] mt-1.5">Related ION pages: ${(domain.ion_pages||[]).map(p => `<a class="link link-primary text-[var(--primary)] no-underline" href="${p}">${p}</a>`).join(', ')}</div>`;
         html += '</div></div>';
     }
 
@@ -232,7 +232,7 @@ function matRenderResult(a) {
     }
     html += '</div>';
 
-    html += `<div class="_ion-s-309cf4771c">
+    html += `<div class="flex gap-2 justify-end">
         <button class="btn btn-ghost" data-click-action="matShowHistory">View History</button>
         <button class="btn btn-primary" data-click-action="matStartNew">New Assessment</button>
     </div>`;
@@ -249,11 +249,11 @@ async function matShowHistory() {
         const assessments = d.assessments || [];
 
         if (!assessments.length) {
-            c.innerHTML = `<div class="card bg-base-200 shadow _ion-s-91a87015f4">
+            c.innerHTML = `<div class="card bg-base-200 shadow text-center">
                 <div class="card-body items-center text-center py-14">
-                <h3 class="card-title _ion-s-ba0af95016">No assessments yet</h3>
+                <h3 class="card-title text-[var(--text-primary)] mb-2">No assessments yet</h3>
                 <p>Run your first SOC maturity assessment to establish a baseline.</p>
-                <button class="btn btn-primary _ion-s-d6f2af6e0a" data-click-action="matStartNew">Start Assessment</button>
+                <button class="btn btn-primary mt-3.5" data-click-action="matStartNew">Start Assessment</button>
             </div></div>`;
             return;
         }
@@ -273,13 +273,13 @@ async function matShowHistory() {
                 <td>${(s.process||{}).score||'-'}</td>
                 <td>${(s.technology||{}).score||'-'}</td>
                 <td>${(s.services||{}).score||'-'}</td>
-                <td><button class="btn btn-ghost btn-sm btn-error _ion-s-a318f9408e" data-click-action="matDelete" data-args='[${a.id}]'>Delete</button></td>
+                <td><button class="btn btn-ghost btn-sm btn-error py-0.5 px-2 text-[.7rem]" data-click-action="matDelete" data-args='[${a.id}]'>Delete</button></td>
             </tr>`;
         }
         html += '</tbody></table></div>';
         c.innerHTML = html;
     } catch (e) {
-        c.innerHTML = `<div class="alert alert-error _ion-s-5dd0211252">${matEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical)]">${matEsc(e.message)}</div>`;
     }
 }
 

@@ -110,9 +110,20 @@ def verify(page: str, before_text: str, mode: str) -> list[str]:
         cmap = load_map()
         before = before_set
 
-        # Mappable classes MUST be gone. A leftover means the pass silently
-        # skipped work, which looks identical to having nothing to do.
-        skipped = [c for c in present if cmap.get(c, {}).get("kind") in ("exact", "arbitrary")]
+        # Mappable classes MUST be gone -- EXCEPT ones referenced from inside a
+        # <script> block. The convert prompt's rule 4 explicitly tells Grok to
+        # leave those alone, because converting the markup while JS still looks
+        # for the old class name breaks the lookup silently. Failing the page
+        # for obeying that instruction is the tooling contradicting itself: it
+        # rolled back 5 of 26 M-band pages, and every one of the 9 "missed"
+        # classes was inside a script block.
+        in_script = set()
+        for block in re.findall(r"<script\b[^>]*>(.*?)</script>", text, re.DOTALL | re.I):
+            in_script.update(HASHED.findall(block))
+
+        skipped = [c for c in present
+                   if cmap.get(c, {}).get("kind") in ("exact", "arbitrary")
+                   and c not in in_script]
         if skipped:
             problems.append(
                 f"{len(skipped)} mappable class(es) left unconverted: {sorted(skipped)[:4]}"

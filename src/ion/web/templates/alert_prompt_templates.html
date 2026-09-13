@@ -88,7 +88,7 @@
 <!-- JS opens/closes via element.style.display = 'flex'|'none' (CSSOM, allowed).
      daisyUI .modal uses visibility/opacity, so style.display would not reveal it.
      Overlay stays a flex layer; hashed class hides it until JS shows it. -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 _ion-s-c8be1ccba6" id="prompt-modal">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 hidden" id="prompt-modal">
     <div class="card bg-base-100 shadow-xl w-full max-w-[880px] max-h-[92vh] overflow-y-auto">
         <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-base-300">
             <h3 id="prompt-modal-title" class="text-lg font-semibold">New Alert Prompt Template</h3>
@@ -101,11 +101,11 @@
                 <div class="mb-5 pb-5 border-b border-base-300">
                     <h4 class="text-primary font-semibold mb-3">Identity</h4>
                     <div class="flex flex-wrap gap-4">
-                        <div class="mb-3 _ion-s-c2d2e263dc">
+                        <div class="mb-3 flex-[2]">
                             <label for="prompt-name" class="label text-sm text-base-content/60 py-1">Name *</label>
                             <input type="text" id="prompt-name" class="input w-full" required>
                         </div>
-                        <div class="mb-3 _ion-s-ee3d55bf99">
+                        <div class="mb-3 flex-1">
                             <label for="prompt-priority" class="label text-sm text-base-content/60 py-1">Priority (lower = higher)</label>
                             <input type="number" id="prompt-priority" class="input w-full" value="100" min="0">
                         </div>
@@ -162,7 +162,7 @@
                         <textarea id="prompt-checklist" class="textarea w-full font-mono text-sm" rows="6" placeholder="- What is the parent process?&#10;- ..."></textarea>
                     </div>
                     <div class="flex flex-wrap gap-4">
-                        <div class="mb-3 _ion-s-ee3d55bf99">
+                        <div class="mb-3 flex-1">
                             <label for="prompt-severity" class="label text-sm text-base-content/60 py-1">Severity Hint</label>
                             <select id="prompt-severity" class="select w-full">
                                 <option value="">(none)</option>
@@ -172,15 +172,15 @@
                                 <option value="critical">critical</option>
                             </select>
                         </div>
-                        <div class="mb-3 _ion-s-c2d2e263dc">
+                        <div class="mb-3 flex-[2]">
                             <label for="prompt-outputs" class="label text-sm text-base-content/60 py-1">Expected Output Fields (one per line)</label>
                             <textarea id="prompt-outputs" class="textarea w-full font-mono text-sm" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
                         </div>
                     </div>
                     <!-- (L6): row hidden for users without system:settings; -->
                     <!-- backend also enforces the gate so this is defence-in-depth. -->
-                    <div class="flex flex-wrap gap-4 _ion-s-c8be1ccba6" id="prompt-confidence-threshold-row">
-                        <div class="mb-3 _ion-s-ee3d55bf99">
+                    <div class="flex flex-wrap gap-4 hidden" id="prompt-confidence-threshold-row">
+                        <div class="mb-3 flex-1">
                             <label for="prompt-confidence-threshold" class="label text-sm text-base-content/60 py-1">Confidence Threshold Override (0-100)</label>
                             <input type="number" id="prompt-confidence-threshold" class="input w-full" min="0" max="100" placeholder="e.g. 70 — leave blank to use global default">
                             <p class="text-sm text-base-content/60 mt-1">When set, Bob must reach this confidence score to write a verdict for alerts matched by this template. Overrides ION_BOB_CONFIDENCE_THRESHOLD (default 60).</p>
@@ -197,7 +197,7 @@
 </div>
 
 <!-- Resolve / Test Match Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 _ion-s-c8be1ccba6" id="resolve-modal">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 hidden" id="resolve-modal">
     <div class="card bg-base-100 shadow-xl w-full max-w-[880px] max-h-[92vh] overflow-y-auto">
         <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-base-300">
             <h3 class="text-lg font-semibold">Test Match</h3>
@@ -218,7 +218,7 @@
             </div>
             <div class="mb-3">
                 <label class="label text-sm text-base-content/60 py-1">Result</label>
-                <pre class="font-mono text-sm _ion-s-f72ff42b6c" id="resolve-output">(click Resolve)</pre>
+                <pre class="font-mono text-sm bg-[var(--bg-tertiary)] p-3 rounded-[4px] max-h-[320px] overflow-auto" id="resolve-output">(click Resolve)</pre>
             </div>
         </div>
         <div class="flex justify-end gap-2 px-6 py-4 border-t border-base-300">
@@ -278,7 +278,7 @@ let _scorecards = {};
 function renderScorecard(tplId) {
     const s = _scorecards[tplId];
     if (!s || !s.sample_size) {
-        return '<span class="_ion-s-a513d343e2">no data</span>';
+        return '<span class="text-[var(--text-secondary)] text-xs">no data</span>';
     }
     const agree = s.agreement_pct;
     let color = 'color:var(--text-secondary);';
@@ -287,11 +287,11 @@ function renderScorecard(tplId) {
         else if (agree >= 60) color = 'color:#f59e0b;';
         else color = 'color:#ef4444; font-weight:600;';
     }
-    const flag = s.tuning_needed ? ' <span class="_ion-s-9dd1207e58" title="Agreement below 60% on 10+ samples — prompt may need tuning">⚠️ tune</span>' : '';
+    const flag = s.tuning_needed ? ' <span class="text-[#ef4444]" title="Agreement below 60% on 10+ samples — prompt may need tuning">⚠️ tune</span>' : '';
     const agreeStr = agree !== null && agree !== undefined ? `${agree}%` : '—';
     return `<div data-ion-style="${color} font-size:0.78rem">
         agree <strong>${agreeStr}</strong> · n=${s.sample_size}${flag}
-        <div class="_ion-s-707a537f4d">TP ${s.tp_rate ?? 0}% · FP ${s.fp_rate ?? 0}% · BTP ${s.btp_rate ?? 0}%</div>
+        <div class="text-[var(--text-secondary)] text-[0.7rem]">TP ${s.tp_rate ?? 0}% · FP ${s.fp_rate ?? 0}% · BTP ${s.btp_rate ?? 0}%</div>
     </div>`;
 }
 
@@ -302,22 +302,22 @@ function renderPrompts(items) {
         return;
     }
     body.innerHTML = items.map(t => {
-        const ruleIds = (t.rule_ids || []).map(r => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(r)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
-        const ruleGroups = (t.rule_groups || []).map(g => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(g)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
-        const pattern = t.rule_id_pattern ? `<code>${esc(t.rule_id_pattern)}</code>` : '<span class="_ion-s-0e42856cf0">—</span>';
+        const ruleIds = (t.rule_ids || []).map(r => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(r)}</span>`).join('') || '<span class="text-[var(--text-secondary)]">—</span>';
+        const ruleGroups = (t.rule_groups || []).map(g => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(g)}</span>`).join('') || '<span class="text-[var(--text-secondary)]">—</span>';
+        const pattern = t.rule_id_pattern ? `<code>${esc(t.rule_id_pattern)}</code>` : '<span class="text-[var(--text-secondary)]">—</span>';
         const sevMap = { critical: 'badge-error', high: 'badge-warning', medium: 'badge-info', low: 'badge-success' };
-        const sev = t.severity_hint ? `<span class="badge badge-sm ${sevMap[t.severity_hint] || 'badge-ghost'}">${esc(t.severity_hint)}</span>` : '<span class="_ion-s-0e42856cf0">—</span>';
+        const sev = t.severity_hint ? `<span class="badge badge-sm ${sevMap[t.severity_hint] || 'badge-ghost'}">${esc(t.severity_hint)}</span>` : '<span class="text-[var(--text-secondary)]">—</span>';
         const statusBadge = t.enabled
             ? `<span class="badge badge-success badge-sm">Enabled</span>`
             : `<span class="badge badge-ghost badge-sm">Disabled</span>`;
         const techChips = (t.mitre_techniques || []).map(x => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(x)}</span>`).join('');
         const tacticChips = (t.mitre_tactics || []).map(x => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(x)}</span>`).join('');
         const mitreLine = (techChips || tacticChips)
-            ? `<div class="_ion-s-6def4d2d95"><span class="_ion-s-0e42856cf0">MITRE:</span> ${techChips}${tacticChips}</div>`
+            ? `<div class="mt-[0.3rem] text-xs"><span class="text-[var(--text-secondary)]">MITRE:</span> ${techChips}${tacticChips}</div>`
             : '';
         return `
             <tr>
-                <td><strong>${esc(t.name)}</strong><div class="_ion-s-9c82e5036d">${esc(t.description || '')}</div>${mitreLine}</td>
+                <td><strong>${esc(t.name)}</strong><div class="text-[var(--text-secondary)] text-[0.8rem]">${esc(t.description || '')}</div>${mitreLine}</td>
                 <td>${ruleIds}</td>
                 <td>${ruleGroups}</td>
                 <td>${pattern}</td>

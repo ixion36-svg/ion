@@ -202,7 +202,7 @@
           <div class="stat"><div class="stat-title">Indices</div>
             ${statVal('muted', '', esc(c.indices_count ?? '—'))}</div>
           <div class="stat"><div class="stat-title">Storage</div>
-            ${statVal('muted', '_ion-s-df72aa4fcb', esc(c.store_size || '—'))}</div>
+            ${statVal('muted', 'text-[clamp(28px,4vw,56px)]', esc(c.store_size || '—'))}</div>
           <div class="stat"><div class="stat-title">Unassigned shards</div>
             ${statVal((c.unassigned_shards || 0) > 0 ? 'crit' : 'ok', '', esc(c.unassigned_shards ?? '—'))}</div>
         </div>
@@ -276,11 +276,11 @@
         const rules = (r.triggered_rules && r.triggered_rules.length)
           ? r.triggered_rules.slice(0, 3).map(esc).join(', ')
             + (r.triggered_rules.length > 3 ? ` +${r.triggered_rules.length - 3}` : '')
-          : '<span class="_ion-s-e0b6f683ff">—</span>';
+          : '<span class="text-[var(--deck-faint)]">—</span>';
         return `<tr>
           <td class="font-mono">${esc(r.case_number || '')}</td>
           <td class="max-w-[30vw] truncate">${esc(r.title || '')}</td>
-          <td class="max-w-[30vw] truncate _ion-s-5d05e2e124">${rules}</td>
+          <td class="max-w-[30vw] truncate max-w-[22vw]">${rules}</td>
           <td>${sevPill(r.severity)}</td>
           <td class="font-mono">${esc(r.hours_open ?? 0)}h</td>
         </tr>`;
@@ -378,7 +378,7 @@
       const cls = silent > 0 ? 'crit' : 'ok';
       return `<div class="stat">
         <div class="stat-title">${esc(label)}</div>
-        ${statVal(cls, '', esc(silent) + ' <span class="_ion-s-1fd9776cf9">/ ' + esc(total) + '</span>')}
+        ${statVal(cls, '', esc(silent) + ' <span class="text-[var(--deck-faint)] text-[0.5em] font-normal">/ ' + esc(total) + '</span>')}
         <div class="stat-desc">silent / total hosts</div>
       </div>`;
     };
@@ -452,7 +452,7 @@
       ? `<div class="card bg-base-200 shadow _ion-s-4f2d370f62">${esc(text)}</div>`
       : `<div class="alert alert-info mt-[4vh]">
            No AI threat summary available.<br>
-           <span class="_ion-s-d900a9388d">
+           <span class="text-[0.6em] text-[var(--deck-faint)]">
              Click <strong>Generate Summary</strong> on /daily-standup, then refresh this deck.
            </span>
          </div>`;
@@ -472,7 +472,7 @@
       ? `<div class="card bg-base-200 shadow _ion-s-e4873e3c1b">${esc(text)}</div>`
       : `<div class="alert alert-info mt-[4vh]">
            No AOB items recorded.<br>
-           <span class="_ion-s-d900a9388d">
+           <span class="text-[0.6em] text-[var(--deck-faint)]">
              Add notes via the <strong>Additional Notes</strong> field on /daily-standup, then refresh this deck.
            </span>
          </div>`;
@@ -494,9 +494,9 @@
         ${titleEyebrow('End of Standup')}
         <div class="deck-title mb-[2vh] text-[clamp(48px,8vw,110px)] font-semibold leading-[1.05] tracking-tight">Questions? Action items?</div>
         <div class="text-[clamp(18px,2vw,28px)] text-base-content/60">
-          <kbd class="kbd kbd-sm _ion-s-bc1acd9238">←</kbd>
+          <kbd class="kbd kbd-sm font-mono text-sm py-[3px] px-2 rounded-[5px] bg-[rgba(148,163,184,0.12)] border border-[var(--deck-line)]">←</kbd>
           to revisit any section ·
-          <kbd class="kbd kbd-sm _ion-s-bc1acd9238">Esc</kbd>
+          <kbd class="kbd kbd-sm font-mono text-sm py-[3px] px-2 rounded-[5px] bg-[rgba(148,163,184,0.12)] border border-[var(--deck-line)]">Esc</kbd>
           to exit
         </div>
       `)
@@ -603,7 +603,7 @@
     .then(render)
     .catch(err => {
       loading.innerHTML =
-        '<div class="alert alert-error _ion-s-02d8d99c2c">Failed to load: ' + esc(err.message) + '</div>';
+        '<div class="alert alert-error text-[var(--ion-coral)]">Failed to load: ' + esc(err.message) + '</div>';
     });
 })();
 </script>

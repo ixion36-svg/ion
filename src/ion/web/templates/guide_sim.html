@@ -24,7 +24,7 @@
   <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Hands-on alert triage scenarios.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-ghost _ion-s-6b99de8b69" data-click-action="simBack" id="sim-back-btn"><i class="icon-arrow-left"></i> Back to Scenarios</button>
+        <button class="btn btn-ghost hidden" data-click-action="simBack" id="sim-back-btn"><i class="icon-arrow-left"></i> Back to Scenarios</button>
     </div>
 </section>
 <div id="sim-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading scenarios...</div></div>
@@ -209,12 +209,12 @@ async function simInit() {
         const d = await r.json();
         renderScenarioList(d.scenarios);
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="alert alert-error _ion-s-5dd0211252">Failed to load scenarios</div>';
+        $('sim-content').innerHTML = '<div class="alert alert-error text-[var(--sev-critical)]">Failed to load scenarios</div>';
     }
 }
 
 function renderScenarioList(scenarios) {
-    let html = '<div class="alert alert-info mb-4 _ion-s-87c136dfd0"><p class="_ion-s-53cce34fa0">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
+    let html = '<div class="alert alert-info mb-4 mb-4"><p class="text-[.9rem] text-[var(--text-secondary)]">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
     html += '<div class="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">';
     for (const s of scenarios) {
         const diffBadge = s.difficulty === 'beginner' ? 'badge-success' : s.difficulty === 'advanced' ? 'badge-error' : 'badge-warning';
@@ -248,7 +248,7 @@ async function simStart(scenarioId) {
         $('sim-back-btn').style.display = '';
         renderSimulation();
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="alert alert-error _ion-s-5dd0211252">Failed to load scenario</div>';
+        $('sim-content').innerHTML = '<div class="alert alert-error text-[var(--sev-critical)]">Failed to load scenario</div>';
     }
 }
 
@@ -277,9 +277,9 @@ function renderSimulation() {
                 ${a.user ? '<span><strong>User:</strong> '+esc(a.user)+'</span>' : ''}
                 <span><strong>Time:</strong> ${new Date(a.timestamp).toLocaleString()}</span>
             </div>
-            ${a.mitre_technique_id ? `<div class="_ion-s-fdf33f2304"><span class="_ion-s-b1a8a836ea">${esc(a.mitre_technique_id)}</span> <span class="_ion-s-a975440d91">${esc(a.mitre_technique_name)} (${esc(a.mitre_tactic_name)})</span></div>` : ''}
+            ${a.mitre_technique_id ? `<div class="mb-2"><span class="py-0.5 px-1.5 bg-[var(--primary-dim)] border border-[rgba(0,212,255,.25)] rounded-[3px] text-[.72rem] font-mono text-[var(--primary)]">${esc(a.mitre_technique_id)}</span> <span class="text-[.78rem] text-[var(--text-secondary)]">${esc(a.mitre_technique_name)} (${esc(a.mitre_tactic_name)})</span></div>` : ''}
             <div class="p-2.5 bg-base-100 border border-base-300 rounded text-sm leading-relaxed">${esc(a.message)}</div>
-            <details><summary class="_ion-s-1c8066d23c">View Raw Data</summary>
+            <details><summary class="text-[.78rem] text-[var(--primary)] cursor-pointer mb-1">View Raw Data</summary>
             <div class="font-mono text-xs bg-base-100 border border-base-300 rounded p-2.5 max-h-[200px] overflow-y-auto">${Object.entries(a.raw_data||{}).map(([k,v])=>`<div><span class="text-primary">${esc(k)}</span>: <span>${esc(String(v))}</span></div>`).join('')}</div>
             </details>
         </div>
@@ -292,7 +292,7 @@ function renderSimulation() {
             html += `<div class="rounded-box bg-base-100 p-2.5 mb-1.5">
                 <div class="font-semibold">${sevBadge(ra.severity)} ${esc(ra.title)}</div>
                 <div class="text-xs opacity-50 mt-0.5">${esc(ra.rule_name)} | ${esc(ra.host||'')} | ${new Date(ra.timestamp).toLocaleTimeString()} | ${esc(ra.mitre_tactic_name||'')}</div>
-                <div class="_ion-s-a86ebff019">${esc(ra.message)}</div>
+                <div class="text-[.82rem] text-[var(--text-secondary)] mt-1">${esc(ra.message)}</div>
             </div>`;
         }
         html += '</div></div>';
@@ -306,7 +306,7 @@ function renderSimulation() {
         html += `<div>
             <div class="sim-ob flex items-center gap-2 p-2 bg-base-100 border border-base-300 rounded cursor-pointer ${isEnriched?'enriched':''}" id="sim-ob-${i}">
                 <span class="badge badge-primary badge-sm">${esc(o.type)}</span>
-                <div class="_ion-s-97445a8d93">
+                <div class="flex-1">
                     <div class="font-mono text-sm">${esc(o.value)}</div>
                     <div class="text-xs opacity-50">${esc(o.context)}</div>
                 </div>
@@ -325,9 +325,9 @@ function renderSimulation() {
         html += `<div class="card bg-base-200 shadow"><div class="card-body">
             <h3 class="card-title text-sm"><i class="icon-eye text-primary"></i> Threat Intelligence</h3>
             <div class="p-2.5 bg-base-100 border border-base-300 rounded text-sm">
-                <div class="_ion-s-947b39942a">${esc(ti.actor)}</div>
-                <div class="_ion-s-a975440d91">Confidence: <strong>${ti.confidence}%</strong></div>
-                <div class="_ion-s-96628d4d70">${esc(ti.context)}</div>
+                <div class="font-bold text-[var(--text-primary)] mb-1">${esc(ti.actor)}</div>
+                <div class="text-[.78rem] text-[var(--text-secondary)]">Confidence: <strong>${ti.confidence}%</strong></div>
+                <div class="text-[.82rem] text-[var(--text-secondary)] mt-1.5">${esc(ti.context)}</div>
                 <div class="flex gap-1 flex-wrap mt-1.5">${(ti.ttps||[]).map(t=>`<span class="badge badge-outline badge-sm font-mono">${esc(t)}</span>`).join('')}</div>
             </div>
         </div></div>`;
@@ -389,8 +389,8 @@ function renderSimulation() {
 
     // Score button (shown when all steps completed)
     if (currentStep >= s.steps.length) {
-        html += `<div class="_ion-s-766e488b93">
-            <button class="btn btn-primary _ion-s-3599ef6997" data-click-action="simScore">View Score</button>
+        html += `<div class="text-center p-4">
+            <button class="btn btn-primary py-3 px-8 text-[.95rem]" data-click-action="simScore">View Score</button>
         </div>`;
     }
 
@@ -423,10 +423,10 @@ function renderQuestion(q, stepIdx) {
 
 function renderEnrichment(value, scenario) {
     const er = (scenario.enrichment_results || {})[value];
-    if (!er) return '<div class="_ion-s-ebb3a47e42">No enrichment data available for this observable.</div>';
+    if (!er) return '<div class="text-[.82rem] text-[var(--text-muted)]">No enrichment data available for this observable.</div>';
     const levelCls = er.threat_level === 'high' ? 'badge-error' : er.threat_level === 'medium' ? 'badge-warning' : 'badge-success';
     return `<div class="text-xs opacity-50 mb-1">Source: ${esc(er.source)}</div>
-        <div class="_ion-s-d9f8a31df1">${esc(er.details)}</div>
+        <div class="text-[.82rem] text-[var(--text-secondary)] leading-[1.5]">${esc(er.details)}</div>
         <div class="badge ${levelCls} mt-1">${esc(er.verdict)}</div>`;
 }
 
@@ -464,7 +464,7 @@ function simSelectOption(qId, optId, type) {
             if (check) check.innerHTML = isSelected ? '&#10003;' : '';
             const radio = opt.querySelector('.sim-option-radio');
             if (radio) {
-                if (isSelected) radio.innerHTML = '<div class="_ion-s-de4bcf5c43"></div>';
+                if (isSelected) radio.innerHTML = '<div class="w-[8px] h-[8px] rounded-[50%] bg-[var(--primary)]"></div>';
                 else radio.innerHTML = '';
             }
         });
@@ -563,7 +563,7 @@ async function simScore() {
         const d = await r.json();
         renderScore(d);
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="alert alert-error _ion-s-5dd0211252">Failed to calculate score</div>';
+        $('sim-content').innerHTML = '<div class="alert alert-error text-[var(--sev-critical)]">Failed to calculate score</div>';
     }
 }
 
@@ -589,7 +589,7 @@ function renderScore(d) {
     html += '<div class="w-full overflow-x-auto text-left">';
     html += '<table class="table table-sm">';
     for (const r of d.results) {
-        const icon = r.correct ? '<span class="_ion-s-b00112b508">&#10003;</span>' : '<span class="_ion-s-5dd0211252">&#10007;</span>';
+        const icon = r.correct ? '<span class="text-[var(--mitre-covered)]">&#10003;</span>' : '<span class="text-[var(--sev-critical)]">&#10007;</span>';
         html += `<tr>
             <td>${icon}</td>
             <td>${esc(r.feedback)}</td>
@@ -598,7 +598,7 @@ function renderScore(d) {
     }
     html += '</table></div>';
 
-    html += `<div class="_ion-s-5367325448">
+    html += `<div class="mt-6 flex gap-3 justify-center">
         <button class="btn btn-primary" data-click-action="simStart" data-args='["${currentScenario.id}"]'>Retry Scenario</button>
         <button class="btn btn-ghost" data-click-action="simBack">All Scenarios</button>
     </div>`;

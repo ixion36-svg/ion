@@ -23,7 +23,7 @@
     <div class="card-body py-4 gap-3">
         <div class="flex flex-wrap items-center gap-2">
             <span class="badge badge-info" id="template-format">-</span>
-            <span class="_ion-s-6b99de8b69" id="template-doctype-badge"></span>
+            <span class="hidden" id="template-doctype-badge"></span>
             <span class="badge badge-ghost" id="template-version">v1</span>
             <span class="text-sm text-base-content/60" id="template-updated">Updated: -</span>
         </div>
@@ -46,7 +46,7 @@
         </div>
     </div>
     <!-- Section cards view (shown when template has sections) -->
-    <div id="sections-view" class="section _ion-s-c8be1ccba6">
+    <div id="sections-view" class="section hidden">
         <div class="card bg-base-200 shadow">
             <div class="card-body">
                 <h3 class="card-title">Sections <span class="badge badge-info" id="section-count-badge">0</span></h3>
@@ -66,7 +66,7 @@
 </div>
 
 <!-- Variables View -->
-<div id="variables-view" class="tab-content _ion-s-f2892a2e8a">
+<div id="variables-view" class="tab-content hidden">
     <div class="card bg-base-200 shadow">
         <div class="card-body p-0">
             <div class="overflow-x-auto">
@@ -81,7 +81,7 @@
 </div>
 
 <!-- Versions View -->
-<div id="versions-view" class="tab-content _ion-s-f2892a2e8a">
+<div id="versions-view" class="tab-content hidden">
     <div class="card bg-base-200 shadow">
         <div class="card-body p-0">
             <div class="overflow-x-auto">
@@ -96,7 +96,7 @@
 </div>
 
 <!-- Version Preview Modal -->
-<div id="version-modal" class="modal _ion-s-f2892a2e8a">
+<div id="version-modal" class="modal hidden">
     <div class="modal-box w-11/12 max-w-5xl">
         <div class="flex items-center justify-between gap-4">
             <h2 id="version-modal-title" class="text-lg font-semibold">Version Preview</h2>
@@ -111,7 +111,7 @@
             <div id="version-content-tab" class="version-tab-content">
                 <pre id="version-content" class="code-block ion-mono bg-base-300 p-4 rounded-box overflow-x-auto text-sm whitespace-pre-wrap"></pre>
             </div>
-            <div id="version-diff-tab" class="version-tab-content _ion-s-f2892a2e8a">
+            <div id="version-diff-tab" class="version-tab-content hidden">
                 <pre id="version-diff" class="code-block diff-view font-mono whitespace-pre-wrap bg-base-300 p-4 rounded-box overflow-x-auto text-sm"></pre>
             </div>
         </div>

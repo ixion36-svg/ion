@@ -138,7 +138,7 @@ def check(page: str, css: str) -> list[str]:
 
 def changed_templates() -> list[str]:
     out = subprocess.run(["git", "status", "--porcelain", "src/ion/web/templates/"],
-                         capture_output=True, text=True, cwd=REPO).stdout
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=REPO).stdout
     names = []
     for line in out.splitlines():
         p = line[3:].strip()

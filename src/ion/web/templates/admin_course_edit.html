@@ -129,11 +129,11 @@ function renderModule(m,mi){
   return `
     <div class="ce-mod card bg-base-300 shadow-sm mt-3" data-mid="${id}">
       <div class="card-body p-4">
-      <div class="flex flex-wrap items-center gap-2 _ion-s-59b87fdbd1">
-        <div class="_ion-s-65e3af54b5">
+      <div class="flex flex-wrap items-center gap-2 mb-2">
+        <div class="flex-1 min-w-[240px]">
           <input class="input input-sm w-full" data-field="title" value="${escHtml(m.title)}" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]'>
         </div>
-        <input type="number" class="input input-sm _ion-s-7fce3abc18" data-field="estimated_minutes" value="${m.estimated_minutes}" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]' title="Minutes">
+        <input type="number" class="input input-sm w-[5rem]" data-field="estimated_minutes" value="${m.estimated_minutes}" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]' title="Minutes">
         <button class="btn btn-primary btn-sm" data-click-action="saveModule" data-args='[${m.id||-1}, ${mi}]'>Save</button>
         <button class="btn btn-ghost btn-sm" data-click-action="addLesson" data-args='[${m.id||-1}, ${mi}]'>+ Lesson</button>
         ${m.id?`<button class="btn btn-ghost btn-sm btn-error" data-click-action="deleteModule" data-args='[${m.id}]'>Delete module</button>`:''}
@@ -159,8 +159,8 @@ function renderLesson(l,m,mi,li){
         <strong>${escHtml(l.title||'(untitled lesson)')}</strong>
         <span class="text-xs opacity-50 ml-auto">~${l.duration_min}m · ${qcount} q</span>
       </div>
-      <div class="ce-lesson-body _ion-s-22df499f68" data-ion-style="display:${isExpanded?'block':'none'}">
-        <div class="ce-grid _ion-s-bba5e32d4a">
+      <div class="ce-lesson-body mt-[0.6rem]" data-ion-style="display:${isExpanded?'block':'none'}">
+        <div class="ce-grid mb-[0.6rem]">
           <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Title</div><input class="input input-sm w-full" data-field="title" value="${escHtml(l.title)}"></div>
           <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Type</div><select class="select select-sm w-full" data-field="lesson_type">${typeOpts}</select></div>
           <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Duration (min)</div><input type="number" class="input input-sm w-full" data-field="duration_min" value="${l.duration_min}"></div>
@@ -168,18 +168,18 @@ function renderLesson(l,m,mi,li){
         </div>
         <div class="text-xs font-semibold uppercase tracking-wide opacity-60">Content (markdown — supports \`\`\`mermaid blocks)</div>
         <textarea class="textarea w-full ce-textarea ce-textarea-md" data-field="content_md" placeholder="Lesson body in markdown…" data-input-action="updateMdPreview" data-args='["${id}", "$value"]'>${escHtml(l.content_md||'')}</textarea>
-        <div class="text-xs font-semibold uppercase tracking-wide opacity-60 _ion-s-c9ef2a58eb">Live preview</div>
+        <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mt-2">Live preview</div>
         <div class="ce-mdpreview" id="ce-md-${id}">${md(l.content_md||'')}</div>
 
-        <div class="flex flex-wrap items-center justify-between gap-2 _ion-s-62a1d0e646">
+        <div class="flex flex-wrap items-center justify-between gap-2 mt-[0.85rem] mr-0 mb-2 ml-0">
           <h3 class="text-sm font-semibold">Questions (${qcount})</h3>
           <button class="btn btn-ghost btn-sm" data-click-action="addQuestion" data-args='[${l.id||-1}, ${mi}, ${li}]'>+ Question</button>
         </div>
         ${(l.questions||[]).map((q,qi)=>renderQuestion(q,l,mi,li,qi)).join('')}
 
-        <div class="flex flex-wrap items-center gap-2 _ion-s-a26d92bbf4">
+        <div class="flex flex-wrap items-center gap-2 mt-[0.7rem]">
           <button class="btn btn-primary btn-sm" data-click-action="saveLesson" data-args='[${l.id||-1}, ${mi}, ${li}]'>Save lesson</button>
-          ${l.id?`<button class="btn btn-ghost btn-sm btn-error _ion-s-690f054c4e" data-click-action="deleteLesson" data-args='[${l.id}]'>Delete lesson</button>`:''}
+          ${l.id?`<button class="btn btn-ghost btn-sm btn-error ml-[auto]" data-click-action="deleteLesson" data-args='[${l.id}]'>Delete lesson</button>`:''}
         </div>
       </div>
       </div>
@@ -195,24 +195,24 @@ function renderQuestion(q,l,mi,li,qi){
   return `
     <div class="ce-question card bg-base-300 shadow-sm mt-2 text-sm" data-qid="${id}">
       <div class="card-body p-3">
-      <div class="flex flex-wrap items-center gap-2 _ion-s-e802b7a103">
+      <div class="flex flex-wrap items-center gap-2 mb-[0.4rem]">
         <select class="select select-sm" data-field="kind">${kindOpts}</select>
-        <input type="number" class="input input-sm _ion-s-81c26f8ca5" data-field="points" value="${q.points}" title="Points">
+        <input type="number" class="input input-sm w-[4rem]" data-field="points" value="${q.points}" title="Points">
         <span class="text-xs opacity-50 ml-auto">#${qi+1}</span>
       </div>
       <div class="text-xs font-semibold uppercase tracking-wide opacity-60">Stem (markdown)</div>
       <textarea class="textarea w-full ce-textarea" data-field="stem_md">${escHtml(q.stem_md||'')}</textarea>
-      <div class="ce-grid _ion-s-c9ef2a58eb">
+      <div class="ce-grid mt-2">
         <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Options (JSON array of {value, label})</div>
-          <textarea class="textarea w-full ce-textarea _ion-s-4500b7ef55" data-field="options">${escHtml(optsJson)}</textarea></div>
+          <textarea class="textarea w-full ce-textarea text-[0.7rem]" data-field="options">${escHtml(optsJson)}</textarea></div>
         <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Correct answer (JSON: string for single/truefalse, list for multi/shortanswer)</div>
-          <textarea class="textarea w-full ce-textarea _ion-s-4500b7ef55" data-field="correct_answer">${escHtml(corrJson)}</textarea></div>
+          <textarea class="textarea w-full ce-textarea text-[0.7rem]" data-field="correct_answer">${escHtml(corrJson)}</textarea></div>
       </div>
-      <div class="text-xs font-semibold uppercase tracking-wide opacity-60 _ion-s-09e8c5ac29">Explanation (markdown, shown after submit)</div>
+      <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mt-[0.4rem]">Explanation (markdown, shown after submit)</div>
       <textarea class="textarea w-full ce-textarea" data-field="explanation_md">${escHtml(q.explanation_md||'')}</textarea>
-      <div class="flex flex-wrap items-center gap-2 _ion-s-09e8c5ac29">
+      <div class="flex flex-wrap items-center gap-2 mt-[0.4rem]">
         <button class="btn btn-primary btn-sm" data-click-action="saveQuestion" data-args='[${q.id||-1}, ${l.id||-1}, ${mi}, ${li}, ${qi}]'>Save question</button>
-        ${q.id?`<button class="btn btn-ghost btn-sm btn-error _ion-s-690f054c4e" data-click-action="deleteQuestion" data-args='[${q.id}]'>Delete</button>`:''}
+        ${q.id?`<button class="btn btn-ghost btn-sm btn-error ml-[auto]" data-click-action="deleteQuestion" data-args='[${q.id}]'>Delete</button>`:''}
       </div>
       </div>
     </div>
