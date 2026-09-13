@@ -288,6 +288,9 @@
     "convert": true,
     "restyle": true
   },
+  "settings.html": {
+    "restyle": true
+  },
   "shift_handover.html": {
     "convert": true,
     "restyle": true

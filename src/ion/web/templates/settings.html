@@ -19,55 +19,55 @@
     </div>
 </section>
 
-<div class="settings-layout">
+<div class="grid grid-cols-1 min-[901px]:grid-cols-[220px_1fr] gap-8 mt-6">
     <!-- Sidebar Navigation -->
-    <nav class="settings-nav">
-        <a href="#wizard" class="settings-nav-item wizard-nav-item" data-section="wizard">
-            <span class="nav-icon">&#9889;</span> Integration Wizard
+    <nav class="flex flex-col gap-1">
+        <a href="#wizard" class="settings-nav-item block px-4 py-3 text-sm rounded-field bg-gradient-to-br from-primary to-secondary text-primary-content font-semibold hover:brightness-110 transition-[filter]" data-section="wizard">
+            <span class="mr-1">&#9889;</span> Integration Wizard
         </a>
-        <div class="nav-divider"></div>
-        <a href="#general" class="settings-nav-item active" data-section="general">General</a>
-        <a href="#elasticsearch" class="settings-nav-item" data-section="elasticsearch">Elasticsearch</a>
-        <a href="#gitlab" class="settings-nav-item" data-section="gitlab">GitLab</a>
-        <a href="#opencti" class="settings-nav-item" data-section="opencti">OpenCTI</a>
-        <a href="#kibana" class="settings-nav-item" data-section="kibana">Kibana Cases</a>
-        <a href="#dfir_iris" class="settings-nav-item" data-section="dfir_iris">DFIR-IRIS</a>
-        <a href="#tide" class="settings-nav-item" data-section="tide">TIDE</a>
-        <a href="#arkime" class="settings-nav-item" data-section="arkime">Arkime</a>
-        <a href="#ollama" class="settings-nav-item" data-section="ollama">Ollama AI</a>
-        <a href="#abuseipdb" class="settings-nav-item" data-section="abuseipdb">AbuseIPDB</a>
-        <a href="#virustotal" class="settings-nav-item" data-section="virustotal">VirusTotal</a>
-        <a href="#oidc" class="settings-nav-item" data-section="oidc">OIDC / Keycloak</a>
-        <a href="#sessions" class="settings-nav-item" data-section="sessions">Active Sessions</a>
-        <a href="#database" class="settings-nav-item" data-section="database">Database</a>
-        <a href="#system" class="settings-nav-item" data-section="system">System Info</a>
-        <a href="#logs" class="settings-nav-item" data-section="logs">System Logs</a>
+        <div class="h-px bg-base-300 my-2"></div>
+        <a href="#general" class="settings-nav-item active block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="general">General</a>
+        <a href="#elasticsearch" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="elasticsearch">Elasticsearch</a>
+        <a href="#gitlab" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="gitlab">GitLab</a>
+        <a href="#opencti" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="opencti">OpenCTI</a>
+        <a href="#kibana" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="kibana">Kibana Cases</a>
+        <a href="#dfir_iris" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="dfir_iris">DFIR-IRIS</a>
+        <a href="#tide" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="tide">TIDE</a>
+        <a href="#arkime" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="arkime">Arkime</a>
+        <a href="#ollama" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="ollama">Ollama AI</a>
+        <a href="#abuseipdb" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="abuseipdb">AbuseIPDB</a>
+        <a href="#virustotal" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="virustotal">VirusTotal</a>
+        <a href="#oidc" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="oidc">OIDC / Keycloak</a>
+        <a href="#sessions" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="sessions">Active Sessions</a>
+        <a href="#database" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="database">Database</a>
+        <a href="#system" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="system">System Info</a>
+        <a href="#logs" class="settings-nav-item block px-4 py-3 rounded-field text-sm font-medium text-base-content/70 hover:bg-base-200 hover:text-base-content transition-colors" data-section="logs">System Logs</a>
     </nav>
 
     <!-- Settings Content -->
-    <div class="settings-content">
+    <div class="min-w-0">
         <!-- Integration Wizard Section -->
         <section id="wizard" class="settings-section">
             <h2>Integration Wizard</h2>
-            <p class="section-description">Configure all your integrations with step-by-step guidance and AI-powered troubleshooting.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure all your integrations with step-by-step guidance and AI-powered troubleshooting.</p>
 
-            <div class="wizard-launcher">
-                <div class="wizard-launcher-content">
-                    <div class="wizard-launcher-icon">
+            <div class="bg-gradient-to-br from-primary/10 to-secondary/10 border border-base-300 rounded-xl p-8">
+                <div class="flex flex-col min-[601px]:flex-row items-center gap-6 mb-8 text-center min-[601px]:text-left">
+                    <div class="shrink-0 w-16 h-16 bg-primary rounded-xl flex items-center justify-center text-primary-content">
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                             <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
                         </svg>
                     </div>
-                    <div class="wizard-launcher-text">
-                        <h3>Quick Setup</h3>
-                        <p>Configure your integrations with a guided wizard. Test connections and get AI-powered help when things go wrong.</p>
+                    <div class="flex-1">
+                        <h3 class="mb-2 text-xl">Quick Setup</h3>
+                        <p class="m-0 text-base-content/60">Configure your integrations with a guided wizard. Test connections and get AI-powered help when things go wrong.</p>
                     </div>
                     <button class="btn btn-primary btn-lg" data-click-action="openIntegrationWizard">
                         Launch Wizard
                     </button>
                 </div>
 
-                <div class="wizard-status-grid" id="wizard-status-grid">
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4" id="wizard-status-grid">
                     <!-- Status cards will be loaded dynamically -->
                     <div class="loading">Loading integration status...</div>
                 </div>
@@ -77,42 +77,42 @@
         <!-- General Settings -->
         <section id="general" class="settings-section active">
             <h2>General Settings</h2>
-            <p class="section-description">Basic application configuration.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Basic application configuration.</p>
 
             <form id="general-form" data-submit-action="saveSettings" data-args='["$event", "general"]'>
-                <div class="form-group">
-                    <label for="default_format">Default Document Format</label>
-                    <select id="default_format" name="default_format">
+                <div class="mb-5">
+                    <label for="default_format" class="block mb-2 font-medium text-[0.9rem]">Default Document Format</label>
+                    <select class="ion-select" id="default_format" name="default_format">
                         <option value="markdown">Markdown</option>
                         <option value="html">HTML</option>
                         <option value="text">Plain Text</option>
                     </select>
-                    <span class="form-help">Default format for new documents</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Default format for new documents</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="max_versions_to_keep">Max Versions to Keep</label>
-                    <input type="number" id="max_versions_to_keep" name="max_versions_to_keep" min="1" max="1000">
-                    <span class="form-help">Maximum number of document versions to retain</span>
+                <div class="mb-5">
+                    <label for="max_versions_to_keep" class="block mb-2 font-medium text-[0.9rem]">Max Versions to Keep</label>
+                    <input type="number" class="ion-input" id="max_versions_to_keep" name="max_versions_to_keep" min="1" max="1000">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Maximum number of document versions to retain</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="auto_save" name="auto_save">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="auto_save" name="auto_save">
                         Enable Auto-Save
                     </label>
-                    <span class="form-help">Automatically save documents while editing</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Automatically save documents while editing</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="cookie_secure" name="cookie_secure">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="cookie_secure" name="cookie_secure">
                         Secure Cookies (HTTPS only)
                     </label>
-                    <span class="form-help">Enable when using HTTPS in production</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Enable when using HTTPS in production</span>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
@@ -121,82 +121,82 @@
         <!-- Elasticsearch Settings -->
         <section id="elasticsearch" class="settings-section">
             <h2>Elasticsearch Integration</h2>
-            <p class="section-description">Configure connection to Elasticsearch for alerts and case management.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure connection to Elasticsearch for alerts and case management.</p>
 
             <form id="elasticsearch-form" data-submit-action="saveSettings" data-args='["$event", "elasticsearch"]'>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="elasticsearch_enabled" name="elasticsearch_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="elasticsearch_enabled" name="elasticsearch_enabled">
                         Enable Elasticsearch Integration
                     </label>
                 </div>
 
-                <div class="form-group">
-                    <label for="elasticsearch_url">Elasticsearch URL</label>
-                    <input type="url" id="elasticsearch_url" name="elasticsearch_url" placeholder="https://localhost:9200">
-                    <span class="form-help">Full URL including protocol and port</span>
+                <div class="mb-5">
+                    <label for="elasticsearch_url" class="block mb-2 font-medium text-[0.9rem]">Elasticsearch URL</label>
+                    <input type="url" class="ion-input" id="elasticsearch_url" name="elasticsearch_url" placeholder="https://localhost:9200">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Full URL including protocol and port</span>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="elasticsearch_username">Username</label>
-                        <input type="text" id="elasticsearch_username" name="elasticsearch_username" placeholder="elastic">
+                <div class="grid grid-cols-1 min-[601px]:grid-cols-2 gap-4">
+                    <div class="mb-5">
+                        <label for="elasticsearch_username" class="block mb-2 font-medium text-[0.9rem]">Username</label>
+                        <input type="text" class="ion-input" id="elasticsearch_username" name="elasticsearch_username" placeholder="elastic">
                     </div>
-                    <div class="form-group">
-                        <label for="elasticsearch_password">Password</label>
-                        <input type="password" id="elasticsearch_password" name="elasticsearch_password" placeholder="Leave blank to keep current">
-                        <span class="form-help" id="elasticsearch_password_status"></span>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="elasticsearch_api_key">API Key (alternative to username/password)</label>
-                    <input type="password" id="elasticsearch_api_key" name="elasticsearch_api_key" placeholder="Leave blank to keep current">
-                    <span class="form-help" id="elasticsearch_api_key_status"></span>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="elasticsearch_alert_index">Alert Index Pattern</label>
-                        <input type="text" id="elasticsearch_alert_index" name="elasticsearch_alert_index" placeholder=".alerts-*">
-                    </div>
-                    <div class="form-group">
-                        <label for="elasticsearch_case_index">Case Index</label>
-                        <input type="text" id="elasticsearch_case_index" name="elasticsearch_case_index" placeholder="ion-cases">
+                    <div class="mb-5">
+                        <label for="elasticsearch_password" class="block mb-2 font-medium text-[0.9rem]">Password</label>
+                        <input type="password" class="ion-input" id="elasticsearch_password" name="elasticsearch_password" placeholder="Leave blank to keep current">
+                        <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="elasticsearch_password_status"></span>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="elasticsearch_verify_ssl" name="elasticsearch_verify_ssl">
+                <div class="mb-5">
+                    <label for="elasticsearch_api_key" class="block mb-2 font-medium text-[0.9rem]">API Key (alternative to username/password)</label>
+                    <input type="password" class="ion-input" id="elasticsearch_api_key" name="elasticsearch_api_key" placeholder="Leave blank to keep current">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="elasticsearch_api_key_status"></span>
+                </div>
+
+                <div class="grid grid-cols-1 min-[601px]:grid-cols-2 gap-4">
+                    <div class="mb-5">
+                        <label for="elasticsearch_alert_index" class="block mb-2 font-medium text-[0.9rem]">Alert Index Pattern</label>
+                        <input type="text" class="ion-input" id="elasticsearch_alert_index" name="elasticsearch_alert_index" placeholder=".alerts-*">
+                    </div>
+                    <div class="mb-5">
+                        <label for="elasticsearch_case_index" class="block mb-2 font-medium text-[0.9rem]">Case Index</label>
+                        <input type="text" class="ion-input" id="elasticsearch_case_index" name="elasticsearch_case_index" placeholder="ion-cases">
+                    </div>
+                </div>
+
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="elasticsearch_verify_ssl" name="elasticsearch_verify_ssl">
                         Verify SSL Certificate
                     </label>
-                    <span class="form-help">Disable for self-signed certificates (not recommended for production)</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Disable for self-signed certificates (not recommended for production)</span>
                 </div>
 
                 <h3 class="_ion-s-340c480b1f">User Assignment Mapping</h3>
-                <p class="section-description">Map an Elasticsearch index containing user profiles for alert assignment. When analysts assign alerts, the user name is written back to the configured field on the alert document.</p>
+                <p class="text-base-content/60 mb-6 text-[0.9rem]">Map an Elasticsearch index containing user profiles for alert assignment. When analysts assign alerts, the user name is written back to the configured field on the alert document.</p>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="elasticsearch_user_index">User Index</label>
-                        <input type="text" id="elasticsearch_user_index" name="elasticsearch_user_index" placeholder="e.g. ion-users">
-                        <span class="form-help">ES index containing user profiles</span>
+                <div class="grid grid-cols-1 min-[601px]:grid-cols-2 gap-4">
+                    <div class="mb-5">
+                        <label for="elasticsearch_user_index" class="block mb-2 font-medium text-[0.9rem]">User Index</label>
+                        <input type="text" class="ion-input" id="elasticsearch_user_index" name="elasticsearch_user_index" placeholder="e.g. ion-users">
+                        <span class="block mt-1.5 text-[0.8rem] text-base-content/60">ES index containing user profiles</span>
                     </div>
-                    <div class="form-group">
-                        <label for="elasticsearch_user_field">User Name Field</label>
-                        <input type="text" id="elasticsearch_user_field" name="elasticsearch_user_field" placeholder="e.g. ion.user">
-                        <span class="form-help">Field path containing display names</span>
+                    <div class="mb-5">
+                        <label for="elasticsearch_user_field" class="block mb-2 font-medium text-[0.9rem]">User Name Field</label>
+                        <input type="text" class="ion-input" id="elasticsearch_user_field" name="elasticsearch_user_field" placeholder="e.g. ion.user">
+                        <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Field path containing display names</span>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="elasticsearch_assignment_field">Alert Assignment Field</label>
-                    <input type="text" id="elasticsearch_assignment_field" name="elasticsearch_assignment_field" placeholder="kibana.alert.workflow_user">
-                    <span class="form-help">Field on alert documents to write the assigned user name to</span>
+                <div class="mb-5">
+                    <label for="elasticsearch_assignment_field" class="block mb-2 font-medium text-[0.9rem]">Alert Assignment Field</label>
+                    <input type="text" class="ion-input" id="elasticsearch_assignment_field" name="elasticsearch_assignment_field" placeholder="kibana.alert.workflow_user">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Field on alert documents to write the assigned user name to</span>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["elasticsearch"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -206,51 +206,51 @@
         <!-- GitLab Settings -->
         <section id="gitlab" class="settings-section">
             <h2>GitLab Integration</h2>
-            <p class="section-description">Configure GitLab for template synchronization and version control.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure GitLab for template synchronization and version control.</p>
 
             <form id="gitlab-form" data-submit-action="saveSettings" data-args='["$event", "gitlab"]'>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="gitlab_enabled" name="gitlab_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="gitlab_enabled" name="gitlab_enabled">
                         Enable GitLab Integration
                     </label>
                 </div>
 
-                <div class="form-group">
-                    <label for="gitlab_url">GitLab URL</label>
-                    <input type="url" id="gitlab_url" name="gitlab_url" placeholder="https://gitlab.example.com">
-                    <span class="form-help">Your GitLab instance URL</span>
+                <div class="mb-5">
+                    <label for="gitlab_url" class="block mb-2 font-medium text-[0.9rem]">GitLab URL</label>
+                    <input type="url" class="ion-input" id="gitlab_url" name="gitlab_url" placeholder="https://gitlab.example.com">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Your GitLab instance URL</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="gitlab_token">Personal Access Token</label>
-                    <input type="password" id="gitlab_token" name="gitlab_token" placeholder="Leave blank to keep current">
-                    <span class="form-help" id="gitlab_token_status">Token with 'api' scope required</span>
+                <div class="mb-5">
+                    <label for="gitlab_token" class="block mb-2 font-medium text-[0.9rem]">Personal Access Token</label>
+                    <input type="password" class="ion-input" id="gitlab_token" name="gitlab_token" placeholder="Leave blank to keep current">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="gitlab_token_status">Token with 'api' scope required</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="gitlab_project_id">Project ID or Path</label>
-                    <input type="text" id="gitlab_project_id" name="gitlab_project_id" placeholder="group/project or 123">
-                    <span class="form-help">Project ID number or full path (e.g., "mygroup/myproject")</span>
+                <div class="mb-5">
+                    <label for="gitlab_project_id" class="block mb-2 font-medium text-[0.9rem]">Project ID or Path</label>
+                    <input type="text" class="ion-input" id="gitlab_project_id" name="gitlab_project_id" placeholder="group/project or 123">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Project ID number or full path (e.g., "mygroup/myproject")</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="gitlab_verify_ssl" name="gitlab_verify_ssl" checked>
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="gitlab_verify_ssl" name="gitlab_verify_ssl" checked>
                         Verify SSL Certificate
                     </label>
-                    <span class="form-help">Disable for self-signed certificates</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Disable for self-signed certificates</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="gitlab_sudo_enabled" name="gitlab_sudo_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="gitlab_sudo_enabled" name="gitlab_sudo_enabled">
                         Enable Sudo Impersonation
                     </label>
-                    <span class="form-help">Requires an admin-level API token. Comments and issues will appear as the logged-in ION user in GitLab.</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Requires an admin-level API token. Comments and issues will appear as the logged-in ION user in GitLab.</span>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["gitlab"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -260,36 +260,36 @@
         <!-- OpenCTI Settings -->
         <section id="opencti" class="settings-section">
             <h2>OpenCTI Integration</h2>
-            <p class="section-description">Configure OpenCTI for threat intelligence integration.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure OpenCTI for threat intelligence integration.</p>
 
             <form id="opencti-form" data-submit-action="saveSettings" data-args='["$event", "opencti"]'>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="opencti_enabled" name="opencti_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="opencti_enabled" name="opencti_enabled">
                         Enable OpenCTI Integration
                     </label>
                 </div>
 
-                <div class="form-group">
-                    <label for="opencti_url">OpenCTI URL</label>
-                    <input type="url" id="opencti_url" name="opencti_url" placeholder="http://localhost:8888">
-                    <span class="form-help">Your OpenCTI instance URL</span>
+                <div class="mb-5">
+                    <label for="opencti_url" class="block mb-2 font-medium text-[0.9rem]">OpenCTI URL</label>
+                    <input type="url" class="ion-input" id="opencti_url" name="opencti_url" placeholder="http://localhost:8888">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Your OpenCTI instance URL</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="opencti_token">API Token</label>
-                    <input type="password" id="opencti_token" name="opencti_token" placeholder="Leave blank to keep current">
-                    <span class="form-help" id="opencti_token_status">Bearer token (UUID format)</span>
+                <div class="mb-5">
+                    <label for="opencti_token" class="block mb-2 font-medium text-[0.9rem]">API Token</label>
+                    <input type="password" class="ion-input" id="opencti_token" name="opencti_token" placeholder="Leave blank to keep current">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="opencti_token_status">Bearer token (UUID format)</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="opencti_verify_ssl" name="opencti_verify_ssl">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="opencti_verify_ssl" name="opencti_verify_ssl">
                         Verify SSL Certificate
                     </label>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["opencti"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -299,60 +299,60 @@
         <!-- Kibana Cases Settings -->
         <section id="kibana" class="settings-section">
             <h2>Kibana Cases Integration</h2>
-            <p class="section-description">Configure Kibana for bidirectional case synchronization.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure Kibana for bidirectional case synchronization.</p>
 
             <form id="kibana-form" data-submit-action="saveSettings" data-args='["$event", "kibana"]'>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="kibana_cases_enabled" name="kibana_cases_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="kibana_cases_enabled" name="kibana_cases_enabled">
                         Enable Kibana Cases Integration
                     </label>
                 </div>
 
-                <div class="form-group">
-                    <label for="kibana_url">Kibana URL</label>
-                    <input type="url" id="kibana_url" name="kibana_url" placeholder="http://localhost:5601">
-                    <span class="form-help">Full URL including protocol and port</span>
+                <div class="mb-5">
+                    <label for="kibana_url" class="block mb-2 font-medium text-[0.9rem]">Kibana URL</label>
+                    <input type="url" class="ion-input" id="kibana_url" name="kibana_url" placeholder="http://localhost:5601">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Full URL including protocol and port</span>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="kibana_username">Username</label>
-                        <input type="text" id="kibana_username" name="kibana_username" placeholder="Uses ES credentials if empty">
+                <div class="grid grid-cols-1 min-[601px]:grid-cols-2 gap-4">
+                    <div class="mb-5">
+                        <label for="kibana_username" class="block mb-2 font-medium text-[0.9rem]">Username</label>
+                        <input type="text" class="ion-input" id="kibana_username" name="kibana_username" placeholder="Uses ES credentials if empty">
                     </div>
-                    <div class="form-group">
-                        <label for="kibana_password">Password</label>
-                        <input type="password" id="kibana_password" name="kibana_password" placeholder="Leave blank to keep current">
-                        <span class="form-help" id="kibana_password_status"></span>
+                    <div class="mb-5">
+                        <label for="kibana_password" class="block mb-2 font-medium text-[0.9rem]">Password</label>
+                        <input type="password" class="ion-input" id="kibana_password" name="kibana_password" placeholder="Leave blank to keep current">
+                        <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="kibana_password_status"></span>
                     </div>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="kibana_space_id">Space ID</label>
-                        <input type="text" id="kibana_space_id" name="kibana_space_id" placeholder="default">
-                        <span class="form-help">Kibana space ID (use "default" for the default space)</span>
+                <div class="grid grid-cols-1 min-[601px]:grid-cols-2 gap-4">
+                    <div class="mb-5">
+                        <label for="kibana_space_id" class="block mb-2 font-medium text-[0.9rem]">Space ID</label>
+                        <input type="text" class="ion-input" id="kibana_space_id" name="kibana_space_id" placeholder="default">
+                        <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Kibana space ID (use "default" for the default space)</span>
                     </div>
-                    <div class="form-group">
-                        <label for="kibana_case_owner">Case Owner</label>
-                        <select id="kibana_case_owner" name="kibana_case_owner">
+                    <div class="mb-5">
+                        <label for="kibana_case_owner" class="block mb-2 font-medium text-[0.9rem]">Case Owner</label>
+                        <select class="ion-select" id="kibana_case_owner" name="kibana_case_owner">
                             <option value="securitySolution">Security Solution</option>
                             <option value="observability">Observability</option>
                             <option value="cases">Cases</option>
                         </select>
-                        <span class="form-help">Kibana application that owns the cases</span>
+                        <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Kibana application that owns the cases</span>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="kibana_verify_ssl" name="kibana_verify_ssl" checked>
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="kibana_verify_ssl" name="kibana_verify_ssl" checked>
                         Verify SSL Certificate
                     </label>
-                    <span class="form-help">Disable for self-signed certificates</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Disable for self-signed certificates</span>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["kibana"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -362,43 +362,43 @@
         <!-- DFIR-IRIS Settings -->
         <section id="dfir_iris" class="settings-section">
             <h2>DFIR-IRIS Integration</h2>
-            <p class="section-description">Configure DFIR-IRIS for incident response case escalation.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure DFIR-IRIS for incident response case escalation.</p>
 
             <form id="dfir_iris-form" data-submit-action="saveSettings" data-args='["$event", "dfir_iris"]'>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="dfir_iris_enabled" name="dfir_iris_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="dfir_iris_enabled" name="dfir_iris_enabled">
                         Enable DFIR-IRIS Integration
                     </label>
                 </div>
 
-                <div class="form-group">
-                    <label for="dfir_iris_url">DFIR-IRIS URL</label>
-                    <input type="url" id="dfir_iris_url" name="dfir_iris_url" placeholder="https://iris.example.com">
-                    <span class="form-help">Full URL of your DFIR-IRIS instance</span>
+                <div class="mb-5">
+                    <label for="dfir_iris_url" class="block mb-2 font-medium text-[0.9rem]">DFIR-IRIS URL</label>
+                    <input type="url" class="ion-input" id="dfir_iris_url" name="dfir_iris_url" placeholder="https://iris.example.com">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Full URL of your DFIR-IRIS instance</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="dfir_iris_api_key">API Key</label>
-                    <input type="password" id="dfir_iris_api_key" name="dfir_iris_api_key" placeholder="Leave blank to keep current">
-                    <span class="form-help" id="dfir_iris_api_key_status">Bearer API key from IRIS user profile</span>
+                <div class="mb-5">
+                    <label for="dfir_iris_api_key" class="block mb-2 font-medium text-[0.9rem]">API Key</label>
+                    <input type="password" class="ion-input" id="dfir_iris_api_key" name="dfir_iris_api_key" placeholder="Leave blank to keep current">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="dfir_iris_api_key_status">Bearer API key from IRIS user profile</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="dfir_iris_default_customer">Default Customer ID</label>
-                    <input type="number" id="dfir_iris_default_customer" name="dfir_iris_default_customer" min="1" placeholder="1">
-                    <span class="form-help">Default customer ID for new cases in IRIS</span>
+                <div class="mb-5">
+                    <label for="dfir_iris_default_customer" class="block mb-2 font-medium text-[0.9rem]">Default Customer ID</label>
+                    <input type="number" class="ion-input" id="dfir_iris_default_customer" name="dfir_iris_default_customer" min="1" placeholder="1">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Default customer ID for new cases in IRIS</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="dfir_iris_verify_ssl" name="dfir_iris_verify_ssl" checked>
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="dfir_iris_verify_ssl" name="dfir_iris_verify_ssl" checked>
                         Verify SSL Certificate
                     </label>
-                    <span class="form-help">Disable for self-signed certificates</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Disable for self-signed certificates</span>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["dfir_iris"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -408,49 +408,49 @@
         <!-- TIDE Settings -->
         <section id="tide" class="settings-section">
             <h2>TIDE Integration</h2>
-            <p class="section-description">Configure TIDE (Threat Informed Detection Engineering) for the detection rule catalog, kill chains, and gap analysis.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure TIDE (Threat Informed Detection Engineering) for the detection rule catalog, kill chains, and gap analysis.</p>
 
             <form id="tide-form" data-submit-action="saveSettings" data-args='["$event", "tide"]'>
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="tide_enabled" name="tide_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="tide_enabled" name="tide_enabled">
                         Enable TIDE Integration
                     </label>
                 </div>
 
-                <div class="form-group">
-                    <label for="tide_url">TIDE URL</label>
-                    <input type="url" id="tide_url" name="tide_url" placeholder="https://tide.example.com">
-                    <span class="form-help">Base URL of your TIDE instance (no trailing slash)</span>
+                <div class="mb-5">
+                    <label for="tide_url" class="block mb-2 font-medium text-[0.9rem]">TIDE URL</label>
+                    <input type="url" class="ion-input" id="tide_url" name="tide_url" placeholder="https://tide.example.com">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Base URL of your TIDE instance (no trailing slash)</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="tide_api_key">API Key</label>
-                    <input type="password" id="tide_api_key" name="tide_api_key" placeholder="Leave blank to keep current">
-                    <span class="form-help" id="tide_api_key_status">X-TIDE-API-KEY value used for the external query API</span>
+                <div class="mb-5">
+                    <label for="tide_api_key" class="block mb-2 font-medium text-[0.9rem]">API Key</label>
+                    <input type="password" class="ion-input" id="tide_api_key" name="tide_api_key" placeholder="Leave blank to keep current">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="tide_api_key_status">X-TIDE-API-KEY value used for the external query API</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="tide_space">Space</label>
-                    <input type="text" id="tide_space" name="tide_space" placeholder="default">
-                    <span class="form-help">Kibana space the TIDE rules belong to (e.g. <code>default</code> or <code>production</code>)</span>
+                <div class="mb-5">
+                    <label for="tide_space" class="block mb-2 font-medium text-[0.9rem]">Space</label>
+                    <input type="text" class="ion-input" id="tide_space" name="tide_space" placeholder="default">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Kibana space the TIDE rules belong to (e.g. <code>default</code> or <code>production</code>)</span>
                 </div>
 
-                <div class="form-group">
-                    <label for="tide_client_id">Client ID <span class="form-help-inline">(TIDE 4.x tenant)</span></label>
-                    <input type="text" id="tide_client_id" name="tide_client_id" placeholder="Leave blank for single-tenant keys">
-                    <span class="form-help">TIDE 4.x multi-tenant deployments require the target tenant id. Leave blank if your API key has access to exactly one tenant — ION will auto-resolve it.</span>
+                <div class="mb-5">
+                    <label for="tide_client_id" class="block mb-2 font-medium text-[0.9rem]">Client ID <span class="text-base-content/60 font-normal">(TIDE 4.x tenant)</span></label>
+                    <input type="text" class="ion-input" id="tide_client_id" name="tide_client_id" placeholder="Leave blank for single-tenant keys">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">TIDE 4.x multi-tenant deployments require the target tenant id. Leave blank if your API key has access to exactly one tenant — ION will auto-resolve it.</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="tide_verify_ssl" name="tide_verify_ssl" checked>
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="tide_verify_ssl" name="tide_verify_ssl" checked>
                         Verify SSL Certificate
                     </label>
-                    <span class="form-help">Disable for self-signed certificates</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Disable for self-signed certificates</span>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="button" class="btn btn-secondary" data-click-action="testConnection" data-args='["tide"]'>Test Connection</button>
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
@@ -460,119 +460,119 @@
         <!-- Arkime Settings -->
         <section id="arkime" class="settings-section">
             <h2>Arkime Integration</h2>
-            <p class="section-description">Configure Arkime for PCAP download and session search from alerts.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure Arkime for PCAP download and session search from alerts.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "arkime"]'>
-                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_enabled" name="arkime_enabled"> Enable Arkime Integration</label></div>
-                <div class="form-group"><label for="arkime_url">Arkime URL</label><input type="url" id="arkime_url" name="arkime_url" placeholder="https://viewer.guardedglass.internal"></div>
-                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="arkime_verify_ssl" name="arkime_verify_ssl"> Verify SSL Certificate</label></div>
+                <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="arkime_enabled" name="arkime_enabled"> Enable Arkime Integration</label></div>
+                <div class="mb-5"><label for="arkime_url" class="block mb-2 font-medium text-[0.9rem]">Arkime URL</label><input type="url" class="ion-input" id="arkime_url" name="arkime_url" placeholder="https://viewer.guardedglass.internal"></div>
+                <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="arkime_verify_ssl" name="arkime_verify_ssl"> Verify SSL Certificate</label></div>
                 <h3 class="_ion-s-0cf8f93b0e">Authentication (HTTP Basic)</h3>
-                <div class="form-group"><label for="arkime_username">Username</label><input type="text" id="arkime_username" name="arkime_username" placeholder="admin"></div>
-                <div class="form-group"><label for="arkime_password">Password</label><input type="password" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
-                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                <div class="mb-5"><label for="arkime_username" class="block mb-2 font-medium text-[0.9rem]">Username</label><input type="text" class="ion-input" id="arkime_username" name="arkime_username" placeholder="admin"></div>
+                <div class="mb-5"><label for="arkime_password" class="block mb-2 font-medium text-[0.9rem]">Password</label><input type="password" class="ion-input" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
         </section>
 
         <!-- Ollama AI Settings -->
         <section id="ollama" class="settings-section">
             <h2>Ollama AI</h2>
-            <p class="section-description">Configure the Ollama LLM for AI chat, morning briefing narratives, and training plan generation.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure the Ollama LLM for AI chat, morning briefing narratives, and training plan generation.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "ollama"]'>
-                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ollama_enabled" name="ollama_enabled"> Enable Ollama AI</label></div>
-                <div class="form-group"><label for="ollama_url">Ollama URL</label><input type="url" id="ollama_url" name="ollama_url" placeholder="http://ollama-host:11434"></div>
-                <div class="form-group"><label for="ollama_model">Model</label><input type="text" id="ollama_model" name="ollama_model" placeholder="qwen2.5:3b"></div>
-                <div class="form-group"><label for="ollama_timeout">Timeout (seconds)</label><input type="number" id="ollama_timeout" name="ollama_timeout" min="10" max="600" placeholder="120"></div>
-                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="ollama_verify_ssl" name="ollama_verify_ssl"> Verify SSL Certificate</label></div>
-                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="ollama_enabled" name="ollama_enabled"> Enable Ollama AI</label></div>
+                <div class="mb-5"><label for="ollama_url" class="block mb-2 font-medium text-[0.9rem]">Ollama URL</label><input type="url" class="ion-input" id="ollama_url" name="ollama_url" placeholder="http://ollama-host:11434"></div>
+                <div class="mb-5"><label for="ollama_model" class="block mb-2 font-medium text-[0.9rem]">Model</label><input type="text" class="ion-input" id="ollama_model" name="ollama_model" placeholder="qwen2.5:3b"></div>
+                <div class="mb-5"><label for="ollama_timeout" class="block mb-2 font-medium text-[0.9rem]">Timeout (seconds)</label><input type="number" class="ion-input" id="ollama_timeout" name="ollama_timeout" min="10" max="600" placeholder="120"></div>
+                <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="ollama_verify_ssl" name="ollama_verify_ssl"> Verify SSL Certificate</label></div>
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
         </section>
 
         <!-- AbuseIPDB Settings -->
         <section id="abuseipdb" class="settings-section">
             <h2>AbuseIPDB</h2>
-            <p class="section-description">IP address reputation lookups for observable enrichment.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">IP address reputation lookups for observable enrichment.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "abuseipdb"]'>
-                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="abuseipdb_enabled" name="abuseipdb_enabled"> Enable AbuseIPDB</label></div>
-                <div class="form-group"><label for="abuseipdb_api_key">API Key</label><input type="password" id="abuseipdb_api_key" name="abuseipdb_api_key" placeholder="Leave blank to keep current"><span class="form-help" id="abuseipdb_api_key_status"></span></div>
-                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="abuseipdb_enabled" name="abuseipdb_enabled"> Enable AbuseIPDB</label></div>
+                <div class="mb-5"><label for="abuseipdb_api_key" class="block mb-2 font-medium text-[0.9rem]">API Key</label><input type="password" class="ion-input" id="abuseipdb_api_key" name="abuseipdb_api_key" placeholder="Leave blank to keep current"><span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="abuseipdb_api_key_status"></span></div>
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
         </section>
 
         <!-- VirusTotal Settings -->
         <section id="virustotal" class="settings-section">
             <h2>VirusTotal</h2>
-            <p class="section-description">File hash and URL reputation lookups for observable enrichment.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">File hash and URL reputation lookups for observable enrichment.</p>
             <form data-submit-action="saveSettings" data-args='["$event", "virustotal"]'>
-                <div class="form-group"><label class="checkbox-label"><input type="checkbox" id="virustotal_enabled" name="virustotal_enabled"> Enable VirusTotal</label></div>
-                <div class="form-group"><label for="virustotal_api_key">API Key</label><input type="password" id="virustotal_api_key" name="virustotal_api_key" placeholder="Leave blank to keep current"><span class="form-help" id="virustotal_api_key_status"></span></div>
-                <div class="form-actions"><button type="submit" class="btn btn-primary">Save Changes</button></div>
+                <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="virustotal_enabled" name="virustotal_enabled"> Enable VirusTotal</label></div>
+                <div class="mb-5"><label for="virustotal_api_key" class="block mb-2 font-medium text-[0.9rem]">API Key</label><input type="password" class="ion-input" id="virustotal_api_key" name="virustotal_api_key" placeholder="Leave blank to keep current"><span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="virustotal_api_key_status"></span></div>
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
             </form>
         </section>
 
         <!-- OIDC Settings -->
         <section id="oidc" class="settings-section">
             <h2>OIDC / Keycloak Authentication</h2>
-            <p class="section-description">Configure single sign-on with Keycloak or other OIDC providers.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Configure single sign-on with Keycloak or other OIDC providers.</p>
 
             <form id="oidc-form" data-submit-action="saveSettings" data-args='["$event", "oidc"]'>
-                <div class="form-group">
-                    <label for="base_url">ION Base URL</label>
-                    <input type="url" id="base_url" name="base_url" placeholder="https://ion.example.org">
-                    <span class="form-help">External URL of this ION instance. Used to build the OIDC redirect URI. Must match Keycloak's "Valid Redirect URIs" setting.</span>
+                <div class="mb-5">
+                    <label for="base_url" class="block mb-2 font-medium text-[0.9rem]">ION Base URL</label>
+                    <input type="url" class="ion-input" id="base_url" name="base_url" placeholder="https://ion.example.org">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">External URL of this ION instance. Used to build the OIDC redirect URI. Must match Keycloak's "Valid Redirect URIs" setting.</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="oidc_enabled" name="oidc_enabled">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="oidc_enabled" name="oidc_enabled">
                         Enable OIDC Authentication
                     </label>
                 </div>
 
-                <div class="form-group">
-                    <label for="oidc_keycloak_url">Keycloak URL</label>
-                    <input type="url" id="oidc_keycloak_url" name="oidc_keycloak_url" placeholder="https://keycloak.example.com">
-                    <span class="form-help">Base URL of your Keycloak server</span>
+                <div class="mb-5">
+                    <label for="oidc_keycloak_url" class="block mb-2 font-medium text-[0.9rem]">Keycloak URL</label>
+                    <input type="url" class="ion-input" id="oidc_keycloak_url" name="oidc_keycloak_url" placeholder="https://keycloak.example.com">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Base URL of your Keycloak server</span>
                 </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="oidc_realm">Realm</label>
-                        <input type="text" id="oidc_realm" name="oidc_realm" placeholder="master">
+                <div class="grid grid-cols-1 min-[601px]:grid-cols-2 gap-4">
+                    <div class="mb-5">
+                        <label for="oidc_realm" class="block mb-2 font-medium text-[0.9rem]">Realm</label>
+                        <input type="text" class="ion-input" id="oidc_realm" name="oidc_realm" placeholder="master">
                     </div>
-                    <div class="form-group">
-                        <label for="oidc_client_id">Client ID</label>
-                        <input type="text" id="oidc_client_id" name="oidc_client_id" placeholder="ion">
+                    <div class="mb-5">
+                        <label for="oidc_client_id" class="block mb-2 font-medium text-[0.9rem]">Client ID</label>
+                        <input type="text" class="ion-input" id="oidc_client_id" name="oidc_client_id" placeholder="ion">
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label for="oidc_client_secret">Client Secret</label>
-                    <input type="password" id="oidc_client_secret" name="oidc_client_secret" placeholder="Leave blank to keep current">
-                    <span class="form-help" id="oidc_client_secret_status"></span>
+                <div class="mb-5">
+                    <label for="oidc_client_secret" class="block mb-2 font-medium text-[0.9rem]">Client Secret</label>
+                    <input type="password" class="ion-input" id="oidc_client_secret" name="oidc_client_secret" placeholder="Leave blank to keep current">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60" id="oidc_client_secret_status"></span>
                 </div>
 
-                <div class="form-group">
-                    <label for="oidc_role_claim">Role Claim Path</label>
-                    <input type="text" id="oidc_role_claim" name="oidc_role_claim" placeholder="realm_access.roles">
-                    <span class="form-help">JWT claim path for user roles</span>
+                <div class="mb-5">
+                    <label for="oidc_role_claim" class="block mb-2 font-medium text-[0.9rem]">Role Claim Path</label>
+                    <input type="text" class="ion-input" id="oidc_role_claim" name="oidc_role_claim" placeholder="realm_access.roles">
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">JWT claim path for user roles</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="oidc_auto_create_users" name="oidc_auto_create_users">
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="oidc_auto_create_users" name="oidc_auto_create_users">
                         Auto-create Users on First Login
                     </label>
-                    <span class="form-help">Automatically create user accounts for new OIDC users</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Automatically create user accounts for new OIDC users</span>
                 </div>
 
-                <div class="form-group">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="oidc_verify_ssl" name="oidc_verify_ssl" checked>
+                <div class="mb-5">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="oidc_verify_ssl" name="oidc_verify_ssl" checked>
                         Verify SSL Certificate
                     </label>
-                    <span class="form-help">Disable for self-signed certificates</span>
+                    <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Disable for self-signed certificates</span>
                 </div>
 
-                <div class="form-actions">
+                <div class="flex gap-3 mt-6 pt-6 border-t border-base-300">
                     <button type="submit" class="btn btn-primary">Save Changes</button>
                 </div>
             </form>
@@ -581,13 +581,13 @@
         <!-- Active Sessions -->
         <section id="sessions" class="settings-section">
             <h2>Active Sessions</h2>
-            <p class="section-description">View active user sessions. Users shown have logged in recently.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">View active user sessions. Users shown have logged in recently.</p>
 
-            <div class="sessions-actions">
+            <div class="mb-4">
                 <button class="btn btn-secondary" data-click-action="loadSessions">Refresh</button>
             </div>
 
-            <div id="sessions-list" class="sessions-list">
+            <div id="sessions-list" class="bg-base-100 border border-base-300 rounded overflow-hidden">
                 <div class="loading">Loading sessions...</div>
             </div>
         </section>
@@ -595,38 +595,38 @@
         <!-- Database Management -->
         <section id="database" class="settings-section">
             <h2>Database Management</h2>
-            <p class="section-description">View database statistics, create backups, and manage data.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">View database statistics, create backups, and manage data.</p>
 
             <!-- Database Stats -->
-            <div class="db-section">
-                <h3>Statistics</h3>
-                <div id="db-stats" class="info-grid">
+            <div class="mb-8 pb-6 border-b border-base-300 last:mb-0 last:pb-0 last:border-b-0">
+                <h3 class="text-base font-medium mb-4">Statistics</h3>
+                <div id="db-stats" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
                     <div class="loading">Loading...</div>
                 </div>
             </div>
 
             <!-- Backup Actions -->
-            <div class="db-section">
-                <h3>Backup & Restore</h3>
-                <div class="db-actions">
+            <div class="mb-8 pb-6 border-b border-base-300 last:mb-0 last:pb-0 last:border-b-0">
+                <h3 class="text-base font-medium mb-4">Backup & Restore</h3>
+                <div class="flex gap-3 mb-4">
                     <button class="btn btn-primary" data-click-action="createBackup">Create Backup</button>
                     <button class="btn btn-secondary" data-click-action="loadBackups">Refresh List</button>
                 </div>
 
-                <div id="backups-list" class="backups-list">
+                <div id="backups-list" class="bg-base-100 border border-base-300 rounded overflow-hidden">
                     <div class="loading">Loading backups...</div>
                 </div>
             </div>
 
             <!-- Cleanup -->
-            <div class="db-section">
-                <h3>Data Cleanup</h3>
-                <p class="section-description">Remove old logs and temporary data to free up space.</p>
-                <div class="cleanup-form">
-                    <div class="form-group _ion-s-8d1f4ab850">
-                        <label for="cleanup-days">Keep data from last</label>
+            <div class="mb-8 pb-6 border-b border-base-300 last:mb-0 last:pb-0 last:border-b-0">
+                <h3 class="text-base font-medium mb-4">Data Cleanup</h3>
+                <p class="text-base-content/60 mb-6 text-[0.9rem]">Remove old logs and temporary data to free up space.</p>
+                <div class="flex items-end gap-4">
+                    <div class="_ion-s-8d1f4ab850 mb-5">
+                        <label for="cleanup-days" class="block mb-2 font-medium text-[0.9rem]">Keep data from last</label>
                         <div class="_ion-s-85056bada5">
-                            <input class="_ion-s-1b3b307987" type="number" id="cleanup-days" value="30" min="1" max="365">
+                            <input class="_ion-s-1b3b307987 ion-input" type="number" id="cleanup-days" value="30" min="1" max="365">
                             <span>days</span>
                         </div>
                     </div>
@@ -638,22 +638,22 @@
         <!-- System Information -->
         <section id="system" class="settings-section">
             <h2>System Information</h2>
-            <p class="section-description">View system details, technologies, and environment information.</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">View system details, technologies, and environment information.</p>
 
             <h3>Technologies Used</h3>
-            <div id="tech-stack" class="info-grid">
+            <div id="tech-stack" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
                 <div class="loading">Loading technologies...</div>
             </div>
 
             <h3 class="_ion-s-cee5c5825a">System Details</h3>
-            <div id="system-info" class="info-grid">
+            <div id="system-info" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
                 <div class="loading">Loading system information...</div>
             </div>
 
             <h3 class="_ion-s-cee5c5825a">Environment Variables</h3>
-            <p class="section-description">ION-related environment variables (sensitive values masked).</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">ION-related environment variables (sensitive values masked).</p>
 
-            <div id="env-vars" class="env-vars-list">
+            <div id="env-vars" class="bg-base-100 border border-base-300 rounded p-4 max-h-[300px] overflow-y-auto">
                 <div class="loading">Loading...</div>
             </div>
         </section>
@@ -661,10 +661,10 @@
         <!-- System Logs -->
         <section id="logs" class="settings-section">
             <h2>System Logs</h2>
-            <p class="section-description">Recent application logs from the server (last 2000 entries buffered in memory).</p>
+            <p class="text-base-content/60 mb-6 text-[0.9rem]">Recent application logs from the server (last 2000 entries buffered in memory).</p>
 
-            <div class="logs-toolbar">
-                <select id="log-level-filter" data-change-action="loadSystemLogs">
+            <div class="flex gap-2 items-center flex-wrap mb-4">
+                <select class="ion-select" id="log-level-filter" data-change-action="loadSystemLogs">
                     <option value="">All Levels</option>
                     <option value="DEBUG">DEBUG</option>
                     <option value="INFO">INFO</option>
@@ -672,8 +672,8 @@
                     <option value="ERROR">ERROR+</option>
                     <option value="CRITICAL">CRITICAL</option>
                 </select>
-                <input type="text" id="log-search" placeholder="Search logs..." data-enter-key-action="loadSystemLogs">
-                <select id="log-limit">
+                <input type="text" class="ion-input flex-1 min-w-[150px]" id="log-search" placeholder="Search logs..." data-enter-key-action="loadSystemLogs">
+                <select class="ion-select" id="log-limit">
                     <option value="100">100 entries</option>
                     <option value="200" selected>200 entries</option>
                     <option value="500">500 entries</option>
@@ -681,11 +681,11 @@
                 </select>
                 <button class="btn btn-sm" data-click-action="loadSystemLogs">Refresh</button>
                 <label class="_ion-s-ae67ec2b38">
-                    <input type="checkbox" id="log-auto-refresh"> Auto-refresh (10s)
+                    <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="log-auto-refresh"> Auto-refresh (10s)
                 </label>
             </div>
 
-            <div id="logs-container" class="logs-container">
+            <div id="logs-container" class="bg-base-100 border border-base-300 rounded-lg max-h-[600px] overflow-y-auto font-mono text-[0.78rem] leading-[1.5]">
                 <div class="loading">Click Refresh or select this tab to load logs...</div>
             </div>
             <div class="_ion-s-992dc32f95" id="logs-count"></div>
