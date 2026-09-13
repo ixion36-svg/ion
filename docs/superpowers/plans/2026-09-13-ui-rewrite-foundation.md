@@ -55,7 +55,7 @@ Grok is not used in Tasks 1–3. Delegating foundation work before the harness e
 
 1. A `[data-mode="light"]` block that reassigns `--color-ink-*` so every `bg-ink-*` / `text-ink-*` utility flips automatically.
 2. Shell tokens (`--ion-bg`, `--ion-surface`, `--ion-text`, borders, scrollbars, selection, radial backgrounds).
-3. **31 explicit patch rules** for utilities Tailwind bakes literally — `text-white`, `bg-white/5`, `border-white/5`. There is no variable to override for these, so the var flip cannot reach them. The list was built from a grep across templates.
+3. **13 explicit patch selectors** for utilities Tailwind bakes literally — `text-white`, `bg-white/5`, `border-white/5`. There is no variable to override for these, so the var flip cannot reach them. The list was built from a grep across templates.
 4. A `[data-mode="light"] body` override, because `style.css` hardcodes the body background to `#07080c`.
 
 - [ ] **Step 1: Write the failing parity test**
@@ -67,8 +67,9 @@ Create `tests/test_ui_rewrite_theme_parity.py`:
 
 tailwind.input.css is 13KB of which only the first ~30 lines are tokens. The
 rest is accumulated light-mode machinery: the ink-ramp flip, shell tokens, and
-31 explicit patches for utilities Tailwind bakes literally (text-white,
-bg-white/5, border-white/5) which no CSS-variable override can reach.
+13 explicit patch selectors for utilities Tailwind bakes literally
+(text-white, bg-white/5, border-white/5) which no CSS-variable override can
+reach.
 
 A clean-slate rewrite input that carries only the tokens regresses light mode
 across the entire app, and does so silently — the page still renders, it is
@@ -82,11 +83,22 @@ CURRENT = Path("frontend/tailwind.input.css")
 REWRITE = Path("frontend/tailwind-daisy.input.css")
 
 
+def _strip_comments(css: str) -> str:
+    """Remove /* ... */ blocks.
+
+    Both files discuss [data-mode="light"] in prose. Without this, the selector
+    regex below matches inside a comment and runs on to the next real `{`,
+    inventing a selector that was never dropped. That produced a false failure
+    on the first run of this test.
+    """
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+
+
 def _light_selectors(css: str) -> set[str]:
     """Every selector carrying a [data-mode="light"] qualifier."""
     return {
         m.group(0).strip()
-        for m in re.finditer(r'\[data-mode="light"\][^{]*(?={)', css)
+        for m in re.finditer(r'\[data-mode="light"\][^{;}]*(?={)', _strip_comments(css))
     }
 
 
@@ -129,7 +141,7 @@ def test_rewrite_overrides_the_hardcoded_body_background():
 
 Run: `source .venv/Scripts/activate && python -m pytest tests/test_ui_rewrite_theme_parity.py -q`
 
-Expected: FAIL. `test_rewrite_carries_a_light_mode_block`, the ink-ramp test, the patch-parity test and the body test all fail, because `tailwind-daisy.input.css` currently has no `[data-mode="light"]` content at all. The patch-parity failure should list roughly 31 dropped selectors.
+Expected: FAIL. `test_rewrite_carries_a_light_mode_block`, the ink-ramp test, the patch-parity test and the body test all fail, because `tailwind-daisy.input.css` currently has no `[data-mode="light"]` content at all. The patch-parity failure should list 13 dropped selectors.
 
 - [ ] **Step 3: Port the light-mode apparatus**
 
@@ -140,7 +152,7 @@ Port these regions verbatim, then adapt:
 ```bash
 # Inspect the regions to port — do not guess at their content
 sed -n '85,250p'  frontend/tailwind.input.css   # [data-mode="light"] block: shell tokens + ink flip
-sed -n '250,$p'   frontend/tailwind.input.css   # the 31 literally-baked utility patches
+sed -n '250,$p'   frontend/tailwind.input.css   # the literally-baked utility patches (13 selectors)
 ```
 
 Two adaptations are required, and only two:
@@ -170,7 +182,7 @@ git add frontend/tailwind-daisy.input.css tests/test_ui_rewrite_theme_parity.py 
 git commit -m "feat(ui): port light-mode apparatus into the rewrite stylesheet
 
 tailwind.input.css is 13KB of which only ~30 lines are tokens; the rest is
-accumulated light-mode fixes — the ink-ramp flip, shell tokens, and 31 explicit
+accumulated light-mode fixes — the ink-ramp flip, shell tokens, and 13 explicit
 patches for utilities Tailwind bakes literally (text-white, bg-white/5) that no
 variable override can reach.
 

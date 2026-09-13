@@ -1,0 +1,97 @@
+"""The rewrite's stylesheet input must not silently drop light-mode support.
+
+tailwind.input.css is 13KB of which only the first ~30 lines are tokens. The
+rest is accumulated light-mode machinery: the ink-ramp flip, shell tokens, and
+13 explicit patch selectors for utilities Tailwind bakes literally
+(text-white, bg-white/5, border-white/5) which no CSS-variable override can
+reach.
+
+A clean-slate rewrite input that carries only the tokens regresses light mode
+across the entire app, and does so silently — the page still renders, it is
+just unreadable. A proof build on 2026-09-13 rendered accent text at roughly
+1.6:1 contrast on white. This test is the guard.
+"""
+
+import re
+from pathlib import Path
+
+CURRENT = Path("frontend/tailwind.input.css")
+REWRITE = Path("frontend/tailwind-daisy.input.css")
+
+
+def _strip_comments(css: str) -> str:
+    """Remove /* ... */ blocks.
+
+    Both files discuss [data-mode="light"] in prose. Without this, the selector
+    regex below matches inside a comment and runs on to the next real `{`,
+    inventing a selector that was never dropped. That produced a false failure
+    on the first run of this test.
+    """
+    return re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+
+
+def _light_selectors(css: str) -> set[str]:
+    """Every selector carrying a [data-mode="light"] qualifier."""
+    return {
+        m.group(0).strip()
+        for m in re.finditer(r'\[data-mode="light"\][^{;}]*(?={)', _strip_comments(css))
+    }
+
+
+def test_rewrite_input_exists():
+    assert REWRITE.is_file()
+
+
+def test_rewrite_carries_a_light_mode_block():
+    assert '[data-mode="light"]' in REWRITE.read_text(encoding="utf-8")
+
+
+def test_rewrite_flips_the_ink_ramp_for_light_mode():
+    """bg-ink-* utilities cascade off --color-ink-*; if those do not flip,
+    every dark surface stays dark on a white page."""
+    css = REWRITE.read_text(encoding="utf-8")
+    light = css.split('[data-mode="light"]', 1)[1]
+    for token in ("--color-ink-950", "--color-ink-900", "--color-ink-800",
+                  "--color-ink-700", "--color-ink-600"):
+        assert token in light, f"{token} is not flipped for light mode"
+
+
+def test_rewrite_patches_every_literally_baked_utility_the_current_build_does():
+    """Tailwind compiles text-white / bg-white/5 to literal values, so the
+    variable flip cannot reach them. Each one the current build patches must
+    still be patched, or it renders white-on-white."""
+    current = _light_selectors(CURRENT.read_text(encoding="utf-8"))
+    rewrite = _light_selectors(REWRITE.read_text(encoding="utf-8"))
+    missing = current - rewrite
+    assert not missing, f"light-mode patches dropped by the rewrite: {sorted(missing)}"
+
+
+def test_rewrite_flips_the_ion_accent_ramp_for_light_mode():
+    """A fix-forward, NOT a parity check — tailwind.input.css does not do this.
+
+    The original left --color-ion-* at their dark-mode values in light mode, so
+    text-ion-cyan rendered #6de4ff on a white page: measured 1.38:1, against
+    WCAG AA's 4.5:1. ion-lime measured 1.31:1, ion-amber 1.70:1. `text-ion-*`
+    appears 370 times across 70 of the 114 templates, so this was widespread
+    rather than a corner case. After the flip the same three measured 4.50,
+    5.03 and 4.13.
+
+    Deliberately asserted only against the rewrite stylesheet. Applying it to
+    tailwind.input.css would change every page in the current build, which is
+    not this plan's scope.
+    """
+    css = REWRITE.read_text(encoding="utf-8")
+    light = css.split('[data-mode="light"]', 1)[1]
+    for token in ("--color-ion-cyan", "--color-ion-amber", "--color-ion-coral",
+                  "--color-ion-lime", "--color-ion-iris"):
+        assert token in light, (
+            f"{token} is not flipped for light mode; text-{token[8:]} will render "
+            "at roughly 1.3-1.7:1 contrast on a light surface"
+        )
+
+
+def test_rewrite_overrides_the_hardcoded_body_background():
+    """style.css hardcodes body to #07080c. Without this override everything
+    outside .ion-tw-page reads as dark on a light page."""
+    css = REWRITE.read_text(encoding="utf-8")
+    assert re.search(r'\[data-mode="light"\]\s+body', css)
