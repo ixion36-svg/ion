@@ -179,6 +179,9 @@
   "de_workbench.html": {
     "restyle": true
   },
+  "detection_engineering.html": {
+    "restyle": true
+  },
   "detection_health.html": {
     "restyle": true
   },
