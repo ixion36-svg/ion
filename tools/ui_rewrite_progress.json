@@ -260,6 +260,9 @@
   "pcap.html": {
     "restyle": true
   },
+  "playbooks.html": {
+    "restyle": true
+  },
   "profile.html": {
     "convert": true,
     "restyle": true

@@ -21,27 +21,27 @@
 </section>
 
 <!-- Tab Navigation -->
-<div class="tab-nav">
+<div class="flex mb-6 border-b-2 border-base-300">
     <button class="tab-btn active" data-tab="library" data-click-action="switchTab" data-args='["library"]'>Playbook Library</button>
     <button class="tab-btn" data-tab="executions" data-click-action="switchTab" data-args='["executions"]'>
-        Active Executions <span class="tab-badge _ion-s-c8be1ccba6" id="executions-badge">0</span>
+        Active Executions <span class="badge badge-primary badge-sm _ion-s-c8be1ccba6" id="executions-badge">0</span>
     </button>
 </div>
 
 <!-- TAB: Playbook Library -->
 <div class="tab-content" id="tab-library">
-    <section class="section">
-        <div class="section-header">
+    <section class="bg-base-200 rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
             <h2>Playbooks</h2>
-            <div class="filter-controls">
+            <div class="flex items-center gap-4">
                 <label class="checkbox-label">
                     <input type="checkbox" id="filter-active-only" checked data-change-action="loadPlaybooks">
                     Active only
                 </label>
             </div>
         </div>
-        <div class="table-container">
-            <table class="ion-table data-table" id="playbooks-table">
+        <div class="overflow-x-auto">
+            <table class="table table-sm" id="playbooks-table">
                 <thead>
                     <tr>
                         <th>Name</th>
@@ -62,10 +62,10 @@
 
 <!-- TAB: Active Executions -->
 <div class="tab-content _ion-s-c8be1ccba6" id="tab-executions">
-    <section class="section">
-        <div class="section-header">
+    <section class="bg-base-200 rounded-lg p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
             <h2>Playbook Executions</h2>
-            <div class="filter-controls">
+            <div class="flex items-center gap-4">
                 <select id="exec-status-filter" class="ion-select _ion-s-2f8e8ab1f2" data-change-action="loadExecutions">
                     <option value="">All Statuses</option>
                     <option value="in_progress" selected>In Progress</option>
@@ -75,8 +75,8 @@
                 </select>
             </div>
         </div>
-        <div class="table-container">
-            <table class="ion-table data-table" id="executions-table">
+        <div class="overflow-x-auto">
+            <table class="table table-sm" id="executions-table">
                 <thead>
                     <tr>
                         <th>Playbook</th>
@@ -96,26 +96,26 @@
     </section>
     <!-- Inline execution detail panel -->
     <div class="exec-detail-panel _ion-s-c8be1ccba6" id="exec-detail-panel">
-        <div class="exec-detail-header">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-base-300">
             <h3 id="exec-detail-title">Execution Details</h3>
-            <button class="modal-close" data-click-action="closeExecDetail">&times;</button>
+            <button class="bg-transparent border-none text-2xl cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closeExecDetail">&times;</button>
         </div>
         <div class="exec-detail-body" id="exec-detail-body"></div>
     </div>
 </div>
 
 <!-- Create/Edit Playbook Modal -->
-<div class="modal-overlay _ion-s-f2892a2e8a" id="playbook-modal">
-    <div class="modal-dialog modal-large">
-        <div class="modal-header">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 _ion-s-f2892a2e8a" id="playbook-modal">
+    <div class="bg-base-100 rounded-lg w-full max-w-[800px] max-h-[90vh] overflow-y-auto shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-base-300">
             <h3 id="playbook-modal-title">Create Playbook</h3>
-            <button class="modal-close" data-click-action="closePlaybookModal">&times;</button>
+            <button class="bg-transparent border-none text-2xl cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closePlaybookModal">&times;</button>
         </div>
-        <div class="modal-body">
+        <div class="p-6">
             <form id="playbook-form">
                 <!-- Basic Info -->
-                <div class="form-section">
-                    <h4>Basic Information</h4>
+                <div class="mb-6 pb-6 border-b border-base-300 last:border-b-0 last:mb-0">
+                    <h4 class="mb-4 text-primary">Basic Information</h4>
                     <div class="form-row">
                         <div class="form-group _ion-s-c2d2e263dc">
                             <label for="playbook-name">Name *</label>
@@ -139,9 +139,9 @@
                 </div>
 
                 <!-- Trigger Conditions -->
-                <div class="form-section">
-                    <h4>Trigger Conditions</h4>
-                    <p class="form-help">Define when this playbook should be recommended for an alert. Leave empty to match all alerts.</p>
+                <div class="mb-6 pb-6 border-b border-base-300 last:border-b-0 last:mb-0">
+                    <h4 class="mb-4 text-primary">Trigger Conditions</h4>
+                    <p class="text-[0.85rem] text-base-content/60 mb-4">Define when this playbook should be recommended for an alert. Leave empty to match all alerts.</p>
 
                     <div class="form-group">
                         <label for="trigger-rule-patterns">Rule Name Patterns (regex, one per line)</label>
@@ -150,7 +150,7 @@
 
                     <div class="form-group">
                         <label>Severities</label>
-                        <div class="checkbox-group">
+                        <div class="flex flex-wrap gap-4">
                             <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="critical"> Critical</label>
                             <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="high"> High</label>
                             <label class="checkbox-label"><input type="checkbox" class="trigger-severity" value="medium"> Medium</label>
@@ -171,14 +171,14 @@
                 </div>
 
                 <!-- Steps -->
-                <div class="form-section">
-                    <h4>Steps</h4>
+                <div class="mb-6 pb-6 border-b border-base-300 last:border-b-0 last:mb-0">
+                    <h4 class="mb-4 text-primary">Steps</h4>
                     <div id="steps-container"></div>
                     <button type="button" class="btn btn-sm" data-click-action="addStep">+ Add Step</button>
                 </div>
             </form>
         </div>
-        <div class="modal-footer">
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-base-300">
             <button class="ion-btn" data-click-action="closePlaybookModal">Cancel</button>
             <button class="ion-btn ion-btn-primary" data-click-action="savePlaybook">Save Playbook</button>
         </div>
@@ -186,16 +186,16 @@
 </div>
 
 <!-- View Playbook Modal -->
-<div class="modal-overlay _ion-s-f2892a2e8a" id="view-playbook-modal">
-    <div class="modal-dialog modal-large">
-        <div class="modal-header">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 _ion-s-f2892a2e8a" id="view-playbook-modal">
+    <div class="bg-base-100 rounded-lg w-full max-w-[800px] max-h-[90vh] overflow-y-auto shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-base-300">
             <h3 id="view-playbook-title">Playbook Details</h3>
-            <button class="modal-close" data-click-action="closeViewModal">&times;</button>
+            <button class="bg-transparent border-none text-2xl cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closeViewModal">&times;</button>
         </div>
-        <div class="modal-body" id="view-playbook-body">
+        <div class="p-6" id="view-playbook-body">
             <!-- Populated by JS -->
         </div>
-        <div class="modal-footer">
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-base-300">
             <button class="ion-btn" data-click-action="closeViewModal">Close</button>
         </div>
     </div>
