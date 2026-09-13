@@ -1,13 +1,79 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.92.0 -->
-<!-- ion-doc:version=0.92.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.93.0 -->
+<!-- ion-doc:version=0.93.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-13 -->
+<!-- ion-doc:date=2026-09-14 -->
 
 # Changelog
+
+## v0.93.0 — 2026-09-14
+
+**Tailwind + daisyUI as the styling system.** 110 of 114 templates restyled;
+the four excluded are the email and PDF exporters, which emit standalone
+documents with their own inline styling and never load the app stylesheet.
+`base.html` now links five stylesheets instead of eight.
+
+- **`ion.css` is the single build**, compiled by the standalone Tailwind binary
+  from `frontend/tailwind-daisy.input.css`. No Node toolchain is involved.
+  daisyUI 5 is vendored and imported as plain CSS, and its semantic slots are
+  mapped onto ION's own tokens in `frontend/ion-daisy-theme.css`, so
+  `btn-primary` renders ION cyan rather than daisyUI violet.
+- **Retired:** `ion-ui.css`, the second `tailwind.css` build,
+  `design-system.css`, and the `style.css` link. What survived `style.css` is
+  `frontend/ion-legacy.css`, compiled into `ion.css` immediately before the
+  Tailwind utilities so utilities still win. `design-system.css` was deleted
+  outright: all thirty of its selectors were gated on a `.ds-card` /
+  `.ds-badge` / `.ds-skeleton` ancestor that no element in the app carries.
+- **The eight accent themes still drive everything.** daisyUI's
+  `--color-primary` and friends derive from ION's `--primary`, `--success`,
+  `--warning`, `--danger` and `--info`, so `[data-theme="purple"]` recolours
+  daisyUI components as well as ION ones.
+
+**Silent bugs this uncovered.** None of these failed a test or logged anything;
+several had been shipping for many releases.
+
+- **`.loading` was hijacking 211 elements across all 114 pages.** daisyUI
+  defines `.loading` as a masked spinner. ION uses it as a text class, so every
+  "Loading..." string was being replaced by a blank masked box.
+- **Borders were 0px app-wide.** ION's `--border` held a colour and daisyUI's
+  held a width, so `1px solid var(--border)` resolved to `1px solid 1px`, which
+  is invalid and dropped. ION's token is now `--ion-border`.
+- **`--radius-lg` was 14px against Tailwind's 0.5rem**, so every `rounded-lg`
+  was the wrong size.
+- **23 rules contained JavaScript instead of a value.** The v0.31.21
+  inline-style migration emitted the string that built the style, for example
+  `flex:' + slaCounts.green + '`. Browsers drop the declaration and keep the
+  rest of the rule, so the SLA bar on the cases board never proportioned,
+  progress bars had no width, and severity, TLP, closure and verdict badges had
+  no colour. Those declarations now travel in a `data-ion-style` attribute and
+  are applied through `el.style.setProperty`, which CSP allows.
+- **`var(--accent)` was undefined**, so the pcap progress bar never had a fill.
+- **A bare `select { background; color }`** was defeating Tailwind colour
+  utilities on every select in the app.
+- **The Tailwind content scan had no `@source`**, so it walked the whole
+  repository and compiled class names out of the changelog, the docs and the
+  migration tools' own data files. `source(none)` plus explicit globs fixes it.
+  Note that `@source` alone does not: it adds to the automatic scan rather than
+  replacing it.
+
+**Page weight, honestly.** Per page this is heavier, not lighter: 90.6KB
+gzipped across five sheets against 64.6KB across eight, so roughly 26KB more
+over the wire in exchange for three fewer requests and one cache entry that
+covers every page. That is the cost of shipping a framework rather than
+hand-written CSS. It would have been 143KB gzipped without
+`tools/trim_daisyui.py`, which drops the responsive component variants daisyUI
+pregenerates at all five breakpoints. It ships 2,725 of those and ION uses
+four.
+
+**Not finished.** Around 110 component rules in `frontend/ion-legacy.css` still
+shadow daisyUI names (`card`, `alert`, `modal`, `stat-value`, `toast`). They
+need a per-page markup migration rather than a move, because daisyUI's `.alert`
+has no left accent bar and its `.card` no ION border, so deleting them changes
+how pages look. `alerts-queue.css`, `alert-detail.css`, `ion-workspace.css` and
+`ai-chat.css` remain as page-scoped sheets.
 
 ## v0.92.0 — 2026-09-13
 
