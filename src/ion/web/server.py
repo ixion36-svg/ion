@@ -198,6 +198,7 @@ import secrets as _secrets
 
 from ion.web._csp_nonce import _csp_nonce_var, _CSPNonceProxy
 from ion.web._csrf_token import _CSRFTokenProxy
+from ion.web.csrf_middleware import CSRFMiddleware
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -294,6 +295,11 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Add security headers middleware
 app.add_middleware(SecurityHeadersMiddleware)
+
+# CSRF: token + Origin checks on cookie-authenticated state-changing requests.
+# Sits inside the rate limiter and the monitoring middleware in execution order,
+# so rejections are still counted and logged by those.
+app.add_middleware(CSRFMiddleware)
 
 # Add security monitoring middleware (attack detection)
 app.add_middleware(SecurityMonitoringMiddleware)
