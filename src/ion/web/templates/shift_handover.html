@@ -115,7 +115,7 @@ async function shGenerate(){
         const d = await r.json();
         renderReport(d);
     } catch(e) {
-        $('sh-content').innerHTML = `<div class="sh-loading _ion-s-5dd0211252">${esc(e.message)}</div>`;
+        $('sh-content').innerHTML = `<div class="sh-loading text-[var(--sev-critical)]">${esc(e.message)}</div>`;
     }
 }
 
@@ -174,7 +174,7 @@ function renderReport(d) {
         }
         html += '</tbody></table>';
     } else {
-        html += '<div class="_ion-s-58f8339b58">No cases opened.</div>';
+        html += '<div class="text-[var(--text-secondary)] text-[.85rem] p-3">No cases opened.</div>';
     }
     html += '</div>';
 
@@ -193,7 +193,7 @@ function renderReport(d) {
         }
         html += '</tbody></table>';
     } else {
-        html += '<div class="_ion-s-58f8339b58">No cases closed.</div>';
+        html += '<div class="text-[var(--text-secondary)] text-[.85rem] p-3">No cases closed.</div>';
     }
     html += '</div>';
 
@@ -202,15 +202,15 @@ function renderReport(d) {
     // Closure reason breakdown
     if (c.closed > 0) {
         html += '<div class="sh-section"><div class="sh-section-title"><i class="icon-pie-chart"></i> Closure Reasons</div>';
-        html += '<div class="_ion-s-c664a954f6">';
+        html += '<div class="flex gap-4 flex-wrap">';
         const reasons = c.closure_reasons || {};
         for (const [reason, count] of Object.entries(reasons)) {
             const label = reason.replace(/_/g, ' ');
             const pct = Math.round(count / c.closed * 100);
             const color = reason === 'true_positive' ? 'var(--mitre-covered)' : reason === 'false_positive' ? 'var(--sev-critical)' : 'var(--text-secondary)';
-            html += `<div class="_ion-s-91a87015f4">
-                <div class="_ion-s-edfbba956c" data-ion-style="color:${color}">${count}</div>
-                <div class="_ion-s-e65c44381d">${esc(label)} (${pct}%)</div>
+            html += `<div class="text-center">
+                <div class="text-[1.2rem] font-bold font-mono" data-ion-style="color:${color}">${count}</div>
+                <div class="text-[.72rem] text-[var(--text-secondary)] capitalize">${esc(label)} (${pct}%)</div>
             </div>`;
         }
         html += '</div></div>';
@@ -223,18 +223,18 @@ function renderReport(d) {
     for (const sev of sevOrder) {
         const cnt = (p.open_cases_by_severity||{})[sev];
         if (cnt) {
-            html += `<div class="_ion-s-015a5e7fbe">
+            html += `<div class="flex items-center gap-2">
                 <span class="sh-badge sev-${sev}">${esc(sev)}</span>
-                <span class="_ion-s-02e146320d">${cnt}</span> open case${cnt>1?'s':''}
+                <span class="font-bold font-mono">${cnt}</span> open case${cnt>1?'s':''}
             </div>`;
         }
     }
     if (p.unassigned_cases > 0) {
-        html += `<div class="_ion-s-de27888a53">
+        html += `<div class="flex items-center gap-2 text-[var(--sev-medium)]">
             <i class="icon-user-x"></i> <strong>${p.unassigned_cases}</strong> unassigned case${p.unassigned_cases>1?'s':''}
         </div>`;
     }
-    html += `<div class="_ion-s-015a5e7fbe">
+    html += `<div class="flex items-center gap-2">
         <i class="icon-inbox"></i> <strong>${p.open_alerts||0}</strong> open alerts, <strong>${p.in_progress_alerts||0}</strong> in progress
     </div>`;
     html += '</div></div>';
@@ -247,9 +247,9 @@ function renderReport(d) {
         for (const a of activity) {
             const topActions = Object.entries(a.actions||{}).sort((x,y)=>y[1]-x[1]).slice(0,4).map(([k,v])=>`${k}: ${v}`).join(', ');
             html += `<tr>
-                <td class="_ion-s-eed0f8fb89">${esc(a.username)}</td>
+                <td class="font-semibold">${esc(a.username)}</td>
                 <td class="ion-mono">${a.total}</td>
-                <td class="_ion-s-a975440d91">${esc(topActions)}</td>
+                <td class="text-[.78rem] text-[var(--text-secondary)]">${esc(topActions)}</td>
             </tr>`;
         }
         html += '</tbody></table></div>';
@@ -266,7 +266,7 @@ function renderReport(d) {
                 <td><span class="sh-badge ${t.status==='closed'?'sev-low':t.status==='acknowledged'?'sev-medium':'sev-critical'}">${esc(t.status)}</span></td>
                 <td>${esc(t.priority||'-')}</td>
                 <td>${esc(t.analyst)}</td>
-                <td class="_ion-s-f63147b2ed">${fmtTime(t.updated_at)}</td>
+                <td class="text-[.78rem]">${fmtTime(t.updated_at)}</td>
                 <td class="_ion-s-9ab09dae3e" title="${esc(t.notes)}">${esc(t.notes||'-')}</td>
             </tr>`;
         }
@@ -280,11 +280,11 @@ function renderReport(d) {
         html += '<table class="ion-table"><thead><tr><th>Actor/Campaign</th><th>Type</th><th>Matches</th><th>Watched By</th><th>Last Seen</th></tr></thead><tbody>';
         for (const watch of w.watches) {
             html += `<tr>
-                <td class="_ion-s-eed0f8fb89">${esc(watch.name)}</td>
+                <td class="font-semibold">${esc(watch.name)}</td>
                 <td>${esc((watch.entity_type||'').replace('_',' '))}</td>
                 <td class="ion-mono">${watch.match_count}</td>
                 <td>${esc(watch.watched_by)}</td>
-                <td class="_ion-s-f63147b2ed">${fmtTime(watch.last_seen_at)}</td>
+                <td class="text-[.78rem]">${fmtTime(watch.last_seen_at)}</td>
             </tr>`;
         }
         html += '</tbody></table></div>';

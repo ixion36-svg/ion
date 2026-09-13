@@ -570,7 +570,7 @@ async function loadEvents() {
                 }
             }
             return `
-            <tr class="_ion-s-8410c989c9" data-click-action="showEventDetail" data-args='[${event.id}]'>
+            <tr class="cursor-pointer" data-click-action="showEventDetail" data-args='[${event.id}]'>
                 <td>${formatDateTime(event.created_at)}</td>
                 <td><span class="severity-badge severity-${event.severity}">${event.severity}</span></td>
                 <td>${formatEventType(event.event_type)}</td>
@@ -608,7 +608,7 @@ async function loadBlockedIPs() {
             <div class="list-item">
                 <div>
                     <span class="list-item-ip">${escapeHtml(b.ip_address)}</span>
-                    <small class="_ion-s-d598ba9f79">
+                    <small class="block text-[var(--text-muted)]">
                         ${b.permanent ? 'Permanent' : (b.blocked_until ? 'Until ' + formatDateTime(b.blocked_until) : 'Indefinite')}
                     </small>
                 </div>

@@ -17,9 +17,17 @@ from fastapi.testclient import TestClient
 from ion.web.server import app
 
 
-def test_audit_reports_no_losses_against_baseline():
-    """The rewrite may change markup freely; it may not drop a CSP hashed class
-    or add a raw inline style."""
+def test_audit_reports_no_unreplaceable_losses():
+    """The rewrite may change markup freely, and pass 2 deliberately removes
+    hashed classes that have a Tailwind equivalent. What it may never do is drop
+    a class the lookup table could NOT map — that deletes a style with no
+    replacement — or introduce a raw inline style.
+
+    This assertion was originally "no hashed class may be lost", which was right
+    while the plan preserved them and wrong once conversion started. The audit is
+    now map-aware; whether a replacement is CORRECT is checked separately and
+    more strictly by tools/verify_conversion.py.
+    """
     result = subprocess.run(
         [sys.executable, "tools/ui_rewrite_audit.py", "--check"],
         capture_output=True, text=True,
