@@ -33,7 +33,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 GROK = Path("C:/Users/lyndo/.grok/bin/grok")
@@ -208,6 +208,21 @@ def verify(page: str, before_text: str, mode: str) -> list[str]:
     return problems
 
 
+# Conditions that will not resolve by trying the next page. Retrying through a
+# 60-page queue on any of these wastes an hour to learn what the first failure
+# already said.
+_FATAL_PATTERNS = (
+    "payment required", "usage balance exhausted", "quota",
+    "not signed in", "unauthorized", "401", "402", "403",
+    "rate limit", "429",
+)
+
+
+def is_fatal(blob: str) -> bool:
+    low = blob.lower()
+    return any(p in low for p in _FATAL_PATTERNS)
+
+
 def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
     path = TEMPLATES / page
     started = time.time()
@@ -236,7 +251,13 @@ def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
             encoding="utf-8", errors="replace",
         )
         result["exit"] = proc.returncode
+        # BOTH streams. Recording only stdout meant a hard API error arrived as
+        # an empty tail and the page was reported "template unchanged" — the
+        # same words as "Grok looked and found nothing to do". The whole L band
+        # died on `402 Payment Required: Grok Build usage balance exhausted`
+        # and the run reported ten no-ops with no hint of the cause.
         result["tail"] = (proc.stdout or "")[-400:]
+        result["stderr"] = (proc.stderr or "")[-600:]
     except subprocess.TimeoutExpired:
         shutil.copy(backup, path)
         result.update(status="TIMEOUT", problems=[f"exceeded {timeout}s"],
@@ -247,6 +268,24 @@ def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
     before_text = backup.read_text(encoding="utf-8", errors="replace")
     result["lines_after"] = after.count("\n") + 1
     result["lines_before_actual"] = before_text.count("\n") + 1
+
+    # A non-zero exit with no edit is an agent FAILURE, not a considered no-op.
+    # Distinguishing them matters: a no-op is a page to look at, an error is a
+    # run to stop.
+    if proc.returncode != 0 and after == before_text:
+        blob = (result["stderr"] + result["tail"])
+        # Grok reports API failures as a JSON blob spanning several lines, so
+        # the first line containing "error" is just `Internal error: {`. Prefer
+        # the "message" field, which is the part a human needs.
+        m = re.search(r'"message"\s*:\s*"([^"]+)"', blob)
+        if m:
+            detail = m.group(1)
+        else:
+            detail = next((ln.strip() for ln in blob.splitlines()
+                           if ln.strip() and "error" in ln.lower()), blob.strip()[:200])
+        result.update(status="ERROR", problems=[f"grok exit {proc.returncode}: {detail}"],
+                      fatal=is_fatal(blob), elapsed=round(time.time() - started))
+        return result
 
     # Content comparison only. This previously also required the line count to
     # match `baseline[page]["lines"]`, which is the ORIGINAL repo state — for a
@@ -332,14 +371,19 @@ def main() -> int:
         return 0
 
     results = []
+    aborted = None
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         futures = {pool.submit(run_one, p, baseline, args.timeout, args.mode): p for p in pages}
         for fut in as_completed(futures):
-            r = fut.result()
+            try:
+                r = fut.result()
+            except CancelledError:
+                # Cancelled by the abort below; nothing ran, nothing to report.
+                continue
             results.append(r)
             if r["status"] == "OK":
                 record_done(r["page"], args.mode)
-            flag = {"OK": "ok  ", "FAILED": "FAIL", "NO_CHANGE": "noop",
+            flag = {"OK": "ok  ", "FAILED": "FAIL", "NO_CHANGE": "noop", "ERROR": "ERR ",
                     "TIMEOUT": "TIME", "SKIPPED": "skip"}.get(r["status"], "????")
             extra = f" {r['problems']}" if r["problems"] else ""
             # lines_before_actual is the file as it was before THIS run;
@@ -350,12 +394,29 @@ def main() -> int:
             print(f"[{flag}] {r['page']} ({r.get('elapsed','?')}s)"
                   f" {lb}->{r.get('lines_after','?')}{extra}", flush=True)
 
+            # Stop the whole run on a condition the next page cannot fix.
+            # Ten L-band pages each burned a worker slot on the same 402 before
+            # this existed; the first failure already carried the answer.
+            if r.get("fatal") and aborted is None:
+                aborted = r["problems"][0] if r["problems"] else "fatal error"
+                print(f"\nABORTING: {aborted}", file=sys.stderr)
+                print("Not a page problem — the remaining pages would fail identically.",
+                      file=sys.stderr)
+                for f in futures:
+                    f.cancel()
+
     RESULTS.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     ok = sum(1 for r in results if r["status"] == "OK")
+    errored = sum(1 for r in results if r["status"] == "ERROR")
     print(f"\n{ok}/{len(results)} OK -> {RESULTS}")
+    if errored:
+        print(f"{errored} page(s) hit an agent/API error and were NOT attempted properly.")
+    if aborted:
+        print(f"RUN ABORTED: {aborted}")
+        print(f"{len(pages) - len(results)} page(s) never started.")
     print("Failed and no-change pages were left at their original content.")
     print("Still required: human review of each OK page for JS<->CSS contracts.")
-    return 0 if ok == len(results) else 1
+    return 2 if aborted else (0 if ok == len(results) else 1)
 
 
 if __name__ == "__main__":

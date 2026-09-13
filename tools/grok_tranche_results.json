@@ -1,62 +1,50 @@
 [
   {
-    "page": "notes.html",
-    "mode": "convert",
-    "lines_before": 271,
-    "exit": 0,
-    "tail": "page.js` look up the wrapper with `document.getElementById('fp-editor-wrapper')`, not the hashed class. Safe to convert.\n\n**4. Table disagreements not applied**\nNone. The mapped string repeats `hidden` because the original CSS repeats `display:none`. I applied the table entry as written.\n\n**Audit**\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 423,
-    "lines_before_actual": 423,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 52
+    "page": "chat.html",
+    "mode": "restyle",
+    "lines_before": 2181,
+    "exit": 1,
+    "tail": "",
+    "stderr": "Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}\nError: Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}\n",
+    "lines_after": 2181,
+    "lines_before_actual": 2181,
+    "status": "ERROR",
+    "problems": [
+      "grok exit 1: API error (status 402 Payment Required): Grok Build usage balance exhausted"
+    ],
+    "fatal": true,
+    "elapsed": 1
   },
   {
-    "page": "admin_courses.html",
-    "mode": "convert",
-    "lines_before": 185,
-    "exit": 0,
-    "tail": "ever mentions `_ion-s-*`. Dialogs are shown/hidden via CSSOM (`element.style.display = 'block'|'none'`), which still overrides the mapped `hidden` utility the same way it overrode the hashed `display:none`.\n\n**Table disagreements:** none. Looked-up `tailwind` strings were applied as-is.\n\n**Audit:** `python tools/ui_rewrite_audit.py --check` exited 0 with `0 problem(s)` \u2014 no new raw inline styles.\n",
-    "lines_after": 195,
-    "lines_before_actual": 195,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 52
+    "page": "documents.html",
+    "mode": "restyle",
+    "lines_before": 1722,
+    "exit": 1,
+    "tail": "",
+    "stderr": "Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}\nError: Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}\n",
+    "lines_after": 1722,
+    "lines_before_actual": 1722,
+    "status": "ERROR",
+    "problems": [
+      "grok exit 1: API error (status 402 Payment Required): Grok Build usage balance exhausted"
+    ],
+    "fatal": true,
+    "elapsed": 2
   },
   {
-    "page": "versions.html",
-    "mode": "convert",
-    "lines_before": 184,
-    "exit": 0,
-    "tail": "close goes through `getElementById('version-modal')` / `getElementById('modal-diff-section')` and CSSOM `style.display`. The existing nonce\u2019d `[style*=\"flex\"]` / `[style*=\"block\"]` bridges are unchanged.\n\n## Lookup disagreements\n\nNone. `hidden` is the table mapping; it was applied as-is.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 296,
-    "lines_before_actual": 296,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 59
-  },
-  {
-    "page": "entity_timeline.html",
-    "mode": "convert",
-    "lines_before": 225,
-    "exit": 0,
-    "tail": "2rem]` (`arbitrary`) |\n| `_ion-s-2574d57a62` | source-filter chip | `mr-0.5` (`exact`) |\n\nNone of the five were `manual` or missing from the table. Nothing in the table was skipped for disagreement.\n\n### Checks\n\n- `python tools/ui_rewrite_audit.py --check` \u2014 **0 problem(s)** (no new raw `style=\"...\"`)\n- `python tools/verify_conversion.py --pages entity_timeline.html` \u2014 **converted=2, 0 problems**\n",
-    "lines_after": 380,
-    "lines_before_actual": 380,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 109
-  },
-  {
-    "page": "service_accounts.html",
-    "mode": "convert",
-    "lines_before": 122,
-    "exit": 0,
-    "tail": "arkup that was converted.\n\n## 4. Table disagreements\nNone. Applied `_ion-s-b5853abefe` exactly as mapped. Did not invent utilities for the manual rule.\n\n## Audit\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n\nAlso ran `python tools/verify_conversion.py --pages service_accounts.html --verbose`: **converted=1, kept=0, wrong=0, still-present=0**.\n",
-    "lines_after": 96,
-    "lines_before_actual": 96,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 126
+    "page": "tools.html",
+    "mode": "restyle",
+    "lines_before": 1367,
+    "exit": 1,
+    "tail": "",
+    "stderr": "Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}\nError: Internal error: {\n  \"message\": \"API error (status 402 Payment Required): Grok Build usage balance exhausted\",\n  \"http_status\": 402\n}\n",
+    "lines_after": 1367,
+    "lines_before_actual": 1367,
+    "status": "ERROR",
+    "problems": [
+      "grok exit 1: API error (status 402 Payment Required): Grok Build usage balance exhausted"
+    ],
+    "fatal": true,
+    "elapsed": 2
   }
 ]
