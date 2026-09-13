@@ -10,42 +10,52 @@
   "signed_off":         "Sign-off",
 } %}
 {% set status_dot = {
-  "green":   "text-emerald-400",
-  "amber":   "text-amber-400",
-  "red":     "text-rose-400",
-  "unknown": "text-slate-600",
+  "green":   "badge-success",
+  "amber":   "badge-warning",
+  "red":     "badge-error",
+  "unknown": "badge-ghost",
 } %}
 
-<table class="ion-table">
-  <thead>
-    <tr>
-      <th>System</th>
-      <th>Owner</th>
-      {% for dim in matrix.dimensions %}
-        <th class="text-center">{{ dim_labels[dim] }}</th>
-      {% endfor %}
-    </tr>
-  </thead>
-  <tbody>
-    {% for row in matrix.rows %}
-      <tr>
-        <td class="ion-mono">
-          <a href="/cyab/systems/{{ row.system_id }}" class="hover:underline">{{ row.name }}</a>
-        </td>
-        <td class="text-slate-400">{{ row.owner or '—' }}</td>
-        {% for dim in matrix.dimensions %}
-          {% set cell = row.cells[dim] %}
-          <td class="text-center">
-            <a href="/cyab/systems/{{ row.system_id }}/tab/{{ cell.tab }}"
-               title="{{ dim }}: {{ cell.status }}"
-               class="inline-block px-1">
-              <span class="{{ status_dot[cell.status] }} text-[16px]">●</span>
-            </a>
-          </td>
-        {% endfor %}
-      </tr>
-    {% else %}
-      <tr><td colspan="9" class="py-6 text-center text-slate-500">No systems match the current filters.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<div class="card bg-base-200 shadow">
+  <div class="card-body p-0">
+    <div class="overflow-x-auto">
+      <table class="table table-sm w-full">
+        <thead>
+          <tr>
+            <th>System</th>
+            <th>Owner</th>
+            {% for dim in matrix.dimensions %}
+              <th class="text-center">{{ dim_labels[dim] }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in matrix.rows %}
+            <tr>
+              <td class="font-mono">
+                <a href="/cyab/systems/{{ row.system_id }}" class="link link-hover">{{ row.name }}</a>
+              </td>
+              <td class="text-base-content/50">{{ row.owner or '—' }}</td>
+              {% for dim in matrix.dimensions %}
+                {% set cell = row.cells[dim] %}
+                <td class="text-center">
+                  <a href="/cyab/systems/{{ row.system_id }}/tab/{{ cell.tab }}"
+                     title="{{ dim }}: {{ cell.status }}"
+                     class="inline-flex items-center justify-center px-1">
+                    <span class="badge badge-xs {{ status_dot[cell.status] }} p-0 w-4 h-4"></span>
+                  </a>
+                </td>
+              {% endfor %}
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="9" class="py-8">
+                <div class="alert alert-info justify-center">No systems match the current filters.</div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

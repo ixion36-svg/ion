@@ -2,31 +2,33 @@
    existing /api/cyab/systems/bulk action=delete-selected path; the
    per-row trash button uses DELETE /api/cyab/systems/{id}. #}
 {% if not rows %}
-  <p class="text-slate-500 text-[12px] py-8 text-center">
+  <div role="alert" class="alert alert-info justify-center">
     No systems match these filters.
-  </p>
+  </div>
 {% else %}
 <form id="cyab-systems-bulk-form"
       hx-post="/api/cyab/systems/bulk"
       hx-trigger="submit"
       hx-swap="none"
       onsubmit="return cyabBulkSystemsConfirm(event)">
-  <div class="flex items-center gap-2 mb-2 text-[11.5px]">
-    <span class="text-slate-500">{{ rows | length }} systems</span>
-    <span class="flex-1"></span>
-    <select name="action" id="cyab-systems-bulk-action" class="ion-select w-auto">
-      <option value="mark-reviewed">Mark reviewed</option>
-      <option value="export-csv">Export CSV</option>
-      <option value="rerun-health">Re-run health checks</option>
-      <option value="delete-selected" class="text-rose-300">Delete selected</option>
-    </select>
-    <button type="submit" class="ion-btn">Apply</button>
+  <div class="flex flex-wrap items-center gap-2 mb-3 text-sm">
+    <span class="text-base-content/50">{{ rows | length }} systems</span>
+    <div class="join ms-auto">
+      <select name="action" id="cyab-systems-bulk-action" class="select select-sm join-item w-auto">
+        <option value="mark-reviewed">Mark reviewed</option>
+        <option value="export-csv">Export CSV</option>
+        <option value="rerun-health">Re-run health checks</option>
+        <option value="delete-selected" class="text-error">Delete selected</option>
+      </select>
+      <button type="submit" class="btn btn-primary btn-sm join-item">Apply</button>
+    </div>
   </div>
 
-  <table class="systems-table ion-table">
+  <div class="overflow-x-auto">
+  <table class="table table-sm w-full">
     <thead>
       <tr>
-        <th><input type="checkbox" id="select-all"></th>
+        <th><input type="checkbox" id="select-all" class="checkbox checkbox-sm"></th>
         <th>Name</th>
         <th>Pillar</th>
         <th>Sub-profile</th>
@@ -41,41 +43,42 @@
     <tbody>
       {% for r in rows %}
         <tr data-system-id="{{ r.id }}">
-          <td><input type="checkbox" name="system_ids" value="{{ r.id }}"></td>
-          <td><a href="/cyab/systems/{{ r.id }}" class="text-cyan-400 hover:underline">{{ r.name }}</a></td>
-          <td class="text-slate-400">{{ r.pillar or '—' }}</td>
-          <td class="text-slate-400">{{ r.subprofile or '—' }}</td>
-          <td class="text-slate-400">{{ r.owner or '—' }}</td>
+          <td><input type="checkbox" name="system_ids" value="{{ r.id }}" class="checkbox checkbox-sm"></td>
+          <td><a href="/cyab/systems/{{ r.id }}" class="link link-hover">{{ r.name }}</a></td>
+          <td class="text-base-content/50">{{ r.pillar or '—' }}</td>
+          <td class="text-base-content/50">{{ r.subprofile or '—' }}</td>
+          <td class="text-base-content/50">{{ r.owner or '—' }}</td>
           <td>
             {% set pct = (r.progress.done / r.progress.total * 100) | round(0) | int if r.progress.total else 0 %}
-            <div class="flex items-center gap-1">
-              <div class="h-1 w-16 bg-slate-800 rounded">
-                <div class="h-full bg-cyan-400 rounded" data-ion-style="width: {{ pct }}%"></div>
+            <div class="flex items-center gap-2">
+              {# Native <progress> cannot carry a CSP-safe dynamic width; keep the fill hook. #}
+              <div class="h-1.5 w-16 rounded-full bg-base-300 overflow-hidden">
+                <div class="h-full bg-primary rounded-full" data-ion-style="width: {{ pct }}%"></div>
               </div>
-              <span class="text-cyan-300 text-[10.5px]">{{ r.progress.done }}/{{ r.progress.total }}</span>
+              <span class="text-xs font-mono text-primary">{{ r.progress.done }}/{{ r.progress.total }}</span>
             </div>
           </td>
           <td>
             {% if r.critical_missing %}
-              <span class="text-rose-400 text-[10.5px]">{{ r.critical_missing }} missing</span>
+              <span class="badge badge-error badge-sm">{{ r.critical_missing }} missing</span>
             {% else %}
-              <span class="text-emerald-400 text-[10.5px]">ok</span>
+              <span class="badge badge-success badge-sm">ok</span>
             {% endif %}
           </td>
-          <td class="text-slate-500 text-[10.5px]">
+          <td class="text-xs text-base-content/50 font-mono">
             {{ r.updated_at.strftime('%Y-%m-%d %H:%M') if r.updated_at else '—' }}
           </td>
           <td>
-            <span class="ion-badge
-                         {% if r.status == 'ACTIVE' %}ion-c-green
-                         {% elif r.status == 'DRAFT' %}ion-c-muted
-                         {% else %}ion-c-muted{% endif %}">
+            <span class="badge badge-sm
+                         {% if r.status == 'ACTIVE' %}badge-success
+                         {% elif r.status == 'DRAFT' %}badge-ghost
+                         {% else %}badge-ghost{% endif %}">
               {{ r.status }}
             </span>
           </td>
           <td class="text-right">
             <button type="button"
-                    class="cyab-system-del ion-btn ion-btn-ghost text-rose-300 hover:text-white hover:bg-rose-900/40"
+                    class="cyab-system-del btn btn-ghost btn-sm btn-error"
                     data-system-id="{{ r.id }}"
                     data-system-name="{{ r.name }}"
                     title="Delete this system permanently">Delete</button>
@@ -84,6 +87,7 @@
       {% endfor %}
     </tbody>
   </table>
+  </div>
 </form>
 
 <script>

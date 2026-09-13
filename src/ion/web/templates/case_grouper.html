@@ -3,30 +3,30 @@
 {% block title %}Case Grouper - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
-      <svg class="w-4 h-4 text-ion-lime"><use href="#i-activity"/></svg>
-      <span class="label-tiny text-ion-lime">Automation</span>
+      <svg class="w-4 h-4 text-success"><use href="#i-activity"/></svg>
+      <span class="label-tiny text-success">Automation</span>
     </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Case Grouper</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Case Grouper</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">
       Automatically clusters open ES alerts into investigation cases by
       (rule, host, user) and kicks off autonomous investigations. Skips any
       alert that an analyst has already attached to a case manually.
     </p>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
-    <button class="ion-btn" data-click-action="cgRefresh">Refresh</button>
-    <button class="ion-btn ion-btn-primary" id="cg-run-btn" data-click-action="cgRunNow">Run now</button>
+    <button class="btn btn-ghost" data-click-action="cgRefresh">Refresh</button>
+    <button class="btn btn-primary" id="cg-run-btn" data-click-action="cgRunNow">Run now</button>
   </div>
 </section>
 
 <div id="cg-content">
-  <div class="cg-loading"><span class="cg-spinner"></span> Loading status...</div>
+  <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading status...</div>
 </div>
 
 </div><!-- /ion-tw inner -->
@@ -34,41 +34,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-.cg-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.cg-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:cg-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes cg-spin{to{transform:rotate(360deg)}}
-
-.cg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px}
-.cg-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;position:relative;border-left:4px solid var(--border)}
-.cg-card.ok{border-left-color:var(--mitre-covered,#3fb950)}
-.cg-card.off{border-left-color:var(--text-secondary);opacity:.75}
-.cg-card.warn{border-left-color:var(--sev-medium,#d29922)}
-.cg-card h4{font-size:.7rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px}
-.cg-card .cg-big{font-size:1.8rem;font-weight:700;color:var(--text-primary);line-height:1.1;font-family:'JetBrains Mono',monospace}
-.cg-card .cg-sub{font-size:.72rem;color:var(--text-secondary);margin-top:6px}
-
-.cg-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 22px;margin-bottom:14px}
-.cg-panel h3{font-size:.95rem;font-weight:700;color:var(--text-primary);margin:0 0 12px}
-.cg-row{display:flex;justify-content:space-between;gap:14px;padding:6px 0;border-bottom:1px dashed var(--border);font-size:.85rem}
-.cg-row:last-child{border-bottom:none}
-.cg-row .cg-label{color:var(--text-secondary)}
-.cg-row .cg-val{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
-
-.cg-badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.66rem;text-transform:uppercase;letter-spacing:.4px;font-weight:700}
-.cg-badge.ok{background:rgba(63,185,80,.18);color:var(--mitre-covered,#3fb950)}
-.cg-badge.off{background:rgba(99,110,123,.2);color:var(--text-secondary)}
-.cg-badge.err{background:rgba(248,81,73,.18);color:var(--sev-critical,#f85149)}
-
-.cg-flash{padding:10px 14px;border-radius:var(--radius);margin-bottom:12px;font-size:.85rem}
-.cg-flash.ok{background:rgba(63,185,80,.12);border:1px solid rgba(63,185,80,.3);color:var(--mitre-covered,#3fb950)}
-.cg-flash.err{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.3);color:var(--sev-critical,#f85149)}
-
-@media (max-width: 768px) {
-  .cg-grid { grid-template-columns: 1fr; }
-  .cg-row { flex-direction: column; gap: 2px; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const CG_API = '/api/case-grouper';
 
@@ -77,74 +42,93 @@ function cgFmtTime(iso){if(!iso)return'never';try{const d=new Date(iso);const di
 
 async function cgLoad() {
   const c = document.getElementById('cg-content');
-  c.innerHTML = '<div class="cg-loading"><span class="cg-spinner"></span> Loading status...</div>';
+  c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading status...</div>';
   try {
     const r = await fetch(CG_API + '/status');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     cgRender(data);
   } catch (e) {
-    c.innerHTML = `<div class="cg-loading _ion-s-3c9b2ebd4d">${cgEsc(e.message || 'Failed to load')}</div>`;
+    c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${cgEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 
 function cgRender(s) {
   const c = document.getElementById('cg-content');
-  const enabledCls = s.enabled ? 'ok' : 'off';
   const enabledLabel = s.enabled ? 'Enabled' : 'Disabled';
   const result = s.last_result || {};
   const cards = `
-    <div class="cg-grid">
-      <div class="cg-card ${enabledCls}">
-        <h4>Status</h4>
-        <div class="cg-big">${cgEsc(enabledLabel)}</div>
-        <div class="cg-sub">Advisory lock 1017 · one worker per container</div>
+    <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+      <div class="stat ${s.enabled ? '' : 'opacity-75'}">
+        <div class="stat-title">Status</div>
+        <div class="stat-value font-mono ${s.enabled ? 'text-success' : ''}">${cgEsc(enabledLabel)}</div>
+        <div class="stat-desc">Advisory lock 1017 · one worker per container</div>
       </div>
-      <div class="cg-card ok">
-        <h4>Poll interval</h4>
-        <div class="cg-big">${cgEsc(s.interval_s)}s</div>
-        <div class="cg-sub">ION_CASE_GROUPER_INTERVAL_S</div>
+      <div class="stat">
+        <div class="stat-title">Poll interval</div>
+        <div class="stat-value font-mono">${cgEsc(s.interval_s)}s</div>
+        <div class="stat-desc">ION_CASE_GROUPER_INTERVAL_S</div>
       </div>
-      <div class="cg-card ok">
-        <h4>Extend window</h4>
-        <div class="cg-big">${cgEsc(s.window_minutes)}m</div>
-        <div class="cg-sub">append alerts to open [Auto] case within this window</div>
+      <div class="stat">
+        <div class="stat-title">Extend window</div>
+        <div class="stat-value font-mono">${cgEsc(s.window_minutes)}m</div>
+        <div class="stat-desc">append alerts to open [Auto] case within this window</div>
       </div>
-      <div class="cg-card ${s.auto_cases_total > 0 ? 'ok' : 'off'}">
-        <h4>Total auto-cases</h4>
-        <div class="cg-big">${cgEsc(s.auto_cases_total)}</div>
-        <div class="cg-sub">all AlertCases with title "[Auto]…"</div>
+      <div class="stat ${s.auto_cases_total > 0 ? '' : 'opacity-75'}">
+        <div class="stat-title">Total auto-cases</div>
+        <div class="stat-value font-mono">${cgEsc(s.auto_cases_total)}</div>
+        <div class="stat-desc">all AlertCases with title "[Auto]…"</div>
       </div>
     </div>
   `;
 
   const lastRun = `
-    <div class="cg-panel">
-      <h3>Last run</h3>
-      <div class="cg-row"><span class="cg-label">Ran at</span><span class="cg-val">${cgFmtTime(s.last_run_at)}${s.last_run_at ? ' · '+cgEsc(s.last_run_at) : ''}</span></div>
-      <div class="cg-row"><span class="cg-label">Scanned</span><span class="cg-val">${cgEsc(result.scanned ?? '—')}</span></div>
-      <div class="cg-row"><span class="cg-label">New cases</span><span class="cg-val">${cgEsc(result.grouped_new_cases ?? '—')}</span></div>
-      <div class="cg-row"><span class="cg-label">Extended cases</span><span class="cg-val">${cgEsc(result.grouped_extended_cases ?? '—')}</span></div>
-      <div class="cg-row"><span class="cg-label">Alerts attached</span><span class="cg-val">${cgEsc(result.alerts_attached ?? '—')}</span></div>
-      <div class="cg-row"><span class="cg-label">Investigations queued</span><span class="cg-val">${cgEsc(result.investigations_queued ?? '—')}</span></div>
-      <div class="cg-row"><span class="cg-label">Errors</span><span class="cg-val">${cgEsc(result.errors ?? '—')}</span></div>
+    <div class="card bg-base-200 shadow mb-4">
+      <div class="card-body p-0">
+        <div class="px-5 py-3 border-b border-base-300">
+          <h2 class="card-title text-base">Last run</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <tbody>
+              <tr><td class="text-base-content/60">Ran at</td><td class="font-mono">${cgFmtTime(s.last_run_at)}${s.last_run_at ? ' · '+cgEsc(s.last_run_at) : ''}</td></tr>
+              <tr><td class="text-base-content/60">Scanned</td><td class="font-mono">${cgEsc(result.scanned ?? '—')}</td></tr>
+              <tr><td class="text-base-content/60">New cases</td><td class="font-mono">${cgEsc(result.grouped_new_cases ?? '—')}</td></tr>
+              <tr><td class="text-base-content/60">Extended cases</td><td class="font-mono">${cgEsc(result.grouped_extended_cases ?? '—')}</td></tr>
+              <tr><td class="text-base-content/60">Alerts attached</td><td class="font-mono">${cgEsc(result.alerts_attached ?? '—')}</td></tr>
+              <tr><td class="text-base-content/60">Investigations queued</td><td class="font-mono">${cgEsc(result.investigations_queued ?? '—')}</td></tr>
+              <tr><td class="text-base-content/60">Errors</td><td class="font-mono">${cgEsc(result.errors ?? '—')}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   `;
 
   const toggles = `
-    <div class="cg-panel">
-      <h3>Side-effects</h3>
-      <div class="cg-row">
-        <span class="cg-label">Push new cases to Kibana</span>
-        <span class="cg-badge ${s.push_to_kibana ? 'ok' : 'off'}">${s.push_to_kibana ? 'on' : 'off'}</span>
-      </div>
-      <div class="cg-row">
-        <span class="cg-label">Auto-run investigation pipeline</span>
-        <span class="cg-badge ${s.auto_investigate ? 'ok' : 'off'}">${s.auto_investigate ? 'on' : 'off'}</span>
-      </div>
-      <div class="cg-row _ion-s-a41031e958">
-        <span>Toggle via ION_CASE_GROUPER_PUSH_TO_KIBANA / ION_CASE_GROUPER_AUTO_INVESTIGATE.</span>
-        <span></span>
+    <div class="card bg-base-200 shadow mb-4">
+      <div class="card-body p-0">
+        <div class="px-5 py-3 border-b border-base-300">
+          <h2 class="card-title text-base">Side-effects</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <tbody>
+              <tr>
+                <td class="text-base-content/60">Push new cases to Kibana</td>
+                <td class="text-end"><span class="badge badge-sm uppercase ${s.push_to_kibana ? 'badge-success' : 'badge-ghost'}">${s.push_to_kibana ? 'on' : 'off'}</span></td>
+              </tr>
+              <tr>
+                <td class="text-base-content/60">Auto-run investigation pipeline</td>
+                <td class="text-end"><span class="badge badge-sm uppercase ${s.auto_investigate ? 'badge-success' : 'badge-ghost'}">${s.auto_investigate ? 'on' : 'off'}</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="px-5 pb-4 _ion-s-a41031e958">
+          <span>Toggle via ION_CASE_GROUPER_PUSH_TO_KIBANA / ION_CASE_GROUPER_AUTO_INVESTIGATE.</span>
+          <span></span>
+        </div>
       </div>
     </div>
   `;
@@ -155,7 +139,8 @@ function cgRender(s) {
 function cgFlash(cls, msg) {
   let host = document.getElementById('cg-flash-host');
   if (!host) return;
-  host.innerHTML = `<div class="cg-flash ${cls}">${cgEsc(msg)}</div>`;
+  const kind = cls === 'err' ? 'alert-error' : 'alert-success';
+  host.innerHTML = `<div class="alert ${kind} mb-4">${cgEsc(msg)}</div>`;
   setTimeout(() => { if (host.firstChild) host.innerHTML = ''; }, 6000);
 }
 

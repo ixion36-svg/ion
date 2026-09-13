@@ -1,69 +1,102 @@
 <header class="mb-4">
-  <h3 class="text-white text-[14px] font-semibold">Sign-off</h3>
-  <p class="text-slate-500 text-[11px]">Final approval for this system to enter operational status.</p>
+  <h3 class="text-sm font-semibold">Sign-off</h3>
+  <p class="text-xs text-base-content/50">Final approval for this system to enter operational status.</p>
 </header>
 
 {# === Governance: containment authority === #}
-<section class="bg-slate-900/40 border border-slate-800 rounded p-3 mb-4">
-  <h4 class="text-slate-300 text-[12px] mb-2">Governance</h4>
-  <div class="grid grid-cols-2 gap-3 text-[12px]">
-    <label class="flex flex-col gap-1">
-      <span class="text-slate-400">Containment authority</span>
-      <input type="text" name="containment_authority" value="{{ system.containment_authority or '' }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded"
-             hx-put="/api/cyab/systems/{{ system.id }}" hx-trigger="change">
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="text-slate-400">Department lead</span>
-      <input type="text" name="department_lead" value="{{ system.department_lead or '' }}"
-             class="px-2 py-1 bg-slate-900 border border-slate-700 rounded"
-             hx-put="/api/cyab/systems/{{ system.id }}" hx-trigger="change">
-    </label>
+<section class="card bg-base-200 shadow mb-4">
+  <div class="card-body p-4 gap-3">
+    <h4 class="card-title text-sm">Governance</h4>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Containment authority</legend>
+        <input type="text" name="containment_authority" value="{{ system.containment_authority or '' }}"
+               class="input input-sm w-full"
+               hx-put="/api/cyab/systems/{{ system.id }}" hx-trigger="change">
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Department lead</legend>
+        <input type="text" name="department_lead" value="{{ system.department_lead or '' }}"
+               class="input input-sm w-full"
+               hx-put="/api/cyab/systems/{{ system.id }}" hx-trigger="change">
+      </fieldset>
+    </div>
   </div>
 </section>
 
 {# === Onboarding Pack preview & sign === #}
-<section class="bg-slate-900/40 border border-slate-800 rounded p-3 mb-4">
-  <header class="flex items-center justify-between mb-2">
-    <h4 class="text-slate-300 text-[12px]">Onboarding Pack</h4>
-    <a href="/api/cyab/systems/{{ system.id }}/onboarding-pack" target="_blank"
-       class="text-cyan-400 text-[11.5px] hover:underline">Open PDF &rarr;</a>
-  </header>
+<section class="card bg-base-200 shadow mb-4">
+  <div class="card-body p-4 gap-3">
+    <header class="flex flex-wrap items-center justify-between gap-2">
+      <h4 class="card-title text-sm">Onboarding Pack</h4>
+      <a href="/api/cyab/systems/{{ system.id }}/onboarding-pack" target="_blank"
+         class="btn btn-ghost btn-sm">Open PDF &rarr;</a>
+    </header>
 
-  {% if progress %}
-  <div class="text-[12px] text-slate-400 mb-3">
-    Onboarding progress: <span class="text-cyan-300">{{ progress.done }} / {{ progress.total }}</span>
+    {% if progress %}
+    <div class="stats stats-vertical sm:stats-horizontal bg-base-300 shadow-sm w-full">
+      <div class="stat py-3">
+        <div class="stat-title">Onboarding progress</div>
+        <div class="stat-value text-2xl text-primary">{{ progress.done }} / {{ progress.total }}</div>
+        <div class="stat-desc">Items completed</div>
+      </div>
+      {% if progress.critical_missing %}
+      <div class="stat py-3">
+        <div class="stat-title">Critical missing</div>
+        <div class="stat-value text-2xl text-error">{{ progress.critical_missing | length }}</div>
+        <div class="stat-desc">Must complete before sign-off</div>
+      </div>
+      {% endif %}
+    </div>
     {% if progress.critical_missing %}
-      &middot; <span class="text-rose-400">{{ progress.critical_missing | length }} critical items still missing</span>
+    <div role="alert" class="alert alert-warning">
+      <span>{{ progress.critical_missing | length }} critical items still missing</span>
+    </div>
     {% endif %}
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <form hx-post="/api/cyab/systems/{{ system.id }}/onboarding-pack/sign"
-        hx-target="#tab-content" hx-swap="innerHTML"
-        class="flex items-center gap-2">
-    <input name="sign_soc_name" placeholder="Your name" required
-           class="flex-1 px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
-    <button type="submit"
-            class="px-3 py-1 bg-emerald-700 text-white text-[12px] rounded">
-      Sign Onboarding Pack
-    </button>
-  </form>
+    <form hx-post="/api/cyab/systems/{{ system.id }}/onboarding-pack/sign"
+          hx-target="#tab-content" hx-swap="innerHTML"
+          class="flex flex-wrap items-center gap-2">
+      <input name="sign_soc_name" placeholder="Your name" required
+             class="input input-sm basis-full md:basis-auto md:flex-1">
+      <button type="submit"
+              class="btn btn-primary btn-sm">
+        Sign Onboarding Pack
+      </button>
+    </form>
+  </div>
 </section>
 
 {# === Prior sign-offs === #}
-<section class="bg-slate-900/40 border border-slate-800 rounded p-3">
-  <h4 class="text-slate-300 text-[12px] mb-2">Prior sign-offs</h4>
-  {% if not signoffs %}
-    <p class="text-slate-500 text-[11px]">No sign-offs yet.</p>
-  {% else %}
-    <ul class="text-[12px] space-y-1">
-      {% for so in signoffs %}
-        <li class="flex justify-between text-slate-300">
-          <span><span class="text-slate-500">[{{ so.role }}]</span> {{ so.signed_by or 'unknown' }}</span>
-          <span class="text-slate-500 text-[11px]">{{ so.signed_on.strftime('%Y-%m-%d') }}</span>
-        </li>
-      {% endfor %}
-    </ul>
-  {% endif %}
+<section class="card bg-base-200 shadow">
+  <div class="card-body p-4 gap-3">
+    <h4 class="card-title text-sm">Prior sign-offs</h4>
+    {% if not signoffs %}
+      <div role="alert" class="alert alert-info">
+        <span>No sign-offs yet.</span>
+      </div>
+    {% else %}
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Signed by</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for so in signoffs %}
+              <tr>
+                <td><span class="badge badge-ghost badge-sm">{{ so.role }}</span></td>
+                <td>{{ so.signed_by or 'unknown' }}</td>
+                <td class="text-xs text-base-content/50">{{ so.signed_on.strftime('%Y-%m-%d') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </div>
 </section>

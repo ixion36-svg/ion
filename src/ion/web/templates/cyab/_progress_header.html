@@ -1,24 +1,25 @@
-<div class="onboarding-progress sticky top-0 z-20 bg-slate-900/95 backdrop-blur border-b border-slate-800 py-2 px-4 flex items-center gap-3 text-[12.5px]">
-  <span class="text-slate-400 uppercase tracking-wider text-[10px]">Onboarding</span>
+<div class="onboarding-progress sticky top-0 z-20 bg-base-100/95 backdrop-blur border-b border-base-300 py-2 px-4 flex flex-wrap items-center gap-3 text-xs">
+  <span class="uppercase tracking-wider text-[10px] text-base-content/50">Onboarding</span>
 
-  <div class="flex items-center gap-2 flex-1 max-w-md">
-    <div class="h-1.5 flex-1 bg-slate-800 rounded-full overflow-hidden">
-      <div class="h-full bg-gradient-to-r from-cyan-400 to-emerald-500"
+  <div class="flex items-center gap-2 basis-full md:basis-auto md:flex-1 md:max-w-md">
+    {# Native <progress> cannot carry a CSP-safe dynamic width; keep the fill hook. #}
+    <div class="h-1.5 flex-1 rounded-full bg-base-300 overflow-hidden">
+      <div class="h-full bg-gradient-to-r from-primary to-success"
            data-ion-style="width: {{ progress.completion_pct }}%"></div>
     </div>
-    <span class="text-cyan-300 font-medium">{{ progress.done }} / {{ progress.total }}</span>
+    <span class="text-primary font-medium whitespace-nowrap">{{ progress.done }} / {{ progress.total }}</span>
   </div>
 
   {% if progress.critical_missing %}
-    <span class="ion-badge ion-c-red">
+    <span class="badge badge-error badge-sm">
       {{ progress.critical_missing|length }} critical missing
     </span>
   {% else %}
-    <span class="text-emerald-400 text-[11px]">all critical items done</span>
+    <span class="badge badge-success badge-sm">all critical items done</span>
   {% endif %}
 
   {% if system.updated_at %}
-    <span class="text-slate-500 ml-auto text-[11px]">
+    <span class="text-base-content/40 text-xs md:ms-auto">
       last edited {{ system.updated_at.strftime('%Y-%m-%d %H:%M') }}
     </span>
   {% endif %}

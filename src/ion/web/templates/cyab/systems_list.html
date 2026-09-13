@@ -1,14 +1,26 @@
 {% extends "base.html" %}
 {% block title %}Systems — CyAB · ION{% endblock %}
 {% block content %}
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <div class="cyab-systems-list">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="ion-page-header mb-4">
-    <div>
-      <h1 class="ion-ph-title">Systems</h1>
+  <header class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
+      <nav class="breadcrumbs text-sm mb-3">
+        <ul>
+          <li><a href="/cyab">CyAB</a></li>
+          <li>Systems</li>
+        </ul>
+      </nav>
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-primary"><use href="#i-server"/></svg>
+        <span class="label-tiny text-primary">CyAB portfolio</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Systems</h1>
     </div>
-    <a href="/cyab/onboard" class="ion-btn ion-btn-primary">+ Onboard</a>
+    <a href="/cyab/onboard" class="btn btn-primary">+ Onboard</a>
   </header>
 
   {# Hidden column-header reference so the page shell advertises the table
@@ -19,45 +31,56 @@
   </div>
 
   {# Filter bar — HTMX swaps the table partial on every change #}
-  <form class="filters flex flex-wrap gap-2 mb-3 text-[12px]"
+  <form class="filters card bg-base-200 shadow mb-6"
         hx-get="/cyab/systems/_table"
         hx-target="#systems-table"
         hx-trigger="change, keyup[target.tagName=='INPUT'] delay:300ms"
         hx-swap="innerHTML">
-    <input name="q" placeholder="Search name / hostname / owner"
-           class="ion-input flex-1">
-    <select name="pillar" class="ion-select w-auto">
-      <option value="">all pillars</option>
-      {% for p in pillars %}<option value="{{ p.id }}">{{ p.label }}</option>{% endfor %}
-    </select>
-    <select name="subprofile" class="ion-select w-auto">
-      <option value="">all sub-profiles</option>
-      {% for s in subprofiles %}<option value="{{ s.id }}">{{ s.label }}</option>{% endfor %}
-    </select>
-    <select name="status" class="ion-select w-auto">
-      <option value="">any status</option>
-      <option value="DRAFT">DRAFT</option>
-      <option value="ACTIVE">ACTIVE</option>
-      <option value="RETIRED">RETIRED</option>
-    </select>
-    <input name="owner" placeholder="owner" class="ion-input w-32">
-    <select name="missing" class="ion-select w-auto">
-      <option value="">missing: any</option>
-      <option value="HLD">missing HLD</option>
-      <option value="NETWORK_TOPOLOGY">missing topology</option>
-      <option value="OWNERS">missing owners</option>
-    </select>
-    <label class="flex items-center gap-1 text-slate-400">
-      <input type="checkbox" name="stale" value="1"> stale data (&gt;24h)
-    </label>
+    <div class="card-body flex flex-wrap items-end gap-3 py-4">
+      <input name="q" placeholder="Search name / hostname / owner"
+             class="input input-sm grow min-w-56">
+      <select name="pillar" class="select select-sm w-auto">
+        <option value="">all pillars</option>
+        {% for p in pillars %}<option value="{{ p.id }}">{{ p.label }}</option>{% endfor %}
+      </select>
+      <select name="subprofile" class="select select-sm w-auto">
+        <option value="">all sub-profiles</option>
+        {% for s in subprofiles %}<option value="{{ s.id }}">{{ s.label }}</option>{% endfor %}
+      </select>
+      <select name="status" class="select select-sm w-auto">
+        <option value="">any status</option>
+        <option value="DRAFT">DRAFT</option>
+        <option value="ACTIVE">ACTIVE</option>
+        <option value="RETIRED">RETIRED</option>
+      </select>
+      <input name="owner" placeholder="owner" class="input input-sm w-32">
+      <select name="missing" class="select select-sm w-auto">
+        <option value="">missing: any</option>
+        <option value="HLD">missing HLD</option>
+        <option value="NETWORK_TOPOLOGY">missing topology</option>
+        <option value="OWNERS">missing owners</option>
+      </select>
+      <label class="label cursor-pointer gap-2 py-0 w-fit">
+        <input type="checkbox" class="checkbox checkbox-sm" name="stale" value="1">
+        <span class="label-text">stale data (&gt;24h)</span>
+      </label>
+    </div>
   </form>
 
+  {# card-body lives on the same element as the id so HTMX innerHTML swaps
+     of #systems-table keep the panel padding. #}
   <div id="systems-table"
+       class="card card-body bg-base-200 shadow overflow-x-auto"
        hx-get="/cyab/systems/_table"
        hx-trigger="load"
        hx-swap="innerHTML">
     {# initial load — replaced by HTMX after page renders #}
-    <p class="text-slate-500 text-[12px]">Loading…</p>
+    <p class="text-base-content/50 text-sm flex items-center justify-center gap-2 py-8">
+      <span class="loading loading-spinner loading-sm text-primary"></span>
+      Loading…
+    </p>
   </div>
+</div>
+</div>
 </div>
 {% endblock %}

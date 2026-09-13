@@ -2,55 +2,72 @@
 {% block title %}Audit — CyAB · ION{% endblock %}
 
 {% block content %}
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <div class="cyab-audit">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="mb-4">
-    <nav class="breadcrumb text-sm text-slate-400 mb-2">
-      <a href="/cyab" class="hover:text-white">CyAB</a>
-      <span class="mx-2">·</span>
-      <span class="text-white">Audit trail</span>
-    </nav>
-    <h1 class="ion-ph-title">Audit trail</h1>
-    <p class="ion-ph-sub">
-      Sign-offs, checklist updates, containment-authority changes, and system lifecycle events.
-    </p>
+  <header class="flex flex-wrap items-end gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
+      <nav class="breadcrumbs text-sm mb-2">
+        <ul>
+          <li><a href="/cyab">CyAB</a></li>
+          <li>Audit trail</li>
+        </ul>
+      </nav>
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-primary"><use href="#i-file-text"/></svg>
+        <span class="label-tiny text-primary">CyAB journal</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Audit trail</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">
+        Sign-offs, checklist updates, containment-authority changes, and system lifecycle events.
+      </p>
+    </div>
   </header>
 
   {# Filters — all five forwarded as GET query params and echoed back below. #}
-  <form method="get" action="/cyab/audit" class="grid grid-cols-6 gap-2 mb-4 text-[12px]">
-    <label class="flex flex-col gap-1">
-      <span class="text-slate-400 text-[10.5px]">System ID</span>
-      <input name="system_id" value="{{ filters.system_id }}" class="ion-input">
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="text-slate-400 text-[10.5px]">User</span>
-      <input name="user" value="{{ filters.user }}" class="ion-input">
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="text-slate-400 text-[10.5px]">Action</span>
-      <select name="action_type" class="ion-select">
-        <option value="">— any —</option>
-        {% for opt in ['create', 'signoff', 'checklist_update', 'containment_change', 'archive', 'snapshot'] %}
-          <option value="{{ opt }}" {% if filters.action_type == opt %}selected{% endif %}>{{ opt }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="text-slate-400 text-[10.5px]">Since</span>
-      <input type="date" name="since" value="{{ filters.since }}" class="ion-input">
-    </label>
-    <label class="flex flex-col gap-1">
-      <span class="text-slate-400 text-[10.5px]">Until</span>
-      <input type="date" name="until" value="{{ filters.until }}" class="ion-input">
-    </label>
-    <button type="submit" class="ion-btn ion-btn-primary self-end">
-      Apply
-    </button>
+  <form method="get" action="/cyab/audit" class="card bg-base-200 shadow mb-4">
+    <div class="card-body">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">System ID</legend>
+          <input name="system_id" value="{{ filters.system_id }}" class="input w-full">
+        </fieldset>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">User</legend>
+          <input name="user" value="{{ filters.user }}" class="input w-full">
+        </fieldset>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Action</legend>
+          <select name="action_type" class="select w-full">
+            <option value="">— any —</option>
+            {% for opt in ['create', 'signoff', 'checklist_update', 'containment_change', 'archive', 'snapshot'] %}
+              <option value="{{ opt }}" {% if filters.action_type == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+          </select>
+        </fieldset>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Since</legend>
+          <input type="date" name="since" value="{{ filters.since }}" class="input w-full">
+        </fieldset>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Until</legend>
+          <input type="date" name="until" value="{{ filters.until }}" class="input w-full">
+        </fieldset>
+        <button type="submit" class="btn btn-primary">
+          Apply
+        </button>
+      </div>
+    </div>
   </form>
 
-  <div id="audit-feed">
-    {% include "cyab/_audit_feed.html" %}
+  <div id="audit-feed" class="card bg-base-200 shadow overflow-x-auto">
+    <div class="card-body p-0">
+      {% include "cyab/_audit_feed.html" %}
+    </div>
   </div>
+</div>
+</div>
 </div>
 {% endblock %}

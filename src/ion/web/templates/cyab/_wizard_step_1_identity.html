@@ -3,8 +3,8 @@
    show it here as a hint that gets carried through to Step 3. #}
 
 <header class="mb-4">
-  <h2 class="ion-card-title text-[16px]">Identity</h2>
-  <p class="text-slate-400 text-[12px]">
+  <h2 class="card-title text-base">Identity</h2>
+  <p class="text-sm text-base-content/60">
     Tell us what we're onboarding. None of these fields block — fill in what you know.
   </p>
 </header>
@@ -14,62 +14,62 @@
       hx-swap="innerHTML"
       method="post"
       action="/api/cyab/onboard/{{ wid }}/step/1"
-      class="grid grid-cols-2 gap-4 text-[12.5px]">
+      class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Name <span class="text-rose-400">*</span></span>
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Name <span class="text-error">*</span></legend>
     <input name="name" type="text" required value="{{ state.identity.get('name', '') }}"
-           class="ion-input">
-  </label>
+           class="input w-full">
+  </fieldset>
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Hostname (primary)</span>
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Hostname (primary)</legend>
     <input name="hostname" type="text" value="{{ state.identity.get('hostname', '') }}"
            placeholder="e.g. sso01.corp"
-           class="ion-input">
-  </label>
+           class="input w-full">
+  </fieldset>
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Pillar</span>
-    <select name="pillar" class="ion-select">
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Pillar</legend>
+    <select name="pillar" class="select w-full">
       <option value="">— select —</option>
       {% for p in (pillars or []) %}
         <option value="{{ p.id }}" {% if state.identity.get('pillar') == p.id %}selected{% endif %}>{{ p.label }}</option>
       {% endfor %}
     </select>
-  </label>
+  </fieldset>
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Sub-profile (assigned at Step 3)</span>
-    <select name="subprofile_id" class="ion-select">
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Sub-profile (assigned at Step 3)</legend>
+    <select name="subprofile_id" class="select w-full">
       <option value="">— select after pillar —</option>
       {% for s in (subprofiles or []) %}
         <option value="{{ s.id }}" {% if state.identity.get('subprofile_id') == s.id %}selected{% endif %}>{{ s.label }}</option>
       {% endfor %}
     </select>
-  </label>
+  </fieldset>
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Owner</span>
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Owner</legend>
     <input name="owner" type="text" value="{{ state.identity.get('owner', '') }}"
-           class="ion-input">
-  </label>
+           class="input w-full">
+  </fieldset>
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Department <span class="text-rose-400">*</span></span>
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Department <span class="text-error">*</span></legend>
     <input name="department" type="text" required value="{{ state.identity.get('department', '') }}"
-           class="ion-input">
-  </label>
+           class="input w-full">
+  </fieldset>
 
-  <label class="col-span-2 flex flex-col gap-1">
-    <span class="text-slate-400">Containment authority (free text — runbook URL or on-call team)</span>
+  <fieldset class="fieldset p-0 md:col-span-2">
+    <legend class="fieldset-legend">Containment authority (free text — runbook URL or on-call team)</legend>
     <textarea name="containment_authority" rows="2"
-              class="ion-textarea">{{ state.identity.get('containment_authority', '') }}</textarea>
-  </label>
+              class="textarea w-full">{{ state.identity.get('containment_authority', '') }}</textarea>
+  </fieldset>
 
-  <div class="col-span-2 flex justify-between items-center mt-2">
-    <a href="/cyab/systems" class="text-slate-500 text-[11px]">← Save & exit</a>
-    <button type="submit" class="ion-btn ion-btn-primary">
+  <div class="md:col-span-2 flex flex-wrap items-center justify-between gap-3 mt-2">
+    <a href="/cyab/systems" class="btn btn-ghost btn-sm">← Save & exit</a>
+    <button type="submit" class="btn btn-primary">
       Continue → Intake
     </button>
   </div>

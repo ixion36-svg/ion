@@ -1,79 +1,105 @@
 <header class="mb-4" data-tab="data-health">
-  <h3 class="text-white text-[14px] font-semibold">Data Health</h3>
-  <p class="text-slate-500 text-[11px]">Live signals about the data feeding this system. Phase-1: ingestion freshness, field mapping, coverage. Phase-2: reconciliation.</p>
+  <h3 class="text-sm font-semibold">Data Health</h3>
+  <p class="text-xs text-base-content/50">Live signals about the data feeding this system. Phase-1: ingestion freshness, field mapping, coverage. Phase-2: reconciliation.</p>
 </header>
 
-<div class="grid grid-cols-2 gap-3">
+<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 
   {# Panel 1: Ingestion freshness #}
-  <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
-    <h4 class="text-slate-300 text-[12px] mb-2">Ingestion freshness</h4>
-    {% if not ingestion %}
-      <p class="text-slate-500 text-[11px]">No data sources configured.</p>
-    {% else %}
-      <table class="w-full text-[12px]">
-        <tbody>
-          {% for r in ingestion %}
-            {% set color = {'fresh':'emerald-400','amber':'amber-400','red':'rose-400','unknown':'slate-500'}[r.sla_status] %}
-            <tr>
-              <td class="py-1"><span class="text-{{ color }}">&#9679;</span> {{ r.source_name }}</td>
-              <td class="text-slate-500 text-[11px] py-1 text-right">
-                {{ r.last_event_at.strftime('%Y-%m-%d %H:%M') if r.last_event_at else 'no events seen' }}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    {% endif %}
+  <section class="card bg-base-200 shadow">
+    <div class="card-body p-3 gap-2">
+      <h4 class="card-title text-xs uppercase tracking-wider">Ingestion freshness</h4>
+      {% if not ingestion %}
+        <div role="alert" class="alert alert-info">
+          <span>No data sources configured.</span>
+        </div>
+      {% else %}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <tbody>
+              {% for r in ingestion %}
+                {% set sla_badge = {
+                  'fresh': 'badge-success',
+                  'amber': 'badge-warning',
+                  'red': 'badge-error',
+                  'unknown': 'badge-ghost'
+                }[r.sla_status] %}
+                <tr>
+                  <td>
+                    <span class="badge badge-sm {{ sla_badge }}">{{ r.sla_status }}</span>
+                    {{ r.source_name }}
+                  </td>
+                  <td class="text-right text-xs text-base-content/50">
+                    {{ r.last_event_at.strftime('%Y-%m-%d %H:%M') if r.last_event_at else 'no events seen' }}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
   </section>
 
   {# Panel 2: Field mapping completeness #}
-  <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
-    <h4 class="text-slate-300 text-[12px] mb-2">Field mapping</h4>
-    {% if not mapping %}
-      <p class="text-slate-500 text-[11px]">No data sources configured.</p>
-    {% else %}
-      {% for r in mapping %}
-        <div class="flex items-center gap-2 py-1 text-[12px]">
-          <span class="flex-1 text-slate-300">{{ r.source_name }}</span>
-          {% if r.completeness is none %}
-            <span class="text-slate-500 text-[11px]">no profile</span>
-          {% else %}
-            {% set pct = (r.completeness * 100) | round(0) | int %}
-            <div class="h-1 w-20 bg-slate-800 rounded">
-              <div class="h-full bg-cyan-400 rounded" data-ion-style="width: {{ pct }}%"></div>
-            </div>
-            <span class="text-cyan-300 text-[11px]">{{ pct }}%</span>
-          {% endif %}
+  <section class="card bg-base-200 shadow">
+    <div class="card-body p-3 gap-2">
+      <h4 class="card-title text-xs uppercase tracking-wider">Field mapping</h4>
+      {% if not mapping %}
+        <div role="alert" class="alert alert-info">
+          <span>No data sources configured.</span>
         </div>
-        {% if r.missing_fields %}
-          <p class="text-rose-400 text-[10px] pl-2 pb-1">missing: {{ r.missing_fields | join(', ') }}</p>
-        {% endif %}
-      {% endfor %}
-    {% endif %}
+      {% else %}
+        {% for r in mapping %}
+          <div class="flex items-center gap-2 py-1 text-xs">
+            <span class="flex-1">{{ r.source_name }}</span>
+            {% if r.completeness is none %}
+              <span class="badge badge-ghost badge-sm">no profile</span>
+            {% else %}
+              {% set pct = (r.completeness * 100) | round(0) | int %}
+              {# Native <progress> cannot carry a CSP-safe dynamic width; keep the fill hook. #}
+              <div class="h-1.5 w-20 rounded-full bg-base-300 overflow-hidden">
+                <div class="h-full bg-primary rounded-full" data-ion-style="width: {{ pct }}%"></div>
+              </div>
+              <span class="text-xs font-mono text-primary">{{ pct }}%</span>
+            {% endif %}
+          </div>
+          {% if r.missing_fields %}
+            <p class="text-xs text-error pl-2 pb-1">missing: {{ r.missing_fields | join(', ') }}</p>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    </div>
   </section>
 
   {# Panel 3: Coverage rollup #}
-  <section class="bg-slate-900/40 border border-slate-800 rounded p-3">
-    <h4 class="text-slate-300 text-[12px] mb-2">Coverage rollup</h4>
-    <div class="space-y-2 text-[12px]">
-      {% for k, label in [('intake_pct','Intake'),('detection_pct','Detection'),('audit_pct','Audit')] %}
-        {% set pct = (coverage.get(k, 0) * 100) | round(0) | int if coverage.get(k) is not none else 0 %}
-        <div class="flex items-center gap-2">
-          <span class="flex-1 text-slate-300">{{ label }}</span>
-          <div class="h-1 w-20 bg-slate-800 rounded">
-            <div class="h-full bg-emerald-400 rounded" data-ion-style="width: {{ pct }}%"></div>
+  <section class="card bg-base-200 shadow">
+    <div class="card-body p-3 gap-2">
+      <h4 class="card-title text-xs uppercase tracking-wider">Coverage rollup</h4>
+      <div class="flex flex-col gap-2 text-xs">
+        {% for k, label in [('intake_pct','Intake'),('detection_pct','Detection'),('audit_pct','Audit')] %}
+          {% set pct = (coverage.get(k, 0) * 100) | round(0) | int if coverage.get(k) is not none else 0 %}
+          <div class="flex items-center gap-2">
+            <span class="flex-1">{{ label }}</span>
+            {# Native <progress> cannot carry a CSP-safe dynamic width; keep the fill hook. #}
+            <div class="h-1.5 w-20 rounded-full bg-base-300 overflow-hidden">
+              <div class="h-full bg-success rounded-full" data-ion-style="width: {{ pct }}%"></div>
+            </div>
+            <span class="text-xs font-mono text-success">{{ pct }}%</span>
           </div>
-          <span class="text-emerald-300 text-[11px]">{{ pct }}%</span>
-        </div>
-      {% endfor %}
+        {% endfor %}
+      </div>
     </div>
   </section>
 
   {# Panel 4: Reconciliation (Phase 2 stub) #}
-  <section class="bg-slate-900/40 border border-slate-800 rounded p-3 opacity-50">
-    <h4 class="text-slate-300 text-[12px] mb-2">Reconciliation</h4>
-    <p class="text-slate-500 text-[11px]">{{ reconciliation.reason }}</p>
+  <section class="card bg-base-200 shadow opacity-50">
+    <div class="card-body p-3 gap-2">
+      <h4 class="card-title text-xs uppercase tracking-wider">Reconciliation</h4>
+      <div role="alert" class="alert alert-info">
+        <span>{{ reconciliation.reason }}</span>
+      </div>
+    </div>
   </section>
 
 </div>

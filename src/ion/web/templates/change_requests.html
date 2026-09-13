@@ -22,7 +22,7 @@
 
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
       <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
       <span class="label-tiny text-ion-iris">Change management</span>
@@ -32,12 +32,13 @@
   </div>
 </section>
 
-<section class="section">
-  <div class="section-header"><h2>New change request — ION upgrade</h2></div>
-  <div class="cr-form">
-    <div class="cr-grid">
-      <label>Change type
-        <select id="cf-type" class="ion-select" data-change-action="onCRTypeChange">
+<section class="card bg-base-200 shadow mb-6">
+  <div class="card-body">
+    <h2 class="card-title">New change request — ION upgrade</h2>
+    <div class="grid grid-cols-1 min-[821px]:grid-cols-3 gap-4">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Change type</legend>
+        <select id="cf-type" class="select w-full" data-change-action="onCRTypeChange">
           <option value="ION version upgrade" selected>ION version upgrade</option>
           <option value="New UAD">New UAD</option>
           <option value="Operating System">Operating System (OS)</option>
@@ -46,53 +47,95 @@
           <option value="Patching">Patching</option>
           <option value="Other">Other</option>
         </select>
-      </label>
-      <label class="cr-upgrade-only">Target version<input id="cf-target" class="ion-input" maxlength="40" placeholder="e.g. 0.49.0"></label>
-      <label>Risk
-        <select id="cf-risk" class="ion-select">
+      </fieldset>
+      <fieldset class="fieldset p-0 cr-upgrade-only">
+        <legend class="fieldset-legend">Target version</legend>
+        <input id="cf-target" class="input w-full" maxlength="40" placeholder="e.g. 0.49.0">
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Risk</legend>
+        <select id="cf-risk" class="select w-full">
           <option value="low">Low</option>
           <option value="medium" selected>Medium</option>
           <option value="high">High</option>
         </select>
+      </fieldset>
+    </div>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Title</legend>
+      <input id="cf-title" class="input w-full" maxlength="300" placeholder="(optional for an upgrade; required for other change types)">
+    </fieldset>
+    <div class="cr-upgrade-only grid grid-cols-1 min-[821px]:grid-cols-[1fr_auto] gap-4 items-end">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Current version</legend>
+        <input id="cf-current" class="input w-full" readonly>
+      </fieldset>
+      <button class="btn btn-ghost" data-click-action="loadChangelog">Pull CHANGELOG delta</button>
+    </div>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Justification</legend>
+      <textarea id="cf-just" class="textarea w-full" rows="2" placeholder="Why is this change needed?"></textarea>
+    </fieldset>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">What is changing (auto-filled from CHANGELOG)</legend>
+      <textarea id="cf-changes" class="textarea w-full" rows="5"></textarea>
+    </fieldset>
+    <div class="grid grid-cols-1 min-[821px]:grid-cols-2 gap-4">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Impact</legend>
+        <textarea id="cf-impact" class="textarea w-full" rows="3" placeholder="User/service impact, downtime"></textarea>
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Affected systems</legend>
+        <textarea id="cf-affected" class="textarea w-full" rows="3" placeholder="ION app + seeder containers, Postgres, …"></textarea>
+      </fieldset>
+    </div>
+    <div class="grid grid-cols-1 min-[821px]:grid-cols-2 gap-4">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Implementation plan</legend>
+        <textarea id="cf-impl" class="textarea w-full" rows="3" placeholder="docker compose pull && up -d, verify health"></textarea>
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Backout / rollback plan</legend>
+        <textarea id="cf-backout" class="textarea w-full" rows="3"></textarea>
+      </fieldset>
+    </div>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Test / validation plan</legend>
+      <textarea id="cf-test" class="textarea w-full" rows="2" placeholder="Login, dashboard, run a triage, check integrations"></textarea>
+    </fieldset>
+    <div class="grid grid-cols-1 min-[821px]:grid-cols-3 gap-4 items-end">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Planned change date</legend>
+        <input id="cf-planned" type="date" class="input w-full">
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Window start</legend>
+        <input id="cf-start" type="datetime-local" class="input w-full">
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Window end</legend>
+        <input id="cf-end" type="datetime-local" class="input w-full">
+      </fieldset>
+      <label class="flex items-center gap-2 cursor-pointer text-sm">
+        <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="cf-gitlab" checked>
+        Create linked GitLab issue
       </label>
     </div>
-    <div class="cr-row">
-      <label>Title<input id="cf-title" class="ion-input" maxlength="300" placeholder="(optional for an upgrade; required for other change types)"></label>
-    </div>
-    <div class="cr-row cr-upgrade-only">
-      <label>Current version<input id="cf-current" class="ion-input" readonly></label>
-      <button class="ion-btn ion-btn-ghost cr-load" data-click-action="loadChangelog">Pull CHANGELOG delta</button>
-    </div>
-    <div class="cr-row"><label>Justification<textarea id="cf-just" class="ion-input" rows="2" placeholder="Why is this change needed?"></textarea></label></div>
-    <div class="cr-row"><label>What is changing (auto-filled from CHANGELOG)<textarea id="cf-changes" class="ion-input" rows="5"></textarea></label></div>
-    <div class="cr-grid2">
-      <label>Impact<textarea id="cf-impact" class="ion-input" rows="3" placeholder="User/service impact, downtime"></textarea></label>
-      <label>Affected systems<textarea id="cf-affected" class="ion-input" rows="3" placeholder="ION app + seeder containers, Postgres, …"></textarea></label>
-    </div>
-    <div class="cr-grid2">
-      <label>Implementation plan<textarea id="cf-impl" class="ion-input" rows="3" placeholder="docker compose pull && up -d, verify health"></textarea></label>
-      <label>Backout / rollback plan<textarea id="cf-backout" class="ion-input" rows="3"></textarea></label>
-    </div>
-    <div class="cr-row"><label>Test / validation plan<textarea id="cf-test" class="ion-input" rows="2" placeholder="Login, dashboard, run a triage, check integrations"></textarea></label></div>
-    <div class="cr-grid">
-      <label>Planned change date<input id="cf-planned" type="date" class="ion-input"></label>
-      <label>Window start<input id="cf-start" type="datetime-local" class="ion-input"></label>
-      <label>Window end<input id="cf-end" type="datetime-local" class="ion-input"></label>
-      <label class="cr-chk"><input type="checkbox" id="cf-gitlab" checked> Create linked GitLab issue</label>
-    </div>
-    <div class="cr-actions">
-      <span id="cf-msg" class="ion-muted"></span>
-      <button class="ion-btn ion-btn-primary" data-click-action="submitCR">Create change request</button>
+    <div class="flex flex-wrap justify-end items-center gap-4">
+      <span id="cf-msg" class="text-sm text-base-content/60"></span>
+      <button class="btn btn-primary" data-click-action="submitCR">Create change request</button>
     </div>
   </div>
 </section>
 
-<section class="section">
-  <div class="section-header">
-    <h2>Change requests</h2>
-    <div class="filter-controls">
-      <label>Status:
-        <select id="filter-status" class="ion-select sh-filter-select" data-change-action="loadCRs">
+<section class="card bg-base-200 shadow">
+  <div class="card-body p-0">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300">
+      <h2 class="card-title text-base">Change requests</h2>
+      <label class="flex items-center gap-2 text-sm">
+        <span class="text-base-content/60">Status:</span>
+        <select id="filter-status" class="select select-sm w-auto" data-change-action="loadCRs">
           <option value="all" selected>All</option>
           <option value="draft">Draft</option>
           <option value="submitted">Submitted</option>
@@ -105,34 +148,38 @@
         </select>
       </label>
     </div>
-  </div>
-  <div class="table-container">
-    <table class="ion-table" id="crs-table">
-      <thead>
-        <tr><th>Ref</th><th>Title</th><th>Type</th><th>Risk</th><th>Status</th><th>Requested by</th><th>GitLab</th><th>Created</th><th>Actions</th></tr>
-      </thead>
-      <tbody id="crs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="table table-sm" id="crs-table">
+        <thead>
+          <tr><th>Ref</th><th>Title</th><th>Type</th><th>Risk</th><th>Status</th><th>Requested by</th><th>GitLab</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="crs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </section>
 
 <style nonce="{{ csp_nonce }}">
-.section { background: var(--bg-secondary); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
-.filter-controls { display:flex; gap:1rem; align-items:center; }
-.sh-filter-select { width:auto; }
-.table-container { overflow-x:auto; }
-.loading { text-align:center; color: var(--text-secondary); padding: 2rem; }
-.cr-form label { display:block; font-size:12px; color: var(--text-secondary); margin-bottom:.35rem; }
-.cr-row { margin-bottom: 1rem; }
-.cr-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:1rem; margin-bottom:1rem; }
-.cr-grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; margin-bottom:1rem; }
-@media (max-width: 820px){ .cr-grid, .cr-grid2 { grid-template-columns: 1fr; } }
-.cr-chk { display:flex; align-items:center; gap:.5rem; margin-top:1.6rem; }
-.cr-load { align-self:flex-end; margin-top:.35rem; }
-.cr-actions { display:flex; justify-content:flex-end; align-items:center; gap:1rem; }
-.cr-act { display:flex; gap:.35rem; flex-wrap:wrap; }
-.dw-hidden { display:none; }
+/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
+#crs-table td.loading {
+    display: table-cell;
+    aspect-ratio: auto;
+    width: auto;
+    height: auto;
+    background: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.6;
+}
+
+/* JS toggles .dw-hidden on .cr-upgrade-only (not Tailwind .hidden). */
+.dw-hidden,
+.cr-upgrade-only.dw-hidden { display: none; }
+
+/* JS innerHTML wraps row actions in .cr-act; no daisyUI equivalent on a JS-emitted class. */
+.cr-act { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 </style>
 
 <script nonce="{{ csp_nonce }}">

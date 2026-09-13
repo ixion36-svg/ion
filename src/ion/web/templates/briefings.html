@@ -3,61 +3,62 @@
 {% block title %}About ION — Briefing Decks{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1200px] w-full px-4 sm:px-6 lg:px-10 py-10 md:py-14">
 
   <!-- Header -->
   <section class="mb-8 rise d-1">
     <div class="flex items-center gap-3 mb-4">
-      <span class="h-2 w-2 rounded-full bg-ion-cyan inline-block"></span>
-      <span class="label-tiny text-ion-cyan uppercase tracking-[0.2em] text-[11px] font-semibold">About ION</span>
+      <span class="h-1.5 w-1.5 rounded-full bg-primary pulse-cyan"></span>
+      <span class="label-tiny text-primary">About ION</span>
     </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-[1.05] text-white tracking-[-0.02em]">Briefing &amp; Overview decks</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Ready-to-present decks explaining what ION does, how it works, and the integrations behind it. Hit <span class="text-ion-cyan font-medium">Present</span> for a full-screen, single-slide show (or click any slide below). Downloads appear where a deck has a companion document.</p>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-[1.05] tracking-[-0.02em]">Briefing &amp; Overview decks</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Ready-to-present decks explaining what ION does, how it works, and the integrations behind it. Hit <span class="text-primary font-medium">Present</span> for a full-screen, single-slide show (or click any slide below). Downloads appear where a deck has a companion document.</p>
   </section>
 
   <!-- Deck toggle + downloads -->
   <section class="flex flex-wrap items-center justify-between gap-4 mb-8 rise d-2">
-    <div class="flex items-center gap-1 bg-slate-900/60 border border-slate-700 rounded-lg p-1" role="tablist">
+    <div class="tabs tabs-box flex-wrap" role="tablist">
       {# One tab per decks-dict entry — hardcoding this list is how the
          ai-airgap deck shipped unreachable from the UI. #}
       {% for key, d in decks.items() %}
       <a href="/about?deck={{ key }}"
-         class="px-4 py-1.5 rounded-md text-sm font-medium transition-colors {% if deck == key %}bg-ion-cyan text-ink-950{% else %}text-slate-300 hover:text-white{% endif %}">{{ d.label }}</a>
+         role="tab"
+         class="tab {% if deck == key %}tab-active{% endif %}">{{ d.label }}</a>
       {% endfor %}
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
       {% if slides %}
       <button type="button" data-click-action="presentStart" data-args="[0]"
-         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-ion-cyan hover:brightness-110 text-ink-950 font-semibold text-sm transition-colors">
+         class="btn btn-primary">
         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         Present</button>
       {% endif %}
       {% if current.pdf %}
       <a href="{{ current.pdf }}" download
-         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm text-slate-100 transition-colors">
-        <svg class="w-4 h-4 text-ion-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+         class="btn btn-ghost">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
         PDF</a>
       {% endif %}
       {% if current.pptx %}
       <a href="{{ current.pptx }}" download
-         class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-sm text-slate-100 transition-colors">
-        <svg class="w-4 h-4 text-ion-cyan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+         class="btn btn-ghost">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
         PowerPoint</a>
       {% endif %}
     </div>
   </section>
 
   <!-- Current deck caption -->
-  <p class="text-[13px] text-slate-500 mb-5">{{ current.blurb }}</p>
+  <p class="text-sm text-base-content/50 mb-5">{{ current.blurb }}</p>
 
   <!-- Slide gallery -->
   <section id="slide-gallery" class="flex flex-col gap-6 rise d-3">
     {% for s in slides %}
-    <figure class="relative rounded-xl overflow-hidden border border-slate-700/70 shadow-xl bg-ink-900 cursor-pointer group" data-click-action="presentStart" data-args="[{{ loop.index0 }}]">
-      <span class="absolute top-3 left-3 z-10 px-2 py-0.5 rounded-md bg-black/55 text-slate-200 font-mono text-[11px]">{{ "%02d"|format(loop.index) }} / {{ slides|length }}</span>
-      <span class="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/30">
-        <span class="px-3 py-1.5 rounded-full bg-ion-cyan text-ink-950 text-xs font-semibold">▶ Present from here</span>
+    <figure class="card bg-base-200 shadow-xl overflow-hidden relative cursor-pointer group border border-base-300" data-click-action="presentStart" data-args="[{{ loop.index0 }}]">
+      <span class="badge badge-neutral font-mono absolute top-3 left-3 z-10">{{ "%02d"|format(loop.index) }} / {{ slides|length }}</span>
+      <span class="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-neutral/30">
+        <span class="btn btn-primary btn-sm pointer-events-none">▶ Present from here</span>
       </span>
       <img src="{{ s }}" data-slide-src="{{ s }}" alt="{{ current.label }} — slide {{ loop.index }}" class="w-full h-auto block" loading="lazy">
     </figure>
@@ -66,30 +67,34 @@
 
   <!-- Full-screen single-slide presenter (hidden until Present) -->
   {% if slides %}
-  <div id="present-overlay" class="present-hidden fixed inset-0 z-[100] bg-ink-950/95 backdrop-blur-sm flex-col items-center justify-center"
+  <div id="present-overlay" class="present-hidden fixed inset-0 z-[100] bg-base-100/95 backdrop-blur-sm flex-col items-center justify-center"
        data-deck-label="{{ current.label }}">
     <img id="present-img" src="" alt="" class="max-w-[94vw] max-h-[82vh] object-contain rounded-lg shadow-2xl">
     <div class="mt-4 flex items-center gap-4">
       <button type="button" data-click-action="presentPrev" aria-label="Previous slide"
-        class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-100 text-lg leading-none">‹</button>
-      <span id="present-counter" class="text-slate-300 font-mono text-sm tabular-nums"></span>
+        class="btn btn-ghost text-lg leading-none">‹</button>
+      <span id="present-counter" class="font-mono text-sm tabular-nums text-base-content/70"></span>
       <button type="button" data-click-action="presentNext" aria-label="Next slide"
-        class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-100 text-lg leading-none">›</button>
+        class="btn btn-ghost text-lg leading-none">›</button>
     </div>
     <button type="button" data-click-action="presentClose" aria-label="Close presentation"
-      class="absolute top-5 right-6 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-sm">Esc ✕</button>
-    <span class="absolute top-6 left-6 text-slate-400 text-[12px] uppercase tracking-[0.18em]">{{ current.label }}</span>
+      class="btn btn-ghost btn-sm absolute top-5 right-6">Esc ✕</button>
+    <span class="absolute top-6 left-6 text-base-content/50 text-[12px] uppercase tracking-[0.18em]">{{ current.label }}</span>
   </div>
   {% endif %}
 
   {% if not slides %}
-  <div class="rounded-lg border border-amber-500/30 bg-amber-900/20 px-5 py-4 text-amber-300 text-sm">Deck images not found. Rebuild the ION image so the briefing assets are bundled under <code class="font-mono bg-slate-800 px-1 rounded">static/briefings/</code>.</div>
+  <div role="alert" class="alert alert-warning">
+    <span>Deck images not found. Rebuild the ION image so the briefing assets are bundled under <code class="font-mono bg-base-300 px-1 rounded">static/briefings/</code>.</span>
+  </div>
   {% endif %}
 
 </div>
 </div>
 
 <style nonce="{{ csp_nonce }}">
+  /* JS toggles .present-hidden on #present-overlay and .present-active on
+     body. Neither is a daisyUI state, so these rules stay. */
   #present-overlay { display: flex; }
   #present-overlay.present-hidden { display: none; }
   body.present-active { overflow: hidden; }

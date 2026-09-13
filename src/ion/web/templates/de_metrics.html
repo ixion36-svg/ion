@@ -3,7 +3,7 @@
 {% block title %}DE Metrics - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {# Route audit phase 7: /detection-health and /de-metrics both aggregate
    per-rule FP/noise from closed cases over a 90-day default and both offer a
@@ -25,26 +25,26 @@
 {% if tabs | length > 1 %}{% include "_nav_tabs.html" %}{% endif %}
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="de-hero flex-1">
   <div class="flex items-center gap-3 mb-4">
-    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-shield"/></svg>
-    <span class="label-tiny text-ion-cyan">Detection engineering · Phase 0</span>
+    <svg class="w-4 h-4 text-primary"><use href="#i-shield"/></svg>
+    <span class="label-tiny text-primary">Detection engineering · Phase 0</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">DE Metrics</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Noise campaigns — false-positive closures clustered by rule, ranked by the analyst-hours they cost. Measurement only: ION surfaces the noise, the analyst decides what to tune.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">DE Metrics</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Noise campaigns — false-positive closures clustered by rule, ranked by the analyst-hours they cost. Measurement only: ION surfaces the noise, the analyst decides what to tune.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="de-days" class="ion-select" data-change-action="deLoad">
+        <select id="de-days" class="select select-sm w-auto" data-change-action="deLoad">
             <option value="7">Last 7 days</option>
             <option value="30">Last 30 days</option>
             <option value="90" selected>Last 90 days</option>
             <option value="180">Last 180 days</option>
         </select>
-        <button class="ion-btn ion-btn-primary" data-click-action="deLoad">Refresh</button>
+        <button class="btn btn-primary btn-sm" data-click-action="deLoad">Refresh</button>
     </div>
 </section>
 
-<div id="de-content"><div class="de-loading"><span class="de-spinner"></span> Loading DE metrics...</div></div>
+<div id="de-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading DE metrics...</div></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -52,35 +52,13 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.de-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.de-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:de-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes de-spin{to{transform:rotate(360deg)}}
-
-.de-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.de-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative;overflow:hidden}
-.de-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
-.de-stat-val{font-size:1.5rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
-.de-stat-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-.de-stat-sub{font-size:.68rem;color:var(--text-secondary);margin-top:2px}
-.de-stat.crit .de-stat-val{color:var(--sev-critical)}.de-stat.crit::before{background:var(--sev-critical)}
-.de-stat.warn .de-stat-val{color:var(--sev-medium)}.de-stat.warn::before{background:var(--sev-medium)}
-.de-stat.good .de-stat-val{color:var(--mitre-covered,#34d399)}.de-stat.good::before{background:var(--mitre-covered,#34d399)}
-
-.de-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
-.de-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
-.de-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.de-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
-.de-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary);vertical-align:middle}
-.de-table tr:hover td{background:rgba(0,212,255,.03)}
-.mono{font-family:'JetBrains Mono',monospace;font-size:.78rem}
-.de-muted{color:var(--text-secondary)}
-.de-hours{font-weight:700;color:var(--sev-medium)}
-.de-chip{display:inline-block;font-size:.66rem;font-weight:600;padding:1px 6px;border-radius:4px;margin:1px 3px 1px 0;background:rgba(99,110,123,.18);color:var(--text-secondary)}
-.de-chip-mitre{background:rgba(0,212,255,.12);color:var(--ion-cyan,#00d4ff)}
-.de-act{cursor:pointer;color:var(--primary);font-size:.74rem;background:none;border:none;padding:0;text-decoration:underline}
-.de-drill{font-size:.76rem;color:var(--text-secondary);padding:8px 10px;background:rgba(0,0,0,.15);border-radius:4px;margin-top:4px}
-.de-trend-rising{color:var(--sev-critical)}.de-trend-falling{color:var(--mitre-covered,#34d399)}.de-trend-flat{color:var(--text-secondary)}
-.de-note{font-size:.76rem;color:var(--text-secondary);margin-top:10px;line-height:1.5}
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+.de-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+/* Compiled ion.css has no basis-full / md:basis-auto. Wrap the copy to a full
+   row below md so it cannot shrink beside the period controls. */
+@media (max-width: 767px) {
+  .de-hero { flex-basis: 100%; }
+}
 </style>
 <script nonce="{{ csp_nonce }}">
 const DE_API = '/api/de';
@@ -91,29 +69,38 @@ let _deData = null;
 
 async function deLoad(){
     const days = de$('de-days').value;
-    de$('de-content').innerHTML = '<div class="de-loading"><span class="de-spinner"></span> Loading DE metrics...</div>';
+    de$('de-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading DE metrics...</div>';
     try {
         const r = await fetch(DE_API + '/metrics?days=' + encodeURIComponent(days));
         if(!r.ok) throw new Error('HTTP ' + r.status);
         _deData = await r.json();
         deRender(_deData);
     } catch(e) {
-        de$('de-content').innerHTML = '<div class="de-loading">Failed to load: ' + deEsc(e.message) + '</div>';
+        de$('de-content').innerHTML = '<div role="alert" class="alert alert-error"><span>Failed to load: ' + deEsc(e.message) + '</span></div>';
     }
 }
 
 function deStat(val, label, cls, sub){
-    return '<div class="de-stat ' + (cls||'') + '"><div class="de-stat-val">' + val + '</div>'
-         + '<div class="de-stat-label">' + label + '</div>'
-         + (sub ? '<div class="de-stat-sub">' + sub + '</div>' : '') + '</div>';
+    const tone = cls === 'crit' ? 'text-error' : cls === 'warn' ? 'text-warning' : cls === 'good' ? 'text-success' : 'text-primary';
+    return '<div class="stat bg-base-200 shadow rounded-lg"><div class="stat-title">' + label + '</div>'
+         + '<div class="stat-value text-2xl ' + tone + '">' + val + '</div>'
+         + (sub ? '<div class="stat-desc">' + sub + '</div>' : '') + '</div>';
 }
 
 function deTrendText(t){
-    if(!t) return '<span class="de-muted">—</span>';
-    const cls = t.direction === 'rising' ? 'de-trend-rising' : t.direction === 'falling' ? 'de-trend-falling' : 'de-trend-flat';
+    if(!t) return '<span class="opacity-50">—</span>';
+    const cls = t.direction === 'rising' ? 'text-error' : t.direction === 'falling' ? 'text-success' : 'opacity-50';
     const arrow = t.direction === 'rising' ? '▲' : t.direction === 'falling' ? '▼' : '▬';
     const d = (t.delta_pct === null || t.delta_pct === undefined) ? '' : (' ' + (t.delta_pct > 0 ? '+' : '') + t.delta_pct + '%');
     return '<span class="' + cls + '">' + arrow + ' ' + deEsc(t.direction) + d + '</span>';
+}
+
+function deSevBadge(name){
+    const n = String(name || '').toLowerCase();
+    if(n === 'critical' || n === 'crit') return 'badge-error';
+    if(n === 'high' || n === 'medium' || n === 'med') return 'badge-warning';
+    if(n === 'low' || n === 'info' || n === 'informational') return 'badge-info';
+    return 'badge-ghost';
 }
 
 function deRender(d){
@@ -123,7 +110,7 @@ function deRender(d){
     const agreeVal = (agree.agreement_rate === null || agree.agreement_rate === undefined) ? '—' : (agree.agreement_rate + '%');
     const agreeCls = (agree.agreement_rate === null) ? '' : (agree.agreement_rate >= 80 ? 'good' : agree.agreement_rate >= 60 ? 'warn' : 'crit');
 
-    let html = '<div class="de-stats">';
+    let html = '<div class="de-stats gap-3 mb-6">';
     html += deStat((s.addressable_hours || 0), 'Addressable hours', (s.addressable_hours >= 8 ? 'warn' : ''), 'reclaimable if resolved');
     html += deStat((s.total_fp_alerts || 0), 'FP alerts', '', 'closed as FP/benign');
     html += deStat((s.campaign_count || 0), 'Noise campaigns', (s.campaign_count ? 'warn' : ''), 'rules ≥ min cluster');
@@ -133,35 +120,36 @@ function deRender(d){
     html += '</div>';
 
     const camps = d.campaigns || [];
-    html += '<div class="de-section"><div class="de-section-title">Noise campaigns — costliest first · ' + (d.period_days||90) + 'd</div>';
+    html += '<div class="card bg-base-200 shadow"><div class="card-body">';
+    html += '<h2 class="card-title text-base">Noise campaigns — costliest first · ' + (d.period_days||90) + 'd</h2>';
     if(!camps.length){
-        html += '<div class="de-muted">No false-positive closures in this window (or none reaching the minimum cluster size). Campaigns appear as cases are closed as false-positive / benign.</div>';
+        html += '<div role="alert" class="alert alert-info"><span>No false-positive closures in this window (or none reaching the minimum cluster size). Campaigns appear as cases are closed as false-positive / benign.</span></div>';
     } else {
-        html += '<table class="de-table"><thead><tr><th>Rule</th><th>FP alerts</th><th>Cases</th><th>Cost (hrs)</th><th>Window</th><th>Severity</th><th>MITRE</th><th></th></tr></thead><tbody>';
+        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Rule</th><th>FP alerts</th><th>Cases</th><th>Cost (hrs)</th><th>Window</th><th>Severity</th><th>MITRE</th><th></th></tr></thead><tbody>';
         for(const c of camps){
-            const sev = Object.entries(c.severity_mix || {}).map(function(kv){return '<span class="de-chip">' + deEsc(kv[0]) + ' ' + kv[1] + '</span>'}).join('');
-            const mitre = (c.mitre_techniques || []).slice(0,6).map(function(m){return '<span class="de-chip de-chip-mitre">' + deEsc(m) + '</span>'}).join('') || '<span class="de-muted">—</span>';
+            const sev = Object.entries(c.severity_mix || {}).map(function(kv){return '<span class="badge badge-sm ' + deSevBadge(kv[0]) + '">' + deEsc(kv[0]) + ' ' + kv[1] + '</span>'}).join(' ');
+            const mitre = (c.mitre_techniques || []).slice(0,6).map(function(m){return '<span class="badge badge-sm badge-info font-mono">' + deEsc(m) + '</span>'}).join(' ') || '<span class="opacity-50">—</span>';
             const win = deWindow(c.first_seen, c.last_seen);
             const split = (c.benign_true_positive ? (c.false_positive + ' FP + ' + c.benign_true_positive + ' benign') : '');
             html += '<tr>'
-                + '<td class="mono">' + deEsc(c.rule_name) + '</td>'
-                + '<td class="mono">' + c.fp_alerts + (split ? '<div class="de-stat-sub">' + split + '</div>' : '') + '</td>'
-                + '<td class="mono">' + c.case_count + '</td>'
-                + '<td><span class="de-hours">' + c.cost_hours + '</span></td>'
-                + '<td class="de-muted">' + win + '</td>'
-                + '<td>' + (sev || '<span class="de-muted">—</span>') + '</td>'
-                + '<td>' + mitre + '</td>'
-                + '<td><button class="de-act" data-click-action="deDrill" data-args=\'["' + deEsc(c.rule_name) + '"]\'>Evidence</button>'
-                + ' · <button class="de-act" data-click-action="deDraft" data-args=\'["' + deEsc(c.rule_name) + '"]\'>Draft proposal</button></td>'
+                + '<td class="font-mono text-sm">' + deEsc(c.rule_name) + '</td>'
+                + '<td class="font-mono text-sm">' + c.fp_alerts + (split ? '<div class="text-xs opacity-50">' + split + '</div>' : '') + '</td>'
+                + '<td class="font-mono text-sm">' + c.case_count + '</td>'
+                + '<td><span class="font-bold text-warning">' + c.cost_hours + '</span></td>'
+                + '<td class="opacity-50">' + win + '</td>'
+                + '<td><div class="flex flex-wrap gap-1">' + (sev || '<span class="opacity-50">—</span>') + '</div></td>'
+                + '<td><div class="flex flex-wrap gap-1">' + mitre + '</div></td>'
+                + '<td><button class="btn btn-ghost btn-sm" data-click-action="deDrill" data-args=\'["' + deEsc(c.rule_name) + '"]\'>Evidence</button>'
+                + ' <button class="btn btn-ghost btn-sm" data-click-action="deDraft" data-args=\'["' + deEsc(c.rule_name) + '"]\'>Draft proposal</button></td>'
                 + '</tr>';
-            html += '<tr id="de-drill-' + deSlug(c.rule_name) + '" hidden><td colspan="8"><div class="de-drill">—</div></td></tr>';
+            html += '<tr id="de-drill-' + deSlug(c.rule_name) + '" hidden><td colspan="8"><div class="de-drill text-sm bg-base-300 rounded p-2 mt-1">—</div></td></tr>';
         }
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
     }
-    html += '<div class="de-note"><strong>Reading this:</strong> hours are <em>addressable</em> — the analyst time these FPs are still costing at '
+    html += '<div role="alert" class="alert alert-info text-sm"><span><strong>Reading this:</strong> hours are <em>addressable</em> — the analyst time these FPs are still costing at '
           + (d.settings ? d.settings.minutes_per_alert : 10) + ' min/alert. Nothing is auto-tuned or suppressed; drafting a fix and applying it is Phase 1. '
-          + 'Bob agreement is measured over closed alerts where Bob scored a verdict.</div>';
-    html += '</div>';
+          + 'Bob agreement is measured over closed alerts where Bob scored a verdict.</span></div>';
+    html += '</div></div>';
     de$('de-content').innerHTML = html;
 }
 
@@ -182,13 +170,13 @@ function deDrill(rule){
     let h = '';
     const sigs = c.top_signatures || [];
     h += '<strong>Top triggering signatures</strong>: ';
-    h += sigs.length ? sigs.map(function(x){return '<span class="de-chip mono">' + deEsc(x.value) + ' ×' + x.count + '</span>'}).join('') : '<span class="de-muted">none captured</span>';
+    h += sigs.length ? sigs.map(function(x){return '<span class="badge badge-sm badge-ghost font-mono">' + deEsc(x.value) + ' ×' + x.count + '</span>'}).join(' ') : '<span class="opacity-50">none captured</span>';
     const hosts = c.top_hosts || [];
     h += '<br><strong>Top hosts</strong>: ';
-    h += hosts.length ? hosts.map(function(x){return '<span class="de-chip mono">' + deEsc(x.value) + ' ×' + x.count + '</span>'}).join('') : '<span class="de-muted">none captured</span>';
+    h += hosts.length ? hosts.map(function(x){return '<span class="badge badge-sm badge-ghost font-mono">' + deEsc(x.value) + ' ×' + x.count + '</span>'}).join(' ') : '<span class="opacity-50">none captured</span>';
     const ids = c.sample_alert_ids || [];
     if(ids.length){
-        h += '<br><strong>Sample alert ids</strong>: <span class="mono de-muted">' + ids.map(deEsc).join(', ') + '</span>';
+        h += '<br><strong>Sample alert ids</strong>: <span class="font-mono text-xs opacity-50">' + ids.map(deEsc).join(', ') + '</span>';
     }
     cell.innerHTML = h;
 }

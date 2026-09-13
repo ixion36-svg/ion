@@ -3,7 +3,7 @@
 {% block title %}Courses · ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {% set tabs = [
     {"label": "ION Guide", "href": "/guide"},
@@ -16,13 +16,13 @@
 {% include "_nav_tabs.html" %}
 
   <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-    <div class="flex-1 min-w-0">
+    <div class="basis-full md:basis-auto md:flex-1">
       <div class="flex items-center gap-3 mb-4">
         <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
         <span class="label-tiny text-ion-iris">SOC training</span>
       </div>
-      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Courses</h1>
-      <p class="mt-3 max-w-2xl text-[15px] text-slate-400">
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Courses</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">
         Tiered curriculum for L1 / L2 / L3 / L4 SOC analysts. Each course bundles
         modules → lessons → quizzes; complete every lesson and pass the quizzes
         to earn the badge for that tier.
@@ -31,43 +31,39 @@
     {# Route audit phase 7: /my-courses was this same catalogue filtered by
        enrolment plus four progress fields, rendering the identical card grid —
        and each page linked to the other. It is now a scope toggle here. #}
-    <div class="inline-flex rounded-md border border-white/10 overflow-hidden" role="group" aria-label="Course scope">
+    <div class="join" role="group" aria-label="Course scope">
       <button type="button" id="cl-scope-all" data-click-action="setScope" data-args='["all"]'
-              class="h-10 px-5 text-[13px] font-semibold transition bg-ion-cyan text-ink-950">All courses</button>
+              class="btn join-item btn-primary">All courses</button>
       <button type="button" id="cl-scope-mine" data-click-action="setScope" data-args='["mine"]'
-              class="h-10 px-5 text-[13px] font-semibold transition bg-white/5 text-slate-200 hover:bg-white/10">My courses</button>
+              class="btn join-item btn-ghost">My courses</button>
     </div>
   </section>
 
   <!-- Level filter strip -->
   <div class="flex flex-wrap gap-2 mb-6">
-    <button data-click-action="filterLevel" data-args='[""]'      class="cl-filter cl-filter-active" data-level="">All levels</button>
-    <button data-click-action="filterLevel" data-args='["L1"]'    class="cl-filter" data-level="L1">L1 — Tier-1 SOC</button>
-    <button data-click-action="filterLevel" data-args='["L2"]'    class="cl-filter" data-level="L2">L2 — Senior analyst</button>
-    <button data-click-action="filterLevel" data-args='["L3"]'    class="cl-filter" data-level="L3">L3 — IR / hunting</button>
-    <button data-click-action="filterLevel" data-args='["L4"]'    class="cl-filter" data-level="L4">L4 — Lead / engineering</button>
+    <button data-click-action="filterLevel" data-args='[""]'      class="btn btn-sm btn-ghost cl-filter cl-filter-active" data-level="">All levels</button>
+    <button data-click-action="filterLevel" data-args='["L1"]'    class="btn btn-sm btn-ghost cl-filter" data-level="L1">L1 — Tier-1 SOC</button>
+    <button data-click-action="filterLevel" data-args='["L2"]'    class="btn btn-sm btn-ghost cl-filter" data-level="L2">L2 — Senior analyst</button>
+    <button data-click-action="filterLevel" data-args='["L3"]'    class="btn btn-sm btn-ghost cl-filter" data-level="L3">L3 — IR / hunting</button>
+    <button data-click-action="filterLevel" data-args='["L4"]'    class="btn btn-sm btn-ghost cl-filter" data-level="L4">L4 — Lead / engineering</button>
   </div>
 
   <div id="courses-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-    <div class="text-slate-500 text-[13px] py-8 col-span-full text-center">Loading…</div>
+    <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50 col-span-full">
+      <span class="loading loading-spinner loading-sm text-primary"></span> Loading…
+    </div>
   </div>
 </div>
 </div>
 
 <style nonce="{{ csp_nonce }}">
-.cl-filter{padding:0.5rem 0.95rem;border-radius:0.4rem;border:1px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.03);color:var(--text-secondary);font-size:0.78rem;font-weight:600;cursor:pointer;transition:background .12s,border-color .12s}
-.cl-filter:hover{background:rgba(255,255,255,0.07)}
-.cl-filter-active{background:var(--primary-dim);border-color:var(--primary);color:var(--text-primary)}
-.cl-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.5rem;padding:1.25rem;transition:transform .12s,border-color .12s;display:flex;flex-direction:column;gap:0.55rem;text-decoration:none;color:inherit}
-.cl-card:hover{transform:translateY(-2px);border-color:var(--primary)}
-.cl-level-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px;margin-bottom:0.4rem}
-.cl-level-L1{background:rgba(34,197,94,0.14);color:#86efac}
-.cl-level-L2{background:rgba(109,228,255,0.14);color:#6de4ff}
-.cl-level-L3{background:rgba(245,158,11,0.14);color:#fbbf24}
-.cl-level-L4{background:rgba(239,68,68,0.14);color:#fca5a5}
-.cl-title{font-size:1.05rem;font-weight:700;color:var(--text-primary);line-height:1.3}
-.cl-meta{display:flex;flex-wrap:wrap;gap:0.6rem;font-size:0.7rem;color:var(--text-muted);margin-top:auto;padding-top:0.5rem;border-top:1px solid var(--border)}
-.cl-desc{font-size:0.82rem;color:var(--text-secondary);line-height:1.45}
+/* JS toggles .cl-filter-active on .cl-filter, not daisyUI .btn-active. Bridge the two. */
+.btn.cl-filter.cl-filter-active {
+  background-color: var(--color-primary);
+  color: var(--color-primary-content);
+  font-weight: 600;
+  border-color: var(--color-primary);
+}
 </style>
 
 <script nonce="{{ csp_nonce }}">
@@ -78,13 +74,13 @@ let _scope = 'all';
 
 function setScope(scope) {
   _scope = scope === 'mine' ? 'mine' : 'all';
-  const on  = 'bg-ion-cyan text-ink-950';
-  const off = 'bg-white/5 text-slate-200 hover:bg-white/10';
+  const on  = 'btn join-item btn-primary';
+  const off = 'btn join-item btn-ghost';
   const all = document.getElementById('cl-scope-all');
   const mine = document.getElementById('cl-scope-mine');
   if (all && mine) {
-    all.className  = 'h-10 px-5 text-[13px] font-semibold transition ' + (_scope === 'all' ? on : off);
-    mine.className = 'h-10 px-5 text-[13px] font-semibold transition ' + (_scope === 'mine' ? on : off);
+    all.className  = _scope === 'all'  ? on : off;
+    mine.className = _scope === 'mine' ? on : off;
   }
   loadCourses();
 }
@@ -92,7 +88,7 @@ window.setScope = setScope;
 
 async function loadCourses() {
   const grid = document.getElementById('courses-grid');
-  grid.innerHTML = '<div class="text-slate-500 text-[13px] py-8 col-span-full text-center">Loading…</div>';
+  grid.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50 col-span-full"><span class="loading loading-spinner loading-sm text-primary"></span> Loading…</div>';
   try {
     const r = await fetch(_scope === 'mine' ? '/api/my-courses' : '/api/courses');
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -100,7 +96,7 @@ async function loadCourses() {
     _courses = d.courses || [];
     render();
   } catch (e) {
-    grid.innerHTML = '<div class="text-ion-coral text-[13px] py-8 col-span-full text-center">Failed to load: ' + e.message + '</div>';
+    grid.innerHTML = '<div role="alert" class="alert alert-error col-span-full"><span>Failed to load: ' + e.message + '</span></div>';
   }
 }
 
@@ -123,20 +119,27 @@ function render() {
   let rows = _courses;
   if (_currentLevel) rows = rows.filter(c => c.level === _currentLevel);
   if (!rows.length) {
-    grid.innerHTML = '<div class="text-slate-500 text-[13px] py-8 col-span-full text-center">No published courses' +
-      (_currentLevel ? ' for ' + _currentLevel : '') + ' yet.</div>';
+    grid.innerHTML = '<div role="alert" class="alert alert-info col-span-full justify-center"><span>No published courses' +
+      (_currentLevel ? ' for ' + _currentLevel : '') + ' yet.</span></div>';
     return;
   }
   grid.innerHTML = rows.map(c => {
     // Strip markdown for the description preview — full markdown renders on detail page
     const desc = (c.description_md || '').replace(/[#*`_>]+/g, '').slice(0, 220);
-    return `<a class="cl-card" href="/courses/${escHtml(c.slug)}">
-      <span class="cl-level-pill cl-level-${escHtml(c.level)}">${escHtml(c.level)}</span>
-      <div class="cl-title">${escHtml(c.title)}</div>
-      <div class="cl-desc">${escHtml(desc)}${desc.length >= 220 ? '…' : ''}</div>
-      <div class="cl-meta">
+    const levelBadge = c.level === 'L1' ? 'badge-success'
+      : c.level === 'L2' ? 'badge-info'
+      : c.level === 'L3' ? 'badge-warning'
+      : c.level === 'L4' ? 'badge-error'
+      : 'badge-ghost';
+    return `<a class="card bg-base-200 shadow border border-base-300 transition hover:-translate-y-0.5 hover:border-primary no-underline text-inherit h-full" href="/courses/${escHtml(c.slug)}">
+      <div class="card-body">
+      <span class="badge badge-sm ${levelBadge}">${escHtml(c.level)}</span>
+      <h2 class="card-title text-base">${escHtml(c.title)}</h2>
+      <p class="text-sm opacity-70">${escHtml(desc)}${desc.length >= 220 ? '…' : ''}</p>
+      <div class="mt-auto pt-2 border-t border-base-300 flex flex-wrap gap-3 text-xs opacity-60">
         <span>⏱ ~${c.estimated_hours}h</span>
         <span>Pass ≥ ${c.pass_threshold}%</span>
+      </div>
       </div>
     </a>`;
   }).join('');

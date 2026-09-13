@@ -13,19 +13,20 @@
   {% set status_icon = {
     'done': '✓', 'in_progress': '◐', 'missing': '✗', 'na': '—', 'unknown': '○'
   }.get(item.status, '○') %}
+  {# Colour names are JS-coupled: setRowStatus() add/removes text-<name>. #}
   {% set status_color = {
     'done': 'emerald-400', 'in_progress': 'amber-400',
     'missing': 'rose-400', 'na': 'slate-500', 'unknown': 'slate-500'
   }.get(item.status, 'slate-500') %}
-  <div class="checklist-item flex items-center gap-3 py-1.5 px-2 hover:bg-slate-800/40 rounded"
+  <div class="checklist-item flex flex-wrap items-center gap-3 py-1.5 px-2 hover:bg-base-300 rounded"
        data-kind="{{ item.kind }}" data-item-id="{{ item.id }}">
-    <span class="status-icon text-{{ status_color }} text-[14px] w-4">{{ status_icon }}</span>
-    <span class="flex-1 text-[13px] text-slate-200">{{ item.label }}</span>
-    <span class="text-slate-600 text-[10px] font-mono uppercase">{{ item.kind }}</span>
+    <span class="status-icon text-{{ status_color }} text-sm w-4 shrink-0">{{ status_icon }}</span>
+    <span class="flex-1 text-sm">{{ item.label }}</span>
+    <span class="badge badge-ghost badge-sm font-mono uppercase shrink-0">{{ item.kind }}</span>
     {% if item.url %}
-      <a href="{{ item.url }}" class="text-cyan-400 text-[11px] hover:underline" target="_blank" rel="noopener">link</a>
+      <a href="{{ item.url }}" class="link link-primary text-xs shrink-0" target="_blank" rel="noopener">link</a>
     {% endif %}
-    <select class="checklist-status px-1.5 py-0.5 bg-slate-900 border border-slate-700 text-slate-200 text-[11px] rounded w-24"
+    <select class="checklist-status select select-sm w-32 shrink-0"
             data-item-id="{{ item.id }}" aria-label="Status for {{ item.label }}">
       <option value="unknown"     {% if item.status == 'unknown' %}selected{% endif %}>Unknown</option>
       <option value="missing"     {% if item.status == 'missing' %}selected{% endif %}>Missing</option>
@@ -38,9 +39,9 @@
 {% endmacro %}
 
 {% if critical_items %}
-<section class="mb-6">
-  <h3 class="text-rose-400 text-[11px] uppercase tracking-wider mb-2">Critical (must complete to ship)</h3>
-  <div class="bg-slate-900/40 border border-rose-900/30 rounded-md p-2">
+<section class="card bg-base-200 shadow mb-6 border border-error/30">
+  <div class="card-body p-3 gap-1">
+    <h3 class="card-title text-error text-xs uppercase tracking-wider">Critical (must complete to ship)</h3>
     {% for item in critical_items %}{{ item_row(item) }}{% endfor %}
   </div>
 </section>
@@ -50,12 +51,12 @@
 {% for cat in categories %}
   {% set rows = non_critical | selectattr('category', 'equalto', cat) | list %}
   {% if rows %}
-    <section class="mb-5">
-      <h3 class="text-slate-400 text-[11px] uppercase tracking-wider mb-2">
-        {{ cat | capitalize }}
-        ({{ rows | selectattr('status', 'equalto', 'done') | list | length }} / {{ rows | length }})
-      </h3>
-      <div class="bg-slate-900/40 border border-slate-800 rounded-md p-2">
+    <section class="card bg-base-200 shadow mb-5">
+      <div class="card-body p-3 gap-1">
+        <h3 class="card-title text-xs uppercase tracking-wider text-base-content/60">
+          {{ cat | capitalize }}
+          ({{ rows | selectattr('status', 'equalto', 'done') | list | length }} / {{ rows | length }})
+        </h3>
         {% for item in rows %}{{ item_row(item) }}{% endfor %}
       </div>
     </section>
@@ -65,24 +66,26 @@
 {# "Add custom item" form — POSTs to /api/cyab/systems/{id}/checklist
    as JSON. v0.19.4: was HTMX form-encoded which the BaseModel-bound
    endpoint silently 422'd on. #}
-<section class="mt-6 pt-4 border-t border-slate-800">
-  <details>
-    <summary class="text-cyan-400 text-[12px] cursor-pointer">+ Add custom checklist item</summary>
-    <form id="cyab-add-checklist-form"
-          data-system-id="{{ system.id }}"
-          class="mt-3 flex gap-2 items-center"
-          onsubmit="return cyabAddChecklistItem(event)">
-      <input name="label" placeholder="e.g. Quarterly access review" required
-             class="flex-1 px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
-      <select name="category" class="px-2 py-1 bg-slate-900 border border-slate-700 text-[12px] rounded">
-        <option value="design">Design</option>
-        <option value="operational">Operational</option>
-        <option value="security">Security</option>
-        <option value="compliance">Compliance</option>
-      </select>
-      <button type="submit" class="px-3 py-1 bg-cyan-700 text-white text-[12px] rounded">Add</button>
-      <span id="cyab-add-checklist-msg" class="text-[11px] text-slate-500"></span>
-    </form>
+<section class="mt-6">
+  <details class="collapse collapse-arrow bg-base-200 shadow">
+    <summary class="collapse-title min-h-0 py-3 text-sm text-primary cursor-pointer">+ Add custom checklist item</summary>
+    <div class="collapse-content">
+      <form id="cyab-add-checklist-form"
+            data-system-id="{{ system.id }}"
+            class="flex flex-wrap gap-2 items-center"
+            onsubmit="return cyabAddChecklistItem(event)">
+        <input name="label" placeholder="e.g. Quarterly access review" required
+               class="input input-sm basis-full md:basis-auto md:flex-1">
+        <select name="category" class="select select-sm w-auto">
+          <option value="design">Design</option>
+          <option value="operational">Operational</option>
+          <option value="security">Security</option>
+          <option value="compliance">Compliance</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Add</button>
+        <span id="cyab-add-checklist-msg" class="text-xs text-slate-500"></span>
+      </form>
+    </div>
   </details>
 </section>
 

@@ -6,7 +6,7 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-iris"><use href="#i-file-text"/></svg>
     <span class="label-tiny text-ion-iris">Stakeholder brief</span>
@@ -15,14 +15,14 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Boardroom-ready roll-up of operational posture.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="er-days" class="ion-select er-range" data-change-action="erLoad">
+        <select id="er-days" class="select select-sm w-auto" data-change-action="erLoad">
             <option value="7" selected>Last 7 days</option>
             <option value="14">Last 14 days</option>
             <option value="30">Last 30 days</option>
         </select>
-        <button class="ion-btn ion-btn-primary" data-click-action="erLoad">Generate</button>
-        <button class="ion-btn" data-click-action="erDownloadPdf"><i class="icon-download"></i> PDF</button>
-        <button class="ion-btn" data-window-print><i class="icon-printer"></i> Print</button>
+        <button class="btn btn-primary" data-click-action="erLoad">Generate</button>
+        <button class="btn btn-ghost" data-click-action="erDownloadPdf"><i class="icon-download"></i> PDF</button>
+        <button class="btn btn-ghost" data-window-print><i class="icon-printer"></i> Print</button>
     </div>
 </section>
 
@@ -31,15 +31,15 @@
    the same default window, and this page's "Team Performance" table was a
    strict 3-column subset of its 9-column "Per-Analyst Breakdown". Merged here
    as a Team tab; that page now redirects. #}
-<div class="flex items-center gap-1 p-1 mb-6 rounded-lg bg-white/5 border border-white/10 w-fit">
-  <button type="button" id="er-tab-summary" data-click-action="erTab" data-args='["summary"]'
-          class="px-4 py-2 rounded-md text-xs font-semibold transition bg-ion-cyan text-ink-950">Summary</button>
-  <button type="button" id="er-tab-team" data-click-action="erTab" data-args='["team"]'
-          class="px-4 py-2 rounded-md text-xs font-semibold transition text-slate-400 hover:text-white">Team</button>
+<div role="tablist" class="tabs tabs-box w-fit mb-6">
+  <button type="button" role="tab" id="er-tab-summary" data-click-action="erTab" data-args='["summary"]'
+          class="tab tab-active">Summary</button>
+  <button type="button" role="tab" id="er-tab-team" data-click-action="erTab" data-args='["team"]'
+          class="tab">Team</button>
 </div>
 
-<div id="er-content"><div class="er-loading"><span class="er-spinner"></span> Generating executive report...</div></div>
-<div id="er-team" class="hidden"><div class="er-loading"><span class="er-spinner"></span> Loading team metrics...</div></div>
+<div id="er-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Generating executive report...</div></div>
+<div id="er-team" class="hidden"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading team metrics...</div></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -47,58 +47,16 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.er-range{width:auto}
-.er-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.er-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:er-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes er-spin{to{transform:rotate(360deg)}}
-
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
 .er-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
-.er-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;text-align:center;position:relative;overflow:hidden}
-.er-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
-.er-stat-val{font-size:1.4rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
-.er-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;margin-top:4px}
-.er-stat.crit .er-stat-val{color:var(--sev-critical)}.er-stat.crit::before{background:var(--sev-critical)}
-.er-stat.green .er-stat-val{color:var(--mitre-covered)}.er-stat.green::before{background:var(--mitre-covered)}
-.er-stat.warn .er-stat-val{color:var(--sev-medium)}.er-stat.warn::before{background:var(--sev-medium)}
 
-.er-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
-.er-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.er-section-title i{color:var(--primary)}
-.er-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.er-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;border-bottom:1px solid var(--border)}
-.er-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15)}
-.er-table tr:hover td{background:rgba(0,212,255,.03)}
-.mono{font-family:'JetBrains Mono',monospace;font-size:.78rem}
+@media print{.navbar,.header-actions,.chat-widget,.chat-toggle{display:none!important}body{background:#fff;color:#000}.card,.stat{break-inside:avoid;border-color:#ddd}}
 
-.er-trend-chart{display:flex;align-items:flex-end;gap:6px;height:100px;padding:8px 0}
-.er-trend-group{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1}
-.er-trend-bars{display:flex;gap:2px;align-items:flex-end;height:80px}
-.er-trend-bar{width:12px;border-radius:2px 2px 0 0;min-height:2px}
-.er-trend-label{font-size:.6rem;color:var(--text-muted);white-space:nowrap}
-
-@media print{.navbar,.header-actions,.chat-widget,.chat-toggle{display:none!important}body{background:#fff;color:#000}.er-section,.er-stat{break-inside:avoid;border-color:#ddd}}
-
-/* Team tab - ported from the retired /analyst-efficiency page (phase 7) */
-.ae-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.ae-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative;overflow:hidden}
-.ae-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
-.ae-stat-val{font-size:1.5rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
-.ae-stat-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-.ae-stat.crit .ae-stat-val{color:var(--sev-critical)}.ae-stat.crit::before{background:var(--sev-critical)}
-.ae-stat.green .ae-stat-val{color:var(--mitre-covered)}.ae-stat.green::before{background:var(--mitre-covered)}
-.ae-stat.warn .ae-stat-val{color:var(--sev-medium)}.ae-stat.warn::before{background:var(--sev-medium)}
-.ae-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
-.ae-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.ae-section-title i{color:var(--primary)}
-.ae-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.ae-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);cursor:pointer}
-.ae-table th:hover{color:var(--text-primary)}
-.ae-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary)}
-.ae-table tr:hover td{background:rgba(0,212,255,.03)}
+/* JS sets .ae-activity-bar height from data-pct; hover .tip has no daisyUI equivalent. */
 .ae-activity-chart{display:flex;align-items:flex-end;gap:2px;height:80px;padding:8px 0}
-.ae-activity-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:var(--primary);opacity:.7;position:relative}
+.ae-activity-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:var(--color-primary);opacity:.7;position:relative}
 .ae-activity-bar:hover{opacity:1}
-.ae-activity-bar .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);padding:3px 8px;background:var(--bg-card);border:1px solid var(--border);border-radius:4px;font-size:.68rem;white-space:nowrap;z-index:10}
+.ae-activity-bar .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);padding:3px 8px;background:var(--color-base-200);border:1px solid var(--color-base-300);border-radius:4px;font-size:.68rem;white-space:nowrap;z-index:10}
 .ae-activity-bar:hover .tip{display:block}
 </style>
 <script nonce="{{ csp_nonce }}">
@@ -109,13 +67,13 @@ function fmtDate(iso){if(!iso)return'-';return new Date(iso).toLocaleDateString(
 
 async function erLoad(){
     const days = $('er-days').value;
-    $('er-content').innerHTML = '<div class="er-loading"><span class="er-spinner"></span> Generating executive report...</div>';
+    $('er-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Generating executive report...</div>';
     try{
         const r = await fetch(API+'/json?days='+days);
         if(!r.ok) throw new Error('Failed');
         renderReport(await r.json());
     } catch(e){
-        $('er-content').innerHTML = `<div class="er-loading _ion-s-5dd0211252">${esc(e.message)}</div>`;
+        $('er-content').innerHTML = `<div role="alert" class="alert alert-error _ion-s-5dd0211252">${esc(e.message)}</div>`;
     }
 }
 
@@ -144,46 +102,46 @@ function renderReport(d){
     // Trend chart
     const daily = (d.trends||{}).daily||[];
     if(daily.length){
-        html += '<div class="er-section"><div class="er-section-title"><i class="icon-trending-up"></i> Daily Trend</div>';
+        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-trending-up text-primary"></i> Daily Trend</h3>';
         const maxVal = Math.max(...daily.map(d=>Math.max(d.opened,d.closed)),1);
-        html += '<div class="er-trend-chart">';
+        html += '<div class="flex items-end gap-1.5 h-[100px] py-2">';
         for(const day of daily){
             const oh = Math.max(day.opened/maxVal*80,2);
             const ch = Math.max(day.closed/maxVal*80,2);
-            html += `<div class="er-trend-group">
-                <div class="er-trend-bars">
-                    <div class="er-trend-bar _ion-s-aaedcd59fa" data-ion-style="height:${oh}px" title="Opened: ${day.opened}"></div>
-                    <div class="er-trend-bar _ion-s-26f4da1bb9" data-ion-style="height:${ch}px" title="Closed: ${day.closed}"></div>
+            html += `<div class="flex flex-col items-center gap-0.5 flex-1">
+                <div class="flex gap-0.5 items-end h-20">
+                    <div class="w-3 rounded-t min-h-0.5 _ion-s-aaedcd59fa" data-ion-style="height:${oh}px" title="Opened: ${day.opened}"></div>
+                    <div class="w-3 rounded-t min-h-0.5 _ion-s-26f4da1bb9" data-ion-style="height:${ch}px" title="Closed: ${day.closed}"></div>
                 </div>
-                <span class="er-trend-label">${day.date.substring(5)}</span>
+                <span class="text-[0.6rem] opacity-50 whitespace-nowrap">${day.date.substring(5)}</span>
             </div>`;
         }
-        html += '</div><div class="_ion-s-d2c5f04842"><span class="_ion-s-8f813ee01f"><span class="_ion-s-b01217e141"></span>Opened</span><span class="_ion-s-8f813ee01f"><span class="_ion-s-d27032f0a8"></span>Closed</span></div></div>';
+        html += '</div><div class="_ion-s-d2c5f04842"><span class="_ion-s-8f813ee01f"><span class="_ion-s-b01217e141"></span>Opened</span><span class="_ion-s-8f813ee01f"><span class="_ion-s-d27032f0a8"></span>Closed</span></div></div></div>';
     }
 
     // Closure reasons
     const reasons = c.closure_reasons||{};
     if(Object.keys(reasons).length){
-        html += '<div class="er-section"><div class="er-section-title"><i class="icon-pie-chart"></i> Closure Reasons</div>';
+        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-pie-chart text-primary"></i> Closure Reasons</h3>';
         html += '<div class="_ion-s-42cd01a7ba">';
         const total = Object.values(reasons).reduce((a,b)=>a+b,0);
         for(const [reason,count] of Object.entries(reasons).sort((a,b)=>b[1]-a[1])){
             const pct = Math.round(count/total*100);
             const color = reason==='true_positive'?'var(--mitre-covered)':reason==='false_positive'?'var(--sev-critical)':'var(--text-secondary)';
-            html += `<div class="_ion-s-91a87015f4"><div class="mono _ion-s-2871763e47" data-ion-style="color:${color}">${count}</div><div class="_ion-s-e65c44381d">${reason.replace(/_/g,' ')} (${pct}%)</div></div>`;
+            html += `<div class="_ion-s-91a87015f4"><div class="font-mono _ion-s-2871763e47" data-ion-style="color:${color}">${count}</div><div class="_ion-s-e65c44381d">${reason.replace(/_/g,' ')} (${pct}%)</div></div>`;
         }
-        html += '</div></div>';
+        html += '</div></div></div>';
     }
 
     // Notable incidents
     const incidents = d.notable_incidents||[];
     if(incidents.length){
-        html += '<div class="er-section"><div class="er-section-title"><i class="icon-alert-triangle"></i> Notable Incidents</div>';
-        html += '<table class="er-table"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead><tbody>';
+        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-alert-triangle text-primary"></i> Notable Incidents</h3>';
+        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th><th>Date</th></tr></thead><tbody>';
         for(const inc of incidents){
-            html += `<tr><td class="mono">${esc(inc.case_number)}</td><td>${esc(inc.title)}</td><td><span class="sev-badge sev-${inc.severity}">${esc(inc.severity)}</span></td><td>${esc(inc.status)}</td><td class="_ion-s-f63147b2ed">${fmtDate(inc.created_at)}</td></tr>`;
+            html += `<tr><td class="font-mono">${esc(inc.case_number)}</td><td>${esc(inc.title)}</td><td>${erSevBadge(inc.severity)}</td><td>${esc(inc.status)}</td><td class="_ion-s-f63147b2ed">${fmtDate(inc.created_at)}</td></tr>`;
         }
-        html += '</tbody></table></div>';
+        html += '</tbody></table></div></div></div>';
     }
 
     // Team
@@ -192,24 +150,33 @@ function renderReport(d){
     // /analyst-efficiency (route audit phase 7).
     const team = (d.team||{}).analysts||[];
     if(team.length){
-        html += '<div class="er-section"><div class="er-section-title"><i class="icon-users"></i> Team Performance</div>';
-        html += '<table class="er-table"><thead><tr><th>Analyst</th><th>Cases Closed</th><th>Total Actions</th></tr></thead><tbody>';
-        for(const t of team) html += `<tr><td class="_ion-s-eed0f8fb89">${esc(t.username)}</td><td class="mono">${t.cases_closed}</td><td class="mono">${t.total_actions}</td></tr>`;
-        html += '</tbody></table></div>';
+        html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-users text-primary"></i> Team Performance</h3>';
+        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Analyst</th><th>Cases Closed</th><th>Total Actions</th></tr></thead><tbody>';
+        for(const t of team) html += `<tr><td class="_ion-s-eed0f8fb89">${esc(t.username)}</td><td class="font-mono">${t.cases_closed}</td><td class="font-mono">${t.total_actions}</td></tr>`;
+        html += '</tbody></table></div></div></div>';
     }
 
     $('er-content').innerHTML = html;
 }
 
-function erStat(val,label,cls){return `<div class="er-stat ${cls}"><div class="er-stat-val">${val}</div><div class="er-stat-label">${label}</div></div>`}
+function erSevBadge(sev){
+    const s = (sev || '').toLowerCase();
+    const kind = s === 'critical' ? 'badge-error' : s === 'high' ? 'badge-warning' : s === 'medium' ? 'badge-info' : s === 'low' ? 'badge-success' : 'badge-ghost';
+    return `<span class="badge badge-sm ${kind}">${esc(sev || '-')}</span>`;
+}
+
+function erStat(val,label,cls){
+    const tone = cls === 'crit' ? 'text-error' : cls === 'green' ? 'text-success' : cls === 'warn' ? 'text-warning' : 'text-primary';
+    return `<div class="stat bg-base-200 shadow rounded-box text-center"><div class="stat-value font-mono text-2xl ${tone}">${val}</div><div class="stat-title">${label}</div></div>`;
+}
 
 
 let _erTeamLoaded = false;
 
 function erTab(which) {
     const isTeam = which === 'team';
-    const on = 'px-4 py-2 rounded-md text-xs font-semibold transition bg-ion-cyan text-ink-950';
-    const off = 'px-4 py-2 rounded-md text-xs font-semibold transition text-slate-400 hover:text-white';
+    const on = 'tab tab-active';
+    const off = 'tab';
     document.getElementById('er-tab-summary').className = isTeam ? off : on;
     document.getElementById('er-tab-team').className = isTeam ? on : off;
     document.getElementById('er-content').classList.toggle('hidden', isTeam);
@@ -231,7 +198,7 @@ async function erLoadTeam() {
 
         const hourly = d.hourly_activity || [];
         if (hourly.length) {
-            html += '<div class="ae-section"><div class="ae-section-title">Activity Timeline (Last 24h)</div>';
+            html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70">Activity Timeline (Last 24h)</h3>';
             const maxVal = Math.max(...hourly.map(h => (h.cases_closed||0) + (h.alerts_triaged||0)), 1);
             html += '<div class="ae-activity-chart">';
             for (const h of hourly) {
@@ -243,39 +210,39 @@ async function erLoadTeam() {
                 // browser drops, so those bars never had a height.
                 html += '<div class="ae-activity-bar" data-pct="' + pct + '"><div class="tip">' + time + ': ' + val + ' actions</div></div>';
             }
-            html += '</div></div>';
+            html += '</div></div></div>';
         }
 
         const analysts = d.analysts || [];
         if (analysts.length) {
-            html += '<div class="ae-section"><div class="ae-section-title">Per-Analyst Breakdown</div>';
-            html += '<table class="ae-table"><thead><tr><th>Analyst</th><th>Cases Closed</th><th>Cases Opened</th><th>Alerts Triaged</th><th>True Positives</th><th>False Positives</th><th>FP Rate</th><th>Avg MTTR</th><th>Total Actions</th></tr></thead><tbody>';
+            html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70">Per-Analyst Breakdown</h3>';
+            html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Analyst</th><th>Cases Closed</th><th>Cases Opened</th><th>Alerts Triaged</th><th>True Positives</th><th>False Positives</th><th>FP Rate</th><th>Avg MTTR</th><th>Total Actions</th></tr></thead><tbody>';
             for (const a of analysts) {
                 html += '<tr><td>' + esc(a.username) + '</td>'
-                     + '<td class="mono">' + a.cases_closed + '</td>'
-                     + '<td class="mono">' + a.cases_opened + '</td>'
-                     + '<td class="mono">' + a.alerts_triaged + '</td>'
-                     + '<td class="mono">' + a.true_positives + '</td>'
-                     + '<td class="mono">' + a.false_positives + '</td>'
-                     + '<td class="mono">' + a.fp_rate + '%</td>'
-                     + '<td class="mono">' + (a.avg_mttr_hours != null ? a.avg_mttr_hours + 'h' : '-') + '</td>'
-                     + '<td class="mono">' + a.total_actions + '</td></tr>';
+                     + '<td class="font-mono">' + a.cases_closed + '</td>'
+                     + '<td class="font-mono">' + a.cases_opened + '</td>'
+                     + '<td class="font-mono">' + a.alerts_triaged + '</td>'
+                     + '<td class="font-mono">' + a.true_positives + '</td>'
+                     + '<td class="font-mono">' + a.false_positives + '</td>'
+                     + '<td class="font-mono">' + a.fp_rate + '%</td>'
+                     + '<td class="font-mono">' + (a.avg_mttr_hours != null ? a.avg_mttr_hours + 'h' : '-') + '</td>'
+                     + '<td class="font-mono">' + a.total_actions + '</td></tr>';
             }
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             // This FP rate divides by real dispositions (TP+FP); the Summary tab
             // divides by ALL closures. See services/case_metrics.
             if ((d.team_summary || {}).fp_rate_basis === 'of_dispositions') {
-                html += '<p class="text-[12px] text-slate-500 mt-2">FP Rate here is measured against true/false-positive dispositions only; the Summary tab measures it against all closures.</p>';
+                html += '<p class="text-xs opacity-50 mt-2">FP Rate here is measured against true/false-positive dispositions only; the Summary tab measures it against all closures.</p>';
             }
-            html += '</div>';
+            html += '</div></div>';
         }
 
-        el.innerHTML = html || '<div class="er-section">No team activity in this window.</div>';
+        el.innerHTML = html || '<div class="card bg-base-200 shadow"><div class="card-body">No team activity in this window.</div></div>';
         el.querySelectorAll('.ae-activity-bar[data-pct]').forEach(function (b) {
             b.style.height = b.getAttribute('data-pct') + '%';
         });
     } catch (e) {
-        el.innerHTML = '<div class="er-section">Failed to load team metrics: ' + esc(e.message) + '</div>';
+        el.innerHTML = '<div role="alert" class="alert alert-error">Failed to load team metrics: ' + esc(e.message) + '</div>';
     }
 }
 

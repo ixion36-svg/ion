@@ -1,64 +1,70 @@
 {# Chronological feed table — included by audit.html and reusable for HTMX swaps. #}
 {% if not feed.events %}
-  <p class="text-slate-500 text-[12px] py-6 text-center">
+  <div role="alert" class="alert alert-info justify-center">
     No events match the current filters.
-  </p>
+  </div>
 {% else %}
-<table class="ion-table">
-  <thead>
-    <tr>
-      <th>When</th>
-      <th>Who</th>
-      <th>Action</th>
-      <th>What</th>
-      <th>System</th>
-      <th>Links</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for ev in feed.events %}
-      <tr>
-        <td class="ion-mono text-[11px]">
-          {{ ev.when[:19].replace('T', ' ') }}
-        </td>
-        <td class="text-slate-300">{{ ev.who }}</td>
-        <td>
-          {% set badge_class = {
-            'create':             'ion-c-cyan',
-            'signoff':            'ion-c-green',
-            'snapshot':           'ion-c-muted',
-            'checklist_update':   'ion-c-muted',
-            'containment_change': 'ion-c-amber',
-            'archive':            'ion-c-red',
-          }.get(ev.action_type, 'ion-c-muted') %}
-          <span class="ion-badge {{ badge_class }} font-mono">
-            {{ ev.action_type }}
-          </span>
-        </td>
-        <td class="text-slate-300">{{ ev.what }}</td>
-        <td class="text-cyan-400">
-          {% if ev.system_id %}
-            <a href="/cyab/systems/{{ ev.system_id }}" class="hover:underline">
-              {{ ev.system_name or '#' ~ ev.system_id }}
-            </a>
-          {% endif %}
-        </td>
-        <td>
-          <a href="{{ ev.link }}" class="text-cyan-400 text-[11px] hover:underline">view</a>
-          {% if ev.pdf_link %}
-            <span class="text-slate-600 px-1">·</span>
-            <a href="{{ ev.pdf_link }}" target="_blank"
-               class="text-cyan-400 text-[11px] hover:underline"
-               title="View onboarding pack PDF as of {{ ev.snapshot_date }}">
-              pack@{{ ev.snapshot_date }}
-            </a>
-          {% endif %}
-        </td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
-<p class="text-slate-500 text-[10.5px] mt-3">
+<div class="card bg-base-200 shadow">
+  <div class="card-body p-0">
+    <div class="overflow-x-auto">
+      <table class="table table-sm w-full">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Who</th>
+            <th>Action</th>
+            <th>What</th>
+            <th>System</th>
+            <th>Links</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ev in feed.events %}
+            <tr>
+              <td class="font-mono text-xs">
+                {{ ev.when[:19].replace('T', ' ') }}
+              </td>
+              <td>{{ ev.who }}</td>
+              <td>
+                {% set badge_class = {
+                  'create':             'badge-info',
+                  'signoff':            'badge-success',
+                  'snapshot':           'badge-ghost',
+                  'checklist_update':   'badge-ghost',
+                  'containment_change': 'badge-warning',
+                  'archive':            'badge-error',
+                }.get(ev.action_type, 'badge-ghost') %}
+                <span class="badge badge-sm {{ badge_class }} font-mono">
+                  {{ ev.action_type }}
+                </span>
+              </td>
+              <td>{{ ev.what }}</td>
+              <td>
+                {% if ev.system_id %}
+                  <a href="/cyab/systems/{{ ev.system_id }}" class="link link-hover">
+                    {{ ev.system_name or '#' ~ ev.system_id }}
+                  </a>
+                {% endif %}
+              </td>
+              <td>
+                <a href="{{ ev.link }}" class="link link-hover text-xs">view</a>
+                {% if ev.pdf_link %}
+                  <span class="text-base-content/40 px-1">·</span>
+                  <a href="{{ ev.pdf_link }}" target="_blank"
+                     class="link link-hover text-xs"
+                     title="View onboarding pack PDF as of {{ ev.snapshot_date }}">
+                    pack@{{ ev.snapshot_date }}
+                  </a>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<p class="text-base-content/50 text-xs mt-3">
   Showing {{ feed.events | length }} of {{ feed.total }} events.
 </p>
 {% endif %}

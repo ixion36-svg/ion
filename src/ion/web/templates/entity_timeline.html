@@ -3,19 +3,19 @@
 {% block title %}Entity Timeline - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<section class="ion-page-header flex-wrap gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
-    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-activity"/></svg>
-    <span class="label-tiny text-ion-cyan">Timeline reconstruction</span>
+    <svg class="w-4 h-4 text-primary"><use href="#i-activity"/></svg>
+    <span class="label-tiny text-primary">Timeline reconstruction</span>
   </div>
-  <h1 class="ion-ph-title font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Entity Timeline</h1>
-  <p class="ion-ph-sub mt-3 max-w-2xl text-[15px]">Reconstruct activity for a host, user, or IOC across sources.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Entity Timeline</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Reconstruct activity for a host, user, or IOC across sources.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="et-hours" class="ion-select et-select">
+        <select id="et-hours" class="select select-sm w-auto">
             <option value="24">Last 24h</option>
             <option value="168" selected>Last 7 days</option>
             <option value="720">Last 30 days</option>
@@ -23,25 +23,31 @@
     </div>
 </section>
 
-<div class="et-search-bar">
-    <input type="text" id="et-query" class="ion-input et-input" placeholder="Enter IP, hostname, username, domain, or hash..." data-enter-key-action="etSearch">
-    <select id="et-type" class="ion-select et-select">
-        <option value="auto">Auto-detect</option>
-        <option value="ip">IP Address</option>
-        <option value="host">Hostname</option>
-        <option value="user">Username</option>
-        <option value="domain">Domain</option>
-        <option value="hash">Hash</option>
-        <option value="email">Email</option>
-    </select>
-    <button class="ion-btn ion-btn-primary" data-click-action="etSearch">Search</button>
+<div class="card bg-base-200 shadow mb-5">
+    <div class="card-body p-3">
+        <div class="flex flex-wrap items-center gap-2">
+            <input type="text" id="et-query" class="input flex-1 min-w-[240px]" placeholder="Enter IP, hostname, username, domain, or hash..." data-enter-key-action="etSearch">
+            <select id="et-type" class="select w-auto shrink-0">
+                <option value="auto">Auto-detect</option>
+                <option value="ip">IP Address</option>
+                <option value="host">Hostname</option>
+                <option value="user">Username</option>
+                <option value="domain">Domain</option>
+                <option value="hash">Hash</option>
+                <option value="email">Email</option>
+            </select>
+            <button class="btn btn-primary" data-click-action="etSearch">Search</button>
+        </div>
+    </div>
 </div>
 
 <div id="et-content">
-    <div class="et-empty">
-        <i class="icon-search _ion-s-d8e1e29e37"></i>
-        <div>Search for any entity to see its complete history across all ION data sources.</div>
-        <div class="_ion-s-56a0948f69">Cases, alert triage, observables, enrichments, and audit log entries — all in one timeline.</div>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body items-center text-center py-16">
+            <i class="icon-search _ion-s-d8e1e29e37"></i>
+            <div>Search for any entity to see its complete history across all ION data sources.</div>
+            <div class="_ion-s-56a0948f69">Cases, alert triage, observables, enrichments, and audit log entries — all in one timeline.</div>
+        </div>
     </div>
 </div>
 
@@ -51,55 +57,204 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.et-search-bar{display:flex;gap:8px;margin-bottom:20px;align-items:center}
-/* flex:1 1 240px + width:auto so the input grows; the type-select carries the
-   ion-select class (width:100%) which would otherwise eat the whole flex row. */
-.et-input{flex:1 1 240px;width:auto;padding:10px 14px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);color:var(--text-primary);font-size:.9rem}
-.et-input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-dim)}
-.et-input::placeholder{color:var(--text-muted)}
-.et-select{flex:0 0 auto;width:auto;padding:10px 12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);color:var(--text-primary);font-size:.85rem}
-.et-empty{text-align:center;padding:60px;color:var(--text-secondary);font-size:.9rem}
+/* JS innerHTML: entity header after search. Not daisyUI card markup. */
+.et-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+}
+.et-entity-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+.et-entity-type {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: var(--radius-selector, 0.25rem);
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+}
 
-/* Entity header */
-.et-header{display:flex;gap:16px;align-items:center;margin-bottom:20px;padding:14px 18px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg)}
-.et-entity-value{font-size:1.1rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
-.et-entity-type{font-size:.72rem;font-weight:700;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--primary-dim);color:var(--primary)}
-.et-source-badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase;margin-right:4px}
-.et-source-case{background:var(--sev-high-bg);color:var(--sev-high)}
-.et-source-triage{background:var(--sev-critical-bg);color:var(--sev-critical)}
-.et-source-observable{background:var(--sev-info-bg);color:var(--sev-info)}
-.et-source-enrichment{background:var(--mitre-covered-bg);color:var(--mitre-covered)}
-.et-source-audit{background:var(--sev-low-bg);color:var(--sev-low)}
+/* JS innerHTML: source chips. Colours map onto daisyUI slots
+   (warning = ION amber / case; error = ION coral / triage; info = ION cyan /
+   observable; success = ION lime / enrichment). */
+.et-source-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-selector, 0.25rem);
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-right: 4px;
+}
+.et-source-case {
+    background: color-mix(in oklab, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
+}
+.et-source-triage {
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+}
+.et-source-observable {
+    background: color-mix(in oklab, var(--color-info) 15%, transparent);
+    color: var(--color-info);
+}
+.et-source-enrichment {
+    background: color-mix(in oklab, var(--color-success) 15%, transparent);
+    color: var(--color-success);
+}
+.et-source-audit {
+    background: var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
 
-/* Timeline */
-.et-timeline{position:relative;padding-left:32px}
-.et-timeline::before{content:'';position:absolute;left:11px;top:0;bottom:0;width:2px;background:var(--border)}
+/* JS innerHTML: vertical rail + per-source dots via ::before. daisyUI's
+   timeline component needs its own markup, which this script does not emit. */
+.et-timeline { position: relative; padding-left: 32px; }
+.et-timeline::before {
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-base-300);
+}
 
-.et-event{position:relative;margin-bottom:12px;padding:12px 16px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);transition:border-color .15s}
-.et-event:hover{border-color:var(--primary)}
-.et-event::before{content:'';position:absolute;left:-26px;top:16px;width:12px;height:12px;border-radius:50%;background:var(--bg-secondary);border:2px solid var(--border);z-index:1}
-.et-event.source-case::before{border-color:var(--sev-high);background:var(--sev-high-bg)}
-.et-event.source-triage::before{border-color:var(--sev-critical);background:var(--sev-critical-bg)}
-.et-event.source-observable::before{border-color:var(--sev-info);background:var(--sev-info-bg)}
-.et-event.source-enrichment::before{border-color:var(--mitre-covered);background:var(--mitre-covered-bg)}
-.et-event.source-audit::before{border-color:var(--sev-low);background:var(--sev-low-bg)}
+.et-event {
+    position: relative;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+    transition: border-color .15s;
+}
+.et-event:hover { border-color: var(--color-primary); }
+.et-event::before {
+    content: '';
+    position: absolute;
+    left: -26px;
+    top: 16px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-base-200);
+    border: 2px solid var(--color-base-300);
+    z-index: 1;
+}
+.et-event.source-case::before {
+    border-color: var(--color-warning);
+    background: color-mix(in oklab, var(--color-warning) 15%, transparent);
+}
+.et-event.source-triage::before {
+    border-color: var(--color-error);
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+}
+.et-event.source-observable::before {
+    border-color: var(--color-info);
+    background: color-mix(in oklab, var(--color-info) 15%, transparent);
+}
+.et-event.source-enrichment::before {
+    border-color: var(--color-success);
+    background: color-mix(in oklab, var(--color-success) 15%, transparent);
+}
+.et-event.source-audit::before {
+    border-color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    background: var(--color-base-300);
+}
 
-.et-event-header{display:flex;align-items:center;gap:8px;margin-bottom:4px}
-.et-event-title{font-size:.85rem;font-weight:600;color:var(--text-primary);flex:1}
-.et-event-time{font-size:.72rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
-.et-event-detail{font-size:.78rem;color:var(--text-secondary);margin-top:4px;line-height:1.5}
-.et-event-meta{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap}
-.et-meta-tag{font-size:.68rem;padding:1px 6px;background:var(--bg-card);border:1px solid var(--border);border-radius:3px;color:var(--text-secondary)}
+.et-event-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.et-event-title {
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--color-base-content);
+    flex: 1 1 auto;
+}
+.et-event-time {
+    font-size: .72rem;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+.et-event-detail {
+    font-size: .78rem;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    margin-top: 4px;
+    line-height: 1.5;
+}
+.et-event-meta { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.et-meta-tag {
+    font-size: .68rem;
+    padding: 1px 6px;
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-selector, 0.25rem);
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
 
-.et-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.et-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:et-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes et-spin{to{transform:rotate(360deg)}}
+/* JS innerHTML: loading / error / empty states. */
+.et-loading {
+    text-align: center;
+    padding: 60px;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+.et-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--color-base-300);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: et-spin .8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+@keyframes et-spin { to { transform: rotate(360deg); } }
+.et-empty {
+    text-align: center;
+    padding: 60px;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    font-size: .9rem;
+}
 
-/* Source filter */
-.et-filters{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
-.et-filter{padding:4px 12px;border:1px solid var(--border);border-radius:20px;font-size:.75rem;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all .15s}
-.et-filter:hover{border-color:var(--primary);color:var(--text-primary)}
-.et-filter.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
+/* JS querySelectorAll('.et-filter') and classList toggles .active, not daisyUI btn-active. */
+.et-filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.et-filter {
+    padding: 4px 12px;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    transition: border-color .15s, color .15s, background .15s;
+}
+.et-filter:hover {
+    border-color: var(--color-primary);
+    color: var(--color-base-content);
+}
+.et-filter.active {
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
 </style>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/entity-timeline';

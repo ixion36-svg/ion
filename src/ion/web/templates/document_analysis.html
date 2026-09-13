@@ -3,79 +3,84 @@
 {% block title %}AI Document Analysis - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1200px] w-full px-4 sm:px-6 lg:px-10 py-10 md:py-14">
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
       <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
       <span class="label-tiny text-ion-iris">Internal AI · air-gapped</span>
     </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-[1.05] text-white tracking-[-0.02em]">AI Document Analysis</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Read a large PDF with the internal model (Bob) — the document is chunked and map-reduced so it never overflows the context or response budget. Nothing leaves this environment.</p>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-[1.05] tracking-[-0.02em]">AI Document Analysis</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Read a large PDF with the internal model (Bob) — the document is chunked and map-reduced so it never overflows the context or response budget. Nothing leaves this environment.</p>
   </div>
 </section>
 
-<div id="disabled-banner" class="ion-banner dw-hidden">
-  <strong>This feature is turned off.</strong> Enable it by setting <code>ION_AI_LARGE_PDF_ENABLED=true</code> and restarting ION. Turn it back off when you're done.
+<div id="disabled-banner" role="alert" class="alert alert-warning mb-6 dw-hidden">
+  <span><strong>This feature is turned off.</strong> Enable it by setting <code class="font-mono">ION_AI_LARGE_PDF_ENABLED=true</code> and restarting ION. Turn it back off when you're done.</span>
 </div>
 
-<section class="section">
-  <div class="section-header"><h2>Analyse a document</h2><span id="da-status" class="ion-muted"></span></div>
-  <div class="da-form">
-    <div class="da-grid">
-      <label>Document (PDF, DOCX, TXT, HTML)
-        <input type="file" id="da-file" class="ion-input" accept=".pdf,.docx,.txt,.md,.html,.htm,.eml">
-      </label>
-      <label>Task
-        <select id="da-task" class="ion-select" data-change-action="onTaskChange">
+<section class="card bg-base-200 shadow mb-6">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <h2 class="card-title text-base">Analyse a document</h2>
+      <span id="da-status" class="text-sm text-base-content/50"></span>
+    </div>
+    <div class="grid grid-cols-1 min-[820px]:grid-cols-[2fr_1fr] gap-4 mb-4">
+      <div>
+        <label for="da-file" class="label text-xs text-base-content/60 py-1">Document (PDF, DOCX, TXT, HTML)</label>
+        <input type="file" id="da-file" class="file-input file-input-bordered w-full" accept=".pdf,.docx,.txt,.md,.html,.htm,.eml">
+      </div>
+      <div>
+        <label for="da-task" class="label text-xs text-base-content/60 py-1">Task</label>
+        <select id="da-task" class="select w-full" data-change-action="onTaskChange">
           <option value="checklist" selected>Extract a compliance checklist</option>
           <option value="summary">Summarise the document</option>
           <option value="custom">Custom instruction…</option>
         </select>
-      </label>
+      </div>
     </div>
-    <div class="da-row dw-hidden" id="da-custom-wrap">
-      <label>Custom instruction (applied to each chunk, then consolidated)
-        <textarea id="da-custom" class="ion-input" rows="2" placeholder="e.g. Extract every defined term and its definition"></textarea>
-      </label>
+    <div class="mb-4 dw-hidden" id="da-custom-wrap">
+      <label for="da-custom" class="label text-xs text-base-content/60 py-1">Custom instruction (applied to each chunk, then consolidated)</label>
+      <textarea id="da-custom" class="textarea w-full" rows="2" placeholder="e.g. Extract every defined term and its definition"></textarea>
     </div>
-    <div class="da-actions">
-      <span id="da-msg" class="ion-muted"></span>
-      <button class="ion-btn ion-btn-primary" id="da-run" data-click-action="runAnalysis">Run analysis</button>
+    <div class="flex flex-wrap justify-end items-center gap-4">
+      <span id="da-msg" class="text-sm text-base-content/50"></span>
+      <button class="btn btn-primary" id="da-run" data-click-action="runAnalysis">Run analysis</button>
     </div>
   </div>
 </section>
 
-<section class="section dw-hidden" id="da-progress-card">
-  <div class="section-header"><h2>Progress</h2></div>
-  <p id="da-progress" class="ion-muted">Starting…</p>
-  <div class="da-bar"><div id="da-bar-fill" class="da-bar-fill"></div></div>
+<section class="card bg-base-200 shadow mb-6 dw-hidden" id="da-progress-card">
+  <div class="card-body">
+    <h2 class="card-title text-base">Progress</h2>
+    <p id="da-progress" class="text-sm text-base-content/50">Starting…</p>
+    <div class="h-2 bg-base-300 border border-base-300 rounded-md overflow-hidden">
+      <div id="da-bar-fill" class="h-full w-0 bg-primary transition-[width] duration-300"></div>
+    </div>
+  </div>
 </section>
 
-<section class="section dw-hidden" id="da-result-card">
-  <div class="section-header">
-    <h2>Result</h2>
-    <button class="ion-btn ion-btn-ghost" data-click-action="downloadResult">Download .md</button>
+<section class="card bg-base-200 shadow mb-6 dw-hidden" id="da-result-card">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-4">
+      <h2 class="card-title text-base">Result</h2>
+      <button class="btn btn-ghost btn-sm" data-click-action="downloadResult">Download .md</button>
+    </div>
+    <p id="da-result-meta" class="text-sm text-base-content/50"></p>
+    <pre id="da-result" class="whitespace-pre-wrap font-mono text-[12.5px] leading-[1.6] text-base-content/70 bg-base-300 border border-base-300 rounded-lg p-4 max-h-[60vh] overflow-auto"></pre>
   </div>
-  <p id="da-result-meta" class="ion-muted"></p>
-  <pre id="da-result" class="da-result"></pre>
 </section>
 
 <style nonce="{{ csp_nonce }}">
-.section { background: var(--bg-secondary); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
-.ion-banner { background: rgba(251,191,36,.12); border:1px solid rgba(251,191,36,.4); color:#fbbf24; border-radius:8px; padding:.9rem 1.1rem; margin-bottom:1.5rem; font-size:13px; }
-.da-form label { display:block; font-size:12px; color: var(--text-secondary); margin-bottom:.35rem; }
-.da-grid { display:grid; grid-template-columns: 2fr 1fr; gap:1rem; margin-bottom:1rem; }
-@media (max-width:820px){ .da-grid { grid-template-columns:1fr; } }
-.da-row { margin-bottom:1rem; }
-.da-actions { display:flex; justify-content:flex-end; align-items:center; gap:1rem; }
-.da-bar { height:8px; background: var(--bg-card, #0f172a); border:1px solid var(--border,#1e293b); border-radius:6px; overflow:hidden; }
-.da-bar-fill { height:100%; width:0%; background: var(--primary, #38bdf8); transition: width .3s; }
-.da-result { white-space:pre-wrap; font-family: var(--font-mono, monospace); font-size:12.5px; line-height:1.6; color: var(--text-secondary); background: var(--bg-card,#0f172a); border:1px solid var(--border,#1e293b); border-radius:8px; padding:1rem; max-height:60vh; overflow:auto; }
-.dw-hidden { display:none; }
+/* JS toggles .dw-hidden (not Tailwind .hidden). Combined selectors so daisyUI
+   .alert / .card display values cannot win on source order. */
+.dw-hidden { display: none; }
+#disabled-banner.dw-hidden,
+#da-custom-wrap.dw-hidden,
+#da-progress-card.dw-hidden,
+#da-result-card.dw-hidden { display: none; }
 </style>
 
 <script nonce="{{ csp_nonce }}">

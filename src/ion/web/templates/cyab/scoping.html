@@ -3,86 +3,101 @@
 {% block title %}Scoping — CyAB · ION{% endblock %}
 
 {% block content %}
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <div class="cyab-scoping">
-  <header class="mb-6">
-    <nav class="breadcrumb text-sm text-slate-400 mb-2">
-      <a href="/cyab" class="hover:text-white">CyAB</a>
-      <span class="mx-2">·</span>
-      <span class="text-white">Scoping</span>
-    </nav>
-    <h1 class="ion-ph-title">Stack-to-coverage scoping</h1>
-    <p class="ion-ph-sub">
-      Answer a few questions about the technology stack to see how many
-      detection rules, audit checks, and threat-actor profiles would apply.
-      No system is created — for a real onboarding, use the wizard.
-    </p>
+  <header class="flex flex-wrap items-end gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
+      <nav class="breadcrumbs text-sm mb-3">
+        <ul>
+          <li><a href="/cyab">CyAB</a></li>
+          <li>Scoping</li>
+        </ul>
+      </nav>
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-primary"><use href="#i-layers"/></svg>
+        <span class="label-tiny text-primary">Stack-to-coverage</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Stack-to-coverage scoping</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">
+        Answer a few questions about the technology stack to see how many
+        detection rules, audit checks, and threat-actor profiles would apply.
+        No system is created — for a real onboarding, use the wizard.
+      </p>
+    </div>
   </header>
 
-  <div class="grid grid-cols-3 gap-6">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
     {# Left 2/3 — the questionnaire form #}
     <form id="scoping-form"
-          class="col-span-2 space-y-3"
+          class="lg:col-span-2 space-y-3"
           hx-post="/api/cyab/scoping/score"
           hx-target="#scoping-counter"
           hx-swap="innerHTML"
           hx-trigger="change">
       {% for q in questions %}
-        <fieldset class="scoping-question ion-card"
+        <fieldset class="scoping-question fieldset card bg-base-200 shadow p-0"
                   data-question-id="{{ q.id }}"
                   data-category="{{ q.category }}">
-          <legend class="text-slate-200 text-[12.5px] mb-2">{{ q.text }}</legend>
+          <legend class="fieldset-legend px-6 pt-4 pb-0">{{ q.text }}</legend>
+          <div class="card-body pt-2">
           {% if q.type == "choice" %}
-            <select name="{{ q.id }}" class="ion-select">
+            <select name="{{ q.id }}" class="select w-full">
               <option value="">— select —</option>
               {% for opt in q.options %}
                 <option value="{{ opt.value }}">{{ opt.label }}</option>
               {% endfor %}
             </select>
           {% elif q.type == "multi" %}
-            <div class="grid grid-cols-2 gap-1">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {% for opt in q.options %}
-                <label class="flex items-center gap-2 text-[12px] text-slate-300">
-                  <input type="checkbox" name="{{ q.id }}" value="{{ opt.value }}">
-                  {{ opt.label }}
+                <label class="flex items-start gap-2 cursor-pointer text-sm">
+                  <input type="checkbox" class="checkbox checkbox-sm mt-0.5" name="{{ q.id }}" value="{{ opt.value }}">
+                  <span>{{ opt.label }}</span>
                 </label>
               {% endfor %}
             </div>
           {% else %}
-            <input type="text" name="{{ q.id }}" class="ion-input">
+            <input type="text" name="{{ q.id }}" class="input w-full">
           {% endif %}
+          </div>
         </fieldset>
       {% endfor %}
 
-      <div class="flex items-center gap-3 mt-4">
+      <div class="flex flex-wrap items-center gap-3 mt-4">
         <button type="button"
                 hx-post="/api/cyab/scoping/score?summary=1"
                 hx-target="#scoping-summary"
                 hx-include="#scoping-form"
                 hx-swap="innerHTML"
-                class="ion-btn ion-btn-primary">
+                class="btn btn-primary">
           See summary
         </button>
         <a href="#" id="scoping-pdf-link"
-           class="text-cyan-400 text-[12px] hover:underline hidden">Download PDF</a>
+           class="link link-primary text-sm hidden">Download PDF</a>
       </div>
 
       <div id="scoping-summary" class="mt-4"></div>
     </form>
 
-    {# Right 1/3 — sticky live counter #}
-    <aside class="col-span-1">
+    {# Right 1/3 — sticky live counter
+       card-body lives on the same element as the id so HTMX innerHTML
+       swaps of #scoping-counter keep the panel padding. #}
+    <aside class="lg:col-span-1">
       <div id="scoping-counter"
-           class="sticky top-4 ion-card">
+           class="sticky top-4 card card-body bg-base-200 shadow">
         {% include "cyab/_scoping_counter.html" %}
       </div>
     </aside>
 
   </div>
 </div>
+</div>
+</div>
 
 {# Progressive disclosure: hide questions after the first un-answered one. #}
-<script>
+<script nonce="{{ csp_nonce }}">
 (function() {
   const form = document.getElementById('scoping-form');
   function reveal() {

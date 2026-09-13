@@ -3,7 +3,7 @@
 {% block title %}Detection Health - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {# Route audit phase 7: /detection-health and /de-metrics both aggregate
    per-rule FP/noise from closed cases over a 90-day default and both offer a
@@ -25,41 +25,45 @@
 {% if tabs | length > 1 %}{% include "_nav_tabs.html" %}{% endif %}
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
-    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-shield"/></svg>
-    <span class="label-tiny text-ion-cyan">Detection engineering</span>
+    <svg class="w-4 h-4 text-primary"><use href="#i-shield"/></svg>
+    <span class="label-tiny text-primary">Detection engineering</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Detection Health</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Per-rule outcome analytics from closed cases — noisy, silent and decaying rules, and where Bob disagrees with the analyst. Closes the IR&rarr;detection feedback loop.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Detection Health</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Per-rule outcome analytics from closed cases — noisy, silent and decaying rules, and where Bob disagrees with the analyst. Closes the IR&rarr;detection feedback loop.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="dh-days" class="ion-select" data-change-action="dhLoad">
+        <select id="dh-days" class="select select-sm w-auto" data-change-action="dhLoad">
             <option value="7">Last 7 days</option>
             <option value="30">Last 30 days</option>
             <option value="90" selected>Last 90 days</option>
             <option value="180">Last 180 days</option>
         </select>
-        <button class="ion-btn ion-btn-primary" data-click-action="dhLoad">Refresh</button>
+        <button class="btn btn-primary" data-click-action="dhLoad">Refresh</button>
     </div>
 </section>
 
-<div id="dh-content"><div class="dh-loading"><span class="dh-spinner"></span> Loading detection metrics...</div></div>
+<div id="dh-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading detection metrics...</div></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
 
 <!-- Tuning-proposal modal -->
-<div id="dh-modal-overlay" class="dh-modal-overlay" data-click-action="dhCloseModal" data-only-self-click>
-  <div class="dh-modal">
-    <div class="dh-modal-title">File tuning proposal — <span id="dh-modal-rule" class="mono"></span></div>
-    <label class="dh-modal-label">Suggested change *</label>
-    <textarea id="dh-modal-change" class="dh-modal-input" rows="3" placeholder="e.g. raise threshold to 5 events / exclude svc_backup account / narrow to non-RFC1918 destinations"></textarea>
-    <label class="dh-modal-label">Rationale</label>
-    <textarea id="dh-modal-rationale" class="dh-modal-input" rows="2" placeholder="Why — backed by the FP rate / disagreements above"></textarea>
-    <div class="dh-modal-actions">
-      <button class="ion-btn" data-click-action="dhCloseModal">Cancel</button>
-      <button class="ion-btn ion-btn-primary" data-click-action="dhSubmitProposal">File proposal</button>
+<div id="dh-modal-overlay" class="modal" data-click-action="dhCloseModal" data-only-self-click>
+  <div class="modal-box w-11/12 max-w-[520px]">
+    <h2 class="text-lg font-semibold">File tuning proposal — <span id="dh-modal-rule" class="font-mono"></span></h2>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Suggested change *</legend>
+      <textarea id="dh-modal-change" class="textarea w-full" rows="3" placeholder="e.g. raise threshold to 5 events / exclude svc_backup account / narrow to non-RFC1918 destinations"></textarea>
+    </fieldset>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Rationale</legend>
+      <textarea id="dh-modal-rationale" class="textarea w-full" rows="2" placeholder="Why — backed by the FP rate / disagreements above"></textarea>
+    </fieldset>
+    <div class="modal-action">
+      <button class="btn btn-ghost" data-click-action="dhCloseModal">Cancel</button>
+      <button class="btn btn-primary" data-click-action="dhSubmitProposal">File proposal</button>
     </div>
   </div>
 </div>
@@ -67,42 +71,23 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.dh-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.dh-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:dh-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes dh-spin{to{transform:rotate(360deg)}}
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+#dh-modal-overlay.show {
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+#dh-modal-overlay.show > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 520px;
+}
 
-.dh-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.dh-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;text-align:center;position:relative;overflow:hidden}
-.dh-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary)}
-.dh-stat-val{font-size:1.5rem;font-weight:700;color:var(--primary);font-family:'JetBrains Mono',monospace}
-.dh-stat-label{font-size:.72rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-.dh-stat.crit .dh-stat-val{color:var(--sev-critical)}.dh-stat.crit::before{background:var(--sev-critical)}
-.dh-stat.warn .dh-stat-val{color:var(--sev-medium)}.dh-stat.warn::before{background:var(--sev-medium)}
-
-.dh-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:16px}
-.dh-section-title{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px}
-.dh-table{width:100%;border-collapse:collapse;font-size:.82rem}
-.dh-table th{text-align:left;padding:8px 10px;color:var(--text-secondary);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
-.dh-table td{padding:8px 10px;border-bottom:1px solid rgba(99,110,123,.15);color:var(--text-primary);vertical-align:middle}
-.dh-table tr:hover td{background:rgba(0,212,255,.03)}
-.mono{font-family:'JetBrains Mono',monospace;font-size:.78rem}
-.dh-bar{display:inline-block;height:10px;border-radius:3px;background:rgba(99,110,123,.2);width:70px;vertical-align:middle;overflow:hidden;margin-right:6px}
+/* JS-computed bar width/colour via data-w / data-c — no daisyUI equivalent. */
+.dh-bar{display:inline-block;height:10px;border-radius:3px;background:color-mix(in oklab, var(--color-base-content) 12%, transparent);width:70px;vertical-align:middle;overflow:hidden;margin-right:6px}
 .dh-bar-fill{display:block;height:100%;border-radius:3px}
-.dh-muted{color:var(--text-secondary)}
-.dh-flag{display:inline-block;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:1px 6px;border-radius:4px;margin-right:4px}
-.dh-flag-noisy{background:rgba(239,68,68,.16);color:var(--sev-critical,#ef4444)}
-.dh-flag-silent{background:rgba(245,158,11,.16);color:var(--sev-medium,#f59e0b)}
-.dh-flag-decaying{background:rgba(167,139,250,.16);color:var(--neon-purple,#a78bfa)}
-.dh-act{cursor:pointer;color:var(--primary);font-size:.74rem;background:none;border:none;padding:0;text-decoration:underline}
-.dh-drill{font-size:.76rem;color:var(--text-secondary);padding:6px 10px;background:rgba(0,0,0,.15);border-radius:4px;margin-top:4px}
-
-.dh-modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;align-items:center;justify-content:center}
-.dh-modal-overlay.show{display:flex}
-.dh-modal{background:var(--bg-card,#0d1117);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;max-width:520px;width:90%}
-.dh-modal-title{font-weight:700;margin-bottom:14px}
-.dh-modal-label{display:block;font-size:.74rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.4px;margin:10px 0 4px}
-.dh-modal-input{width:100%;background:var(--bg-secondary);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);padding:8px;font-size:.85rem;resize:vertical}
-.dh-modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 </style>
 <script nonce="{{ csp_nonce }}">
 const DH_API = '/api/detection-health';
@@ -112,29 +97,29 @@ let _dhProposeRule = null;
 
 async function dhLoad(){
     const days = dh$('dh-days').value;
-    dh$('dh-content').innerHTML = '<div class="dh-loading"><span class="dh-spinner"></span> Loading detection metrics...</div>';
+    dh$('dh-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading detection metrics...</div>';
     try {
         const r = await fetch(DH_API + '/metrics?days=' + encodeURIComponent(days));
         if(!r.ok) throw new Error('HTTP ' + r.status);
         dhRender(await r.json());
     } catch(e) {
-        dh$('dh-content').innerHTML = '<div class="dh-loading">Failed to load: ' + dhEsc(e.message) + '</div>';
+        dh$('dh-content').innerHTML = '<div role="alert" class="alert alert-error">Failed to load: ' + dhEsc(e.message) + '</div>';
     }
 }
 
 function dhPctCell(pct, kind){
-    if(pct === null || pct === undefined) return '<span class="dh-muted">—</span>';
-    let color = 'var(--text-primary)';
-    if(kind === 'fp') color = pct >= 70 ? 'var(--sev-critical)' : pct >= 40 ? 'var(--sev-medium)' : 'var(--text-primary)';
-    if(kind === 'tp') color = pct >= 60 ? 'var(--mitre-covered,#34d399)' : pct >= 30 ? 'var(--sev-medium)' : 'var(--sev-critical)';
+    if(pct === null || pct === undefined) return '<span class="opacity-50">—</span>';
+    let color = 'var(--color-base-content)';
+    if(kind === 'fp') color = pct >= 70 ? 'var(--color-error)' : pct >= 40 ? 'var(--color-warning)' : 'var(--color-base-content)';
+    if(kind === 'tp') color = pct >= 60 ? 'var(--color-success)' : pct >= 30 ? 'var(--color-warning)' : 'var(--color-error)';
     const w = Math.max(0, Math.min(100, pct));
-    return '<span class="dh-bar"><span class="dh-bar-fill" data-w="' + w + '" data-c="' + color + '"></span></span>'
-         + '<span class="mono">' + pct + '%</span>';
+    return '<span class="dh-bar"><span class="dh-bar-fill" data-w="' + w + '" data-c="' + color + '" data-ion-style="width:' + w + '%;background:' + color + '"></span></span>'
+         + '<span class="font-mono text-xs">' + pct + '%</span>';
 }
 
 function dhRender(d){
     const s = d.summary || {};
-    let html = '<div class="dh-stats">';
+    let html = '<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">';
     html += dhStat(s.rules_tracked || 0, 'Rules Tracked', '');
     html += dhStat(s.total_closed || 0, 'Closed Alerts', '');
     html += dhStat(s.noisy_rules || 0, 'Noisy Rules', s.noisy_rules ? 'crit' : '');
@@ -143,38 +128,38 @@ function dhRender(d){
     html += '</div>';
 
     const rules = d.rules || [];
-    html += '<div class="dh-section"><div class="dh-section-title">Per-rule detection health (worst first · ' + (d.period_days||90) + 'd)</div>';
+    html += '<div class="card bg-base-200 shadow"><div class="card-body"><h2 class="card-title text-sm uppercase tracking-wide opacity-60">Per-rule detection health (worst first · ' + (d.period_days||90) + 'd)</h2>';
     if(!rules.length){
-        html += '<div class="dh-muted">No closed-alert feedback in this window. Detection health fills in as cases are closed with a verdict.</div>';
+        html += '<p class="opacity-60">No closed-alert feedback in this window. Detection health fills in as cases are closed with a verdict.</p>';
     } else {
-        html += '<table class="dh-table"><thead><tr><th>Rule</th><th>Volume</th><th>Closed</th><th>FP rate</th><th>TP yield</th><th>Bob disagree</th><th>Flags</th><th></th></tr></thead><tbody>';
+        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Rule</th><th>Volume</th><th>Closed</th><th>FP rate</th><th>TP yield</th><th>Bob disagree</th><th>Flags</th><th></th></tr></thead><tbody>';
         for(const r of rules){
             const flags = r.flags || {};
             let flagHtml = '';
-            if(flags.noisy) flagHtml += '<span class="dh-flag dh-flag-noisy">noisy</span>';
-            if(flags.silent) flagHtml += '<span class="dh-flag dh-flag-silent">silent</span>';
-            if(flags.decaying) flagHtml += '<span class="dh-flag dh-flag-decaying">decaying</span>';
+            if(flags.noisy) flagHtml += '<span class="badge badge-error badge-sm">noisy</span> ';
+            if(flags.silent) flagHtml += '<span class="badge badge-warning badge-sm">silent</span> ';
+            if(flags.decaying) flagHtml += '<span class="badge badge-secondary badge-sm">decaying</span> ';
             const bobCell = r.bob_disagreement_rate === null
-                ? '<span class="dh-muted">—</span>'
-                : ('<button class="dh-act" data-click-action="dhDrill" data-args=\'["' + dhEsc(r.rule_name) + '"]\'>' + r.bob_disagreement_rate + '%</button>');
+                ? '<span class="opacity-50">—</span>'
+                : ('<button class="btn btn-ghost btn-sm" data-click-action="dhDrill" data-args=\'["' + dhEsc(r.rule_name) + '"]\'>' + r.bob_disagreement_rate + '%</button>');
             html += '<tr>'
-                + '<td class="mono">' + dhEsc(r.rule_name) + '</td>'
-                + '<td class="mono">' + r.volume + '</td>'
-                + '<td class="mono">' + r.closed + '</td>'
+                + '<td class="font-mono text-xs">' + dhEsc(r.rule_name) + '</td>'
+                + '<td class="font-mono text-xs">' + r.volume + '</td>'
+                + '<td class="font-mono text-xs">' + r.closed + '</td>'
                 + '<td>' + dhPctCell(r.fp_rate, 'fp') + '</td>'
                 + '<td>' + dhPctCell(r.tp_yield, 'tp') + '</td>'
                 + '<td>' + bobCell + '</td>'
-                + '<td>' + (flagHtml || '<span class="dh-muted">—</span>') + '</td>'
-                + '<td><button class="dh-act" data-click-action="dhPropose" data-args=\'["' + dhEsc(r.rule_name) + '"]\'>Propose tuning</button></td>'
+                + '<td>' + (flagHtml || '<span class="opacity-50">—</span>') + '</td>'
+                + '<td><button class="btn btn-ghost btn-sm" data-click-action="dhPropose" data-args=\'["' + dhEsc(r.rule_name) + '"]\'>Propose tuning</button></td>'
                 + '</tr>';
-            html += '<tr id="dh-drill-' + dhSlug(r.rule_name) + '" hidden><td colspan="8"><div class="dh-drill">Loading disagreements…</div></td></tr>';
+            html += '<tr id="dh-drill-' + dhSlug(r.rule_name) + '" hidden><td colspan="8"><div class="dh-drill text-sm opacity-70 p-2 bg-base-300 rounded mt-1">Loading disagreements…</div></td></tr>';
         }
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
     }
     if(s.unmapped_alerts){
-        html += '<div class="dh-muted _ion-dh-note">' + s.unmapped_alerts + ' alert(s) lack a rule_name snapshot and are bucketed as "(unmapped)".</div>';
+        html += '<div role="alert" class="alert alert-info mt-3 _ion-dh-note">' + s.unmapped_alerts + ' alert(s) lack a rule_name snapshot and are bucketed as "(unmapped)".</div>';
     }
-    html += '</div>';
+    html += '</div></div>';
     dh$('dh-content').innerHTML = html;
     // Apply bar widths/colours without inline style attrs (CSP style-src-attr none).
     dh$('dh-content').querySelectorAll('.dh-bar-fill').forEach(function(el){
@@ -184,7 +169,8 @@ function dhRender(d){
 }
 
 function dhStat(val, label, cls){
-    return '<div class="dh-stat ' + cls + '"><div class="dh-stat-val">' + val + '</div><div class="dh-stat-label">' + label + '</div></div>';
+    const color = cls === 'crit' ? ' text-error' : cls === 'warn' ? ' text-warning' : ' text-primary';
+    return '<div class="stat"><div class="stat-title">' + label + '</div><div class="stat-value' + color + '">' + val + '</div></div>';
 }
 function dhSlug(s){return (s||'').replace(/[^a-zA-Z0-9]/g,'_')}
 
@@ -201,9 +187,9 @@ async function dhDrill(rule){
         const data = await r.json();
         const list = data.disagreements || [];
         if(!list.length){ cell.textContent = 'No Bob-vs-analyst disagreements recorded for this rule.'; return; }
-        let h = '<strong>' + list.length + ' disagreement(s)</strong> — Bob vs analyst:<ul>';
+        let h = '<strong>' + list.length + ' disagreement(s)</strong> — Bob vs analyst:<ul class="list-disc ml-5 mt-1">';
         for(const x of list){
-            h += '<li class="mono">' + dhEsc(x.alert_id) + ': Bob said <em>' + dhEsc(x.bob_suggested_verdict) + '</em>, analyst closed <em>' + dhEsc(x.human_verdict) + '</em></li>';
+            h += '<li class="font-mono text-xs">' + dhEsc(x.alert_id) + ': Bob said <em>' + dhEsc(x.bob_suggested_verdict) + '</em>, analyst closed <em>' + dhEsc(x.human_verdict) + '</em></li>';
         }
         h += '</ul>';
         cell.innerHTML = h;

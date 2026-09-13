@@ -1,31 +1,42 @@
 {% extends "base.html" %}
 {% block title %}Onboard — CyAB · ION{% endblock %}
 {% block content %}
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <div class="cyab-onboard" data-wid="{{ wid }}" data-step="{{ step }}">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="mb-4">
-    <h1 class="ion-ph-title">Onboard a system</h1>
-    <p class="ion-ph-sub">
-      4 steps. You can exit at any point and resume from this same URL — nothing blocks.
-    </p>
+  <header class="flex flex-wrap items-end gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-primary"><use href="#i-server"/></svg>
+        <span class="label-tiny text-primary">CyAB wizard</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Onboard a system</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">
+        4 steps. You can exit at any point and resume from this same URL — nothing blocks.
+      </p>
+    </div>
   </header>
 
   {# Step rail #}
-  <ol class="wizard-rail flex gap-2 mb-6 text-[12px]">
+  <ol class="wizard-rail steps w-full mb-6">
     {% for n, label in [(1, 'Identity'), (2, 'Intake'), (3, 'First data source'), (4, 'Doc placeholders')] %}
-      <li class="flex items-center gap-2 px-3 py-1 rounded {% if n == step %}bg-cyan-700/30 text-cyan-200{% elif n < step %}text-emerald-400{% else %}text-slate-500{% endif %}">
-        <span class="font-mono">{{ n }}</span>
-        <span>{{ label }}</span>
+      <li class="step {% if n == step %}step-primary{% elif n < step %}step-success{% endif %}">
+        {{ label }}
       </li>
     {% endfor %}
   </ol>
 
-  <section id="wizard-step-content" class="ion-card">
+  {# card-body lives on the same element as the id so HTMX innerHTML swaps
+     of #wizard-step-content keep the panel padding. #}
+  <section id="wizard-step-content" class="card card-body bg-base-200 shadow">
     {% if step == 1 %}{% include "cyab/_wizard_step_1_identity.html" %}{% endif %}
     {% if step == 2 %}{% include "cyab/_wizard_step_2_intake.html" ignore missing %}{% endif %}
     {% if step == 3 %}{% include "cyab/_wizard_step_3_source.html" ignore missing %}{% endif %}
     {% if step == 4 %}{% include "cyab/_wizard_step_4_docs.html" ignore missing %}{% endif %}
   </section>
+</div>
+</div>
 </div>
 {% endblock %}

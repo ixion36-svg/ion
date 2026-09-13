@@ -7,48 +7,50 @@
    to cycle each chip's value (shipped/partial/gap/n/a).
 #}
 {% if not subprofile %}
-  <p class="text-slate-500 text-[12px]">
-    No sub-profile selected. Detection use cases come from the sub-profile catalogue.
-  </p>
+  <div role="alert" class="alert alert-warning">
+    <span>No sub-profile selected. Detection use cases come from the sub-profile catalogue.</span>
+  </div>
 {% elif not use_cases %}
-  <p class="text-slate-500 text-[12px]">
-    No detection use cases defined for {{ subprofile.label }}.
-  </p>
+  <div role="alert" class="alert alert-info">
+    <span>No detection use cases defined for {{ subprofile.label }}.</span>
+  </div>
 {% else %}
-  <header class="flex items-baseline justify-between mb-3">
-    <h3 class="text-white text-[14px] font-semibold">Detection Use Cases</h3>
-    <span class="text-slate-500 text-[11px]">
+  <header class="flex flex-wrap items-baseline justify-between gap-2 mb-3">
+    <h3 class="text-sm font-semibold">Detection Use Cases</h3>
+    <span class="badge badge-ghost badge-sm font-mono">
       {{ use_cases | length }} use cases &middot; {{ sources | length }} sources
     </span>
   </header>
 
-  <div class="space-y-2">
+  <div class="flex flex-col gap-2">
     {% for uc in use_cases %}
-      <article class="use-case-row bg-slate-900/40 border border-slate-800 rounded p-3"
+      <article class="use-case-row card bg-base-200 shadow"
                data-uc-id="{{ uc.id }}">
-        <header class="flex items-center gap-3">
-          <h4 class="flex-1 text-cyan-300 text-[13px]">{{ uc.title }}</h4>
-          {% for src in sources %}
-            <button class="cs-uc-status status-chip px-2 py-0.5 rounded text-[10.5px] font-mono bg-slate-800 text-slate-300"
-                    data-source-id="{{ src.id }}"
-                    data-uc-id="{{ uc.id }}"
-                    data-status="n/a"
-                    title="Cycle status (shipped / partial / gap / n/a) for {{ src.name }}">
-              {{ src.name }}
+        <div class="card-body p-3 gap-2">
+          <header class="flex flex-wrap items-center gap-2">
+            <h4 class="basis-full md:basis-auto md:flex-1 text-sm font-medium text-primary">{{ uc.title }}</h4>
+            {% for src in sources %}
+              <button class="cs-uc-status status-chip btn btn-ghost btn-xs font-mono"
+                      data-source-id="{{ src.id }}"
+                      data-uc-id="{{ uc.id }}"
+                      data-status="n/a"
+                      title="Cycle status (shipped / partial / gap / n/a) for {{ src.name }}">
+                {{ src.name }}
+              </button>
+            {% endfor %}
+            <button class="btn btn-primary btn-xs"
+                    hx-post="/api/cyab/use-cases/{{ uc.id }}/tide-stub"
+                    hx-target="closest article"
+                    hx-swap="afterend">
+              + TIDE
             </button>
-          {% endfor %}
-          <button class="px-2 py-0.5 bg-cyan-700 text-white text-[10.5px] rounded"
-                  hx-post="/api/cyab/use-cases/{{ uc.id }}/tide-stub"
-                  hx-target="closest article"
-                  hx-swap="afterend">
-            + TIDE
-          </button>
-        </header>
-        {% if uc.summary %}
-          <p class="text-slate-400 text-[11.5px] mt-1">{{ uc.summary }}</p>
-        {% elif uc.description %}
-          <p class="text-slate-500 text-[11px] mt-1">{{ uc.description }}</p>
-        {% endif %}
+          </header>
+          {% if uc.summary %}
+            <p class="text-xs text-base-content/60">{{ uc.summary }}</p>
+          {% elif uc.description %}
+            <p class="text-xs text-base-content/50">{{ uc.description }}</p>
+          {% endif %}
+        </div>
       </article>
     {% endfor %}
   </div>

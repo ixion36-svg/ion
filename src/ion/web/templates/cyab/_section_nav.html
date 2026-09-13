@@ -8,11 +8,13 @@
   ('coverage',       'Coverage',       '/cyab/coverage'),
   ('audit',          'Audit',          '/cyab/audit'),
 ] %}
-<nav class="cyab-section-nav flex gap-1 border-b border-slate-800 mb-4"
+<nav class="cyab-section-nav tabs tabs-border tabs-sm mb-4"
+     role="tablist"
      data-active="{{ active_tab }}">
   {% for slug, label, href in _tabs %}
     <a href="{{ href }}"
-       class="px-3 py-2 text-[12.5px] text-slate-400 hover:text-cyan-300 border-b-2 border-transparent {% if slug == active_tab %}text-cyan-300 border-cyan-400 is-active{% endif %}">
+       role="tab"
+       class="tab {% if slug == active_tab %}tab-active is-active{% endif %}">
       {{ label }}
     </a>
   {% endfor %}

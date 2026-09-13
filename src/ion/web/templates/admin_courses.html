@@ -3,77 +3,95 @@
 {% block title %}Course authoring · ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1400px] w-full px-4 sm:px-6 py-10 md:py-14">
 
   <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-    <div class="flex-1 min-w-0">
+    <div class="basis-full md:basis-auto md:flex-1">
       <div class="flex items-center gap-3 mb-3">
         <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
         <span class="label-tiny text-ion-iris">Course authoring</span>
       </div>
-      <h1 class="font-sans font-semibold text-[28px] md:text-[34px] leading-tight text-white tracking-[-0.02em]">Courses (admin)</h1>
-      <p class="mt-2 max-w-2xl text-[13px] text-slate-400">
+      <h1 class="font-sans font-semibold text-[28px] md:text-[34px] leading-tight tracking-[-0.02em]">Courses (admin)</h1>
+      <p class="mt-2 max-w-2xl text-[13px] text-base-content/60">
         Author L1 / L2 / L3 / L4 training courses. Click any course to edit its modules, lessons, and questions.
-        Unpublished drafts only show here — published catalogue is visible to analysts at <a href="/courses" class="underline text-ion-cyan">/courses</a>.
+        Unpublished drafts only show here — published catalogue is visible to analysts at <a href="/courses" class="link link-primary">/courses</a>.
       </p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button data-click-action="openImportDialog" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Import JSON</button>
-      <button data-click-action="openCreateDialog" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition">+ New course</button>
+      <button data-click-action="openImportDialog" class="btn btn-ghost btn-sm">Import JSON</button>
+      <button data-click-action="openCreateDialog" class="btn btn-primary btn-sm">+ New course</button>
     </div>
   </section>
 
-  <div class="rounded-md border border-white/5 bg-ink-900/40 overflow-hidden">
-    <table class="w-full text-[13px]">
-      <thead class="bg-ink-900/70 text-slate-500">
-        <tr>
-          <th class="text-left px-4 py-3 font-semibold">Title</th>
-          <th class="text-left px-4 py-3 font-semibold">Slug</th>
-          <th class="text-center px-4 py-3 font-semibold">Level</th>
-          <th class="text-right px-4 py-3 font-semibold">Hours</th>
-          <th class="text-right px-4 py-3 font-semibold">Pass</th>
-          <th class="text-center px-4 py-3 font-semibold">Status</th>
-          <th class="text-right px-4 py-3 font-semibold"></th>
-        </tr>
-      </thead>
-      <tbody id="ac-tbody" class="divide-y divide-white/5">
-        <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">Loading…</td></tr>
-      </tbody>
-    </table>
+  <div class="card bg-base-200 shadow">
+    <div class="card-body p-0">
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Slug</th>
+              <th class="text-center">Level</th>
+              <th class="text-right">Hours</th>
+              <th class="text-right">Pass</th>
+              <th class="text-center">Status</th>
+              <th class="text-right"></th>
+            </tr>
+          </thead>
+          <tbody id="ac-tbody">
+            <tr><td colspan="7"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading…</div></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 </div>
 
 <!-- Create dialog -->
+<!-- JS opens/closes via element.style.display = 'block'|'none' (CSSOM, allowed).
+     daisyUI .modal uses visibility/opacity, so style.display would not reveal it.
+     Overlay hashed class hides it until JS shows it. -->
 <div class="_ion-s-2f3e0c5eac" id="ac-create" data-click-action="closeCreateDialog" data-only-self-click>
   <div class="_ion-s-d85efb1967">
-    <h2 class="text-[16px] font-semibold text-white mb-4">New course</h2>
+    <h2 class="text-lg font-semibold mb-4">New course</h2>
     <div class="space-y-3">
-      <div><label class="label-tiny text-slate-500 block mb-1">Title <span class="text-ion-coral">*</span></label>
-        <input id="cr-title" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white" placeholder="Alert Triage Fundamentals"></div>
-      <div><label class="label-tiny text-slate-500 block mb-1">Level <span class="text-ion-coral">*</span></label>
-        <select id="cr-level" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Title <span class="text-error">*</span></legend>
+        <input id="cr-title" class="input input-sm w-full" placeholder="Alert Triage Fundamentals">
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Level <span class="text-error">*</span></legend>
+        <select id="cr-level" class="select select-sm w-full">
           <option value="L1">L1 — Tier-1 SOC</option>
           <option value="L2">L2 — Senior analyst</option>
           <option value="L3">L3 — IR / hunting</option>
           <option value="L4">L4 — Lead / engineering</option>
-        </select></div>
-      <div><label class="label-tiny text-slate-500 block mb-1">Slug (auto-generated from title if blank)</label>
-        <input id="cr-slug" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white font-mono"></div>
+        </select>
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Slug (auto-generated from title if blank)</legend>
+        <input id="cr-slug" class="input input-sm w-full font-mono">
+      </fieldset>
       <div class="grid grid-cols-2 gap-2">
-        <div><label class="label-tiny text-slate-500 block mb-1">Estimated hours</label>
-          <input id="cr-hours" type="number" value="2" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white"></div>
-        <div><label class="label-tiny text-slate-500 block mb-1">Pass threshold (%)</label>
-          <input id="cr-pass" type="number" value="70" class="w-full h-9 rounded-md bg-ink-900 border border-white/10 px-3 text-[13px] text-white"></div>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Estimated hours</legend>
+          <input id="cr-hours" type="number" value="2" class="input input-sm w-full">
+        </fieldset>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Pass threshold (%)</legend>
+          <input id="cr-pass" type="number" value="70" class="input input-sm w-full">
+        </fieldset>
       </div>
-      <div><label class="inline-flex items-center gap-2 text-[12px] text-slate-300">
-        <input id="cr-published" type="checkbox"> Publish immediately (visible to analysts)
-      </label></div>
+      <label class="label cursor-pointer justify-start gap-2 py-0 w-fit">
+        <input id="cr-published" type="checkbox" class="checkbox checkbox-sm checkbox-primary">
+        <span class="label-text">Publish immediately (visible to analysts)</span>
+      </label>
     </div>
     <div class="flex justify-end gap-2 mt-5">
-      <button data-click-action="closeCreateDialog" class="h-9 px-4 rounded-md bg-white/5 text-slate-300 border border-white/10 text-[12px] font-semibold">Cancel</button>
-      <button data-click-action="submitCreate" class="h-9 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold">Create</button>
+      <button data-click-action="closeCreateDialog" class="btn btn-ghost btn-sm">Cancel</button>
+      <button data-click-action="submitCreate" class="btn btn-primary btn-sm">Create</button>
     </div>
   </div>
 </div>
@@ -81,51 +99,43 @@
 <!-- Import dialog -->
 <div class="_ion-s-2f3e0c5eac" id="ac-import" data-click-action="closeImportDialog" data-only-self-click>
   <div class="_ion-s-9e454cc368">
-    <h2 class="text-[16px] font-semibold text-white mb-2">Import course JSON</h2>
-    <p class="text-[12px] text-slate-400 mb-3">Paste a course payload exported from another ION instance (or hand-crafted following the same shape). Whole import is one transaction — slug must not collide with an existing course.</p>
-    <textarea id="im-json" rows="20" class="w-full rounded-md bg-ink-950 border border-white/10 px-3 py-2 text-[12px] text-slate-200 font-mono leading-relaxed flex-1" spellcheck="false" placeholder='{ "course": { "title": "...", "level": "L1", "modules": [...] } }'></textarea>
-    <div id="im-error" class="hidden text-[11px] text-ion-coral mt-2"></div>
+    <h2 class="text-lg font-semibold mb-2">Import course JSON</h2>
+    <p class="text-sm text-base-content/60 mb-3">Paste a course payload exported from another ION instance (or hand-crafted following the same shape). Whole import is one transaction — slug must not collide with an existing course.</p>
+    <textarea id="im-json" rows="20" class="textarea w-full font-mono text-sm leading-relaxed flex-1" spellcheck="false" placeholder='{ "course": { "title": "...", "level": "L1", "modules": [...] } }'></textarea>
+    <div id="im-error" class="hidden"></div>
     <div class="flex justify-end gap-2 mt-4">
-      <button data-click-action="closeImportDialog" class="h-9 px-4 rounded-md bg-white/5 text-slate-300 border border-white/10 text-[12px] font-semibold">Cancel</button>
-      <button data-click-action="submitImport" class="h-9 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold">Import</button>
+      <button data-click-action="closeImportDialog" class="btn btn-ghost btn-sm">Cancel</button>
+      <button data-click-action="submitImport" class="btn btn-primary btn-sm">Import</button>
     </div>
   </div>
 </div>
 
-<style nonce="{{ csp_nonce }}">
-.ac-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px}
-.ac-L1{background:rgba(34,197,94,0.14);color:var(--success)}
-.ac-L2{background:rgba(109,228,255,0.14);color:#6de4ff}
-.ac-L3{background:rgba(245,158,11,0.14);color:var(--warning)}
-.ac-L4{background:rgba(239,68,68,0.14);color:var(--danger)}
-.ac-status-pub{background:rgba(34,197,94,0.14);color:var(--success)}
-.ac-status-draft{background:rgba(148,163,184,0.14);color:#94a3b8}
-</style>
-
 <script nonce="{{ csp_nonce }}">
 function escHtml(s){if(s==null)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
+
+const LEVEL_BADGE={L1:'badge-success',L2:'badge-info',L3:'badge-warning',L4:'badge-error'};
 
 async function loadCourses(){
   try{
     const r=await fetch('/api/courses?include_unpublished=true');
     const d=await r.json();
     const tbody=document.getElementById('ac-tbody');
-    if(!d.courses.length){tbody.innerHTML='<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500">No courses yet. Click <strong>+ New course</strong> to start.</td></tr>';return;}
+    if(!d.courses.length){tbody.innerHTML='<tr><td colspan="7" class="text-center text-base-content/50 py-8">No courses yet. Click <strong>+ New course</strong> to start.</td></tr>';return;}
     tbody.innerHTML=d.courses.map(c=>`
-      <tr class="hover:bg-white/5 cursor-pointer" data-click-action="openEdit" data-args='[${c.id}]'>
-        <td class="px-4 py-3 text-slate-200 font-semibold">${escHtml(c.title)}</td>
-        <td class="px-4 py-3 text-slate-500 font-mono text-[11px]">${escHtml(c.slug)}</td>
-        <td class="px-4 py-3 text-center"><span class="ac-pill ac-${escHtml(c.level)}">${escHtml(c.level)}</span></td>
-        <td class="px-4 py-3 text-right text-slate-400 font-mono">${c.estimated_hours}h</td>
-        <td class="px-4 py-3 text-right text-slate-400 font-mono">${c.pass_threshold}%</td>
-        <td class="px-4 py-3 text-center"><span class="ac-pill ${c.published?'ac-status-pub':'ac-status-draft'}">${c.published?'Published':'Draft'}</span></td>
-        <td class="px-4 py-3 text-right">
-          <a href="/api/courses/${escHtml(c.slug)}/export" target="_blank" data-stop-propagation class="text-ion-cyan hover:text-ion-cyan/80 text-[11px] mr-3">Export</a>
-          <button data-click-action="openEdit" data-stop-propagation data-args='[${c.id}]' class="text-ion-cyan hover:text-ion-cyan/80 text-[11px]">Edit</button>
+      <tr class="hover:bg-base-300 cursor-pointer" data-click-action="openEdit" data-args='[${c.id}]'>
+        <td class="font-semibold">${escHtml(c.title)}</td>
+        <td class="font-mono text-xs opacity-60">${escHtml(c.slug)}</td>
+        <td class="text-center"><span class="badge badge-sm ${LEVEL_BADGE[c.level]||'badge-ghost'}">${escHtml(c.level)}</span></td>
+        <td class="text-right font-mono opacity-70">${c.estimated_hours}h</td>
+        <td class="text-right font-mono opacity-70">${c.pass_threshold}%</td>
+        <td class="text-center"><span class="badge badge-sm ${c.published?'badge-success':'badge-ghost'}">${c.published?'Published':'Draft'}</span></td>
+        <td class="text-right">
+          <a href="/api/courses/${escHtml(c.slug)}/export" target="_blank" data-stop-propagation class="btn btn-ghost btn-xs mr-1">Export</a>
+          <button data-click-action="openEdit" data-stop-propagation data-args='[${c.id}]' class="btn btn-ghost btn-xs">Edit</button>
         </td>
       </tr>`).join('');
   }catch(e){
-    document.getElementById('ac-tbody').innerHTML='<tr><td colspan="7" class="px-4 py-8 text-center text-ion-coral">Failed to load: '+escHtml(e.message)+'</td></tr>';
+    document.getElementById('ac-tbody').innerHTML='<tr><td colspan="7"><div role="alert" class="alert alert-error m-4"><span>Failed to load: '+escHtml(e.message)+'</span></div></td></tr>';
   }
 }
 
@@ -157,7 +167,7 @@ async function submitCreate(){
 }
 window.submitCreate=submitCreate;
 
-function openImportDialog(){document.getElementById('ac-import').style.display='block';document.getElementById('im-error').className='hidden text-[11px] text-ion-coral mt-2';}
+function openImportDialog(){document.getElementById('ac-import').style.display='block';document.getElementById('im-error').className='hidden';}
 function closeImportDialog(){document.getElementById('ac-import').style.display='none';}
 window.openImportDialog=openImportDialog;window.closeImportDialog=closeImportDialog;
 
@@ -165,17 +175,17 @@ async function submitImport(){
   const errEl=document.getElementById('im-error');
   let payload;
   try{payload=JSON.parse(document.getElementById('im-json').value);}
-  catch(e){errEl.className='block text-[11px] text-ion-coral mt-2';errEl.textContent='Invalid JSON: '+e.message;return;}
+  catch(e){errEl.className='alert alert-error mt-2';errEl.textContent='Invalid JSON: '+e.message;return;}
   // Accept either {course:{...}} or just {...}
   const body=payload.course?payload:{course:payload};
   try{
     const r=await fetch('/api/courses/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     const d=await r.json();
-    if(!r.ok){errEl.className='block text-[11px] text-ion-coral mt-2';errEl.textContent=d.detail||'Import failed';return;}
+    if(!r.ok){errEl.className='alert alert-error mt-2';errEl.textContent=d.detail||'Import failed';return;}
     closeImportDialog();
     showToast('Imported — opening editor','success');
     setTimeout(()=>{window.location.href='/admin/courses/'+d.id+'/edit';},400);
-  }catch(e){errEl.className='block text-[11px] text-ion-coral mt-2';errEl.textContent='Import failed: '+e.message;}
+  }catch(e){errEl.className='alert alert-error mt-2';errEl.textContent='Import failed: '+e.message;}
 }
 window.submitImport=submitImport;
 

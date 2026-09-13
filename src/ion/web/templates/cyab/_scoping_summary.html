@@ -1,72 +1,82 @@
-<section class="scoping-summary bg-slate-900/60 border border-cyan-900/40 rounded p-4">
-  <h2 class="text-cyan-300 text-[14px] font-semibold mb-2">
-    Recommended for your stack
-  </h2>
-  <p class="text-slate-300 text-[12.5px] mb-3">{{ summary_text }}</p>
+<section class="scoping-summary card bg-base-200 shadow">
+  <div class="card-body">
+    <h2 class="card-title text-base text-primary">
+      Recommended for your stack
+    </h2>
+    <p class="text-sm text-base-content/70">{{ summary_text }}</p>
 
-  <div class="grid grid-cols-3 gap-3 mb-4">
-    <div class="ion-metric">
-      <div class="text-cyan-300 text-[20px] font-semibold">{{ scores.use_case_count }}</div>
-      <div class="ion-metric-label">detection &amp; audit use cases</div>
+    <div class="stats stats-vertical sm:stats-horizontal w-full bg-base-100 shadow">
+      <div class="stat">
+        <div class="stat-value text-2xl text-primary">{{ scores.use_case_count }}</div>
+        <div class="stat-desc">detection &amp; audit use cases</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value text-2xl text-warning">{{ scores.threat_actor_matches }}</div>
+        <div class="stat-desc">threat-actor profiles</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value text-2xl text-success">{{ scores.mitre_coverage_pct }}%</div>
+        <div class="stat-desc">MITRE Initial Access coverage</div>
+      </div>
     </div>
-    <div class="ion-metric">
-      <div class="text-amber-300 text-[20px] font-semibold">{{ scores.threat_actor_matches }}</div>
-      <div class="ion-metric-label">threat-actor profiles</div>
+
+    {% if scores.recommended_use_cases %}
+    <details class="collapse collapse-arrow bg-base-100 border border-base-300">
+      <summary class="collapse-title min-h-0 py-2 text-sm text-primary font-medium">
+        Top {{ scores.recommended_use_cases | length }} ranked use cases
+      </summary>
+      <div class="collapse-content">
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <tbody>
+              {% for uc in scores.recommended_use_cases %}
+                <tr>
+                  <td>{{ uc.name }}</td>
+                  <td class="text-end font-mono">{{ uc.score }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+    {% endif %}
+
+    {% if scores.recommended_threat_actors %}
+    <details class="collapse collapse-arrow bg-base-100 border border-base-300">
+      <summary class="collapse-title min-h-0 py-2 text-sm text-warning font-medium">
+        Top {{ scores.recommended_threat_actors | length }} threat-actor categories
+      </summary>
+      <div class="collapse-content">
+        <ul class="space-y-2 text-sm">
+          {% for a in scores.recommended_threat_actors %}
+            <li class="flex flex-wrap items-baseline gap-2">
+              <span class="badge badge-warning badge-sm">{{ a.name }}</span>
+              <span class="text-base-content/50">&mdash; {{ a.why }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    </details>
+    {% endif %}
+
+    <div class="card-actions flex flex-wrap items-center gap-3 pt-3 border-t border-base-300">
+      <form hx-post="/api/cyab/scoping/pdf"
+            hx-include="#scoping-form"
+            hx-swap="none"
+            hx-on::after-request="if (event.detail.successful) { window.location = event.detail.xhr.getResponseHeader('Location') || event.detail.xhr.responseURL; }"
+            class="inline">
+        <button type="submit" class="btn btn-ghost btn-sm">
+          Download PDF
+        </button>
+      </form>
+      <form hx-post="/api/cyab/scoping/convert"
+            hx-include="#scoping-form"
+            class="inline">
+        <button type="submit" class="btn btn-primary btn-sm">
+          Convert to system &rarr;
+        </button>
+      </form>
     </div>
-    <div class="ion-metric">
-      <div class="text-emerald-300 text-[20px] font-semibold">{{ scores.mitre_coverage_pct }}%</div>
-      <div class="ion-metric-label">MITRE Initial Access coverage</div>
-    </div>
-  </div>
-
-  {% if scores.recommended_use_cases %}
-  <details class="mb-3">
-    <summary class="text-cyan-400 text-[12px] cursor-pointer">
-      Top {{ scores.recommended_use_cases | length }} ranked use cases
-    </summary>
-    <ul class="mt-2 space-y-1 text-[11.5px]">
-      {% for uc in scores.recommended_use_cases %}
-        <li class="flex justify-between text-slate-300">
-          <span>{{ uc.name }}</span>
-          <span class="ion-mono">{{ uc.score }}</span>
-        </li>
-      {% endfor %}
-    </ul>
-  </details>
-  {% endif %}
-
-  {% if scores.recommended_threat_actors %}
-  <details class="mb-3">
-    <summary class="text-amber-400 text-[12px] cursor-pointer">
-      Top {{ scores.recommended_threat_actors | length }} threat-actor categories
-    </summary>
-    <ul class="mt-2 space-y-1 text-[11.5px]">
-      {% for a in scores.recommended_threat_actors %}
-        <li class="text-slate-300">
-          <strong class="text-amber-200">{{ a.name }}</strong>
-          <span class="text-slate-500"> &mdash; {{ a.why }}</span>
-        </li>
-      {% endfor %}
-    </ul>
-  </details>
-  {% endif %}
-
-  <div class="flex items-center gap-3 pt-3 border-t border-slate-800">
-    <form hx-post="/api/cyab/scoping/pdf"
-          hx-include="#scoping-form"
-          hx-swap="none"
-          hx-on::after-request="if (event.detail.successful) { window.location = event.detail.xhr.getResponseHeader('Location') || event.detail.xhr.responseURL; }"
-          class="inline">
-      <button type="submit" class="ion-btn">
-        Download PDF
-      </button>
-    </form>
-    <form hx-post="/api/cyab/scoping/convert"
-          hx-include="#scoping-form"
-          class="inline">
-      <button type="submit" class="ion-btn ion-btn-primary">
-        Convert to system &rarr;
-      </button>
-    </form>
   </div>
 </section>

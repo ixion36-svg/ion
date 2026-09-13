@@ -1,19 +1,31 @@
 {% extends "base.html" %}
 {% block title %}Overview — CyAB · ION{% endblock %}
 {% block content %}
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <div class="cyab-overview">
   {% include "cyab/_section_nav.html" %}
 
-  <header class="ion-page-header mb-4">
-    <div>
-      <h1 class="ion-ph-title">CyAB Overview</h1>
+  <header class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
+      <nav class="breadcrumbs text-sm mb-3">
+        <ul>
+          <li><a href="/cyab">CyAB</a></li>
+          <li>Overview</li>
+        </ul>
+      </nav>
+      <div class="flex items-center gap-3 mb-4">
+        <svg class="w-4 h-4 text-primary"><use href="#i-layers"/></svg>
+        <span class="label-tiny text-primary">Cyber asset baseline</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">CyAB Overview</h1>
     </div>
-    <div class="flex gap-2">
-      <a href="/cyab/onboard" class="ion-btn ion-btn-primary">+ Onboard</a>
-      <a href="/cyab/systems" class="ion-btn">View systems</a>
+    <div class="flex gap-2 flex-wrap">
+      <a href="/cyab/onboard" class="btn btn-primary">+ Onboard</a>
+      <a href="/cyab/systems" class="btn btn-ghost">View systems</a>
       <button hx-post="/api/cyab/coverage/rollup-now"
               hx-swap="none"
-              class="ion-btn">
+              class="btn btn-ghost">
         Run coverage rollup
       </button>
     </div>
@@ -22,65 +34,85 @@
   {# === KPI strip === #}
   {% set onb_pct = (kpis.sal_compliance_pass / kpis.total_systems * 100) | round(0) | int if kpis.total_systems else 0 %}
   {% set crit_pct = (needs_attention | length) / kpis.total_systems * 100 if kpis.total_systems else 0 %}
-  <section class="kpi-strip ion-metrics-grid mb-6">
-    <div class="kpi-card ion-metric">
-      <div class="ion-metric-label">Total systems</div>
-      <div class="ion-metric-value text-cyan-300">{{ kpis.total_systems }}</div>
+  <section class="stats stats-vertical md:stats-horizontal w-full bg-base-200 shadow mb-6">
+    <div class="stat">
+      <div class="stat-title">Total systems</div>
+      <div class="stat-value font-mono text-primary">{{ kpis.total_systems }}</div>
     </div>
-    <div class="kpi-card ion-metric">
-      <div class="ion-metric-label">% onboarded</div>
-      <div class="ion-metric-value text-emerald-300">{{ onb_pct }}%</div>
+    <div class="stat">
+      <div class="stat-title">% onboarded</div>
+      <div class="stat-value font-mono text-success">{{ onb_pct }}%</div>
     </div>
-    <div class="kpi-card ion-metric">
-      <div class="ion-metric-label">% critical-missing</div>
-      <div class="ion-metric-value text-rose-400">{{ crit_pct | round(0) | int }}%</div>
+    <div class="stat">
+      <div class="stat-title">% critical-missing</div>
+      <div class="stat-value font-mono text-error">{{ crit_pct | round(0) | int }}%</div>
     </div>
-    <div class="kpi-card ion-metric">
-      <div class="ion-metric-label">Sign-offs this week</div>
-      <div class="ion-metric-value text-amber-300">{{ kpis.signoffs_this_week }}</div>
+    <div class="stat">
+      <div class="stat-title">Sign-offs this week</div>
+      <div class="stat-value font-mono text-warning">{{ kpis.signoffs_this_week }}</div>
     </div>
   </section>
 
-  <div class="grid grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
     {# === In progress feed === #}
-    <section class="ion-card">
-      <header class="flex items-baseline justify-between mb-2">
-        <h3 class="ion-card-title">In progress</h3>
-        <span class="text-slate-500 text-[10.5px]">5 most recent</span>
-      </header>
-      {% if not in_progress %}
-        <p class="text-slate-500 text-[11px]">Nothing in progress. <a href="/cyab/onboard" class="text-cyan-400">+ Onboard a system</a>.</p>
-      {% else %}
-        <ul class="divide-y divide-slate-800 text-[12px]">
-          {% for s in in_progress %}
-            <li class="py-2 flex justify-between">
-              <a href="/cyab/systems/{{ s.id }}" class="text-cyan-400 hover:underline">{{ s.name }}</a>
-              <span class="text-slate-500 text-[11px]">{{ s.updated_at.strftime('%Y-%m-%d %H:%M') if s.updated_at else '' }}</span>
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
+    <section class="card bg-base-200 shadow">
+      <div class="card-body">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="card-title text-sm">In progress</h2>
+          <span class="text-xs text-base-content/50">5 most recent</span>
+        </div>
+        {% if not in_progress %}
+          <div class="alert alert-info">
+            <span>Nothing in progress. <a href="/cyab/onboard" class="link link-primary">+ Onboard a system</a>.</span>
+          </div>
+        {% else %}
+          <div class="overflow-x-auto">
+            <table class="table table-sm">
+              <tbody>
+                {% for s in in_progress %}
+                  <tr>
+                    <td><a href="/cyab/systems/{{ s.id }}" class="link link-primary">{{ s.name }}</a></td>
+                    <td class="text-right text-xs text-base-content/50">{{ s.updated_at.strftime('%Y-%m-%d %H:%M') if s.updated_at else '' }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
     </section>
 
     {# === Needs attention feed === #}
-    <section class="ion-card">
-      <header class="flex items-baseline justify-between mb-2">
-        <h3 class="ion-card-title text-rose-400">Needs attention</h3>
-        <span class="text-slate-500 text-[10.5px]">critical-missing or stale data</span>
-      </header>
-      {% if not needs_attention %}
-        <p class="text-emerald-400 text-[11px]">All clear — no critical gaps right now.</p>
-      {% else %}
-        <ul class="divide-y divide-slate-800 text-[12px]">
-          {% for s in needs_attention %}
-            <li class="py-2 flex justify-between">
-              <a href="/cyab/systems/{{ s.id }}" class="text-rose-300 hover:underline">{{ s.name }}</a>
-              <span class="text-slate-500 text-[11px]">{{ s.reason }}</span>
-            </li>
-          {% endfor %}
-        </ul>
-      {% endif %}
+    <section class="card bg-base-200 shadow">
+      <div class="card-body">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 class="card-title text-sm text-error">Needs attention</h2>
+          <span class="text-xs text-base-content/50">critical-missing or stale data</span>
+        </div>
+        {% if not needs_attention %}
+          <div class="alert alert-success">
+            <span>All clear — no critical gaps right now.</span>
+          </div>
+        {% else %}
+          <div class="overflow-x-auto">
+            <table class="table table-sm">
+              <tbody>
+                {% for s in needs_attention %}
+                  <tr>
+                    <td><a href="/cyab/systems/{{ s.id }}" class="link link-error">{{ s.name }}</a></td>
+                    <td class="text-right">
+                      <span class="badge badge-error badge-sm">{{ s.reason }}</span>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
     </section>
   </div>
+</div>
+</div>
 </div>
 {% endblock %}

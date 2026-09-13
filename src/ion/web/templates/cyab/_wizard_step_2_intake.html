@@ -9,23 +9,23 @@
    reused verbatim so the two surfaces stay byte-identical. #}
 
 <header class="mb-4">
-  <h2 class="ion-card-title text-[16px]">Intake</h2>
-  <p class="text-slate-400 text-[12px]">Sub-profile-driven questions. Auto-saves as you type.</p>
+  <h2 class="card-title text-base">Intake</h2>
+  <p class="text-sm text-base-content/60">Sub-profile-driven questions. Auto-saves as you type.</p>
 </header>
 
 {# === Two-column layout: form on the left, sticky live counter on the right.
      The counter swaps via HTMX on every form change; same engine as
      /cyab/scoping (see /api/cyab/onboard/score). === #}
-<div class="grid grid-cols-3 gap-4">
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-  <div class="col-span-2">
+  <div class="md:col-span-2">
     <form id="wizard-intake-form"
           hx-post="/api/cyab/onboard/{{ wid }}/step/2"
           hx-target="#wizard-step-content"
           hx-swap="innerHTML"
           method="post"
           action="/api/cyab/onboard/{{ wid }}/step/2"
-          class="space-y-3">
+          class="space-y-4">
 
       {# Live-counter trigger: every change posts the form to the shared
          scoring endpoint and swaps the counter region. Kept on the form
@@ -38,31 +38,31 @@
            hx-include="#wizard-intake-form"></div>
 
       {% if not state.identity.subprofile_id %}
-        <p class="text-amber-400 text-[12px]">
-          No sub-profile yet — questions will load after Step 3 picks one. You can skip ahead.
-        </p>
+        <div role="alert" class="alert alert-warning">
+          <span>No sub-profile yet — questions will load after Step 3 picks one. You can skip ahead.</span>
+        </div>
       {% else %}
         {# Sub-profile catalogue questions. The full renderer lives in the
            per-system Intake tab from Sub-plan A — keep this minimal so the
            wizard never blocks. #}
         {% for q in (questions or []) %}
-          <label class="block text-[12.5px]">
-            <span class="text-slate-300">{{ q.text }}</span>
+          <fieldset class="fieldset p-0">
+            <legend class="fieldset-legend">{{ q.text }}</legend>
             <input type="text" name="answers[{{ q.id }}]" value="{{ state.intake.get(q.id, '') }}"
-                   class="ion-input mt-1"
+                   class="input w-full"
                    hx-post="/api/cyab/systems/{{ state.system_id }}/answers"
                    hx-trigger="change delay:600ms"
                    hx-vals='js:{ answers: { "{{ q.id }}": this.value } }'
                    hx-swap="none">
-          </label>
+          </fieldset>
         {% endfor %}
       {% endif %}
 
-      <div class="flex justify-between items-center mt-4">
-        <a href="/cyab/onboard?wid={{ wid }}&step=1" class="text-slate-500 text-[11px]">← Back</a>
-        <div class="flex gap-2">
-          <a href="/cyab/systems" class="text-slate-500 text-[11px] py-1">Save & exit</a>
-          <button type="submit" class="ion-btn ion-btn-primary">
+      <div class="flex flex-wrap items-center justify-between gap-3 mt-4">
+        <a href="/cyab/onboard?wid={{ wid }}&step=1" class="btn btn-ghost btn-sm">← Back</a>
+        <div class="flex flex-wrap gap-2">
+          <a href="/cyab/systems" class="btn btn-ghost btn-sm">Save & exit</a>
+          <button type="submit" class="btn btn-primary">
             Continue → Source
           </button>
         </div>
@@ -70,9 +70,11 @@
     </form>
   </div>
 
-  <aside class="col-span-1">
+  <aside class="md:col-span-1">
+    {# card-body lives on the same element as the id so HTMX innerHTML swaps
+       of #wizard-counter keep the panel padding. #}
     <div id="wizard-counter"
-         class="sticky top-4 ion-card">
+         class="sticky top-4 card card-body bg-base-100 shadow-sm">
       {# Initial render: zero state from the server. The wizard page
          handler may pre-populate `scoping_initial` from any answers
          already saved against this session. #}

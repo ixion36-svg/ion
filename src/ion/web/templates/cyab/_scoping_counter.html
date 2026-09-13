@@ -1,23 +1,23 @@
 {% set scores = scores | default(initial_scores) %}
 <div class="scoping-counter-body">
-  <h3 class="text-slate-300 text-[11px] uppercase tracking-wider mb-3">Live scope</h3>
+  <h3 class="text-xs font-medium uppercase tracking-wider text-base-content/60">Live scope</h3>
 
-  <div class="mb-3">
-    <div class="text-cyan-300 text-[24px] font-semibold leading-none">{{ scores.use_case_count }}</div>
-    <div class="text-slate-400 text-[11px]">use cases</div>
+  <div class="stats stats-vertical w-full bg-transparent shadow-none">
+    <div class="stat px-0">
+      <div class="stat-title">use cases</div>
+      <div class="stat-value text-2xl text-primary">{{ scores.use_case_count }}</div>
+    </div>
+    <div class="stat px-0">
+      <div class="stat-title">threat-actor matches</div>
+      <div class="stat-value text-2xl text-warning">{{ scores.threat_actor_matches }}</div>
+    </div>
+    <div class="stat px-0">
+      <div class="stat-title">MITRE Initial Access coverage</div>
+      <div class="stat-value text-2xl text-success">{{ scores.mitre_coverage_pct }}%</div>
+    </div>
   </div>
 
-  <div class="mb-3">
-    <div class="text-amber-300 text-[24px] font-semibold leading-none">{{ scores.threat_actor_matches }}</div>
-    <div class="text-slate-400 text-[11px]">threat-actor matches</div>
-  </div>
-
-  <div class="mb-3">
-    <div class="text-emerald-300 text-[24px] font-semibold leading-none">{{ scores.mitre_coverage_pct }}%</div>
-    <div class="text-slate-400 text-[11px]">MITRE Initial Access coverage</div>
-  </div>
-
-  <p class="text-slate-500 text-[10.5px] mt-3 pt-3 border-t border-slate-800">
+  <p class="text-xs text-base-content/50 mt-1 pt-3 border-t border-base-300">
     Updates as you answer.
   </p>
 </div>

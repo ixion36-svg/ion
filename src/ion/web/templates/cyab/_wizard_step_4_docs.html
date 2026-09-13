@@ -3,51 +3,60 @@
    click "I'll do this later" to leave the row in 'unknown' state. #}
 
 <header class="mb-4">
-  <h2 class="ion-card-title text-[16px]">Doc placeholders</h2>
-  <p class="text-slate-400 text-[12px]">
-    20 default checklist items will be created. Add URLs now or skip — every row stays editable from the Overview tab.
-  </p>
+  <h2 class="card-title text-base">Doc placeholders</h2>
 </header>
+
+<div role="alert" class="alert alert-info mb-4">
+  <span>20 default checklist items will be created. Add URLs now or skip — every row stays editable from the Overview tab.</span>
+</div>
 
 <form hx-post="/api/cyab/onboard/{{ wid }}/finish"
       hx-target="this" hx-swap="outerHTML"
       method="post"
       action="/api/cyab/onboard/{{ wid }}/finish"
-      class="space-y-2">
-  <table class="ion-table">
-    <thead>
-      <tr>
-        <th>Item</th>
-        <th>Critical?</th>
-        <th>URL (optional)</th>
-        <th class="text-right">I'll do later</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for item in (checklist or []) %}
-        <tr>
-          <td class="text-slate-200">{{ item.label }}</td>
-          <td>
-            <input type="checkbox" name="docs[{{ item.kind }}][is_critical]" value="1"
-                   {% if item.is_critical %}checked{% endif %}>
-          </td>
-          <td>
-            <input type="url" name="docs[{{ item.kind }}][url]"
-                   value="{{ item.url or '' }}"
-                   placeholder="https://..."
-                   class="ion-input">
-          </td>
-          <td class="text-right">
-            <input type="checkbox" name="docs[{{ item.kind }}][mark_later]" value="1">
-          </td>
-        </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+      class="space-y-4">
+  <div class="card bg-base-100 shadow-sm">
+    <div class="card-body p-0">
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Critical?</th>
+              <th>URL (optional)</th>
+              <th class="text-right">I'll do later</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in (checklist or []) %}
+              <tr class="hover">
+                <td>{{ item.label }}</td>
+                <td>
+                  <input type="checkbox" name="docs[{{ item.kind }}][is_critical]" value="1"
+                         class="checkbox checkbox-sm checkbox-error"
+                         {% if item.is_critical %}checked{% endif %}>
+                </td>
+                <td>
+                  <input type="url" name="docs[{{ item.kind }}][url]"
+                         value="{{ item.url or '' }}"
+                         placeholder="https://..."
+                         class="input input-sm w-full">
+                </td>
+                <td class="text-right">
+                  <input type="checkbox" name="docs[{{ item.kind }}][mark_later]" value="1"
+                         class="checkbox checkbox-sm">
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
-  <div class="flex justify-between items-center mt-4">
-    <a href="/cyab/onboard?wid={{ wid }}&step=3" class="text-slate-500 text-[11px]">← Back</a>
-    <button type="submit" class="ion-btn ion-btn-primary">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <a href="/cyab/onboard?wid={{ wid }}&step=3" class="btn btn-ghost btn-sm">← Back</a>
+    <button type="submit" class="btn btn-primary">
       Finish — open system page
     </button>
   </div>

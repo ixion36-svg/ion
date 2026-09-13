@@ -4,24 +4,26 @@
 
 {% block content %}
 <div class="system-detail" data-system-id="{{ system.id }}">
-  <nav class="breadcrumb text-sm text-slate-400 mb-3">
-    <a href="/cyab" class="hover:text-white">CyAB</a>
-    <span class="mx-2">·</span>
-    <a href="/cyab/systems" class="hover:text-white">Systems</a>
-    <span class="mx-2">·</span>
-    <span class="text-white">{{ system.name }}</span>
+  <nav class="breadcrumbs text-sm mb-3">
+    <ul>
+      <li><a href="/cyab">CyAB</a></li>
+      <li><a href="/cyab/systems">Systems</a></li>
+      <li>{{ system.name }}</li>
+    </ul>
   </nav>
 
-  <header class="flex items-baseline gap-4 mb-4">
-    <h1 class="ion-ph-title">{{ system.name }}</h1>
-    {% if system.department %}<span class="text-slate-400">{{ system.department }}</span>{% endif %}
+  <header class="flex flex-wrap items-baseline gap-3 mb-4">
+    <h1 class="text-2xl font-semibold tracking-tight">{{ system.name }}</h1>
+    {% if system.department %}
+      <span class="badge badge-ghost badge-sm">{{ system.department }}</span>
+    {% endif %}
   </header>
 
   {# Sticky progress header — implemented in Task 2 #}
   {% include "cyab/_progress_header.html" %}
 
   {# Tab nav + content slot — implemented in Task 3 #}
-  <nav class="tab-strip flex gap-1 mt-4 border-b border-slate-800">
+  <nav class="tab-strip tabs tabs-border tabs-sm mt-4" role="tablist">
     {% set tabs = [
       ('overview', 'Overview'),
       ('intake', 'Intake'),
@@ -32,7 +34,9 @@
       ('signoff', 'Sign-off'),
     ] %}
     {% for slug, label in tabs %}
-      <button class="tab-btn px-3 py-2 text-[12.5px] text-slate-400 hover:text-cyan-300 border-b-2 border-transparent {% if slug == 'overview' %}text-cyan-300 border-cyan-400{% endif %}"
+      <button type="button"
+              role="tab"
+              class="tab {% if slug == 'overview' %}tab-active{% endif %}"
               hx-get="/cyab/systems/{{ system.id }}/tab/{{ slug }}"
               hx-target="#tab-content"
               hx-swap="innerHTML"
@@ -46,7 +50,10 @@
        hx-get="/cyab/systems/{{ system.id }}/tab/overview"
        hx-trigger="load"
        hx-swap="innerHTML">
-    <p class="text-slate-500 text-[12px]">Loading…</p>
+    <p class="text-base-content/50 text-sm flex items-center gap-2">
+      <span class="loading loading-spinner loading-sm text-primary"></span>
+      Loading…
+    </p>
   </div>
 </div>
 {% endblock %}

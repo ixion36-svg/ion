@@ -22,7 +22,7 @@
 
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
       <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
       <span class="label-tiny text-ion-iris">Service desk</span>
@@ -32,79 +32,93 @@
   </div>
 </section>
 
-<section class="section">
-  <div class="section-header"><h2>Report a bug</h2></div>
-  <div class="bug-form">
-    <div class="bf-row">
-      <label>Title<input id="bf-title" class="ion-input" maxlength="300" placeholder="Short summary of the problem"></label>
-    </div>
-    <div class="bf-grid">
-      <label>Severity
-        <select id="bf-severity" class="ion-select">
+<section class="card bg-base-200 shadow mb-6">
+  <div class="card-body">
+    <h2 class="card-title">Report a bug</h2>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Title</legend>
+      <input id="bf-title" class="input w-full" maxlength="300" placeholder="Short summary of the problem">
+    </fieldset>
+    <div class="grid grid-cols-1 min-[821px]:grid-cols-3 gap-4">
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Severity</legend>
+        <select id="bf-severity" class="select w-full">
           <option value="low">Low</option>
           <option value="medium" selected>Medium</option>
           <option value="high">High</option>
           <option value="critical">Critical</option>
         </select>
-      </label>
-      <label>Component / page
-        <input id="bf-component" class="ion-input" maxlength="120" placeholder="e.g. /alerts, Daily Standup">
-      </label>
-      <label>URL where it happened
-        <input id="bf-page" class="ion-input" maxlength="500" placeholder="optional">
-      </label>
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Component / page</legend>
+        <input id="bf-component" class="input w-full" maxlength="120" placeholder="e.g. /alerts, Daily Standup">
+      </fieldset>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">URL where it happened</legend>
+        <input id="bf-page" class="input w-full" maxlength="500" placeholder="optional">
+      </fieldset>
     </div>
-    <div class="bf-row">
-      <label>Description<textarea id="bf-desc" class="ion-input" rows="4" placeholder="What went wrong? What did you expect?"></textarea></label>
-    </div>
-    <div class="bf-row">
-      <label>Steps to reproduce<textarea id="bf-steps" class="ion-input" rows="3" placeholder="1. … 2. … (optional)"></textarea></label>
-    </div>
-    <div class="bf-actions">
-      <span id="bf-msg" class="ion-muted"></span>
-      <button class="ion-btn ion-btn-primary" data-click-action="submitBug">Submit bug report</button>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Description</legend>
+      <textarea id="bf-desc" class="textarea w-full" rows="4" placeholder="What went wrong? What did you expect?"></textarea>
+    </fieldset>
+    <fieldset class="fieldset p-0">
+      <legend class="fieldset-legend">Steps to reproduce</legend>
+      <textarea id="bf-steps" class="textarea w-full" rows="3" placeholder="1. … 2. … (optional)"></textarea>
+    </fieldset>
+    <div class="flex flex-wrap justify-end items-center gap-4">
+      <span id="bf-msg" class="text-sm text-base-content/60"></span>
+      <button class="btn btn-primary" data-click-action="submitBug">Submit bug report</button>
     </div>
   </div>
 </section>
 
-<section class="section">
-  <div class="section-header">
-    <h2>Submitted reports</h2>
-    <div class="filter-controls">
-      <label><input type="checkbox" id="filter-mine" data-change-action="loadBugs"> Only mine</label>
-      <label>Status:
-        <select id="filter-status" class="ion-select sh-filter-select" data-change-action="loadBugs">
-          <option value="all" selected>All</option>
-          <option value="open">Open</option>
-          <option value="in_progress">In progress</option>
-          <option value="resolved">Resolved</option>
-          <option value="closed">Closed</option>
-        </select>
-      </label>
+<section class="card bg-base-200 shadow">
+  <div class="card-body p-0">
+    <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300">
+      <h2 class="card-title text-base">Submitted reports</h2>
+      <div class="flex flex-wrap items-center gap-4">
+        <label class="label cursor-pointer justify-start gap-2 py-0 w-fit">
+          <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="filter-mine" data-change-action="loadBugs">
+          <span class="label-text">Only mine</span>
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <span class="text-base-content/60">Status:</span>
+          <select id="filter-status" class="select select-sm w-auto" data-change-action="loadBugs">
+            <option value="all" selected>All</option>
+            <option value="open">Open</option>
+            <option value="in_progress">In progress</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+          </select>
+        </label>
+      </div>
     </div>
-  </div>
-  <div class="table-container">
-    <table class="ion-table" id="bugs-table">
-      <thead>
-        <tr><th>#</th><th>Title</th><th>Severity</th><th>Component</th><th>Status</th><th>GitLab</th><th>Reported by</th><th>Created</th><th>Actions</th></tr>
-      </thead>
-      <tbody id="bugs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
-    </table>
+    <div class="overflow-x-auto">
+      <table class="table table-sm" id="bugs-table">
+        <thead>
+          <tr><th>#</th><th>Title</th><th>Severity</th><th>Component</th><th>Status</th><th>GitLab</th><th>Reported by</th><th>Created</th><th>Actions</th></tr>
+        </thead>
+        <tbody id="bugs-body"><tr><td colspan="9" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
   </div>
 </section>
 
 <style nonce="{{ csp_nonce }}">
-.section { background: var(--bg-secondary); border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem; }
-.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; gap:1rem; flex-wrap:wrap; }
-.filter-controls { display:flex; gap:1rem; align-items:center; }
-.sh-filter-select { width:auto; }
-.table-container { overflow-x:auto; }
-.loading { text-align:center; color: var(--text-secondary); padding: 2rem; }
-.bug-form label { display:block; font-size:12px; color: var(--text-secondary); margin-bottom:.35rem; }
-.bf-row { margin-bottom: 1rem; }
-.bf-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap:1rem; margin-bottom:1rem; }
-@media (max-width: 820px){ .bf-grid { grid-template-columns: 1fr; } }
-.bf-actions { display:flex; justify-content:flex-end; align-items:center; gap:1rem; }
+/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
+#bugs-table td.loading {
+    display: table-cell;
+    aspect-ratio: auto;
+    width: auto;
+    height: auto;
+    background: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.6;
+}
 </style>
 
 <script nonce="{{ csp_nonce }}">

@@ -13,7 +13,7 @@
 {% set active_label = "Morning Briefing" %}
 {% include "_nav_tabs.html" %}
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-cyan"><use href="#i-calendar"/></svg>
     <span class="label-tiny text-ion-cyan">Start of shift</span>
@@ -22,9 +22,9 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Overnight activity, open cases, and priority alerts for the day.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <label class="brf-window">
+        <label class="flex items-center gap-2 text-sm opacity-70">
             Window:
-            <select id="brf-hours" data-change-action="brfLoad">
+            <select id="brf-hours" class="select select-sm w-auto" data-change-action="brfLoad">
                 <option value="6">6 hours</option>
                 <option value="12" selected>12 hours (overnight)</option>
                 <option value="24">24 hours</option>
@@ -32,12 +32,14 @@
                 <option value="168">7 days</option>
             </select>
         </label>
-        <button class="ion-btn" data-click-action="brfLoad">Refresh</button>
-        <button class="ion-btn ion-btn-primary" data-click-action="brfLoad" data-args='[true]'>Generate AI Summary</button>
+        <button class="btn btn-ghost" data-click-action="brfLoad">Refresh</button>
+        <button class="btn btn-primary" data-click-action="brfLoad" data-args='[true]'>Generate AI Summary</button>
     </div>
 </section>
 
-<div id="brf-content"><div class="brf-loading"><span class="brf-spinner"></span> Composing briefing...</div></div>
+<div id="brf-content">
+    <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Composing briefing...</div>
+</div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -45,78 +47,41 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.brf-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.brf-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:brf-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes brf-spin{to{transform:rotate(360deg)}}
-.brf-window{display:inline-flex;align-items:center;gap:8px;color:var(--text-secondary);font-size:.78rem}
-.brf-window select{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:6px 10px;border-radius:var(--radius);font:inherit;font-size:.82rem}
-
-.brf-meta{font-size:.78rem;color:var(--text-secondary);margin-bottom:14px}
-
-/* Headlines */
-.brf-headlines{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:18px}
-.brf-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center;position:relative;overflow:hidden}
-.brf-stat::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--primary);opacity:.4}
-.brf-stat-val{font-size:1.7rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
-.brf-stat-val.warn{color:var(--sev-medium)}
-.brf-stat-val.crit{color:var(--sev-critical)}
-.brf-stat-val.muted{color:var(--text-secondary)}
-.brf-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-
-/* AI narrative */
-.brf-narrative{background:linear-gradient(135deg, rgba(88,166,255,.06), rgba(88,166,255,.02));border:1px solid var(--border);border-left:3px solid var(--primary);border-radius:var(--radius-lg);padding:18px 22px;margin-bottom:18px}
-.brf-narrative-label{font-size:.7rem;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:8px}
-.brf-narrative-body{font-size:.92rem;color:var(--text-primary);line-height:1.6;white-space:pre-wrap}
-.brf-narrative.empty .brf-narrative-body{color:var(--text-secondary);font-style:italic}
-
-/* Section grid */
-.brf-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+.brf-headlines{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.25rem}
+/* 900px is not a Tailwind breakpoint. */
+.brf-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
 @media (max-width: 900px){.brf-grid{grid-template-columns:1fr}}
-.brf-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px}
-.brf-card-title{font-size:.78rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-.brf-card-title .brf-pill{background:var(--bg-tertiary);border:1px solid var(--border);padding:2px 8px;border-radius:99px;font-size:.62rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
-.brf-card-title .brf-pill.live{color:var(--mitre-covered);border-color:rgba(63,185,80,.4)}
-.brf-card-title .brf-pill.off{color:var(--sev-critical);border-color:rgba(248,81,73,.4)}
-
-.brf-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
-.brf-list li{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;background:var(--bg-tertiary);border-radius:var(--radius);font-size:.82rem;color:var(--text-primary)}
-.brf-list li strong{font-family:'JetBrains Mono',monospace;color:var(--primary);font-size:.85rem}
-.brf-empty{font-size:.78rem;color:var(--text-secondary);text-align:center;padding:14px;font-style:italic}
-
-.brf-sev{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-.brf-sev-pill{padding:4px 10px;border-radius:99px;font-size:.7rem;font-weight:700;background:var(--bg-tertiary);border:1px solid var(--border)}
-.brf-sev-pill.critical{background:rgba(248,81,73,.18);color:var(--sev-critical);border-color:rgba(248,81,73,.4)}
-.brf-sev-pill.high{background:rgba(240,136,62,.18);color:var(--sev-high);border-color:rgba(240,136,62,.4)}
-.brf-sev-pill.medium{background:rgba(210,153,34,.18);color:var(--sev-medium);border-color:rgba(210,153,34,.4)}
-.brf-sev-pill.low{background:rgba(99,110,123,.18);color:var(--text-secondary);border-color:var(--border)}
-
 @media (max-width: 768px) {
     .brf-headlines { grid-template-columns: repeat(2, 1fr); }
-    .brf-grid { grid-template-columns: 1fr; }
-    .brf-narrative { padding: 14px 16px; }
-    .brf-narrative-body { font-size: .85rem; }
-    .brf-window select { font-size: .75rem; padding: 6px 8px; }
 }
 @media (max-width: 480px) {
-    .brf-stat-val { font-size: 1.3rem; }
-    .brf-headlines { gap: 8px; }
+    .brf-headlines { gap: 0.5rem; }
 }
 </style>
 <script nonce="{{ csp_nonce }}">
 const BRF_API = '/api/briefing';
 function brfEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function brfFmt(iso){if(!iso)return'-';try{return new Date(iso).toLocaleString()}catch(e){return iso}}
+function brfSevKind(sev){
+    const s = String(sev || '').toLowerCase();
+    if (s === 'critical') return 'badge-error';
+    if (s === 'high') return 'badge-warning';
+    if (s === 'medium') return 'badge-info';
+    if (s === 'low') return 'badge-success';
+    return 'badge-ghost';
+}
 
 async function brfLoad(withAI) {
     const c = document.getElementById('brf-content');
     const hours = document.getElementById('brf-hours').value;
-    c.innerHTML = `<div class="brf-loading"><span class="brf-spinner"></span> ${withAI ? 'Generating AI summary...' : 'Composing briefing...'}</div>`;
+    c.innerHTML = `<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> ${withAI ? 'Generating AI summary...' : 'Composing briefing...'}</div>`;
     try {
         const r = await fetch(`${BRF_API}?hours=${hours}${withAI ? '&ai=true' : ''}`);
         if (!r.ok) throw new Error('Briefing request failed');
         brfRender(await r.json());
     } catch (e) {
-        c.innerHTML = `<div class="brf-loading _ion-s-3c9b2ebd4d">${brfEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${brfEsc(e.message)}</div>`;
     }
 }
 
@@ -128,105 +93,115 @@ function brfRender(b) {
     const tide = b.tide || {};
     const sources = b.sources_reached || [];
 
-    let html = `<div class="brf-meta">Generated ${brfFmt(b.generated_at)} &middot; Window: last ${b.window_hours||0}h &middot; Sources reached: ${sources.length ? sources.join(', ') : '<em>none</em>'}</div>`;
+    let html = `<div class="text-sm opacity-70 mb-4">Generated ${brfFmt(b.generated_at)} &middot; Window: last ${b.window_hours||0}h &middot; Sources reached: ${sources.length ? sources.join(', ') : '<em>none</em>'}</div>`;
 
     // AI narrative (or hint)
     if (b.narrative) {
-        html += `<div class="brf-narrative">
-            <div class="brf-narrative-label">AI Briefing</div>
-            <div class="brf-narrative-body">${brfEsc(b.narrative)}</div>
+        html += `<div class="card bg-base-200 shadow mb-4 border-l-4 border-primary">
+            <div class="card-body py-4">
+            <div class="text-xs font-bold uppercase tracking-wider text-primary">AI Briefing</div>
+            <div class="whitespace-pre-wrap leading-relaxed">${brfEsc(b.narrative)}</div>
+            </div>
         </div>`;
     }
 
     // Headlines
     html += `<div class="brf-headlines">
-        <div class="brf-stat"><div class="brf-stat-val">${h.alerts_total||0}</div><div class="brf-stat-label">Alerts</div></div>
-        <div class="brf-stat"><div class="brf-stat-val">${h.cases_opened||0}</div><div class="brf-stat-label">Cases Opened</div></div>
-        <div class="brf-stat"><div class="brf-stat-val">${h.cases_closed||0}</div><div class="brf-stat-label">Cases Closed</div></div>
-        <div class="brf-stat"><div class="brf-stat-val warn">${h.open_backlog||0}</div><div class="brf-stat-label">Open Backlog</div></div>
-        <div class="brf-stat"><div class="brf-stat-val muted">${h.actors_tracked||0}</div><div class="brf-stat-label">Actors Tracked</div></div>
-        <div class="brf-stat"><div class="brf-stat-val muted">${h.tide_rules_enabled||'-'}</div><div class="brf-stat-label">TIDE Rules Live</div></div>
+        <div class="stat bg-base-200 shadow rounded-box"><div class="stat-title">Alerts</div><div class="stat-value text-2xl font-mono text-primary">${h.alerts_total||0}</div></div>
+        <div class="stat bg-base-200 shadow rounded-box"><div class="stat-title">Cases Opened</div><div class="stat-value text-2xl font-mono text-primary">${h.cases_opened||0}</div></div>
+        <div class="stat bg-base-200 shadow rounded-box"><div class="stat-title">Cases Closed</div><div class="stat-value text-2xl font-mono text-primary">${h.cases_closed||0}</div></div>
+        <div class="stat bg-base-200 shadow rounded-box"><div class="stat-title">Open Backlog</div><div class="stat-value text-2xl font-mono text-warning">${h.open_backlog||0}</div></div>
+        <div class="stat bg-base-200 shadow rounded-box"><div class="stat-title">Actors Tracked</div><div class="stat-value text-2xl font-mono text-base-content/50">${h.actors_tracked||0}</div></div>
+        <div class="stat bg-base-200 shadow rounded-box"><div class="stat-title">TIDE Rules Live</div><div class="stat-value text-2xl font-mono text-base-content/50">${h.tide_rules_enabled||'-'}</div></div>
     </div>`;
 
     html += '<div class="brf-grid">';
 
     // Alerts card
-    html += `<div class="brf-card">
-        <div class="brf-card-title">Alert Activity <span class="brf-pill ${es.enabled ? 'live' : 'off'}">${es.enabled ? 'live' : 'es offline'}</span></div>`;
+    html += `<div class="card bg-base-200 shadow">
+        <div class="card-body">
+        <h3 class="card-title text-xs uppercase tracking-wider opacity-70 justify-between">Alert Activity <span class="badge badge-sm ${es.enabled ? 'badge-success' : 'badge-error'}">${es.enabled ? 'live' : 'es offline'}</span></h3>`;
     if (es.by_severity && Object.keys(es.by_severity).length) {
-        html += '<div class="brf-sev">';
+        html += '<div class="flex flex-wrap gap-1.5 mb-3">';
         for (const [sev, cnt] of Object.entries(es.by_severity)) {
-            html += `<span class="brf-sev-pill ${brfEsc(sev)}">${brfEsc(sev)}: ${cnt}</span>`;
+            html += `<span class="badge badge-sm ${brfSevKind(sev)}">${brfEsc(sev)}: ${cnt}</span>`;
         }
         html += '</div>';
     }
     if (es.top_rules && es.top_rules.length) {
-        html += '<ul class="brf-list">';
+        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Rule</th><th>Count</th></tr></thead><tbody>';
         for (const r of es.top_rules.slice(0, 6)) {
             const name = (r && r.name) || (typeof r === 'string' ? r : JSON.stringify(r));
             const count = (r && r.count) || (r && r.doc_count) || '';
-            html += `<li><span>${brfEsc(name)}</span>${count !== '' ? `<strong>${brfEsc(count)}</strong>` : ''}</li>`;
+            html += `<tr><td>${brfEsc(name)}</td><td class="font-mono font-semibold text-primary">${count !== '' ? brfEsc(count) : ''}</td></tr>`;
         }
-        html += '</ul>';
+        html += '</tbody></table></div>';
     } else {
-        html += `<div class="brf-empty">No firing rules in window.</div>`;
+        html += `<div class="text-sm opacity-50 p-3 text-center italic">No firing rules in window.</div>`;
     }
-    html += '</div>';
+    html += '</div></div>';
 
     // Cases card
-    html += `<div class="brf-card">
-        <div class="brf-card-title">Case Activity</div>`;
+    html += `<div class="card bg-base-200 shadow">
+        <div class="card-body">
+        <h3 class="card-title text-xs uppercase tracking-wider opacity-70">Case Activity</h3>`;
     if ((cases.notable || []).length) {
-        html += '<ul class="brf-list">';
+        html += '<div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th>Case</th><th>Title</th><th>Severity</th></tr></thead><tbody>';
         for (const c of cases.notable) {
-            html += `<li><span>${brfEsc(c.case_number || '')} &middot; ${brfEsc(c.title || '')}</span><strong>${brfEsc(c.severity || '-')}</strong></li>`;
+            html += `<tr><td class="font-mono">${brfEsc(c.case_number || '')}</td><td>${brfEsc(c.title || '')}</td><td><span class="badge badge-sm ${brfSevKind(c.severity)}">${brfEsc(c.severity || '-')}</span></td></tr>`;
         }
-        html += '</ul>';
+        html += '</tbody></table></div>';
     } else {
-        html += '<div class="brf-empty">No notable cases in window.</div>';
+        html += '<div class="text-sm opacity-50 p-3 text-center italic">No notable cases in window.</div>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     // OpenCTI card
-    html += `<div class="brf-card">
-        <div class="brf-card-title">Threat Actors <span class="brf-pill ${octi.enabled ? 'live' : 'off'}">${octi.enabled ? 'live' : 'opencti offline'}</span></div>`;
+    html += `<div class="card bg-base-200 shadow">
+        <div class="card-body">
+        <h3 class="card-title text-xs uppercase tracking-wider opacity-70 justify-between">Threat Actors <span class="badge badge-sm ${octi.enabled ? 'badge-success' : 'badge-error'}">${octi.enabled ? 'live' : 'opencti offline'}</span></h3>`;
     if ((octi.actors || []).length) {
-        html += '<ul class="brf-list">';
+        html += '<div class="overflow-x-auto"><table class="table table-sm"><tbody>';
         for (const a of octi.actors) {
-            html += `<li><span>${brfEsc(a.name || '-')}${a.aliases && a.aliases.length ? ' <em class="_ion-s-18f820e713">(' + a.aliases.map(brfEsc).join(', ') + ')</em>' : ''}</span></li>`;
+            html += `<tr><td>${brfEsc(a.name || '-')}${a.aliases && a.aliases.length ? ' <em class="_ion-s-18f820e713">(' + a.aliases.map(brfEsc).join(', ') + ')</em>' : ''}</td></tr>`;
         }
-        html += '</ul>';
+        html += '</tbody></table></div>';
     } else {
-        html += '<div class="brf-empty">No actor data available.</div>';
+        html += '<div class="text-sm opacity-50 p-3 text-center italic">No actor data available.</div>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     // TIDE card
-    html += `<div class="brf-card">
-        <div class="brf-card-title">Detection Posture <span class="brf-pill ${tide.enabled ? 'live' : 'off'}">${tide.enabled ? 'live' : 'tide offline'}</span></div>`;
+    html += `<div class="card bg-base-200 shadow">
+        <div class="card-body">
+        <h3 class="card-title text-xs uppercase tracking-wider opacity-70 justify-between">Detection Posture <span class="badge badge-sm ${tide.enabled ? 'badge-success' : 'badge-error'}">${tide.enabled ? 'live' : 'tide offline'}</span></h3>`;
     if (tide.enabled) {
-        html += `<ul class="brf-list">
-            <li><span>Total rules</span><strong>${tide.total_rules ?? '-'}</strong></li>
-            <li><span>Enabled</span><strong>${tide.enabled_rules ?? '-'}</strong></li>
-            <li><span>MITRE techniques covered</span><strong>${tide.mitre_techniques_covered ?? '-'}</strong></li>
-            <li><span>Avg quality score</span><strong>${tide.quality_avg ?? '-'}</strong></li>
-        </ul>`;
+        html += `<div class="overflow-x-auto"><table class="table table-sm"><tbody>
+            <tr><td>Total rules</td><td class="font-mono font-semibold text-primary text-right">${tide.total_rules ?? '-'}</td></tr>
+            <tr><td>Enabled</td><td class="font-mono font-semibold text-primary text-right">${tide.enabled_rules ?? '-'}</td></tr>
+            <tr><td>MITRE techniques covered</td><td class="font-mono font-semibold text-primary text-right">${tide.mitre_techniques_covered ?? '-'}</td></tr>
+            <tr><td>Avg quality score</td><td class="font-mono font-semibold text-primary text-right">${tide.quality_avg ?? '-'}</td></tr>
+        </tbody></table></div>`;
     } else {
-        html += '<div class="brf-empty">TIDE not configured. Add it in <a class="_ion-s-dc2e428fc7" href="/settings#tide">Settings</a>.</div>';
+        html += '<div class="text-sm opacity-50 p-3 text-center italic">TIDE not configured. Add it in <a class="link link-primary _ion-s-dc2e428fc7" href="/settings#tide">Settings</a>.</div>';
     }
-    html += '</div>';
+    html += '</div></div>';
 
     html += '</div>'; // /grid
 
     if (!b.narrative && b._ai_requested) {
-        html += `<div class="brf-narrative empty">
-            <div class="brf-narrative-label">AI Briefing</div>
-            <div class="brf-narrative-body _ion-s-71bebebb15">AI summary unavailable — Ollama is not configured or not reachable. Check Settings → AI to configure.</div>
+        html += `<div class="alert alert-warning mb-4">
+            <div>
+            <div class="text-xs font-bold uppercase tracking-wider">AI Briefing</div>
+            <div class="_ion-s-71bebebb15">AI summary unavailable — Ollama is not configured or not reachable. Check Settings → AI to configure.</div>
+            </div>
         </div>`;
     } else if (!b.narrative) {
-        html += `<div class="brf-narrative empty">
-            <div class="brf-narrative-label">AI Briefing</div>
-            <div class="brf-narrative-body">Click "Generate AI Summary" above to have Ollama write an executive narrative from this snapshot.</div>
+        html += `<div class="alert alert-info mb-4">
+            <div>
+            <div class="text-xs font-bold uppercase tracking-wider">AI Briefing</div>
+            <div class="italic">Click "Generate AI Summary" above to have Ollama write an executive narrative from this snapshot.</div>
+            </div>
         </div>`;
     }
 

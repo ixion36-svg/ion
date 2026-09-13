@@ -1,6 +1,6 @@
 <header class="mb-4">
-  <h2 class="ion-card-title text-[16px]">First data source</h2>
-  <p class="text-slate-400 text-[12px]">
+  <h2 class="card-title text-base">First data source</h2>
+  <p class="text-sm text-base-content/60">
     One source to start. Add more later from the Sources tab.
   </p>
 </header>
@@ -10,28 +10,28 @@
       hx-swap="innerHTML"
       method="post"
       action="/api/cyab/onboard/{{ wid }}/step/3"
-      class="grid grid-cols-2 gap-4 text-[12.5px]">
+      class="grid grid-cols-1 md:grid-cols-2 gap-4">
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Source name <span class="text-rose-400">*</span></span>
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Source name <span class="text-error">*</span></legend>
     <input name="name" type="text" required
            value="{{ state.source.name or state.identity.hostname or '' }}"
-           class="ion-input">
-  </label>
+           class="input w-full">
+  </fieldset>
 
-  <label class="flex flex-col gap-1">
-    <span class="text-slate-400">Source type</span>
-    <select name="data_source_type" class="ion-select">
+  <fieldset class="fieldset p-0">
+    <legend class="fieldset-legend">Source type</legend>
+    <select name="data_source_type" class="select w-full">
       {% for opt in ['windows-evtx', 'generic-syslog', 'linux-auditd', 'aws-cloudtrail',
                      'office365', 'okta', 'azure-ad', 'edr-generic'] %}
         <option value="{{ opt }}" {% if state.source.data_source_type == opt %}selected{% endif %}>{{ opt }}</option>
       {% endfor %}
     </select>
-  </label>
+  </fieldset>
 
-  <label class="col-span-2 flex flex-col gap-1">
-    <span class="text-slate-400">Sub-profile</span>
-    <select name="subprofile_id" class="ion-select">
+  <fieldset class="fieldset p-0 md:col-span-2">
+    <legend class="fieldset-legend">Sub-profile</legend>
+    <select name="subprofile_id" class="select w-full">
       <option value="">— pick a sub-profile —</option>
       {% for s in (subprofiles or []) %}
         <option value="{{ s.id }}"
@@ -40,13 +40,13 @@
         </option>
       {% endfor %}
     </select>
-  </label>
+  </fieldset>
 
-  <div class="col-span-2 flex justify-between items-center mt-2">
-    <a href="/cyab/onboard?wid={{ wid }}&step=2" class="text-slate-500 text-[11px]">← Back</a>
-    <div class="flex gap-2">
-      <a href="/cyab/systems" class="text-slate-500 text-[11px] py-1">Save & exit</a>
-      <button type="submit" class="ion-btn ion-btn-primary">
+  <div class="md:col-span-2 flex flex-wrap items-center justify-between gap-3 mt-2">
+    <a href="/cyab/onboard?wid={{ wid }}&step=2" class="btn btn-ghost btn-sm">← Back</a>
+    <div class="flex flex-wrap gap-2">
+      <a href="/cyab/systems" class="btn btn-ghost btn-sm">Save & exit</a>
+      <button type="submit" class="btn btn-primary">
         Continue → Doc placeholders
       </button>
     </div>

@@ -3,35 +3,42 @@
 {% block title %}Knowledge Graph - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
-    <svg class="w-4 h-4 text-ion-iris"><use href="#i-network"/></svg>
-    <span class="label-tiny text-ion-iris">Entity graph</span>
+    <svg class="w-4 h-4 text-primary"><use href="#i-network"/></svg>
+    <span class="label-tiny text-primary">Entity graph</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Knowledge Graph</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Interactive visualisation of related observables and entities.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Knowledge Graph</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Interactive visualisation of related observables and entities.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <input id="kg-seed" type="text" placeholder="Pivot from observable value..." class="kg-seed-input">
-        <label class="kg-cb"><input type="checkbox" id="kg-closed"> Include closed cases</label>
-        <select id="kg-limit" class="kg-select">
+        <input id="kg-seed" type="text" placeholder="Pivot from observable value..." class="input input-sm w-[240px] max-md:w-full max-md:max-w-[280px]">
+        <label class="label cursor-pointer gap-2 py-0">
+            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="kg-closed">
+            <span class="label-text text-sm">Include closed cases</span>
+        </label>
+        <select id="kg-limit" class="select select-sm">
             <option value="20">Last 20 cases</option>
             <option value="50" selected>Last 50</option>
             <option value="100">Last 100</option>
             <option value="200">Last 200</option>
         </select>
-        <button class="btn btn-secondary" data-click-action="kgLoad">Refresh</button>
+        <button class="btn btn-primary btn-sm" data-click-action="kgLoad">Refresh</button>
     </div>
 </section>
 
-<div class="kg-meta" id="kg-meta">Loading...</div>
-<div id="kg-canvas" class="kg-canvas">
-    <div class="kg-loading"><span class="kg-spinner"></span> Loading vis-network...</div>
+<div class="card bg-base-200 shadow mb-2.5 flex flex-row flex-wrap items-center gap-[18px] max-md:gap-2.5 px-3.5 py-2.5 text-sm" id="kg-meta">Loading...</div>
+<div class="card bg-base-200 shadow overflow-hidden">
+  <div class="card-body p-0">
+    <div id="kg-canvas" class="relative overflow-hidden h-[620px] max-md:h-[460px] max-[480px]:h-[380px]">
+        <div class="kg-loading"><span class="kg-spinner"></span> Loading vis-network...</div>
+    </div>
+  </div>
 </div>
-<div id="kg-detail" class="kg-detail"></div>
+<div id="kg-detail" class="card bg-base-200 shadow mt-3.5 p-4 min-h-[60px] text-sm kg-detail"></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -39,38 +46,80 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.kg-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.kg-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:kg-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes kg-spin{to{transform:rotate(360deg)}}
+/* JS innerHTML: canvas loading / error / empty states. */
+.kg-loading {
+  text-align: center;
+  padding: 60px;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+.kg-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-base-300);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: kg-spin .8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes kg-spin { to { transform: rotate(360deg); } }
 
-.kg-seed-input{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:7px 12px;border-radius:var(--radius);font:inherit;font-size:.82rem;width:240px}
-.kg-seed-input:focus{outline:none;border-color:var(--primary)}
-.kg-select{background:var(--bg-secondary);border:1px solid var(--border);color:var(--text-primary);padding:7px 10px;border-radius:var(--radius);font:inherit;font-size:.82rem}
-.kg-cb{display:inline-flex;align-items:center;gap:6px;color:var(--text-secondary);font-size:.78rem}
+/* JS innerHTML: #kg-meta node/edge counts + legend. */
+#kg-meta strong {
+  color: var(--color-base-content);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.kg-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.kg-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .7rem;
+}
+.kg-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid var(--color-base-300);
+}
 
-.kg-meta{font-size:.78rem;color:var(--text-secondary);margin-bottom:10px;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);display:flex;flex-wrap:wrap;gap:18px;align-items:center}
-.kg-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
-.kg-legend{display:inline-flex;align-items:center;gap:14px;margin-left:auto;flex-wrap:wrap}
-.kg-legend-item{display:inline-flex;align-items:center;gap:5px;font-size:.7rem}
-.kg-legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;border:1px solid var(--border)}
-
-.kg-canvas{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);height:620px;position:relative;overflow:hidden}
-
-.kg-detail{margin-top:14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 18px;min-height:60px;color:var(--text-secondary);font-size:.85rem}
-.kg-detail h3{font-size:1rem;color:var(--text-primary);margin:0 0 6px 0}
-.kg-detail .kg-detail-meta{font-size:.72rem;color:var(--text-secondary);margin-bottom:6px}
-.kg-detail .kg-detail-link{display:inline-block;margin-top:8px;color:var(--primary);font-size:.78rem;text-decoration:none}
-.kg-detail .kg-detail-link:hover{text-decoration:underline}
-.kg-detail.empty{display:flex;align-items:center;justify-content:center;color:var(--text-secondary);font-style:italic;font-size:.82rem}
+/* JS classList toggles .empty; JS innerHTML injects h3 / .kg-detail-meta / .kg-detail-link. */
+.kg-detail h3 {
+  font-size: 1rem;
+  color: var(--color-base-content);
+  margin: 0 0 6px 0;
+}
+.kg-detail-meta {
+  font-size: .72rem;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  margin-bottom: 6px;
+}
+.kg-detail-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--color-primary);
+  font-size: .78rem;
+  text-decoration: none;
+}
+.kg-detail-link:hover { text-decoration: underline; }
+.kg-detail.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: italic;
+  font-size: .82rem;
+}
 
 @media (max-width: 768px) {
-    .kg-seed-input { width: 100%; max-width: 280px; }
-    .kg-canvas { height: 460px; }
-    .kg-meta { font-size: .7rem; gap: 10px; }
-    .kg-legend { margin-left: 0; width: 100%; }
-}
-@media (max-width: 480px) {
-    .kg-canvas { height: 380px; }
+  .kg-legend { margin-left: 0; width: 100%; }
 }
 </style>
 <script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
