@@ -39,6 +39,12 @@
     <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
     <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
+    {# CSRF token for state-changing requests. Guarded so anonymous pages emit
+       nothing. csrf.js reads this and attaches it to same-origin unsafe fetch
+       and htmx requests — see src/ion/web/csrf_middleware.py for the server
+       side. #}
+    {% if csrf_token %}<meta name="csrf-token" content="{{ csrf_token }}">{% endif %}
+    <script nonce="{{ csp_nonce }}" src="/static/js/csrf.js?v={{ ion_version }}"></script>
     <!-- delegated event listener so templates can move off
          `data-click-action="foo"` (which is blocked by strict CSP once
          `script-src-attr` drops `'unsafe-inline'`). Templates declare

@@ -21,6 +21,7 @@ from jinja2 import FileSystemBytecodeCache
 import ion
 from ion.core.config import get_config
 from ion.web._csp_nonce import _CSPNonceProxy
+from ion.web._csrf_token import _CSRFTokenProxy
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 _BYTECODE_CACHE_DIR = Path("/tmp/ion-jinja2-cache")
@@ -44,4 +45,5 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
     templates.env.auto_reload = bool(getattr(get_config(), "debug_mode", False))
     templates.env.globals["ion_version"] = ion.__version__
     templates.env.globals["csp_nonce"] = _CSPNonceProxy()
+    templates.env.globals["csrf_token"] = _CSRFTokenProxy()
     return templates

@@ -60,6 +60,8 @@ class Config:
     alert_detail_v2: bool = False  # Serve the redesigned alert-detail panel (decision-first header + tabbed body + source badges); opt-in, falls back to the current render
     alert_field_pins: bool = False  # Let analysts pin alert fields to the Case-context panel (per-user, per-rule); opt-in, needs alert_detail_v2
     bob_custom_templates: bool = False  # Let Bob generate custom per-rule investigation templates (human-reviewed) alongside the authored guide; opt-in
+    csrf_enabled: bool = True  # Enforce CSRF token + Origin checks on cookie-authenticated state-changing requests. ON by default: a security control that ships disabled is not a control. Escape hatch for debugging only
+    csrf_extra_origins: str = ""  # Comma-separated additional origins accepted by the CSRF Origin check, for deployments fronted by another hostname. The request's own Host and base_url are always accepted
     authz_alert_window_minutes: int = 5  # Rolling window for the authz-failure threshold
 
     # GitLab integration
@@ -320,6 +322,8 @@ class Config:
             alert_detail_v2=data.get("alert_detail_v2", False),
             alert_field_pins=data.get("alert_field_pins", False),
             bob_custom_templates=data.get("bob_custom_templates", False),
+            csrf_enabled=data.get("csrf_enabled", True),
+            csrf_extra_origins=data.get("csrf_extra_origins", ""),
             authz_alert_window_minutes=data.get("authz_alert_window_minutes", 5),
             # GitLab integration
             gitlab_enabled=data.get("gitlab_enabled", True),
@@ -712,6 +716,11 @@ def get_config() -> Config:
             _config.alert_field_pins = _get_env_bool("ION_ALERT_FIELD_PINS")
         if os.environ.get("ION_BOB_CUSTOM_TEMPLATES"):
             _config.bob_custom_templates = _get_env_bool("ION_BOB_CUSTOM_TEMPLATES")
+        if os.environ.get("ION_CSRF_ENABLED"):
+            _config.csrf_enabled = _get_env_bool("ION_CSRF_ENABLED", True)
+        _env_csrf_origins = os.environ.get("ION_CSRF_EXTRA_ORIGINS", "").strip()
+        if _env_csrf_origins:
+            _config.csrf_extra_origins = _env_csrf_origins
         if os.environ.get("ION_AUTHZ_ALERT_THRESHOLD"):
             try:
                 _config.authz_alert_threshold = int(os.environ["ION_AUTHZ_ALERT_THRESHOLD"])

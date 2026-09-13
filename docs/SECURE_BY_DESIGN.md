@@ -184,6 +184,17 @@ ION example of why this matters.
 * UI layer: visibility hints only — never the authoritative gate.
 * Database layer: per-row foreign-key integrity, soft-delete instead
   of hard-delete on tamper-evident structures (Workbench ledger).
+* Request layer (CSRF): two independent checks in
+  `src/ion/web/csrf_middleware.py`. A per-session HMAC token proves the
+  request came from a page ION rendered; Origin/Referer validation proves
+  it came from ION's site. Either alone stops a classic CSRF, and neither
+  depends on the other. Both sit behind the `SameSite=strict` session
+  cookie, which already blocks the primary vector — this layer exists for
+  when that one is relaxed, bypassed, or mishandled by an older client.
+  A `Bearer` request with no cookie is exempt from the token check: CSRF
+  exploits credentials the browser attaches automatically, and a Bearer
+  token is not one. The exemption keys on cookie absence, never on header
+  presence — the reverse is a total bypass.
 
 **Status:** Met. The TOCTOU rule is encoded in `CLAUDE.md` and audited
 by the `workbench-ledger-reviewer` agent on every Workbench change.
