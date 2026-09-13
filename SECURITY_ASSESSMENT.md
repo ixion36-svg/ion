@@ -526,7 +526,7 @@ All migrated routes confirmed to carry `require_permission` or `get_current_user
 | SQL injection | Protected â€” SQLAlchemy ORM parameterised queries; raw SQL uses bind params except lab fixture column names (see M4) |
 | SSTI | Protected â€” SandboxedEnvironment |
 | XSS | Protected â€” DOMPurify on user content; html.escape() in all WeasyPrint paths |
-| CSRF | Protected â€” OIDC state parameter, SameSite cookies |
+| CSRF | Protected — per-session HMAC token (`X-CSRF-Token`) + Origin/Referer validation on all cookie-authenticated POST/PUT/PATCH/DELETE, plus OIDC state parameter and `SameSite=strict` cookies. `ION_CSRF_ENABLED`, on by default. Bearer-without-cookie is exempt by design: not CSRF-able. See `src/ion/web/csrf_middleware.py` |
 | Rate limiting | login (5/min), password (5/min), OIDC (10/min), bulk ops (20/min), escalation (10/min), token regen (3/min), global default (120/min) |
 | Session management | Server-side sessions, configurable expiry |
 | Account lockout | Configurable threshold (default: 5 attempts) |

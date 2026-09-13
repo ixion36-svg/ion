@@ -9,6 +9,49 @@
 
 # Changelog
 
+## Unreleased
+
+**CSRF protection — token + Origin validation.** Enforcement is **ON by
+default**, unlike ION's feature flags: this restricts behaviour rather than
+adding capability, and a security control that ships disabled is not a control.
+
+- **New `CSRFMiddleware`** (`src/ion/web/csrf_middleware.py`) runs two
+  independent checks on every `POST`/`PUT`/`PATCH`/`DELETE`. A per-session HMAC
+  token (`X-CSRF-Token`) proves the request came from a page ION rendered;
+  Origin/Referer validation proves it came from ION's site. Either alone stops a
+  classic CSRF, and neither depends on the other.
+- **The token is required only for cookie-authenticated requests.** A request
+  using `Authorization: Bearer` with no session cookie is exempt, because CSRF
+  exploits credentials the browser attaches automatically and a Bearer token is
+  not one of those. Origin validation still applies to those requests, so it
+  covers Bearer-authenticated browser traffic the token check does not.
+- **`ION_CSRF_ENABLED`** (default **on**) and **`ION_CSRF_EXTRA_ORIGINS`**
+  (default empty). The first is a debugging escape hatch, not a rollout gate.
+  The second is only needed where a deployment is fronted by a hostname that is
+  neither the request `Host` nor the configured `base_url`; both of those are
+  accepted automatically, so access by IP or `localhost` needs no configuration.
+- **No UI change required.** `static/js/csrf.js` attaches the header
+  automatically to same-origin state-changing `fetch` calls and HTMX requests,
+  covering all existing call sites. Cross-origin requests are left untouched so
+  the token is never sent to a third party. A `403` carrying
+  `code: "csrf_invalid"` redirects to login, since a token derived from the
+  session cannot be stale unless the session itself is gone.
+- **Exempt routes:** `POST /api/auth/login` (no session exists yet to bind to;
+  already rate limited) and `POST /api/integrations/webhooks/receive/{token}`
+  (inbound from external systems, authenticated by the path token). The OIDC
+  routes need no exemption — both are `GET`.
+
+**Breaking for external callers.** Any client that `POST`s to ION carrying a
+browser **session cookie** must now send a matching `X-CSRF-Token` header.
+Clients using `Authorization: Bearer` with no cookie are unaffected, as are
+`GET` requests.
+
+**Scope, honestly.** The session cookie was already `HttpOnly` and
+`SameSite=strict`, so current browsers do not attach it cross-site and the
+headline attack was already blocked. This is defence in depth: it covers a
+future `SameSite` relaxation, same-site attacker positions, and older or buggy
+clients. It closes a documented gap rather than a live hole.
+
 ## v0.91.0 — 2026-09-09
 
 **Alert-detail redesign + Bob custom investigation templates.** All four feature
