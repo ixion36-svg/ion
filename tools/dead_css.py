@@ -41,8 +41,13 @@ REPO = Path(__file__).resolve().parent.parent
 CSS_DIR = REPO / "src/ion/web/static/css"
 SEARCH_DIRS = [REPO / "src/ion/web/templates", REPO / "src/ion/web/static/js"]
 # lucide.css is an icon font, not legacy styling.
+# alerts-queue.css was missing from this list and so had never been scanned.
+# It is loaded by alerts.html rather than base.html, which is how it was
+# overlooked; being page-scoped makes it more likely to hold dead rules, not
+# less.
 SHEETS = ["style.css", "ion-migrated-styles.css", "alert-detail.css",
-          "ai-chat.css", "design-system.css", "ion-workspace.css"]
+          "ai-chat.css", "design-system.css", "ion-workspace.css",
+          "alerts-queue.css"]
 
 CLASS_IN_SELECTOR = re.compile(r"\.(_?[A-Za-z][A-Za-z0-9_-]*)")
 RULE = re.compile(r"(?P<sel>[^{}]+)\{(?P<body>[^{}]*)\}", re.S)
@@ -78,19 +83,91 @@ def corpus() -> str:
     return "\n".join(parts)
 
 
+# `${...}` in a JS template literal, `{{...}}`/`{%...%}` in a Jinja template.
+# Both sit INSIDE class attributes constantly, and both must be cut out before
+# the attribute is split, not used as a reason to skip the attribute.
+INTERPOLATION = re.compile(r"\$\{[^{}]*\}|\{\{.*?\}\}|\{%.*?%\}", re.S)
+# The attribute value is "anything up to the closing quote, except that an
+# interpolation may contain quotes of its own". Spelling the value as a plain
+# [^"'] character class is not enough: `${auto ? ' aq-autocase' : ''}` holds
+# four single quotes, so the match died at the first one and the attribute was
+# skipped exactly as before.
+_INTERP = r"\$\{[^{}]*\}|\{\{.*?\}\}|\{%.*?%\}"
+CLASS_ATTR = re.compile(
+    r'class\s*=\s*"(?P<dq>(?:' + _INTERP + r'|[^"]){0,600}?)"'
+    r"|class\s*=\s*'(?P<sq>(?:" + _INTERP + r"|[^']){0,600}?)'", re.S)
+
+
+IDENT = re.compile(r"-?_?[A-Za-z][A-Za-z0-9_-]*")
+QUOTED_INSIDE = re.compile(r"""['"]([^'"]*)['"]""")
+
+
+def _attr_tokens(value: str) -> set[str]:
+    """Split a class attribute, keeping class names written inside `${...}`.
+
+    Deleting the interpolation outright loses the conditional half of
+
+        `<div class="aq-ghead sev-${esc(g.sev)}${shut ? ' aq-closed' : ''}">`
+
+    where `aq-closed` is a real class applied to a real element and appears
+    nowhere else in the app. Its rule then reads as dead. So an interpolation
+    contributes the contents of any quoted string it holds -- that is where a
+    literal class name in a ternary lives -- and nothing else, since the rest
+    is expression code (`esc`, `g.sev`) that would only add noise.
+    """
+    def expand(m: re.Match) -> str:
+        return " " + " ".join(QUOTED_INSIDE.findall(m.group(0))) + " "
+    # Keep only what could actually be a class name. An interpolation this
+    # parser cannot follow -- one with a nested brace -- otherwise leaks
+    # fragments of expression code (`${xs.map(x`) into the live set. They can
+    # never match a CSS class, so they are pure noise, but noise in the set
+    # that decides what gets deleted is worth not having.
+    return {t for t in INTERPOLATION.sub(expand, value).split()
+            if IDENT.fullmatch(t)}
+
+
 def literal_tokens(text: str) -> set[str]:
     out: set[str] = set()
-    for m in re.finditer(r'class="([^"{}]*)"', text):
-        out.update(m.group(1).split())
-    for m in re.finditer(r"class='([^'{}]*)'", text):
-        out.update(m.group(1).split())
+    # Class attributes, interpolations and all. The first version required the
+    # value to contain no braces:  class="([^"{}]*)"  -- which silently skipped
+    # every attribute built at runtime. alerts-queue.js is written almost
+    # entirely that way:
+    #
+    #     `<span class="aq-tag aq-caseref${auto ? ' aq-autocase' : ''}"`
+    #
+    # so aq-caseref, aq-ghead, aq-kev and aq-sev-pill all looked dead, and a
+    # --write on alerts-queue.css would have deleted four live rules. The
+    # generic quoted-string pass below did not save them either: it starts at
+    # the backtick and stops at the first `"`, so it never reaches past
+    # `<span class=`.
+    #
+    # Known limit: an interpolation containing a nested brace, `${xs.map(x =>
+    # `${x}`)}`, still ends the match early. That fails towards calling a class
+    # LIVE -- the attribute is skipped, so nothing is deleted on its account.
+    for m in CLASS_ATTR.finditer(text):
+        val = m.group("dq") if m.group("dq") is not None else m.group("sq")
+        out.update(_attr_tokens(val or ""))
     # Any quoted string can carry a class name: querySelector('.x'),
     # classList.add('x'), className = 'a b c', a template literal chunk.
-    for m in re.finditer(r"""['"`]([^'"`\n]{1,200})['"`]""", text):
+    #
+    # {0,200} rather than {1,200}, because an EMPTY string must still consume
+    # its pair of quotes. With {1,200} the scan cannot match '' and carries on
+    # from the first of the two, which puts every following quote on this line
+    # out of phase:
+    #
+    #     { k: 'act', label: '', cls: 'aq-act', on: true }
+    #
+    # paired as 'act' … ', cls: ' … ', on: true }', so `aq-act` fell in a gap
+    # between two matches and was never seen. It is the class for the whole
+    # actions column, and its rule was reported removable.
+    for m in re.finditer(r"""['"`]([^'"`\n]{0,200})['"`]""", text):
         for tok in re.split(r"[\s.,#>()\[\]{}:;+~*=]+", m.group(1)):
             if tok:
                 out.add(tok)
-    return out
+    # Everything compared against this set is a class name parsed out of a
+    # selector, so anything that cannot be one is noise either way. Dropping it
+    # here rather than per-pass keeps the two passes free to over-collect.
+    return {t for t in out if IDENT.fullmatch(t)}
 
 
 def constructed_prefixes(text: str) -> set[str]:
@@ -178,7 +255,12 @@ def analyse(sheet: str, live_tokens: set[str], prefixes: set[str],
     # A class is live if this sheet leans on it, OR any page's own <style>
     # block does, OR any OTHER shared sheet does.
     # Deliberately NOT seeded from other rules -- see css_internal_refs.
-    internal: set[str] = set()
+    # A page's own <style> block is a reference source like any other: it can
+    # scope a shared class the sheet defines. This was collected by
+    # page_style_blocks() and handed in, then never read -- the parameter was
+    # accepted and dropped on the floor, so the whole reason that function
+    # exists did not apply.
+    internal: set[str] = set(CLASS_IN_SELECTOR.findall(mask_comments(page_css)))
     masked = mask_comments(css)
     # Only names appearing in an actual SELECTOR count as defined. Scanning the
     # whole file swept up `.ion-ws-*` from a comment documenting the naming
