@@ -44,7 +44,9 @@ BASELINE = REPO / "tools/ui_rewrite_baseline.json"
 CSS_CURRENT = [
     REPO / "src/ion/web/static/css/ion.css",
     REPO / "src/ion/web/static/css/ion-migrated-styles.css",
-    REPO / "src/ion/web/static/css/style.css",
+    # style.css is no longer served: what survived of it is compiled into
+    # ion.css above, from frontend/ion-legacy.css.
+    REPO / "frontend/ion-legacy.css",
     # ion-ui.css was retired: it declared .btn/.badge/.table as grouped
     # selectors alongside its own ion-* names, unlayered and after ion.css, so
     # daisyUI's components could never win. Its ion-* and ti-* rules moved into

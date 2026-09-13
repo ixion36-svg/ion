@@ -55,6 +55,11 @@
 @source "../src/ion/web/static/js";
 @source "../src/ion/web/*.py";
 
+/* The remains of style.css. MUST precede the utilities import -- both are
+   unlayered, so whichever comes last wins, and Tailwind utilities have to
+   beat the legacy component rules. See the header of ion-legacy.css. */
+@import "./ion-legacy.css";
+
 @import "tailwindcss/utilities.css" source(none);
 
 /* daisyUI 5 component layer. Vendored at frontend/daisyui.css for the

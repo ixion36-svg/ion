@@ -1,3 +1,40 @@
+/*
+ * What is left of the old style.css, compiled into ion.css instead of served
+ * as its own <link>.
+ *
+ * WHY IT IS STILL A SEPARATE FILE rather than merged into ion-daisy-theme.css:
+ * these are the rules that could NOT be moved into the theme. Every one names
+ * a class daisyUI also defines -- card, card-body, card-title, alert, modal,
+ * stat-value, toast, badge -- so it is not ION-only and a straight move would
+ * change which sheet owns the name. Keeping them in their own file, at their
+ * own position in the cascade, keeps the behaviour identical while still
+ * retiring the <link>.
+ *
+ * WHY IT IS IMPORTED WHERE IT IS. This file must sit immediately BEFORE
+ * `@import "tailwindcss/utilities.css"`, and the position is load-bearing:
+ *
+ *   - Both this file and Tailwind's utilities are UNLAYERED, so between them
+ *     the later one wins. style.css used to load before ion.css, so utilities
+ *     beat it -- which is the entire point of the rewrite: `p-4` has to
+ *     override `.card`'s padding. Import it AFTER the utilities and that
+ *     flips, silently, on every element carrying both a legacy class and a
+ *     Tailwind utility.
+ *   - daisyUI is layered (@layer daisyui.*), and an unlayered declaration
+ *     beats a layered one whatever the order, so its relationship to this file
+ *     does not depend on position at all.
+ *   - ion-daisy-theme.css is unlayered and imported last, so it still wins
+ *     ties against this file, exactly as it did when it was inside ion.css and
+ *     style.css was a separate earlier <link>.
+ *
+ * The remaining content is two kinds. Roughly 110 component rules for the
+ * daisyUI-shadowed names above, which need a markup migration rather than a
+ * move: daisyUI's .alert has no left accent bar and its .card no ION border,
+ * so deleting these changes how pages look. And the eight accent themes --
+ * [data-theme="cyan"|purple|green|orange|pink|red|blue|gold] -- which stay by
+ * design: they are the SOURCE the daisyUI theme derives from, via
+ * --color-primary: var(--primary).
+ */
+
 /* ION - Cyber/Neon Theme
    Intelligent Operating Network
    Part of Guarded Glass Security Toolkit */

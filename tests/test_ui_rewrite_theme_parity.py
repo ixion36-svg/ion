@@ -156,9 +156,9 @@ def test_daisyui_border_width_token_does_not_collide_with_ions_border_colour():
     Fixed by renaming ION's colour token to `--ion-border` and leaving
     daisyUI's width token alone. This guards the rename.
     """
-    legacy = [
+    legacy = [Path("frontend/ion-legacy.css")] + [
         Path("src/ion/web/static/css") / f
-        for f in ("style.css", "ai-chat.css",
+        for f in ("ai-chat.css",
                   "alert-detail.css", "ion-workspace.css", "ion-migrated-styles.css")
     ]
     templates = sorted(Path("src/ion/web/templates").rglob("*.html"))
@@ -200,8 +200,9 @@ def test_no_custom_property_is_defined_by_both_the_legacy_sheets_and_ion_css():
         return out
 
     legacy = {}
-    for name in ("style.css", "ai-chat.css",
-                 "alert-detail.css", "ion-workspace.css", "ion-migrated-styles.css"):
+    for name in ("ai-chat.css",
+                 "alert-detail.css", "ion-workspace.css", "ion-migrated-styles.css",
+                 "../../../../frontend/ion-legacy.css"):
         p = css_dir / name
         if p.is_file():
             for k, v in tokens(p).items():
@@ -221,7 +222,7 @@ def test_no_custom_property_is_defined_by_both_the_legacy_sheets_and_ion_css():
 
 def test_tailwinds_radius_lg_is_not_shadowed_by_ions():
     """ION's large radius must live under its own name."""
-    style = Path("src/ion/web/static/css/style.css").read_text(encoding="utf-8")
+    style = Path("frontend/ion-legacy.css").read_text(encoding="utf-8")
     assert not re.search(r"(?<![-\w])--radius-lg(?![-\w])", style), \
         "style.css is redefining Tailwind's --radius-lg; use --ion-radius-lg"
 

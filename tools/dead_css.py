@@ -45,9 +45,9 @@ SEARCH_DIRS = [REPO / "src/ion/web/templates", REPO / "src/ion/web/static/js"]
 # It is loaded by alerts.html rather than base.html, which is how it was
 # overlooked; being page-scoped makes it more likely to hold dead rules, not
 # less.
-SHEETS = ["style.css", "ion-migrated-styles.css", "alert-detail.css",
+SHEETS = ["ion-migrated-styles.css", "alert-detail.css",
           "ai-chat.css", "ion-workspace.css",
-          "alerts-queue.css"]
+          "alerts-queue.css", "ion-legacy.css"]
 
 CLASS_IN_SELECTOR = re.compile(r"\.(_?[A-Za-z][A-Za-z0-9_-]*)")
 RULE = re.compile(r"(?P<sel>[^{}]+)\{(?P<body>[^{}]*)\}", re.S)
@@ -57,6 +57,18 @@ COMMENT = re.compile(r"/\*.*?\*/", re.S)
 # their semantics (an OR, so dead only if ALL branches are dead) differ
 # again. Guessing at them is how this kind of tool starts deleting things.
 NEGATION = re.compile(r":not\([^()]*\)")
+
+
+def sheet_path(sheet: str) -> Path:
+    """Where a sheet lives.
+
+    ion-legacy.css is a BUILD INPUT rather than a served stylesheet -- it is
+    what survived style.css, compiled into ion.css from frontend/. It is still
+    worth scanning: it is the largest remaining pile of legacy rules, and being
+    a build input makes dead code in it easier to overlook, not harder.
+    """
+    return (REPO / "frontend" / sheet) if sheet == "ion-legacy.css" \
+        else (CSS_DIR / sheet)
 
 
 def mask_comments(css: str) -> str:
@@ -272,7 +284,7 @@ def css_internal_refs(css: str) -> set[str]:
 
 def analyse(sheet: str, live_tokens: set[str], prefixes: set[str],
             page_css: str = ""):
-    path = CSS_DIR / sheet
+    path = sheet_path(sheet)
     css = path.read_text(encoding="utf-8", errors="replace")
     # A class is live if this sheet leans on it, OR any page's own <style>
     # block does, OR any OTHER shared sheet does.
@@ -412,7 +424,7 @@ def main() -> int:
             if new_css.count("{") != new_css.count("}"):
                 print("    REFUSED: braces unbalanced after strip")
                 continue
-            (CSS_DIR / sheet).write_text(new_css, encoding="utf-8", newline="")
+            sheet_path(sheet).write_text(new_css, encoding="utf-8", newline="")
             print("    written")
         grand += removed
     print(f"\n{grand} rule(s) {'removed' if args.write else 'removable'}")

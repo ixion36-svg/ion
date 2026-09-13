@@ -6,7 +6,11 @@
     <title>{% block title %}ION{% endblock %}</title>
     <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
     <link rel="stylesheet" href="/static/css/lucide.css?v={{ ion_version }}">
-    <link rel="stylesheet" href="/static/css/style.css?v={{ ion_version }}">
+    {# style.css was retired here. What survived of it is now
+       frontend/ion-legacy.css, compiled into ion.css immediately before
+       the Tailwind utilities so that utilities still beat the legacy
+       component rules. See that file's header for why the position
+       matters. #}
     {# design-system.css was deleted here. Every one of its 30 selectors was
        gated on a .ds-card / .ds-badge / .ds-bar-fill / .ds-metric-status /
        .ds-section-label / .ds-skeleton / .ds-toggle-btn ancestor, and no
