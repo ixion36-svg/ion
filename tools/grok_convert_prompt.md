@@ -22,12 +22,17 @@ redundant. Your job is to replace them with the equivalent utilities.
 `tools/hashed_class_map.json` maps every hashed class to its Tailwind
 equivalent. Read it. Each entry looks like:
 
-    "ion-s-59b87fdbd1": {
+    "_ion-s-59b87fdbd1": {
       "css": "margin-bottom:0.5rem;",
       "tailwind": "mb-2",
       "kind": "exact",
       "unmapped": []
     }
+
+Note the LEADING UNDERSCORE in the key. It is part of the class name and part
+of the JSON key. An early version of this table stripped it, giving keys with
+zero overlap against the real class names: every lookup missed, the whole run
+converted nothing, and both sides stayed silent about it.
 
 For each `_ion-s-XXXX` in the template:
 
