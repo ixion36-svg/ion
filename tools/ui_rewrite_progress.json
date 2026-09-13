@@ -17,6 +17,9 @@
   "analyst.html": {
     "restyle": true
   },
+  "analytics.html": {
+    "restyle": true
+  },
   "architecture.html": {
     "convert": true,
     "restyle": true

@@ -3,52 +3,52 @@
 {% block title %}Analytics Engine - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-iris"><use href="#i-cpu"/></svg>
     <span class="label-tiny text-ion-iris">Analytics engine</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Analytics Engine</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Query builder, saved searches and scheduled reports.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Analytics Engine</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Query builder, saved searches and scheduled reports.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="ion-btn" data-click-action="loadDashboard">Refresh</button>
-        <button class="ion-btn ion-btn-primary" data-click-action="runAllJobs">Run All Jobs</button>
+        <button class="btn" data-click-action="loadDashboard">Refresh</button>
+        <button class="btn btn-primary" data-click-action="runAllJobs">Run All Jobs</button>
     </div>
 </section>
 
 <!-- Summary Stats Bar -->
-<div class="analytics-stats-bar" id="analytics-stats">
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3 mb-8" id="analytics-stats">
     <div class="astat-card" data-tab="entity_risk">
-        <div class="astat-value" id="astat-entities">-</div>
-        <div class="astat-label">Entities at Risk</div>
+        <div class="text-[1.75rem] font-bold font-mono text-primary leading-tight" id="astat-entities">-</div>
+        <div class="text-xs uppercase tracking-wide text-base-content/60 mt-1.5">Entities at Risk</div>
     </div>
     <div class="astat-card" data-tab="repeat_offenders">
-        <div class="astat-value" id="astat-offenders">-</div>
-        <div class="astat-label">Repeat Offenders</div>
+        <div class="text-[1.75rem] font-bold font-mono text-primary leading-tight" id="astat-offenders">-</div>
+        <div class="text-xs uppercase tracking-wide text-base-content/60 mt-1.5">Repeat Offenders</div>
     </div>
     <div class="astat-card" data-tab="rule_noise">
-        <div class="astat-value" id="astat-noisy">-</div>
-        <div class="astat-label">Noisy Rules</div>
+        <div class="text-[1.75rem] font-bold font-mono text-primary leading-tight" id="astat-noisy">-</div>
+        <div class="text-xs uppercase tracking-wide text-base-content/60 mt-1.5">Noisy Rules</div>
     </div>
     <div class="astat-card" data-tab="case_metrics">
-        <div class="astat-value" id="astat-mttr">-</div>
-        <div class="astat-label">MTTR (hrs)</div>
+        <div class="text-[1.75rem] font-bold font-mono text-primary leading-tight" id="astat-mttr">-</div>
+        <div class="text-xs uppercase tracking-wide text-base-content/60 mt-1.5">MTTR (hrs)</div>
     </div>
     <div class="astat-card" data-tab="observable_velocity">
-        <div class="astat-value" id="astat-velocity">-</div>
-        <div class="astat-label">IOCs (7d)</div>
+        <div class="text-[1.75rem] font-bold font-mono text-primary leading-tight" id="astat-velocity">-</div>
+        <div class="text-xs uppercase tracking-wide text-base-content/60 mt-1.5">IOCs (7d)</div>
     </div>
     <div class="astat-card" data-tab="stale_investigations">
-        <div class="astat-value" id="astat-stale">-</div>
-        <div class="astat-label">Stale Items</div>
+        <div class="text-[1.75rem] font-bold font-mono text-primary leading-tight" id="astat-stale">-</div>
+        <div class="text-xs uppercase tracking-wide text-base-content/60 mt-1.5">Stale Items</div>
     </div>
     <div class="astat-card" data-tab="systems">
-        <div class="astat-value" id="astat-systems">-</div>
-        <div class="astat-label">Systems</div>
+        <div class="text-[1.75rem] font-bold font-mono text-primary leading-tight" id="astat-systems">-</div>
+        <div class="text-xs uppercase tracking-wide text-base-content/60 mt-1.5">Systems</div>
     </div>
 </div>
 
@@ -69,114 +69,98 @@
 
 <!-- Overview -->
 <div id="tab-overview" class="analytics-tab-content active">
-    <div class="analytics-grid" id="overview-grid">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4" id="overview-grid">
         <div class="loading-state">Loading analytics...</div>
     </div>
 </div>
 
 <!-- Entity Risk -->
 <div id="tab-entity_risk" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header"><h2>Entity Risk Scores</h2><span class="section-sub">Top hosts and users by aggregate risk</span></div>
-        <div id="entity-risk-content"><div class="loading-state">Run the job to see results</div></div>
-    </div>
+    <div class="flex items-baseline gap-3 mb-5"><h2 class="text-lg font-semibold text-base-content">Entity Risk Scores</h2><span class="text-sm text-base-content/60">Top hosts and users by aggregate risk</span></div>
+    <div id="entity-risk-content"><div class="loading-state">Run the job to see results</div></div>
 </div>
 
 <!-- Repeat Offenders -->
 <div id="tab-repeat_offenders" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header"><h2>Repeat Offenders</h2><span class="section-sub">Entities appearing in 3+ alerts over 30 days</span></div>
-        <div id="repeat-offenders-content"><div class="loading-state">Run the job to see results</div></div>
-    </div>
+    <div class="flex items-baseline gap-3 mb-5"><h2 class="text-lg font-semibold text-base-content">Repeat Offenders</h2><span class="text-sm text-base-content/60">Entities appearing in 3+ alerts over 30 days</span></div>
+    <div id="repeat-offenders-content"><div class="loading-state">Run the job to see results</div></div>
 </div>
 
 <!-- Rule Noise -->
 <div id="tab-rule_noise" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header"><h2>Rule Noise Analysis</h2><span class="section-sub">Detection rules by alert volume and false positive rate</span></div>
-        <div id="rule-noise-content"><div class="loading-state">Run the job to see results</div></div>
-    </div>
+    <div class="flex items-baseline gap-3 mb-5"><h2 class="text-lg font-semibold text-base-content">Rule Noise Analysis</h2><span class="text-sm text-base-content/60">Detection rules by alert volume and false positive rate</span></div>
+    <div id="rule-noise-content"><div class="loading-state">Run the job to see results</div></div>
 </div>
 
 <!-- Observable Velocity -->
 <div id="tab-observable_velocity" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header"><h2>Observable Velocity</h2><span class="section-sub">IOC ingestion rate, threat levels, and stale indicators</span></div>
-        <div id="observable-velocity-content"><div class="loading-state">Run the job to see results</div></div>
-    </div>
+    <div class="flex items-baseline gap-3 mb-5"><h2 class="text-lg font-semibold text-base-content">Observable Velocity</h2><span class="text-sm text-base-content/60">IOC ingestion rate, threat levels, and stale indicators</span></div>
+    <div id="observable-velocity-content"><div class="loading-state">Run the job to see results</div></div>
 </div>
 
 <!-- Case Metrics -->
 <div id="tab-case_metrics" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header"><h2>Case Metrics</h2><span class="section-sub">Resolution times, closure reasons, and volume trends</span></div>
-        <div id="case-metrics-content"><div class="loading-state">Run the job to see results</div></div>
-    </div>
+    <div class="flex items-baseline gap-3 mb-5"><h2 class="text-lg font-semibold text-base-content">Case Metrics</h2><span class="text-sm text-base-content/60">Resolution times, closure reasons, and volume trends</span></div>
+    <div id="case-metrics-content"><div class="loading-state">Run the job to see results</div></div>
 </div>
 
 <!-- Stale Investigations -->
 <div id="tab-stale_investigations" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header"><h2>Stale Investigations</h2><span class="section-sub">Open items with no recent activity</span></div>
-        <div id="stale-content"><div class="loading-state">Run the job to see results</div></div>
-    </div>
+    <div class="flex items-baseline gap-3 mb-5"><h2 class="text-lg font-semibold text-base-content">Stale Investigations</h2><span class="text-sm text-base-content/60">Open items with no recent activity</span></div>
+    <div id="stale-content"><div class="loading-state">Run the job to see results</div></div>
 </div>
 
 <!-- System Analytics -->
 <div id="tab-systems" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header">
-            <h2>System Analytics</h2>
-            <span class="section-sub">Per-system alert volume + TIDE detection coverage</span>
+    <div class="flex items-baseline gap-3 mb-5">
+        <h2 class="text-lg font-semibold text-base-content">System Analytics</h2>
+        <span class="text-sm text-base-content/60">Per-system alert volume + TIDE detection coverage</span>
+    </div>
+    <div class="_ion-s-7da3fcbd45 flex-wrap">
+        <select class="_ion-s-d54f9f63d4 select select-sm w-auto" id="sys-time-range" data-change-action="loadSystemAnalyticsTab">
+            <option value="24">Last 24 Hours</option>
+            <option value="72">Last 3 Days</option>
+            <option value="168" selected>Last 7 Days</option>
+            <option value="720">Last 30 Days</option>
+        </select>
+        <button class="btn btn-sm" data-click-action="loadSystemAnalyticsTab">Refresh</button>
+        <span class="_ion-s-1b20421adc" id="sys-summary-text"></span>
+    </div>
+    <!-- System stats bar -->
+    <div class="_ion-s-6867cb41f1" id="sys-stats-bar">
+        <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-total">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Total Alerts</div></div>
+        <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-logs">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Logs Ingested</div></div>
+        <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-systems">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Systems</div></div>
+        <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-mapped">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">TIDE Mapped</div></div>
+        <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-coverage">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Avg Coverage</div></div>
+        <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-error leading-tight" id="sys-s-critical">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Critical</div></div>
+    </div>
+    <!-- Timeline -->
+    <div class="_ion-s-6f0bd4129e" id="sys-timeline-chart">
+        <div class="loading-state _ion-s-c951e35a79">Loading...</div>
+    </div>
+    <!-- System cards grid -->
+    <div class="_ion-s-c5f415d8e3" id="sys-cards-grid">
+        <div class="loading-state">Loading system analytics...</div>
+    </div>
+    <!-- Index Breakdown — ported from the retired /engineering-analytics
+         page (route audit phase 7). It was that page's only unique section;
+         everything else there duplicated this tab. -->
+    <div class="mt-8">
+        <div class="flex items-baseline gap-3 mb-5">
+            <h2 class="text-lg font-semibold text-base-content">Index Breakdown</h2>
+            <span class="text-sm text-base-content/60">Alert counts by Elasticsearch index</span>
         </div>
-        <div class="_ion-s-7da3fcbd45">
-            <select class="_ion-s-d54f9f63d4" id="sys-time-range" data-change-action="loadSystemAnalyticsTab">
-                <option value="24">Last 24 Hours</option>
-                <option value="72">Last 3 Days</option>
-                <option value="168" selected>Last 7 Days</option>
-                <option value="720">Last 30 Days</option>
-            </select>
-            <button class="ion-btn" data-click-action="loadSystemAnalyticsTab">Refresh</button>
-            <span class="_ion-s-1b20421adc" id="sys-summary-text"></span>
-        </div>
-        <!-- System stats bar -->
-        <div class="_ion-s-6867cb41f1" id="sys-stats-bar">
-            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-total">-</div><div class="sys-stat-label">Total Alerts</div></div>
-            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-logs">-</div><div class="sys-stat-label">Logs Ingested</div></div>
-            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-systems">-</div><div class="sys-stat-label">Systems</div></div>
-            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-mapped">-</div><div class="sys-stat-label">TIDE Mapped</div></div>
-            <div class="sys-stat-card"><div class="sys-stat-val" id="sys-s-coverage">-</div><div class="sys-stat-label">Avg Coverage</div></div>
-            <div class="sys-stat-card"><div class="sys-stat-val severity-critical" id="sys-s-critical">-</div><div class="sys-stat-label">Critical</div></div>
-        </div>
-        <!-- Timeline -->
-        <div class="_ion-s-6f0bd4129e" id="sys-timeline-chart">
-            <div class="loading-state _ion-s-c951e35a79">Loading...</div>
-        </div>
-        <!-- System cards grid -->
-        <div class="_ion-s-c5f415d8e3" id="sys-cards-grid">
-            <div class="loading-state">Loading system analytics...</div>
-        </div>
-        <!-- Index Breakdown — ported from the retired /engineering-analytics
-             page (route audit phase 7). It was that page's only unique section;
-             everything else there duplicated this tab. -->
-        <div class="an-section">
-            <div class="an-section-header">
-                <h2>Index Breakdown</h2>
-                <span class="an-section-sub">Alert counts by Elasticsearch index</span>
-            </div>
-            <div id="index-table-container">
-                <div class="loading-state">Loading...</div>
-            </div>
+        <div id="index-table-container">
+            <div class="loading-state">Loading...</div>
         </div>
     </div>
 </div>
 
 <!-- Job Config -->
 <div id="tab-config" class="analytics-tab-content">
-    <div class="analytics-section">
-        <div class="section-header"><h2>Job Configuration</h2><span class="section-sub">Enable, disable, and schedule analytics jobs</span></div>
-        <div id="config-content"><div class="loading-state">Loading...</div></div>
-    </div>
+    <div class="flex items-baseline gap-3 mb-5"><h2 class="text-lg font-semibold text-base-content">Job Configuration</h2><span class="text-sm text-base-content/60">Enable, disable, and schedule analytics jobs</span></div>
+    <div id="config-content"><div class="loading-state">Loading...</div></div>
 </div>
 
 
