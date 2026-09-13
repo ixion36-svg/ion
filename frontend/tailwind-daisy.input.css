@@ -64,7 +64,12 @@
 
 /* daisyUI 5 component layer. Vendored at frontend/daisyui.css for the
    air-gap; no CDN reference and no Node resolution. */
-@import "./daisyui.css";
+/* daisyui.trimmed.css, not daisyui.css. The vendored dist is 1.12MB, of
+   which ~790KB is five @media blocks holding every component again under
+   an sm:/md:/lg:/xl:/2xl: prefix -- 2,725 variants, of which ION uses
+   four. tools/trim_daisyui.py regenerates the trimmed copy from the
+   pristine dist, so a daisyUI upgrade stays a straight file swap. */
+@import "./daisyui.trimmed.css";
 
 /* ION's semantic mapping. Must come after daisyui.css. */
 @import "./ion-daisy-theme.css";
