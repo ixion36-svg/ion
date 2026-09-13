@@ -135,3 +135,40 @@ def test_daisyui_loading_spinner_does_not_hijack_ion_loading_text():
         assert 'loading:not([class*=loading-])' in built.replace('"', ''), (
             "the reset is in the source but missing from the built ion.css"
         )
+
+
+def test_daisyui_border_width_token_does_not_collide_with_ions_border_colour():
+    """daisyUI's `--border` is a WIDTH; ION's was a COLOUR. Same name.
+
+    daisyUI 5 uses `--border` as its border-width token (`1px`). ION's
+    style.css had used `--border` as a colour since long before, and 598
+    declarations across seven stylesheets and 21 templates read it that way,
+    as `border: 1px solid var(--border)`.
+
+    Both are declared on an unlayered `:root`, and base.html loads ion.css
+    (line 23) after style.css (line 9), so daisyUI won. `1px solid var(--border)`
+    then resolved to `1px solid 1px`, which is not a valid shorthand, so the
+    browser discarded the whole declaration. Measured: border-width computed to
+    0px and border-style to none. The borders did not change colour, they
+    disappeared -- on every page, from the moment ion.css entered base.html,
+    with no error anywhere.
+
+    Fixed by renaming ION's colour token to `--ion-border` and leaving
+    daisyUI's width token alone. This guards the rename.
+    """
+    legacy = [
+        Path("src/ion/web/static/css") / f
+        for f in ("style.css", "design-system.css", "ion-ui.css", "ai-chat.css",
+                  "alert-detail.css", "ion-workspace.css", "ion-migrated-styles.css")
+    ]
+    templates = sorted(Path("src/ion/web/templates").rglob("*.html"))
+    # --border exactly, not --border-bright or --border-color.
+    bare = re.compile(r"(?<![-\w])--border(?![-\w])")
+    offenders = [
+        p.as_posix() for p in legacy + templates
+        if p.is_file() and bare.search(p.read_text(encoding="utf-8", errors="replace"))
+    ]
+    assert not offenders, (
+        "these still use the bare --border token, which daisyUI defines as a "
+        f"1px width; their borders will vanish: {offenders}"
+    )

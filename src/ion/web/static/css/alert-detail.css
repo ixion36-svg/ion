@@ -22,7 +22,7 @@
     padding: 9px 0 10px;
     margin-bottom: 14px;
     background: var(--bg-primary);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
 }
 
 .iad-jump-link {
@@ -39,7 +39,7 @@
 
 .iad-jump-link:hover {
     color: var(--text-bright);
-    border-color: var(--border);
+    border-color: var(--ion-border);
 }
 
 /* Driven by the IntersectionObserver in alert-detail.js, so the highlight
@@ -88,7 +88,7 @@
 .cpanel-alert-fields-table td,
 .alert-parsed-fields-table td {
     padding: 4px 8px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
     vertical-align: top;
 }
 
@@ -132,7 +132,7 @@
 .alert-meta-item {
     padding: 14px 16px;
     background: var(--bg-tertiary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius-lg);
     transition: border-color .15s ease, transform .15s ease;
 }
@@ -162,7 +162,7 @@
 
 .alert-message-box {
     background: var(--bg-tertiary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-left: 3px solid var(--primary);
     border-radius: var(--radius-lg);
     padding: 18px 22px;
@@ -203,7 +203,7 @@
     background: var(--bg-secondary);
     padding: 4px;
     border-radius: var(--radius-lg);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     margin-bottom: 20px;
 }
 
@@ -264,7 +264,7 @@
 
 .alert-parsed-fields-table td {
     padding: 0.3rem 0.5rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
     vertical-align: top;
 }
 
@@ -284,7 +284,7 @@
 
 .alert-parsed-extracted {
     margin-bottom: 0.75rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     overflow: hidden;
 }
@@ -309,7 +309,7 @@
     font-size: 0.78rem;
     background: var(--bg-secondary);
     color: var(--text-primary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     cursor: pointer;
 }
@@ -330,7 +330,7 @@
     flex-wrap: wrap;
     padding: 0.75rem 1rem;
     background: var(--bg);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     margin-bottom: 1.25rem;
 }
@@ -344,7 +344,7 @@
 
 .triage-bar select {
     padding: 0.35rem 0.5rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: 4px;
     font-size: 0.8125rem;
     background: var(--bg-secondary);
@@ -412,7 +412,7 @@
 
 .ai-analysis-bar {
     margin: 0.75rem 0; padding: 0.5rem 0;
-    border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    border-top: 1px solid var(--ion-border); border-bottom: 1px solid var(--ion-border);
     display: flex; align-items: flex-start; gap: 0.75rem; flex-direction: column;
 }
 
@@ -575,7 +575,7 @@
 .iad2-head .ai-analysis-result:empty { display: none; }
 .iad2-hero {
     padding: 2px 0 12px;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
     margin-bottom: 12px;
 }
 .iad2-sevrow { margin-bottom: 8px; }
@@ -596,7 +596,7 @@
     font-size: 11px;
     color: var(--text-secondary);
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: 20px;
     padding: 3px 10px;
 }
@@ -644,7 +644,7 @@
     font-size: 10px;
     padding: 3px 8px;
     border-radius: 6px;
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
 }
 .iad2-fsrc.rule  { color: var(--warning); border-color: rgba(248,179,58,.3); background: rgba(248,179,58,.07); }
 .iad2-fsrc.alert { color: var(--info);    border-color: rgba(96,165,250,.3); background: rgba(96,165,250,.06); }
@@ -653,10 +653,10 @@
     display: flex; align-items: center; justify-content: space-between;
     gap: 10px; flex-wrap: wrap; margin-bottom: 12px;
 }
-.iad2-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--bg-tertiary); }
+.iad2-seg { display: inline-flex; border: 1px solid var(--ion-border); border-radius: 8px; overflow: hidden; background: var(--bg-tertiary); }
 .iad2-segbtn {
     font-family: inherit; font-size: 11.5px; padding: 6px 12px;
-    background: none; border: none; border-right: 1px solid var(--border);
+    background: none; border: none; border-right: 1px solid var(--ion-border);
     color: var(--text-secondary); cursor: pointer;
 }
 .iad2-segbtn:last-child { border-right: none; }
@@ -665,14 +665,14 @@
 .iad2-segbtn.on .c { color: var(--primary); }
 .iad2-fsearch {
     flex: 1; min-width: 130px; max-width: 240px;
-    background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg-tertiary); border: 1px solid var(--ion-border); border-radius: 8px;
     padding: 6px 11px; color: var(--text-bright); font-family: inherit; font-size: 12px;
 }
 .iad2-fsearch::placeholder { color: var(--text-muted); }
 .iad2-fsearch:focus { outline: none; border-color: var(--primary); }
 .iad2-fempty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 16px 0; }
 .iad2-fmode { margin-bottom: 12px; }
-.iad2-json { max-height: 460px; overflow: auto; font-size: 11.5px; line-height: 1.5; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: var(--bg-secondary); }
+.iad2-json { max-height: 460px; overflow: auto; font-size: 11.5px; line-height: 1.5; border: 1px solid var(--ion-border); border-radius: 8px; padding: 10px 12px; background: var(--bg-secondary); }
 
 /* v2 field pins — row control + Case-context chips */
 .iad2-fpincell { text-align: right; white-space: nowrap; vertical-align: top; }
@@ -726,7 +726,7 @@
 .iad2-gstatus {
     font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 10px;
     text-transform: uppercase; letter-spacing: .04em; padding: 2px 8px; border-radius: 6px;
-    color: var(--text-muted); border: 1px solid var(--border);
+    color: var(--text-muted); border: 1px solid var(--ion-border);
 }
 .iad2-gstatus.pending { color: var(--warning); border-color: rgba(248,179,58,.3); background: rgba(248,179,58,.07); }
 .iad2-gstatus.approved { color: var(--success); border-color: rgba(134,240,160,.3); background: rgba(134,240,160,.07); }

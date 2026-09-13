@@ -338,7 +338,7 @@
     flex: 1;
     padding: 0.5rem 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -350,7 +350,7 @@
 .cases-filter-select {
     padding: 0.5rem 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -384,7 +384,7 @@
 .cw {
     position: relative;
     background: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius-lg);
     overflow: hidden;
     transition: border-color .18s, transform .18s, box-shadow .18s;
@@ -445,7 +445,7 @@
 /* closure badge */
 .cw-closure {
     font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
-    padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border);
+    padding: 3px 8px; border-radius: 6px; border: 1px solid var(--ion-border);
 }
 .cw-closure.reason-true_positive { background: var(--sev-critical-bg); color: var(--sev-critical); border-color: var(--sev-critical-dim); }
 .cw-closure.reason-benign_true_positive { background: rgba(134,240,160,.12); color: var(--success); border-color: rgba(134,240,160,.3); }
@@ -458,7 +458,7 @@
 .cw-meta { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-top: 14px; }
 .cw-chip {
     display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-secondary);
-    background: rgba(255,255,255,.05); border: 1px solid var(--border); padding: 4px 9px; border-radius: 7px;
+    background: rgba(255,255,255,.05); border: 1px solid var(--ion-border); padding: 4px 9px; border-radius: 7px;
     font-variant-numeric: tabular-nums;
 }
 .cw-chip svg { width: 12px; height: 12px; opacity: .7; flex: none; }
@@ -477,7 +477,7 @@
 .cw-sync { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
 .cw-syncchip {
     display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--text-secondary);
-    background: rgba(255,255,255,.05); border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px;
+    background: rgba(255,255,255,.05); border: 1px solid var(--ion-border); padding: 3px 8px; border-radius: 6px;
 }
 .cw-syncchip .cw-sb { width: 6px; height: 6px; border-radius: 50%; }
 .cw-syncchip.kibana .cw-sb { background: #00bfb3; }
@@ -486,14 +486,14 @@
 /* footer */
 .cw-foot {
     display: flex; align-items: center; justify-content: space-between; gap: 10px;
-    padding: 11px 17px; border-top: 1px solid var(--border); background: rgba(0,0,0,.16);
+    padding: 11px 17px; border-top: 1px solid var(--ion-border); background: rgba(0,0,0,.16);
 }
 .cw-who { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); min-width: 0; }
 .cw-who > span:not(.cw-av) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cw-unassigned { color: var(--text-muted); }
 .cw-av {
     width: 22px; height: 22px; border-radius: 50%;
-    background: linear-gradient(135deg, #2a3444, #1a2130); border: 1px solid var(--border);
+    background: linear-gradient(135deg, #2a3444, #1a2130); border: 1px solid var(--ion-border);
     display: grid; place-items: center; font-size: 10px; font-weight: 700; color: var(--primary);
     font-family: var(--font-mono, ui-monospace, monospace); flex: none;
 }
@@ -504,7 +504,7 @@
 /* per-widget status control (reuses panelUpdateField → closure modal for closed) */
 .cw-status-select {
     font-family: inherit; font-size: 11px; color: var(--text-secondary);
-    background: rgba(255,255,255,.05); border: 1px solid var(--border); border-radius: 6px;
+    background: rgba(255,255,255,.05); border: 1px solid var(--ion-border); border-radius: 6px;
     padding: 3px 6px; cursor: pointer; max-width: 130px;
 }
 .cw-status-select:hover { border-color: var(--border-bright); color: var(--text-primary); }
@@ -688,7 +688,7 @@
 /* v0.31.0: panel tab nav */
 .cpanel-tab-nav {
     display: flex; gap: 0;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
     margin: -0.5rem -1.25rem 1rem;
     padding: 0 0.75rem;
     overflow-x: auto;
@@ -729,7 +729,7 @@
     width: 100%;
     padding: 0.35rem 0.5rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: 4px;
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -778,7 +778,7 @@
     padding: 0.15rem 0.45rem;
     border-radius: 3px;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     color: var(--text-secondary);
 }
 
@@ -787,7 +787,7 @@
     color: var(--text-primary);
     line-height: 1.6;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     padding: 0.75rem;
 }
@@ -798,7 +798,7 @@
     align-items: center;
     padding: 0.4rem 0.6rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: 4px;
     font-size: 0.8rem;
     margin-bottom: 0.35rem;
@@ -816,7 +816,7 @@
 .cpanel-note {
     padding: 0.6rem 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     margin-bottom: 0.4rem;
 }
@@ -939,7 +939,7 @@
     flex: 1;
     padding: 0.4rem 0.6rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: 4px;
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -956,7 +956,7 @@
     gap: 0.5rem;
     margin-top: 1rem;
     padding-top: 0.75rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ion-border);
 }
 
 .cpanel-actions .btn {
@@ -965,7 +965,7 @@
 }
 .cpanel-playbook-browser {
     margin-top: 0.75rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: 4px;
     max-height: 320px;
     overflow-y: auto;
@@ -976,12 +976,12 @@
     z-index: 1;
     padding: 0.375rem 0.5rem;
     background: var(--bg-primary);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
 }
 .cpanel-playbook-browser-search input {
     width: 100%;
     padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: 3px;
     background: var(--bg-secondary);
     color: var(--text-primary);
@@ -994,7 +994,7 @@
     letter-spacing: 0.06em;
     padding: 0.375rem 0.5rem;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
     position: sticky;
     top: 37px;
     z-index: 1;
@@ -1004,7 +1004,7 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.5rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
     font-size: 0.8125rem;
 }
 .cpanel-pb-item:last-child { border-bottom: none; }
@@ -1039,7 +1039,7 @@
 .cpanel-alert-card {
     padding: 0.5rem 0.65rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     margin-bottom: 0.35rem;
     transition: border-color 0.15s;
@@ -1087,7 +1087,7 @@
     margin-top: 0.4rem;
     max-height: 320px;
     overflow: auto;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ion-border);
     padding-top: 0.35rem;
 }
 .cpanel-alert-fields-table {
@@ -1147,7 +1147,7 @@
     line-height: 1.5;
     padding: 0.45rem 0.6rem;
     background: var(--bg-secondary, #11141c);
-    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border: 1px solid var(--ion-border, rgba(255,255,255,0.08));
     border-radius: 6px;
 }
 .cpanel-rule-guide-label {
@@ -1162,7 +1162,7 @@
     color: var(--text-primary, #cbd5e1);
     padding: 0.45rem 0.6rem;
     background: var(--bg-secondary, #11141c);
-    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border: 1px solid var(--ion-border, rgba(255,255,255,0.08));
     border-left: 2px solid var(--primary, #6de4ff);
     border-radius: 0 6px 6px 0;
 }
@@ -1190,7 +1190,7 @@
     margin-bottom: 0.3rem;
 }
 .cpanel-proc-node {
-    border-left: 2px solid var(--border, rgba(255,255,255,0.08));
+    border-left: 2px solid var(--ion-border, rgba(255,255,255,0.08));
     padding: 0.3rem 0 0.3rem 0.55rem;
     margin-left: 0.15rem;
 }
@@ -1222,7 +1222,7 @@
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--text-muted, #64748b);
-    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border: 1px solid var(--ion-border, rgba(255,255,255,0.08));
     border-radius: 4px;
     padding: 0 0.3rem;
 }
@@ -1234,7 +1234,7 @@
 .cpanel-proc-actions { margin-left: auto; display: inline-flex; gap: 0.2rem; flex: none; }
 .cpanel-proc-act {
     background: none;
-    border: 1px solid var(--border, rgba(255,255,255,0.08));
+    border: 1px solid var(--ion-border, rgba(255,255,255,0.08));
     border-radius: 4px;
     color: var(--text-muted, #64748b);
     cursor: pointer;
@@ -1257,7 +1257,7 @@
 .cpanel-alert-extracted {
     margin-bottom: 0.5rem;
     padding-bottom: 0.45rem;
-    border-bottom: 1px dashed var(--border);
+    border-bottom: 1px dashed var(--ion-border);
 }
 .cpanel-alert-extracted-title {
     font-size: 0.64rem;
@@ -1272,7 +1272,7 @@
 .cpanel-comment {
     padding: 0.6rem 0.75rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-left: 3px solid var(--info);
     border-radius: var(--radius);
     margin-bottom: 0.4rem;
@@ -1329,7 +1329,7 @@
     padding: 0.75rem;
     text-align: center;
     background: var(--bg-secondary);
-    border: 1px dashed var(--border);
+    border: 1px dashed var(--ion-border);
     border-radius: var(--radius);
 }
 
@@ -1351,7 +1351,7 @@
 
 .cases-modal {
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius-lg);
     width: 90%;
     max-width: 480px;
@@ -1365,7 +1365,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 1rem 1.25rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
 }
 
 .cases-modal-header h3 { margin: 0; font-size: 1.05rem; }
@@ -1417,7 +1417,7 @@
     width: 100%;
     padding: 0.5rem 0.75rem;
     background: var(--bg-primary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius);
     color: var(--text-primary);
     font-size: 0.85rem;
@@ -1435,7 +1435,7 @@
     justify-content: flex-end;
     gap: 0.5rem;
     padding: 0.75rem 1.25rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--ion-border);
 }
 
 /* ── Responsive ──────────────────────────────────────────── */
@@ -1543,7 +1543,7 @@
     padding: 0.6rem 0.75rem;
     border-radius: var(--radius);
     background: var(--bg-primary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
 }
 
 .summary-chip-dot {
@@ -1712,7 +1712,7 @@
     padding: 0.75rem 1rem;
     margin-top: 1.5rem;
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     cursor: pointer;
     user-select: none;
@@ -1736,7 +1736,7 @@
 
 .analytics-panel {
     background: var(--bg-secondary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-top: none;
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     padding: 1rem;
@@ -1754,7 +1754,7 @@
 
 .analytics-card {
     background: var(--bg-primary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius-lg);
     padding: 1rem;
     transition: box-shadow 0.2s;
@@ -1775,7 +1775,7 @@
 
 .analytics-card-full {
     background: var(--bg-primary);
-    border: 1px solid var(--border);
+    border: 1px solid var(--ion-border);
     border-radius: var(--radius-lg);
     padding: 1rem;
 }
@@ -1918,7 +1918,7 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--ion-border);
     font-size: 0.8rem;
 }
 
@@ -1987,7 +1987,7 @@
    confidence meter / auto-escalated badge, common ES fields, note preview.
    Built on design tokens; degrade gracefully when a field is absent.
    ============================================================================ */
-.awx-common { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 11px; }
+.awx-common { margin-top: 12px; border-top: 1px solid var(--ion-border); padding-top: 11px; }
 .awx-lab {
     font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted);
     font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 7px;
@@ -2002,7 +2002,7 @@
 .awx-cfv.cmdline { color: var(--text-secondary); font-size: 10.5px; }
 
 /* observables row */
-.awx-obs { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 11px; }
+.awx-obs { margin-top: 12px; border-top: 1px solid var(--ion-border); padding-top: 11px; }
 .awx-obscount {
     font-family: var(--font-mono, ui-monospace, monospace); font-size: 10px; color: var(--primary);
     background: rgba(109,228,255,.12); border: 1px solid var(--border-bright); padding: 1px 6px; border-radius: 99px;
@@ -2011,7 +2011,7 @@
 .awx-obschip {
     display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
     font-family: var(--font-mono, ui-monospace, monospace); color: var(--text-primary);
-    background: rgba(255,255,255,.05); border: 1px solid var(--border); padding: 3px 8px; border-radius: 6px; max-width: 100%;
+    background: rgba(255,255,255,.05); border: 1px solid var(--ion-border); padding: 3px 8px; border-radius: 6px; max-width: 100%;
 }
 .awx-ot { font-size: 9px; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
 .awx-ot.t-ip, .awx-ot.t-ipv4, .awx-ot.t-ipv6 { color: var(--primary); }
@@ -2041,7 +2041,7 @@
 
 /* Bob suggested-verdict + confidence meter */
 .awx-bob {
-    margin-top: 12px; background: rgba(109,228,255,.05); border: 1px solid var(--border); border-radius: 8px;
+    margin-top: 12px; background: rgba(109,228,255,.05); border: 1px solid var(--ion-border); border-radius: 8px;
     padding: 9px 11px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
 }
 .awx-bl {
@@ -2078,7 +2078,7 @@
 /* analyst-note preview */
 .awx-note {
     margin-top: 11px; font-size: 11.5px; color: var(--text-secondary); font-style: italic;
-    border-left: 2px solid var(--border); padding-left: 9px; line-height: 1.45;
+    border-left: 2px solid var(--ion-border); padding-left: 9px; line-height: 1.45;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 
@@ -2091,7 +2091,7 @@
     margin-bottom: 10px;
 }
 .apg-stat {
-    background: var(--bg-elevated); border: 1px solid var(--border);
+    background: var(--bg-elevated); border: 1px solid var(--ion-border);
     border-radius: 6px; padding: 3px 9px; color: var(--text-secondary);
     font-size: 11px; white-space: nowrap;
 }
@@ -2113,7 +2113,7 @@
 }
 .apg-legend-item { display: inline-flex; align-items: center; gap: 5px; }
 .apg-legend-swatch {
-    width: 16px; height: 0; border-top: 2px solid var(--border);
+    width: 16px; height: 0; border-top: 2px solid var(--ion-border);
     display: inline-block; border-radius: 2px;
 }
 .apg-sw-process_lineage   { border-top-color: var(--sev-info); }
@@ -2125,7 +2125,7 @@
    content box; scrolls horizontally when the kill-chain is wide. */
 .apg-graph {
     position: relative; overflow: auto;
-    border: 1px solid var(--border); border-radius: 8px;
+    border: 1px solid var(--ion-border); border-radius: 8px;
     background: var(--bg-elevated);
     padding: 12px; max-height: 560px;
 }
@@ -2139,7 +2139,7 @@
     font-size: 10px; font-weight: 700; text-transform: uppercase;
     letter-spacing: .04em; color: var(--text-muted);
     padding: 0 0 8px; margin-bottom: 8px;
-    border-bottom: 1px solid var(--border); text-align: center;
+    border-bottom: 1px solid var(--ion-border); text-align: center;
 }
 .apg-lane-body { display: flex; flex-direction: column; gap: 16px; }
 .apg-lane-empty { color: var(--text-muted); text-align: center; font-size: 11px; opacity: .5; }
@@ -2149,7 +2149,7 @@
     position: relative; z-index: 1;
     display: flex; align-items: center; gap: 7px;
     background: var(--surface, var(--bg-primary, #12161f));
-    border: 1px solid var(--border); border-left-width: 3px;
+    border: 1px solid var(--ion-border); border-left-width: 3px;
     border-radius: 7px; padding: 7px 9px;
 }
 .apg-node-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }

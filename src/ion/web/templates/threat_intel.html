@@ -29,7 +29,7 @@
 /* Stat cards */
 .ti-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .ti-stat-card {
-    background: var(--bg-secondary); border: 1px solid var(--border);
+    background: var(--bg-secondary); border: 1px solid var(--ion-border);
     border-radius: var(--radius-lg); padding: 16px 20px; text-align: center;
 }
 .ti-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
@@ -39,7 +39,7 @@
 .ti-search-bar { display: flex; gap: 10px; margin-bottom: 20px; }
 .ti-search-input {
     flex: 1; padding: 8px 14px; background: var(--bg-secondary);
-    border: 1px solid var(--border); border-radius: var(--radius);
+    border: 1px solid var(--ion-border); border-radius: var(--radius);
     color: var(--text-primary); font-size: .85rem;
 }
 .ti-search-input::placeholder { color: var(--text-secondary); }
@@ -51,7 +51,7 @@
 .ti-btn:hover { opacity: .85; }
 .ti-btn:disabled { opacity: .4; cursor: not-allowed; }
 .ti-btn-outline {
-    padding: 6px 14px; background: transparent; border: 1px solid var(--border);
+    padding: 6px 14px; background: transparent; border: 1px solid var(--ion-border);
     border-radius: var(--radius); color: var(--text-secondary); cursor: pointer; font-size: .8rem;
 }
 .ti-btn-outline:hover { color: var(--text-primary); border-color: var(--text-secondary); }
@@ -64,10 +64,10 @@
 .ti-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
 .ti-table th {
     text-align: left; padding: 10px 12px; color: var(--text-secondary);
-    border-bottom: 1px solid var(--border); font-weight: 600; font-size: .78rem;
+    border-bottom: 1px solid var(--ion-border); font-weight: 600; font-size: .78rem;
     text-transform: uppercase; letter-spacing: .5px;
 }
-.ti-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.ti-table td { padding: 10px 12px; border-bottom: 1px solid var(--ion-border); vertical-align: top; }
 .ti-table tr:hover td { background: rgba(255,255,255,.02); }
 .ti-table .ti-name-cell { cursor: pointer; color: var(--accent); font-weight: 600; }
 .ti-table .ti-name-cell:hover { text-decoration: underline; }
@@ -104,7 +104,7 @@
 
 /* Loading / empty states */
 .ti-loading, .ti-empty { text-align: center; padding: 40px; color: var(--text-secondary); font-size: .85rem; }
-.ti-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: ti-spin .6s linear infinite; margin-right: 8px; vertical-align: middle; }
+.ti-spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid var(--ion-border); border-top-color: var(--accent); border-radius: 50%; animation: ti-spin .6s linear infinite; margin-right: 8px; vertical-align: middle; }
 @keyframes ti-spin { to { transform: rotate(360deg); } }
 
 /* Unread indicator */

@@ -444,7 +444,7 @@
                 if (!p1 || !p2) return;
                 var bg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 bg.setAttribute('d', 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y);
-                bg.setAttribute('stroke', 'var(--border)');
+                bg.setAttribute('stroke', 'var(--ion-border)');
                 bg.setAttribute('stroke-width', '1');
                 bg.setAttribute('stroke-opacity', '0.08');
                 bg.setAttribute('class', 'arch-conn');
@@ -485,7 +485,7 @@
             var line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             line.setAttribute('d', 'M ' + p1.x + ' ' + p1.y + ' L ' + p2.x + ' ' + p2.y);
             line.setAttribute('id', pathId);
-            line.setAttribute('stroke', isScenario ? 'var(--primary)' : 'var(--border)');
+            line.setAttribute('stroke', isScenario ? 'var(--primary)' : 'var(--ion-border)');
             line.setAttribute('stroke-width', isScenario ? '2' : '1');
             line.setAttribute('stroke-opacity', isScenario ? '0.6' : '0.2');
             line.setAttribute('class', 'arch-conn' + (isScenario ? ' active-line' : ''));

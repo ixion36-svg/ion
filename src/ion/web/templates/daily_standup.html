@@ -417,11 +417,11 @@ data-click-action="dsCloseReport"></div>
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.dth{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--border)}
-.ds-country-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.02);transition:border-color .2s,background .2s}
+.dth{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);font-weight:600;padding:8px 12px;border-bottom:1px solid var(--ion-border)}
+.ds-country-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;border-radius:10px;border:1px solid var(--ion-border);background:rgba(255,255,255,.02);transition:border-color .2s,background .2s}
 .ds-country-card.highlighted{border-color:rgba(255,108,108,.4);background:rgba(255,108,108,.08)}
 .ds-country-count.active{color:var(--danger);font-weight:700}
-.ds-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:ds-spin .7s linear infinite}
+.ds-spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--ion-border);border-top-color:var(--primary);border-radius:50%;animation:ds-spin .7s linear infinite}
 @keyframes ds-spin{to{transform:rotate(360deg)}}
 .ds-status-pill{display:inline-flex;align-items:center;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
 .ds-pill-ok{background:rgba(163,230,53,.1);color:var(--success);border:1px solid rgba(163,230,53,.2)}
@@ -437,14 +437,14 @@ data-click-action="dsCloseReport"></div>
 .ds-hours-yellow{color:var(--warning);font-weight:600}
 .ds-gap-row{background:rgba(255,108,108,.04)}
 /* RAG traffic lights */
-.ds-rag-light{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid var(--border)}
+.ds-rag-light{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid var(--ion-border)}
 .ds-rag-green{background:var(--success);box-shadow:0 0 8px rgba(34,197,94,.6)}
 .ds-rag-amber{background:var(--warning);box-shadow:0 0 8px rgba(245,158,11,.6);animation:ds-rag-pulse 1.5s ease-in-out infinite}
 .ds-rag-red{background:var(--danger);box-shadow:0 0 10px rgba(239,68,68,.7);animation:ds-rag-pulse 0.8s ease-in-out infinite}
 .ds-rag-grey{background:var(--text-muted)}
 @keyframes ds-rag-pulse{0%,100%{opacity:1}50%{opacity:.4}}
 /* Host widget card */
-.ds-host-widget{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:rgba(255,255,255,.02);transition:border-color .2s}
+.ds-host-widget{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;border:1px solid var(--ion-border);background:rgba(255,255,255,.02);transition:border-color .2s}
 .ds-host-widget.ds-hw-ok{border-color:rgba(34,197,94,.15)}
 .ds-host-widget.ds-hw-warning{border-color:rgba(245,158,11,.25);background:rgba(245,158,11,.04)}
 .ds-host-widget.ds-hw-critical{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.06)}
