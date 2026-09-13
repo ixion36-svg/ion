@@ -1547,3 +1547,378 @@
   border-color: var(--color-base-300) !important;
   color: var(--color-base-content) !important;
 }
+
+
+/* ============================================================
+ * Page chrome moved out of style.css.
+ *
+ * Every class here is ION-only -- a name daisyUI does not define -- so
+ * moving the rules changes nothing about which sheet wins. Rules that
+ * mixed an ION-only class with a shadowed one stayed behind; those need
+ * a markup migration, not a move.
+ *
+ * Declarations are verbatim, ION custom properties included. style.css
+ * is already a dependency of this file (the accent themes derive from
+ * --primary), so this adds no new coupling, and translating 26KB of
+ * colours onto daisyUI tokens would change a lot of them subtly for no
+ * functional gain. That is a separate, reviewable pass.
+ *
+ * Order is preserved: style.css carries two generations of several
+ * families and the later wins. Moving them together keeps that intact.
+ * ============================================================ */
+
+.theme-option:hover {
+    transform: scale(1.1);
+}
+.theme-option.active {
+    border-color: var(--text-bright);
+    box-shadow: 0 0 15px currentColor;
+}
+.theme-option.active::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-weight: bold;
+    text-shadow: 0 0 3px rgba(0,0,0,0.8);
+}
+.theme-option[data-theme="cyan"] { background: linear-gradient(135deg, #00d4ff, #0ea5e9); }
+.theme-option[data-theme="purple"] { background: linear-gradient(135deg, #a855f7, #7c3aed); }
+.theme-option[data-theme="green"] { background: linear-gradient(135deg, #10b981, #059669); }
+.theme-option[data-theme="orange"] { background: linear-gradient(135deg, #f97316, #ea580c); }
+.theme-option[data-theme="pink"] { background: linear-gradient(135deg, #ec4899, #db2777); }
+.theme-option[data-theme="red"] { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.theme-option[data-theme="blue"] { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+.theme-option[data-theme="gold"] { background: linear-gradient(135deg, #fbbf24, #f59e0b); }
+.mode-btn:hover {
+    color: var(--text-primary);
+}
+.mode-btn.active {
+    background: var(--primary);
+    color: var(--bg-deep);
+}
+.nav-links > li > a:not(.nav-dropdown-toggle).active {
+    color: var(--primary);
+    background: var(--primary-dim);
+    border-color: var(--border-bright);
+    box-shadow: inset 0 -2px 0 var(--primary), var(--glow-sm);
+}
+.nav-dropdown.open > .nav-dropdown-toggle {
+    color: var(--primary);
+    background: var(--primary-dim);
+    border-color: var(--border-bright);
+    text-shadow: var(--glow-sm);
+}
+.nav-dropdown-toggle:hover .nav-chevron,
+.nav-dropdown.open > .nav-dropdown-toggle .nav-chevron {
+    opacity: 1;
+}
+.nav-dropdown.open > .nav-dropdown-toggle .nav-chevron {
+    transform: rotate(180deg);
+}
+.nav-dropdown.open > .nav-dropdown-menu {
+    display: block;
+    animation: navDropIn 0.18s ease;
+}
+.btn-danger:hover {
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+}
+.card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    transition: border-color 0.2s ease;
+}
+.card:hover {
+    border-color: var(--border-bright);
+}
+.np-btn-sm:hover i {
+    color: var(--primary);
+}
+.quick-action-btn:hover i {
+    color: var(--primary);
+}
+.role-card.t1 .card-icon i { color: var(--neon-green); }
+.role-card.t2 .card-icon i { color: var(--neon-blue); }
+.role-card.t3 .card-icon i { color: var(--neon-purple); }
+.role-card.t4 .card-icon i { color: var(--neon-orange); }
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
+    border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg);
+    overflow: hidden;
+}
+.data-table th, .data-table td {
+    padding: 0.875rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(99, 110, 123, 0.15);
+}
+.data-table th {
+    font-weight: 700;
+    background: var(--bg-secondary);
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-secondary);
+}
+.data-table tr:hover td {
+    background: var(--primary-dim);
+}
+.role-badge.role-admin {
+    background: rgba(168, 85, 247, 0.15);
+    color: var(--neon-purple);
+}
+.role-badge.role-editor {
+    background: rgba(0, 212, 255, 0.15);
+    color: var(--neon-cyan);
+}
+.role-badge.role-viewer {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--neon-green);
+}
+.role-badge.role-engineering {
+    background: rgba(249, 115, 22, 0.15);
+    color: var(--neon-orange);
+}
+.status-badge.status-active {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--neon-green);
+}
+.status-badge.status-inactive {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--neon-red);
+}
+.modal-close:hover {
+    color: var(--neon-red);
+}
+.user-dropdown.show {
+    display: block;
+}
+.tab-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-card);
+}
+.tab-btn.active {
+    color: var(--bg-deep);
+    background: var(--primary);
+    box-shadow: 0 2px 8px var(--primary-glow);
+}
+.list-item-title:hover {
+    color: var(--primary);
+}
+.search-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: var(--glow-sm);
+}
+.version-item.checkpoint {
+    border-left: 3px solid var(--primary);
+}
+.checkbox-group .checkbox-label:hover {
+    border-color: var(--primary);
+    background: var(--primary-dim);
+}
+.text-primary { color: var(--primary); }
+.settings-tab.active {
+    color: var(--primary);
+    border-right-color: var(--primary);
+    background: var(--primary-dim);
+}
+.ion-page-header {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 28px; padding-bottom: 20px;
+    border-bottom: 1px solid var(--ion-border);
+    flex-wrap: wrap; gap: 16px;
+}
+.ion-toggle-btn.active {
+    background: var(--primary); color: var(--bg-deep);
+    box-shadow: 0 4px 12px var(--primary-glow);
+}
+.ion-card {
+    background: var(--bg-secondary); border: 1px solid var(--ion-border);
+    border-radius: var(--ion-radius-lg); padding: 24px;
+    transition: border-color .2s;
+}
+.ion-card:hover { border-color: var(--border-bright); }
+.ion-table { width: 100%; border-collapse: collapse; }
+.ion-table thead th {
+    font-size: 9px; font-weight: 700; color: var(--text-secondary);
+    text-transform: uppercase; letter-spacing: 1px;
+    text-align: left; padding: 10px 12px;
+    border-bottom: 1px solid var(--ion-border);
+    background: transparent;
+}
+.ion-table tbody td {
+    font-size: 12px; padding: 12px; color: var(--text-primary);
+    border-bottom: 1px solid rgba(99,110,123,.12);
+    vertical-align: middle;
+}
+.ion-table tbody tr:hover td { background: var(--primary-dim); }
+.ion-table tbody tr:last-child td { border-bottom: none; }
+.ion-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; font-family: inherit;
+    text-transform: uppercase; letter-spacing: 0.5px;
+}
+.ion-metric { margin-bottom: 18px; }
+.ion-metric:last-child { margin-bottom: 0; }
+.ion-metric-value { font-weight: 700; }
+.ion-metric-value.success { color: var(--success); }
+.ion-metric-value.danger  { color: var(--danger); }
+.ion-metric-value.warning { color: var(--warning); }
+.ion-metric-value.info    { color: var(--info); }
+.ion-bar-fill.success { background: var(--success); }
+.ion-bar-fill.danger  { background: var(--danger); }
+.ion-bar-fill.primary { background: var(--primary); }
+.ion-pill-tab.active { background: var(--primary); color: var(--bg-deep); }
+.ion-stat-value.primary { color: var(--primary); }
+.ion-stat-value.success { color: var(--success); }
+.ion-stat-value.danger  { color: var(--danger); }
+.btn-danger:hover { filter: brightness(1.05); box-shadow: 0 0 16px -6px rgba(255, 108, 108, 0.8); }
+.card {
+    background: rgba(10, 12, 18, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    padding: 1.75rem;
+    margin-bottom: 1rem;
+    box-shadow: none;
+    transition: border-color .18s ease, background .18s ease;
+}
+.card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+}
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(10, 12, 18, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 14px;
+    overflow: hidden;
+}
+.data-table th {
+    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: #64748b;
+    background: transparent;
+    padding: 0.875rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.data-table td {
+    padding: 1rem;
+    font-size: 0.8125rem;
+    color: #cbd5e1;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-variant-numeric: tabular-nums;
+}
+.data-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+.data-table tbody tr:last-child td { border-bottom: 0; }
+.modal-close:hover { color: #fff; }
+.tab-btn:hover { color: #cbd5e1; }
+.tab-btn.active {
+    color: #6de4ff;
+    border-bottom-color: #6de4ff;
+}
+.metric-card:hover { border-color: rgba(255, 255, 255, 0.12); }
+.role-card:hover { border-color: rgba(255, 255, 255, 0.12); }
+.role-badge.role-admin      { background: rgba(154, 140, 255, 0.1); color: #9a8cff; border-color: rgba(154, 140, 255, 0.25); }
+.role-badge.role-editor     { background: rgba(109, 228, 255, 0.1); color: #6de4ff; border-color: rgba(109, 228, 255, 0.25); }
+.role-badge.role-viewer     { background: rgba(134, 240, 160, 0.1); color: #86f0a0; border-color: rgba(134, 240, 160, 0.25); }
+.role-badge.role-engineering{ background: rgba(109, 228, 255, 0.1); color: #6de4ff; border-color: rgba(109, 228, 255, 0.25); }
+.role-badge.role-analyst    { background: rgba(109, 228, 255, 0.1); color: #6de4ff; border-color: rgba(109, 228, 255, 0.25); }
+.role-badge.role-senior_analyst { background: rgba(154, 140, 255, 0.1); color: #9a8cff; border-color: rgba(154, 140, 255, 0.25); }
+.role-badge.role-principal_analyst { background: rgba(255, 108, 108, 0.1); color: #ff6c6c; border-color: rgba(255, 108, 108, 0.25); }
+.role-badge.role-lead       { background: rgba(248, 179, 58, 0.1); color: #f8b33a; border-color: rgba(248, 179, 58, 0.25); }
+.role-badge.role-forensic   { background: rgba(154, 140, 255, 0.1); color: #9a8cff; border-color: rgba(154, 140, 255, 0.25); }
+.version-item:hover { border-color: rgba(255, 255, 255, 0.12); }
+.settings-tab.active {
+    background: rgba(109, 228, 255, 0.08);
+    color: #6de4ff;
+    border: 1px solid rgba(109, 228, 255, 0.2);
+}
+.theme-option:hover { transform: scale(1.05); }
+.theme-option.active {
+    border-color: #6de4ff;
+    box-shadow: 0 0 0 2px rgba(109, 228, 255, 0.2);
+}
+.search-input:focus {
+    outline: none;
+    border-color: rgba(109, 228, 255, 0.5);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2px rgba(109, 228, 255, 0.1);
+}
+.search-input::placeholder { color: #475569; }
+.filter-select:focus {
+    outline: none;
+    border-color: rgba(109, 228, 255, 0.5);
+}
+.mode-btn:hover { color: #fff; }
+.mode-btn.active {
+    background: #6de4ff;
+    color: #07080c;
+}
+[data-mode="light"] .card,
+[data-mode="light"] .integration-card,
+[data-mode="light"] .ion-card {
+  background: var(--bg-card) !important;
+  border-color: var(--ion-border) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+[data-mode="light"] .card:hover,
+[data-mode="light"] .integration-card:hover {
+  border-color: rgba(100, 116, 139, 0.5) !important;
+}
+[data-mode="light"] .metric-card:hover, [data-mode="light"] .role-card:hover {
+  border-color: rgba(100, 116, 139, 0.5) !important;
+}
+[data-mode="light"] .data-table {
+  background: var(--bg-card) !important;
+  border-color: var(--ion-border) !important;
+}
+[data-mode="light"] .data-table th {
+  color: var(--text-muted) !important;
+  border-bottom-color: var(--ion-border) !important;
+}
+[data-mode="light"] .data-table td {
+  color: var(--text-primary) !important;
+  border-bottom-color: rgba(148, 163, 184, 0.2) !important;
+}
+[data-mode="light"] .data-table tr:hover td {
+  background: rgba(15, 23, 42, 0.04) !important;
+}
+[data-mode="light"] .form-control, [data-mode="light"] .form-input, [data-mode="light"] input[type="text"], [data-mode="light"] input[type="email"], [data-mode="light"] input[type="password"], [data-mode="light"] input[type="number"], [data-mode="light"] input[type="url"], [data-mode="light"] input[type="search"], [data-mode="light"] textarea, [data-mode="light"] select {
+  background: var(--bg-card) !important;
+  border-color: var(--ion-border) !important;
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .form-control::placeholder,
+[data-mode="light"] input::placeholder,
+[data-mode="light"] textarea::placeholder {
+  color: var(--text-muted) !important;
+}
+[data-mode="light"] .section-nav a:hover, [data-mode="light"] .tab-btn:hover {
+  color: var(--text-primary) !important;
+}
+[data-mode="light"] .settings-tab.active {
+  background: var(--bg-secondary) !important;
+  color: var(--primary) !important;
+}
+[data-mode="light"] .pagination-btn.active,
+[data-mode="light"] .page-btn.active {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+}
