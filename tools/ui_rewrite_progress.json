@@ -251,6 +251,9 @@
     "convert": true,
     "restyle": true
   },
+  "pcap.html": {
+    "restyle": true
+  },
   "profile.html": {
     "convert": true,
     "restyle": true

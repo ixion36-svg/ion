@@ -211,9 +211,9 @@
 .pcap-reset { margin-bottom: 16px; }
 </style>
 
-<div class="pcap-page">
-    <section class="ion-page-header mb-8 rise d-1">
-      <div class="flex-1 min-w-0">
+<div class="max-w-[1400px] mx-auto">
+    <section class="ion-page-header mb-8 rise d-1 flex-wrap">
+      <div class="basis-full md:basis-auto md:flex-1 min-w-0">
         <div class="flex items-center gap-3 mb-4">
           <svg class="w-4 h-4 text-ion-lime"><use href="#i-network"/></svg>
           <span class="label-tiny text-ion-lime">Packet forensics</span>
@@ -225,39 +225,39 @@
 
     <!-- Upload Zone -->
     <div class="pcap-upload-zone" id="pcap-drop-zone" data-click-target="pcap-file-input">
-        <div class="upload-icon"><i class="icon-upload-cloud"></i></div>
+        <div class="text-[2.5rem] text-base-content/60 mb-3"><i class="icon-upload-cloud"></i></div>
         <h3>Drop PCAP file here or click to browse</h3>
         <p>Supports .pcap, .pcapng, .cap &mdash; Max 100 MB</p>
     </div>
     <input class="_ion-s-6b99de8b69" type="file" id="pcap-file-input" accept=".pcap,.pcapng,.cap">
 
     <!-- Progress -->
-    <div class="pcap-progress" id="pcap-progress">
-        <div class="progress-bar-outer"><div class="progress-bar-inner" id="pcap-progress-bar"></div></div>
-        <div class="progress-text" id="pcap-progress-text">Uploading and analyzing...</div>
+    <div class="hidden mb-6" id="pcap-progress">
+        <div class="h-1.5 rounded-[3px] bg-base-200 overflow-hidden"><div class="h-full w-0 rounded-[3px] bg-primary transition-[width] duration-300 animate-[pulse-bar_1.5s_ease-in-out_infinite]" id="pcap-progress-bar"></div></div>
+        <div class="text-[0.8rem] text-base-content/60 mt-1.5" id="pcap-progress-text">Uploading and analyzing...</div>
     </div>
 
     <!-- Results -->
     <div class="pcap-results" id="pcap-results">
-        <div class="pcap-reset">
+        <div class="mb-4">
             <button class="ion-btn" data-click-action="resetAnalysis"><i class="icon-rotate-ccw"></i> Analyze Another File</button>
         </div>
 
         <!-- Verdict Banner -->
         <div class="verdict-banner" id="verdict-banner">
             <div class="verdict-icon" id="verdict-icon"></div>
-            <div class="verdict-info">
-                <h2 id="verdict-label"></h2>
-                <div class="verdict-confidence" id="verdict-confidence"></div>
+            <div>
+                <h2 id="verdict-label" class="mb-1 text-[1.15rem]"></h2>
+                <div id="verdict-confidence" class="text-[0.82rem] text-base-content/60"></div>
                 <ul class="verdict-reasons" id="verdict-reasons"></ul>
             </div>
         </div>
 
         <!-- Summary Cards -->
-        <div class="pcap-summary" id="pcap-summary"></div>
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3 mb-6" id="pcap-summary"></div>
 
         <!-- Tabs -->
-        <div class="pcap-tabs" id="pcap-tabs">
+        <div class="flex gap-0 border-b border-base-300 mb-5 overflow-x-auto" id="pcap-tabs">
             <button class="pcap-tab active" data-panel="overview">Overview</button>
             <button class="pcap-tab" data-panel="network">Network</button>
             <button class="pcap-tab" data-panel="dns">DNS</button>
