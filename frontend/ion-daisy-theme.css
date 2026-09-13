@@ -137,3 +137,31 @@
   --color-error: #c02828;
   --color-error-content: #ffffff;
 }
+
+/*
+ * BRIDGE: the bespoke `.tool-tab` strip.
+ *
+ * tools.html and discover.html both drive a hand-rolled tab strip rather than
+ * daisyUI's `tabs` component: JS toggles a plain `.active` class on
+ * `.tool-tab` / `.tool-tab-content`. Those two class names are declared ONLY in
+ * the legacy style.css, so once that sheet is retired the toggle stops meaning
+ * anything and every pane renders at once, with no error to show for it.
+ *
+ * Declared here rather than in a per-page <style> block because the contract is
+ * shared: a bridge that lives in tools.html leaves discover.html broken.
+ *
+ * `border-bottom-color`, not `border-color`: the markup sets a transparent
+ * bottom border via `border-b-2 border-transparent` and no other edge, matching
+ * what style.css did. Colouring all four edges would draw a box round the tab.
+ *
+ * Unlayered, so it beats Tailwind's layered utilities — deliberate, since the
+ * inactive panes carry `hidden` and the active one must win. discover.html's JS
+ * additionally writes `style.display` directly; an inline style beats this
+ * either way, so both mechanisms coexist.
+ */
+.tool-tab-content { display: none; }
+.tool-tab-content.active { display: block; }
+.tool-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}

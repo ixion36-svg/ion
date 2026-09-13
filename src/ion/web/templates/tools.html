@@ -3,7 +3,7 @@
 {% block title %}SOC Tools - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <section class="mb-8 rise d-1">
 <div class="flex-1 min-w-0">
@@ -17,20 +17,20 @@
 </section>
 
 <!-- Tool Tabs -->
-<div class="tools-tabs">
+<div class="tools-tabs flex flex-wrap gap-1 border-b border-base-300 mb-6">
     <!-- (route audit phase 7f): /translator was a 277-line page whose
          only sibling in its tab strip was this page. It is a tool; it now sits
          with the tools. -->
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["translator"]'>Translator</button>
-    <button class="tool-tab active" data-click-action="switchToolTab" data-args='["ioc"]'>IOC Processor</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["timestamp"]'>Timestamp</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["hash"]'>Hash Identifier</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["url"]'>URL Parser</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["regex"]'>Regex Tester</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["email"]'>Email Headers</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["log"]'>Log Parser</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["encoding"]'>Encoding</button>
-    <button class="tool-tab" data-click-action="switchToolTab" data-args='["lookup"]'>IOC Lookup</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["translator"]'>Translator</button>
+    <button class="tool-tab active px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["ioc"]'>IOC Processor</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["timestamp"]'>Timestamp</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["hash"]'>Hash Identifier</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["url"]'>URL Parser</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["regex"]'>Regex Tester</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["email"]'>Email Headers</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["log"]'>Log Parser</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["encoding"]'>Encoding</button>
+    <button class="tool-tab px-4 py-2.5 -mb-px text-[13px] font-semibold text-base-content/60 border-b-2 border-transparent hover:text-base-content transition" data-click-action="switchToolTab" data-args='["lookup"]'>IOC Lookup</button>
 </div>
 
 <!-- ==================== TRANSLATOR TAB ==================== -->
@@ -117,190 +117,197 @@
 
 <!-- ==================== IOC PROCESSOR TAB ==================== -->
 <div id="tab-ioc" class="tool-tab-content active">
-    <div class="tools-layout">
-        <div class="tools-panel">
-            <div class="panel-header">
-                <h3>Input</h3>
-                <div class="panel-actions">
-                    <button class="btn btn-sm" data-click-action="clearInput">Clear</button>
-                    <button class="btn btn-sm" data-click-action="loadFile">Load File</button>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div class="card bg-base-200 shadow">
+            <div class="card-body">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="card-title text-base basis-full md:basis-auto">Input</h3>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button class="btn btn-sm" data-click-action="clearInput">Clear</button>
+                        <button class="btn btn-sm" data-click-action="loadFile">Load File</button>
+                    </div>
                 </div>
+                <textarea id="input-text" class="textarea textarea-bordered w-full h-[300px] font-mono text-[13px]" placeholder="Paste or type text here..." data-input-action="processText"></textarea>
             </div>
-            <textarea id="input-text" class="tools-textarea" placeholder="Paste or type text here..." data-input-action="processText"></textarea>
         </div>
 
-        <div class="tools-panel">
-            <div class="panel-header">
-                <h3>Output</h3>
-                <div class="panel-actions">
-                    <button class="btn btn-sm btn-primary" data-click-action="copyOutput">Copy</button>
-                    <button class="btn btn-sm" data-click-action="downloadOutput">Download</button>
+        <div class="card bg-base-200 shadow">
+            <div class="card-body">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="card-title text-base basis-full md:basis-auto">Output</h3>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <button class="btn btn-sm btn-primary" data-click-action="copyOutput">Copy</button>
+                        <button class="btn btn-sm" data-click-action="downloadOutput">Download</button>
+                    </div>
                 </div>
+                <textarea id="output-text" class="textarea textarea-bordered w-full h-[300px] font-mono text-[13px]" readonly placeholder="Processed output will appear here..."></textarea>
             </div>
-            <textarea id="output-text" class="tools-textarea" readonly placeholder="Processed output will appear here..."></textarea>
         </div>
     </div>
 
     <!-- Detected IOCs -->
-    <div class="tools-panel section-panel">
-        <div class="panel-header">
-            <h3>Detected IOCs</h3>
-            <button class="btn btn-sm" data-click-action="toggleIocDetails" id="ioc-toggle-btn">Show Details</button>
-        </div>
-        <div class="ioc-stats" id="ioc-stats">
-            <span class="ioc-stat">URLs: <strong id="ioc-urls">0</strong></span>
-            <span class="ioc-stat">IPs: <strong id="ioc-ips">0</strong></span>
-            <span class="ioc-stat">Emails: <strong id="ioc-emails">0</strong></span>
-            <span class="ioc-stat">Domains: <strong id="ioc-domains">0</strong></span>
-            <span class="ioc-stat">MD5: <strong id="ioc-md5">0</strong></span>
-            <span class="ioc-stat">SHA1: <strong id="ioc-sha1">0</strong></span>
-            <span class="ioc-stat">SHA256: <strong id="ioc-sha256">0</strong></span>
-        </div>
-        <div class="ioc-details _ion-s-f2892a2e8a" id="ioc-details">
-            <div class="ioc-details-content" id="ioc-details-content"></div>
+    <div class="card bg-base-200 shadow mb-4">
+        <div class="card-body">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="card-title text-base basis-full md:basis-auto">Detected IOCs</h3>
+                <button class="btn btn-sm" data-click-action="toggleIocDetails" id="ioc-toggle-btn">Show Details</button>
+            </div>
+            <div class="flex flex-wrap gap-2 text-sm" id="ioc-stats">
+                <span class="badge badge-outline gap-1">URLs <strong id="ioc-urls">0</strong></span>
+                <span class="badge badge-outline gap-1">IPs <strong id="ioc-ips">0</strong></span>
+                <span class="badge badge-outline gap-1">Emails <strong id="ioc-emails">0</strong></span>
+                <span class="badge badge-outline gap-1">Domains <strong id="ioc-domains">0</strong></span>
+                <span class="badge badge-outline gap-1">MD5 <strong id="ioc-md5">0</strong></span>
+                <span class="badge badge-outline gap-1">SHA1 <strong id="ioc-sha1">0</strong></span>
+                <span class="badge badge-outline gap-1">SHA256 <strong id="ioc-sha256">0</strong></span>
+            </div>
+            <div class="ioc-details _ion-s-f2892a2e8a mt-4" id="ioc-details">
+                <div class="ioc-details-content" id="ioc-details-content"></div>
+            </div>
         </div>
     </div>
 
     <!-- Quick Actions -->
-    <div class="tools-panel section-panel">
-        <div class="panel-header">
-            <h3>Quick Actions</h3>
-        </div>
-        <div class="quick-actions">
-            <button class="btn btn-primary" data-click-action="applyAction" data-args='["defangAll"]'>Defang All</button>
-            <button class="btn btn-primary" data-click-action="applyAction" data-args='["refangAll"]'>Refang All</button>
-            <button class="btn" data-click-action="applyAction" data-args='["extractIOCs"]'>Extract IOCs Only</button>
-            <button class="btn" data-click-action="applyAction" data-args='["base64Encode"]'>Base64 Enc</button>
-            <button class="btn" data-click-action="applyAction" data-args='["base64Decode"]'>Base64 Dec</button>
-            <button class="btn" data-click-action="applyAction" data-args='["urlEncode"]'>URL Encode</button>
-            <button class="btn" data-click-action="applyAction" data-args='["urlDecode"]'>URL Decode</button>
-            <button class="btn" data-click-action="applyAction" data-args='["uppercase"]'>Uppercase</button>
-            <button class="btn" data-click-action="applyAction" data-args='["lowercase"]'>Lowercase</button>
-            <button class="btn" data-click-action="applyAction" data-args='["removeEmptyLines"]'>Remove Empty Lines</button>
-            <button class="btn" data-click-action="applyAction" data-args='["sortLines"]'>Sort Lines</button>
-            <button class="btn" data-click-action="applyAction" data-args='["uniqueLines"]'>Unique Lines</button>
-            <button class="btn" data-click-action="applyAction" data-args='["trimLines"]'>Trim</button>
-            <button class="btn" data-click-action="applyAction" data-args='["reverseLines"]'>Reverse Lines</button>
+    <div class="card bg-base-200 shadow mb-4">
+        <div class="card-body">
+            <h3 class="card-title text-base">Quick Actions</h3>
+            <div class="flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-primary" data-click-action="applyAction" data-args='["defangAll"]'>Defang All</button>
+                <button class="btn btn-sm btn-primary" data-click-action="applyAction" data-args='["refangAll"]'>Refang All</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["extractIOCs"]'>Extract IOCs Only</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["base64Encode"]'>Base64 Enc</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["base64Decode"]'>Base64 Dec</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["urlEncode"]'>URL Encode</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["urlDecode"]'>URL Decode</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["uppercase"]'>Uppercase</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["lowercase"]'>Lowercase</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["removeEmptyLines"]'>Remove Empty Lines</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["sortLines"]'>Sort Lines</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["uniqueLines"]'>Unique Lines</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["trimLines"]'>Trim</button>
+                <button class="btn btn-sm" data-click-action="applyAction" data-args='["reverseLines"]'>Reverse Lines</button>
+            </div>
         </div>
     </div>
 
     <!-- Custom Rules -->
-    <div class="tools-panel section-panel">
-        <div class="panel-header">
-            <h3>Custom Find/Replace Rules</h3>
-            <button class="btn btn-sm btn-primary" data-click-action="addRule">+ Add</button>
-        </div>
-        <div class="rules-list" id="rules-list"></div>
-        <div class="rules-actions">
-            <button class="btn btn-sm" data-click-action="saveRules">Save Rules</button>
-            <button class="btn btn-sm" data-click-action="loadRules">Load Rules</button>
-            <button class="btn btn-sm btn-danger" data-click-action="clearRules">Clear Rules</button>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="card-title text-base basis-full md:basis-auto">Custom Find/Replace Rules</h3>
+                <button class="btn btn-sm btn-primary" data-click-action="addRule">+ Add</button>
+            </div>
+            <div class="rules-list flex flex-col gap-2" id="rules-list"></div>
+            <div class="flex flex-wrap gap-2 mt-2">
+                <button class="btn btn-sm" data-click-action="saveRules">Save Rules</button>
+                <button class="btn btn-sm" data-click-action="loadRules">Load Rules</button>
+                <button class="btn btn-sm btn-error" data-click-action="clearRules">Clear Rules</button>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- ==================== TIMESTAMP TAB ==================== -->
 <div id="tab-timestamp" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>Timestamp Converter</h3>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">Timestamp Converter</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Unix Timestamp (seconds)</legend>
+                    <input type="text" class="input w-full" id="ts-unix" placeholder="1706454000" data-input-action="convertTimestamp" data-args='["unix"]'>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Unix Timestamp (milliseconds)</legend>
+                    <input type="text" class="input w-full" id="ts-unix-ms" placeholder="1706454000000" data-input-action="convertTimestamp" data-args='["unix-ms"]'>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">ISO 8601 / UTC</legend>
+                    <input type="text" class="input w-full" id="ts-iso" placeholder="2024-01-28T15:00:00Z" data-input-action="convertTimestamp" data-args='["iso"]'>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Local Time</legend>
+                    <input type="text" class="input w-full" id="ts-local" placeholder="2024-01-28 15:00:00" data-input-action="convertTimestamp" data-args='["local"]'>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">RFC 2822</legend>
+                    <input type="text" class="input w-full" id="ts-rfc" placeholder="Sun, 28 Jan 2024 15:00:00 +0000" data-input-action="convertTimestamp" data-args='["rfc"]'>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Windows FILETIME</legend>
+                    <input type="text" class="input w-full" id="ts-filetime" placeholder="133508412000000000" data-input-action="convertTimestamp" data-args='["filetime"]'>
+                </fieldset>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-4">
+                <button class="btn btn-primary" data-click-action="setCurrentTime">Now</button>
+                <button class="btn" data-click-action="clearTimestamps">Clear</button>
+            </div>
+            <div class="timestamp-info mt-4 text-sm" id="timestamp-info"></div>
         </div>
-        <div class="timestamp-grid">
-            <div class="timestamp-field">
-                <label>Unix Timestamp (seconds)</label>
-                <input type="text" id="ts-unix" placeholder="1706454000" data-input-action="convertTimestamp" data-args='["unix"]'>
-            </div>
-            <div class="timestamp-field">
-                <label>Unix Timestamp (milliseconds)</label>
-                <input type="text" id="ts-unix-ms" placeholder="1706454000000" data-input-action="convertTimestamp" data-args='["unix-ms"]'>
-            </div>
-            <div class="timestamp-field">
-                <label>ISO 8601 / UTC</label>
-                <input type="text" id="ts-iso" placeholder="2024-01-28T15:00:00Z" data-input-action="convertTimestamp" data-args='["iso"]'>
-            </div>
-            <div class="timestamp-field">
-                <label>Local Time</label>
-                <input type="text" id="ts-local" placeholder="2024-01-28 15:00:00" data-input-action="convertTimestamp" data-args='["local"]'>
-            </div>
-            <div class="timestamp-field">
-                <label>RFC 2822</label>
-                <input type="text" id="ts-rfc" placeholder="Sun, 28 Jan 2024 15:00:00 +0000" data-input-action="convertTimestamp" data-args='["rfc"]'>
-            </div>
-            <div class="timestamp-field">
-                <label>Windows FILETIME</label>
-                <input type="text" id="ts-filetime" placeholder="133508412000000000" data-input-action="convertTimestamp" data-args='["filetime"]'>
-            </div>
-        </div>
-        <div class="timestamp-actions">
-            <button class="btn btn-primary" data-click-action="setCurrentTime">Now</button>
-            <button class="btn" data-click-action="clearTimestamps">Clear</button>
-        </div>
-        <div class="timestamp-info" id="timestamp-info"></div>
     </div>
 </div>
 
 <!-- ==================== HASH IDENTIFIER TAB ==================== -->
 <div id="tab-hash" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>Hash Identifier</h3>
-        </div>
-        <div class="form-group">
-            <label>Enter Hash(es) - one per line</label>
-            <textarea id="hash-input" class="tools-textarea" rows="6" placeholder="Enter hashes to identify...
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">Hash Identifier</h3>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Enter Hash(es) - one per line</legend>
+                <textarea id="hash-input" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="6" placeholder="Enter hashes to identify...
 e.g., d41d8cd98f00b204e9800998ecf8427e
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" data-input-action="identifyHashes"></textarea>
+            </fieldset>
+            <div class="hash-results mt-4 overflow-x-auto" id="hash-results"></div>
         </div>
-        <div class="hash-results" id="hash-results"></div>
     </div>
 </div>
 
 <!-- ==================== URL PARSER TAB ==================== -->
 <div id="tab-url" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>URL Parser</h3>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">URL Parser</h3>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Enter URL</legend>
+                <input type="text" class="input w-full" id="url-input" placeholder="https://example.com:8080/path/to/page?query=value&foo=bar#section" data-input-action="parseUrl">
+            </fieldset>
+            <div class="url-results mt-4 overflow-x-auto" id="url-results"></div>
         </div>
-        <div class="form-group">
-            <label>Enter URL</label>
-            <input type="text" id="url-input" class="form-control" placeholder="https://example.com:8080/path/to/page?query=value&foo=bar#section" data-input-action="parseUrl">
-        </div>
-        <div class="url-results" id="url-results"></div>
     </div>
 </div>
 
 <!-- ==================== REGEX TESTER TAB ==================== -->
 <div id="tab-regex" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>Regex Tester</h3>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">Regex Tester</h3>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Regular Expression</legend>
+                <div class="flex items-center gap-2">
+                    <span class="text-base-content/50 font-mono">/</span>
+                    <input type="text" class="input flex-1" id="regex-pattern" placeholder="[a-zA-Z0-9]+" data-input-action="testRegex">
+                    <span class="text-base-content/50 font-mono">/</span>
+                    <input type="text" class="input w-20" id="regex-flags" value="gi" size="4" placeholder="gi" data-input-action="testRegex">
+                </div>
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Test String</legend>
+                <textarea id="regex-test" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="6" placeholder="Enter text to test against..." data-input-action="testRegex"></textarea>
+            </fieldset>
+            <div class="regex-results mt-4 overflow-x-auto" id="regex-results"></div>
         </div>
-        <div class="form-group">
-            <label>Regular Expression</label>
-            <div class="regex-input-row">
-                <span class="regex-delimiter">/</span>
-                <input type="text" id="regex-pattern" placeholder="[a-zA-Z0-9]+" data-input-action="testRegex">
-                <span class="regex-delimiter">/</span>
-                <input type="text" id="regex-flags" value="gi" size="4" placeholder="gi" data-input-action="testRegex">
-            </div>
-        </div>
-        <div class="form-group">
-            <label>Test String</label>
-            <textarea id="regex-test" class="tools-textarea" rows="6" placeholder="Enter text to test against..." data-input-action="testRegex"></textarea>
-        </div>
-        <div class="regex-results" id="regex-results"></div>
     </div>
 </div>
 
 <!-- ==================== EMAIL HEADERS TAB ==================== -->
 <div id="tab-email" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>Email Header Analyzer</h3>
-        </div>
-        <div class="form-group">
-            <label>Paste Email Headers</label>
-            <textarea id="email-headers" class="tools-textarea" rows="10" placeholder="Paste raw email headers here...
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">Email Header Analyzer</h3>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Paste Email Headers</legend>
+                <textarea id="email-headers" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="10" placeholder="Paste raw email headers here...
 Return-Path: <sender@example.com>
 Received: from mail.example.com...
 From: Sender Name <sender@example.com>
@@ -308,75 +315,76 @@ To: recipient@example.com
 Subject: Test Email
 Date: Mon, 28 Jan 2024 10:00:00 +0000
 ..." data-input-action="parseEmailHeaders"></textarea>
+            </fieldset>
+            <div class="email-results mt-4 overflow-x-auto" id="email-results"></div>
         </div>
-        <div class="email-results" id="email-results"></div>
     </div>
 </div>
 
 <!-- ==================== LOG PARSER TAB ==================== -->
 <div id="tab-log" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>Log Parser</h3>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">Log Parser</h3>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Log Format</legend>
+                <select id="log-format" class="select w-full" data-change-action="parseLog">
+                    <option value="auto">Auto-detect</option>
+                    <option value="json">JSON</option>
+                    <option value="cef">CEF (Common Event Format)</option>
+                    <option value="syslog">Syslog (RFC 3164)</option>
+                    <option value="apache">Apache Access Log</option>
+                    <option value="windows">Windows Event Log (XML)</option>
+                    <option value="kv">Key=Value Pairs</option>
+                </select>
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Log Entry</legend>
+                <textarea id="log-input" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="8" placeholder="Paste log entry here..." data-input-action="parseLog"></textarea>
+            </fieldset>
+            <div class="log-results mt-4 overflow-x-auto" id="log-results"></div>
         </div>
-        <div class="form-group">
-            <label>Log Format</label>
-            <select id="log-format" data-change-action="parseLog">
-                <option value="auto">Auto-detect</option>
-                <option value="json">JSON</option>
-                <option value="cef">CEF (Common Event Format)</option>
-                <option value="syslog">Syslog (RFC 3164)</option>
-                <option value="apache">Apache Access Log</option>
-                <option value="windows">Windows Event Log (XML)</option>
-                <option value="kv">Key=Value Pairs</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Log Entry</label>
-            <textarea id="log-input" class="tools-textarea" rows="8" placeholder="Paste log entry here..." data-input-action="parseLog"></textarea>
-        </div>
-        <div class="log-results" id="log-results"></div>
     </div>
 </div>
 
 <!-- ==================== ENCODING TAB ==================== -->
 <div id="tab-encoding" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>Encoding / Decoding</h3>
-        </div>
-        <div class="encoding-grid">
-            <div class="encoding-section">
-                <h4>Text Input</h4>
-                <textarea id="enc-text" class="tools-textarea" rows="4" placeholder="Enter text..." data-input-action="updateEncodings"></textarea>
-            </div>
-            <div class="encoding-section">
-                <h4>Base64</h4>
-                <textarea id="enc-base64" class="tools-textarea" rows="3" placeholder="Base64..." data-input-action="decodeFromBase64"></textarea>
-            </div>
-            <div class="encoding-section">
-                <h4>Hex</h4>
-                <textarea id="enc-hex" class="tools-textarea" rows="3" placeholder="48 65 6c 6c 6f..." data-input-action="decodeFromHex"></textarea>
-            </div>
-            <div class="encoding-section">
-                <h4>URL Encoded</h4>
-                <textarea id="enc-url" class="tools-textarea" rows="3" placeholder="Hello%20World..." data-input-action="decodeFromUrl"></textarea>
-            </div>
-            <div class="encoding-section">
-                <h4>HTML Entities</h4>
-                <textarea id="enc-html" class="tools-textarea" rows="3" placeholder="&lt;script&gt;..." data-input-action="decodeFromHtml"></textarea>
-            </div>
-            <div class="encoding-section">
-                <h4>Binary</h4>
-                <textarea id="enc-binary" class="tools-textarea" rows="3" placeholder="01001000 01100101..." readonly></textarea>
-            </div>
-            <div class="encoding-section">
-                <h4>ROT13</h4>
-                <textarea id="enc-rot13" class="tools-textarea" rows="3" placeholder="ROT13..." data-input-action="decodeFromRot13"></textarea>
-            </div>
-            <div class="encoding-section">
-                <h4>ASCII Decimal</h4>
-                <textarea id="enc-decimal" class="tools-textarea" rows="3" placeholder="72 101 108 108 111..." readonly></textarea>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">Encoding / Decoding</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Text Input</h4>
+                    <textarea id="enc-text" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="4" placeholder="Enter text..." data-input-action="updateEncodings"></textarea>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Base64</h4>
+                    <textarea id="enc-base64" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="Base64..." data-input-action="decodeFromBase64"></textarea>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Hex</h4>
+                    <textarea id="enc-hex" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="48 65 6c 6c 6f..." data-input-action="decodeFromHex"></textarea>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">URL Encoded</h4>
+                    <textarea id="enc-url" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="Hello%20World..." data-input-action="decodeFromUrl"></textarea>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">HTML Entities</h4>
+                    <textarea id="enc-html" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="&lt;script&gt;..." data-input-action="decodeFromHtml"></textarea>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">Binary</h4>
+                    <textarea id="enc-binary" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="01001000 01100101..." readonly></textarea>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">ROT13</h4>
+                    <textarea id="enc-rot13" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="ROT13..." data-input-action="decodeFromRot13"></textarea>
+                </div>
+                <div>
+                    <h4 class="text-xs font-semibold uppercase tracking-wide text-base-content/60 mb-2">ASCII Decimal</h4>
+                    <textarea id="enc-decimal" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="3" placeholder="72 101 108 108 111..." readonly></textarea>
+                </div>
             </div>
         </div>
     </div>
@@ -384,37 +392,37 @@ Date: Mon, 28 Jan 2024 10:00:00 +0000
 
 <!-- ==================== IOC LOOKUP TAB ==================== -->
 <div id="tab-lookup" class="tool-tab-content">
-    <div class="tools-panel">
-        <div class="panel-header">
-            <h3>IOC Lookup (via OpenCTI)</h3>
-        </div>
-        <div class="form-group">
-            <label>Enter IOC (IP, Domain, Hash, URL)</label>
-            <div class="lookup-input-row">
-                <input type="text" id="lookup-ioc" class="form-control" placeholder="e.g., 8.8.8.8, evil.com, d41d8cd98f00b204e9800998ecf8427e">
-                <button class="btn btn-primary" data-click-action="lookupIOC">Lookup</button>
+    <div class="card bg-base-200 shadow mb-4">
+        <div class="card-body">
+            <h3 class="card-title text-base">IOC Lookup (via OpenCTI)</h3>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Enter IOC (IP, Domain, Hash, URL)</legend>
+                <div class="flex flex-wrap gap-2">
+                    <input type="text" class="input flex-1 min-w-[240px]" id="lookup-ioc" placeholder="e.g., 8.8.8.8, evil.com, d41d8cd98f00b204e9800998ecf8427e">
+                    <button class="btn btn-primary" data-click-action="lookupIOC">Lookup</button>
+                </div>
+            </fieldset>
+            <div class="lookup-results mt-4 overflow-x-auto" id="lookup-results">
+                <p class="text-sm opacity-60">Enter an IOC and click Lookup to query OpenCTI for threat intelligence.</p>
             </div>
-        </div>
-        <div class="lookup-results" id="lookup-results">
-            <p class="muted">Enter an IOC and click Lookup to query OpenCTI for threat intelligence.</p>
         </div>
     </div>
 
-    <div class="tools-panel section-panel">
-        <div class="panel-header">
-            <h3>Bulk IOC Lookup</h3>
-        </div>
-        <div class="form-group">
-            <label>Enter IOCs (one per line)</label>
-            <textarea id="bulk-lookup-input" class="tools-textarea" rows="6" placeholder="8.8.8.8
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base">Bulk IOC Lookup</h3>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Enter IOCs (one per line)</legend>
+                <textarea id="bulk-lookup-input" class="textarea textarea-bordered w-full font-mono text-[13px]" rows="6" placeholder="8.8.8.8
 evil.com
 d41d8cd98f00b204e9800998ecf8427e"></textarea>
+            </fieldset>
+            <div class="flex flex-wrap gap-2 mt-2">
+                <button class="btn btn-primary" data-click-action="bulkLookupIOCs">Lookup All</button>
+                <button class="btn" data-click-action="exportLookupResults">Export Results</button>
+            </div>
+            <div class="bulk-lookup-results mt-4 overflow-x-auto" id="bulk-lookup-results"></div>
         </div>
-        <div class="form-actions">
-            <button class="btn btn-primary" data-click-action="bulkLookupIOCs">Lookup All</button>
-            <button class="btn" data-click-action="exportLookupResults">Export Results</button>
-        </div>
-        <div class="bulk-lookup-results" id="bulk-lookup-results"></div>
     </div>
 </div>
 
@@ -424,6 +432,7 @@ d41d8cd98f00b204e9800998ecf8427e"></textarea>
 {% endblock %}
 
 {% block scripts %}
+
 <script nonce="{{ csp_nonce }}">
 // ==================== TAB SWITCHING ====================
 function switchToolTab(tabName) {
