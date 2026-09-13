@@ -184,8 +184,8 @@
 
     <!-- Tab: MITRE ATT&CK -->
     <div class="ad-panel" id="ad-panel-mitre">
-        <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 col-span-full _ion-s-97294b207c">
-            <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm _ion-s-6e1e5d161f">&#9862;</span> MITRE ATT&CK Technique Heatmap</div>
+        <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 col-span-full col-span-full">
+            <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm text-[#f44336]">&#9862;</span> MITRE ATT&CK Technique Heatmap</div>
             <div class="text-[0.6875rem] text-slate-400 opacity-70 -mt-1.5 mb-2">Click a technique to filter alerts</div>
             <div id="mitre-heatmap-legend" class="mitre-heatmap-legend _ion-s-c8be1ccba6"></div>
             <div id="chart-mitre-heatmap" class="grid grid-cols-[repeat(14,1fr)] gap-0.5 text-[0.6875rem]"></div>
@@ -194,7 +194,7 @@
 
     <!-- Tab: Threat Map -->
     <div class="ad-panel" id="ad-panel-geo">
-        <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 _ion-s-97294b207c">
+        <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 col-span-full">
             <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm">&#127760;</span> Attack Origin Map</div>
             <div class="relative rounded-md overflow-hidden aspect-video w-full leading-[0] bg-ink-900 bg-[radial-gradient(ellipse_at_30%_25%,rgba(109,228,255,0.04)_0%,transparent_55%),radial-gradient(ellipse_at_70%_75%,rgba(154,140,255,0.04)_0%,transparent_55%)]">
                 <canvas id="globe-canvas"></canvas>
@@ -240,7 +240,7 @@
 </div>
 
 <!-- Active Filter Banner -->
-<div class="active-filter-banner _ion-s-f2892a2e8a" id="active-filter-banner">
+<div class="active-filter-banner hidden" id="active-filter-banner">
     <span id="active-filter-text"></span>
     <button class="btn btn-sm" data-click-action="clearEntityFilter">&#10005; Clear Filter</button>
 </div>
@@ -295,7 +295,7 @@
 </div>
 
 <!-- Bulk Actions Toolbar -->
-<div class="bulk-actions-toolbar _ion-s-f2892a2e8a" id="bulk-actions-toolbar">
+<div class="bulk-actions-toolbar hidden" id="bulk-actions-toolbar">
     <div class="flex items-center gap-3 text-sm text-slate-200">
         <input type="checkbox" id="select-all-cb" class="checkbox w-4 h-4 cursor-pointer" data-change-action="toggleSelectAll" title="Select all visible alerts">
         <span id="selected-count">0</span> alerts selected
@@ -327,7 +327,7 @@
 </div>
 
 <!-- Alert Context Menu -->
-<div id="alert-context-menu" class="context-menu _ion-s-f2892a2e8a">
+<div id="alert-context-menu" class="context-menu hidden">
     <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["open"]'>
         <span class="w-4 text-center group-hover:text-white"><i class="icon-eye"></i></span> View Details
     </div>
@@ -352,8 +352,8 @@
             <span class="ml-auto text-xs"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
-            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group _ion-s-568dd5ecc1" data-click-action="contextMenuAction" data-args='["close-as", "benign"]'>&#10003; Benign</div>
-            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group _ion-s-2ddf87696d" data-click-action="contextMenuAction" data-args='["close-as", "escalated"]'>&#9650; Escalated</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group text-[#10b981]" data-click-action="contextMenuAction" data-args='["close-as", "benign"]'>&#10003; Benign</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group text-[#fbbf24]" data-click-action="contextMenuAction" data-args='["close-as", "escalated"]'>&#9650; Escalated</div>
             <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group _ion-s-9dd1207e58" data-click-action="contextMenuAction" data-args='["close-as", "false_positive"]'>&#10007; False Positive</div>
         </div>
     </div>
@@ -517,7 +517,7 @@
 <div class="acp-overlay" id="acp-overlay" data-click-action="closeCasePanel"></div>
 <div class="acp-panel" id="acp-panel" data-case-id="">
   <div class="flex justify-between items-start px-5 py-4 border-b border-white/10 shrink-0">
-    <div class="_ion-s-ec92352525">
+    <div class="min-w-[0] flex-1">
       <span class="acp-number" id="acp-number"></span>
       <span class="acp-title" id="acp-title"></span>
     </div>
@@ -536,9 +536,9 @@
       <button class="bg-transparent border-none text-slate-400 text-xl cursor-pointer leading-none" data-click-action="cancelCasePanelClosure">&times;</button>
     </div>
     <div class="py-4 px-5">
-      <div class="form-group _ion-s-90634e1f6b">
-        <label class="_ion-s-06c7fb4577">Closure Reason *</label>
-        <select id="acp-closure-reason" class="form-control _ion-s-656ea72a2e">
+      <div class="form-group mb-3">
+        <label class="block mb-1 text-[var(--text-muted)] text-[0.8rem]">Closure Reason *</label>
+        <select id="acp-closure-reason" class="form-control w-full p-2 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--ion-border)] rounded-[4px]">
           <option value="">Select reason...</option>
           <option value="true_positive">True Positive</option>
           <option value="false_positive">False Positive</option>
@@ -549,8 +549,8 @@
         </select>
       </div>
       <div class="form-group">
-        <label class="_ion-s-06c7fb4577">Closure Notes</label>
-        <textarea class="_ion-s-c6d4c126db" id="acp-closure-notes" rows="3" placeholder="Closure details..."
+        <label class="block mb-1 text-[var(--text-muted)] text-[0.8rem]">Closure Notes</label>
+        <textarea class="w-full p-2 bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--ion-border)] rounded-[4px] resize-y" id="acp-closure-notes" rows="3" placeholder="Closure details..."
 ></textarea>
       </div>
     </div>

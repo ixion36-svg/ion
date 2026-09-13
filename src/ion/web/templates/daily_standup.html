@@ -93,7 +93,7 @@
             <span class="badge badge-error badge-sm">Critical: <span id="kpi-critical">--</span></span>
           </div>
           <!-- shown only when the API falls back to ION-local data -->
-          <div id="alerts-fallback-banner" role="alert" class="alert alert-warning _ion-s-c8be1ccba6"></div>
+          <div id="alerts-fallback-banner" role="alert" class="alert alert-warning hidden"></div>
           <div id="alerts-table-wrap" class="overflow-x-auto">
             <table class="table table-sm">
               <thead><tr><th>Time</th><th>Severity</th><th>Rule Name</th><th>Host</th><th>Status</th></tr></thead>
@@ -132,13 +132,13 @@
           <div class="grid grid-cols-4 gap-2 pt-3 border-t border-white/5 text-center">
             <div><div id="ds-a24-critical" class="text-[16px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">critical</div></div>
             <div><div id="ds-a24-high"     class="text-[16px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">high</div></div>
-            <div><div id="ds-a24-medium"   class="text-[16px] font-semibold tabular-nums text-slate-300  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
-            <div><div id="ds-a24-low"      class="text-[16px] font-semibold tabular-nums text-slate-400  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
+            <div><div id="ds-a24-medium"   class="text-[16px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
+            <div><div id="ds-a24-low"      class="text-[16px] font-semibold tabular-nums text-slate-400 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
           </div>
           <div class="grid grid-cols-3 gap-2 pt-2 mt-2 border-t border-white/5 text-center">
             <div><div id="ds-a24-open"     class="text-[14px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">open</div></div>
             <div><div id="ds-a24-ack"      class="text-[14px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">ack</div></div>
-            <div><div id="ds-a24-closed"   class="text-[14px] font-semibold tabular-nums text-ion-lime  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
+            <div><div id="ds-a24-closed"   class="text-[14px] font-semibold tabular-nums text-ion-lime leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">closed</div></div>
           </div>
         </div>
 
@@ -161,8 +161,8 @@
           <div class="grid grid-cols-4 gap-2 pt-2 mt-2 border-t border-white/5 text-center">
             <div><div id="ds-cs-sev-critical" class="text-[14px] font-semibold tabular-nums text-ion-coral leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">critical</div></div>
             <div><div id="ds-cs-sev-high"     class="text-[14px] font-semibold tabular-nums text-ion-amber leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">high</div></div>
-            <div><div id="ds-cs-sev-medium"   class="text-[14px] font-semibold tabular-nums text-slate-300  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
-            <div><div id="ds-cs-sev-low"      class="text-[14px] font-semibold tabular-nums text-slate-400  leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
+            <div><div id="ds-cs-sev-medium"   class="text-[14px] font-semibold tabular-nums text-slate-300 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">medium</div></div>
+            <div><div id="ds-cs-sev-low"      class="text-[14px] font-semibold tabular-nums text-slate-400 leading-none">—</div><div class="text-[10px] uppercase tracking-wider text-slate-500 mt-1.5">low</div></div>
           </div>
         </div>
 

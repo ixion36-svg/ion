@@ -174,7 +174,7 @@
                     <span class="block mt-1.5 text-[0.8rem] text-base-content/60">Disable for self-signed certificates (not recommended for production)</span>
                 </div>
 
-                <h3 class="_ion-s-340c480b1f">User Assignment Mapping</h3>
+                <h3 class="mt-6 mb-2 text-[var(--text-primary)]">User Assignment Mapping</h3>
                 <p class="text-base-content/60 mb-6 text-[0.9rem]">Map an Elasticsearch index containing user profiles for alert assignment. When analysts assign alerts, the user name is written back to the configured field on the alert document.</p>
 
                 <div class="grid grid-cols-1 min-[601px]:grid-cols-2 gap-4">
@@ -465,7 +465,7 @@
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="arkime_enabled" name="arkime_enabled"> Enable Arkime Integration</label></div>
                 <div class="mb-5"><label for="arkime_url" class="block mb-2 font-medium text-[0.9rem]">Arkime URL</label><input type="url" class="ion-input" id="arkime_url" name="arkime_url" placeholder="https://viewer.guardedglass.internal"></div>
                 <div class="mb-5"><label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" class="checkbox w-[18px] h-[18px]" id="arkime_verify_ssl" name="arkime_verify_ssl"> Verify SSL Certificate</label></div>
-                <h3 class="_ion-s-0cf8f93b0e">Authentication (HTTP Basic)</h3>
+                <h3 class="mt-4">Authentication (HTTP Basic)</h3>
                 <div class="mb-5"><label for="arkime_username" class="block mb-2 font-medium text-[0.9rem]">Username</label><input type="text" class="ion-input" id="arkime_username" name="arkime_username" placeholder="admin"></div>
                 <div class="mb-5"><label for="arkime_password" class="block mb-2 font-medium text-[0.9rem]">Password</label><input type="password" class="ion-input" id="arkime_password" name="arkime_password" placeholder="Leave blank to keep current"></div>
                 <div class="flex gap-3 mt-6 pt-6 border-t border-base-300"><button type="submit" class="btn btn-primary">Save Changes</button></div>
@@ -623,10 +623,10 @@
                 <h3 class="text-base font-medium mb-4">Data Cleanup</h3>
                 <p class="text-base-content/60 mb-6 text-[0.9rem]">Remove old logs and temporary data to free up space.</p>
                 <div class="flex items-end gap-4">
-                    <div class="_ion-s-8d1f4ab850 mb-5">
+                    <div class="max-w-[200px] mb-5">
                         <label for="cleanup-days" class="block mb-2 font-medium text-[0.9rem]">Keep data from last</label>
-                        <div class="_ion-s-85056bada5">
-                            <input class="_ion-s-1b3b307987 ion-input" type="number" id="cleanup-days" value="30" min="1" max="365">
+                        <div class="flex items-center gap-2">
+                            <input class="w-[80px] ion-input" type="number" id="cleanup-days" value="30" min="1" max="365">
                             <span>days</span>
                         </div>
                     </div>
@@ -645,12 +645,12 @@
                 <div class="loading">Loading technologies...</div>
             </div>
 
-            <h3 class="_ion-s-cee5c5825a">System Details</h3>
+            <h3 class="mt-8">System Details</h3>
             <div id="system-info" class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4">
                 <div class="loading">Loading system information...</div>
             </div>
 
-            <h3 class="_ion-s-cee5c5825a">Environment Variables</h3>
+            <h3 class="mt-8">Environment Variables</h3>
             <p class="text-base-content/60 mb-6 text-[0.9rem]">ION-related environment variables (sensitive values masked).</p>
 
             <div id="env-vars" class="bg-base-100 border border-base-300 rounded p-4 max-h-[300px] overflow-y-auto">
@@ -680,7 +680,7 @@
                     <option value="1000">1000 entries</option>
                 </select>
                 <button class="btn btn-sm" data-click-action="loadSystemLogs">Refresh</button>
-                <label class="_ion-s-ae67ec2b38">
+                <label class="flex items-center gap-[0.3rem] text-[0.85rem] text-[var(--text-secondary)]">
                     <input type="checkbox" class="checkbox w-[18px] h-[18px]" id="log-auto-refresh"> Auto-refresh (10s)
                 </label>
             </div>
@@ -688,7 +688,7 @@
             <div id="logs-container" class="bg-base-100 border border-base-300 rounded-lg max-h-[600px] overflow-y-auto font-mono text-[0.78rem] leading-[1.5]">
                 <div class="loading">Click Refresh or select this tab to load logs...</div>
             </div>
-            <div class="_ion-s-992dc32f95" id="logs-count"></div>
+            <div class="py-2 px-0 text-[0.8rem] text-[var(--text-secondary)]" id="logs-count"></div>
         </section>
     </div>
 </div>

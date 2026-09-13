@@ -229,7 +229,7 @@
         <h3>Drop PCAP file here or click to browse</h3>
         <p>Supports .pcap, .pcapng, .cap &mdash; Max 100 MB</p>
     </div>
-    <input class="_ion-s-6b99de8b69" type="file" id="pcap-file-input" accept=".pcap,.pcapng,.cap">
+    <input class="hidden" type="file" id="pcap-file-input" accept=".pcap,.pcapng,.cap">
 
     <!-- Progress -->
     <div class="hidden mb-6" id="pcap-progress">
@@ -264,26 +264,26 @@
             <button class="pcap-tab" data-panel="http">HTTP</button>
             <button class="pcap-tab" data-panel="tls">TLS</button>
             <button class="pcap-tab" data-panel="data">Data Transfer</button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="isakmp" id="tab-isakmp">ISAKMP/IKE</button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="files" id="tab-files">Extracted Files <span id="files-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="ja3" id="tab-ja3">JA3 Fingerprints <span id="ja3-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="creds" id="tab-creds">Credentials <span id="creds-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="ja3s" id="tab-ja3s">JA3S <span id="ja3s-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="hassh" id="tab-hassh">HASSH <span id="hassh-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="ja4" id="tab-ja4">JA4/JA4S <span id="ja4-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="certs" id="tab-certs">TLS Certs <span id="certs-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="hosts" id="tab-hosts">Hosts <span id="hosts-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="beacons" id="tab-beacons">Beaconing <span id="beacons-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="smb" id="tab-smb">SMB <span id="smb-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="kerberos" id="tab-kerberos">Kerberos <span id="kerberos-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="httpfiles" id="tab-httpfiles">HTTP Files <span id="httpfiles-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="arp" id="tab-arp">ARP <span id="arp-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="b64" id="tab-b64">Base64 <span id="b64-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="streams" id="tab-streams">Streams <span id="streams-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab _ion-s-6b99de8b69" data-panel="email" id="tab-email">Email <span id="email-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab hidden" data-panel="isakmp" id="tab-isakmp">ISAKMP/IKE</button>
+            <button class="pcap-tab hidden" data-panel="files" id="tab-files">Extracted Files <span id="files-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="ja3" id="tab-ja3">JA3 Fingerprints <span id="ja3-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="creds" id="tab-creds">Credentials <span id="creds-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="ja3s" id="tab-ja3s">JA3S <span id="ja3s-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="hassh" id="tab-hassh">HASSH <span id="hassh-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="ja4" id="tab-ja4">JA4/JA4S <span id="ja4-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="certs" id="tab-certs">TLS Certs <span id="certs-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="hosts" id="tab-hosts">Hosts <span id="hosts-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="beacons" id="tab-beacons">Beaconing <span id="beacons-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="smb" id="tab-smb">SMB <span id="smb-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="kerberos" id="tab-kerberos">Kerberos <span id="kerberos-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="httpfiles" id="tab-httpfiles">HTTP Files <span id="httpfiles-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="arp" id="tab-arp">ARP <span id="arp-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="b64" id="tab-b64">Base64 <span id="b64-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="streams" id="tab-streams">Streams <span id="streams-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab hidden" data-panel="email" id="tab-email">Email <span id="email-count-badge" class="badge hidden"></span></button>
             <button class="pcap-tab" data-panel="graph" id="tab-graph">Network Graph</button>
-            <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
-            <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge _ion-s-6b99de8b69"></span></button>
+            <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge hidden"></span></button>
         </div>
 
         <!-- Panels -->

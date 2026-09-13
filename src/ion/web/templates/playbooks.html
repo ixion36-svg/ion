@@ -24,7 +24,7 @@
 <div class="flex mb-6 border-b-2 border-base-300">
     <button class="tab-btn active" data-tab="library" data-click-action="switchTab" data-args='["library"]'>Playbook Library</button>
     <button class="tab-btn" data-tab="executions" data-click-action="switchTab" data-args='["executions"]'>
-        Active Executions <span class="badge badge-primary badge-sm _ion-s-c8be1ccba6" id="executions-badge">0</span>
+        Active Executions <span class="badge badge-primary badge-sm hidden" id="executions-badge">0</span>
     </button>
 </div>
 
@@ -61,12 +61,12 @@
 </div>
 
 <!-- TAB: Active Executions -->
-<div class="tab-content _ion-s-c8be1ccba6" id="tab-executions">
+<div class="tab-content hidden" id="tab-executions">
     <section class="bg-base-200 rounded-lg p-6 mb-6">
         <div class="flex items-center justify-between mb-4">
             <h2>Playbook Executions</h2>
             <div class="flex items-center gap-4">
-                <select id="exec-status-filter" class="ion-select _ion-s-2f8e8ab1f2" data-change-action="loadExecutions">
+                <select id="exec-status-filter" class="ion-select w-[auto]" data-change-action="loadExecutions">
                     <option value="">All Statuses</option>
                     <option value="in_progress" selected>In Progress</option>
                     <option value="pending">Pending</option>
@@ -95,7 +95,7 @@
         </div>
     </section>
     <!-- Inline execution detail panel -->
-    <div class="exec-detail-panel _ion-s-c8be1ccba6" id="exec-detail-panel">
+    <div class="exec-detail-panel hidden" id="exec-detail-panel">
         <div class="flex items-center justify-between px-6 py-4 border-b border-base-300">
             <h3 id="exec-detail-title">Execution Details</h3>
             <button class="bg-transparent border-none text-2xl cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closeExecDetail">&times;</button>
@@ -105,7 +105,7 @@
 </div>
 
 <!-- Create/Edit Playbook Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 _ion-s-f2892a2e8a" id="playbook-modal">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 hidden" id="playbook-modal">
     <div class="bg-base-100 rounded-lg w-full max-w-[800px] max-h-[90vh] overflow-y-auto shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
         <div class="flex items-center justify-between px-6 py-4 border-b border-base-300">
             <h3 id="playbook-modal-title">Create Playbook</h3>
@@ -186,7 +186,7 @@
 </div>
 
 <!-- View Playbook Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 _ion-s-f2892a2e8a" id="view-playbook-modal">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 hidden" id="view-playbook-modal">
     <div class="bg-base-100 rounded-lg w-full max-w-[800px] max-h-[90vh] overflow-y-auto shadow-[0_2px_8px_rgba(0,0,0,0.15)]">
         <div class="flex items-center justify-between px-6 py-4 border-b border-base-300">
             <h3 id="view-playbook-title">Playbook Details</h3>

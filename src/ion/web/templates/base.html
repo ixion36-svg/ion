@@ -477,7 +477,7 @@
                 <div class="np-empty">No notes yet</div>
             </div>
             <!-- Editor (hidden by default) -->
-            <div id="np-note-editor" class="np-editor _ion-s-c8be1ccba6">
+            <div id="np-note-editor" class="np-editor hidden">
                 <div class="np-editor-toolbar">
                     <button id="np-btn-back" class="np-btn-sm" title="Back to list"><i class="icon-arrow-left"></i> Back</button>
                     <span id="np-save-status" class="np-save-status"></span>
@@ -650,26 +650,26 @@
     {% block scripts %}{% endblock %}
 
 <!-- Keyboard shortcuts overlay -->
-<div class="_ion-s-2f3e0c5eac" id="shortcuts-overlay" data-close-on-self-click>
-  <div class="_ion-s-9c6112a8cc">
-    <div class="_ion-s-bcbb844d17">
-      <h2 class="_ion-s-f8cb8eab82">Keyboard Shortcuts</h2>
-      <button class="_ion-s-494fb5689f" data-close-target="shortcuts-overlay">&times;</button>
+<div class="hidden fixed inset-0 z-[9999] bg-[rgba(0,0,0,0.7)] [backdrop-filter:blur(4px)]" id="shortcuts-overlay" data-close-on-self-click>
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] max-h-[80vh] overflow-y-auto bg-[#0f172a] border border-[rgba(255,255,255,0.1)] rounded-[14px] p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h2 class="text-lg font-semibold text-[white]">Keyboard Shortcuts</h2>
+      <button class="text-[#64748b] bg-transparent border-0 text-xl cursor-pointer" data-close-target="shortcuts-overlay">&times;</button>
     </div>
-    <div class="_ion-s-ae3edb8025">
-      <div><kbd class="_ion-s-2f0dfaca08">?</kbd> <span class="_ion-s-e20b255543">This help</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g a</kbd> <span class="_ion-s-e20b255543">Go to Alerts</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g c</kbd> <span class="_ion-s-e20b255543">Go to Cases</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g d</kbd> <span class="_ion-s-e20b255543">Go to Dashboard</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g o</kbd> <span class="_ion-s-e20b255543">Go to Observables</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g t</kbd> <span class="_ion-s-e20b255543">Go to Threat Landscape</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g s</kbd> <span class="_ion-s-e20b255543">Go to SOC Workspace</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g h</kbd> <span class="_ion-s-e20b255543">Go to Shift Handover</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g e</kbd> <span class="_ion-s-e20b255543">Go to Detection Engineering</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g n</kbd> <span class="_ion-s-e20b255543">Go to Network Map</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">g i</kbd> <span class="_ion-s-e20b255543">Go to AI Chat</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">Ctrl+Shift+N</kbd> <span class="_ion-s-e20b255543">Toggle Notepad</span></div>
-      <div><kbd class="_ion-s-2f0dfaca08">Esc</kbd> <span class="_ion-s-e20b255543">Close modal/drawer</span></div>
+    <div class="grid grid-cols-2 gap-3 text-[13px]">
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">?</kbd> <span class="text-[#94a3b8] ml-2">This help</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g a</kbd> <span class="text-[#94a3b8] ml-2">Go to Alerts</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g c</kbd> <span class="text-[#94a3b8] ml-2">Go to Cases</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g d</kbd> <span class="text-[#94a3b8] ml-2">Go to Dashboard</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g o</kbd> <span class="text-[#94a3b8] ml-2">Go to Observables</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g t</kbd> <span class="text-[#94a3b8] ml-2">Go to Threat Landscape</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g s</kbd> <span class="text-[#94a3b8] ml-2">Go to SOC Workspace</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g h</kbd> <span class="text-[#94a3b8] ml-2">Go to Shift Handover</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g e</kbd> <span class="text-[#94a3b8] ml-2">Go to Detection Engineering</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g n</kbd> <span class="text-[#94a3b8] ml-2">Go to Network Map</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">g i</kbd> <span class="text-[#94a3b8] ml-2">Go to AI Chat</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">Ctrl+Shift+N</kbd> <span class="text-[#94a3b8] ml-2">Toggle Notepad</span></div>
+      <div><kbd class="bg-[#1e293b] py-0.5 px-2 rounded-[4px] border border-[#334155] font-mono text-[11px] text-[#94a3b8]">Esc</kbd> <span class="text-[#94a3b8] ml-2">Close modal/drawer</span></div>
     </div>
   </div>
 </div>

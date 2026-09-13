@@ -132,13 +132,13 @@
     <!-- global search bar — hits /api/threat-intel/unified-search.
          Fans out to actors + campaigns (OpenCTI) + IOCs + cases. Results
          grouped by kind under the bar. Press Enter or click Search. -->
-    <div class="flex items-center gap-2.5 mb-5 _ion-s-8b9688e6e0">
+    <div class="flex items-center gap-2.5 mb-5 mb-6">
         <input type="text" class="input flex-1" id="ti-global-search"
                placeholder="Search across actors, campaigns, IOCs, cases (e.g. APT28, evil.com, 10.0.0.1)…">
         <button class="btn btn-primary" data-click-action="tiUnifiedSearch">Search</button>
-        <button class="btn btn-ghost _ion-s-c8be1ccba6" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
+        <button class="btn btn-ghost hidden" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
     </div>
-    <div class="_ion-s-30ded21efa" id="ti-global-search-results"></div>
+    <div class="hidden mb-6" id="ti-global-search-results"></div>
 
     <!-- Tabs (v0.27.0: 4 → 7 tabs after merging /threat-landscape +
          /attack-stories. Pill style with cyan active state ported from
@@ -149,7 +149,7 @@
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="campaigns">Campaigns</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="ioc">IOC Feed</button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="reports">Reports</button>
-        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge _ion-s-c8be1ccba6">0</span></button>
+        <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="watchlist">Watchlist <span id="ti-unread-badge" class="ti-badge hidden">0</span></button>
         <button class="ti-tab px-4 py-2 rounded-md text-xs font-semibold whitespace-nowrap transition" data-panel="stories">Attack Stories</button>
         {# CISA KEV, shipped as a snapshot inside the image. Lives here
            rather than under Reporting because "is this being exploited right
@@ -285,15 +285,15 @@
 
     <!-- Watchlist Panel -->
     <div class="ti-panel" id="panel-watchlist">
-        <h3 class="_ion-s-65ad540569">Active Watches</h3>
+        <h3 class="text-[.95rem] mt-0 mr-0 mb-4 ml-0">Active Watches</h3>
         <table class="ti-table" id="watchlist-table">
             <thead><tr><th>Name</th><th>Origin</th><th>Type</th><th>Matches</th><th>Last Match</th><th>Watched By</th><th>Reason</th><th>Actions</th></tr></thead>
             <tbody id="watchlist-body"><tr><td colspan="8" class="ti-empty">Loading...</td></tr></tbody>
         </table>
 
-        <h3 class="_ion-s-2714558e5b">
+        <h3 class="text-[.95rem] mt-6 mr-0 mb-3 ml-0">
             Match Alerts
-            <button class="btn btn-ghost ti-btn-sm _ion-s-7f90823361" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
+            <button class="btn btn-ghost ti-btn-sm ml-2.5" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
         </h3>
         <table class="ti-table" id="matches-table">
             <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
@@ -304,7 +304,7 @@
     <!-- IOC Feed Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-ioc">
         <div class="flex items-center gap-2.5 mb-5">
-            <select id="ti-ioc-min-score" class="select flex-1 _ion-s-f9e27e828c" data-change-action="tiLoadIOCFeed">
+            <select id="ti-ioc-min-score" class="select flex-1 flex-[0_0_auto] w-[auto]" data-change-action="tiLoadIOCFeed">
                 <option value="0">All scores</option>
                 <option value="50">Score ≥ 50</option>
                 <option value="75" selected>Score ≥ 75</option>
@@ -332,39 +332,39 @@
     <!-- ATT&CK technique drill-down side panel.
          Opened by clicking a technique on the Overview's Recently Seen
          MITRE list. Closed by the X button or clicking the backdrop. -->
-    <div class="_ion-s-f054d745af" id="ti-drill-panel"
+    <div class="hidden fixed top-0 right-0 bottom-0 w-[480px] max-w-[90vw] bg-[var(--bg-primary)] border-l-[1px] border-l-[var(--ion-border)] shadow-[-8px_0_24px_rgba(0,0,0,0.5)] z-[200] overflow-y-auto p-5" id="ti-drill-panel"
 >
-        <div class="_ion-s-4aaba5a4dd">
-            <h3 class="_ion-s-a935918594" id="ti-drill-title">—</h3>
-            <button class="_ion-s-ee7af9422a" data-click-action="tiCloseDrill"
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base m-0 text-[var(--ion-cyan,#6de4ff)] font-mono" id="ti-drill-title">—</h3>
+            <button class="bg-transparent border-0 text-[var(--text-secondary)] cursor-pointer text-[1.2rem]" data-click-action="tiCloseDrill"
 >&times;</button>
         </div>
         <div id="ti-drill-body">
             <div class="ti-loading"><span class="ti-spinner"></span>Loading…</div>
         </div>
     </div>
-    <div class="_ion-s-b26cdbb562" id="ti-drill-backdrop"
+    <div class="hidden fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,0,0,0.5)] z-[199]" id="ti-drill-backdrop"
 
  data-click-action="tiCloseDrill"></div>
 
     <!-- Report detail side panel — same layout as ti-drill-panel above -->
-    <div class="_ion-s-f054d745af" id="ti-report-panel">
-        <div class="_ion-s-4aaba5a4dd">
-            <h3 class="_ion-s-a935918594" id="ti-report-panel-title">—</h3>
-            <button class="_ion-s-ee7af9422a"
+    <div class="hidden fixed top-0 right-0 bottom-0 w-[480px] max-w-[90vw] bg-[var(--bg-primary)] border-l-[1px] border-l-[var(--ion-border)] shadow-[-8px_0_24px_rgba(0,0,0,0.5)] z-[200] overflow-y-auto p-5" id="ti-report-panel">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-base m-0 text-[var(--ion-cyan,#6de4ff)] font-mono" id="ti-report-panel-title">—</h3>
+            <button class="bg-transparent border-0 text-[var(--text-secondary)] cursor-pointer text-[1.2rem]"
 data-click-action="tiCloseReport">&times;</button>
         </div>
         <div id="ti-report-panel-body">
             <div class="ti-loading"><span class="ti-spinner"></span>Loading…</div>
         </div>
     </div>
-    <div class="_ion-s-b26cdbb562" id="ti-report-backdrop"
+    <div class="hidden fixed top-0 left-0 right-0 bottom-0 bg-[rgba(0,0,0,0.5)] z-[199]" id="ti-report-backdrop"
 data-click-action="tiCloseReport"></div>
 
     <!-- Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
         <div class="flex items-center gap-2.5 mb-5">
-            <select id="ti-stories-hours" class="select flex-1 _ion-s-f9e27e828c" data-change-action="tiLoadStories">
+            <select id="ti-stories-hours" class="select flex-1 flex-[0_0_auto] w-[auto]" data-change-action="tiLoadStories">
                 <option value="4">Last 4h</option>
                 <option value="12">Last 12h</option>
                 <option value="24" selected>Last 24h</option>

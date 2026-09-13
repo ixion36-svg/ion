@@ -29,17 +29,17 @@
         </div>
         <div class="flex flex-col gap-4">
             <div class="flex gap-4 flex-wrap">
-                <div class="flex flex-col gap-1 _ion-s-c2d2e263dc">
+                <div class="flex flex-col gap-1 flex-[2]">
                     <label for="search-index" class="text-sm text-slate-400">Index Pattern</label>
                     <input type="text" id="search-index" class="input w-full" value="*,-.*" placeholder="e.g., logs-*, filebeat-*">
                 </div>
-                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                <div class="flex flex-col gap-1 flex-1">
                     <label for="search-time-field" class="text-sm text-slate-400">Time Field</label>
                     <input type="text" id="search-time-field" class="input w-full" value="@timestamp">
                 </div>
             </div>
             <div class="flex gap-4 flex-wrap">
-                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                <div class="flex flex-col gap-1 flex-1">
                     <label for="search-time-from" class="text-sm text-slate-400">From</label>
                     <select id="search-time-from" class="select w-full">
                         <option value="now-15m">Last 15 minutes</option>
@@ -51,7 +51,7 @@
                         <option value="now-90d">Last 90 days</option>
                     </select>
                 </div>
-                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                <div class="flex flex-col gap-1 flex-1">
                     <label for="search-size" class="text-sm text-slate-400">Results</label>
                     <select id="search-size" class="select w-full">
                         <option value="25">25</option>
@@ -64,9 +64,9 @@
             </div>
             <div class="flex flex-col gap-1">
                 <label for="search-query" class="text-sm text-slate-400">Query (Lucene/KQL syntax)</label>
-                <div class="_ion-s-d3ecd376d1">
-                    <input type="text" id="search-query" class="input w-full _ion-s-7623f05545" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
-                    <button class="btn _ion-s-9c71bc0492" data-click-action="openNlQueryModal" title="Generate query with AI">
+                <div class="flex gap-1.5 items-center">
+                    <input type="text" id="search-query" class="input w-full flex-1" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
+                    <button class="btn whitespace-nowrap inline-flex items-center gap-1" data-click-action="openNlQueryModal" title="Generate query with AI">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1v4a4 4 0 0 1-8 0v-4H7a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/></svg>
                         AI
                     </button>
@@ -85,7 +85,7 @@
     </div>
 
     <!-- Saved Searches Panel -->
-    <div class="tools-panel section-panel max-h-[400px] overflow-y-auto _ion-s-f2892a2e8a" id="saved-searches-panel">
+    <div class="tools-panel section-panel max-h-[400px] overflow-y-auto hidden" id="saved-searches-panel">
         <div class="panel-header">
             <h3>Saved Searches</h3>
             <button class="btn" data-click-action="loadSavedSearches">Refresh</button>
@@ -107,7 +107,7 @@
     </div>
 
     <!-- Save Search Modal -->
-    <div class="modal-overlay _ion-s-f2892a2e8a" id="save-search-modal">
+    <div class="modal-overlay hidden" id="save-search-modal">
         <div class="modal-dialog">
             <div class="modal-header">
                 <h3 id="save-search-modal-title">Save Search</h3>
@@ -137,7 +137,7 @@
     </div>
 
     <!-- Histogram -->
-    <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="histogram-panel">
+    <div class="tools-panel section-panel hidden" id="histogram-panel">
         <div class="panel-header">
             <h3>Event Timeline</h3>
             <span id="histogram-total" class="badge badge-info"></span>
@@ -169,7 +169,7 @@
 </div>
 
 <!-- ==================== INDEX BROWSER TAB ==================== -->
-<div id="tab-indices" class="tool-tab-content _ion-s-f2892a2e8a">
+<div id="tab-indices" class="tool-tab-content hidden">
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Available Indices</h3>
@@ -200,7 +200,7 @@
     </div>
 
     <!-- Field Mappings Panel -->
-    <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="mappings-panel">
+    <div class="tools-panel section-panel hidden" id="mappings-panel">
         <div class="panel-header">
             <h3>Field Mappings: <span id="mappings-index-name"></span></h3>
             <span id="mappings-field-count" class="badge badge-info"></span>
@@ -222,7 +222,7 @@
     </div>
 
     <!-- Field Stats Panel -->
-    <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="field-stats-panel">
+    <div class="tools-panel section-panel hidden" id="field-stats-panel">
         <div class="panel-header">
             <h3>Field Statistics: <span id="field-stats-name"></span></h3>
         </div>
@@ -243,18 +243,18 @@
 </div>
 
 <!-- ==================== IOC HUNT TAB ==================== -->
-<div id="tab-ioc-hunt" class="tool-tab-content _ion-s-f2892a2e8a">
+<div id="tab-ioc-hunt" class="tool-tab-content hidden">
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>IOC Hunt</h3>
         </div>
         <div class="flex flex-col gap-4">
             <div class="flex gap-4 flex-wrap">
-                <div class="flex flex-col gap-1 _ion-s-c2d2e263dc">
+                <div class="flex flex-col gap-1 flex-[2]">
                     <label for="ioc-value" class="text-sm text-slate-400">IOC Value</label>
                     <input type="text" id="ioc-value" class="input w-full" placeholder="Enter IP, hash, domain, URL, or email...">
                 </div>
-                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                <div class="flex flex-col gap-1 flex-1">
                     <label for="ioc-type" class="text-sm text-slate-400">Type (auto-detected)</label>
                     <select id="ioc-type" class="select w-full">
                         <option value="">Auto-detect</option>
@@ -267,7 +267,7 @@
                 </div>
             </div>
             <div class="flex gap-4 flex-wrap">
-                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                <div class="flex flex-col gap-1 flex-1">
                     <label for="ioc-time-from" class="text-sm text-slate-400">Time Range</label>
                     <select id="ioc-time-from" class="select w-full">
                         <option value="now-24h">Last 24 hours</option>
@@ -277,7 +277,7 @@
                         <option value="">All time</option>
                     </select>
                 </div>
-                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                <div class="flex flex-col gap-1 flex-1">
                     <label for="ioc-index" class="text-sm text-slate-400">Index Pattern</label>
                     <input type="text" id="ioc-index" class="input w-full" value="*,-.*">
                 </div>
@@ -314,7 +314,7 @@
         </div>
 
         <!-- Single IOC Results -->
-        <div class="_ion-s-f2892a2e8a" id="ioc-single-results">
+        <div class="hidden" id="ioc-single-results">
             <div class="ioc-hunt-summary flex gap-4 mb-4 p-4 bg-base-200 rounded" id="ioc-hunt-summary"></div>
             <div class="ioc-indices-found flex gap-2 flex-wrap mb-4" id="ioc-indices-found"></div>
             <table class="table table-sm w-full" id="ioc-hunt-table">
@@ -330,7 +330,7 @@
         </div>
 
         <!-- Bulk IOC Results -->
-        <div class="_ion-s-f2892a2e8a" id="ioc-bulk-results">
+        <div class="hidden" id="ioc-bulk-results">
             <div class="bulk-summary flex gap-8 mb-4 p-4 bg-base-200 rounded" id="bulk-summary"></div>
             <table class="table table-sm w-full" id="bulk-results-table">
                 <thead>

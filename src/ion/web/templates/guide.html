@@ -209,7 +209,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                <tr class="hover _ion-s-40d92da530">
+                <tr class="hover border-l-[3px] border-l-[var(--sev-critical)]">
                     <td><span class="badge badge-error badge-sm flex-[0.5]">CRIT</span></td>
                     <td class="flex-[2]">Credential Dumping via LSASS</td>
                     <td class="flex-1 text-[.72rem]">Credential Access</td>
@@ -217,7 +217,7 @@
                     <td class="flex-[0.8]"><span class="badge badge-error badge-sm">OPEN</span></td>
                     <td class="flex-[0.8] text-[.72rem] text-[var(--text-muted)]">2 min ago</td>
                 </tr>
-                <tr class="hover _ion-s-2fb8daf4f3">
+                <tr class="hover border-l-[3px] border-l-[var(--sev-high)]">
                     <td><span class="badge badge-warning badge-sm flex-[0.5]">HIGH</span></td>
                     <td class="flex-[2]">Suspicious PowerShell Encoded Command</td>
                     <td class="flex-1 text-[.72rem]">Execution</td>
@@ -225,7 +225,7 @@
                     <td class="flex-[0.8]"><span class="badge badge-info badge-sm">ACK</span></td>
                     <td class="flex-[0.8] text-[.72rem] text-[var(--text-muted)]">15 min ago</td>
                 </tr>
-                <tr class="hover _ion-s-ebd4006129">
+                <tr class="hover border-l-[3px] border-l-[var(--sev-medium)]">
                     <td><span class="badge badge-info badge-sm flex-[0.5]">MED</span></td>
                     <td class="flex-[2]">Unusual Login from New Geolocation</td>
                     <td class="flex-1 text-[.72rem]">Initial Access</td>
@@ -289,7 +289,7 @@
                 <span class="badge badge-error badge-sm">CRITICAL</span>
                 <span class="badge badge-warning badge-sm bg-[var(--sev-high-dim)]">ACKNOWLEDGED</span>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 _ion-s-cb7c5c70a2">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 grid-cols-3">
                 <div class="stat bg-base-200 rounded-box border border-base-300 p-2">
                     <div class="stat-title text-[.68rem] text-[var(--text-muted)]">ASSIGNED TO</div>
                     <div class="stat-value text-base">analyst1</div>
@@ -316,19 +316,19 @@
 
     <h3 class="text-lg font-semibold mt-4 mb-2">Closure Reasons</h3>
     <div class="g-grid-3">
-        <div class="card bg-base-100 border border-base-300 _ion-s-bd21ced526">
+        <div class="card bg-base-100 border border-base-300 border-l-[3px] border-l-[var(--mitre-covered)]">
             <div class="card-body p-3">
                 <strong>True Positive</strong>
                 <p class="text-sm text-base-content/50">Confirmed real attack. Document findings.</p>
             </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 _ion-s-40d92da530">
+        <div class="card bg-base-100 border border-base-300 border-l-[3px] border-l-[var(--sev-critical)]">
             <div class="card-body p-3">
                 <strong>False Positive</strong>
                 <p class="text-sm text-base-content/50">Not a real threat. Consider rule tuning.</p>
             </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 _ion-s-ebd4006129">
+        <div class="card bg-base-100 border border-base-300 border-l-[3px] border-l-[var(--sev-medium)]">
             <div class="card-body p-3">
                 <strong>Benign True Positive</strong>
                 <p class="text-sm text-base-content/50">Real activity but authorized/expected.</p>
@@ -549,19 +549,19 @@
     <h3 class="text-lg font-semibold mt-4 mb-2">Rule Tuning</h3>
     <p class="text-sm mb-2">The <strong>Rule Tuning</strong> page (<code>/rule-tuning</code>) cross-references TIDE rules with case closure outcomes to identify:</p>
     <div class="g-grid-3">
-        <div class="card bg-base-100 border border-base-300 _ion-s-40d92da530">
+        <div class="card bg-base-100 border border-base-300 border-l-[3px] border-l-[var(--sev-critical)]">
             <div class="card-body p-3">
                 <strong>FP-Heavy Rules</strong>
                 <p class="text-sm text-base-content/50">Rules closed as false positive > 60% of the time</p>
             </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 _ion-s-bd21ced526">
+        <div class="card bg-base-100 border border-base-300 border-l-[3px] border-l-[var(--mitre-covered)]">
             <div class="card-body p-3">
                 <strong>High-Value Rules</strong>
                 <p class="text-sm text-base-content/50">Rules consistently producing true positives</p>
             </div>
         </div>
-        <div class="card bg-base-100 border border-base-300 _ion-s-fcaaa6f0c8">
+        <div class="card bg-base-100 border border-base-300 border-l-[3px] border-l-[var(--sev-low)]">
             <div class="card-body p-3">
                 <strong>Silent Rules</strong>
                 <p class="text-sm text-base-content/50">Enabled in TIDE but never firing — misconfigured?</p>

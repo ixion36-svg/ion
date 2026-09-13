@@ -19,7 +19,7 @@
       <button data-click-action="loadStats" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh</button>
       <button data-click-action="showGraphView" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-network"/></svg>Graph</button>
       <button data-click-action="showPatternsView" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Patterns</button>
-      <button data-click-action="showWatchlist" class="relative inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-eye"/></svg>Watchlist<span id="watchlist-count" class="ml-1 px-1.5 py-0.5 rounded-full bg-ion-coral/20 text-ion-coral text-[10px] _ion-s-6b99de8b69">0</span></button>
+      <button data-click-action="showWatchlist" class="relative inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-eye"/></svg>Watchlist<span id="watchlist-count" class="ml-1 px-1.5 py-0.5 rounded-full bg-ion-coral/20 text-ion-coral text-[10px] hidden">0</span></button>
       <button data-click-action="showImportModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-upload"/></svg>Import</button>
       <button data-click-action="exportCSV" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition"><svg class="w-3.5 h-3.5"><use href="#i-download"/></svg>Export</button>
       <button data-click-action="showMigrateModal" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[12px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">Migrate</button>
@@ -27,7 +27,7 @@
   </section>
 
   <!-- Watchlist Banner -->
-  <div id="watchlist-banner" class="mb-4 rounded-[12px] border border-ion-coral/30 bg-ion-coral/5 px-5 py-4 flex items-center gap-3 _ion-s-6b99de8b69">
+  <div id="watchlist-banner" class="mb-4 rounded-[12px] border border-ion-coral/30 bg-ion-coral/5 px-5 py-4 flex items-center gap-3 hidden">
     <div class="h-7 w-7 rounded-full bg-ion-coral/20 grid place-items-center text-ion-coral font-bold">!</div>
     <span id="watchlist-alert-text" class="flex-1 text-[13px] text-white">You have unread watchlist alerts</span>
     <button data-click-action="showWatchlistAlerts" class="h-8 px-3 rounded-md bg-ion-coral text-ink-950 text-[11px] font-semibold hover:brightness-110 transition">View</button>
@@ -163,12 +163,12 @@
                 <button class="ion-btn" data-click-action="resetGraphView">Reset View</button>
             </div>
             <div class="flex flex-wrap gap-4 mb-3 text-xs">
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-868f8b60c1"></span> IP</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-350816fec6"></span> Domain</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-c0414be229"></span> Hostname</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-6e6abd54ea"></span> URL</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-a9d427a1d6"></span> Email</span>
-                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-84b70af496"></span> User</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#ef4444]"></span> IP</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#8b5cf6]"></span> Domain</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#3b82f6]"></span> Hostname</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#22c55e]"></span> URL</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#f59e0b]"></span> Email</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-[#06b6d4]"></span> User</span>
             </div>
             <div id="graph-container" class="flex-1 border border-base-300 rounded-[14px] bg-base-200 min-h-[400px] shadow-[0_2px_8px_rgba(0,0,0,.15)]">
                 <div class="loading">Loading graph...</div>
@@ -207,7 +207,7 @@
         <div class="modal-body">
             <p>This will extract observables from the legacy JSON fields in alert triage records and create normalized observable records with proper links.</p>
             <p><strong>Note:</strong> This operation is idempotent - running it multiple times won't create duplicates.</p>
-            <div class="_ion-s-c8be1ccba6" id="migrate-result">
+            <div class="hidden" id="migrate-result">
                 <h4>Migration Results</h4>
                 <div id="migrate-stats"></div>
             </div>
@@ -266,7 +266,7 @@ sha256,abc123...,c2,</pre>
                 </div>
             </div>
 
-            <div id="stix-import-tab" class="import-tab-content _ion-s-6b99de8b69">
+            <div id="stix-import-tab" class="import-tab-content hidden">
                 <p>Import from STIX 2.1 bundle JSON:</p>
                 <div class="mb-4">
                     <label>STIX Bundle JSON:</label>
@@ -278,7 +278,7 @@ sha256,abc123...,c2,</pre>
                 </div>
             </div>
 
-            <div class="_ion-s-6b99de8b69" id="import-result">
+            <div class="hidden" id="import-result">
                 <h4>Import Results</h4>
                 <div id="import-stats"></div>
             </div>

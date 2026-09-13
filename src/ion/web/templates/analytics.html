@@ -116,18 +116,18 @@
         <h2 class="text-lg font-semibold text-base-content">System Analytics</h2>
         <span class="text-sm text-base-content/60">Per-system alert volume + TIDE detection coverage</span>
     </div>
-    <div class="_ion-s-7da3fcbd45 flex-wrap">
-        <select class="_ion-s-d54f9f63d4 select select-sm w-auto" id="sys-time-range" data-change-action="loadSystemAnalyticsTab">
+    <div class="flex items-center gap-4 mb-5 flex-wrap">
+        <select class="py-1.5 px-3 border border-[var(--ion-border)] rounded-[var(--radius)] bg-[var(--bg-secondary)] text-[var(--text-primary)] text-[0.8125rem] select select-sm w-auto" id="sys-time-range" data-change-action="loadSystemAnalyticsTab">
             <option value="24">Last 24 Hours</option>
             <option value="72">Last 3 Days</option>
             <option value="168" selected>Last 7 Days</option>
             <option value="720">Last 30 Days</option>
         </select>
         <button class="btn btn-sm" data-click-action="loadSystemAnalyticsTab">Refresh</button>
-        <span class="_ion-s-1b20421adc" id="sys-summary-text"></span>
+        <span class="text-xs text-[var(--text-muted)] ml-[auto]" id="sys-summary-text"></span>
     </div>
     <!-- System stats bar -->
-    <div class="_ion-s-6867cb41f1" id="sys-stats-bar">
+    <div class="grid grid-cols-6 gap-3 mb-6" id="sys-stats-bar">
         <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-total">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Total Alerts</div></div>
         <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-logs">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Logs Ingested</div></div>
         <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-primary leading-tight" id="sys-s-systems">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Systems</div></div>
@@ -136,11 +136,11 @@
         <div class="sys-stat-card"><div class="text-2xl font-bold font-mono text-error leading-tight" id="sys-s-critical">-</div><div class="text-[0.7rem] uppercase tracking-wide text-base-content/60 mt-1">Critical</div></div>
     </div>
     <!-- Timeline -->
-    <div class="_ion-s-6f0bd4129e" id="sys-timeline-chart">
-        <div class="loading-state _ion-s-c951e35a79">Loading...</div>
+    <div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[var(--radius-lg)] p-4 mb-6 min-h-[80px] relative overflow-hidden" id="sys-timeline-chart">
+        <div class="loading-state p-4">Loading...</div>
     </div>
     <!-- System cards grid -->
-    <div class="_ion-s-c5f415d8e3" id="sys-cards-grid">
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(420px,1fr))] gap-5" id="sys-cards-grid">
         <div class="loading-state">Loading system analytics...</div>
     </div>
     <!-- Index Breakdown — ported from the retired /engineering-analytics

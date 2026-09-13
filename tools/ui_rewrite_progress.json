@@ -3,6 +3,7 @@
     "restyle": true
   },
   "_icons.html": {
+    "convert": true,
     "restyle": true
   },
   "_nav_tabs.html": {
@@ -24,12 +25,14 @@
     "restyle": true
   },
   "alerts.html": {
+    "convert": true,
     "restyle": true
   },
   "analyst.html": {
     "restyle": true
   },
   "analytics.html": {
+    "convert": true,
     "restyle": true
   },
   "architecture.html": {
@@ -43,6 +46,7 @@
     "restyle": true
   },
   "base.html": {
+    "convert": true,
     "restyle": true
   },
   "bob_eval.html": {
@@ -65,12 +69,14 @@
     "restyle": true
   },
   "cases.html": {
+    "convert": true,
     "restyle": true
   },
   "change_requests.html": {
     "restyle": true
   },
   "chat.html": {
+    "convert": true,
     "restyle": true
   },
   "compliance.html": {
@@ -165,6 +171,7 @@
     "restyle": true
   },
   "daily_standup.html": {
+    "convert": true,
     "restyle": true
   },
   "daily_standup_slides.html": {
@@ -198,18 +205,21 @@
     "restyle": true
   },
   "detection_engineering.html": {
+    "convert": true,
     "restyle": true
   },
   "detection_health.html": {
     "restyle": true
   },
   "discover.html": {
+    "convert": true,
     "restyle": true
   },
   "document_analysis.html": {
     "restyle": true
   },
   "documents.html": {
+    "convert": true,
     "restyle": true
   },
   "entity_timeline.html": {
@@ -220,6 +230,7 @@
     "restyle": true
   },
   "forensics.html": {
+    "convert": true,
     "restyle": true
   },
   "gitlab.html": {
@@ -235,6 +246,7 @@
     "restyle": true
   },
   "integrations.html": {
+    "convert": true,
     "restyle": true
   },
   "investigation_memory.html": {
@@ -276,12 +288,15 @@
     "restyle": true
   },
   "observables.html": {
+    "convert": true,
     "restyle": true
   },
   "pcap.html": {
+    "convert": true,
     "restyle": true
   },
   "playbooks.html": {
+    "convert": true,
     "restyle": true
   },
   "profile.html": {
@@ -301,6 +316,7 @@
     "restyle": true
   },
   "settings.html": {
+    "convert": true,
     "restyle": true
   },
   "shift_handover.html": {
@@ -321,6 +337,7 @@
     "restyle": true
   },
   "template_form.html": {
+    "convert": true,
     "restyle": true
   },
   "template_render.html": {
@@ -336,15 +353,18 @@
     "restyle": true
   },
   "threat_intel.html": {
+    "convert": true,
     "restyle": true
   },
   "threat_intel_actor.html": {
     "restyle": true
   },
   "tools.html": {
+    "convert": true,
     "restyle": true
   },
   "training.html": {
+    "convert": true,
     "restyle": true
   },
   "users.html": {
