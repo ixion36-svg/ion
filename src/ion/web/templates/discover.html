@@ -27,21 +27,21 @@
         <div class="panel-header">
             <h3>Search Query</h3>
         </div>
-        <div class="discover-search-form">
-            <div class="form-row">
-                <div class="form-group _ion-s-c2d2e263dc">
-                    <label for="search-index">Index Pattern</label>
-                    <input type="text" id="search-index" class="ion-input" value="*,-.*" placeholder="e.g., logs-*, filebeat-*">
+        <div class="flex flex-col gap-4">
+            <div class="flex gap-4 flex-wrap">
+                <div class="flex flex-col gap-1 _ion-s-c2d2e263dc">
+                    <label for="search-index" class="text-sm text-slate-400">Index Pattern</label>
+                    <input type="text" id="search-index" class="input w-full" value="*,-.*" placeholder="e.g., logs-*, filebeat-*">
                 </div>
-                <div class="form-group _ion-s-ee3d55bf99">
-                    <label for="search-time-field">Time Field</label>
-                    <input type="text" id="search-time-field" class="ion-input" value="@timestamp">
+                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                    <label for="search-time-field" class="text-sm text-slate-400">Time Field</label>
+                    <input type="text" id="search-time-field" class="input w-full" value="@timestamp">
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group _ion-s-ee3d55bf99">
-                    <label for="search-time-from">From</label>
-                    <select id="search-time-from" class="ion-select">
+            <div class="flex gap-4 flex-wrap">
+                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                    <label for="search-time-from" class="text-sm text-slate-400">From</label>
+                    <select id="search-time-from" class="select w-full">
                         <option value="now-15m">Last 15 minutes</option>
                         <option value="now-1h">Last 1 hour</option>
                         <option value="now-4h">Last 4 hours</option>
@@ -51,9 +51,9 @@
                         <option value="now-90d">Last 90 days</option>
                     </select>
                 </div>
-                <div class="form-group _ion-s-ee3d55bf99">
-                    <label for="search-size">Results</label>
-                    <select id="search-size" class="ion-select">
+                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                    <label for="search-size" class="text-sm text-slate-400">Results</label>
+                    <select id="search-size" class="select w-full">
                         <option value="25">25</option>
                         <option value="50">50</option>
                         <option value="100" selected>100</option>
@@ -62,46 +62,46 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="search-query">Query (Lucene/KQL syntax)</label>
+            <div class="flex flex-col gap-1">
+                <label for="search-query" class="text-sm text-slate-400">Query (Lucene/KQL syntax)</label>
                 <div class="_ion-s-d3ecd376d1">
-                    <input type="text" id="search-query" class="ion-input _ion-s-7623f05545" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
-                    <button class="ion-btn _ion-s-9c71bc0492" data-click-action="openNlQueryModal" title="Generate query with AI">
+                    <input type="text" id="search-query" class="input w-full _ion-s-7623f05545" value="*" placeholder="e.g., error AND host.name:SRV* OR source.ip:192.168.*">
+                    <button class="btn _ion-s-9c71bc0492" data-click-action="openNlQueryModal" title="Generate query with AI">
                         <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a4 4 0 0 1 4 4v1h1a3 3 0 0 1 3 3v1a3 3 0 0 1-3 3h-1v4a4 4 0 0 1-8 0v-4H7a3 3 0 0 1-3-3v-1a3 3 0 0 1 3-3h1V6a4 4 0 0 1 4-4z"/></svg>
                         AI
                     </button>
                 </div>
             </div>
-            <div class="form-actions">
-                <button class="ion-btn ion-btn-primary" data-click-action="executeDiscoverSearch">Search</button>
-                <button class="ion-btn" data-click-action="getHistogram">Show Histogram</button>
-                <button class="ion-btn" data-click-action="exportSearchResults">Export CSV</button>
-                <div class="saved-searches-actions">
-                    <button class="ion-btn" data-click-action="openSaveSearchModal">Save Search</button>
-                    <button class="ion-btn" data-click-action="toggleSavedSearchesPanel">Saved Searches</button>
+            <div class="flex gap-2 mt-2 flex-wrap">
+                <button class="btn btn-primary" data-click-action="executeDiscoverSearch">Search</button>
+                <button class="btn" data-click-action="getHistogram">Show Histogram</button>
+                <button class="btn" data-click-action="exportSearchResults">Export CSV</button>
+                <div class="flex gap-2 ml-auto">
+                    <button class="btn" data-click-action="openSaveSearchModal">Save Search</button>
+                    <button class="btn" data-click-action="toggleSavedSearchesPanel">Saved Searches</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Saved Searches Panel -->
-    <div class="tools-panel section-panel saved-searches-panel _ion-s-f2892a2e8a" id="saved-searches-panel">
+    <div class="tools-panel section-panel max-h-[400px] overflow-y-auto _ion-s-f2892a2e8a" id="saved-searches-panel">
         <div class="panel-header">
             <h3>Saved Searches</h3>
-            <button class="ion-btn" data-click-action="loadSavedSearches">Refresh</button>
+            <button class="btn" data-click-action="loadSavedSearches">Refresh</button>
         </div>
-        <div class="saved-searches-container">
-            <div class="saved-searches-section" id="saved-searches-favorites">
-                <h4>Favorites</h4>
-                <div class="saved-searches-list" id="favorites-list"></div>
+        <div class="flex flex-col gap-4">
+            <div id="saved-searches-favorites">
+                <h4 class="text-sm text-slate-400 mb-2 uppercase tracking-wide">Favorites</h4>
+                <div class="flex flex-col gap-2" id="favorites-list"></div>
             </div>
-            <div class="saved-searches-section" id="saved-searches-mine">
-                <h4>My Searches</h4>
-                <div class="saved-searches-list" id="my-searches-list"></div>
+            <div id="saved-searches-mine">
+                <h4 class="text-sm text-slate-400 mb-2 uppercase tracking-wide">My Searches</h4>
+                <div class="flex flex-col gap-2" id="my-searches-list"></div>
             </div>
-            <div class="saved-searches-section" id="saved-searches-shared">
-                <h4>Shared Searches</h4>
-                <div class="saved-searches-list" id="shared-searches-list"></div>
+            <div id="saved-searches-shared">
+                <h4 class="text-sm text-slate-400 mb-2 uppercase tracking-wide">Shared Searches</h4>
+                <div class="flex flex-col gap-2" id="shared-searches-list"></div>
             </div>
         </div>
     </div>
@@ -114,24 +114,24 @@
                 <button class="modal-close" data-click-action="closeSaveSearchModal">&times;</button>
             </div>
             <div class="modal-body">
-                <div class="form-group">
-                    <label for="save-search-name">Name</label>
-                    <input type="text" id="save-search-name" class="ion-input" placeholder="Enter a name for this search">
+                <div class="flex flex-col gap-1">
+                    <label for="save-search-name" class="text-sm text-slate-400">Name</label>
+                    <input type="text" id="save-search-name" class="input w-full" placeholder="Enter a name for this search">
                 </div>
-                <div class="form-group">
-                    <label for="save-search-description">Description (optional)</label>
-                    <textarea id="save-search-description" class="ion-textarea" rows="2" placeholder="Describe what this search does"></textarea>
+                <div class="flex flex-col gap-1">
+                    <label for="save-search-description" class="text-sm text-slate-400">Description (optional)</label>
+                    <textarea id="save-search-description" class="textarea w-full" rows="2" placeholder="Describe what this search does"></textarea>
                 </div>
-                <div class="form-group">
+                <div class="flex flex-col gap-1">
                     <label class="checkbox-label">
-                        <input type="checkbox" id="save-search-shared">
+                        <input type="checkbox" id="save-search-shared" class="checkbox checkbox-sm">
                         Share with team
                     </label>
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="ion-btn" data-click-action="closeSaveSearchModal">Cancel</button>
-                <button class="ion-btn ion-btn-primary" data-click-action="saveSearch">Save</button>
+                <button class="btn" data-click-action="closeSaveSearchModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="saveSearch">Save</button>
             </div>
         </div>
     </div>
@@ -140,19 +140,19 @@
     <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="histogram-panel">
         <div class="panel-header">
             <h3>Event Timeline</h3>
-            <span id="histogram-total" class="ion-badge ion-c-cyan"></span>
+            <span id="histogram-total" class="badge badge-info"></span>
         </div>
-        <div class="histogram-container" id="histogram-container"></div>
+        <div class="flex items-end gap-0.5 h-[150px] p-4" id="histogram-container"></div>
     </div>
 
     <!-- Search Results -->
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Results</h3>
-            <span id="search-result-count" class="ion-badge ion-c-cyan">0 hits</span>
+            <span id="search-result-count" class="badge badge-info">0 hits</span>
         </div>
-        <div class="search-results-container">
-            <table class="data-table" id="search-results-table">
+        <div class="max-h-[500px] overflow-y-auto">
+            <table class="table table-sm w-full" id="search-results-table">
                 <thead>
                     <tr id="search-results-header">
                         <th>@timestamp</th>
@@ -175,14 +175,14 @@
             <h3>Available Indices</h3>
             <div class="panel-actions">
                 <label class="checkbox-label">
-                    <input type="checkbox" id="include-system-indices" data-change-action="loadIndices">
+                    <input type="checkbox" id="include-system-indices" data-change-action="loadIndices" class="checkbox checkbox-sm">
                     Include system indices
                 </label>
-                <button class="ion-btn" data-click-action="loadIndices">Refresh</button>
+                <button class="btn" data-click-action="loadIndices">Refresh</button>
             </div>
         </div>
-        <div class="indices-container">
-            <table class="data-table" id="indices-table">
+        <div class="max-h-[500px] overflow-y-auto">
+            <table class="table table-sm w-full" id="indices-table">
                 <thead>
                     <tr>
                         <th>Index Name</th>
@@ -203,10 +203,10 @@
     <div class="tools-panel section-panel _ion-s-f2892a2e8a" id="mappings-panel">
         <div class="panel-header">
             <h3>Field Mappings: <span id="mappings-index-name"></span></h3>
-            <span id="mappings-field-count" class="ion-badge ion-c-cyan"></span>
+            <span id="mappings-field-count" class="badge badge-info"></span>
         </div>
-        <div class="mappings-container">
-            <table class="data-table" id="mappings-table">
+        <div class="max-h-[500px] overflow-y-auto">
+            <table class="table table-sm w-full" id="mappings-table">
                 <thead>
                     <tr>
                         <th>Field Name</th>
@@ -226,9 +226,9 @@
         <div class="panel-header">
             <h3>Field Statistics: <span id="field-stats-name"></span></h3>
         </div>
-        <div class="field-stats-container">
-            <div class="stats-summary" id="field-stats-summary"></div>
-            <table class="data-table" id="field-stats-table">
+        <div class="max-h-[500px] overflow-y-auto">
+            <div class="stats-summary flex gap-8 mb-4 p-4 bg-base-200 rounded" id="field-stats-summary"></div>
+            <table class="table table-sm w-full" id="field-stats-table">
                 <thead>
                     <tr>
                         <th>Value</th>
@@ -248,15 +248,15 @@
         <div class="panel-header">
             <h3>IOC Hunt</h3>
         </div>
-        <div class="ioc-hunt-form">
-            <div class="form-row">
-                <div class="form-group _ion-s-c2d2e263dc">
-                    <label for="ioc-value">IOC Value</label>
-                    <input type="text" id="ioc-value" class="ion-input" placeholder="Enter IP, hash, domain, URL, or email...">
+        <div class="flex flex-col gap-4">
+            <div class="flex gap-4 flex-wrap">
+                <div class="flex flex-col gap-1 _ion-s-c2d2e263dc">
+                    <label for="ioc-value" class="text-sm text-slate-400">IOC Value</label>
+                    <input type="text" id="ioc-value" class="input w-full" placeholder="Enter IP, hash, domain, URL, or email...">
                 </div>
-                <div class="form-group _ion-s-ee3d55bf99">
-                    <label for="ioc-type">Type (auto-detected)</label>
-                    <select id="ioc-type" class="ion-select">
+                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                    <label for="ioc-type" class="text-sm text-slate-400">Type (auto-detected)</label>
+                    <select id="ioc-type" class="select w-full">
                         <option value="">Auto-detect</option>
                         <option value="ip">IP Address</option>
                         <option value="hash">Hash (MD5/SHA1/SHA256)</option>
@@ -266,10 +266,10 @@
                     </select>
                 </div>
             </div>
-            <div class="form-row">
-                <div class="form-group _ion-s-ee3d55bf99">
-                    <label for="ioc-time-from">Time Range</label>
-                    <select id="ioc-time-from" class="ion-select">
+            <div class="flex gap-4 flex-wrap">
+                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                    <label for="ioc-time-from" class="text-sm text-slate-400">Time Range</label>
+                    <select id="ioc-time-from" class="select w-full">
                         <option value="now-24h">Last 24 hours</option>
                         <option value="now-7d">Last 7 days</option>
                         <option value="now-30d" selected>Last 30 days</option>
@@ -277,14 +277,14 @@
                         <option value="">All time</option>
                     </select>
                 </div>
-                <div class="form-group _ion-s-ee3d55bf99">
-                    <label for="ioc-index">Index Pattern</label>
-                    <input type="text" id="ioc-index" class="ion-input" value="*,-.*">
+                <div class="flex flex-col gap-1 _ion-s-ee3d55bf99">
+                    <label for="ioc-index" class="text-sm text-slate-400">Index Pattern</label>
+                    <input type="text" id="ioc-index" class="input w-full" value="*,-.*">
                 </div>
             </div>
-            <div class="form-actions">
-                <button class="ion-btn ion-btn-primary" data-click-action="executeIOCHunt">Hunt</button>
-                <button class="ion-btn" data-click-action="clearIOCHunt">Clear</button>
+            <div class="flex gap-2 mt-2 flex-wrap">
+                <button class="btn btn-primary" data-click-action="executeIOCHunt">Hunt</button>
+                <button class="btn" data-click-action="clearIOCHunt">Clear</button>
             </div>
         </div>
     </div>
@@ -294,14 +294,14 @@
         <div class="panel-header">
             <h3>Bulk IOC Hunt</h3>
         </div>
-        <div class="bulk-ioc-form">
-            <div class="form-group">
-                <label for="bulk-iocs">IOC Values (one per line)</label>
-                <textarea id="bulk-iocs" class="ion-textarea" rows="5" placeholder="185.220.101.32&#10;evil.com&#10;d41d8cd98f00b204e9800998ecf8427e"></textarea>
+        <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-1">
+                <label for="bulk-iocs" class="text-sm text-slate-400">IOC Values (one per line)</label>
+                <textarea id="bulk-iocs" class="textarea w-full" rows="5" placeholder="185.220.101.32&#10;evil.com&#10;d41d8cd98f00b204e9800998ecf8427e"></textarea>
             </div>
-            <div class="form-actions">
-                <button class="ion-btn ion-btn-primary" data-click-action="executeBulkIOCHunt">Hunt All</button>
-                <button class="ion-btn" data-clear-target="bulk-iocs">Clear</button>
+            <div class="flex gap-2 mt-2 flex-wrap">
+                <button class="btn btn-primary" data-click-action="executeBulkIOCHunt">Hunt All</button>
+                <button class="btn" data-clear-target="bulk-iocs">Clear</button>
             </div>
         </div>
     </div>
@@ -310,14 +310,14 @@
     <div class="tools-panel section-panel">
         <div class="panel-header">
             <h3>Hunt Results</h3>
-            <span id="ioc-hunt-result-count" class="ion-badge ion-c-cyan"></span>
+            <span id="ioc-hunt-result-count" class="badge badge-info"></span>
         </div>
 
         <!-- Single IOC Results -->
         <div class="_ion-s-f2892a2e8a" id="ioc-single-results">
-            <div class="ioc-hunt-summary" id="ioc-hunt-summary"></div>
-            <div class="ioc-indices-found" id="ioc-indices-found"></div>
-            <table class="data-table" id="ioc-hunt-table">
+            <div class="ioc-hunt-summary flex gap-4 mb-4 p-4 bg-base-200 rounded" id="ioc-hunt-summary"></div>
+            <div class="ioc-indices-found flex gap-2 flex-wrap mb-4" id="ioc-indices-found"></div>
+            <table class="table table-sm w-full" id="ioc-hunt-table">
                 <thead>
                     <tr>
                         <th>@timestamp</th>
@@ -331,8 +331,8 @@
 
         <!-- Bulk IOC Results -->
         <div class="_ion-s-f2892a2e8a" id="ioc-bulk-results">
-            <div class="bulk-summary" id="bulk-summary"></div>
-            <table class="data-table" id="bulk-results-table">
+            <div class="bulk-summary flex gap-8 mb-4 p-4 bg-base-200 rounded" id="bulk-summary"></div>
+            <table class="table table-sm w-full" id="bulk-results-table">
                 <thead>
                     <tr>
                         <th>IOC Value</th>
@@ -353,7 +353,18 @@
     </div>
 </div>
 
+
 <style nonce="{{ csp_nonce }}">
+/* Discover page specific styles.
+   RESTORED: the daisyUI restyle removed this wholesale, which is safe for the
+   static markup it converted but not for the classes below, which JS builds at
+   runtime inside script template literals and so cannot be converted --
+   .modal-overlay/.modal-dialog (shared with the JS-built #nl-query-modal),
+   .saved-search-*, .histogram-bar, .health-*, .found-badge/.not-found-badge,
+   .index-badge, .clickable, .empty-searches, .stat/.stat-label/.stat-value.
+   No verification tool caught the loss: the audit checks hashed classes and
+   inline styles, and the spot check only reads JS->CSS contracts it can see a
+   rule for somewhere. Rules for markup that no longer exists are inert. */
 /* Discover page specific styles */
 .page-subtitle {
     color: var(--text-secondary);
@@ -672,7 +683,6 @@
     padding: 0.5rem;
 }
 </style>
-
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->

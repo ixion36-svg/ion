@@ -179,6 +179,9 @@
   "detection_health.html": {
     "restyle": true
   },
+  "discover.html": {
+    "restyle": true
+  },
   "document_analysis.html": {
     "restyle": true
   },
