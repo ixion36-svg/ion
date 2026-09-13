@@ -205,86 +205,15 @@ html body ._ion-s-c8be1ccba6 { display:none; }
 
 
 
+._ion-s-0a1c7436f5 { position:relative; margin-bottom:0.6rem; padding:0.45rem 0.65rem; border-radius:0.3rem; }
+._ion-s-e080dc03bc { position:absolute; left:-1.05rem; top:0.55rem; width:0.65rem; height:0.65rem; border-radius:50%; border:2px solid var(--bg-deep); }
 
+._ion-s-e62e34ae9b { font-size:0.55rem; font-weight:700; letter-spacing:0.05em; }
 
-
-
-._ion-s-be6a8d314f { top:' + (cy - r1 - 55) + 'px; }
-._ion-s-5245a21b9b { top:' + (cy - r2 - 55) + 'px; }
-._ion-s-83122ec640 { top:' + (cy - r3 - 55) + 'px; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-._ion-s-19fdfcbae6 { background:' + sc.bg + ';color:' + sc.color + '; }
-
-
-
-
-
-
-
-
-
-._ion-s-899842b393 { background:' + c.bg + ';color:' + c.color + '; }
-
-
-
-._ion-s-dc86a0be5b { background:' + vc.bg + ';color:' + vc.color + '; }
-
-
-
-
-
-
-
-
-
-
-
-._ion-s-0a1c7436f5 { position:relative;margin-bottom:0.6rem;padding:0.45rem 0.65rem;background:' + km.bg + ';border-radius:0.3rem; }
-._ion-s-e080dc03bc { position:absolute;left:-1.05rem;top:0.55rem;width:0.65rem;height:0.65rem;background:' + km.color + ';border-radius:50%;border:2px solid var(--bg-deep); }
-
-._ion-s-e62e34ae9b { font-size:0.55rem;font-weight:700;letter-spacing:0.05em;color:' + km.color + '; }
-
-
-
-
-
-
-
-
-
-._ion-s-1f6be90690 { background:' + tlp.bg + ';color:' + tlp.color + '; }
-
-
-._ion-s-efb05bbd3b { background:' + colors[i] + '; }
-
-
-
-
-._ion-s-0f3cce5268 { background:' + (oldestDays > 7 ? 'var(--danger)' : oldestDays > 3 ? 'var(--warning)' : 'var(--success)') + '; }
-
-
-._ion-s-da30d960d9 { width:' + pct + '%;background:' + color + '; }
-
-._ion-s-09b0c9a2e1 { flex:' + slaCounts.green + ';background:var(--success);border-radius:3px;height:6px; }
-._ion-s-b2ff45bb5d { flex:' + slaCounts.yellow + ';background:var(--warning);border-radius:3px;height:6px; }
-._ion-s-d28cf57fed { flex:' + slaCounts.orange + ';background:var(--neon-orange);border-radius:3px;height:6px; }
-._ion-s-eaadf28b85 { flex:' + slaCounts.red + ';background:var(--danger);border-radius:3px;height:6px; }
+._ion-s-09b0c9a2e1 { background:var(--success); border-radius:3px; height:6px; }
+._ion-s-b2ff45bb5d { background:var(--warning); border-radius:3px; height:6px; }
+._ion-s-d28cf57fed { background:var(--neon-orange); border-radius:3px; height:6px; }
+._ion-s-eaadf28b85 { background:var(--danger); border-radius:3px; height:6px; }
 
 
 
@@ -672,51 +601,9 @@ html body ._ion-s-c8be1ccba6 { display:none; }
 
 
 
-._ion-s-7554583028 { background:' + color + '20;color:' + color + ';padding:1px 6px;border-radius:3px;font-size:.75rem;margin-right:3px; }
+._ion-s-7554583028 { padding:1px 6px; border-radius:3px; font-size:.75rem; margin-right:3px; }
 
 ._ion-s-b17605f04d { color:var(--text-primary);text-decoration:underline dotted; }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-html body ._ion-s-eb85f508da { ' + (isVar ? '' : 'display:none') + '; }
 
 
 
@@ -768,42 +655,7 @@ html body #ti-report-panel { width:760px;max-width:92vw; }
 
 
 
-/* Attack-stories kill-chain stage. The migration inlined a JS `${active?…}`
-   ternary here (invalid CSS, dropped -> no highlight); split into static
-   base + .active/:not(.active) state classes applied by the renderer. */
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-._ion-s-0d131543ef { background:conic-gradient(' + color + ' ' + pct + '%, rgba(99,110,123,.2) ' + pct + '%); }
-._ion-s-999e54c893 { color:' + color + '; }
-._ion-s-83ebd10300 { color:' + aColor + '; }
-._ion-s-3ff4f72529 { width:' + aScore.pct + '%;background:' + aColor + '; }
+/* Attack-stories kill-chain stage. The migration inlined a JS `${active?…}
 
 
 

@@ -3493,7 +3493,7 @@ function renderPanelContent(c) {
                 +   '<span class="rail-sev rail-sev-' + esc(sev) + '"></span>'
                 +   '<div class="cpanel-rail-alert-head">'
                 +     '<span class="cpanel-rail-alert-name">' + esc(displayName) + '</span>'
-                +     '<span class="cpanel-alert-badge _ion-s-19fdfcbae6">' + esc(st) + '</span>'
+                +     '<span class="cpanel-alert-badge _ion-s-19fdfcbae6" data-ion-style="background:' + sc.bg + ';color:' + sc.color + '">' + esc(st) + '</span>'
                 +   '</div>'
                 + (bits.length ? '<div class="cpanel-rail-alert-sub">' + bits.join('<br>') + '</div>' : '')
                 + '</div>';
@@ -3695,7 +3695,7 @@ async function loadSimilarCases(caseId) {
                 +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
                 +     '<div class="cpanel-alert-badges">'
                 +       '<span class="cpanel-alert-badge bg-[rgba(109,228,255,.12)] text-[#6de4ff]" title="Cosine similarity">' + esc(pct) + '</span>'
-                +       '<span class="cpanel-alert-badge _ion-s-899842b393">' + esc((s.closure_reason || '').replace(/_/g, ' ')) + '</span>'
+                +       '<span class="cpanel-alert-badge _ion-s-899842b393" data-ion-style="background:' + c.bg + ';color:' + c.color + '">' + esc((s.closure_reason || '').replace(/_/g, ' ')) + '</span>'
                 +     '</div>'
                 +   '</div>'
                 +   '<div class="cpanel-alert-card-meta">' + esc((s.title || '').slice(0, 120)) + '</div>'
@@ -4003,7 +4003,7 @@ async function loadCaseTimeline(caseId) {
                 +     '<div class="flex items-center gap-[0.4rem] mb-[0.35rem] flex-wrap">'
                 +       '<span class="text-[0.6rem] font-bold tracking-[0.04em] uppercase text-[#6de4ff]">🤖 Bob\'s take</span>';
             if (verdict) {
-                html +=   '<span class="cpanel-alert-badge _ion-s-dc86a0be5b">' + esc(verdict.replace(/_/g, ' ')) + '</span>';
+                html +=   '<span class="cpanel-alert-badge _ion-s-dc86a0be5b" data-ion-style="background:' + vc.bg + ';color:' + vc.color + '">' + esc(verdict.replace(/_/g, ' ')) + '</span>';
             }
             html +=     '</div>'
                 +     '<div class="text-[0.78rem] text-[var(--text-primary)] leading-[1.45]">' + esc((narrative.summary || '').slice(0, 600)) + '</div>';
@@ -4051,10 +4051,10 @@ async function loadCaseTimeline(caseId) {
         events.forEach(function(e, idx) {
             const km = kindMeta[e.kind] || kindMeta.system;
             const ts = e.ts ? new Date(e.ts).toLocaleString() : '';
-            html += '<div class="_ion-s-0a1c7436f5">'
-                  +   '<div class="_ion-s-e080dc03bc"></div>'
+            html += '<div class="_ion-s-0a1c7436f5" data-ion-style="background:' + km.bg + '">'
+                  +   '<div class="_ion-s-e080dc03bc" data-ion-style="background:' + km.color + '"></div>'
                   +   '<div class="flex items-center gap-[0.4rem] mb-[0.2rem] flex-wrap">'
-                  +     '<span class="_ion-s-e62e34ae9b">' + km.label + '</span>'
+                  +     '<span class="_ion-s-e62e34ae9b" data-ion-style="color:' + km.color + '">' + km.label + '</span>'
                   +     '<span class="text-[0.65rem] text-[var(--text-muted)] font-mono">' + esc(ts) + '</span>'
                   +   '</div>'
                   +   '<div class="text-[0.78rem] text-[var(--text-primary)] font-medium">' + esc(e.title || '') + '</div>';
@@ -4117,7 +4117,7 @@ async function loadSimilarObservables(caseId) {
                 : '';
             return '<div class="mb-[0.85rem] pb-[0.65rem] border-b-[1px] border-b-[var(--ion-border)]">'
                 +   '<div class="flex items-center gap-[0.4rem] flex-wrap mb-[0.35rem]">'
-                +     '<span class="cpanel-alert-badge _ion-s-1f6be90690" title="TLP">' + esc((o.tlp || '').toUpperCase()) + '</span>'
+                +     '<span class="cpanel-alert-badge _ion-s-1f6be90690" data-ion-style="background:' + tlp.bg + ';color:' + tlp.color + '" title="TLP">' + esc((o.tlp || '').toUpperCase()) + '</span>'
                 +     iocBadge
                 +     '<code class="text-[0.7rem] text-[var(--text-muted)]">' + esc(o.type) + '</code>'
                 +     '<code class="text-xs text-[var(--text-primary)] break-all flex-1">' + esc(o.value) + '</code>'
@@ -4967,7 +4967,7 @@ function renderDonutChart(containerId, data, colors, centerLabel) {
         if (d.value === 0) return;
         const pctLabel = Math.round((d.value / total) * 100);
         legend += '<div class="donut-legend-item">'
-            + '<span class="donut-legend-dot _ion-s-efb05bbd3b"></span>'
+            + '<span class="donut-legend-dot _ion-s-efb05bbd3b" data-ion-style="background:' + colors[i] + '"></span>'
             + '<span class="donut-legend-label">' + d.label + '</span>'
             + '<span class="donut-legend-val">' + d.value + ' <span class="font-normal text-[var(--text-secondary)] text-[0.65rem]">' + pctLabel + '%</span></span>'
             + '</div>';
@@ -5000,7 +5000,7 @@ function renderSummaryStrip() {
     strip.innerHTML = ''
         + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--danger)]"></span><span class="summary-chip-label">Critical/High Active</span><span class="summary-chip-value text-[var(--danger)]">' + critHigh + '</span></div>'
         + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--warning)]"></span><span class="summary-chip-label">Unassigned</span><span class="summary-chip-value text-[var(--warning)]">' + unassigned + '</span></div>'
-        + '<div class="summary-chip"><span class="summary-chip-dot _ion-s-0f3cce5268"></span><span class="summary-chip-label">Oldest Active</span><span class="summary-chip-value">' + oldestDays + 'd</span></div>'
+        + '<div class="summary-chip"><span class="summary-chip-dot _ion-s-0f3cce5268" data-ion-style="background:' + (oldestDays > 7 ? 'var(--danger)' : oldestDays > 3 ? 'var(--warning)' : 'var(--success)') + '"></span><span class="summary-chip-label">Oldest Active</span><span class="summary-chip-value">' + oldestDays + 'd</span></div>'
         + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--success)]"></span><span class="summary-chip-label">Closed Today</span><span class="summary-chip-value text-[var(--success)]">' + closedToday + '</span></div>';
 }
 
@@ -5081,7 +5081,7 @@ function renderWorkloadBars() {
         const color = barColors[i % barColors.length];
         return '<div class="hbar-row">'
             + '<span class="hbar-label" title="' + esc(d.display_name) + '">' + esc(d.display_name) + '</span>'
-            + '<div class="hbar-track"><div class="hbar-fill _ion-s-da30d960d9"></div></div>'
+            + '<div class="hbar-track"><div class="hbar-fill _ion-s-da30d960d9" data-ion-style="width:' + pct + '%;background:' + color + '"></div></div>'
             + '<span class="hbar-value">' + d.open_count + '</span>'
             + '</div>';
     }).join('');
@@ -5120,10 +5120,10 @@ function renderSLAIndicators() {
     });
     const slaTotal = active.length || 1;
     let slaBar = '<div class="flex gap-1 mb-3 text-[0.7rem]">';
-    if (slaCounts.green) slaBar += '<div class="_ion-s-09b0c9a2e1" title="<24h: ' + slaCounts.green + '"></div>';
-    if (slaCounts.yellow) slaBar += '<div class="_ion-s-b2ff45bb5d" title="24-72h: ' + slaCounts.yellow + '"></div>';
-    if (slaCounts.orange) slaBar += '<div class="_ion-s-d28cf57fed" title="72h-7d: ' + slaCounts.orange + '"></div>';
-    if (slaCounts.red) slaBar += '<div class="_ion-s-eaadf28b85" title=">7d: ' + slaCounts.red + '"></div>';
+    if (slaCounts.green) slaBar += '<div class="_ion-s-09b0c9a2e1" data-ion-style="flex:' + slaCounts.green + '" title="<24h: ' + slaCounts.green + '"></div>';
+    if (slaCounts.yellow) slaBar += '<div class="_ion-s-b2ff45bb5d" data-ion-style="flex:' + slaCounts.yellow + '" title="24-72h: ' + slaCounts.yellow + '"></div>';
+    if (slaCounts.orange) slaBar += '<div class="_ion-s-d28cf57fed" data-ion-style="flex:' + slaCounts.orange + '" title="72h-7d: ' + slaCounts.orange + '"></div>';
+    if (slaCounts.red) slaBar += '<div class="_ion-s-eaadf28b85" data-ion-style="flex:' + slaCounts.red + '" title=">7d: ' + slaCounts.red + '"></div>';
     slaBar += '</div>';
     slaBar += '<div class="flex gap-3 mb-2 text-[0.65rem] text-[var(--text-secondary)]">'
         + '<span><span class="sla-dot sla-green inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>&lt;24h: ' + slaCounts.green + '</span>'

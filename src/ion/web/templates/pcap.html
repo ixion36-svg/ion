@@ -1231,7 +1231,7 @@
             const level = o.threat_level || 'unknown';
             const color = threatColors[level] || '#8b949e';
             const score = e ? (e.score != null ? e.score : '—') : '—';
-            const labels = e && e.labels && e.labels.length ? e.labels.map(l => '<span class="_ion-s-7554583028">' + esc(typeof l === 'string' ? l : l.value || l.name || '') + '</span>').join('') : '—';
+            const labels = e && e.labels && e.labels.length ? e.labels.map(l => '<span class="_ion-s-7554583028" data-ion-style="background:' + color + '20;color:' + color + '">' + esc(typeof l === 'string' ? l : l.value || l.name || '') + '</span>').join('') : '—';
             const actors = e && e.threat_actors && e.threat_actors.length ? e.threat_actors.map(a => esc(typeof a === 'string' ? a : a.name || '')).join(', ') : '—';
             const rowBg = e && e.is_malicious ? 'background:rgba(248,81,73,0.06);' : '';
 

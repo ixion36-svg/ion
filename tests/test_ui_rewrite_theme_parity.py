@@ -316,3 +316,50 @@ def test_no_utility_is_generated_from_a_javascript_expression():
         "ion.css contains a utility generated from a string concatenation; "
         "the content scan is reading source code or data, not markup"
     )
+
+
+def test_no_served_stylesheet_contains_javascript_source():
+    """A CSS declaration built at runtime cannot be a static rule.
+
+    The v0.31.21 inline-style migration hashed inline styles into classes, and
+    where the style was assembled in JS it emitted the ASSEMBLER as CSS:
+
+        ._ion-s-09b0c9a2e1 { flex:' + slaCounts.green + ';
+                             background:var(--success);height:6px }
+
+    A browser parses that, drops `flex` as invalid and keeps the rest, so the
+    element gets its static styling and silently loses the dynamic part. The
+    four SLA segments on the cases board never proportioned; progress bars had
+    no width; severity, TLP and closure badges had no colour. 23 rules were
+    like this and nothing failed.
+
+    The fix is ion-dynamic-styles.js: the dynamic declarations live in a
+    `data-ion-style` attribute and are applied with el.style.setProperty, which
+    is a DOM write rather than an inline `style=` attribute and so is not
+    blocked by CSP's style-src-attr 'none'.
+
+    This guard exists because the failure is invisible: nothing errors, nothing
+    logs, and the page looks plausible.
+    """
+    css_dir = Path("src/ion/web/static/css")
+    # The signature is a CONCATENATION, not merely a quote next to a plus.
+    # daisyUI ships `--tw-content:"+"` for the collapse-plus marker, and a
+    # looser pattern reads that as JavaScript. Requiring an expression on one
+    # side of the operator -- an identifier, a paren, a bracket -- tells a
+    # string being built from a variable apart from a plus sign someone meant
+    # literally.
+    js_ish = re.compile(r"['\"]\s*\+\s*[A-Za-z_$(]|[A-Za-z0-9_)\]]\s*\+\s*['\"]|\$\{")
+    offenders = []
+    for p in list(css_dir.glob("*.css")) + [Path("frontend/ion-legacy.css")]:
+        if p.name in ("lucide.css", "quill.snow.css"):
+            continue          # third-party, not ours to police
+        text = re.sub(r"/\*.*?\*/", "", p.read_text(encoding="utf-8",
+                                                    errors="replace"), flags=re.S)
+        for m in re.finditer(r"([^{}]+)\{([^{}]*)\}", text, re.S):
+            if js_ish.search(m.group(2)):
+                offenders.append(f"{p.name}: {' '.join(m.group(1).split())[:60]}")
+    assert not offenders, (
+        "stylesheet rules whose declarations contain JavaScript; the value is "
+        "dropped by the browser and the styling silently does not apply. Move "
+        "the dynamic declarations to a data-ion-style attribute:\n  "
+        + "\n  ".join(offenders[:12]))
