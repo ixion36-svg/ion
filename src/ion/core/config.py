@@ -716,7 +716,8 @@ def get_config() -> Config:
             _config.alert_field_pins = _get_env_bool("ION_ALERT_FIELD_PINS")
         if os.environ.get("ION_BOB_CUSTOM_TEMPLATES"):
             _config.bob_custom_templates = _get_env_bool("ION_BOB_CUSTOM_TEMPLATES")
-        _config.csrf_enabled = _get_env_bool("ION_CSRF_ENABLED", True)
+        if os.environ.get("ION_CSRF_ENABLED"):
+            _config.csrf_enabled = _get_env_bool("ION_CSRF_ENABLED", True)
         _env_csrf_origins = os.environ.get("ION_CSRF_EXTRA_ORIGINS", "").strip()
         if _env_csrf_origins:
             _config.csrf_extra_origins = _env_csrf_origins
