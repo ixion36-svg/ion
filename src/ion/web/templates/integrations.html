@@ -32,55 +32,55 @@
 
 <div id="tab-services" class="int-tab-panel active">
 <!-- Main Dashboard Layout -->
-<div class="dashboard-layout">
+<div class="grid grid-cols-1 min-[1200px]:grid-cols-[1fr_320px] gap-6 mb-8">
     <!-- Left Column: Integrations + Metrics -->
-    <div class="dashboard-main">
+    <div class="min-w-0">
         <!-- Integration Status Cards -->
-        <section class="section">
-            <h2>Integrations</h2>
-            <div class="integration-cards" id="integration-cards">
+        <section class="mb-6">
+            <h2 class="text-[1.1rem] mb-0">Integrations</h2>
+            <div class="grid grid-cols-1 min-[601px]:grid-cols-2 min-[901px]:grid-cols-3 gap-4 mt-4" id="integration-cards">
                 <div class="loading">Loading integrations...</div>
             </div>
         </section>
 
         <!-- Metrics Grid -->
-        <section class="section">
-            <h2>System Metrics</h2>
-            <div class="metrics-grid">
+        <section class="mb-6">
+            <h2 class="text-[1.1rem] mb-0">System Metrics</h2>
+            <div class="grid grid-cols-1 min-[769px]:grid-cols-2 gap-4 mt-4">
                 <!-- Row 1: Server + ES Cluster -->
-                <div class="metrics-card" id="server-metrics">
-                    <h3>Server Health</h3>
-                    <div class="metrics-content">
+                <div class="ion-card" id="server-metrics">
+                    <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Server Health</h3>
+                    <div class="metrics-content text-sm">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
-                <div class="metrics-card" id="es-cluster-metrics">
-                    <h3>Elasticsearch Cluster</h3>
-                    <div class="metrics-content">
+                <div class="ion-card" id="es-cluster-metrics">
+                    <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Elasticsearch Cluster</h3>
+                    <div class="metrics-content text-sm">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
                 <!-- Row 2: Ingestion + Data Flows -->
-                <div class="metrics-card" id="es-ingest-metrics">
-                    <h3>Ingestion Statistics</h3>
-                    <div class="metrics-content">
+                <div class="ion-card" id="es-ingest-metrics">
+                    <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Ingestion Statistics</h3>
+                    <div class="metrics-content text-sm">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
-                <div class="metrics-card" id="data-flow-metrics">
-                    <h3>Data Flows (24h)</h3>
-                    <div class="metrics-content">
+                <div class="ion-card" id="data-flow-metrics">
+                    <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Data Flows (24h)</h3>
+                    <div class="metrics-content text-sm">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
 
                 <!-- Row 3: Server Logs - Full Width -->
-                <div class="metrics-card metrics-card-wide" id="server-logs-metrics">
-                    <h3>Server Logs (Elasticsearch)</h3>
-                    <div class="metrics-content">
+                <div class="ion-card min-[769px]:col-span-2" id="server-logs-metrics">
+                    <h3 class="mt-0 mb-3 text-sm font-semibold text-base-content/60 uppercase tracking-[0.5px]">Server Logs (Elasticsearch)</h3>
+                    <div class="metrics-content text-sm">
                         <div class="loading">Loading...</div>
                     </div>
                 </div>
@@ -89,13 +89,13 @@
     </div>
 
     <!-- Right Column: Webhooks -->
-    <div class="dashboard-sidebar">
-        <section class="section">
-            <div class="section-header">
-                <h2>Webhooks</h2>
+    <div class="min-w-0">
+        <section class="mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-[1.1rem] mb-0">Webhooks</h2>
                 <button class="btn btn-sm btn-primary" data-click-action="showCreateWebhookModal">+ New</button>
             </div>
-            <div class="webhooks-list" id="webhooks-list">
+            <div class="mt-4" id="webhooks-list">
                 <div class="loading">Loading webhooks...</div>
             </div>
         </section>
@@ -103,17 +103,17 @@
 </div>
 
 <!-- Integration Logs Section - Full Width -->
-<section class="section">
-    <div class="section-header">
-        <h2>Integration Logs</h2>
-        <div class="filter-controls">
-            <select id="log-type-filter" data-change-action="loadIntegrationLogs">
+<section class="mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h2 class="text-[1.1rem] mb-0">Integration Logs</h2>
+        <div class="flex gap-2 flex-wrap">
+            <select id="log-type-filter" class="ion-select w-auto" data-change-action="loadIntegrationLogs">
                 <option value="">All Types</option>
                 <option value="gitlab">GitLab</option>
                 <option value="opencti">OpenCTI</option>
                 <option value="elasticsearch">Elasticsearch</option>
             </select>
-            <select id="log-level-filter" data-change-action="loadIntegrationLogs">
+            <select id="log-level-filter" class="ion-select w-auto" data-change-action="loadIntegrationLogs">
                 <option value="">All Levels</option>
                 <option value="debug">Debug</option>
                 <option value="info">Info</option>
@@ -122,7 +122,7 @@
             </select>
         </div>
     </div>
-    <div class="table-container">
+    <div class="overflow-x-auto">
         <table class="ion-table" id="logs-table">
             <thead>
                 <tr>
@@ -142,38 +142,38 @@
 
 <!-- Create Webhook Modal -->
 <div class="modal" id="create-webhook-modal">
-    <div class="modal-content">
-        <div class="modal-header">
+    <div class="bg-base-100 rounded-lg p-6 max-w-[500px] w-[90%] max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
             <h3>Create Webhook</h3>
-            <button class="modal-close" data-click-action="closeModal" data-args='["create-webhook-modal"]'>&times;</button>
+            <button class="text-2xl leading-none bg-transparent border-0 cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closeModal" data-args='["create-webhook-modal"]'>&times;</button>
         </div>
         <form id="create-webhook-form" data-submit-action="createWebhook" data-args='["$event"]'>
-            <div class="form-group">
-                <label for="webhook-name">Name *</label>
-                <input type="text" id="webhook-name" name="name" required>
+            <div class="mb-4">
+                <label for="webhook-name" class="block mb-1 font-medium text-sm">Name *</label>
+                <input type="text" id="webhook-name" name="name" class="ion-input" required>
             </div>
-            <div class="form-group">
-                <label for="webhook-description">Description</label>
-                <textarea id="webhook-description" name="description" rows="2"></textarea>
+            <div class="mb-4">
+                <label for="webhook-description" class="block mb-1 font-medium text-sm">Description</label>
+                <textarea id="webhook-description" name="description" rows="2" class="ion-textarea"></textarea>
             </div>
-            <div class="form-group">
-                <label for="webhook-source-type">Source Type</label>
-                <select id="webhook-source-type" name="source_type">
+            <div class="mb-4">
+                <label for="webhook-source-type" class="block mb-1 font-medium text-sm">Source Type</label>
+                <select id="webhook-source-type" name="source_type" class="ion-select">
                     <option value="custom">Custom</option>
                     <option value="gitlab">GitLab</option>
                     <option value="opencti">OpenCTI</option>
                     <option value="elasticsearch">Elasticsearch</option>
                 </select>
             </div>
-            <div class="form-group">
-                <label for="webhook-secret">HMAC Secret (optional)</label>
-                <input type="text" id="webhook-secret" name="secret" placeholder="For signature verification">
+            <div class="mb-4">
+                <label for="webhook-secret" class="block mb-1 font-medium text-sm">HMAC Secret (optional)</label>
+                <input type="text" id="webhook-secret" name="secret" class="ion-input" placeholder="For signature verification">
             </div>
-            <div class="form-group">
-                <label for="webhook-events">Event Types (comma-separated, optional)</label>
-                <input type="text" id="webhook-events" name="event_types" placeholder="push, issue, merge_request">
+            <div class="mb-4">
+                <label for="webhook-events" class="block mb-1 font-medium text-sm">Event Types (comma-separated, optional)</label>
+                <input type="text" id="webhook-events" name="event_types" class="ion-input" placeholder="push, issue, merge_request">
             </div>
-            <div class="form-actions">
+            <div class="flex justify-end gap-2 mt-6">
                 <button type="button" class="btn btn-secondary" data-click-action="closeModal" data-args='["create-webhook-modal"]'>Cancel</button>
                 <button type="submit" class="btn btn-primary">Create</button>
             </div>
@@ -183,36 +183,36 @@
 
 <!-- Edit Webhook Modal -->
 <div class="modal" id="edit-webhook-modal">
-    <div class="modal-content">
-        <div class="modal-header">
+    <div class="bg-base-100 rounded-lg p-6 max-w-[500px] w-[90%] max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
             <h3>Edit Webhook</h3>
-            <button class="modal-close" data-click-action="closeModal" data-args='["edit-webhook-modal"]'>&times;</button>
+            <button class="text-2xl leading-none bg-transparent border-0 cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closeModal" data-args='["edit-webhook-modal"]'>&times;</button>
         </div>
         <form id="edit-webhook-form" data-submit-action="updateWebhook" data-args='["$event"]'>
             <input type="hidden" id="edit-webhook-id">
-            <div class="form-group">
-                <label for="edit-webhook-name">Name *</label>
-                <input type="text" id="edit-webhook-name" name="name" required>
+            <div class="mb-4">
+                <label for="edit-webhook-name" class="block mb-1 font-medium text-sm">Name *</label>
+                <input type="text" id="edit-webhook-name" name="name" class="ion-input" required>
             </div>
-            <div class="form-group">
-                <label for="edit-webhook-description">Description</label>
-                <textarea id="edit-webhook-description" name="description" rows="2"></textarea>
+            <div class="mb-4">
+                <label for="edit-webhook-description" class="block mb-1 font-medium text-sm">Description</label>
+                <textarea id="edit-webhook-description" name="description" rows="2" class="ion-textarea"></textarea>
             </div>
-            <div class="form-group">
-                <label for="edit-webhook-secret">HMAC Secret</label>
-                <input type="text" id="edit-webhook-secret" name="secret" placeholder="Leave blank to keep current">
+            <div class="mb-4">
+                <label for="edit-webhook-secret" class="block mb-1 font-medium text-sm">HMAC Secret</label>
+                <input type="text" id="edit-webhook-secret" name="secret" class="ion-input" placeholder="Leave blank to keep current">
             </div>
-            <div class="form-group">
-                <label for="edit-webhook-events">Event Types (comma-separated)</label>
-                <input type="text" id="edit-webhook-events" name="event_types">
+            <div class="mb-4">
+                <label for="edit-webhook-events" class="block mb-1 font-medium text-sm">Event Types (comma-separated)</label>
+                <input type="text" id="edit-webhook-events" name="event_types" class="ion-input">
             </div>
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="edit-webhook-active" name="is_active">
+            <div class="mb-4">
+                <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" id="edit-webhook-active" name="is_active" class="checkbox checkbox-sm">
                     Active
                 </label>
             </div>
-            <div class="form-actions">
+            <div class="flex justify-end gap-2 mt-6">
                 <button type="button" class="btn btn-secondary" data-click-action="closeModal" data-args='["edit-webhook-modal"]'>Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
@@ -222,29 +222,29 @@
 
 <!-- Webhook Token Modal -->
 <div class="modal" id="webhook-token-modal">
-    <div class="modal-content">
-        <div class="modal-header">
+    <div class="bg-base-100 rounded-lg p-6 max-w-[500px] w-[90%] max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
             <h3>Webhook Created</h3>
-            <button class="modal-close" data-click-action="closeModal" data-args='["webhook-token-modal"]'>&times;</button>
+            <button class="text-2xl leading-none bg-transparent border-0 cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closeModal" data-args='["webhook-token-modal"]'>&times;</button>
         </div>
-        <div class="modal-body">
+        <div>
             <p>Your webhook has been created. Save the token below - it will not be shown again.</p>
-            <div class="form-group">
-                <label>Webhook URL</label>
-                <div class="copy-field">
-                    <input type="text" id="webhook-url-display" readonly>
+            <div class="mb-4">
+                <label class="block mb-1 font-medium text-sm">Webhook URL</label>
+                <div class="flex gap-2">
+                    <input type="text" id="webhook-url-display" class="ion-input flex-1" readonly>
                     <button type="button" class="btn btn-secondary" data-click-action="copyToClipboard" data-args='["webhook-url-display"]'>Copy</button>
                 </div>
             </div>
-            <div class="form-group">
-                <label>Token</label>
-                <div class="copy-field">
-                    <input type="text" id="webhook-token-display" readonly>
+            <div class="mb-4">
+                <label class="block mb-1 font-medium text-sm">Token</label>
+                <div class="flex gap-2">
+                    <input type="text" id="webhook-token-display" class="ion-input flex-1" readonly>
                     <button type="button" class="btn btn-secondary" data-click-action="copyToClipboard" data-args='["webhook-token-display"]'>Copy</button>
                 </div>
             </div>
         </div>
-        <div class="form-actions">
+        <div class="flex justify-end gap-2 mt-6">
             <button type="button" class="btn btn-primary" data-click-action="closeModal" data-args='["webhook-token-modal"]'>Done</button>
         </div>
     </div>
@@ -252,12 +252,12 @@
 
 <!-- Webhook Logs Modal -->
 <div class="modal" id="webhook-logs-modal">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
+    <div class="bg-base-100 rounded-lg p-6 max-w-[800px] w-[90%] max-h-[80vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
             <h3>Webhook Logs</h3>
-            <button class="modal-close" data-click-action="closeModal" data-args='["webhook-logs-modal"]'>&times;</button>
+            <button class="text-2xl leading-none bg-transparent border-0 cursor-pointer text-base-content/60 hover:text-base-content" data-click-action="closeModal" data-args='["webhook-logs-modal"]'>&times;</button>
         </div>
-        <div class="modal-body">
+        <div class="overflow-x-auto">
             <table class="ion-table">
                 <thead>
                     <tr>
@@ -277,12 +277,12 @@
 </div><!-- /#tab-services -->
 
 <div id="tab-topology" class="int-tab-panel">
-<div class="topo-page-wrap">
-<div class="topo-page">
+<div class="w-full px-8 box-border">
+<div class="flex flex-col gap-5 pb-5 max-w-full">
     <!-- Header -->
-    <div class="topo-header">
-        <h1><i class="icon-network"></i> Platform Topology</h1>
-        <div class="topo-header-actions">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+        <h1 class="m-0 text-[1.4rem] flex items-center gap-2.5"><i class="icon-network text-primary"></i> Platform Topology</h1>
+        <div class="flex gap-2 items-center">
             <span class="_ion-s-6e06904f9e" id="last-checked"></span>
             <button class="ion-btn" data-click-action="refreshAll">
                 <i class="icon-refresh-cw"></i> Refresh
@@ -308,19 +308,19 @@
             <div class="topo-health-subtitle" id="health-subtitle">Running service connectivity checks</div>
             <div class="topo-health-stats">
                 <div class="topo-health-stat">
-                    <span class="dot green"></span>
-                    <span class="count" id="healthy-count">-</span>
-                    <span class="label">Online</span>
+                    <span class="w-2 h-2 rounded-full flex-shrink-0 bg-success shadow-[0_0_8px_rgba(34,197,94,0.5)]"></span>
+                    <span class="font-bold text-base-content font-mono" id="healthy-count">-</span>
+                    <span class="text-base-content/60">Online</span>
                 </div>
                 <div class="topo-health-stat">
-                    <span class="dot red"></span>
-                    <span class="count" id="error-count">-</span>
-                    <span class="label">Error</span>
+                    <span class="w-2 h-2 rounded-full flex-shrink-0 bg-error shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span>
+                    <span class="font-bold text-base-content font-mono" id="error-count">-</span>
+                    <span class="text-base-content/60">Error</span>
                 </div>
                 <div class="topo-health-stat">
-                    <span class="dot gray"></span>
-                    <span class="count" id="disabled-count">-</span>
-                    <span class="label">Disabled</span>
+                    <span class="w-2 h-2 rounded-full flex-shrink-0 bg-base-content/40"></span>
+                    <span class="font-bold text-base-content font-mono" id="disabled-count">-</span>
+                    <span class="text-base-content/60">Disabled</span>
                 </div>
             </div>
         </div>

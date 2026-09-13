@@ -52,6 +52,9 @@
   "case_grouper.html": {
     "restyle": true
   },
+  "cases.html": {
+    "restyle": true
+  },
   "change_requests.html": {
     "restyle": true
   },
@@ -217,6 +220,9 @@
   },
   "guide_sim.html": {
     "convert": true,
+    "restyle": true
+  },
+  "integrations.html": {
     "restyle": true
   },
   "investigation_memory.html": {
