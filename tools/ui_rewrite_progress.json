@@ -204,6 +204,9 @@
   "executive_report.html": {
     "restyle": true
   },
+  "forensics.html": {
+    "restyle": true
+  },
   "gitlab.html": {
     "convert": true,
     "restyle": true

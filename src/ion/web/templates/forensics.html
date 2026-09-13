@@ -49,7 +49,7 @@
 </div>
 
 <!-- Tabs -->
-<div class="fr-tabs">
+<div class="fr-tabs flex border-b border-base-300 mb-4 overflow-x-auto w-full">
     <button class="fr-tab active" data-tab="pipeline" data-click-action="switchTab" data-args='["pipeline"]'>Investigation Pipeline</button>
     <button class="fr-tab" data-tab="investigations" data-click-action="switchTab" data-args='["investigations"]'>All Investigations</button>
     <button class="fr-tab" data-tab="evidence" data-click-action="switchTab" data-args='["evidence"]'>Evidence Tracker</button>
@@ -59,39 +59,39 @@
 
 <!-- ==================== PIPELINE TAB (Stage Kanban) ==================== -->
 <div class="fr-panel" id="panel-pipeline">
-    <div class="fr-pipeline">
-        <div class="fr-stage" data-status="intake">
-            <div class="fr-stage-header fr-stage-intake"><span>Intake</span><span class="fr-stage-count" id="pipe-intake">0</span></div>
-            <div class="fr-stage-cards" id="pipe-col-intake"></div>
+    <div class="fr-pipeline grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-2.5 overflow-x-auto min-h-[300px] w-full">
+        <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="intake">
+            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-info/[0.12] text-info"><span>Intake</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem]" id="pipe-intake">0</span></div>
+            <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-intake"></div>
         </div>
-        <div class="fr-stage" data-status="evidence_collection">
-            <div class="fr-stage-header fr-stage-evidence"><span>Evidence Collection</span><span class="fr-stage-count" id="pipe-evidence_collection">0</span></div>
-            <div class="fr-stage-cards" id="pipe-col-evidence_collection"></div>
+        <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="evidence_collection">
+            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-success/[0.12] text-success"><span>Evidence Collection</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem]" id="pipe-evidence_collection">0</span></div>
+            <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-evidence_collection"></div>
         </div>
-        <div class="fr-stage" data-status="analysis">
-            <div class="fr-stage-header fr-stage-analysis"><span>Analysis</span><span class="fr-stage-count" id="pipe-analysis">0</span></div>
-            <div class="fr-stage-cards" id="pipe-col-analysis"></div>
+        <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="analysis">
+            <div class="fr-stage-header flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px] bg-warning/[0.12] text-warning"><span>Analysis</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem]" id="pipe-analysis">0</span></div>
+            <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-analysis"></div>
         </div>
-        <div class="fr-stage" data-status="reporting">
-            <div class="fr-stage-header fr-stage-reporting"><span>Reporting</span><span class="fr-stage-count" id="pipe-reporting">0</span></div>
-            <div class="fr-stage-cards" id="pipe-col-reporting"></div>
+        <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="reporting">
+            <div class="fr-stage-header fr-stage-reporting flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Reporting</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem]" id="pipe-reporting">0</span></div>
+            <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-reporting"></div>
         </div>
-        <div class="fr-stage" data-status="review">
-            <div class="fr-stage-header fr-stage-review"><span>Review</span><span class="fr-stage-count" id="pipe-review">0</span></div>
-            <div class="fr-stage-cards" id="pipe-col-review"></div>
+        <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="review">
+            <div class="fr-stage-header fr-stage-review flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Review</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem]" id="pipe-review">0</span></div>
+            <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-review"></div>
         </div>
-        <div class="fr-stage" data-status="closed">
-            <div class="fr-stage-header fr-stage-closed"><span>Closed</span><span class="fr-stage-count" id="pipe-closed">0</span></div>
-            <div class="fr-stage-cards" id="pipe-col-closed"></div>
+        <div class="fr-stage bg-base-200 border border-base-300 rounded-[10px] flex flex-col min-w-0" data-status="closed">
+            <div class="fr-stage-header fr-stage-closed flex justify-between items-center px-3 py-2.5 font-bold text-[0.8rem] uppercase tracking-wide rounded-t-[10px]"><span>Closed</span><span class="fr-stage-count bg-white/15 px-2 py-0.5 rounded-[10px] text-[0.75rem]" id="pipe-closed">0</span></div>
+            <div class="fr-stage-cards p-2 flex-1 overflow-y-auto max-h-[500px]" id="pipe-col-closed"></div>
         </div>
     </div>
 </div>
 
 <!-- ==================== ALL INVESTIGATIONS TAB ==================== -->
 <div class="fr-panel _ion-s-c8be1ccba6" id="panel-investigations">
-    <div class="cases-filters-bar">
-        <input type="text" id="filter-search" class="ion-input cases-filter-input" placeholder="Search case number or title..." data-input-action="debouncedFilter">
-        <select id="filter-status" class="ion-select cases-filter-select" data-change-action="loadCases">
+    <div class="flex flex-col sm:flex-row gap-3 mb-4 w-full">
+        <input type="text" id="filter-search" class="ion-input flex-1" placeholder="Search case number or title..." data-input-action="debouncedFilter">
+        <select id="filter-status" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadCases">
             <option value="">All Statuses</option>
             <option value="intake">Intake</option>
             <option value="evidence_collection">Evidence Collection</option>
@@ -100,8 +100,8 @@
             <option value="review">Review</option>
             <option value="closed">Closed</option>
         </select>
-        <select id="filter-type" class="ion-select cases-filter-select" data-change-action="loadCases"></select>
-        <select id="filter-priority" class="ion-select cases-filter-select" data-change-action="loadCases">
+        <select id="filter-type" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadCases"></select>
+        <select id="filter-priority" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadCases">
             <option value="">All Priorities</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
@@ -109,61 +109,61 @@
             <option value="low">Low</option>
         </select>
     </div>
-    <div class="table-container">
+    <div class="overflow-x-auto w-full">
         <table class="data-table" id="cases-table">
             <thead><tr><th>Case #</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Lead</th><th>Progress</th><th>SLA</th><th>Lock</th><th>Created</th></tr></thead>
             <tbody id="cases-tbody"></tbody>
         </table>
-        <div class="empty-state _ion-s-c8be1ccba6" id="cases-empty">No investigations found</div>
+        <div class="text-center py-10 text-base-content/60 _ion-s-c8be1ccba6" id="cases-empty">No investigations found</div>
     </div>
 </div>
 
 <!-- ==================== EVIDENCE TAB ==================== -->
 <div class="fr-panel _ion-s-c8be1ccba6" id="panel-evidence">
-    <div class="cases-filters-bar">
-        <select id="evidence-case-select" class="ion-select cases-filter-select" data-change-action="loadEvidenceForCase"><option value="">Select an investigation...</option></select>
+    <div class="flex flex-col sm:flex-row gap-3 mb-4 w-full">
+        <select id="evidence-case-select" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadEvidenceForCase"><option value="">Select an investigation...</option></select>
     </div>
-    <div class="table-container">
+    <div class="overflow-x-auto w-full">
         <table class="data-table" id="evidence-table">
             <thead><tr><th>Evidence #</th><th>Name</th><th>Type</th><th>Status</th><th>Hashes</th><th>Storage</th><th>Collected By</th><th>Custody</th><th>Actions</th></tr></thead>
             <tbody id="evidence-tbody"></tbody>
         </table>
-        <div class="empty-state" id="evidence-empty">Select an investigation to view evidence</div>
+        <div class="text-center py-10 text-base-content/60" id="evidence-empty">Select an investigation to view evidence</div>
     </div>
 </div>
 
 <!-- ==================== PLAYBOOKS TAB ==================== -->
 <div class="fr-panel _ion-s-c8be1ccba6" id="panel-playbooks">
     <div class="_ion-s-bebbec7442">
-        <select id="pb-filter-type" class="ion-select cases-filter-select" data-change-action="loadPlaybooks"><option value="">All Types</option></select>
+        <select id="pb-filter-type" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadPlaybooks"><option value="">All Types</option></select>
         <button class="ion-btn ion-btn-primary" data-click-action="showNewPlaybookModal">+ New Playbook</button>
     </div>
-    <div class="table-container">
+    <div class="overflow-x-auto w-full">
         <table class="data-table" id="playbooks-table">
             <thead><tr><th>Name</th><th>Investigation Type</th><th>Steps</th><th>Active</th><th>Created By</th><th>Actions</th></tr></thead>
             <tbody id="playbooks-tbody"></tbody>
         </table>
-        <div class="empty-state _ion-s-c8be1ccba6" id="playbooks-empty">No forensic playbooks found</div>
+        <div class="text-center py-10 text-base-content/60 _ion-s-c8be1ccba6" id="playbooks-empty">No forensic playbooks found</div>
     </div>
 </div>
 
 <!-- ==================== REFERENCE DOCS TAB ==================== -->
 <div class="fr-panel _ion-s-c8be1ccba6" id="panel-reference">
-    <div class="fr-ref-grid" id="ref-docs-grid"></div>
+    <div class="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4 w-full" id="ref-docs-grid"></div>
 </div>
 
 <!-- ==================== MODALS ==================== -->
 
 <!-- New Investigation Modal (Wizard: playbook → details) -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-new-case">
-    <div class="modal-dialog _ion-s-99e5af0b5b">
-        <div class="modal-header"><h2>New Forensic Investigation</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-new-case"]'>&times;</button></div>
-        <div class="modal-body">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-new-case">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-99e5af0b5b">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">New Forensic Investigation</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-new-case"]'>&times;</button></div>
+        <div class="p-5">
             <!-- Step 1: Select Playbook -->
             <div id="nc-step-1">
-                <label>Select a Forensic Playbook</label>
+                <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Select a Forensic Playbook</label>
                 <p class="_ion-s-ed53d90520">Choose a playbook to guide the investigation with pre-defined sections, or skip to create a blank investigation.</p>
-                <select id="nc-playbook" class="form-input" data-change-action="onPlaybookSelect">
+                <select id="nc-playbook" class="select w-full" data-change-action="onPlaybookSelect">
                     <option value="">-- No Playbook (blank investigation) --</option>
                 </select>
                 <div class="_ion-s-98ae68faa3" id="nc-playbook-preview">
@@ -175,21 +175,21 @@
             <hr class="_ion-s-fd3ef5ec34">
             <!-- Step 2: Case Details -->
             <div id="nc-step-2">
-                <label>Title *</label><input type="text" id="nc-title" class="form-input" placeholder="Investigation title">
+                <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Title *</label><input type="text" id="nc-title" class="input w-full" placeholder="Investigation title">
                 <div class="_ion-s-adf555b36b">
-                    <div><label>Investigation Type *</label><select id="nc-type" class="form-input"></select></div>
-                    <div><label>Priority</label>
-                    <select id="nc-priority" class="form-input"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
+                    <div><label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Investigation Type *</label><select id="nc-type" class="select w-full"></select></div>
+                    <div><label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Priority</label>
+                    <select id="nc-priority" class="select w-full"><option value="low">Low</option><option value="medium" selected>Medium</option><option value="high">High</option><option value="critical">Critical</option></select></div>
                 </div>
                 <div class="_ion-s-adf555b36b">
-                    <div><label>Lead Investigator</label><select id="nc-lead" class="form-input"><option value="">Unassigned</option></select></div>
-                    <div><label>Classification</label><input type="text" id="nc-classification" class="form-input" placeholder="e.g. TLP:RED"></div>
+                    <div><label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Lead Investigator</label><select id="nc-lead" class="select w-full"><option value="">Unassigned</option></select></div>
+                    <div><label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Classification</label><input type="text" id="nc-classification" class="input w-full" placeholder="e.g. TLP:RED"></div>
                 </div>
-                <label>Description</label><textarea id="nc-description" class="form-input" rows="3" placeholder="Describe the investigation..."></textarea>
-                <label>Link to SOC Case (optional)</label><input type="number" id="nc-alert-case" class="form-input" placeholder="Alert Case ID">
+                <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Description</label><textarea id="nc-description" class="textarea w-full resize-y" rows="3" placeholder="Describe the investigation..."></textarea>
+                <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Link to SOC Case (optional)</label><input type="number" id="nc-alert-case" class="input w-full" placeholder="Alert Case ID">
             </div>
         </div>
-        <div class="modal-footer">
+        <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-new-case"]'>Cancel</button>
             <button class="btn btn-primary" data-click-action="createCase">Create Investigation</button>
         </div>
@@ -197,14 +197,14 @@
 </div>
 
 <!-- Case Detail Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-case-detail">
-    <div class="modal-dialog _ion-s-f58def8551">
-        <div class="modal-header">
-            <h2 id="cd-title" class="editable-title" data-click-action="startEditTitle" title="Click to edit title">Investigation Detail</h2>
-            <input type="text" id="cd-title-input" class="form-input _ion-s-4fa05ae95b" data-blur-action="saveTitle" data-enter-key-action="saveTitle" data-escape-key-action="cancelEditTitle">
-            <button class="modal-close" data-click-action="closeModal" data-args='["modal-case-detail"]'>&times;</button>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-case-detail">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-f58def8551">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl">
+            <h2 id="cd-title" class="text-[1.1rem] m-0 cursor-pointer border-b border-dashed border-transparent hover:border-primary transition-colors duration-200" data-click-action="startEditTitle" title="Click to edit title">Investigation Detail</h2>
+            <input type="text" id="cd-title-input" class="input w-full _ion-s-4fa05ae95b" data-blur-action="saveTitle" data-enter-key-action="saveTitle" data-escape-key-action="cancelEditTitle">
+            <button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-case-detail"]'>&times;</button>
         </div>
-        <div class="modal-body" id="cd-body">
+        <div class="p-5" id="cd-body">
             <div class="_ion-s-49e3770117">
                 <span class="badge" id="cd-status-badge"></span>
                 <span class="badge" id="cd-priority-badge"></span>
@@ -213,7 +213,7 @@
                 <span class="_ion-s-7de6a0d47a" id="cd-playbook-name"></span>
                 <span class="_ion-s-b8aeedb644" id="cd-lock-indicator"></span>
                 <div class="_ion-s-d3fd2ef966">
-                    <select id="cd-status-select" class="form-input _ion-s-72abfebb5d" data-change-action="updateCaseStatus"></select>
+                    <select id="cd-status-select" class="select w-full _ion-s-72abfebb5d" data-change-action="updateCaseStatus"></select>
                     <button class="btn btn-secondary _ion-s-108959c2fe" id="cd-lock-btn" data-click-action="toggleLock">Lock</button>
                     <button class="btn btn-secondary _ion-s-108959c2fe" data-click-action="showCloseModal">Close</button>
                     <button class="btn btn-secondary _ion-s-108959c2fe" data-click-action="generateReport">Report</button>
@@ -232,9 +232,9 @@
                 </div>
             </div>
             <div id="cd-description" class="editable-desc _ion-s-f59cfb71a5" data-click-action="startEditDesc" title="Click to edit description"></div>
-            <textarea id="cd-desc-input" class="form-input _ion-s-6129b62c5b" rows="3" data-blur-action="saveDesc" data-escape-key-action="cancelEditDesc"></textarea>
+            <textarea id="cd-desc-input" class="textarea w-full resize-y _ion-s-6129b62c5b" rows="3" data-blur-action="saveDesc" data-escape-key-action="cancelEditDesc"></textarea>
             <!-- Sub-tabs: Sections is now the primary tab -->
-            <div class="fr-tabs _ion-s-3ef1fa1aa1">
+            <div class="fr-tabs _ion-s-3ef1fa1aa1 flex border-b border-base-300 mb-1 overflow-x-auto w-full">
                 <button class="fr-tab active" data-click-action="switchDetailTab" data-args='["sections"]'>Sections</button>
                 <button class="fr-tab" data-click-action="switchDetailTab" data-args='["evidence"]'>Evidence</button>
                 <button class="fr-tab" data-click-action="switchDetailTab" data-args='["timeline"]'>Timeline</button>
@@ -252,7 +252,7 @@
             </div>
             <div class="_ion-s-c8be1ccba6" id="cd-tab-timeline">
                 <div class="_ion-s-1ce40f0bd0">
-                    <input type="text" id="cd-note-input" class="form-input _ion-s-7623f05545" placeholder="Add a timeline note...">
+                    <input type="text" id="cd-note-input" class="input w-full _ion-s-7623f05545" placeholder="Add a timeline note...">
                     <button class="btn btn-primary" data-click-action="addTimelineNote">Add</button>
                 </div>
                 <div class="_ion-s-0763f1beef" id="cd-timeline"></div>
@@ -280,16 +280,16 @@
 </div>
 
 <!-- Close Investigation Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-close-case">
-    <div class="modal-dialog _ion-s-c04fdcc96d">
-        <div class="modal-header"><h2>Close Investigation</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-close-case"]'>&times;</button></div>
-        <div class="modal-body">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-close-case">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-c04fdcc96d">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Close Investigation</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-close-case"]'>&times;</button></div>
+        <div class="p-5">
             <p class="_ion-s-213089e108">Closing will auto-generate a report in the Document Library under "Forensic Reports".</p>
-            <label>Summary</label><textarea id="cc-summary" class="form-input" rows="3" placeholder="Executive summary..."></textarea>
-            <label>Findings</label><textarea id="cc-findings" class="form-input" rows="4" placeholder="Key findings..."></textarea>
-            <label>Recommendations</label><textarea id="cc-recommendations" class="form-input" rows="3" placeholder="Recommended actions..."></textarea>
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Summary</label><textarea id="cc-summary" class="textarea w-full resize-y" rows="3" placeholder="Executive summary..."></textarea>
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Findings</label><textarea id="cc-findings" class="textarea w-full resize-y" rows="4" placeholder="Key findings..."></textarea>
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Recommendations</label><textarea id="cc-recommendations" class="textarea w-full resize-y" rows="3" placeholder="Recommended actions..."></textarea>
         </div>
-        <div class="modal-footer">
+        <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-close-case"]'>Cancel</button>
             <button class="btn btn-primary" data-click-action="closeCaseSubmit">Close Investigation</button>
         </div>
@@ -297,19 +297,19 @@
 </div>
 
 <!-- Add Evidence Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-add-evidence">
-    <div class="modal-dialog _ion-s-c04fdcc96d">
-        <div class="modal-header"><h2>Add Evidence</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-add-evidence"]'>&times;</button></div>
-        <div class="modal-body">
-            <label>Name *</label><input type="text" id="ae-name" class="form-input" placeholder="Evidence item name">
-            <label>Evidence Type *</label><select id="ae-type" class="form-input"></select>
-            <label>Source</label><input type="text" id="ae-source" class="form-input" placeholder="Where evidence was collected from">
-            <label>Storage Location</label><input type="text" id="ae-storage" class="form-input" placeholder="Current storage location">
-            <label>MD5 Hash</label><input type="text" id="ae-md5" class="form-input" placeholder="MD5 hash (optional)">
-            <label>SHA-256 Hash</label><input type="text" id="ae-sha256" class="form-input" placeholder="SHA-256 hash (optional)">
-            <label>Description</label><textarea id="ae-description" class="form-input" rows="3" placeholder="Evidence description..."></textarea>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-add-evidence">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-c04fdcc96d">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Add Evidence</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-add-evidence"]'>&times;</button></div>
+        <div class="p-5">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Name *</label><input type="text" id="ae-name" class="input w-full" placeholder="Evidence item name">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Evidence Type *</label><select id="ae-type" class="select w-full"></select>
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Source</label><input type="text" id="ae-source" class="input w-full" placeholder="Where evidence was collected from">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Storage Location</label><input type="text" id="ae-storage" class="input w-full" placeholder="Current storage location">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">MD5 Hash</label><input type="text" id="ae-md5" class="input w-full" placeholder="MD5 hash (optional)">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">SHA-256 Hash</label><input type="text" id="ae-sha256" class="input w-full" placeholder="SHA-256 hash (optional)">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Description</label><textarea id="ae-description" class="textarea w-full resize-y" rows="3" placeholder="Evidence description..."></textarea>
         </div>
-        <div class="modal-footer">
+        <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-add-evidence"]'>Cancel</button>
             <button class="btn btn-primary" data-click-action="addEvidence">Add Evidence</button>
         </div>
@@ -317,16 +317,16 @@
 </div>
 
 <!-- Custody Action Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-custody">
-    <div class="modal-dialog _ion-s-5c0843b73b">
-        <div class="modal-header"><h2>Log Custody Action</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-custody"]'>&times;</button></div>
-        <div class="modal-body">
-            <label>Action *</label><select id="cust-action" class="form-input"></select>
-            <label>Location</label><input type="text" id="cust-location" class="form-input" placeholder="Location">
-            <label>Received By</label><select id="cust-received-by" class="form-input"><option value="">N/A</option></select>
-            <label>Notes</label><textarea id="cust-notes" class="form-input" rows="3" placeholder="Notes..."></textarea>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-custody">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-5c0843b73b">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Log Custody Action</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-custody"]'>&times;</button></div>
+        <div class="p-5">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Action *</label><select id="cust-action" class="select w-full"></select>
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Location</label><input type="text" id="cust-location" class="input w-full" placeholder="Location">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Received By</label><select id="cust-received-by" class="select w-full"><option value="">N/A</option></select>
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Notes</label><textarea id="cust-notes" class="textarea w-full resize-y" rows="3" placeholder="Notes..."></textarea>
         </div>
-        <div class="modal-footer">
+        <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-custody"]'>Cancel</button>
             <button class="btn btn-primary" data-click-action="submitCustody">Log Action</button>
         </div>
@@ -334,23 +334,23 @@
 </div>
 
 <!-- Custody Log Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-custody-log">
-    <div class="modal-dialog _ion-s-bdcaca75c4">
-        <div class="modal-header"><h2 id="cl-title">Chain of Custody</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-custody-log"]'>&times;</button></div>
-        <div class="modal-body"><div class="_ion-s-e37d1b0263" id="cl-entries"></div></div>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-custody-log">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-bdcaca75c4">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="cl-title" class="text-[1.1rem] m-0">Chain of Custody</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-custody-log"]'>&times;</button></div>
+        <div class="p-5"><div class="_ion-s-e37d1b0263" id="cl-entries"></div></div>
     </div>
 </div>
 
 <!-- Add Section Modal (ad-hoc step) -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-add-step">
-    <div class="modal-dialog _ion-s-5c0843b73b">
-        <div class="modal-header"><h2>Add Investigation Section</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-add-step"]'>&times;</button></div>
-        <div class="modal-body">
-            <label>Section Title *</label><input type="text" id="as-title" class="form-input" placeholder="e.g. Network Analysis">
-            <label>Guidance / Description</label><textarea id="as-description" class="form-input" rows="3" placeholder="What should be documented in this section?"></textarea>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-add-step">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-5c0843b73b">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Add Investigation Section</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-add-step"]'>&times;</button></div>
+        <div class="p-5">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Section Title *</label><input type="text" id="as-title" class="input w-full" placeholder="e.g. Network Analysis">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Guidance / Description</label><textarea id="as-description" class="textarea w-full resize-y" rows="3" placeholder="What should be documented in this section?"></textarea>
             <div class="_ion-s-bcac039da8"><input type="checkbox" id="as-required"><label class="_ion-s-1da9facb4d" for="as-required">Required section</label></div>
         </div>
-        <div class="modal-footer">
+        <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-add-step"]'>Cancel</button>
             <button class="btn btn-primary" data-click-action="addCaseStep">Add Section</button>
         </div>
@@ -358,10 +358,10 @@
 </div>
 
 <!-- IOC Extract Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-ioc-extract">
-    <div class="modal-dialog _ion-s-99e5af0b5b">
-        <div class="modal-header"><h2>Extract IOCs</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-ioc-extract"]'>&times;</button></div>
-        <div class="modal-body">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-ioc-extract">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-99e5af0b5b">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Extract IOCs</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-ioc-extract"]'>&times;</button></div>
+        <div class="p-5">
             <div class="ioc-upload-area" id="ioc-drop-zone">
                 <div id="ioc-upload-prompt">
                     <div class="_ion-s-aa7bb3532c">&#128196;</div>
@@ -372,7 +372,7 @@
                 <div class="_ion-s-07c7125b80" id="ioc-file-name"></div>
             </div>
             <div class="_ion-s-0d1afec7bd">— or paste text directly —</div>
-            <textarea class="form-input" id="ioc-paste-text" rows="4" placeholder="Paste IOC data, log snippets, threat intel reports, etc."></textarea>
+            <textarea class="textarea w-full resize-y" id="ioc-paste-text" rows="4" placeholder="Paste IOC data, log snippets, threat intel reports, etc."></textarea>
             <div class="_ion-s-635fe5f2dc">
                 <button class="btn btn-primary" data-click-action="runIOCExtraction">Extract IOCs</button>
                 <button class="btn btn-secondary" data-click-action="clearIOCModal">Clear</button>
@@ -389,19 +389,19 @@
 </div>
 
 <!-- New/Edit Playbook Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-playbook">
-    <div class="modal-dialog _ion-s-99e5af0b5b">
-        <div class="modal-header"><h2 id="pb-modal-title">New Forensic Playbook</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-playbook"]'>&times;</button></div>
-        <div class="modal-body">
-            <label>Name *</label><input type="text" id="pb-name" class="form-input" placeholder="Playbook name">
-            <label>Investigation Type</label><select id="pb-type" class="form-input"><option value="">Any</option></select>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-playbook">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-99e5af0b5b">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="pb-modal-title" class="text-[1.1rem] m-0">New Forensic Playbook</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-playbook"]'>&times;</button></div>
+        <div class="p-5">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Name *</label><input type="text" id="pb-name" class="input w-full" placeholder="Playbook name">
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Investigation Type</label><select id="pb-type" class="select w-full"><option value="">Any</option></select>
             <div class="_ion-s-09e4b5badb"><input type="checkbox" id="pb-active" checked><label class="_ion-s-1da9facb4d" for="pb-active">Active</label></div>
-            <label>Description</label><textarea id="pb-desc" class="form-input" rows="3" placeholder="Playbook description..."></textarea>
+            <label class="block mt-2.5 mb-1 font-semibold text-[0.85rem] text-base-content/60">Description</label><textarea id="pb-desc" class="textarea w-full resize-y" rows="3" placeholder="Playbook description..."></textarea>
             <h3 class="_ion-s-8395ecd769">Steps</h3>
             <div id="pb-steps-list"></div>
             <button class="btn btn-secondary _ion-s-b1ecc496e0" data-click-action="addPlaybookStepRow">+ Add Step</button>
         </div>
-        <div class="modal-footer">
+        <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-playbook"]'>Cancel</button>
             <button class="btn btn-primary" data-click-action="savePlaybook">Save</button>
         </div>
@@ -409,11 +409,11 @@
 </div>
 
 <!-- Report Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-report">
-    <div class="modal-dialog _ion-s-babea46ba6">
-        <div class="modal-header"><h2 id="rpt-title">Investigation Report</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-report"]'>&times;</button></div>
-        <div class="modal-body"><div class="_ion-s-1b2774abc8" id="rpt-content"></div></div>
-        <div class="modal-footer">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-report">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-babea46ba6">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="rpt-title" class="text-[1.1rem] m-0">Investigation Report</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-report"]'>&times;</button></div>
+        <div class="p-5"><div class="_ion-s-1b2774abc8" id="rpt-content"></div></div>
+        <div class="flex gap-3 px-5 py-4 border-t border-base-300 justify-end bg-base-100 rounded-b-xl">
             <button class="btn btn-secondary" data-click-action="closeModal" data-args='["modal-report"]'>Close</button>
             <button class="btn btn-primary" data-click-action="copyReport">Copy to Clipboard</button>
         </div>
@@ -421,10 +421,10 @@
 </div>
 
 <!-- Reference Doc Viewer Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="modal-ref-doc">
-    <div class="modal-dialog _ion-s-babea46ba6">
-        <div class="modal-header"><h2 id="ref-doc-title">Reference Document</h2><button class="modal-close" data-click-action="closeModal" data-args='["modal-ref-doc"]'>&times;</button></div>
-        <div class="modal-body"><div id="ref-doc-content" class="ref-doc-body"></div></div>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-ref-doc">
+    <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md _ion-s-babea46ba6">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="ref-doc-title" class="text-[1.1rem] m-0">Reference Document</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-ref-doc"]'>&times;</button></div>
+        <div class="p-5"><div id="ref-doc-content" class="ref-doc-body"></div></div>
     </div>
 </div>
 
