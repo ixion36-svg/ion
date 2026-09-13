@@ -1,0 +1,62 @@
+[
+  {
+    "page": "de_workbench.html",
+    "lines_before": 369,
+    "exit": 0,
+    "tail": "",
+    "lines_after": 379,
+    "status": "OK",
+    "problems": [],
+    "elapsed": 235
+  },
+  {
+    "page": "stories.html",
+    "lines_before": 322,
+    "exit": 0,
+    "tail": "btn btn-primary` / `btn-ghost` / `btn-error btn-outline` / `btn-sm`\n- Enabled/disabled and run status \u00e2\u2020\u2019 `badge-success` / `badge-ghost` / `badge-error`\n- Editor fields \u00e2\u2020\u2019 `input` / `textarea` / `checkbox` / `fieldset`\n- Validation errors \u00e2\u2020\u2019 `alert alert-error`\n- Recent runs \u00e2\u2020\u2019 `table table-sm` with daisyUI `collapse` for step outputs\n\nNo raw `style=` attributes. Baseline file was not edited.\n",
+    "lines_after": 348,
+    "status": "OK",
+    "problems": [],
+    "elapsed": 334
+  },
+  {
+    "page": "network_topology.html",
+    "lines_before": 429,
+    "exit": 0,
+    "tail": "Arkime banner, `card` / `card-body` / `card-title` for the three panels, and `link link-primary` for the traffic-analytics link. The vis-network canvas is **not** a `card` \u00e2\u20ac\u201d daisyUI card is `display: flex`, which would collapse the graph viewport.\n\nI have no browser in this session, so layout was not visually verified. The reviewer should check at a real desktop width, not a downscaled preview.\n",
+    "lines_after": 559,
+    "status": "OK",
+    "problems": [],
+    "elapsed": 367
+  },
+  {
+    "page": "analyst.html",
+    "lines_before": 534,
+    "exit": 0,
+    "tail": "ary`, with semantic colours (`text-primary`, `text-error`, `text-warning`, `text-success`) instead of hardcoded palette utilities.\n\n**4. `_ion-s-*` class count**\n**0 before, 0 after.** This template never had hashed classes. No `style=\"...\"` attributes were introduced.\n\nNo browser tools were available in this session, so layout was not exercised in a live browser. The audit is the check that ran.\n",
+    "lines_after": 546,
+    "status": "OK",
+    "problems": [],
+    "elapsed": 367
+  },
+  {
+    "page": "alert_arkime.html",
+    "lines_before": 503,
+    "exit": 0,
+    "tail": "attributes.\n\nStatic markup is now `card` / `stat` / `table` / `badge` / `btn` / `alert` / `input` / `select`. JS still owns the same ids, `.commit-mode-btn`, `data-mode`, and `hidden` / `grid` / `inline-flex` toggles; only the generated class strings were moved onto daisyUI badges, table rows, and alerts.\n\nI did not load the page in a browser \u00e2\u20ac\u201d it needs a running ION server and a real alert id.\n",
+    "lines_after": 517,
+    "status": "OK",
+    "problems": [],
+    "elapsed": 450
+  },
+  {
+    "page": "daily_work.html",
+    "lines_before": 487,
+    "exit": 0,
+    "tail": "-v-green`, `.dw-dot-*`, `.dw-src`, `.dw-empty`.\n\nJavaScript, every `id`, `data-view` / `data-mode`, and the `/shift-handover` link are unchanged.\n\n**4. `_ion-s-*` count:** **0 before, 0 after.** No raw `style=` attributes.\n\nI could not visually verify in a browser (no browser tools in this session). Closest checks: the rewrite audit and `test_daily_work_defers_to_the_real_handover`, both passing.\n",
+    "lines_after": 581,
+    "status": "OK",
+    "problems": [],
+    "elapsed": 616
+  }
+]

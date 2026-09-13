@@ -3,24 +3,24 @@
 {% block title %}SOC Command Centre - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-8 md:py-10">
 
 <!-- Row 1: Greeting + Shift Context -->
 <section class="mb-6 rise d-1">
   <div class="flex flex-wrap items-center justify-between gap-4">
     <div>
-      <h1 class="font-sans font-semibold text-[28px] md:text-[34px] text-white tracking-[-0.02em] leading-tight">
-        Good <span id="greeting-period">morning</span>, <span id="greeting-name" class="text-ion-cyan">Analyst</span>
+      <h1 class="font-sans font-semibold text-[28px] md:text-[34px] text-base-content tracking-[-0.02em] leading-tight">
+        Good <span id="greeting-period">morning</span>, <span id="greeting-name" class="text-primary">Analyst</span>
       </h1>
-      <p class="mt-1 text-[13px] text-slate-500 font-mono">
+      <p class="mt-1 text-sm text-base-content/50 font-mono">
         <span id="utc-clock">--:--:-- UTC</span>
-        <span class="mx-2 text-white/10">|</span>
+        <span class="mx-2 text-base-content/10">|</span>
         Shift started <span id="shift-duration">--</span> ago
       </p>
     </div>
     <div class="flex items-center gap-3">
-      <span id="es-status-pill" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold tracking-wide bg-slate-500/15 text-slate-400">
+      <span id="es-status-pill" class="badge badge-ghost gap-1.5">
         <span class="h-1.5 w-1.5 rounded-full bg-current"></span>
         Checking...
       </span>
@@ -29,35 +29,35 @@
 </section>
 
 <!-- Row 2: KPI Strip -->
-<section class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6 rise d-2">
-  <a href="/alerts" class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4 hover:border-ion-cyan/30 transition-colors cursor-pointer block">
-    <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Open Alerts</div>
-    <div class="text-[28px] font-semibold font-mono text-white leading-none" id="kpi-open-alerts">&mdash;</div>
-    <div class="text-[11px] text-slate-600 mt-1">Last 24h</div>
+<section class="stats stats-vertical md:stats-horizontal w-full bg-base-200 shadow mb-6 rise d-2">
+  <a href="/alerts" class="stat">
+    <div class="stat-title">Open Alerts</div>
+    <div class="stat-value font-mono text-base-content" id="kpi-open-alerts">&mdash;</div>
+    <div class="stat-desc">Last 24h</div>
   </a>
-  <a href="/cases" class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4 hover:border-ion-cyan/30 transition-colors cursor-pointer block">
-    <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">My Cases</div>
-    <div class="text-[28px] font-semibold font-mono text-white leading-none" id="kpi-my-cases">&mdash;</div>
-    <div class="text-[11px] text-slate-600 mt-1">Open / Investigating</div>
+  <a href="/cases" class="stat">
+    <div class="stat-title">My Cases</div>
+    <div class="stat-value font-mono text-base-content" id="kpi-my-cases">&mdash;</div>
+    <div class="stat-desc">Open / Investigating</div>
   </a>
-  <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
-    <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Critical / High</div>
-    <div class="flex items-center gap-2 leading-none">
-      <span class="text-[28px] font-semibold font-mono text-red-400" id="kpi-critical">0</span>
-      <span class="text-[16px] font-mono text-white/20">/</span>
-      <span class="text-[28px] font-semibold font-mono text-amber-400" id="kpi-high">0</span>
+  <div class="stat">
+    <div class="stat-title">Critical / High</div>
+    <div class="stat-value font-mono flex items-center gap-2">
+      <span class="text-error" id="kpi-critical">0</span>
+      <span class="text-2xl font-mono text-base-content/20">/</span>
+      <span class="text-warning" id="kpi-high">0</span>
     </div>
-    <div class="text-[11px] text-slate-600 mt-1">Severity breakdown</div>
+    <div class="stat-desc">Severity breakdown</div>
   </div>
-  <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
-    <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">MTTR</div>
-    <div class="text-[28px] font-semibold font-mono text-white leading-none" id="kpi-mttr">&mdash;</div>
-    <div class="text-[11px] text-slate-600 mt-1">Avg hours (30d)</div>
+  <div class="stat">
+    <div class="stat-title">MTTR</div>
+    <div class="stat-value font-mono text-base-content" id="kpi-mttr">&mdash;</div>
+    <div class="stat-desc">Avg hours (30d)</div>
   </div>
-  <a href="/observables" class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4 hover:border-ion-cyan/30 transition-colors cursor-pointer block">
-    <div class="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Watched IOCs</div>
-    <div class="text-[28px] font-semibold font-mono text-white leading-none" id="kpi-watched">&mdash;</div>
-    <div class="text-[11px] text-slate-600 mt-1">Observables tracked</div>
+  <a href="/observables" class="stat">
+    <div class="stat-title">Watched IOCs</div>
+    <div class="stat-value font-mono text-base-content" id="kpi-watched">&mdash;</div>
+    <div class="stat-desc">Observables tracked</div>
   </a>
 </section>
 
@@ -68,24 +68,28 @@
   <div class="lg:col-span-8 flex flex-col gap-4">
 
     <!-- Priority Queue -->
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-3 border-b border-white/5">
-        <span class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Priority Queue</span>
-        <a href="/alerts" class="text-[11px] text-ion-cyan hover:text-ion-cyan/80 transition-colors">View All &rarr;</a>
-      </div>
-      <div id="priority-queue" class="divide-y divide-white/5">
-        <div class="px-5 py-8 text-center text-[13px] text-slate-600">Loading alerts...</div>
+    <div class="card bg-base-200 shadow overflow-hidden">
+      <div class="card-body p-0">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-base-300">
+          <h2 class="card-title text-xs uppercase tracking-wider">Priority Queue</h2>
+          <a href="/alerts" class="link link-primary text-xs">View All &rarr;</a>
+        </div>
+        <div id="priority-queue">
+          <div class="alert alert-info m-4 justify-center">Loading alerts...</div>
+        </div>
       </div>
     </div>
 
     <!-- My Active Cases -->
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 overflow-hidden">
-      <div class="flex items-center justify-between px-5 py-3 border-b border-white/5">
-        <span class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">My Active Cases</span>
-        <a href="/cases" class="text-[11px] text-ion-cyan hover:text-ion-cyan/80 transition-colors">All Cases &rarr;</a>
-      </div>
-      <div id="my-cases" class="divide-y divide-white/5">
-        <div class="px-5 py-8 text-center text-[13px] text-slate-600">Loading cases...</div>
+    <div class="card bg-base-200 shadow overflow-hidden">
+      <div class="card-body p-0">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-base-300">
+          <h2 class="card-title text-xs uppercase tracking-wider">My Active Cases</h2>
+          <a href="/cases" class="link link-primary text-xs">All Cases &rarr;</a>
+        </div>
+        <div id="my-cases">
+          <div class="alert alert-info m-4 justify-center">Loading cases...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -94,51 +98,57 @@
   <div class="lg:col-span-4 flex flex-col gap-4">
 
     <!-- Quick IOC Lookup -->
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">Quick IOC Lookup</div>
-      <div class="flex gap-2">
-        <input id="ioc-input" type="text" placeholder="IP, domain, hash..."
-               class="flex-1 h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-[13px] text-white placeholder:text-slate-600 focus:outline-none focus:border-ion-cyan/50 focus:ring-1 focus:ring-ion-cyan/20 transition"
-               data-enter-key-action="doIOCLookup">
-        <button data-click-action="doIOCLookup" class="h-9 px-4 rounded-lg bg-ion-cyan/15 text-ion-cyan text-[12px] font-semibold hover:bg-ion-cyan/25 transition-colors">Lookup</button>
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-xs uppercase tracking-wider">Quick IOC Lookup</h2>
+        <div class="join w-full">
+          <input id="ioc-input" type="text" placeholder="IP, domain, hash..."
+                 class="input input-sm join-item flex-1"
+                 data-enter-key-action="doIOCLookup">
+          <button data-click-action="doIOCLookup" class="btn btn-primary btn-sm join-item">Lookup</button>
+        </div>
+        <div id="ioc-result" class="mt-3 hidden"></div>
       </div>
-      <div id="ioc-result" class="mt-3 hidden"></div>
     </div>
 
     <!-- Quick Links -->
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5">
-      <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-3">Quick Links</div>
-      <div class="grid grid-cols-2 gap-2">
-        <a href="/alerts" class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-colors text-[12px] text-slate-300">
-          <i class="icon-alert-triangle text-red-400 text-[14px]"></i>Triage Alerts
-        </a>
-        <a href="/discover" class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-colors text-[12px] text-slate-300">
-          <i class="icon-search text-violet-400 text-[14px]"></i>Search Logs
-        </a>
-        <a href="/cases" class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-colors text-[12px] text-slate-300">
-          <i class="icon-folder-plus text-ion-cyan text-[14px]"></i>New Case
-        </a>
-        <a href="/shift-handover" class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-colors text-[12px] text-slate-300">
-          <i class="icon-arrow-right-left text-amber-400 text-[14px]"></i>Shift Handover
-        </a>
-        <a href="/pcap" class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-colors text-[12px] text-slate-300">
-          <i class="icon-file-scan text-lime-400 text-[14px]"></i>PCAP Analyzer
-        </a>
-        <a href="/threat-landscape" class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-white/5 bg-white/[0.02] hover:bg-white/5 hover:border-white/10 transition-colors text-[12px] text-slate-300">
-          <i class="icon-globe text-rose-400 text-[14px]"></i>Threat Landscape
-        </a>
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <h2 class="card-title text-xs uppercase tracking-wider">Quick Links</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <a href="/alerts" class="btn btn-ghost btn-sm justify-start gap-2">
+            <i class="icon-alert-triangle text-error"></i>Triage Alerts
+          </a>
+          <a href="/discover" class="btn btn-ghost btn-sm justify-start gap-2">
+            <i class="icon-search text-secondary"></i>Search Logs
+          </a>
+          <a href="/cases" class="btn btn-ghost btn-sm justify-start gap-2">
+            <i class="icon-folder-plus text-primary"></i>New Case
+          </a>
+          <a href="/shift-handover" class="btn btn-ghost btn-sm justify-start gap-2">
+            <i class="icon-arrow-right-left text-warning"></i>Shift Handover
+          </a>
+          <a href="/pcap" class="btn btn-ghost btn-sm justify-start gap-2">
+            <i class="icon-file-scan text-success"></i>PCAP Analyzer
+          </a>
+          <a href="/threat-landscape" class="btn btn-ghost btn-sm justify-start gap-2">
+            <i class="icon-globe text-error"></i>Threat Landscape
+          </a>
+        </div>
       </div>
     </div>
 
     <!-- Shift Notes -->
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 p-5 flex flex-col">
-      <div class="flex items-center justify-between mb-3">
-        <span class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Shift Notes</span>
-        <span id="notes-saved" class="text-[10px] text-slate-600 font-mono hidden">Saved</span>
+    <div class="card bg-base-200 shadow flex flex-col">
+      <div class="card-body flex flex-col">
+        <div class="flex items-center justify-between">
+          <h2 class="card-title text-xs uppercase tracking-wider">Shift Notes</h2>
+          <span id="notes-saved" class="badge badge-success badge-sm font-mono hidden">Saved</span>
+        </div>
+        <textarea id="shift-notes"
+                  class="textarea w-full flex-1 min-h-[120px] resize-y"
+                  placeholder="Quick notes for this shift..."></textarea>
       </div>
-      <textarea id="shift-notes"
-                class="flex-1 min-h-[120px] w-full rounded-lg border border-white/10 bg-white/5 p-3 text-[13px] text-slate-300 placeholder:text-slate-600 leading-relaxed resize-y focus:outline-none focus:border-ion-cyan/50 focus:ring-1 focus:ring-ion-cyan/20 transition"
-                placeholder="Quick notes for this shift..."></textarea>
     </div>
   </div>
 </section>
@@ -148,19 +158,21 @@
      already know what to type saw an empty panel and moved on, while ~600
      articles sat one collection away. Topics and recently-updated articles
      are shown up front; typing replaces them with results. -->
-<section class="rounded-xl border border-white/5 bg-ink-900/50 p-5 rise d-4">
-  <div class="flex items-center justify-between gap-4 mb-3">
-    <div class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Knowledge Base</div>
-    <a href="/documents" class="text-[11px] text-slate-500 hover:text-ion-cyan transition">Open library &rarr;</a>
-  </div>
-  <input id="kb-search" type="text" placeholder="Search titles and article text..."
-         class="w-full h-10 px-4 rounded-lg border border-white/10 bg-white/5 text-[13px] text-white placeholder:text-slate-600 focus:outline-none focus:border-ion-cyan/50 focus:ring-1 focus:ring-ion-cyan/20 transition"
-         data-input-action="debounceKBSearch">
-  <div id="kb-results" class="mt-3 hidden divide-y divide-white/5"></div>
-  <div id="kb-browse" class="mt-4">
-    <div id="kb-topics" class="flex flex-wrap gap-1.5"></div>
-    <div class="text-[10px] uppercase tracking-wider text-slate-600 font-semibold mt-4 mb-2">Recently updated</div>
-    <div id="kb-recent" class="divide-y divide-white/5"></div>
+<section class="card bg-base-200 shadow rise d-4">
+  <div class="card-body">
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="card-title text-xs uppercase tracking-wider">Knowledge Base</h2>
+      <a href="/documents" class="link link-hover text-xs text-base-content/50">Open library &rarr;</a>
+    </div>
+    <input id="kb-search" type="text" placeholder="Search titles and article text..."
+           class="input w-full"
+           data-input-action="debounceKBSearch">
+    <div id="kb-results" class="mt-3 hidden divide-y divide-base-300"></div>
+    <div id="kb-browse" class="mt-4">
+      <div id="kb-topics" class="flex flex-wrap gap-1.5"></div>
+      <div class="text-xs uppercase tracking-wider font-semibold text-base-content/40 mt-4 mb-2">Recently updated</div>
+      <div id="kb-recent" class="divide-y divide-base-300"></div>
+    </div>
   </div>
 </section>
 

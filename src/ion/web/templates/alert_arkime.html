@@ -4,14 +4,6 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
-  <!-- Tailwind safelist — classes built dynamically by the JS renderer -->
-  <div class="hidden
-    bg-ion-coral bg-ion-amber bg-ion-iris bg-ion-lime bg-ion-cyan
-    text-ion-coral text-ion-amber text-ion-iris text-ion-lime text-ion-cyan
-    bg-ion-coral/10 bg-ion-amber/10 bg-ion-iris/10 bg-ion-lime/10 bg-ion-cyan/10
-    border-ion-coral/20 border-ion-amber/20 border-ion-iris/20 border-ion-lime/20 border-ion-cyan/20
-  " aria-hidden="true"></div>
-
   <!-- ── Header ── -->
   <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
     <div class="flex-1 min-w-0">
@@ -25,7 +17,7 @@
       <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Pull the raw capture from Arkime, run heuristic analysis, enrich observables via OpenCTI, and attach the result to a case.</p>
     </div>
     <div class="flex items-center gap-2">
-      <a href="/alerts?id={{ alert_id }}" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">
+      <a href="/alerts?id={{ alert_id }}" class="btn btn-ghost btn-sm">
         <svg class="w-3.5 h-3.5"><use href="#i-chevron-left"/></svg>
         Back to alert
       </a>
@@ -33,12 +25,12 @@
   </section>
 
   <!-- ── Status banner ── -->
-  <div id="arkime-status" class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 mb-6 rise d-2">
-    <div class="flex items-center gap-3">
-      <div id="status-spinner" class="h-4 w-4 rounded-full border-2 border-ion-cyan border-t-transparent animate-spin"></div>
-      <span id="status-text" class="text-[14px] text-white">Requesting PCAP from Arkime…</span>
+  <div id="arkime-status" role="alert" class="alert alert-info mb-6 rise d-2">
+    <span id="status-spinner" class="loading loading-spinner loading-sm"></span>
+    <div>
+      <span id="status-text">Requesting PCAP from Arkime…</span>
+      <div id="status-detail" class="text-xs opacity-70"></div>
     </div>
-    <div id="status-detail" class="mt-1 text-[12px] text-slate-500"></div>
   </div>
 
   <!-- ── Main grid ── -->
@@ -48,101 +40,112 @@
     <section class="col-span-12 lg:col-span-8 min-w-0 flex flex-col gap-6">
 
       <!-- Arkime session card -->
-      <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <svg class="w-4 h-4 text-ion-cyan"><use href="#i-network"/></svg>
-            <span class="label-tiny text-slate-500">Arkime session</span>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="card-title">
+              <svg class="w-4 h-4 text-primary"><use href="#i-network"/></svg>
+              Arkime session
+            </h2>
+            <div class="flex items-center gap-4">
+              <a id="open-in-arkime" href="#" target="_blank" rel="noopener"
+                 class="hidden items-center gap-1.5 link link-primary text-sm">
+                <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg>Open in Arkime</a>
+              <span id="session-size" class="font-mono text-xs opacity-60"></span>
+            </div>
           </div>
-          <div class="flex items-center gap-4">
-            <a id="open-in-arkime" href="#" target="_blank" rel="noopener"
-               class="hidden items-center gap-1.5 text-[11px] font-semibold text-ion-cyan hover:brightness-125 transition">
-              <svg class="w-3.5 h-3.5"><use href="#i-external-link"/></svg>Open in Arkime</a>
-            <span id="session-size" class="font-mono text-[11px] text-slate-400"></span>
-          </div>
-        </div>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 text-[12px]">
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">Node</div>
-            <div id="sess-node" class="font-mono text-slate-200">—</div>
-          </div>
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">Session</div>
-            <div id="sess-id" class="font-mono text-slate-200 truncate">—</div>
-          </div>
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">Src → Dst</div>
-            <div id="sess-flow" class="font-mono text-slate-200 truncate">—</div>
-          </div>
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">Protocol</div>
-            <div id="sess-proto" class="font-mono text-slate-200">—</div>
-          </div>
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">First packet</div>
-            <div id="sess-first" class="font-mono text-slate-200">—</div>
-          </div>
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">Last packet</div>
-            <div id="sess-last" class="font-mono text-slate-200">—</div>
-          </div>
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">Packets</div>
-            <div id="sess-packets" class="font-mono text-slate-200">—</div>
-          </div>
-          <div>
-            <div class="label-tiny text-slate-500 mb-1">Community ID</div>
-            <div id="sess-cid" class="font-mono text-slate-200 truncate">—</div>
-          </div>
-          <div id="sess-indexed-wrap" class="col-span-2 md:col-span-4 hidden">
-            <div class="label-tiny text-slate-500 mb-1">Indexed metadata</div>
-            <div id="sess-indexed" class="font-mono text-[11px] text-slate-300 break-all"></div>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-x-5 gap-y-3 text-sm">
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Node</div>
+              <div id="sess-node" class="font-mono">—</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Session</div>
+              <div id="sess-id" class="font-mono truncate">—</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Src → Dst</div>
+              <div id="sess-flow" class="font-mono truncate">—</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Protocol</div>
+              <div id="sess-proto" class="font-mono">—</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">First packet</div>
+              <div id="sess-first" class="font-mono">—</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Last packet</div>
+              <div id="sess-last" class="font-mono">—</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Packets</div>
+              <div id="sess-packets" class="font-mono">—</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Community ID</div>
+              <div id="sess-cid" class="font-mono truncate">—</div>
+            </div>
+            <div id="sess-indexed-wrap" class="col-span-2 md:col-span-4 hidden">
+              <div class="text-xs uppercase tracking-wide opacity-60 mb-1">Indexed metadata</div>
+              <div id="sess-indexed" class="font-mono text-xs break-all"></div>
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Verdict + stats -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-          <div class="label-tiny text-slate-500 mb-2">Verdict</div>
-          <div id="stat-verdict" class="font-sans font-semibold text-[22px] leading-none text-white">—</div>
-          <div id="stat-verdict-sub" class="mt-1 text-[11px] text-slate-500"></div>
+      <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow">
+        <div class="stat">
+          <div class="stat-title">Verdict</div>
+          <div id="stat-verdict" class="stat-value text-2xl">—</div>
+          <div id="stat-verdict-sub" class="stat-desc"></div>
         </div>
-        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-          <div class="label-tiny text-slate-500 mb-2">Findings</div>
-          <div id="stat-findings" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-coral">—</div>
+        <div class="stat">
+          <div class="stat-title text-error">Findings</div>
+          <div id="stat-findings" class="stat-value text-error">—</div>
         </div>
-        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-          <div class="label-tiny text-slate-500 mb-2">Observables</div>
-          <div id="stat-obs" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-cyan">—</div>
+        <div class="stat">
+          <div class="stat-title text-primary">Observables</div>
+          <div id="stat-obs" class="stat-value text-primary">—</div>
         </div>
-        <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-          <div class="label-tiny text-slate-500 mb-2">OpenCTI hits</div>
-          <div id="stat-hits" class="font-sans font-semibold tabular-nums text-[28px] leading-none text-ion-lime">—</div>
+        <div class="stat">
+          <div class="stat-title text-success">OpenCTI hits</div>
+          <div id="stat-hits" class="stat-value text-success">—</div>
         </div>
       </div>
 
       <!-- Findings list -->
-      <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
-        <div class="flex items-baseline gap-3 mb-4">
-          <svg class="w-4 h-4 text-ion-coral"><use href="#i-alert-triangle"/></svg>
-          <span class="label-tiny text-slate-500">Heuristic detection</span>
-          <h2 class="font-sans font-semibold text-[20px] tracking-tight leading-none text-white">Findings</h2>
-        </div>
-        <div id="findings-list" class="space-y-2">
-          <div class="py-6 text-center text-[12px] text-slate-600">No findings yet.</div>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h2 class="card-title">
+            <svg class="w-4 h-4 text-error"><use href="#i-alert-triangle"/></svg>
+            Findings
+          </h2>
+          <div id="findings-list" class="flex flex-col gap-2">
+            <div class="py-6 text-center text-sm opacity-50">No findings yet.</div>
+          </div>
         </div>
       </div>
 
       <!-- Top talkers + protocols side by side -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
-          <h2 class="font-sans font-semibold text-[16px] tracking-tight text-white mb-4">Top destinations</h2>
-          <div id="top-dst" class="space-y-2 text-[12px]"></div>
+        <div class="card bg-base-200 shadow">
+          <div class="card-body">
+            <h2 class="card-title">Top destinations</h2>
+            <div class="overflow-x-auto">
+              <table class="table table-sm">
+                <tbody id="top-dst"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
-          <h2 class="font-sans font-semibold text-[16px] tracking-tight text-white mb-4">Protocols</h2>
-          <div id="protocols" class="space-y-2 text-[12px]"></div>
+        <div class="card bg-base-200 shadow">
+          <div class="card-body">
+            <h2 class="card-title">Protocols</h2>
+            <div id="protocols" class="flex flex-col gap-2"></div>
+          </div>
         </div>
       </div>
 
@@ -152,70 +155,73 @@
     <aside class="col-span-12 lg:col-span-4 min-w-0 flex flex-col gap-6">
 
       <!-- Observables -->
-      <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-6">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-baseline gap-3">
-            <span class="label-tiny text-slate-500">Extracted IOCs</span>
-            <h2 class="font-sans font-semibold text-[18px] tracking-tight leading-none text-white">Observables</h2>
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="card-title">Observables</h2>
+            <span id="obs-count" class="badge badge-ghost font-mono">0</span>
           </div>
-          <span id="obs-count" class="font-mono text-[11px] text-slate-500">0</span>
-        </div>
-        <div id="obs-list" class="space-y-2 max-h-[560px] overflow-y-auto">
-          <div class="py-6 text-center text-[12px] text-slate-600">Waiting for analysis…</div>
+          <div id="obs-list" class="flex flex-col gap-2 max-h-[560px] overflow-y-auto">
+            <div class="py-6 text-center text-sm opacity-50">Waiting for analysis…</div>
+          </div>
         </div>
       </div>
 
       <!-- Commit panel -->
-      <div class="rounded-[14px] border border-ion-cyan/20 bg-ion-cyan/5 px-6 py-6 sticky top-20">
-        <div class="flex items-center gap-3 mb-4">
-          <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg>
-          <span class="label-tiny text-ion-cyan">Attach to case</span>
-        </div>
-        <div class="flex flex-col gap-3">
-          <div class="flex items-center gap-1 p-1 rounded-lg bg-white/5 border border-white/10">
-            <button type="button" data-mode="new" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-ink-950 bg-ion-cyan">New case</button>
-            <button type="button" data-mode="existing" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-slate-400 hover:text-white transition">Existing</button>
-          </div>
-
-          <div id="commit-new" class="flex flex-col gap-3">
-            <div class="flex flex-col gap-1.5">
-              <label class="label-tiny text-slate-500">Case title</label>
-              <input id="case-title" type="text" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition" placeholder="Auto-generated if blank">
+      <div class="card bg-base-200 shadow border border-primary/20 sticky top-20">
+        <div class="card-body">
+          <h2 class="card-title text-primary">
+            <svg class="w-4 h-4"><use href="#i-file-text"/></svg>
+            Attach to case
+          </h2>
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center gap-1 p-1 rounded-lg bg-base-300">
+              <button type="button" data-mode="new" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-ink-950 bg-ion-cyan">New case</button>
+              <button type="button" data-mode="existing" class="commit-mode-btn flex-1 px-3 py-2 rounded-md label-tiny text-slate-400 hover:text-white transition">Existing</button>
             </div>
-            <div class="flex flex-col gap-1.5">
-              <label class="label-tiny text-slate-500">Severity</label>
-              <select id="case-severity" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white focus:border-ion-cyan/50 transition">
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium" selected>Medium</option>
-                <option value="low">Low</option>
-              </select>
+
+            <div id="commit-new" class="flex flex-col gap-3">
+              <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Case title</legend>
+                <input id="case-title" type="text" class="input input-sm w-full" placeholder="Auto-generated if blank">
+              </fieldset>
+              <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Severity</legend>
+                <select id="case-severity" class="select select-sm w-full">
+                  <option value="critical">Critical</option>
+                  <option value="high">High</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              </fieldset>
             </div>
-          </div>
 
-          <div id="commit-existing" class="hidden flex flex-col gap-1.5">
-            <label class="label-tiny text-slate-500">Case ID</label>
-            <input id="case-id-input" type="number" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition" placeholder="e.g. 2847">
-          </div>
+            <div id="commit-existing" class="hidden flex flex-col gap-1.5">
+              <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Case ID</legend>
+                <input id="case-id-input" type="number" class="input input-sm w-full" placeholder="e.g. 2847">
+              </fieldset>
+            </div>
 
-          <button id="commit-btn" type="button" class="h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
-            <svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg>
-            Attach analysis
-          </button>
-          <div id="commit-result" class="hidden text-[12px] text-center"></div>
+            <button id="commit-btn" type="button" class="btn btn-primary">
+              <svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg>
+              Attach analysis
+            </button>
+            <div id="commit-result" class="hidden text-sm text-center"></div>
+          </div>
         </div>
       </div>
     </aside>
   </div>
 
   <!-- ── Error panel ── -->
-  <div id="arkime-error" class="hidden rounded-[14px] border border-ion-coral/30 bg-ion-coral/5 px-6 py-5 rise d-3">
-    <div class="flex items-center gap-3 mb-2">
-      <svg class="w-4 h-4 text-ion-coral"><use href="#i-alert-triangle"/></svg>
-      <span class="label-tiny text-ion-coral">Arkime error</span>
+  <div id="arkime-error" role="alert" class="alert alert-error hidden rise d-3">
+    <svg class="w-4 h-4"><use href="#i-alert-triangle"/></svg>
+    <div>
+      <div class="font-semibold">Arkime error</div>
+      <div id="error-message"></div>
+      <div id="error-detail" class="text-xs font-mono opacity-80"></div>
     </div>
-    <div id="error-message" class="text-[14px] text-white mb-2"></div>
-    <div id="error-detail" class="text-[12px] text-slate-400 font-mono"></div>
   </div>
 
 </div><!-- /ion-tw inner -->
@@ -223,6 +229,14 @@
 {% endblock %}
 
 {% block scripts %}
+<style nonce="{{ csp_nonce }}">
+/* JS classList toggles .hidden on daisyUI alerts / loading. ID+class so
+   daisyUI .alert { display: grid } and .loading { display: inline-block }
+   cannot win over Tailwind .hidden. */
+#arkime-status.hidden,
+#arkime-error.hidden,
+#status-spinner.hidden { display: none; }
+</style>
 <script nonce="{{ csp_nonce }}">
   const ALERT_ID = {{ alert_id | tojson }};
   let previewPayload = null;
@@ -233,8 +247,8 @@
   }[c]));
 
   const SEV_MAP = {
-    critical: 'ion-coral', high: 'ion-amber', medium: 'ion-iris',
-    low: 'slate-400', info: 'ion-cyan',
+    critical: 'badge-error', high: 'badge-warning', medium: 'badge-accent',
+    low: 'badge-ghost', info: 'badge-info',
   };
 
   function setStatus(text, detail = '', done = false) {
@@ -350,19 +364,19 @@
     // Findings
     const fel = $('findings-list');
     if (findings.length === 0) {
-      fel.innerHTML = `<div class="py-6 text-center text-[12px] text-slate-600">No suspicious findings detected.</div>`;
+      fel.innerHTML = `<div class="py-6 text-center text-sm opacity-50">No suspicious findings detected.</div>`;
     } else {
       fel.innerHTML = findings.slice(0, 25).map(f => {
         const sev = (f.severity || 'info').toLowerCase();
-        const color = SEV_MAP[sev] || 'slate-400';
+        const color = SEV_MAP[sev] || 'badge-ghost';
         const title = escHtml(f.title || f.type || '(no title)');
         const desc = escHtml(f.description || '');
         return `
-          <div class="flex items-start gap-3 p-3 rounded-lg bg-white/3 border border-white/5">
-            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-[0.12em] bg-${color}/10 text-${color} border border-${color}/20">${sev}</span>
+          <div class="flex items-start gap-3 p-3 rounded-lg bg-base-300">
+            <span class="badge badge-sm ${color}">${sev}</span>
             <div class="flex-1 min-w-0">
-              <div class="text-[13px] text-white font-medium">${title}</div>
-              ${desc ? `<div class="text-[11px] text-slate-500 mt-0.5">${desc}</div>` : ''}
+              <div class="text-sm font-medium">${title}</div>
+              ${desc ? `<div class="text-xs opacity-60 mt-0.5">${desc}</div>` : ''}
             </div>
           </div>`;
       }).join('');
@@ -372,15 +386,15 @@
     const topDst = analysis.top_dst_ips || [];
     const topEl = $('top-dst');
     if (topDst.length === 0) {
-      topEl.innerHTML = `<div class="text-slate-600">No outbound traffic recorded.</div>`;
+      topEl.innerHTML = `<tr><td class="opacity-50">No outbound traffic recorded.</td></tr>`;
     } else {
       topEl.innerHTML = topDst.slice(0, 8).map(row => {
         const ip = (row.ip || row) + '';
         const bytes = row.bytes ? fmtBytes(row.bytes) : '';
-        return `<div class="flex items-center justify-between gap-3 py-1">
-          <span class="font-mono text-slate-200 truncate">${escHtml(ip)}</span>
-          <span class="font-mono text-[11px] text-slate-500">${bytes}</span>
-        </div>`;
+        return `<tr>
+          <td class="font-mono">${escHtml(ip)}</td>
+          <td class="font-mono text-right text-xs opacity-60">${bytes}</td>
+        </tr>`;
       }).join('');
     }
 
@@ -389,18 +403,18 @@
     const proEl = $('protocols');
     const entries = Object.entries(protos).sort((a, b) => b[1] - a[1]).slice(0, 8);
     if (entries.length === 0) {
-      proEl.innerHTML = `<div class="text-slate-600">—</div>`;
+      proEl.innerHTML = `<div class="opacity-50">—</div>`;
     } else {
       const total = entries.reduce((s, [, n]) => s + n, 0) || 1;
       proEl.innerHTML = entries.map(([name, n]) => {
         const pct = Math.round((n / total) * 100);
         return `<div class="flex flex-col gap-1">
-          <div class="flex items-center justify-between text-[11px]">
-            <span class="font-mono text-slate-200">${escHtml(name)}</span>
-            <span class="font-mono text-slate-500">${n} · ${pct}%</span>
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-mono">${escHtml(name)}</span>
+            <span class="font-mono opacity-60">${n} · ${pct}%</span>
           </div>
-          <div class="h-1 rounded-full bg-white/5 overflow-hidden">
-            <div class="h-full rounded-full bg-ion-cyan" data-ion-style="width:${pct}%"></div>
+          <div class="h-1 rounded-full bg-base-300 overflow-hidden">
+            <div class="h-full rounded-full bg-primary" data-ion-style="width:${pct}%"></div>
           </div>
         </div>`;
       }).join('');
@@ -411,26 +425,26 @@
     $('obs-count').textContent = obs.length;
     const obsEl = $('obs-list');
     if (obs.length === 0) {
-      obsEl.innerHTML = `<div class="py-6 text-center text-[12px] text-slate-600">No observables extracted.</div>`;
+      obsEl.innerHTML = `<div class="py-6 text-center text-sm opacity-50">No observables extracted.</div>`;
     } else {
       obsEl.innerHTML = obs.map(o => {
         const foundBadge = o.found
-          ? `<span class="inline-flex px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-[0.12em] bg-ion-lime/10 text-ion-lime border border-ion-lime/25">OpenCTI</span>`
+          ? `<span class="badge badge-sm badge-success">OpenCTI</span>`
           : '';
         const labels = (o.labels || []).slice(0, 3).map(l =>
-          `<span class="inline-flex px-1.5 py-0.5 rounded text-[9px] bg-ion-iris/10 text-ion-iris border border-ion-iris/25">${escHtml(l)}</span>`
+          `<span class="badge badge-sm badge-accent">${escHtml(l)}</span>`
         ).join(' ');
         const actors = (o.threat_actors || []).slice(0, 2).map(a =>
-          `<span class="inline-flex px-1.5 py-0.5 rounded text-[9px] bg-ion-coral/10 text-ion-coral border border-ion-coral/25">${escHtml(a)}</span>`
+          `<span class="badge badge-sm badge-error">${escHtml(a)}</span>`
         ).join(' ');
-        return `<div class="p-3 rounded-lg bg-white/3 border border-white/5">
+        return `<div class="p-3 rounded-lg bg-base-300">
           <div class="flex items-center justify-between gap-2 mb-1">
-            <span class="font-mono text-[11px] text-slate-500">${escHtml(o.type)}</span>
+            <span class="badge badge-ghost badge-sm font-mono">${escHtml(o.type)}</span>
             ${foundBadge}
           </div>
-          <div class="font-mono text-[12px] text-white break-all">${escHtml(o.value)}</div>
+          <div class="font-mono text-sm break-all">${escHtml(o.value)}</div>
           ${(labels || actors) ? `<div class="mt-2 flex flex-wrap gap-1">${labels} ${actors}</div>` : ''}
-          <div class="mt-1 text-[10px] text-slate-600">via ${escHtml(o.source)}</div>
+          <div class="mt-1 text-xs opacity-50">via ${escHtml(o.source)}</div>
         </div>`;
       }).join('');
     }
@@ -485,7 +499,7 @@
       const result = await resp.json();
       const resEl = $('commit-result');
       resEl.classList.remove('hidden');
-      resEl.innerHTML = `<div class="text-ion-lime">Attached to <a href="/cases?id=${result.case_id}" class="underline">${result.case_number}</a> — ${result.observables_created} observable(s) created.</div>`;
+      resEl.innerHTML = `<div class="alert alert-success">Attached to <a href="/cases?id=${result.case_id}" class="link">${result.case_number}</a> — ${result.observables_created} observable(s) created.</div>`;
       btn.innerHTML = 'Done ✓';
       setTimeout(() => { window.location.href = `/cases?id=${result.case_id}`; }, 1500);
     } catch (e) {
@@ -493,7 +507,7 @@
       btn.innerHTML = '<svg class="w-3.5 h-3.5"><use href="#i-arrow-right"/></svg> Attach analysis';
       const resEl = $('commit-result');
       resEl.classList.remove('hidden');
-      resEl.innerHTML = `<div class="text-ion-coral">${escHtml(e.message || String(e))}</div>`;
+      resEl.innerHTML = `<div class="alert alert-error">${escHtml(e.message || String(e))}</div>`;
     }
   });
 

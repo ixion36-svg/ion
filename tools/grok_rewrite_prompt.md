@@ -56,6 +56,19 @@ Replace the page's `<style>` block with daisyUI components and Tailwind
 utilities where you can. If a specific rule cannot be expressed that way, leave
 that rule in the `<style>` block rather than approximating it.
 
+## Layout pitfall seen in practice
+
+Do not put a text block in `flex-1 min-w-0` inside a `flex ... justify-between`
+header. `min-w-0` lets the text column collapse instead of wrapping, and on
+network_topology.html the page heading shrank to 74px — one word per line —
+below about 700px viewport width. It renders correctly at desktop widths, so it
+is easy to miss.
+
+If a header needs a text block beside controls, let the row wrap
+(`flex-wrap`) and give the text block a sensible floor such as
+`basis-full md:basis-auto md:flex-1`, so it drops to its own line rather than
+being squeezed to nothing.
+
 ## What NOT to change
 
 Keep all of this exactly as it is — this is a restyle, not a refactor:

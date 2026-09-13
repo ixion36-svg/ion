@@ -2,58 +2,64 @@
 {% block title %}My Day · ION{% endblock %}
 
 {% block content %}
-<div class="dw-wrap">
-  <div class="ion-page-header">
-    <div>
-      <p class="ion-ph-title" id="dw-title">My Day</p>
-      <p class="ion-ph-sub" id="dw-sub">Loading…</p>
+<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-3 mb-4">
+        <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
+        <span class="label-tiny text-primary">Daily operations</span>
+      </div>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]" id="dw-title">My Day</h1>
+      <p class="mt-3 max-w-2xl text-[15px] text-slate-400" id="dw-sub">Loading…</p>
     </div>
-    <div class="ion-toggle" id="dw-toggle">
-      <button type="button" class="on" data-view="me">My Day</button>
-      <button type="button" data-view="team">Team Day</button>
+    <div class="join" id="dw-toggle">
+      <button type="button" class="btn btn-sm join-item on" data-view="me">My Day</button>
+      <button type="button" class="btn btn-sm join-item" data-view="team">Team Day</button>
     </div>
-  </div>
+  </section>
 
   <!-- ── My Day ── -->
-  <section id="dw-view-me" class="dw-view">
-    <div class="dw-daybar">
-      <div class="dw-daynav">
-        <button type="button" class="ion-btn dw-nav" id="dw-prev" title="Previous day" aria-label="Previous day">‹</button>
-        <input type="date" class="ion-input dw-datepick" id="dw-date" />
-        <button type="button" class="ion-btn dw-nav" id="dw-next" title="Next day" aria-label="Next day">›</button>
-        <button type="button" class="ion-btn dw-today" id="dw-today">Today</button>
+  <section id="dw-view-me">
+    <div class="flex flex-wrap items-center justify-between gap-3 my-1">
+      <div class="flex items-center gap-1.5">
+        <button type="button" class="btn btn-sm" id="dw-prev" title="Previous day" aria-label="Previous day">‹</button>
+        <input type="date" class="input input-sm w-auto" id="dw-date" />
+        <button type="button" class="btn btn-sm" id="dw-next" title="Next day" aria-label="Next day">›</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="dw-today">Today</button>
       </div>
-      <div class="ion-toggle dw-subtoggle" id="dw-modetoggle">
-        <button type="button" class="on" data-mode="calendar">Calendar</button>
-        <button type="button" data-mode="timeline">Timeline</button>
+      <div class="join" id="dw-modetoggle">
+        <button type="button" class="btn btn-sm join-item on" data-mode="calendar">Calendar</button>
+        <button type="button" class="btn btn-sm join-item" data-mode="timeline">Timeline</button>
       </div>
     </div>
 
-    <div class="ion-metrics-grid dw-metrics" id="dw-metrics"></div>
+    <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow my-4" id="dw-metrics"></div>
 
     <div class="dw-split">
       <div>
-        <div class="dw-quick" id="dw-presets">
-          <span class="dw-quick-label">Quick add</span>
+        <div class="flex flex-wrap gap-1.5 items-center mb-3" id="dw-presets">
+          <span class="text-[11px] uppercase tracking-wide opacity-60 mr-1">Quick add</span>
         </div>
-        <div class="dw-composer">
-          <span class="dw-composer-plus" aria-hidden="true">＋</span>
-          <input class="ion-input dw-composer-input" id="dw-text"
+        <div class="flex gap-2 items-center bg-base-200 border border-base-300 rounded-box px-2.5 py-1.5 mb-4">
+          <span class="text-primary text-base" aria-hidden="true">＋</span>
+          <input class="input input-ghost input-sm flex-1 min-w-0" id="dw-text"
                  placeholder="Or log something custom — add detail, pick a type…" maxlength="2000" />
-          <input type="time" class="ion-input dw-composer-time" id="dw-time" title="Time of day for this entry" />
-          <select class="ion-select dw-composer-type" id="dw-type"></select>
-          <button type="button" class="ion-btn ion-btn-primary" id="dw-add">Add</button>
+          <input type="time" class="input input-sm w-auto shrink-0" id="dw-time" title="Time of day for this entry" />
+          <select class="select select-sm w-auto" id="dw-type"></select>
+          <button type="button" class="btn btn-primary btn-sm" id="dw-add">Add</button>
         </div>
 
         <!-- Calendar (default) -->
         <div id="dw-mode-calendar">
-          <div class="dw-section-label">Day calendar — click an hour to add, an entry to edit</div>
+          <div class="text-[11px] uppercase tracking-wider opacity-60 mb-2.5">Day calendar — click an hour to add, an entry to edit</div>
           <div class="dw-calendar" id="dw-calendar"></div>
         </div>
 
         <!-- Timeline (alternate) -->
         <div id="dw-mode-timeline" class="dw-hidden">
-          <div class="dw-section-label">Activity timeline</div>
+          <div class="text-[11px] uppercase tracking-wider opacity-60 mb-2.5">Activity timeline</div>
           <div class="ion-timeline" id="dw-timeline">
             <div class="ion-timeline-rail"></div>
           </div>
@@ -66,123 +72,211 @@
            queue, no unassigned cases. /shift-handover produces the same artefact
            server-side for the whole SOC with all of that, so the weaker copy is
            replaced by a link to the real one. #}
-        <div class="ion-card">
-          <p class="ion-card-title"><span aria-hidden="true">↪</span> Shift handover</p>
-          <p class="ion-muted dw-hint">The shift handover report is compiled for the whole team — case severity, MTTR, closure reasons and the pending queue for the incoming shift.</p>
-          <a class="ion-btn ion-btn-primary dw-btn-full" href="/shift-handover">Open shift handover</a>
+        <div class="card bg-base-200 shadow">
+          <div class="card-body">
+            <h2 class="card-title"><span aria-hidden="true">↪</span> Shift handover</h2>
+            <p class="text-sm opacity-70">The shift handover report is compiled for the whole team — case severity, MTTR, closure reasons and the pending queue for the incoming shift.</p>
+            <div class="card-actions">
+              <a class="btn btn-primary w-full" href="/shift-handover">Open shift handover</a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- ── Edit / add entry modal ── -->
-  <div class="dw-modal-overlay dw-hidden" id="dw-modal">
-    <div class="dw-modal-card" role="dialog" aria-modal="true" aria-labelledby="dw-modal-title">
-      <p class="ion-card-title" id="dw-modal-title">Edit entry</p>
-      <label class="dw-field-label" for="dw-edit-time">Time</label>
-      <input type="time" class="ion-input dw-field" id="dw-edit-time" />
-      <label class="dw-field-label" for="dw-edit-type">Type</label>
-      <select class="ion-select dw-field" id="dw-edit-type"></select>
-      <label class="dw-field-label" for="dw-edit-text">Detail</label>
-      <textarea class="ion-input dw-field" id="dw-edit-text" rows="3" maxlength="2000"></textarea>
-      <div class="dw-modal-actions">
-        <button type="button" class="ion-btn dw-modal-del dw-hidden" id="dw-edit-delete">Delete</button>
-        <span class="dw-modal-spacer"></span>
-        <button type="button" class="ion-btn" id="dw-edit-cancel">Cancel</button>
-        <button type="button" class="ion-btn ion-btn-primary" id="dw-edit-save">Save</button>
+  <div class="modal dw-hidden" id="dw-modal">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="dw-modal-title">
+      <h2 class="text-lg font-semibold" id="dw-modal-title">Edit entry</h2>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Time</legend>
+        <input type="time" class="input w-full" id="dw-edit-time" />
+      </fieldset>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Type</legend>
+        <select class="select w-full" id="dw-edit-type"></select>
+      </fieldset>
+      <fieldset class="fieldset">
+        <legend class="fieldset-legend">Detail</legend>
+        <textarea class="textarea w-full" id="dw-edit-text" rows="3" maxlength="2000"></textarea>
+      </fieldset>
+      <div class="modal-action">
+        <button type="button" class="btn btn-error btn-outline btn-sm dw-hidden mr-auto" id="dw-edit-delete">Delete</button>
+        <button type="button" class="btn btn-ghost" id="dw-edit-cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="dw-edit-save">Save</button>
       </div>
     </div>
   </div>
 
   <!-- ── Team Day ── -->
-  <section id="dw-view-team" class="dw-view dw-hidden">
+  <section id="dw-view-team" class="dw-hidden">
     <div class="dw-board-head">
       <div>Analyst</div><div>Working now</div><div>Today</div><div class="dw-ta-right">Active</div>
     </div>
     <div id="dw-board"></div>
-    <p class="ion-muted dw-team-note" id="dw-team-note">Loading team…</p>
+    <p class="text-xs opacity-60 mt-3.5" id="dw-team-note">Loading team…</p>
   </section>
+
+</div>
 </div>
 
 <style nonce="{{ csp_nonce }}">
-  .dw-wrap { padding: 1.25rem 1.5rem 3rem; }
-  .dw-metrics { margin: 1rem 0 1.25rem; }
+  /* JS toggles .dw-hidden (not Tailwind .hidden / daisyUI .modal-open).
+     Combined selectors so daisyUI .modal { display:grid } and .btn { display:inline-flex }
+     cannot win on source order the way .dw-modal-overlay once did. */
+  .dw-hidden { display: none; }
+  #dw-modal.dw-hidden,
+  #dw-edit-delete.dw-hidden { display: none; }
+
+  /* JS openModal()/closeModal() toggle .dw-hidden, not daisyUI .modal-open. Bridge the two. */
+  #dw-modal:not(.dw-hidden) {
+    display: grid;
+    place-items: center;
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+  }
+  #dw-modal:not(.dw-hidden) > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    width: 380px;
+    max-width: 92vw;
+  }
+
+  /* JS toggles .on on the join buttons, not daisyUI .btn-active. */
+  #dw-toggle button.on,
+  #dw-modetoggle button.on {
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    font-weight: 600;
+    border-color: var(--color-primary);
+  }
+
+  /* 1fr + 300px sidebar at 880px — not a daisyUI/Tailwind breakpoint. */
   .dw-split { display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
   @media (max-width: 880px) { .dw-split { grid-template-columns: 1fr; } }
-  .dw-quick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 11px; }
-  .dw-quick-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-right: 3px; }
-  .dw-composer { display: flex; gap: 8px; align-items: center; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 6px 9px; margin-bottom: 16px; }
-  .dw-composer-plus { color: var(--primary); font-size: 16px; }
-  .dw-composer-input { border: none; background: none; padding: 4px 2px; }
-  .dw-composer-input:focus { border: none; }
-  .dw-composer-type { width: auto; }
-  .dw-section-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; margin: 0 0 11px 2px; }
-  .dw-hint { margin: 0 0 11px; font-size: 12px; }
-  .dw-btn-full { width: 100%; justify-content: center; }
-  .dw-view.dw-hidden { display: none; }
-  .dw-board-head, .dw-row { display: grid; grid-template-columns: 1.5fr 2fr 1.3fr 0.7fr; gap: 10px; align-items: center; }
-  .dw-board-head { padding: 0 13px 8px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
-  .dw-row { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 11px 13px; margin-bottom: 7px; }
-  .dw-ta-right { text-align: right; }
-  .dw-team-note { font-size: 12px; margin: 14px 2px 0; }
-  .dw-empty { color: var(--text-muted); font-size: 13px; padding: 12px 2px; }
-  /* value-colour modifiers (no inline styles under CSP style-src-attr 'none') */
-  .dw-v-cyan { color: var(--primary); }
-  .dw-v-green { color: var(--success); }
-  .dw-src { font-size: 10px; color: #475569; margin-left: 6px; }
-  /* timeline dot colours */
-  .dw-dot-red { background: var(--danger); }
-  .dw-dot-green { background: var(--success); }
-  .dw-dot-amber { background: var(--warning); }
-  .dw-dot-cyan { background: var(--primary); }
-  .dw-dot-purple { background: #9a8cff; }
+
+  /* JS renderMetrics() emits .ion-metric tiles, not daisyUI .stat. */
+  #dw-metrics .ion-metric {
+    display: inline-grid;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: transparent;
+  }
+  #dw-metrics .ion-metric-label { font-size: 0.75rem; opacity: 0.6; }
+  #dw-metrics .ion-metric-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .dw-v-cyan { color: var(--color-primary); }
+  .dw-v-green { color: var(--color-success); }
+
+  .dw-empty { opacity: 0.6; font-size: 13px; padding: 12px 2px; }
+  .dw-src {
+    font-size: 10px;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    margin-left: 6px;
+  }
+
+  /* timeline dot colours — JS sets dw-dot-* on .ion-ev-dot */
+  .dw-dot-red { background: var(--color-error); }
+  .dw-dot-green { background: var(--color-success); }
+  .dw-dot-amber { background: var(--color-warning); }
+  .dw-dot-cyan { background: var(--color-primary); }
+  .dw-dot-purple { background: var(--color-secondary); }
   .dw-dot-blue { background: var(--neon-blue, #60a5fa); }
-  .dw-dot-muted { background: var(--text-muted); }
-  /* team row cells */
+  .dw-dot-muted { background: color-mix(in oklab, var(--color-base-content) 40%, transparent); }
+
+  /* team board — JS emits .dw-row divs, not <tr>, so this cannot be table/table-sm */
+  .dw-board-head, .dw-row {
+    display: grid;
+    grid-template-columns: 1.5fr 2fr 1.3fr 0.7fr;
+    gap: 10px;
+    align-items: center;
+  }
+  .dw-board-head {
+    padding: 0 13px 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    opacity: 0.6;
+  }
+  .dw-row {
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+    padding: 11px 13px;
+    margin-bottom: 7px;
+  }
+  .dw-ta-right { text-align: right; }
   .dw-who { display: flex; align-items: center; gap: 9px; }
-  .dw-who-name { color: var(--text-bright); font-size: 13px; }
+  .dw-who-name { font-size: 13px; }
   .dw-who-sub { font-size: 11px; }
   .dw-now { font-size: 12px; }
-  .dw-now-empty { color: var(--text-muted); }
-  .dw-cnt { font-size: 12px; color: var(--text-secondary); }
-  .dw-num-cyan { color: var(--primary); }
-  .dw-num-green { color: var(--success); }
-  .dw-last { font-size: 11px; color: var(--text-muted); }
-  .dw-hidden { display: none; }
-  /* day bar: date nav + calendar/timeline sub-toggle */
-  .dw-daybar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 2px; }
-  .dw-daynav { display: flex; align-items: center; gap: 6px; }
-  .dw-nav { padding: 4px 11px; font-size: 16px; line-height: 1; }
-  .dw-today { padding: 5px 12px; font-size: 12px; }
-  .dw-datepick { width: auto; padding: 4px 8px; }
-  .dw-subtoggle button { font-size: 12px; }
-  .dw-composer-time { width: auto; flex: 0 0 auto; }
-  /* day calendar */
-  .dw-calendar { border: 1px solid var(--border); border-radius: var(--radius); max-height: 560px; overflow-y: auto; background: var(--bg-card); }
-  .dw-hour { display: grid; grid-template-columns: 56px 1fr; border-bottom: 1px solid var(--border); min-height: 38px; }
+  .dw-now-empty { opacity: 0.6; }
+  .dw-cnt { font-size: 12px; opacity: 0.8; }
+  .dw-num-cyan { color: var(--color-primary); }
+  .dw-num-green { color: var(--color-success); }
+  .dw-last { font-size: 11px; opacity: 0.6; }
+
+  /* day calendar — custom hour grid; JS querySelector hooks .dw-hour-slot / .dw-cal-item */
+  .dw-calendar {
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+    max-height: 560px;
+    overflow-y: auto;
+    background: var(--color-base-200);
+  }
+  .dw-hour {
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    border-bottom: 1px solid var(--color-base-300);
+    min-height: 38px;
+  }
   .dw-hour:last-child { border-bottom: none; }
-  .dw-hour-label { font-size: 11px; color: var(--text-muted); padding: 6px 8px; text-align: right; border-right: 1px solid var(--border); font-family: var(--font-mono, monospace); }
+  .dw-hour-label {
+    font-size: 11px;
+    opacity: 0.6;
+    padding: 6px 8px;
+    text-align: right;
+    border-right: 1px solid var(--color-base-300);
+    font-family: var(--font-mono, ui-monospace, monospace);
+  }
   .dw-hour-slot { padding: 4px 6px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
-  .dw-hour-slot:hover { background: var(--bg-secondary); }
-  .dw-hour-now { box-shadow: inset 2px 0 0 var(--primary); }
-  .dw-cal-item { display: flex; align-items: center; gap: 7px; padding: 3px 6px; border-radius: 5px; background: var(--bg-secondary); border: 1px solid var(--border); font-size: 12.5px; }
+  .dw-hour-slot:hover { background: var(--color-base-300); }
+  .dw-hour-now { box-shadow: inset 2px 0 0 var(--color-primary); }
+  .dw-cal-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    background: var(--color-base-300);
+    border: 1px solid var(--color-base-300);
+    font-size: 12.5px;
+  }
   .dw-cal-item.dw-editable { cursor: pointer; }
-  .dw-cal-item.dw-editable:hover { border-color: var(--primary); }
-  .dw-cal-time { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono, monospace); flex: 0 0 auto; }
-  .dw-cal-text { color: var(--text-secondary); }
-  .dw-cal-auto { margin-left: auto; font-size: 9.5px; color: #475569; text-transform: uppercase; letter-spacing: .04em; flex: 0 0 auto; }
-  .dw-cal-edit { margin-left: auto; font-size: 10px; color: var(--text-muted); flex: 0 0 auto; }
-  /* edit / add modal */
-  .dw-modal-overlay { position: fixed; inset: 0; background: rgba(2, 6, 16, 0.66); display: flex; align-items: center; justify-content: center; z-index: 200; }
-  /* dw-hidden is defined earlier in source order; without this combined selector
-     the later .dw-modal-overlay display:flex wins and the modal never hides. */
-  .dw-modal-overlay.dw-hidden { display: none; }
-  .dw-modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; width: 380px; max-width: 92vw; box-shadow: 0 18px 48px rgba(0,0,0,.5); }
-  .dw-field-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 4px; }
-  .dw-field { width: 100%; }
-  .dw-modal-actions { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
-  .dw-modal-spacer { flex: 1; }
-  .dw-modal-del { color: var(--danger); border-color: var(--danger); }
+  .dw-cal-item.dw-editable:hover { border-color: var(--color-primary); }
+  .dw-cal-time {
+    font-size: 10.5px;
+    opacity: 0.6;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    flex: 0 0 auto;
+  }
+  .dw-cal-text { opacity: 0.85; }
+  .dw-cal-auto {
+    margin-left: auto;
+    font-size: 9.5px;
+    color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    flex: 0 0 auto;
+  }
+  .dw-cal-edit { margin-left: auto; font-size: 10px; opacity: 0.6; flex: 0 0 auto; }
 </style>
 {% endblock %}
 

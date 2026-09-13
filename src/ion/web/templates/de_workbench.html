@@ -11,119 +11,129 @@
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-3 mb-4">
         <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
-        <span class="label-tiny text-ion-cyan">Detection engineering</span>
+        <span class="label-tiny text-primary">Detection engineering</span>
       </div>
       <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">DE Workbench</h1>
-      <p class="text-[13px] text-slate-500 mt-2">Requests in, proposals out, everything measured.</p>
+      <p class="text-sm text-base-content/60 mt-2">Requests in, proposals out, everything measured.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <a href="/de-metrics" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">DE Metrics</a>
-      <a href="/de-proposals" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Proposals</a>
-      <a href="/de-quirks" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">Quirks</a>
-      <a href="/detection-engineering" class="inline-flex items-center gap-2 h-9 px-4 rounded-md bg-white/5 text-slate-200 hover:bg-white/10 border border-white/10 text-[12px] font-semibold transition">TIDE Intel</a>
+      <a href="/de-metrics" class="btn btn-ghost btn-sm">DE Metrics</a>
+      <a href="/de-proposals" class="btn btn-ghost btn-sm">Proposals</a>
+      <a href="/de-quirks" class="btn btn-ghost btn-sm">Quirks</a>
+      <a href="/detection-engineering" class="btn btn-ghost btn-sm">TIDE Intel</a>
     </div>
   </section>
 
   <!-- KPIs -->
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8 rise d-2">
-    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-      <div class="label-tiny text-ion-coral mb-2">Open requests</div>
-      <div id="kpi-requests" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
-      <div id="kpi-requests-sub" class="text-[11px] text-slate-500 mt-1"></div>
+  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-8 rise d-2">
+    <div class="stat">
+      <div class="stat-title text-error">Open requests</div>
+      <div id="kpi-requests" class="stat-value text-error">—</div>
+      <div id="kpi-requests-sub" class="stat-desc"></div>
     </div>
-    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-      <div class="label-tiny text-ion-amber mb-2">Addressable hours</div>
-      <div id="kpi-hours" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
-      <div id="kpi-hours-sub" class="text-[11px] text-slate-500 mt-1"></div>
+    <div class="stat">
+      <div class="stat-title text-warning">Addressable hours</div>
+      <div id="kpi-hours" class="stat-value text-warning">—</div>
+      <div id="kpi-hours-sub" class="stat-desc"></div>
     </div>
-    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-      <div class="label-tiny text-ion-cyan mb-2">Proposals in flight</div>
-      <div id="kpi-proposals" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
-      <div id="kpi-proposals-sub" class="text-[11px] text-slate-500 mt-1"></div>
+    <div class="stat">
+      <div class="stat-title text-primary">Proposals in flight</div>
+      <div id="kpi-proposals" class="stat-value text-primary">—</div>
+      <div id="kpi-proposals-sub" class="stat-desc"></div>
     </div>
-    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 px-5 py-5">
-      <div class="label-tiny text-ion-amber mb-2">Quirks due review</div>
-      <div id="kpi-quirks" class="font-sans font-semibold text-[26px] leading-none text-white">—</div>
-      <div id="kpi-quirks-sub" class="text-[11px] text-slate-500 mt-1"></div>
+    <div class="stat">
+      <div class="stat-title text-warning">Quirks due review</div>
+      <div id="kpi-quirks" class="stat-value text-warning">—</div>
+      <div id="kpi-quirks-sub" class="stat-desc"></div>
     </div>
   </div>
 
   <!-- Tuning Requests queue -->
-  <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 mb-6 rise d-3">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="label-tiny text-slate-400">Tuning requests</h2>
-      <span class="text-[11px] text-slate-500">analyst-raised · GitLab-mirrored</span>
-    </div>
-    <div id="req-empty" class="hidden text-slate-500 text-[13px] text-center py-8">No open tuning requests — the queue is clear.</div>
-    <div class="overflow-x-auto">
-      <table class="w-full text-[12.5px]" id="req-table">
-        <thead>
-          <tr class="text-slate-500 text-left border-b border-white/5">
-            <th class="pb-2 pr-4 font-medium">Rule</th>
-            <th class="pb-2 pr-4 font-medium">Reason</th>
-            <th class="pb-2 pr-4 font-medium">Details</th>
-            <th class="pb-2 pr-4 font-medium">Age</th>
-            <th class="pb-2 pr-4 font-medium">FP/7d</th>
-            <th class="pb-2 pr-4 font-medium">Ticket</th>
-            <th class="pb-2 pr-4 font-medium">Status</th>
-            <th class="pb-2 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody id="req-body"></tbody>
-      </table>
+  <div class="card bg-base-200 shadow mb-6 rise d-3">
+    <div class="card-body">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="card-title">Tuning requests</h2>
+        <span class="text-xs opacity-60">analyst-raised · GitLab-mirrored</span>
+      </div>
+      <div id="req-empty" class="alert hidden justify-center">No open tuning requests — the queue is clear.</div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm" id="req-table">
+          <thead>
+            <tr>
+              <th>Rule</th>
+              <th>Reason</th>
+              <th>Details</th>
+              <th>Age</th>
+              <th>FP/7d</th>
+              <th>Ticket</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="req-body"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
     <!-- Noise campaigns -->
-    <div class="lg:col-span-2 rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 rise d-4">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="label-tiny text-slate-400">Noise campaigns</h2>
-        <a href="/de-metrics" class="text-[11px] text-ion-cyan hover:brightness-125">all campaigns →</a>
+    <div class="lg:col-span-2 card bg-base-200 shadow rise d-4">
+      <div class="card-body">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="card-title">Noise campaigns</h2>
+          <a href="/de-metrics" class="link link-primary text-sm">all campaigns →</a>
+        </div>
+        <div id="camp-empty" class="alert hidden justify-center">No active noise campaigns.</div>
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Rule</th>
+                <th class="text-right">FP alerts</th>
+                <th class="text-right">Hours</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="camp-body"></tbody>
+          </table>
+        </div>
       </div>
-      <div id="camp-empty" class="hidden text-slate-500 text-[13px] text-center py-8">No active noise campaigns.</div>
-      <table class="w-full text-[12.5px]">
-        <thead>
-          <tr class="text-slate-500 text-left border-b border-white/5">
-            <th class="pb-2 pr-4 font-medium">Rule</th>
-            <th class="pb-2 pr-4 font-medium text-right">FP alerts</th>
-            <th class="pb-2 pr-4 font-medium text-right">Hours</th>
-            <th class="pb-2 font-medium"></th>
-          </tr>
-        </thead>
-        <tbody id="camp-body"></tbody>
-      </table>
     </div>
 
     <!-- Quirks due -->
-    <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 rise d-4">
-      <div class="flex items-center justify-between mb-4">
-        <h2 class="label-tiny text-slate-400">Quirks due for review</h2>
-        <a href="/de-quirks" class="text-[11px] text-ion-cyan hover:brightness-125">register →</a>
+    <div class="card bg-base-200 shadow rise d-4">
+      <div class="card-body">
+        <div class="flex items-center justify-between gap-2">
+          <h2 class="card-title">Quirks due for review</h2>
+          <a href="/de-quirks" class="link link-primary text-sm">register →</a>
+        </div>
+        <div id="quirk-body"></div>
+        <div class="alert alert-info mt-3">Advisory only — quirks never hide or close alerts.</div>
       </div>
-      <div id="quirk-body" class="text-[12.5px]"></div>
-      <div class="text-[11px] text-slate-600 mt-3">Advisory only — quirks never hide or close alerts.</div>
     </div>
   </div>
 
   <!-- Proposals board -->
-  <div class="rounded-[14px] border border-white/5 bg-ink-900/50 px-6 py-5 mb-6 rise d-5">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="label-tiny text-slate-400">Proposals</h2>
-      <a href="/de-proposals" class="text-[11px] text-ion-cyan hover:brightness-125">full board →</a>
-    </div>
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-      <div>
-        <div class="label-tiny text-slate-500 mb-2">Draft <span id="prop-draft-n"></span></div>
-        <div id="prop-draft" class="space-y-2"></div>
+  <div class="card bg-base-200 shadow mb-6 rise d-5">
+    <div class="card-body">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="card-title">Proposals</h2>
+        <a href="/de-proposals" class="link link-primary text-sm">full board →</a>
       </div>
-      <div>
-        <div class="label-tiny text-slate-500 mb-2">Applied · measuring <span id="prop-applied-n"></span></div>
-        <div id="prop-applied" class="space-y-2"></div>
-      </div>
-      <div>
-        <div class="label-tiny text-slate-500 mb-2">Rejected <span id="prop-rejected-n"></span></div>
-        <div id="prop-rejected" class="space-y-2"></div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mb-2">Draft <span id="prop-draft-n"></span></div>
+          <div id="prop-draft" class="space-y-2"></div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mb-2">Applied · measuring <span id="prop-applied-n"></span></div>
+          <div id="prop-applied" class="space-y-2"></div>
+        </div>
+        <div>
+          <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mb-2">Rejected <span id="prop-rejected-n"></span></div>
+          <div id="prop-rejected" class="space-y-2"></div>
+        </div>
       </div>
     </div>
   </div>
