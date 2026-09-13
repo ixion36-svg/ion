@@ -328,9 +328,7 @@
 }
 
 /* Light mode code blocks */
-[data-mode="light"] .code-block,
-[data-mode="light"] .output-box,
-[data-mode="light"] .rendered-content pre {
+[data-mode="light"] .code-block, [data-mode="light"] .rendered-content pre {
     background: #1e293b;
     color: #e2e8f0;
 }
@@ -342,16 +340,9 @@
    Theme Switcher UI
    ============================================================================= */
 
-.theme-switcher {
-    margin-top: 1.5rem;
-}
 
-.theme-switcher h4 {
-    font-size: 0.875rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    color: var(--text-primary);
-}
+
+
 
 .theme-options {
     display: flex;
@@ -415,13 +406,7 @@
     margin: 0;
 }
 
-.mode-switch {
-    display: flex;
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    overflow: hidden;
-}
+
 
 .mode-btn {
     display: flex;
@@ -522,44 +507,13 @@ body::before {
    Navigation
    ============================================================================= */
 
-.navbar {
-    background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
-    border-bottom: 1px solid var(--ion-border);
-    padding: 0 1rem;
-    display: flex;
-    align-items: center;
-    height: 64px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    backdrop-filter: blur(10px);
-    width: 100%;
-    box-sizing: border-box;
-}
 
-.nav-brand {
-    flex-shrink: 0;
-}
 
-.nav-brand a {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--primary);
-    text-decoration: none;
-    text-shadow: var(--glow-sm);
-    letter-spacing: 0.1em;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
 
-.nav-logo {
-    height: 32px;
-    width: 32px;
-    object-fit: contain;
-    border-radius: 6px;
-}
+
+
+
+
 
 .nav-links {
     display: flex;
@@ -752,29 +706,11 @@ body::before {
    Page Header
    ============================================================================= */
 
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 1.75rem;
-    padding-bottom: 1.25rem;
-    border-bottom: 1px solid var(--ion-border);
-    flex-wrap: wrap;
-    gap: 12px;
-}
 
-.page-header h1 {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: var(--text-bright);
-    margin: 0;
-}
 
-.page-subtitle {
-    font-size: .85rem;
-    color: var(--text-secondary);
-    margin: 2px 0 0;
-}
+
+
+
 
 .header-actions {
     display: flex;
@@ -885,12 +821,7 @@ body::before {
    Dashboard Stats
    ============================================================================= */
 
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.5rem;
-    margin-bottom: 2rem;
-}
+
 
 .stat-card {
     background: var(--bg-secondary);
@@ -935,11 +866,7 @@ body::before {
 }
 
 /* Action Cards */
-.action-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 1rem;
-}
+
 
 .action-card {
     background: var(--bg-secondary);
@@ -963,10 +890,7 @@ body::before {
     margin-bottom: 0.75rem;
 }
 
-.action-label {
-    font-size: 0.875rem;
-    font-weight: 500;
-}
+
 
 /* =============================================================================
    Lucide Icon Colors — theme-aware semantic coloring
@@ -1043,14 +967,9 @@ body::before {
 }
 
 /* Navigation chrome — subtle, don't overpower */
-.dropdown-arrow i,
-.np-btn-sm i,
-.chat-toggle-btn i,
-.context-icon i,
-.submenu-arrow i {
+.np-btn-sm i, .context-icon i, .submenu-arrow i {
     color: var(--text-secondary);
 }
-.chat-toggle-btn:hover i,
 .np-btn-sm:hover i {
     color: var(--primary);
 }
@@ -1076,10 +995,10 @@ body::before {
 .role-card.t4 .card-icon i { color: var(--neon-orange); }
 
 /* ── Security dashboard stat icons ────────────────────────────────────────── */
-.stat-icon-total i    { color: var(--primary) !important; }
-.stat-icon-critical i { color: var(--danger) !important; }
-.stat-icon-high i     { color: var(--neon-orange) !important; }
-.stat-icon-blocked i  { color: var(--warning) !important; }
+
+
+
+
 
 /* ── Analyst workspace stat bar — colored per section ─────────────────────── */
 .stat-alerts .stat-icon i      { color: var(--danger) !important; }
@@ -1339,15 +1258,15 @@ body::before {
     letter-spacing: 0.03em;
 }
 
-.mitre-covered { background: var(--mitre-covered-dim); color: var(--mitre-covered); }
-.mitre-gap     { background: var(--mitre-gap-dim);     color: var(--mitre-gap); }
-.mitre-partial { background: var(--mitre-partial-dim); color: var(--mitre-partial); }
+
+
+
 
 /* Quality score badges */
-.quality-excellent { color: var(--quality-excellent); }
-.quality-good      { color: var(--quality-good); }
-.quality-fair      { color: var(--quality-fair); }
-.quality-poor      { color: var(--quality-poor); }
+
+
+
+
 
 /* =============================================================================
    Country Flag Utility
@@ -1362,13 +1281,9 @@ body::before {
     vertical-align: middle;
 }
 
-.country-flag-sm {
-    font-size: 0.9em;
-}
 
-.country-flag-lg {
-    font-size: 1.4em;
-}
+
+
 
 /* =============================================================================
    Code Blocks
@@ -1518,24 +1433,9 @@ body::before {
     flex-shrink: 0;
 }
 
-.user-menu-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: var(--bg-card);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    cursor: pointer;
-    color: var(--text-primary);
-    font-size: 0.875rem;
-    transition: all 0.2s;
-}
 
-.user-menu-btn:hover {
-    border-color: var(--primary);
-    box-shadow: var(--glow-sm);
-}
+
+
 
 .user-avatar {
     width: 32px;
@@ -1557,10 +1457,7 @@ body::before {
     white-space: nowrap;
 }
 
-.dropdown-arrow {
-    font-size: 0.625rem;
-    color: var(--text-muted);
-}
+
 
 .user-dropdown {
     position: absolute;
@@ -1594,23 +1491,11 @@ body::before {
     color: var(--text-secondary);
 }
 
-.user-dropdown-menu {
-    padding: 0.5rem 0;
-}
 
-.user-dropdown-menu a {
-    display: block;
-    padding: 0.75rem 1rem;
-    color: var(--text-primary);
-    text-decoration: none;
-    font-size: 0.875rem;
-    transition: all 0.2s;
-}
 
-.user-dropdown-menu a:hover {
-    background: var(--primary-dim);
-    color: var(--primary);
-}
+
+
+
 
 /* =============================================================================
    Tabs
@@ -1768,31 +1653,11 @@ select option {
    Render/Extract Layouts
    ============================================================================= */
 
-.render-layout, .extract-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-}
 
-.render-input, .render-output,
-.extract-input, .extract-output {
-    background: var(--bg-card);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius-lg);
-    padding: 1.5rem;
-}
 
-.output-box {
-    background: var(--bg-deep);
-    color: var(--neon-cyan);
-    padding: 1.25rem;
-    border-radius: var(--radius);
-    min-height: 300px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 0.875rem;
-    overflow: auto;
-    border: 1px solid var(--ion-border);
-}
+
+
+
 
 /* =============================================================================
    Versions
@@ -1905,11 +1770,7 @@ select option {
    Profile Page
    ============================================================================= */
 
-.profile-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 1.5rem;
-}
+
 
 .profile-field label {
     font-size: 0.75rem;
@@ -1966,12 +1827,7 @@ select option {
    Tools Page
    ============================================================================= */
 
-.tools-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    margin-bottom: 1.5rem;
-}
+
 
 .tools-panel {
     background: var(--bg-card);
@@ -1993,24 +1849,9 @@ select option {
     color: var(--text-bright);
 }
 
-.tools-textarea {
-    width: 100%;
-    height: 300px;
-    font-family: 'JetBrains Mono', 'Fira Code', monospace;
-    font-size: 0.8125rem;
-    padding: 1rem;
-    border: 1px solid var(--ion-border);
-    border-radius: var(--radius);
-    resize: vertical;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-}
 
-.tools-textarea:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: var(--glow-sm);
-}
+
+
 
 /* Tools Tabs */
 .tools-tabs {
@@ -2064,9 +1905,7 @@ select option {
     border-radius: var(--radius);
 }
 
-.ioc-stat strong {
-    color: var(--primary);
-}
+
 
 /* =============================================================================
    Utility Classes
@@ -2207,42 +2046,11 @@ select option {
    Chat Toggle Button
    ============================================================================= */
 
-.chat-toggle-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    margin-right: 0.5rem;
-    background: var(--bg-card);
-    border: 1px solid var(--ion-border);
-    border-radius: 50%;
-    cursor: pointer;
-    color: var(--text-secondary);
-    transition: all 0.2s;
-    flex-shrink: 0;
-    position: relative;
-}
 
-.chat-toggle-btn:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    box-shadow: var(--glow-sm);
-}
 
-.chat-unread-badge {
-    position: absolute;
-    top: -4px;
-    right: -4px;
-    background: var(--neon-red);
-    color: white;
-    font-size: 0.625rem;
-    font-weight: 700;
-    padding: 0.125rem 0.375rem;
-    border-radius: 999px;
-    min-width: 18px;
-    text-align: center;
-}
+
+
+
 
 /* =============================================================================
    Responsive Design
@@ -2260,31 +2068,20 @@ select option {
         padding: 1.5rem;
     }
 
-    .render-layout,
-    .extract-layout,
-    .tools-layout {
-        grid-template-columns: 1fr;
-    }
+    
 
     .nav-links a {
         padding: 0.4rem 0.4rem;
         font-size: 0.7rem;
     }
 
-    .navbar {
-        padding: 0 1rem;
-    }
+    
 }
 
 @media (max-width: 768px) {
-    .navbar {
-        padding: 0 0.75rem;
-        height: 56px;
-    }
+    
 
-    .nav-brand a {
-        font-size: 1.2rem;
-    }
+    
 
     .nav-links {
         margin-left: 0.5rem;
@@ -2308,18 +2105,11 @@ select option {
         grid-template-columns: 1fr;
     }
 
-    .stats-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
+    
 
-    .profile-grid {
-        grid-template-columns: 1fr;
-    }
+    
 
-    .page-header {
-        flex-wrap: wrap;
-        gap: 0.75rem;
-    }
+    
 }
 
 @media (max-width: 600px) {
@@ -2338,15 +2128,9 @@ select option {
 }
 
 @media (max-width: 480px) {
-    .stats-grid {
-        grid-template-columns: 1fr;
-    }
+    
 
-    .page-header {
-        flex-direction: column;
-        gap: 1rem;
-        align-items: flex-start;
-    }
+    
 }
 
 /* =============================================================================
@@ -2423,14 +2207,7 @@ select option {
    Settings Page Tabs
    ============================================================================= */
 
-.settings-tabs {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    margin-bottom: 1.5rem;
-    padding-right: 1rem;
-    border-right: 2px solid var(--ion-border);
-}
+
 
 .settings-tab {
     padding: 0.75rem 1rem;
@@ -2481,40 +2258,15 @@ select option {
     flex-direction: column;
 }
 
-.notif-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--ion-border);
-    color: var(--text-primary);
-    font-size: 0.9rem;
-}
 
-.notif-mark-all {
-    background: none;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    font-size: 0.75rem;
-}
 
-.notif-mark-all:hover {
-    text-decoration: underline;
-}
 
-.notif-list {
-    overflow-y: auto;
-    max-height: 380px;
-    flex: 1;
-}
 
-.notif-empty {
-    padding: 32px 16px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 0.85rem;
-}
+
+
+
+
+
 
 .notif-item {
     display: flex;
@@ -2533,47 +2285,15 @@ select option {
     background: var(--primary-dim);
 }
 
-.notif-item-icon {
-    flex-shrink: 0;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 0.8rem;
-    background: var(--bg-secondary);
-    color: var(--primary);
-}
 
-.notif-item-content {
-    flex: 1;
-    min-width: 0;
-}
 
-.notif-item-title {
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
 
-.notif-item-body {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    margin-top: 2px;
-}
 
-.notif-item-time {
-    font-size: 0.65rem;
-    color: var(--text-muted);
-    margin-top: 2px;
-}
+
+
+
+
+
 
 /* =============================================================================
    ION Design System v2 — Shared component classes
@@ -2582,7 +2302,7 @@ select option {
    ============================================================================= */
 
 /* ── Page Header ─────────────────────────────────────────────────────────── */
-.ion-page { max-width: 1400px; margin: 0 auto; }
+
 
 .ion-page-header {
     display: flex; justify-content: space-between; align-items: flex-start;
@@ -2590,21 +2310,13 @@ select option {
     border-bottom: 1px solid var(--ion-border);
     flex-wrap: wrap; gap: 16px;
 }
-.ion-page-header-left { display: flex; flex-direction: column; gap: 4px; }
-.ion-page-label {
-    display: flex; align-items: center; gap: 6px;
-    color: var(--primary); font-size: 10px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 2px;
-}
-.ion-page-title { font-size: 1.5rem; font-weight: 700; color: var(--text-bright); margin: 0; }
-.ion-page-subtitle { font-size: .85rem; color: var(--text-secondary); margin: 2px 0 0; }
+
+
+
+
 
 /* ── Toggle Button Group ─────────────────────────────────────────────────── */
-.ion-toggle-group {
-    display: flex; align-items: center; gap: 2px;
-    background: var(--bg-secondary); padding: 4px; border-radius: var(--radius-lg);
-    border: 1px solid var(--ion-border);
-}
+
 .ion-toggle-btn {
     padding: 8px 16px; border-radius: 8px; font-size: 10px; font-weight: 800;
     text-transform: uppercase; letter-spacing: 0.5px;
@@ -2629,16 +2341,12 @@ select option {
     transition: border-color .2s;
 }
 .ion-card:hover { border-color: var(--border-bright); }
-.ion-card-flush { padding: 0; }
-.ion-card-dark { background: var(--bg-primary); box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+
+
 
 /* Card section header */
-.ion-card-header {
-    font-size: 11px; font-weight: 900; text-transform: uppercase;
-    color: var(--text-secondary); letter-spacing: 1.5px;
-    margin: 0 0 20px; display: flex; align-items: center; gap: 8px;
-}
-.ion-card-header i { color: var(--primary); }
+
+
 
 /* ── Modern Table ────────────────────────────────────────────────────────── */
 .ion-table { width: 100%; border-collapse: collapse; }
@@ -2658,8 +2366,8 @@ select option {
 .ion-table tbody tr:last-child td { border-bottom: none; }
 
 /* Compact variant */
-.ion-table-compact thead th { padding: 8px 10px; }
-.ion-table-compact tbody td { padding: 8px 10px; font-size: 11px; }
+
+
 
 /* ── Status Badges ───────────────────────────────────────────────────────── */
 .ion-badge {
@@ -2668,28 +2376,24 @@ select option {
     font-size: 10px; font-weight: 700; font-family: inherit;
     text-transform: uppercase; letter-spacing: 0.5px;
 }
-.ion-badge-success { background: rgba(16,185,129,.12); color: var(--success); }
-.ion-badge-danger  { background: rgba(239,68,68,.12); color: var(--danger); }
-.ion-badge-warning { background: rgba(251,191,36,.12); color: var(--warning); }
-.ion-badge-info    { background: rgba(14,165,233,.12); color: var(--info); }
-.ion-badge-primary { background: var(--primary-dim); color: var(--primary); }
-.ion-badge-muted   { background: rgba(99,110,123,.15); color: var(--text-secondary); }
+
+
+
+
+
+
 
 /* ── Metric / Progress Bar ───────────────────────────────────────────────── */
 .ion-metric { margin-bottom: 18px; }
 .ion-metric:last-child { margin-bottom: 0; }
-.ion-metric-header {
-    display: flex; justify-content: space-between;
-    font-size: 10px; font-weight: 700; text-transform: uppercase;
-    color: var(--text-secondary); margin-bottom: 8px; letter-spacing: 0.5px;
-}
+
 .ion-metric-value { font-weight: 700; }
 .ion-metric-value.success { color: var(--success); }
 .ion-metric-value.danger  { color: var(--danger); }
 .ion-metric-value.warning { color: var(--warning); }
 .ion-metric-value.info    { color: var(--info); }
 
-.ion-bar { height: 4px; width: 100%; background: var(--ion-border); border-radius: 4px; overflow: hidden; }
+
 .ion-bar-fill {
     height: 100%; border-radius: 4px;
     transition: width .8s ease;
@@ -2701,25 +2405,14 @@ select option {
 .ion-bar-fill.primary { background: var(--primary); }
 
 /* Thicker bar variant */
-.ion-bar-lg { height: 6px; }
+
 
 /* ── Code Block ──────────────────────────────────────────────────────────── */
-.ion-code {
-    background: var(--bg-secondary); border-radius: var(--radius-lg);
-    padding: 20px; border: 1px solid var(--ion-border);
-}
-.ion-code pre {
-    font-family: 'JetBrains Mono', monospace; font-size: 11px;
-    color: var(--info); overflow-x: auto; white-space: pre;
-    line-height: 1.6; margin: 0;
-}
+
+
 
 /* ── Notes / Detail Panel ────────────────────────────────────────────────── */
-.ion-detail-row {
-    display: flex; gap: 16px; padding: 16px;
-    background: var(--bg-secondary); border-radius: var(--radius-lg);
-    border: 1px solid var(--ion-border);
-}
+
 .ion-detail-col { flex: 1; }
 .ion-detail-col + .ion-detail-col { border-left: 1px solid var(--ion-border); padding-left: 16px; }
 .ion-detail-col h4 {
@@ -2729,19 +2422,11 @@ select option {
 .ion-detail-col p { font-size: 12px; color: var(--text-secondary); margin: 0; }
 
 /* ── Section Heading (small uppercase) ───────────────────────────────────── */
-.ion-section-title {
-    font-size: 12px; font-weight: 900; color: var(--text-secondary);
-    text-transform: uppercase; letter-spacing: 1.5px;
-    margin: 0 0 16px; display: flex; align-items: center; gap: 8px;
-}
-.ion-section-title i { color: var(--primary); }
+
+
 
 /* ── Pill Tabs ───────────────────────────────────────────────────────────── */
-.ion-pill-tabs {
-    display: flex; gap: 2px;
-    background: var(--bg-secondary); padding: 4px; border-radius: var(--radius-lg);
-    border: 1px solid var(--ion-border); display: inline-flex;
-}
+
 .ion-pill-tab {
     padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 600;
     border: none; cursor: pointer; background: transparent;
@@ -2751,19 +2436,9 @@ select option {
 .ion-pill-tab.active { background: var(--primary); color: var(--bg-deep); }
 
 /* ── Stat Grid (modernised) ──────────────────────────────────────────────── */
-.ion-stat-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px; margin-bottom: 24px;
-}
-.ion-stat-card {
-    background: var(--bg-secondary); border: 1px solid var(--ion-border);
-    border-radius: var(--radius-lg); padding: 20px;
-    display: flex; flex-direction: column; gap: 4px;
-}
-.ion-stat-label {
-    font-size: 10px; font-weight: 700; text-transform: uppercase;
-    color: var(--text-secondary); letter-spacing: 1px;
-}
+
+
+
 .ion-stat-value {
     font-size: 1.75rem; font-weight: 700; color: var(--text-bright);
     font-family: 'JetBrains Mono', monospace;
@@ -2773,44 +2448,35 @@ select option {
 .ion-stat-value.danger  { color: var(--danger); }
 .ion-stat-value.warning { color: var(--warning); }
 .ion-stat-value.info    { color: var(--info); }
-.ion-stat-sub {
-    font-size: 11px; color: var(--text-muted);
-}
+
 
 /* ── Empty State ─────────────────────────────────────────────────────────── */
-.ion-empty {
-    text-align: center; padding: 48px 24px;
-    color: var(--text-muted); font-size: 14px;
-}
-.ion-empty i { font-size: 32px; display: block; margin-bottom: 12px; color: var(--text-secondary); }
-.ion-empty p { margin: 4px 0; }
+
+
+
 
 /* ── Alert / Callout Box ─────────────────────────────────────────────────── */
-.ion-callout {
-    padding: 12px 16px; border-radius: var(--radius);
-    font-size: 12px; line-height: 1.5;
-    display: flex; align-items: flex-start; gap: 10px;
-}
-.ion-callout i { flex-shrink: 0; margin-top: 1px; }
-.ion-callout-info    { background: rgba(14,165,233,.08); border: 1px solid rgba(14,165,233,.2); color: var(--info); }
-.ion-callout-success { background: rgba(16,185,129,.08); border: 1px solid rgba(16,185,129,.2); color: var(--success); }
-.ion-callout-warning { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.2); color: var(--warning); }
-.ion-callout-danger  { background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.2); color: var(--danger); }
+
+
+
+
+
+
 
 /* ── Utility: Grid Layouts ───────────────────────────────────────────────── */
-.ion-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.ion-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
-.ion-grid-7-5 { display: grid; grid-template-columns: 7fr 5fr; gap: 32px; }
+
+
+
 @media (max-width: 1024px) {
-    .ion-grid-2, .ion-grid-3, .ion-grid-7-5 { grid-template-columns: 1fr; }
+    
 }
 @media (max-width: 768px) {
-    .ion-detail-row { flex-direction: column; }
+    
     .ion-detail-col + .ion-detail-col { border-left: none; padding-left: 0; border-top: 1px solid var(--ion-border); padding-top: 12px; }
 }
 
 /* ── Transition helper ───────────────────────────────────────────────────── */
-.ion-fade-in { animation: ionFadeIn .3s ease; }
+
 @keyframes ionFadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
 
@@ -2830,31 +2496,9 @@ select option {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ── Page header refresh ────────────────────────────────────────────────── */
-.page-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    flex-wrap: wrap;
-    gap: 16px;
-    margin-bottom: 2rem;
-    padding-bottom: 0;
-    border-bottom: 0;
-}
-.page-header h1 {
-    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
-    font-size: 2.25rem;
-    font-weight: 600;
-    color: #fff;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-    margin: 0;
-}
-.page-subtitle {
-    font-size: 0.9375rem;
-    color: #94a3b8;
-    margin: 0.75rem 0 0;
-    max-width: 44rem;
-}
+
+
+
 .header-actions {
     display: flex;
     gap: 0.5rem;
@@ -3210,11 +2854,7 @@ h1, h2, h3, h4, h5, h6 {
    edits are needed. */
 
 /* ── Action cards (analyst workspace, tools page) ──────────────────────── */
-.action-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 0.75rem;
-}
+
 .action-card {
     display: flex;
     flex-direction: column;
@@ -3232,7 +2872,7 @@ h1, h2, h3, h4, h5, h6 {
     background: rgba(109, 228, 255, 0.04);
 }
 .action-card-danger:hover { border-color: rgba(255, 108, 108, 0.35); background: rgba(255, 108, 108, 0.04); }
-.action-card-primary:hover { border-color: rgba(109, 228, 255, 0.35); background: rgba(109, 228, 255, 0.04); }
+
 .action-icon {
     display: inline-flex;
     align-items: center;
@@ -3243,12 +2883,7 @@ h1, h2, h3, h4, h5, h6 {
     font-size: 1rem;
 }
 .action-card-danger .action-icon { color: #ff6c6c; }
-.action-label {
-    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    color: #fff;
-}
+
 
 /* ── Metric cards (training, analytics pages) ──────────────────────────── */
 .metrics-grid {
@@ -3354,43 +2989,15 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: 0.02em;
     border: 1px solid transparent;
 }
-.mitre-covered {
-    background: rgba(134, 240, 160, 0.1);
-    color: #86f0a0;
-    border-color: rgba(134, 240, 160, 0.25);
-}
-.mitre-gap {
-    background: rgba(255, 108, 108, 0.1);
-    color: #ff6c6c;
-    border-color: rgba(255, 108, 108, 0.25);
-}
-.mitre-partial {
-    background: rgba(248, 179, 58, 0.1);
-    color: #f8b33a;
-    border-color: rgba(248, 179, 58, 0.25);
-}
+
+
+
 
 /* ── Quality score classes (DE rule quality) ──────────────────────────── */
-.quality-excellent {
-    background: rgba(134, 240, 160, 0.1);
-    color: #86f0a0;
-    border-color: rgba(134, 240, 160, 0.25);
-}
-.quality-good {
-    background: rgba(109, 228, 255, 0.1);
-    color: #6de4ff;
-    border-color: rgba(109, 228, 255, 0.25);
-}
-.quality-fair {
-    background: rgba(248, 179, 58, 0.1);
-    color: #f8b33a;
-    border-color: rgba(248, 179, 58, 0.25);
-}
-.quality-poor {
-    background: rgba(255, 108, 108, 0.1);
-    color: #ff6c6c;
-    border-color: rgba(255, 108, 108, 0.25);
-}
+
+
+
+
 
 /* ── Status badge (cases, alerts, system panels) ──────────────────────── */
 .status-badge {
@@ -3469,7 +3076,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Tool tabs & panels (tools page, discover, etc.) ──────────────────── */
-.tools-tabs, .tool-tab-strip {
+.tools-tabs {
     display: flex;
     gap: 0.25rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -3500,31 +3107,9 @@ h1, h2, h3, h4, h5, h6 {
     padding: 1.75rem;
     margin-bottom: 1.25rem;
 }
-.tools-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-}
-.tools-textarea {
-    width: 100%;
-    min-height: 10rem;
-    padding: 0.875rem 1rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 0.5rem;
-    color: #fff;
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 0.8125rem;
-    line-height: 1.6;
-    resize: vertical;
-    transition: border-color .15s ease, background .15s ease;
-}
-.tools-textarea:focus {
-    outline: none;
-    border-color: rgba(109, 228, 255, 0.5);
-    background: rgba(255, 255, 255, 0.06);
-    box-shadow: 0 0 0 2px rgba(109, 228, 255, 0.1);
-}
+
+
+
 
 /* ── Panel headers (generic) ───────────────────────────────────────────── */
 .panel-header {
@@ -3596,12 +3181,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Settings tabs (sidebar style) ────────────────────────────────────── */
-.settings-tabs {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: 0.75rem 0.5rem;
-}
+
 .settings-tab {
     display: flex;
     align-items: center;
@@ -3626,7 +3206,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Theme switcher (admin settings) ───────────────────────────────────── */
-.theme-switcher { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
 .theme-options { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 .theme-option {
     width: 2.25rem;
@@ -3680,7 +3260,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Code blocks (extractors, render previews) ────────────────────────── */
-.code-block, .output-box {
+.code-block {
     background: rgba(7, 8, 12, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
@@ -3709,11 +3289,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Profile grid (user profile pages) ────────────────────────────────── */
-.profile-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 1rem;
-}
+
 .profile-field {
     padding: 1rem 1.25rem;
     background: rgba(10, 12, 18, 0.5);
@@ -3776,7 +3352,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Mode / toggle switches (reporting pages) ─────────────────────────── */
-.mode-switch, .mode-toggle {
+.mode-toggle {
     display: inline-flex;
     align-items: center;
     gap: 2px;
@@ -3862,12 +3438,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Stat / action / metric / tool / role cards — small tile variants */
-[data-mode="light"] .stat-card,
-[data-mode="light"] .action-card,
-[data-mode="light"] .metric-card,
-[data-mode="light"] .tool-card,
-[data-mode="light"] .role-card,
-[data-mode="light"] .ion-stat-card {
+[data-mode="light"] .stat-card, [data-mode="light"] .action-card, [data-mode="light"] .metric-card, [data-mode="light"] .tool-card, [data-mode="light"] .role-card {
   background: var(--bg-card) !important;
   border-color: var(--ion-border) !important;
   box-shadow: var(--shadow-card) !important;
@@ -3901,18 +3472,7 @@ h1, h2, h3, h4, h5, h6 {
 
 
 /* Forms */
-[data-mode="light"] .form-control,
-[data-mode="light"] .form-input,
-[data-mode="light"] .form-select,
-[data-mode="light"] .form-textarea,
-[data-mode="light"] input[type="text"],
-[data-mode="light"] input[type="email"],
-[data-mode="light"] input[type="password"],
-[data-mode="light"] input[type="number"],
-[data-mode="light"] input[type="url"],
-[data-mode="light"] input[type="search"],
-[data-mode="light"] textarea,
-[data-mode="light"] select {
+[data-mode="light"] .form-control, [data-mode="light"] .form-input, [data-mode="light"] input[type="text"], [data-mode="light"] input[type="email"], [data-mode="light"] input[type="password"], [data-mode="light"] input[type="number"], [data-mode="light"] input[type="url"], [data-mode="light"] input[type="search"], [data-mode="light"] textarea, [data-mode="light"] select {
   background: var(--bg-card) !important;
   border-color: var(--ion-border) !important;
   color: var(--text-primary) !important;
@@ -3922,7 +3482,6 @@ h1, h2, h3, h4, h5, h6 {
 [data-mode="light"] textarea::placeholder {
   color: var(--text-muted) !important;
 }
-[data-mode="light"] .form-label,
 [data-mode="light"] label {
   color: var(--text-secondary) !important;
 }
@@ -3939,20 +3498,15 @@ h1, h2, h3, h4, h5, h6 {
 [data-mode="light"] .modal-footer {
   border-color: var(--ion-border) !important;
 }
-[data-mode="light"] .modal-header h2,
-[data-mode="light"] .modal-header h3,
-[data-mode="light"] .modal-title {
+[data-mode="light"] .modal-header h2, [data-mode="light"] .modal-header h3 {
   color: var(--text-bright) !important;
 }
-[data-mode="light"] .modal-overlay,
-[data-mode="light"] .modal-backdrop {
+[data-mode="light"] .modal-overlay {
   background: rgba(15, 23, 42, 0.4) !important;
 }
 
 /* Section tabs / nav pills */
-[data-mode="light"] .section-nav,
-[data-mode="light"] .tab-bar,
-[data-mode="light"] .nav-tabs {
+[data-mode="light"] .section-nav, [data-mode="light"] .tab-bar {
   border-bottom-color: var(--ion-border) !important;
 }
 [data-mode="light"] .section-nav a,
@@ -3976,11 +3530,7 @@ h1, h2, h3, h4, h5, h6 {
 
 
 /* Tool tabs / panels (tools, discover, observables) */
-[data-mode="light"] .tool-tab,
-[data-mode="light"] .panel,
-[data-mode="light"] .panel-body,
-[data-mode="light"] .side-panel,
-[data-mode="light"] .sidebar-card {
+[data-mode="light"] .tool-tab, [data-mode="light"] .panel, [data-mode="light"] .panel-body, [data-mode="light"] .side-panel {
   background: var(--bg-card) !important;
   border-color: var(--ion-border) !important;
   color: var(--text-primary) !important;
@@ -3991,10 +3541,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Code blocks / output boxes — keep readable monospace on off-white */
-[data-mode="light"] .code-block,
-[data-mode="light"] .output-box,
-[data-mode="light"] .rendered-content pre,
-[data-mode="light"] pre {
+[data-mode="light"] .code-block, [data-mode="light"] .rendered-content pre, [data-mode="light"] pre {
   background: #f1f5f9 !important;
   border-color: var(--ion-border) !important;
   color: #0f172a !important;
@@ -4063,11 +3610,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Mode / toggle switches */
-[data-mode="light"] .toggle-switch,
-[data-mode="light"] .mode-switch {
-  background: var(--bg-secondary) !important;
-  border-color: var(--ion-border) !important;
-}
+
 
 /* Notepad panel (if visible during mode flip) */
 [data-mode="light"] .notepad-panel,

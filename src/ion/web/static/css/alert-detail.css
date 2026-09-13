@@ -77,7 +77,6 @@
    The two page copies of _alertFieldsTable differed ONLY in these class names,
    which is why the function could be parameterised into one. Both prefixes
    resolve to the same visual result. */
-.cpanel-alert-fields-table,
 .alert-parsed-fields-table {
     width: 100%;
     border-collapse: collapse;
@@ -85,7 +84,6 @@
     font-size: 11px;
 }
 
-.cpanel-alert-fields-table td,
 .alert-parsed-fields-table td {
     padding: 4px 8px;
     border-bottom: 1px solid var(--ion-border);
@@ -616,7 +614,7 @@
 .iad2-tabs::-webkit-scrollbar { height: 6px; }
 .iad2-tabs::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
 /* Source-provenance dots on the tab strip + legend. */
-.iad2-tab { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; }
+
 .iad2-dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
 .iad2-dot-ai { background: var(--primary); box-shadow: 0 0 0 3px var(--primary-dim); }
 .iad2-dot-rule { background: var(--warning); }
