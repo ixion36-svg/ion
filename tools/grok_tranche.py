@@ -1,0 +1,191 @@
+"""Run the proven Grok rewrite prompt across a tranche of templates.
+
+Each page is handled independently: back up, delegate, verify, keep or roll
+back. A page that fails verification is RESTORED, never left half-rewritten, so
+a bad run costs time rather than correctness.
+
+Verification is per-page rather than the global `ui_rewrite_audit.py --check`,
+because pages are processed in parallel and a global check cannot attribute a
+loss to the page that caused it.
+
+Two failure modes are checked, both invisible in a browser:
+  - a lost `_ion-s-*` hashed class  -> silently unstyled element
+  - a new raw `style="..."`         -> silently refused by style-src-attr 'none'
+
+Not checked here, and the reason a human still reviews: a broken JS<->CSS
+contract. The pilot page's JS toggles `.active` while daisyUI opens modals via
+`modal-open`; nothing in this script would have caught that.
+
+Usage:
+    python tools/grok_tranche.py --list M              # show a band, run nothing
+    python tools/grok_tranche.py --pages a.html b.html
+    python tools/grok_tranche.py --band M --limit 5 --workers 3
+    python tools/grok_tranche.py --band M --dry-run
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+
+GROK = Path("C:/Users/lyndo/.grok/bin/grok")
+REPO = Path(__file__).resolve().parent.parent
+TEMPLATES = REPO / "src/ion/web/templates"
+BASELINE = REPO / "tools/ui_rewrite_baseline.json"
+RESULTS = REPO / "tools/grok_tranche_results.json"
+
+HASHED = re.compile(r"_ion-s-[a-z0-9]+")
+INLINE_STYLE = re.compile(r'(?<![-\w])style\s*=\s*["\']')
+
+# base.html is the shared layout for all 114 pages. Rewriting it in a batch
+# would change every page at once with no way to attribute a regression.
+# It gets its own dedicated pass, deliberately.
+NEVER_BATCH = {"base.html", "_components.html", "_icons.html", "_nav_tabs.html"}
+
+BANDS = {"XL": (2500, 10**9), "L": (1000, 2500), "M": (300, 1000), "S": (0, 300)}
+
+
+def load_baseline() -> dict:
+    return json.loads(BASELINE.read_text(encoding="utf-8"))
+
+
+def pick_band(baseline: dict, band: str) -> list[str]:
+    lo, hi = BANDS[band]
+    names = [n for n, v in baseline.items() if lo <= v["lines"] < hi and n not in NEVER_BATCH]
+    # Lowest hashed-class count first: least CSP risk earliest, so an early
+    # failure is cheap and tells us the prompt is wrong before the risky pages.
+    return sorted(names, key=lambda n: (baseline[n]["hashed_count"], baseline[n]["lines"]))
+
+
+def build_prompt(page: str) -> str:
+    base = (REPO / "tools/grok_rewrite_prompt.md").read_text(encoding="utf-8")
+    # Strip the reviewer's retrospective; Grok only needs the instructions.
+    base = base.split("## Observed behaviour", 1)[0].rstrip()
+    return base.replace("security_dashboard.html", page)
+
+
+def verify(page: str, baseline: dict) -> list[str]:
+    """Return problems for this page only. Empty list means clean."""
+    path = TEMPLATES / page
+    if not path.is_file():
+        return [f"{page}: file missing after run"]
+    text = path.read_text(encoding="utf-8", errors="replace")
+    problems = []
+
+    lost = set(baseline[page]["hashed_classes"]) - set(HASHED.findall(text))
+    if lost:
+        problems.append(f"lost {len(lost)} hashed class(es): {sorted(lost)[:4]}")
+
+    inline_now = len(INLINE_STYLE.findall(text))
+    if inline_now > baseline[page]["raw_inline_styles"]:
+        problems.append(
+            f"raw inline styles {baseline[page]['raw_inline_styles']} -> {inline_now}"
+        )
+    return problems
+
+
+def run_one(page: str, baseline: dict, timeout: int) -> dict:
+    path = TEMPLATES / page
+    started = time.time()
+    backup = Path(tempfile.gettempdir()) / f"grok-tranche-{page.replace('/', '_')}.bak"
+    shutil.copy(path, backup)
+
+    prompt_file = Path(tempfile.gettempdir()) / f"grok-prompt-{page.replace('/', '_')}.md"
+    prompt_file.write_text(build_prompt(page), encoding="utf-8")
+
+    result = {"page": page, "lines_before": baseline[page]["lines"]}
+    try:
+        proc = subprocess.run(
+            [str(GROK), "--cwd", str(REPO), "--permission-mode", "bypassPermissions",
+             "--max-turns", "60", "--prompt-file", str(prompt_file)],
+            capture_output=True, text=True, timeout=timeout,
+        )
+        result["exit"] = proc.returncode
+        result["tail"] = (proc.stdout or "")[-400:]
+    except subprocess.TimeoutExpired:
+        shutil.copy(backup, path)
+        result.update(status="TIMEOUT", problems=[f"exceeded {timeout}s"],
+                      elapsed=round(time.time() - started))
+        return result
+
+    after = path.read_text(encoding="utf-8", errors="replace")
+    result["lines_after"] = after.count("\n") + 1
+
+    if result["lines_after"] == result["lines_before"] and after == backup.read_text(encoding="utf-8", errors="replace"):
+        # Grok explored and wrote nothing. Indistinguishable from success
+        # unless checked -- this is exactly what --permission-mode acceptEdits
+        # produced on the first pilot run.
+        result.update(status="NO_CHANGE", problems=["template unchanged"],
+                      elapsed=round(time.time() - started))
+        return result
+
+    problems = verify(page, baseline)
+    if problems:
+        shutil.copy(backup, path)   # never leave a page half-rewritten
+        result.update(status="FAILED", problems=problems, rolled_back=True)
+    else:
+        result.update(status="OK", problems=[])
+    result["elapsed"] = round(time.time() - started)
+    return result
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--band", choices=list(BANDS))
+    ap.add_argument("--pages", nargs="*")
+    ap.add_argument("--limit", type=int)
+    ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--timeout", type=int, default=1200)
+    ap.add_argument("--list", dest="list_band", choices=list(BANDS))
+    ap.add_argument("--dry-run", action="store_true")
+    args = ap.parse_args()
+
+    baseline = load_baseline()
+
+    if args.list_band:
+        for n in pick_band(baseline, args.list_band):
+            print(f"{baseline[n]['lines']:5d} lines  {baseline[n]['hashed_count']:4d} hashed  {n}")
+        return 0
+
+    pages = args.pages or (pick_band(baseline, args.band) if args.band else [])
+    if not pages:
+        print("nothing selected; use --band or --pages", file=sys.stderr)
+        return 2
+    if args.limit:
+        pages = pages[: args.limit]
+
+    print(f"tranche: {len(pages)} page(s), {args.workers} worker(s)")
+    for p in pages:
+        print(f"  {baseline[p]['lines']:5d} lines  {baseline[p]['hashed_count']:4d} hashed  {p}")
+    if args.dry_run:
+        return 0
+
+    results = []
+    with ThreadPoolExecutor(max_workers=args.workers) as pool:
+        futures = {pool.submit(run_one, p, baseline, args.timeout): p for p in pages}
+        for fut in as_completed(futures):
+            r = fut.result()
+            results.append(r)
+            flag = {"OK": "ok  ", "FAILED": "FAIL", "NO_CHANGE": "noop", "TIMEOUT": "TIME"}[r["status"]]
+            extra = f" {r['problems']}" if r["problems"] else ""
+            print(f"[{flag}] {r['page']} ({r.get('elapsed','?')}s)"
+                  f" {r['lines_before']}->{r.get('lines_after','?')}{extra}", flush=True)
+
+    RESULTS.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
+    ok = sum(1 for r in results if r["status"] == "OK")
+    print(f"\n{ok}/{len(results)} OK -> {RESULTS}")
+    print("Failed and no-change pages were left at their original content.")
+    print("Still required: human review of each OK page for JS<->CSS contracts.")
+    return 0 if ok == len(results) else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
