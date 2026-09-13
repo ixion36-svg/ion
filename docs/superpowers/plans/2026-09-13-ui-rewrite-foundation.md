@@ -17,7 +17,7 @@
 Measured 2026-09-13 against `main` at v0.92.0. These supersede the June figures in `concepts/reskin-scope.md`, which are stale.
 
 - 114 templates, 81,191 total lines. Largest: `alerts.html` 10,482, `training.html` 9,509, `cases.html` 5,568.
-- **1,696 `_ion-s-*` occurrences across 60 templates.** These are CSP-mandated hashed classes for JS-computed values under `style-src-attr 'none'` — they are the *sanctioned pattern*, not debt. The count nearly doubled since June (935), so they are actively growing. **The rewrite must preserve them.** Stripping one produces an unstyled element, not an error.
+- **1,695 `_ion-s-*` occurrences across 60 templates.** These are CSP-mandated hashed classes for JS-computed values under `style-src-attr 'none'` — they are the *sanctioned pattern*, not debt. The count nearly doubled since June (~935), so they are actively growing. Counted with `_ion-s-[a-z0-9]+`; a `*` quantifier returns 1,696 by also matching a bare `_ion-s-…` in a JS comment at network_map.html:191. **The rewrite must preserve them.** Stripping one produces an unstyled element, not an error.
 - **CSP failures are silent.** Per `tests/test_v080_csp_inline_styles.py`: a refused inline style yields no error, no log line, no failed request. 22 sat unnoticed; a severity stripe rendered colourless for three releases. Any rewrite step that cannot be checked by the harness must be checked by eye.
 - **The counting trap:** a naive `style\s*=` regex also matches the tail of `data-ion-style="..."`, which is the sanctioned replacement. Any tooling that counts inline styles must carry the `(?<![-\w])` guard, or it will report already-migrated sites as violations. This once produced a six-phase plan for work already done.
 - No Node, no npm. Tailwind builds only via `./frontend/tailwindcss.exe` (v4.3.3, gitignored, must be present).
@@ -318,9 +318,9 @@ source .venv/Scripts/activate
 python tools/ui_rewrite_audit.py
 ```
 
-Expected: `baseline written: 114 templates, 1696 hashed classes`.
+Expected: `baseline written: 114 templates, 1695 hashed classes`.
 
-If the hashed-class total is not 1696, stop and reconcile before continuing — the measurement was taken on 2026-09-13 against v0.92.0. A different number means either the repo moved or the regex is wrong, and a wrong baseline makes the whole harness worthless.
+If the hashed-class total is not 1695, stop and reconcile before continuing — the measurement was taken on 2026-09-13 against v0.92.0. A different number means either the repo moved or the regex is wrong, and a wrong baseline makes the whole harness worthless.
 
 - [ ] **Step 3: Write the harness test**
 
@@ -408,7 +408,7 @@ _ion-s-* hashed class renders an unstyled element, and a raw inline style is
 refused by style-src-attr 'none' with no error and no log line. Neither shows
 up in a diff review at this volume.
 
-The audit snapshots all 114 templates (1,696 hashed classes) and fails on loss
+The audit snapshots all 114 templates (1,695 hashed classes) and fails on loss
 or on new raw inline styles. The render smoke asserts no page 500s. Verified by
 deliberately breaking a template and confirming the audit catches it.
 
