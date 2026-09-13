@@ -224,3 +224,52 @@ def test_tailwinds_radius_lg_is_not_shadowed_by_ions():
     style = Path("src/ion/web/static/css/style.css").read_text(encoding="utf-8")
     assert not re.search(r"(?<![-\w])--radius-lg(?![-\w])", style), \
         "style.css is redefining Tailwind's --radius-lg; use --ion-radius-lg"
+
+
+def test_daisyui_accents_derive_from_ions_tokens_not_hardcoded_hexes():
+    """ION ships eight accent themes; daisyUI must follow them.
+
+    style.css redefines --primary for [data-theme="cyan"|purple|green|orange|
+    pink|red|blue|gold], in light mode as well as dark, with darkened light
+    values chosen for contrast. theme-init.js sets the attribute on <html>
+    before paint.
+
+    The first version of this theme hardcoded --color-primary: #6de4ff, which
+    is one of those sixteen values. Every daisyUI component then ignored the
+    switcher: browser-measured under [data-theme="purple"], ION's .text-primary
+    rendered #a855f7 while btn-primary and badge-primary stayed cyan. That was
+    a regression introduced by the rewrite, not a pre-existing bug.
+
+    Deriving fixes light mode at the same time, because --primary is already
+    correct for both. After the change, purple+light gives --color-primary
+    #7c3aed and a button background of rgb(124,58,237), matching .text-primary.
+    """
+    css = THEME.read_text(encoding="utf-8")
+    root = css.split(":root", 1)[1].split("}", 1)[0]
+    for token, source in (("--color-primary", "--primary"),
+                          ("--color-success", "--success"),
+                          ("--color-warning", "--warning"),
+                          ("--color-error", "--danger"),
+                          ("--color-info", "--info")):
+        m = re.search(re.escape(token) + r"\s*:\s*([^;]+);", root)
+        assert m, f"{token} is not declared in :root"
+        assert f"var({source}" in m.group(1), (
+            f"{token} is hardcoded as {m.group(1).strip()!r}; derive it from "
+            f"var({source}) or the eight accent themes stop working"
+        )
+
+
+def test_light_mode_does_not_restate_the_derived_accents():
+    """Restating them pins light mode to one accent and drops the other seven.
+
+    The accents already flip: style.css defines
+    [data-mode="light"][data-theme="..."] for every theme.
+    """
+    css = THEME.read_text(encoding="utf-8")
+    light = css.split(':root[data-mode="light"]', 1)[1].split("}", 1)[0]
+    for token in ("--color-primary", "--color-success", "--color-warning",
+                  "--color-error", "--color-info"):
+        assert not re.search(re.escape(token) + r"\s*:", light), (
+            f"{token} is restated for light mode; it derives from ION's token, "
+            "which style.css already flips per accent theme"
+        )

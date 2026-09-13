@@ -30,27 +30,51 @@
   --color-base-300: #171b24;  /* ink-700 */
   --color-base-content: #e6e9ef;
 
-  /* Brand. Every ION accent is a light colour, so its content pair is ink. */
-  --color-primary: #6de4ff;   /* ion-cyan */
-  --color-primary-content: #07080c;
-  --color-secondary: #9a8cff; /* ion-iris */
-  --color-secondary-content: #07080c;
-  --color-accent: #f8b33a;    /* ion-amber */
-  --color-accent-content: #07080c;
+  /*
+   * Brand and status DERIVE from ION's own tokens rather than restating them.
+   *
+   * ION ships eight accent themes -- cyan, purple, green, orange, pink, red,
+   * blue, gold -- selected with [data-theme] on <html> by theme-init.js, and
+   * style.css redefines --primary for each, in light mode as well as dark and
+   * with properly darkened light values (#0891b2, #7c3aed, #059669...).
+   *
+   * Hardcoding #6de4ff here duplicated one of those sixteen values and ignored
+   * the rest, so every daisyUI component stopped following the theme switcher.
+   * Browser-measured under [data-theme="purple"]: ION's .text-primary rendered
+   * #a855f7 while btn-primary and badge-primary stayed cyan.
+   *
+   * Deriving fixes the light-mode flip too: --primary is already correct for
+   * both modes, so there is no need to override these below.
+   *
+   * The fallbacks are the ion-cyan defaults, so this still resolves if
+   * style.css is ever retired.
+   *
+   * Every ION accent pairs with ink text -- this matches what the legacy
+   * .btn-primary did on all eight themes, so it is existing behaviour, not a
+   * new choice.
+   */
+  --color-primary: var(--primary, #6de4ff);
+  --color-primary-content: var(--bg-deep, #07080c);
+  --color-secondary: var(--neon-purple, #9a8cff);
+  --color-secondary-content: var(--bg-deep, #07080c);
+  --color-accent: var(--warning, #f8b33a);
+  --color-accent-content: var(--bg-deep, #07080c);
 
   --color-neutral: #1e232e;   /* ink-600 */
   --color-neutral-content: #e6e9ef;
 
   /* Status. Mapped to ION's severity palette so a daisyUI alert and an ION
-     severity badge cannot drift apart. */
-  --color-info: #6de4ff;      /* ion-cyan */
-  --color-info-content: #07080c;
-  --color-success: #86f0a0;   /* ion-lime */
-  --color-success-content: #07080c;
-  --color-warning: #f8b33a;   /* ion-amber */
-  --color-warning-content: #07080c;
-  --color-error: #ff6c6c;     /* ion-coral */
-  --color-error-content: #07080c;
+     severity badge cannot drift apart. These are semantic rather than brand,
+     so the accent themes leave them alone -- but they still flip for light
+     mode in style.css, which is another reason to derive. */
+  --color-info: var(--info, #6de4ff);
+  --color-info-content: var(--bg-deep, #07080c);
+  --color-success: var(--success, #86f0a0);
+  --color-success-content: var(--bg-deep, #07080c);
+  --color-warning: var(--warning, #f8b33a);
+  --color-warning-content: var(--bg-deep, #07080c);
+  --color-error: var(--danger, #ff6c6c);
+  --color-error-content: var(--bg-deep, #07080c);
 
   /* Geometry and effects. Squarer and flatter than daisyUI's defaults, which
      are rounded and glossy — ION reads as an instrument, not a consumer app. */
@@ -116,25 +140,28 @@
   --color-base-300: #e6e9ef;
   --color-base-content: #11141c;
 
-  /* Accents darken in light mode: the dark-mode values are tuned to glow
-     against ink and would be illegible on white. */
-  --color-primary: #0b7c99;
+  /*
+   * The accents are NOT restated here. They derive from --primary, --success,
+   * --warning, --danger and --info, and style.css already flips every one of
+   * those for light mode -- per accent theme, with darkened values chosen for
+   * contrast (cyan #0891b2, purple #7c3aed, green #059669, and so on).
+   *
+   * Restating them, as this block used to, pinned light mode to a single
+   * hardcoded accent and threw away the other seven themes.
+   *
+   * The content colours flip to white because a darkened light-mode accent is
+   * no longer a light surface; ink on #0891b2 would be unreadable.
+   */
   --color-primary-content: #ffffff;
-  --color-secondary: #5a49d6;
   --color-secondary-content: #ffffff;
-  --color-accent: #a56c00;
   --color-accent-content: #ffffff;
 
   --color-neutral: #e6e9ef;
   --color-neutral-content: #11141c;
 
-  --color-info: #0b7c99;
   --color-info-content: #ffffff;
-  --color-success: #1c7a3a;
   --color-success-content: #ffffff;
-  --color-warning: #a56c00;
   --color-warning-content: #ffffff;
-  --color-error: #c02828;
   --color-error-content: #ffffff;
 }
 
