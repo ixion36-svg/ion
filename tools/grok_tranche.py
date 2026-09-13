@@ -80,13 +80,19 @@ def build_prompt(page: str, mode: str) -> str:
     return base.replace("security_dashboard.html", page)
 
 
-def verify(page: str, baseline: dict, mode: str) -> list[str]:
+def verify(page: str, before_text: str, mode: str) -> list[str]:
     """Return problems for this page only. Empty list means clean.
 
     The two passes have OPPOSITE expectations about hashed classes:
       restyle - they must all survive; the pass only changes surrounding markup
       convert - they must shrink to the subset with no clean utility equivalent
-    Raw inline styles must stay at their baseline in both, always.
+    Raw inline styles must not increase in either, ever.
+
+    Judged against the file as it was immediately BEFORE this run, not against
+    tools/ui_rewrite_baseline.json. The baseline records the original repo state
+    and goes stale the moment a page is converted: shift_handover dropped from
+    15 hashed classes to 3 in pass 2, so a later restyle checked against the
+    baseline would report 12 phantom losses and roll back a perfectly good page.
     """
     path = TEMPLATES / page
     if not path.is_file():
@@ -94,14 +100,15 @@ def verify(page: str, baseline: dict, mode: str) -> list[str]:
     text = path.read_text(encoding="utf-8", errors="replace")
     problems = []
     present = set(HASHED.findall(text))
+    before_set = set(HASHED.findall(before_text))
 
     if mode == "restyle":
-        lost = set(baseline[page]["hashed_classes"]) - present
+        lost = before_set - present
         if lost:
             problems.append(f"lost {len(lost)} hashed class(es): {sorted(lost)[:4]}")
     else:
         cmap = load_map()
-        before = set(baseline[page]["hashed_classes"])
+        before = before_set
 
         # Mappable classes MUST be gone. A leftover means the pass silently
         # skipped work, which looks identical to having nothing to do.
@@ -123,11 +130,10 @@ def verify(page: str, baseline: dict, mode: str) -> list[str]:
                 f"{len(dropped)} unmappable class(es) removed with no replacement: {dropped[:4]}"
             )
 
+    inline_before = len(INLINE_STYLE.findall(before_text))
     inline_now = len(INLINE_STYLE.findall(text))
-    if inline_now > baseline[page]["raw_inline_styles"]:
-        problems.append(
-            f"raw inline styles {baseline[page]['raw_inline_styles']} -> {inline_now}"
-        )
+    if inline_now > inline_before:
+        problems.append(f"raw inline styles {inline_before} -> {inline_now}")
     return problems
 
 
@@ -156,9 +162,15 @@ def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
         return result
 
     after = path.read_text(encoding="utf-8", errors="replace")
+    before_text = backup.read_text(encoding="utf-8", errors="replace")
     result["lines_after"] = after.count("\n") + 1
+    result["lines_before_actual"] = before_text.count("\n") + 1
 
-    if result["lines_after"] == result["lines_before"] and after == backup.read_text(encoding="utf-8", errors="replace"):
+    # Content comparison only. This previously also required the line count to
+    # match `baseline[page]["lines"]`, which is the ORIGINAL repo state — for a
+    # page already touched by an earlier pass that never matches, so a genuine
+    # no-op would slip through as success.
+    if after == before_text:
         # Grok explored and wrote nothing. Indistinguishable from success
         # unless checked -- this is exactly what --permission-mode acceptEdits
         # produced on the first pilot run.
@@ -166,7 +178,7 @@ def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
                       elapsed=round(time.time() - started))
         return result
 
-    problems = verify(page, baseline, mode)
+    problems = verify(page, backup.read_text(encoding="utf-8", errors="replace"), mode)
     if problems:
         shutil.copy(backup, path)   # never leave a page half-rewritten
         result.update(status="FAILED", problems=problems, rolled_back=True)
