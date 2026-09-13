@@ -75,7 +75,102 @@ SIMPLE = {
     "cursor": {"pointer": "cursor-pointer", "default": "cursor-default",
                "not-allowed": "cursor-not-allowed"},
     "white-space": {"nowrap": "whitespace-nowrap", "pre-wrap": "whitespace-pre-wrap"},
+    # Added after the first pass left 117 rules in the manual bucket. Auditing
+    # why, only 26 were genuinely unmappable (JS-concatenated values); the rest
+    # were properties Tailwind covers directly that this table simply did not
+    # know about, so they were being deferred to a human for no reason.
+    "overflow-y": {"auto": "overflow-y-auto", "hidden": "overflow-y-hidden",
+                   "scroll": "overflow-y-scroll", "visible": "overflow-y-visible"},
+    "overflow-x": {"auto": "overflow-x-auto", "hidden": "overflow-x-hidden",
+                   "scroll": "overflow-x-scroll", "visible": "overflow-x-visible"},
+    "text-overflow": {"ellipsis": "text-ellipsis", "clip": "text-clip"},
+    "font-style": {"italic": "italic", "normal": "not-italic"},
+    "vertical-align": {"middle": "align-middle", "top": "align-top",
+                       "bottom": "align-bottom", "baseline": "align-baseline",
+                       "text-top": "align-text-top", "text-bottom": "align-text-bottom"},
+    "box-sizing": {"border-box": "box-border", "content-box": "box-content"},
+    "flex-shrink": {"0": "shrink-0", "1": "shrink"},
+    "flex-grow": {"0": "grow-0", "1": "grow"},
+    "list-style": {"none": "list-none"},
+    "list-style-type": {"none": "list-none", "disc": "list-disc", "decimal": "list-decimal"},
+    "text-decoration": {"none": "no-underline", "underline": "underline",
+                        "line-through": "line-through"},
+    "text-decoration-line": {"none": "no-underline", "underline": "underline",
+                             "line-through": "line-through"},
+    "resize": {"none": "resize-none", "vertical": "resize-y",
+               "horizontal": "resize-x", "both": "resize"},
+    "user-select": {"none": "select-none", "all": "select-all", "text": "select-text"},
 }
+
+# grid-template-columns values with a numbered Tailwind utility. Spelled out
+# rather than parsed because `repeat(3, 1fr)` and `1fr 1fr 1fr` describe the
+# same grid and both spellings appear in the source.
+GRID_COLS: dict[str, str] = {}
+for _n in range(1, 13):
+    for _spelling in (" ".join(["1fr"] * _n), f"repeat({_n},1fr)",
+                      f"repeat({_n}, 1fr)", f"repeat({_n},minmax(0,1fr))",
+                      f"repeat({_n}, minmax(0, 1fr))"):
+        GRID_COLS[_spelling] = f"grid-cols-{_n}"
+
+BORDER_SIDE = {"border-top": "t", "border-right": "r",
+               "border-bottom": "b", "border-left": "l"}
+
+
+def _border_shorthand(side: str, value: str) -> tuple[str | None, str]:
+    """`3px solid #f00` -> `border-l-[3px] border-l-[#f00]`.
+
+    Colour and width are separate utilities in Tailwind, so a one-line CSS
+    shorthand becomes two. Anything that is not <width> <style> <colour> is
+    handed back for a human rather than guessed at.
+    """
+    parts = value.split()
+    if not parts:
+        return None, "manual"
+    width = parts[0]
+    colour = " ".join(parts[2:]) if len(parts) > 2 else ""
+    style = parts[1].lower() if len(parts) > 1 else "solid"
+    if style not in ("solid", "none", "dashed", "dotted"):
+        return None, "manual"
+    if style == "none" or width in ("0", "0px"):
+        return f"border-{side}-0", "exact"
+    out = [f"border-{side}-[{width}]"]
+    if colour:
+        out.append(f"border-{side}-[{colour.replace(' ', '_')}]")
+    if style in ("dashed", "dotted"):
+        # Tailwind's border-style utility is not per-side; flag rather than
+        # silently apply it to all four edges.
+        return None, "manual"
+    return " ".join(out), "arbitrary"
+
+
+def escape_arbitrary(util: str) -> str:
+    """Underscore the spaces inside a Tailwind arbitrary value.
+
+    `border-radius:0 4px 4px 0` naively becomes `rounded-[0 4px 4px 0]`, and in
+    a class attribute the browser splits that on whitespace into four tokens --
+    `rounded-[0`, `4px`, `4px`, `0]` -- none of which is a class Tailwind
+    generated. The radius silently does not apply.
+
+    Two of these were already in the committed map (`rounded-[10px 10px 0 0]`
+    and `flex-[0 0 auto]`); widening the mapper surfaced five more that had been
+    hidden inside blanked manual rules. Escaping centrally here rather than at
+    each call site, so a new handler cannot reintroduce it.
+    """
+    out, i = [], 0
+    while i < len(util):
+        j = util.find("[", i)
+        if j == -1:
+            out.append(util[i:])
+            break
+        k = util.find("]", j)
+        if k == -1:
+            out.append(util[i:])
+            break
+        out.append(util[i:j + 1])
+        out.append(util[j + 1:k].replace(" ", "_"))
+        out.append("]")
+        i = k + 1
+    return "".join(out)
 
 
 def _rem(value: str) -> float | None:
@@ -238,6 +333,51 @@ def convert(prop: str, value: str) -> tuple[str | None, str]:
     if prop == "backdrop-filter":
         return f"[backdrop-filter:{value.replace(' ', '_')}]", "arbitrary"
 
+    if prop == "grid-template-columns":
+        key = " ".join(value.split())
+        if key in GRID_COLS:
+            return GRID_COLS[key], "exact"
+        return f"grid-cols-[{key.replace(' ', '_')}]", "arbitrary"
+
+    if prop == "grid-column":
+        v = " ".join(value.split())
+        if v in ("1 / -1", "1/-1"):
+            return "col-span-full", "exact"
+        m = re.fullmatch(r"span (\d+)(?: / span \d+)?", v)
+        if m:
+            return f"col-span-{m.group(1)}", "exact"
+        return f"col-[{v.replace(' ', '_')}]", "arbitrary"
+
+    if prop in BORDER_SIDE:
+        return _border_shorthand(BORDER_SIDE[prop], value)
+
+    if prop == "border":
+        parts = value.split()
+        if value.strip() in ("0", "none", "0px"):
+            return "border-0", "exact"
+        if len(parts) >= 2 and parts[1].lower() == "solid":
+            colour = " ".join(parts[2:])
+            out = [f"border-[{parts[0]}]"]
+            if colour:
+                out.append(f"border-[{colour.replace(' ', '_')}]")
+            return " ".join(out), "arbitrary"
+        return None, "manual"
+
+    if prop == "background":
+        # Only a plain colour is safe to fold into bg-[...]; a gradient or a
+        # multi-part shorthand needs a person.
+        v = value.strip()
+        if re.fullmatch(r"(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)|hsla?\([^)]*\)"
+                        r"|transparent|currentColor|var\(--[\w-]+\))", v):
+            return f"bg-[{v.replace(' ', '_')}]", "arbitrary"
+        return None, "manual"
+
+    if prop == "fill":
+        return f"fill-[{value.replace(' ', '_')}]", "arbitrary"
+
+    if prop == "transition":
+        return f"[transition:{value.replace(' ', '_')}]", "arbitrary"
+
     return None, "manual"
 
 
@@ -269,7 +409,7 @@ def main() -> int:
                 unmapped.append(decl.strip())
                 kinds.append("manual")
             else:
-                utils.append(util)
+                utils.append(escape_arbitrary(util))
                 kinds.append(kind)
         kind = "manual" if "manual" in kinds else ("arbitrary" if "arbitrary" in kinds else "exact")
         if JS_ARTIFACT.search(body):
