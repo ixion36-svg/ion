@@ -31,7 +31,7 @@
     <div class="card bg-base-200 shadow">
         <div class="card-body">
             <h2 class="card-title">Identity Mapping</h2>
-            <p class="_ion-s-29c8400ca7">
+            <p class="text-[var(--text-muted)] text-[0.8125rem] mb-4">
                 Map your ION account to external services. These are used to sync case assignments to Kibana and filter GitLab issues.
             </p>
             <form id="identity-mapping-form" class="flex flex-col gap-3" data-submit-action="saveIdentityMapping" data-args='["$event"]'>
@@ -44,17 +44,17 @@
                     <input class="input w-full" type="text" id="id-gitlab-username" placeholder="Your GitLab username for 'My Issues' filtering">
                 </fieldset>
                 <fieldset class="fieldset p-0">
-                    <legend class="fieldset-legend">Elastic UID <span class="_ion-s-db99344e35">(auto-resolved)</span></legend>
-                    <div class="_ion-s-8c300d3751">
-                        <input class="input min-w-0 _ion-s-38e03a289e" type="text" id="id-elastic-uid" readonly>
-                        <button type="button" class="btn btn-sm _ion-s-a9efa5449f" data-click-action="resolveElasticUid" id="resolve-btn">Resolve</button>
+                    <legend class="fieldset-legend">Elastic UID <span class="text-[var(--text-muted)] font-normal">(auto-resolved)</span></legend>
+                    <div class="flex gap-2 items-center">
+                        <input class="input min-w-0 opacity-70 flex-1" type="text" id="id-elastic-uid" readonly>
+                        <button type="button" class="btn btn-sm whitespace-nowrap" data-click-action="resolveElasticUid" id="resolve-btn">Resolve</button>
                     </div>
                 </fieldset>
                 <fieldset class="fieldset p-0">
-                    <legend class="fieldset-legend">Keycloak Subject ID <span class="_ion-s-db99344e35">(auto-set on OIDC login)</span></legend>
-                    <input class="input w-full _ion-s-68433eba3d" type="text" id="id-keycloak-sub" readonly>
+                    <legend class="fieldset-legend">Keycloak Subject ID <span class="text-[var(--text-muted)] font-normal">(auto-set on OIDC login)</span></legend>
+                    <input class="input w-full opacity-70" type="text" id="id-keycloak-sub" readonly>
                 </fieldset>
-                <div class="_ion-s-4cdac52ae4" id="resolve-result"></div>
+                <div class="hidden mb-4" id="resolve-result"></div>
                 <button type="submit" class="btn btn-primary">Save Mappings</button>
             </form>
         </div>
@@ -63,7 +63,7 @@
     <div class="card bg-base-200 shadow" id="change-password-card">
         <div class="card-body">
             <h2 class="card-title">Change Password</h2>
-            <div id="password-change-required" role="alert" class="alert alert-warning _ion-s-f2892a2e8a">
+            <div id="password-change-required" role="alert" class="alert alert-warning hidden">
                 You must change your password before continuing.
             </div>
             <form id="change-password-form" class="flex flex-col gap-3" data-submit-action="changePassword" data-args='["$event"]'>

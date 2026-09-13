@@ -1,329 +1,62 @@
 [
   {
-    "page": "login.html",
-    "mode": "convert",
-    "lines_before": 349,
-    "exit": 0,
-    "tail": "one. The hashed class string does not appear in the `<script>` block or in any `querySelector`. OIDC show/hide uses `document.getElementById('oidc-login')`, so the class swap does not break the lookup.\n\n**4. Table disagreements**  \nNone. `hidden` is the correct equivalent; applied as-is.\n\n**Audit**  \n`python tools/ui_rewrite_audit.py --check` \u2192 `0 problem(s)`. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 207,
-    "lines_before_actual": 207,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 51
-  },
-  {
-    "page": "gitlab.html",
-    "mode": "convert",
-    "lines_before": 853,
-    "exit": 0,
-    "tail": "\n**JavaScript references:** none. The template script never mentions `_ion-s-f2892a2e8a`. Visibility is toggled by id (`getElementById(...).style.display = ...`), so converting the class does not break a lookup.\n\n**Table disagreements:** none. Applied the mapped `hidden` utility as given.\n\n**Audit:** `python tools/ui_rewrite_audit.py --check` \u2192 `0 problem(s)`. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 762,
-    "lines_before_actual": 762,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 74
-  },
-  {
-    "page": "investigation_queue.html",
-    "mode": "convert",
-    "lines_before": 462,
-    "exit": 0,
-    "tail": "r = document.getElementById('iq-pause-banner');\nif (banner) banner.style.display = '';      // show when paused\nif (banner) banner.style.display = 'none';  // hide when running\n```\n\nThat toggle was already broken under `style-src-attr 'none'` (and against the hashed `display:none` class). This pass did not change the script.\n\n### 4. Table disagreements\nNone. The one mapping was applied as listed.\n",
-    "lines_after": 466,
-    "lines_before_actual": 466,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 82
-  },
-  {
-    "page": "social.html",
-    "mode": "convert",
-    "lines_before": 456,
-    "exit": 0,
-    "tail": "ts\u201d error path). Nothing used `querySelector`, `classList`, or similar to look it up, so converting it in that string is the same as converting a class attribute. No hashed class was left for a JS-lookup reason.\n\n**4. Table disagreements**  \nNone. The mapped utilities were applied as-is.\n\n**Audit**  \n`python tools/ui_rewrite_audit.py --check` \u2192 `0 problem(s)`. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 476,
-    "lines_before_actual": 476,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 94
-  },
-  {
-    "page": "templates.html",
-    "mode": "convert",
-    "lines_before": 684,
-    "exit": 0,
-    "tail": "## 3. JavaScript references\nNone. The script never mentions `_ion-s-f2892a2e8a`. Modals are shown/hidden via `getElementById('folders-modal')` / `getElementById('move-modal')` and `style.display`. Class attributes only.\n\n### 4. Lookup-table disagreements\nNone. Applied `hidden` as mapped.\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 688,
-    "lines_before_actual": 688,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 76
-  },
-  {
-    "page": "dashboard_v2.html",
-    "mode": "convert",
-    "lines_before": 708,
-    "exit": 0,
-    "tail": "on-s-*` and does not `querySelector` those classes.\n\nIt does still write `element.style.display` / `element.style.width` on `#dash-config` and `#kpi-sla-bar`. Those assignments were already there and were not touched.\n\n### Table disagreements\n\nNone. Both mappings were applied as listed.\n\n### Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 715,
-    "lines_before_actual": 715,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 86
-  },
-  {
-    "page": "canaries.html",
-    "mode": "convert",
-    "lines_before": 354,
-    "exit": 0,
-    "tail": "ate \u201cCreate First Canary\u201d button in `canRender()`\n\nConverted those class attributes in place. No selector lookups to preserve.\n\n### 4. Table disagreements\nNone. Applied both mappings as written.\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` \u2014 **0 problem(s)**. No new raw inline styles.\n\n`python tools/verify_conversion.py --pages canaries.html --verbose` \u2014 **converted=2, kept=0, wrong=0**.\n",
-    "lines_after": 333,
-    "lines_before_actual": 333,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 108
-  },
-  {
     "page": "users.html",
     "mode": "convert",
     "lines_before": 527,
     "exit": 0,
-    "tail": "ree remaining hashed classes are inside the `loadUsers()` template string (not `querySelector` lookups). None of the converted markup classes (`_ion-s-383082bf69`) appear in script; those inputs are reached by id.\n\n### 4. Table disagreements\nNone. The two `manual` entries were left as instructed. The one `arbitrary` class in script was left under the JS rule, not because the mapping looked wrong.\n",
+    "tail": "\n- `_ion-s-ebee7e459c` on the Keycloak Sub `<td>`\n\nNo hashed class appears in both markup and script, so converting the two markup uses does not break a lookup.\n\n### Table disagreements\n\nNone. Manual entries were left as-is; the one convertible JS class was not applied because it is inside script.\n\n### Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw inline styles.\n",
     "lines_after": 567,
     "lines_before_actual": 567,
-    "status": "FAILED",
-    "problems": [
-      "1 mappable class(es) left unconverted: ['_ion-s-5c71f29a29']"
-    ],
-    "rolled_back": true,
-    "elapsed": 74
-  },
-  {
-    "page": "wallboard.html",
-    "mode": "convert",
-    "lines_before": 691,
-    "exit": 0,
-    "tail": "never mentions `_ion-s-*`. `#wb-bob-agreement-fill` is selected by id (`$('wb-bob-agreement-fill')`) and its width is set via CSSOM (`.style.width = pct + '%'`), which is existing behavior and was not changed.\n\n## 4. Table disagreements\n\nNone. Both mapped utilities were applied as given.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 705,
-    "lines_before_actual": 705,
     "status": "OK",
     "problems": [],
-    "elapsed": 48
+    "elapsed": 98
   },
   {
     "page": "investigation_memory.html",
     "mode": "convert",
     "lines_before": 630,
     "exit": 0,
-    "tail": " as `gitlab.html`.\n\n### 4. Table disagreements\nNone. Both mapped classes were `kind: exact`; the markup one was applied as specified.\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw inline `style=` attributes.\n\n`python tools/verify_conversion.py --pages investigation_memory.html --verbose` \u2192 both replacements matched the table (`_ion-s-6b99de8b69` \u2192 `hidden`).\n",
+    "tail": "lass on generated markup. Left in place.\n- **`_ion-s-6b99de8b69`** \u2014 not referenced from script. Open/close still uses `getElementById` and `style.display = 'flex'/'none'`.\n\n### Table disagreements\n\nNone. Both mapped classes were `kind: exact`. The markup one was applied as specified.\n\n### Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw inline `style=` attributes.\n",
     "lines_after": 664,
     "lines_before_actual": 664,
-    "status": "FAILED",
-    "problems": [
-      "1 mappable class(es) left unconverted: ['_ion-s-3b6a3a65d8']"
-    ],
-    "rolled_back": true,
-    "elapsed": 154
-  },
-  {
-    "page": "log_sources.html",
-    "mode": "convert",
-    "lines_before": 352,
-    "exit": 0,
-    "tail": "resh`, `lsRender`). No `querySelector` / `classList` / string match on those hashes, so converting the class in the generated markup is safe. `data-click-action` hooks, ids, and JS logic were left unchanged.\n\n### Lookup-table disagreements\n\nNone. Applied the mapped utilities as written.\n\n### Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 327,
-    "lines_before_actual": 327,
     "status": "OK",
     "problems": [],
-    "elapsed": 105
-  },
-  {
-    "page": "scheduler.html",
-    "mode": "convert",
-    "lines_before": 355,
-    "exit": 0,
-    "tail": "eak if the hashed name disappeared, so they were converted in those strings. No hashed class was left for a JS-lookup reason.\n\n### 4. Table disagreements\nNone. Every mapping was applied as written.\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)** (no new raw `style=`).\n\n`python tools/verify_conversion.py --pages scheduler.html --verbose` \u2192 **converted=4, kept=0, wrong=0**.\n",
-    "lines_after": 355,
-    "lines_before_actual": 355,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 84
-  },
-  {
-    "page": "template_view.html",
-    "mode": "convert",
-    "lines_before": 604,
-    "exit": 0,
-    "tail": "ifies these nodes by id and either overwrites `className` (`#template-doctype-badge` \u2192 `doc-type-badge doc-type-*`) or sets `element.style.display`. Those lookups still work after the class swap.\n\n## 4. Table disagreements\n\nNone. All three entries were `display:none` \u2192 `hidden`. Applied as mapped.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)** (no new raw inline styles).\n",
-    "lines_after": 638,
-    "lines_before_actual": 638,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 98
+    "elapsed": 99
   },
   {
     "page": "network_map.html",
     "mode": "convert",
     "lines_before": 834,
     "exit": 0,
-    "tail": "elector. Markup conversion is safe.\n- No `querySelector` / `classList` usage of hashed class names.\n\n### Lookup table disagreements\n\nNone. All mapped replacements were applied as given.\n\n### Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw inline styles. The converted classes were mappable (`exact` / `arbitrary`), so the audit did not treat their removal as a loss.\n",
+    "tail": "block'` / `'none'`, which continues to override the new `hidden` utility the same way it overrode the hashed class.\n\n## Table disagreements\n\nNone. All mapped replacements were applied as given.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw inline `style=` attributes.\n\n`python tools/verify_conversion.py --pages network_map.html` \u2192 **converted=4, 0 problems**.\n",
     "lines_after": 842,
     "lines_before_actual": 842,
-    "status": "FAILED",
-    "problems": [
-      "1 mappable class(es) left unconverted: ['_ion-s-36838c3eb2']"
-    ],
-    "rolled_back": true,
-    "elapsed": 149
+    "status": "OK",
+    "problems": [],
+    "elapsed": 137
   },
   {
     "page": "architecture.html",
     "mode": "convert",
     "lines_before": 635,
     "exit": 0,
-    "tail": " not utilities:\n\n- `top-[' + (cy - r1 - 55) + 'px]`\n- `top-[' + (cy - r2 - 55) + 'px]`\n- `top-[' + (cy - r3 - 55) + 'px]`\n\nThose came from hashing a concatenated `style=\"top:' + \u2026 + 'px;\"` into a class. The matching CSS in `ion-migrated-styles.css` is invalid (`top:' + (cy - r1 - 55) + 'px;`). I did not apply them: that would edit JavaScript and would not produce a real Tailwind class at runtime.\n",
+    "tail": " JS. The status element is selected by `getElementById('arch-sim-status')`. Existing JS still sets `statusEl.style.color` for Ready/Simulating; that is unchanged.\n\n## 4. Table disagreements\n\nNone. The one convertible class was applied as mapped. The three manuals were left as instructed.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
     "lines_after": 554,
     "lines_before_actual": 554,
-    "status": "FAILED",
-    "problems": [
-      "3 mappable class(es) left unconverted: ['_ion-s-5245a21b9b', '_ion-s-83122ec640', '_ion-s-be6a8d314f']"
-    ],
-    "rolled_back": true,
-    "elapsed": 85
-  },
-  {
-    "page": "daily_standup_slides.html",
-    "mode": "convert",
-    "lines_before": 774,
-    "exit": 0,
-    "tail": "wo replacements stack with an existing utility of the same type (table still applied):\n\n- `_ion-s-5d05e2e124` \u2192 `max-w-[22vw]` on a cell that already has `max-w-[30vw]`\n- `_ion-s-df72aa4fcb` \u2192 `text-[clamp(28px,4vw,56px)]` on `statVal()`, which already has `text-[clamp(40px,6vw,80px)]`\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw inline `style=` attributes.\n",
-    "lines_after": 611,
-    "lines_before_actual": 611,
     "status": "OK",
     "problems": [],
-    "elapsed": 103
-  },
-  {
-    "page": "template_render.html",
-    "mode": "convert",
-    "lines_before": 699,
-    "exit": 0,
-    "tail": "es\n\nNone. The template script never mentions `_ion-s-*`. It addresses `#settings-modal`, `#json-tab`, and `#sections-area` by id (and already sets `element.style.display` on those nodes). That JS was left unchanged.\n\n## 4. Table disagreements\n\nNone. Every mapped string was applied as-is.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 880,
-    "lines_before_actual": 880,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 109
+    "elapsed": 56
   },
   {
     "page": "profile.html",
     "mode": "convert",
     "lines_before": 397,
     "exit": 0,
-    "tail": "ied as class names in dynamically built HTML, not used as selectors. Existing JS still toggles visibility via `element.style.display` on `#resolve-result` and `#password-change-required` (ids, not hashed classes).\n\n## 4. Table disagreements\nNone. All mapped values were applied as written.\n\n## Audit\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
+    "tail": " and `getElementById`, so swapping `display:none` hashed classes for `hidden` does not break those lookups.\n\nThe three leftover hashes are class names written into dynamically constructed HTML, not selectors.\n\n## 4. Table disagreements\n\nNone. Every `exact`/`arbitrary` mapping was applied as listed.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw inline styles.\n",
     "lines_after": 432,
     "lines_before_actual": 432,
-    "status": "FAILED",
-    "problems": [
-      "3 mappable class(es) left unconverted: ['_ion-s-3245fd5a1a', '_ion-s-4dbb3ddbaa', '_ion-s-c9ef2a58eb']"
-    ],
-    "rolled_back": true,
-    "elapsed": 100
-  },
-  {
-    "page": "admin_course_edit.html",
-    "mode": "convert",
-    "lines_before": 402,
-    "exit": 0,
-    "tail": "s, so the markup was converted in place.\n\nExisting JS `wrap.style.display = ...` and `data-ion-style=\"display:...\"` were left untouched \u2014 those are not `style=\"...\"` attributes.\n\n### Table disagreements\nNone. Applied the table as written, including `ml-[auto]` (equivalent to `ml-auto`).\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` exited 0 with **0 problem(s)**. No new raw inline styles.\n",
-    "lines_after": 408,
-    "lines_before_actual": 408,
     "status": "OK",
     "problems": [],
-    "elapsed": 70
-  },
-  {
-    "page": "maturity.html",
-    "mode": "convert",
-    "lines_before": 573,
-    "exit": 0,
-    "tail": "9` remains in the same script string because it is `manual`, not because of a JS lookup.\n\n`data-ion-style` hooks and the existing `el.style.color = scoreColor(avg)` assignment were left untouched.\n\n## 4. Table disagreements\n\nNone. Every `exact`/`arbitrary` mapping was applied as written.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 295,
-    "lines_before_actual": 295,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 193
-  },
-  {
-    "page": "data_flow.html",
-    "mode": "convert",
-    "lines_before": 625,
-    "exit": 0,
-    "tail": "17f` is `font-weight:900`, which is Tailwind `font-black`. The table marks it `manual` with an empty `tailwind` string, so it was not converted.\n\n`_ion-s-8d703344e0` mapped to `mb-6` on an element that already had `mb-6`. Replaced in place as instructed (`mb-6 mb-6`). Harmless duplicate.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 768,
-    "lines_before_actual": 768,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 152
-  },
-  {
-    "page": "alert_prompt_templates.html",
-    "mode": "convert",
-    "lines_before": 576,
-    "exit": 0,
-    "tail": " existing `data-ion-style` hook in `renderScorecard` was left as-is.\n\n## 4. Table disagreements\n\nNone. Every mapped `tailwind` string was applied as written.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2014 **0 problems** (no new raw `style=` attributes).\n\n`python tools/verify_conversion.py --pages alert_prompt_templates.html --verbose` \u2014 **converted=19, kept=0, wrong=0, still-present=0**.\n",
-    "lines_after": 550,
-    "lines_before_actual": 550,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 294
-  },
-  {
-    "page": "cyber_range.html",
-    "mode": "convert",
-    "lines_before": 361,
-    "exit": 0,
-    "tail": "-exec-btn`) were not touched.\n\nThe one `data-ion-style` hook on the alert severity span is unchanged.\n\n### 4. Table disagreements\nNone. Every mapped string was applied as given.\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` \u2014 **0 problem(s)**, no new raw `style=` attributes.\n\n`python tools/verify_conversion.py --pages cyber_range.html` \u2014 **converted=19, kept=0, wrong=0, still-present=0**.\n",
-    "lines_after": 347,
-    "lines_before_actual": 347,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 157
-  },
-  {
-    "page": "guide_sim.html",
-    "mode": "convert",
-    "lines_before": 587,
-    "exit": 0,
-    "tail": "-87c136dfd0` \u2192 `mb-4` on an element that already had `mb-4`, so the class list is now `mb-4 mb-4`.\n- `_ion-s-6b99de8b69` \u2192 `hidden` on the back button that JS later shows with `style.display = ''`. Same hide-via-class behavior as the old `html body ._ion-s-6b99de8b69 { display:none }` rule.\n\n## Audit\n\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s), exit 0.** No new raw inline styles.\n",
-    "lines_after": 613,
-    "lines_before_actual": 613,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 246
-  },
-  {
-    "page": "lesson.html",
-    "mode": "convert",
-    "lines_before": 449,
-    "exit": 0,
-    "tail": "ia block by id (`cardId + '-crit'`), not by hashed class. Existing `host.style.display` / `el.style.display` assignments and `data-ion-style` attributes were left alone.\n\n### Table disagreements\nNone. Exact and arbitrary mappings were applied as written. The manual class was not guessed.\n\n### Audit\n`python tools/ui_rewrite_audit.py --check` \u2192 **0 problem(s)**. No new raw `style=\"...\"` attributes.\n",
-    "lines_after": 458,
-    "lines_before_actual": 458,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 172
-  },
-  {
-    "page": "guide.html",
-    "mode": "convert",
-    "lines_before": 698,
-    "exit": 0,
-    "tail": "k or `querySelector`.\n\n### 4. Table disagreements\nNone. Every `exact`/`arbitrary` mapping was applied as written. Three host cells now have `font-mono` twice (`font-mono flex-[0.8] font-mono text-[.72rem]`) because the element already had `font-mono` and the mapped string includes it; both were kept.\n\n`python tools/ui_rewrite_audit.py --check` reported **0 problem(s)** \u2014 no new raw inline styles.\n",
-    "lines_after": 982,
-    "lines_before_actual": 982,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 268
+    "elapsed": 108
   }
 ]

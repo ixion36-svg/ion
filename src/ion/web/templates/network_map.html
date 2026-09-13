@@ -90,7 +90,7 @@
   </section>
 
   <!-- Network graph visualization -->
-  <section id="graph-view" class="rise d-4 mb-6 _ion-s-c8be1ccba6">
+  <section id="graph-view" class="rise d-4 mb-6 hidden">
     <div class="card bg-base-200 shadow">
       <div class="card-body p-0">
         <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
@@ -106,13 +106,13 @@
             <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-warning"></span> High</span>
           </div>
         </div>
-        <div class="_ion-s-a0684079ae" id="network-graph"></div>
+        <div class="h-[700px] w-full bg-[#07080c]" id="network-graph"></div>
       </div>
     </div>
   </section>
 
   <!-- Topology view -->
-  <section id="topology-view" class="rise d-4 mb-6 _ion-s-c8be1ccba6">
+  <section id="topology-view" class="rise d-4 mb-6 hidden">
     <div class="card bg-base-200 shadow">
       <div class="card-body">
         <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -151,7 +151,7 @@
   </section>
 
   <!-- Detail drawer (hidden by default) -->
-  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-[480px] bg-base-200 border-l border-base-300 shadow-2xl z-50 translate-x-full transition-transform duration-200 _ion-s-c8be1ccba6">
+  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-[480px] bg-base-200 border-l border-base-300 shadow-2xl z-50 translate-x-full transition-transform duration-200 hidden">
     <div class="h-full overflow-y-auto p-6">
       <div class="flex items-center justify-between mb-6">
         <h2 id="drawer-hostname" class="font-sans font-semibold text-xl"></h2>
