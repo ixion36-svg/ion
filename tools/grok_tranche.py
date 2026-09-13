@@ -41,6 +41,12 @@ REPO = Path(__file__).resolve().parent.parent
 TEMPLATES = REPO / "src/ion/web/templates"
 BASELINE = REPO / "tools/ui_rewrite_baseline.json"
 RESULTS = REPO / "tools/grok_tranche_results.json"
+# Which pages have completed which pass. Without this the driver has no memory:
+# band selection reads ui_rewrite_baseline.json, which is the ORIGINAL repo
+# state, so an already-restyled page keeps being picked. security_dashboard was
+# queued for a second restyle in the L band for exactly this reason. Cheap at
+# 5 minutes a page, expensive at 25 in the XL band.
+PROGRESS = REPO / "tools/ui_rewrite_progress.json"
 
 HASHED = re.compile(r"_ion-s-[a-z0-9]+")
 INLINE_STYLE = re.compile(r'(?<![-\w])style\s*=\s*["\']')
@@ -88,6 +94,16 @@ BANDS = {"XL": (2500, 10**9), "L": (1000, 2500), "M": (300, 1000), "S": (0, 300)
 
 def load_baseline() -> dict:
     return json.loads(BASELINE.read_text(encoding="utf-8"))
+
+
+def load_progress() -> dict:
+    return json.loads(PROGRESS.read_text(encoding="utf-8")) if PROGRESS.is_file() else {}
+
+
+def record_done(page: str, mode: str) -> None:
+    prog = load_progress()
+    prog.setdefault(page, {})[mode] = True
+    PROGRESS.write_text(json.dumps(prog, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def pick_band(baseline: dict, band: str) -> list[str]:
@@ -263,6 +279,8 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=1200)
     ap.add_argument("--list", dest="list_band", choices=list(BANDS))
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--force", action="store_true",
+                    help="redo pages the progress ledger already marks complete")
     ap.add_argument("--mode", choices=["restyle", "convert"], default="restyle",
                     help="restyle = daisyUI pass 1; convert = hashed-class pass 2")
     args = ap.parse_args()
@@ -278,6 +296,13 @@ def main() -> int:
     if not pages:
         print("nothing selected; use --band or --pages", file=sys.stderr)
         return 2
+    prog = load_progress()
+    if not args.force:
+        done = [p for p in pages if prog.get(p, {}).get(args.mode)]
+        pages = [p for p in pages if p not in done]
+        if done:
+            print(f"skipping {len(done)} page(s) already {args.mode}d (--force to redo)")
+
     if args.mode == "convert":
         # A page with no hashed classes has nothing to convert. Running Grok on
         # it burns ~8 minutes to produce a guaranteed no-op.
@@ -312,6 +337,8 @@ def main() -> int:
         for fut in as_completed(futures):
             r = fut.result()
             results.append(r)
+            if r["status"] == "OK":
+                record_done(r["page"], args.mode)
             flag = {"OK": "ok  ", "FAILED": "FAIL", "NO_CHANGE": "noop",
                     "TIMEOUT": "TIME", "SKIPPED": "skip"}.get(r["status"], "????")
             extra = f" {r['problems']}" if r["problems"] else ""

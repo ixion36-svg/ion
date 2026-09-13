@@ -1,0 +1,299 @@
+{
+  "admin_course_edit.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "admin_courses.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "alert_arkime.html": {
+    "restyle": true
+  },
+  "alert_prompt_templates.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "analyst.html": {
+    "restyle": true
+  },
+  "architecture.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "audit_logs.html": {
+    "restyle": true
+  },
+  "base.html": {
+    "restyle": true
+  },
+  "bob_eval.html": {
+    "restyle": true
+  },
+  "briefing.html": {
+    "restyle": true
+  },
+  "briefings.html": {
+    "restyle": true
+  },
+  "bug_reports.html": {
+    "restyle": true
+  },
+  "canaries.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "case_grouper.html": {
+    "restyle": true
+  },
+  "change_requests.html": {
+    "restyle": true
+  },
+  "compliance.html": {
+    "restyle": true
+  },
+  "course_detail.html": {
+    "restyle": true
+  },
+  "courses.html": {
+    "restyle": true
+  },
+  "cyab/_audit_feed.html": {
+    "restyle": true
+  },
+  "cyab/_coverage_matrix.html": {
+    "restyle": true
+  },
+  "cyab/_progress_header.html": {
+    "restyle": true
+  },
+  "cyab/_scoping_counter.html": {
+    "restyle": true
+  },
+  "cyab/_scoping_summary.html": {
+    "restyle": true
+  },
+  "cyab/_section_nav.html": {
+    "restyle": true
+  },
+  "cyab/_systems_table.html": {
+    "restyle": true
+  },
+  "cyab/_wizard_step_1_identity.html": {
+    "restyle": true
+  },
+  "cyab/_wizard_step_2_intake.html": {
+    "restyle": true
+  },
+  "cyab/_wizard_step_3_source.html": {
+    "restyle": true
+  },
+  "cyab/_wizard_step_4_docs.html": {
+    "restyle": true
+  },
+  "cyab/audit.html": {
+    "restyle": true
+  },
+  "cyab/coverage.html": {
+    "restyle": true
+  },
+  "cyab/onboard.html": {
+    "restyle": true
+  },
+  "cyab/overview.html": {
+    "restyle": true
+  },
+  "cyab/scoping.html": {
+    "restyle": true
+  },
+  "cyab/system_detail.html": {
+    "restyle": true
+  },
+  "cyab/systems_list.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_audit_use_cases.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_data_health.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_detection.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_intake.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_overview.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_placeholder.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_signoff.html": {
+    "restyle": true
+  },
+  "cyab/tabs/_sources.html": {
+    "restyle": true
+  },
+  "cyber_range.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "daily_standup_slides.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "daily_work.html": {
+    "restyle": true
+  },
+  "dashboard_v2.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "data_flow.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "de_bob.html": {
+    "restyle": true
+  },
+  "de_metrics.html": {
+    "restyle": true
+  },
+  "de_proposals.html": {
+    "restyle": true
+  },
+  "de_quirks.html": {
+    "restyle": true
+  },
+  "de_workbench.html": {
+    "restyle": true
+  },
+  "detection_health.html": {
+    "restyle": true
+  },
+  "document_analysis.html": {
+    "restyle": true
+  },
+  "entity_timeline.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "executive_report.html": {
+    "restyle": true
+  },
+  "gitlab.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "guide.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "guide_sim.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "investigation_memory.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "investigation_queue.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "knowledge_graph.html": {
+    "restyle": true
+  },
+  "lesson.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "log_sources.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "login.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "maturity.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "network_map.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "network_topology.html": {
+    "restyle": true
+  },
+  "notes.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "profile.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "scheduler.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "security_dashboard.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "service_accounts.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "shift_handover.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "soc_health.html": {
+    "restyle": true
+  },
+  "soc_roles.html": {
+    "restyle": true
+  },
+  "social.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "stories.html": {
+    "restyle": true
+  },
+  "template_render.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "template_view.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "templates.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "threat_intel_actor.html": {
+    "restyle": true
+  },
+  "users.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "verdict_review.html": {
+    "restyle": true
+  },
+  "versions.html": {
+    "convert": true,
+    "restyle": true
+  },
+  "wallboard.html": {
+    "convert": true,
+    "restyle": true
+  }
+}
