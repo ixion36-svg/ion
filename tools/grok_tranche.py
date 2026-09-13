@@ -65,24 +65,52 @@ def pick_band(baseline: dict, band: str) -> list[str]:
     return sorted(names, key=lambda n: (baseline[n]["hashed_count"], baseline[n]["lines"]))
 
 
-def build_prompt(page: str) -> str:
+def load_map() -> dict:
+    p = REPO / "tools/hashed_class_map.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
+
+
+def build_prompt(page: str, mode: str) -> str:
+    if mode == "convert":
+        base = (REPO / "tools/grok_convert_prompt.md").read_text(encoding="utf-8")
+        return base.replace("<PAGE>.html", page)
     base = (REPO / "tools/grok_rewrite_prompt.md").read_text(encoding="utf-8")
     # Strip the reviewer's retrospective; Grok only needs the instructions.
     base = base.split("## Observed behaviour", 1)[0].rstrip()
     return base.replace("security_dashboard.html", page)
 
 
-def verify(page: str, baseline: dict) -> list[str]:
-    """Return problems for this page only. Empty list means clean."""
+def verify(page: str, baseline: dict, mode: str) -> list[str]:
+    """Return problems for this page only. Empty list means clean.
+
+    The two passes have OPPOSITE expectations about hashed classes:
+      restyle - they must all survive; the pass only changes surrounding markup
+      convert - they must shrink to the subset with no clean utility equivalent
+    Raw inline styles must stay at their baseline in both, always.
+    """
     path = TEMPLATES / page
     if not path.is_file():
         return [f"{page}: file missing after run"]
     text = path.read_text(encoding="utf-8", errors="replace")
     problems = []
+    present = set(HASHED.findall(text))
 
-    lost = set(baseline[page]["hashed_classes"]) - set(HASHED.findall(text))
-    if lost:
-        problems.append(f"lost {len(lost)} hashed class(es): {sorted(lost)[:4]}")
+    if mode == "restyle":
+        lost = set(baseline[page]["hashed_classes"]) - present
+        if lost:
+            problems.append(f"lost {len(lost)} hashed class(es): {sorted(lost)[:4]}")
+    else:
+        cmap = load_map()
+        # Anything still present must be one the table could not map. A
+        # leftover that WAS mappable means the pass silently skipped work.
+        skipped = [c for c in present if cmap.get(c, {}).get("kind") in ("exact", "arbitrary")]
+        if skipped:
+            problems.append(
+                f"{len(skipped)} mappable class(es) left unconverted: {sorted(skipped)[:4]}"
+            )
+        unknown = [c for c in present if c not in cmap]
+        if unknown:
+            problems.append(f"{len(unknown)} class(es) not in the map: {sorted(unknown)[:4]}")
 
     inline_now = len(INLINE_STYLE.findall(text))
     if inline_now > baseline[page]["raw_inline_styles"]:
@@ -92,16 +120,16 @@ def verify(page: str, baseline: dict) -> list[str]:
     return problems
 
 
-def run_one(page: str, baseline: dict, timeout: int) -> dict:
+def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
     path = TEMPLATES / page
     started = time.time()
     backup = Path(tempfile.gettempdir()) / f"grok-tranche-{page.replace('/', '_')}.bak"
     shutil.copy(path, backup)
 
     prompt_file = Path(tempfile.gettempdir()) / f"grok-prompt-{page.replace('/', '_')}.md"
-    prompt_file.write_text(build_prompt(page), encoding="utf-8")
+    prompt_file.write_text(build_prompt(page, mode), encoding="utf-8")
 
-    result = {"page": page, "lines_before": baseline[page]["lines"]}
+    result = {"page": page, "mode": mode, "lines_before": baseline[page]["lines"]}
     try:
         proc = subprocess.run(
             [str(GROK), "--cwd", str(REPO), "--permission-mode", "bypassPermissions",
@@ -127,7 +155,7 @@ def run_one(page: str, baseline: dict, timeout: int) -> dict:
                       elapsed=round(time.time() - started))
         return result
 
-    problems = verify(page, baseline)
+    problems = verify(page, baseline, mode)
     if problems:
         shutil.copy(backup, path)   # never leave a page half-rewritten
         result.update(status="FAILED", problems=problems, rolled_back=True)
@@ -146,6 +174,8 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=1200)
     ap.add_argument("--list", dest="list_band", choices=list(BANDS))
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--mode", choices=["restyle", "convert"], default="restyle",
+                    help="restyle = daisyUI pass 1; convert = hashed-class pass 2")
     args = ap.parse_args()
 
     baseline = load_baseline()
@@ -159,10 +189,18 @@ def main() -> int:
     if not pages:
         print("nothing selected; use --band or --pages", file=sys.stderr)
         return 2
+    if args.mode == "convert":
+        # A page with no hashed classes has nothing to convert. Running Grok on
+        # it burns ~8 minutes to produce a guaranteed no-op.
+        skipped = [p for p in pages if baseline[p]["hashed_count"] == 0]
+        pages = [p for p in pages if baseline[p]["hashed_count"] > 0]
+        if skipped:
+            print(f"skipping {len(skipped)} page(s) with 0 hashed classes")
+
     if args.limit:
         pages = pages[: args.limit]
 
-    print(f"tranche: {len(pages)} page(s), {args.workers} worker(s)")
+    print(f"tranche[{args.mode}]: {len(pages)} page(s), {args.workers} worker(s)")
     for p in pages:
         print(f"  {baseline[p]['lines']:5d} lines  {baseline[p]['hashed_count']:4d} hashed  {p}")
     if args.dry_run:
@@ -170,7 +208,7 @@ def main() -> int:
 
     results = []
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
-        futures = {pool.submit(run_one, p, baseline, args.timeout): p for p in pages}
+        futures = {pool.submit(run_one, p, baseline, args.timeout, args.mode): p for p in pages}
         for fut in as_completed(futures):
             r = fut.result()
             results.append(r)
