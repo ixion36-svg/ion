@@ -16,12 +16,15 @@
        in frontend/ion-daisy-theme.css and ship inside ion.css. #}
     <link rel="stylesheet" href="/static/css/ai-chat.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
-    <link rel="stylesheet" href="/static/css/tailwind.css?v={{ ion_version }}">
-    {# UI rewrite stylesheet: Tailwind v4 + daisyUI + the ION theme.
-       Loaded AFTER tailwind.css and additively — unmigrated pages keep every
-       sheet they had. Loading it later also means those pages inherit the
-       light-mode --color-ion-* contrast fix for free. See
-       frontend/tailwind-daisy.input.css. #}
+    {# The one Tailwind build: Tailwind v4 + daisyUI 5 + the ION theme.
+       Built from frontend/tailwind-daisy.input.css.
+
+       A second, older build (tailwind.css, v4.2.2, 78KB, no daisyUI) used to
+       load immediately before this one. Two Tailwind versions generating the
+       same utility names on every request is two sources of truth for one
+       class. Measured before removing it: of the 116 selectors it had that
+       this build does not, zero were used anywhere in templates or static/js,
+       and this build carries the same preflight. #}
     <link rel="stylesheet" href="/static/css/ion.css?v={{ ion_version }}">
     <!-- previously-inline `style="..."` attributes migrated to hashed
          CSS classes by tools/migrate_inline_styles.py. Loading this file
