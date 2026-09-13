@@ -21,6 +21,9 @@
     "convert": true,
     "restyle": true
   },
+  "arkime_traffic.html": {
+    "restyle": true
+  },
   "audit_logs.html": {
     "restyle": true
   },
@@ -138,6 +141,9 @@
   },
   "cyber_range.html": {
     "convert": true,
+    "restyle": true
+  },
+  "daily_standup.html": {
     "restyle": true
   },
   "daily_standup_slides.html": {
@@ -264,6 +270,9 @@
     "restyle": true
   },
   "stories.html": {
+    "restyle": true
+  },
+  "template_form.html": {
     "restyle": true
   },
   "template_render.html": {
