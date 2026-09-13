@@ -1,4 +1,13 @@
 {
+  "_components.html": {
+    "restyle": true
+  },
+  "_icons.html": {
+    "restyle": true
+  },
+  "_nav_tabs.html": {
+    "restyle": true
+  },
   "admin_course_edit.html": {
     "convert": true,
     "restyle": true
