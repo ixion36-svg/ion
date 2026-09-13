@@ -108,42 +108,42 @@
   </div>
 
 <!-- Analytics Dashboard (collapsible) -->
-<div class="analytics-toggle">
-    <button class="btn btn-secondary btn-sm" id="analytics-toggle-btn" data-click-action="toggleAnalytics">
+<div class="mb-3">
+    <button class="btn btn-secondary btn-sm gap-2 text-[0.8125rem]" id="analytics-toggle-btn" data-click-action="toggleAnalytics">
         <span id="analytics-toggle-icon"><i class="icon-chevron-right"></i></span> Analytics Dashboard
     </button>
 </div>
 <div class="analytics-dashboard _ion-s-c8be1ccba6" id="analytics-dashboard">
     <!-- Key Metrics Strip -->
-    <div class="ad-metrics-strip">
-        <div class="ad-metric" id="ad-metric-mttr">
+    <div class="grid grid-cols-6 gap-3 mb-4">
+        <div class="bg-white/5 border border-white/10 rounded-md px-4 py-3 text-center relative overflow-hidden before:content-[''] before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-ion-cyan/50" id="ad-metric-mttr">
             <div class="ad-metric-val">-</div>
-            <div class="ad-metric-label">MTTR</div>
+            <div class="text-[0.6875rem] uppercase tracking-[0.5px] text-slate-400 mt-1">MTTR</div>
         </div>
-        <div class="ad-metric" id="ad-metric-velocity">
+        <div class="bg-white/5 border border-white/10 rounded-md px-4 py-3 text-center relative overflow-hidden before:content-[''] before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-ion-cyan/50" id="ad-metric-velocity">
             <div class="ad-metric-val">-</div>
-            <div class="ad-metric-label">Alerts/hr</div>
+            <div class="text-[0.6875rem] uppercase tracking-[0.5px] text-slate-400 mt-1">Alerts/hr</div>
         </div>
-        <div class="ad-metric" id="ad-metric-unassigned">
+        <div class="bg-white/5 border border-white/10 rounded-md px-4 py-3 text-center relative overflow-hidden before:content-[''] before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-ion-cyan/50" id="ad-metric-unassigned">
             <div class="ad-metric-val">-</div>
-            <div class="ad-metric-label">Unassigned Crit/High</div>
+            <div class="text-[0.6875rem] uppercase tracking-[0.5px] text-slate-400 mt-1">Unassigned Crit/High</div>
         </div>
-        <div class="ad-metric" id="ad-metric-caserate">
+        <div class="bg-white/5 border border-white/10 rounded-md px-4 py-3 text-center relative overflow-hidden before:content-[''] before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-ion-cyan/50" id="ad-metric-caserate">
             <div class="ad-metric-val">-</div>
-            <div class="ad-metric-label">Case Conversion</div>
+            <div class="text-[0.6875rem] uppercase tracking-[0.5px] text-slate-400 mt-1">Case Conversion</div>
         </div>
-        <div class="ad-metric" id="ad-metric-fprate">
+        <div class="bg-white/5 border border-white/10 rounded-md px-4 py-3 text-center relative overflow-hidden before:content-[''] before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-ion-cyan/50" id="ad-metric-fprate">
             <div class="ad-metric-val">-</div>
-            <div class="ad-metric-label">FP Rate</div>
+            <div class="text-[0.6875rem] uppercase tracking-[0.5px] text-slate-400 mt-1">FP Rate</div>
         </div>
-        <div class="ad-metric" id="ad-metric-closure">
+        <div class="bg-white/5 border border-white/10 rounded-md px-4 py-3 text-center relative overflow-hidden before:content-[''] before:absolute before:inset-x-0 before:top-0 before:h-0.5 before:bg-ion-cyan/50" id="ad-metric-closure">
             <div class="ad-metric-val">-</div>
-            <div class="ad-metric-label">Closure Rate</div>
+            <div class="text-[0.6875rem] uppercase tracking-[0.5px] text-slate-400 mt-1">Closure Rate</div>
         </div>
     </div>
 
     <!-- Tab navigation -->
-    <div class="ad-tabs">
+    <div class="flex gap-0.5 border-b border-white/10 mb-4">
         <button class="ad-tab active" data-ad-tab="overview" data-click-action="switchAdTab" data-args='["overview"]'>Overview</button>
         <button class="ad-tab" data-ad-tab="mitre" data-click-action="switchAdTab" data-args='["mitre"]'>MITRE ATT&CK</button>
         <button class="ad-tab" data-ad-tab="geo" data-click-action="switchAdTab" data-args='["geo"]'>Threat Map</button>
@@ -152,51 +152,51 @@
 
     <!-- Tab: Overview -->
     <div class="ad-panel active" id="ad-panel-overview">
-        <div class="ad-overview-grid">
-            <div class="ad-card ad-card-trend">
-                <div class="ad-card-header"><span class="ad-card-icon">&#9650;</span> Alert Trend</div>
-                <div id="chart-trend" class="chart-container"></div>
+        <div class="grid grid-cols-[2fr_1fr_1fr] gap-4 mb-4">
+            <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 ad-card-trend">
+                <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm">&#9650;</span> Alert Trend</div>
+                <div id="chart-trend" class="min-h-[200px] relative"></div>
             </div>
-            <div class="ad-card">
-                <div class="ad-card-header"><span class="ad-card-icon _ion-s-defa93481e">&#9679;</span> Severity</div>
-                <div id="chart-severity" class="chart-container chart-container-sm"></div>
+            <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4">
+                <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm _ion-s-defa93481e">&#9679;</span> Severity</div>
+                <div id="chart-severity" class="min-h-[200px] relative"></div>
             </div>
-            <div class="ad-card">
-                <div class="ad-card-header"><span class="ad-card-icon _ion-s-90010faf15">&#9679;</span> Triage Status</div>
-                <div id="chart-triage-status" class="chart-container chart-container-sm"></div>
+            <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4">
+                <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm _ion-s-90010faf15">&#9679;</span> Triage Status</div>
+                <div id="chart-triage-status" class="min-h-[200px] relative"></div>
             </div>
         </div>
-        <div class="ad-overview-bottom">
-            <div class="ad-card">
-                <div class="ad-card-header"><span class="ad-card-icon">&#127760;</span> Top Source Countries</div>
-                <div id="chart-top-countries" class="chart-container"></div>
+        <div class="grid grid-cols-3 gap-4">
+            <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4">
+                <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm">&#127760;</span> Top Source Countries</div>
+                <div id="chart-top-countries" class="min-h-[200px] relative"></div>
             </div>
-            <div class="ad-card">
-                <div class="ad-card-header"><span class="ad-card-icon">&#128421;</span> Top Hosts</div>
-                <div id="chart-top-hosts" class="chart-container"></div>
+            <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4">
+                <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm">&#128421;</span> Top Hosts</div>
+                <div id="chart-top-hosts" class="min-h-[200px] relative"></div>
             </div>
-            <div class="ad-card">
-                <div class="ad-card-header"><span class="ad-card-icon">&#128220;</span> Top Rules</div>
-                <div id="chart-top-rules" class="chart-container"></div>
+            <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4">
+                <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm">&#128220;</span> Top Rules</div>
+                <div id="chart-top-rules" class="min-h-[200px] relative"></div>
             </div>
         </div>
     </div>
 
     <!-- Tab: MITRE ATT&CK -->
     <div class="ad-panel" id="ad-panel-mitre">
-        <div class="ad-card mitre-heatmap-card _ion-s-97294b207c">
-            <div class="ad-card-header"><span class="ad-card-icon _ion-s-6e1e5d161f">&#9862;</span> MITRE ATT&CK Technique Heatmap</div>
-            <div class="ad-card-hint">Click a technique to filter alerts</div>
+        <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 col-span-full _ion-s-97294b207c">
+            <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm _ion-s-6e1e5d161f">&#9862;</span> MITRE ATT&CK Technique Heatmap</div>
+            <div class="text-[0.6875rem] text-slate-400 opacity-70 -mt-1.5 mb-2">Click a technique to filter alerts</div>
             <div id="mitre-heatmap-legend" class="mitre-heatmap-legend _ion-s-c8be1ccba6"></div>
-            <div id="chart-mitre-heatmap" class="mitre-heatmap"></div>
+            <div id="chart-mitre-heatmap" class="grid grid-cols-[repeat(14,1fr)] gap-0.5 text-[0.6875rem]"></div>
         </div>
     </div>
 
     <!-- Tab: Threat Map -->
     <div class="ad-panel" id="ad-panel-geo">
-        <div class="ad-card _ion-s-97294b207c">
-            <div class="ad-card-header"><span class="ad-card-icon">&#127760;</span> Attack Origin Map</div>
-            <div class="globe-container">
+        <div class="bg-white/5 border border-white/10 rounded-md px-5 py-4 _ion-s-97294b207c">
+            <div class="text-xs uppercase text-slate-400 mb-2.5 tracking-[0.5px] font-semibold flex items-center gap-2"><span class="text-sm">&#127760;</span> Attack Origin Map</div>
+            <div class="relative rounded-md overflow-hidden aspect-video w-full leading-[0] bg-ink-900 bg-[radial-gradient(ellipse_at_30%_25%,rgba(109,228,255,0.04)_0%,transparent_55%),radial-gradient(ellipse_at_70%_75%,rgba(154,140,255,0.04)_0%,transparent_55%)]">
                 <canvas id="globe-canvas"></canvas>
                 <div class="globe-tooltip _ion-s-c8be1ccba6" id="globe-tooltip"></div>
             </div>
@@ -205,12 +205,12 @@
 
     <!-- Tab: Systems (TIDE + ES) -->
     <div class="ad-panel" id="ad-panel-systems">
-        <div class="ad-sys-header">
-            <div class="ad-sys-stats" id="ad-sys-stats">
-                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-total">-</span><span class="ad-sys-stat-lbl">Alerts</span></div>
-                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-count">-</span><span class="ad-sys-stat-lbl">Systems</span></div>
-                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-mapped">-</span><span class="ad-sys-stat-lbl">TIDE Mapped</span></div>
-                <div class="ad-sys-stat"><span class="ad-sys-stat-val" id="ad-sys-coverage">-</span><span class="ad-sys-stat-lbl">Avg Coverage</span></div>
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex gap-5" id="ad-sys-stats">
+                <div class="flex flex-col items-center"><span class="text-[1.25rem] font-bold font-mono text-white" id="ad-sys-total">-</span><span class="text-[0.6875rem] uppercase tracking-[0.3px] text-slate-400">Alerts</span></div>
+                <div class="flex flex-col items-center"><span class="text-[1.25rem] font-bold font-mono text-white" id="ad-sys-count">-</span><span class="text-[0.6875rem] uppercase tracking-[0.3px] text-slate-400">Systems</span></div>
+                <div class="flex flex-col items-center"><span class="text-[1.25rem] font-bold font-mono text-white" id="ad-sys-mapped">-</span><span class="text-[0.6875rem] uppercase tracking-[0.3px] text-slate-400">TIDE Mapped</span></div>
+                <div class="flex flex-col items-center"><span class="text-[1.25rem] font-bold font-mono text-white" id="ad-sys-coverage">-</span><span class="text-[0.6875rem] uppercase tracking-[0.3px] text-slate-400">Avg Coverage</span></div>
             </div>
             <select class="ad-sys-range" id="ad-sys-range" data-change-action="loadAdSystems">
                 <option value="24">24 hours</option>
@@ -227,12 +227,12 @@
 <!-- Pattern Detections Panel -->
 <div class="pattern-detections-panel _ion-s-c8be1ccba6" id="pattern-detections-panel">
     <div class="pattern-panel-header" data-click-action="togglePatternPanel">
-        <div class="pattern-panel-title">
+        <div class="flex items-center gap-2 font-semibold text-sm text-slate-200">
             <span class="pattern-panel-icon" id="pattern-panel-icon"><i class="icon-chevron-right"></i></span>
             <span>Pattern Detections</span>
             <span class="pattern-count-badge" id="pattern-count-badge">0</span>
         </div>
-        <button class="btn btn-sm btn-link pattern-dismiss-btn" data-click-action="dismissPatternPanel" data-stop-propagation title="Dismiss for this session">&#10005;</button>
+        <button class="btn btn-sm btn-link text-slate-400 text-base px-1 opacity-60 hover:opacity-100 hover:text-slate-200" data-click-action="dismissPatternPanel" data-stop-propagation title="Dismiss for this session">&#10005;</button>
     </div>
     <div class="pattern-panel-body _ion-s-c8be1ccba6" id="pattern-panel-body">
         <div id="pattern-cards-container"></div>
@@ -246,8 +246,8 @@
 </div>
 
 <!-- Filters -->
-<div class="alerts-filters">
-    <select id="alert-time-range" data-change-action="handleTimeRangeChange">
+<div class="flex gap-3 mb-6 flex-wrap items-center">
+    <select id="alert-time-range" class="ion-select w-auto!" data-change-action="handleTimeRangeChange">
         <option value="1">Last Hour</option>
         <option value="4">Last 4 Hours</option>
         <option value="12">Last 12 Hours</option>
@@ -258,12 +258,12 @@
         <option value="custom">Custom Range...</option>
     </select>
     <div id="custom-time-range" class="custom-time-range _ion-s-c8be1ccba6">
-        <input type="datetime-local" id="custom-time-from" class="custom-time-input" title="From">
-        <span class="custom-time-sep">&rarr;</span>
-        <input type="datetime-local" id="custom-time-to" class="custom-time-input" title="To">
+        <input type="datetime-local" id="custom-time-from" class="px-2 py-1.5 border border-white/10 rounded-md text-[0.8125rem] bg-white/5 text-slate-200" title="From">
+        <span class="text-slate-400 text-[0.8125rem]">&rarr;</span>
+        <input type="datetime-local" id="custom-time-to" class="px-2 py-1.5 border border-white/10 rounded-md text-[0.8125rem] bg-white/5 text-slate-200" title="To">
         <button class="btn btn-sm btn-primary" data-click-action="applyCustomTimeRange">Apply</button>
     </div>
-    <select id="alert-severity-filter" data-change-action="applyFilters">
+    <select id="alert-severity-filter" class="ion-select w-auto!" data-change-action="applyFilters">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -271,7 +271,7 @@
         <option value="low">Low</option>
         <option value="info">Info</option>
     </select>
-    <select id="alert-status-filter" data-change-action="handleStatusFilterChange">
+    <select id="alert-status-filter" class="ion-select w-auto!" data-change-action="handleStatusFilterChange">
         <!-- "Open Only" is the page-load default per user
              direction. The Active (Open + Ack) option remains
              selectable, but new analyst eyes land on Open. -->
@@ -281,12 +281,12 @@
         <option value="closed">Closed</option>
         <option value="all">All Statuses</option>
     </select>
-    <select id="alert-system-filter" data-change-action="loadAlerts" title="Filter by source system (CyAB-registered systems only)">
+    <select id="alert-system-filter" class="ion-select w-auto!" data-change-action="loadAlerts" title="Filter by source system (CyAB-registered systems only)">
         <option value="">All Systems</option>
     </select>
-    <input type="text" id="alert-search" class="search-input" placeholder="Search alerts..." data-input-action="debouncedSearch">
+    <input type="text" id="alert-search" class="px-3 py-2 border border-white/10 rounded-md text-sm bg-white/5 flex-1 min-w-[200px]" placeholder="Search alerts..." data-input-action="debouncedSearch">
     <button class="btn btn-secondary" data-click-action="clearAllFilters">Clear</button>
-    <span class="filter-separator">|</span>
+    <span class="text-slate-400 mx-1">|</span>
     <select id="saved-filters-select" class="saved-filters-select" data-change-action="loadSavedFilter">
         <option value="">Saved Views...</option>
     </select>
@@ -296,23 +296,23 @@
 
 <!-- Bulk Actions Toolbar -->
 <div class="bulk-actions-toolbar _ion-s-f2892a2e8a" id="bulk-actions-toolbar">
-    <div class="bulk-actions-info">
-        <input type="checkbox" id="select-all-cb" data-change-action="toggleSelectAll" title="Select all visible alerts">
+    <div class="flex items-center gap-3 text-sm text-slate-200">
+        <input type="checkbox" id="select-all-cb" class="checkbox w-4 h-4 cursor-pointer" data-change-action="toggleSelectAll" title="Select all visible alerts">
         <span id="selected-count">0</span> alerts selected
         <button class="btn btn-sm btn-link" data-click-action="clearSelection">Clear selection</button>
     </div>
-    <div class="bulk-actions-buttons">
-        <select id="bulk-status" class="bulk-select">
+    <div class="flex items-center gap-2 flex-wrap">
+        <select id="bulk-status" class="px-2.5 py-1.5 border border-white/10 rounded-md text-[0.8rem] bg-white/5 text-slate-200 min-w-[130px]">
             <option value="">Change Status...</option>
             <option value="open">Open</option>
             <option value="acknowledged">Acknowledged</option>
             <option value="closed">Closed</option>
         </select>
-        <select id="bulk-assign" class="bulk-select">
+        <select id="bulk-assign" class="px-2.5 py-1.5 border border-white/10 rounded-md text-[0.8rem] bg-white/5 text-slate-200 min-w-[130px]">
             <option value="">Assign To...</option>
             <option value="-1">Unassign</option>
         </select>
-        <select id="bulk-priority" class="bulk-select">
+        <select id="bulk-priority" class="px-2.5 py-1.5 border border-white/10 rounded-md text-[0.8rem] bg-white/5 text-slate-200 min-w-[130px]">
             <option value="">Set Priority...</option>
             <option value="critical">Critical</option>
             <option value="high">High</option>
@@ -320,7 +320,7 @@
             <option value="low">Low</option>
         </select>
         <button class="btn btn-primary btn-sm" data-click-action="applyBulkAction">Apply</button>
-        <span class="bulk-separator">|</span>
+        <span class="text-slate-400 mx-1">|</span>
         <button class="btn btn-secondary btn-sm" data-click-action="showCreateCaseFromSelected">Create Case</button>
         <button class="btn btn-secondary btn-sm" data-click-action="addToExistingCase">Add to Case</button>
     </div>
@@ -328,68 +328,68 @@
 
 <!-- Alert Context Menu -->
 <div id="alert-context-menu" class="context-menu _ion-s-f2892a2e8a">
-    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["open"]'>
-        <span class="context-icon"><i class="icon-eye"></i></span> View Details
+    <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["open"]'>
+        <span class="w-4 text-center group-hover:text-white"><i class="icon-eye"></i></span> View Details
     </div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["assign-me"]'>
-        <span class="context-icon"><i class="icon-user-check"></i></span> Assign to Me
-    </div>
-    <div class="context-menu-submenu">
-        <div class="context-menu-item">
-            <span class="context-icon"><i class="icon-circle-dot"></i></span> Set Status
-            <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
-        </div>
-        <div class="context-submenu">
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["status", "open"]'>Open</div>
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["status", "acknowledged"]'>Acknowledged</div>
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["status", "closed"]'>Closed</div>
-        </div>
+    <div class="h-px bg-white/10 my-1"></div>
+    <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["assign-me"]'>
+        <span class="w-4 text-center group-hover:text-white"><i class="icon-user-check"></i></span> Assign to Me
     </div>
     <div class="context-menu-submenu">
-        <div class="context-menu-item">
-            <span class="context-icon"><i class="icon-x-circle"></i></span> Close As...
-            <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
+        <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group">
+            <span class="w-4 text-center group-hover:text-white"><i class="icon-circle-dot"></i></span> Set Status
+            <span class="ml-auto text-xs"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
-            <div class="context-menu-item _ion-s-568dd5ecc1" data-click-action="contextMenuAction" data-args='["close-as", "benign"]'>&#10003; Benign</div>
-            <div class="context-menu-item _ion-s-2ddf87696d" data-click-action="contextMenuAction" data-args='["close-as", "escalated"]'>&#9650; Escalated</div>
-            <div class="context-menu-item _ion-s-9dd1207e58" data-click-action="contextMenuAction" data-args='["close-as", "false_positive"]'>&#10007; False Positive</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["status", "open"]'>Open</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["status", "acknowledged"]'>Acknowledged</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["status", "closed"]'>Closed</div>
         </div>
     </div>
     <div class="context-menu-submenu">
-        <div class="context-menu-item">
-            <span class="context-icon"><i class="icon-flag"></i></span> Set Priority
-            <span class="submenu-arrow"><i class="icon-chevron-right"></i></span>
+        <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group">
+            <span class="w-4 text-center group-hover:text-white"><i class="icon-x-circle"></i></span> Close As...
+            <span class="ml-auto text-xs"><i class="icon-chevron-right"></i></span>
         </div>
         <div class="context-submenu">
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "critical"]'>Critical</div>
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "high"]'>High</div>
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "medium"]'>Medium</div>
-            <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["priority", "low"]'>Low</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group _ion-s-568dd5ecc1" data-click-action="contextMenuAction" data-args='["close-as", "benign"]'>&#10003; Benign</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group _ion-s-2ddf87696d" data-click-action="contextMenuAction" data-args='["close-as", "escalated"]'>&#9650; Escalated</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group _ion-s-9dd1207e58" data-click-action="contextMenuAction" data-args='["close-as", "false_positive"]'>&#10007; False Positive</div>
         </div>
     </div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["create-case"]'>
-        <span class="context-icon"><i class="icon-folder-plus"></i></span> Create Case
+    <div class="context-menu-submenu">
+        <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group">
+            <span class="w-4 text-center group-hover:text-white"><i class="icon-flag"></i></span> Set Priority
+            <span class="ml-auto text-xs"><i class="icon-chevron-right"></i></span>
+        </div>
+        <div class="context-submenu">
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["priority", "critical"]'>Critical</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["priority", "high"]'>High</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["priority", "medium"]'>Medium</div>
+            <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["priority", "low"]'>Low</div>
+        </div>
     </div>
-    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["add-to-case"]'>
-        <span class="context-icon"><i class="icon-folder"></i></span> Add to Case...
+    <div class="h-px bg-white/10 my-1"></div>
+    <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["create-case"]'>
+        <span class="w-4 text-center group-hover:text-white"><i class="icon-folder-plus"></i></span> Create Case
     </div>
-    <div class="context-menu-divider"></div>
-    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["copy-id"]'>
-        <span class="context-icon"><i class="icon-clipboard"></i></span> Copy Alert ID
+    <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["add-to-case"]'>
+        <span class="w-4 text-center group-hover:text-white"><i class="icon-folder"></i></span> Add to Case...
     </div>
-    <div class="context-menu-item" data-click-action="contextMenuAction" data-args='["kibana"]'>
-        <span class="context-icon"><i class="icon-external-link"></i></span> Open in Kibana
+    <div class="h-px bg-white/10 my-1"></div>
+    <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["copy-id"]'>
+        <span class="w-4 text-center group-hover:text-white"><i class="icon-clipboard"></i></span> Copy Alert ID
+    </div>
+    <div class="px-4 py-2 cursor-pointer flex items-center gap-2 text-sm text-slate-200 hover:bg-ion-cyan hover:text-white group" data-click-action="contextMenuAction" data-args='["kibana"]'>
+        <span class="w-4 text-center group-hover:text-white"><i class="icon-external-link"></i></span> Open in Kibana
     </div>
 </div>
 
 <!-- Main Grid -->
 <div class="alerts-grid">
     <!-- Alert Table -->
-    <div class="card card-wide">
-        <div class="card-body">
+    <div class="min-w-0 max-w-full bg-ink-900/50 border border-white/5 rounded-[12px] p-6">
+        <div class="overflow-x-auto">
             <!-- The queue's header and rows are rendered by static/js/alerts-queue.js.
                  Columns, grouping and sort live there, so this is deliberately an
                  empty shell — a hardcoded <thead> here would silently disagree with
@@ -402,7 +402,7 @@
             <div class="aq-chips" id="aq-chips"></div>
             <div class="aq-toolbar">
                 <label class="aq-tool">Group
-                    <select id="aq-group">
+                    <select id="aq-group" class="ion-select w-auto!">
                         <option value="sev">by severity</option>
                         <option value="status">by status</option>
                         <option value="rule_name">by rule</option>
@@ -449,48 +449,40 @@
 
     <!-- Side Panel -->
     <div class="side-panel">
-        <div class="card">
-            <div class="card-header">
-                <h3>Cases</h3>
+        <div class="ion-card mb-4">
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
+                <h3 class="text-[13px] font-medium text-base-content">Cases</h3>
                 <span class="badge" id="cases-count">0</span>
             </div>
-            <div class="card-body">
-                <div id="cases-summary" class="list-group">
-                    <div class="loading">Loading...</div>
-                </div>
+            <div id="cases-summary" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
+                <div class="loading">Loading...</div>
             </div>
         </div>
-        <div class="card">
-            <div class="card-header">
-                <h3>Top Hosts</h3>
+        <div class="ion-card mb-4">
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
+                <h3 class="text-[13px] font-medium text-base-content">Top Hosts</h3>
                 <span class="badge" id="hosts-count">0</span>
             </div>
-            <div class="card-body">
-                <div id="top-hosts-list" class="list-group">
-                    <div class="loading">Loading...</div>
-                </div>
+            <div id="top-hosts-list" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
+                <div class="loading">Loading...</div>
             </div>
         </div>
-        <div class="card">
-            <div class="card-header">
-                <h3>Top Rules</h3>
+        <div class="ion-card mb-4">
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
+                <h3 class="text-[13px] font-medium text-base-content">Top Rules</h3>
                 <span class="badge" id="rules-count">0</span>
             </div>
-            <div class="card-body">
-                <div id="top-rules-list" class="list-group">
-                    <div class="loading">Loading...</div>
-                </div>
+            <div id="top-rules-list" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
+                <div class="loading">Loading...</div>
             </div>
         </div>
-        <div class="card">
-            <div class="card-header">
-                <h3>Top Users</h3>
+        <div class="ion-card mb-4">
+            <div class="flex items-center justify-between mb-3 pb-3 border-b border-white/10">
+                <h3 class="text-[13px] font-medium text-base-content">Top Users</h3>
                 <span class="badge" id="users-count">0</span>
             </div>
-            <div class="card-body">
-                <div id="top-users-list" class="list-group">
-                    <div class="loading">Loading...</div>
-                </div>
+            <div id="top-users-list" class="flex flex-col gap-2 max-h-[240px] overflow-y-auto">
+                <div class="loading">Loading...</div>
             </div>
         </div>
     </div>
@@ -498,11 +490,11 @@
 
 <!-- Alert Detail Modal -->
 <div class="modal" id="alert-detail-modal">
-    <div class="modal-content modal-large">
+    <div class="modal-content max-w-[min(1180px,94vw)] w-full">
         <div class="modal-header">
             <h2 id="alert-detail-title">Alert Details</h2>
-            <div class="investigation-timer" id="investigation-timer">
-                <span class="timer-icon">&#9201;</span>
+            <div class="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-md font-mono text-[0.9rem] ml-auto mr-4" id="investigation-timer">
+                <span class="text-base">&#9201;</span>
                 <span class="timer-display" id="timer-display">00:00</span>
                 <button class="timer-btn" id="timer-toggle-btn" data-click-action="toggleInvestigationTimer" title="Pause/Resume timer">&#10074;&#10074;</button>
             </div>
@@ -524,12 +516,12 @@
   ====================================================================== -->
 <div class="acp-overlay" id="acp-overlay" data-click-action="closeCasePanel"></div>
 <div class="acp-panel" id="acp-panel" data-case-id="">
-  <div class="acp-header">
+  <div class="flex justify-between items-start px-5 py-4 border-b border-white/10 shrink-0">
     <div class="_ion-s-ec92352525">
       <span class="acp-number" id="acp-number"></span>
       <span class="acp-title" id="acp-title"></span>
     </div>
-    <button class="acp-close" data-click-action="closeCasePanel" title="Close (Esc)">&times;</button>
+    <button class="bg-transparent border-none text-slate-400 text-2xl cursor-pointer p-0 leading-none shrink-0 hover:text-slate-200" data-click-action="closeCasePanel" title="Close (Esc)">&times;</button>
   </div>
   <div class="acp-body" id="acp-body">
     <p class="_ion-s-bca8b928a3">Loading...</p>
@@ -538,12 +530,12 @@
 
 <!-- Closure modal — full CaseClosureReason enum -->
 <div class="acp-closure-overlay" id="acp-closure-overlay" data-click-action="cancelCasePanelClosure" data-only-self-click>
-  <div class="acp-closure-modal">
-    <div class="acp-closure-header">
-      <h3>Close Case</h3>
-      <button class="acp-closure-close" data-click-action="cancelCasePanelClosure">&times;</button>
+  <div class="bg-ink-900 border border-white/10 rounded-lg w-[480px] max-w-[95vw] flex flex-col shadow-[0_18px_40px_-10px_rgba(0,0,0,0.5)]">
+    <div class="flex justify-between items-center px-5 py-3.5 border-b border-white/10">
+      <h3 class="text-white text-base m-0">Close Case</h3>
+      <button class="bg-transparent border-none text-slate-400 text-xl cursor-pointer leading-none" data-click-action="cancelCasePanelClosure">&times;</button>
     </div>
-    <div class="acp-closure-body">
+    <div class="py-4 px-5">
       <div class="form-group _ion-s-90634e1f6b">
         <label class="_ion-s-06c7fb4577">Closure Reason *</label>
         <select id="acp-closure-reason" class="form-control _ion-s-656ea72a2e">
@@ -562,7 +554,7 @@
 ></textarea>
       </div>
     </div>
-    <div class="acp-closure-footer">
+    <div class="flex justify-end gap-2 px-5 py-3.5 border-t border-white/10">
       <button class="btn btn-secondary" data-click-action="cancelCasePanelClosure">Cancel</button>
       <button class="btn btn-primary" data-click-action="confirmCasePanelClosure">Confirm</button>
     </div>
