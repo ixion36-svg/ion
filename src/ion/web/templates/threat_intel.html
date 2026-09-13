@@ -119,7 +119,7 @@
 .ti-ttp[data-click-action]:hover { opacity: .8; }
 </style>
 
-<div class="ti-page">
+<div class="max-w-[1400px] mx-auto">
     <section class="mb-8 rise d-1">
       <div class="flex items-center gap-3 mb-4">
         <svg class="w-4 h-4 text-ion-coral"><use href="#i-target"/></svg>
@@ -132,11 +132,11 @@
     <!-- global search bar — hits /api/threat-intel/unified-search.
          Fans out to actors + campaigns (OpenCTI) + IOCs + cases. Results
          grouped by kind under the bar. Press Enter or click Search. -->
-    <div class="ti-search-bar _ion-s-8b9688e6e0">
-        <input type="text" class="ti-search-input" id="ti-global-search"
+    <div class="flex items-center gap-2.5 mb-5 _ion-s-8b9688e6e0">
+        <input type="text" class="input flex-1" id="ti-global-search"
                placeholder="Search across actors, campaigns, IOCs, cases (e.g. APT28, evil.com, 10.0.0.1)…">
-        <button class="ion-btn ion-btn-primary" data-click-action="tiUnifiedSearch">Search</button>
-        <button class="ion-btn ion-btn-ghost _ion-s-c8be1ccba6" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
+        <button class="btn btn-primary" data-click-action="tiUnifiedSearch">Search</button>
+        <button class="btn btn-ghost _ion-s-c8be1ccba6" data-click-action="tiClearSearch" id="ti-global-search-clear">Clear</button>
     </div>
     <div class="_ion-s-30ded21efa" id="ti-global-search-results"></div>
 
@@ -240,7 +240,7 @@
             <div class="flex items-center justify-between mb-3">
               <h3 class="font-sans font-semibold text-base text-white">Recently Active Observables <span class="text-[11px] text-slate-500 font-normal">— last 30d in cases</span></h3>
               <label class="text-[11px] text-slate-400 inline-flex items-center gap-1.5 cursor-pointer" title="Hide rule-field / command-content items (process names, command lines, file paths, registry) — not trackable IOCs">
-                <input type="checkbox" id="ti-hide-rule-obs" checked data-change-action="loadRecentlyActive"> Hide rule-field
+                <input type="checkbox" class="checkbox checkbox-xs" id="ti-hide-rule-obs" checked data-change-action="loadRecentlyActive"> Hide rule-field
               </label>
             </div>
             <div id="ti-recent-obs" class="text-sm text-slate-400">Loading…</div>
@@ -263,9 +263,9 @@
 
     <!-- Threat Actors Panel -->
     <div class="ti-panel" id="panel-actors">
-        <div class="ti-search-bar">
-            <input type="text" class="ti-search-input" id="actor-search" placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
-            <button class="ion-btn ion-btn-primary" id="actor-search-btn" data-click-action="searchActors">Search</button>
+        <div class="flex items-center gap-2.5 mb-5">
+            <input type="text" class="input flex-1" id="actor-search" placeholder="Search threat actors in OpenCTI (e.g. APT, Lazarus, FIN7)...">
+            <button class="btn btn-primary" id="actor-search-btn" data-click-action="searchActors">Search</button>
         </div>
         <div id="actor-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for threat actors.</div>
@@ -274,9 +274,9 @@
 
     <!-- Campaigns Panel -->
     <div class="ti-panel" id="panel-campaigns">
-        <div class="ti-search-bar">
-            <input type="text" class="ti-search-input" id="campaign-search" placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
-            <button class="ion-btn ion-btn-primary" id="campaign-search-btn" data-click-action="searchCampaigns">Search</button>
+        <div class="flex items-center gap-2.5 mb-5">
+            <input type="text" class="input flex-1" id="campaign-search" placeholder="Search campaigns in OpenCTI (e.g. SolarWinds, NotPetya)...">
+            <button class="btn btn-primary" id="campaign-search-btn" data-click-action="searchCampaigns">Search</button>
         </div>
         <div id="campaign-results">
             <div class="ti-empty">Enter a search term to query OpenCTI for campaigns.</div>
@@ -293,7 +293,7 @@
 
         <h3 class="_ion-s-2714558e5b">
             Match Alerts
-            <button class="ion-btn ion-btn-ghost ti-btn-sm _ion-s-7f90823361" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
+            <button class="btn btn-ghost ti-btn-sm _ion-s-7f90823361" id="match-filter-btn" data-click-action="toggleMatchFilter">Show Unread Only</button>
         </h3>
         <table class="ti-table" id="matches-table">
             <thead><tr><th>Time</th><th>Observable</th><th>Matched Entity</th><th>Status</th><th>Actions</th></tr></thead>
@@ -303,14 +303,14 @@
 
     <!-- IOC Feed Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-ioc">
-        <div class="ti-search-bar">
-            <select id="ti-ioc-min-score" class="ti-search-input _ion-s-f9e27e828c" data-change-action="tiLoadIOCFeed">
+        <div class="flex items-center gap-2.5 mb-5">
+            <select id="ti-ioc-min-score" class="select flex-1 _ion-s-f9e27e828c" data-change-action="tiLoadIOCFeed">
                 <option value="0">All scores</option>
                 <option value="50">Score ≥ 50</option>
                 <option value="75" selected>Score ≥ 75</option>
                 <option value="90">Score ≥ 90</option>
             </select>
-            <button class="ion-btn ion-btn-primary" data-click-action="tiLoadIOCFeed">Refresh</button>
+            <button class="btn btn-primary" data-click-action="tiLoadIOCFeed">Refresh</button>
         </div>
         <table class="ti-table" id="ioc-table">
             <thead><tr><th>Score</th><th>Type</th><th>Value</th><th>Labels</th><th>Source</th><th title="Local sightings over the last 12 months">Sightings</th><th>Actions</th></tr></thead>
@@ -320,9 +320,9 @@
 
     <!-- Reports Panel — ported from /threat-landscape. -->
     <div class="ti-panel" id="panel-reports">
-        <div class="ti-search-bar">
-            <input type="text" class="ti-search-input" id="ti-report-filter" placeholder="Filter reports by title…">
-            <button class="ion-btn ion-btn-primary" data-click-action="tiLoadReports">Refresh</button>
+        <div class="flex items-center gap-2.5 mb-5">
+            <input type="text" class="input flex-1" id="ti-report-filter" placeholder="Filter reports by title…">
+            <button class="btn btn-primary" data-click-action="tiLoadReports">Refresh</button>
         </div>
         <div id="ti-reports-list">
             <div class="ti-empty">Click Refresh to load latest threat reports from OpenCTI.</div>
@@ -363,15 +363,15 @@ data-click-action="tiCloseReport"></div>
 
     <!-- Attack Stories Panel — ported from /attack-stories. -->
     <div class="ti-panel" id="panel-stories">
-        <div class="ti-search-bar">
-            <select id="ti-stories-hours" class="ti-search-input _ion-s-f9e27e828c" data-change-action="tiLoadStories">
+        <div class="flex items-center gap-2.5 mb-5">
+            <select id="ti-stories-hours" class="select flex-1 _ion-s-f9e27e828c" data-change-action="tiLoadStories">
                 <option value="4">Last 4h</option>
                 <option value="12">Last 12h</option>
                 <option value="24" selected>Last 24h</option>
                 <option value="72">Last 3 days</option>
                 <option value="168">Last 7 days</option>
             </select>
-            <button class="ion-btn ion-btn-primary" data-click-action="tiLoadStories">Refresh</button>
+            <button class="btn btn-primary" data-click-action="tiLoadStories">Refresh</button>
         </div>
         <div id="ti-stories-list">
             <div class="ti-empty">Click Refresh to correlate recent alerts into attack stories.</div>
@@ -384,13 +384,13 @@ data-click-action="tiCloseReport"></div>
        loaded, so the version and its age are stated on every view. #}
     <div class="ti-panel" id="panel-kev">
         <div id="kev-status-bar" class="mb-4"></div>
-        <div class="ti-search-bar">
-            <input id="kev-search" class="ti-search-input" type="text"
+        <div class="flex items-center gap-2.5 mb-5">
+            <input id="kev-search" class="input flex-1" type="text"
                    placeholder="CVE, vendor or product — e.g. CVE-2026-8037, Fortinet, LoadMaster">
             <label class="flex items-center gap-2 text-xs text-slate-400 whitespace-nowrap">
-                <input type="checkbox" id="kev-ransomware-only"> Ransomware-linked only
+                <input type="checkbox" class="checkbox checkbox-xs" id="kev-ransomware-only"> Ransomware-linked only
             </label>
-            <button class="ion-btn ion-btn-primary" data-click-action="kevSearch">Search</button>
+            <button class="btn btn-primary" data-click-action="kevSearch">Search</button>
         </div>
         <div id="kev-results">
             <div class="ti-empty">Loading catalog…</div>

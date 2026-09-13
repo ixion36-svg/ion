@@ -299,6 +299,9 @@
     "convert": true,
     "restyle": true
   },
+  "threat_intel.html": {
+    "restyle": true
+  },
   "threat_intel_actor.html": {
     "restyle": true
   },
