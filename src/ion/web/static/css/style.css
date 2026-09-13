@@ -1909,17 +1909,9 @@ select option {
    Utility Classes
    ============================================================================= */
 
-.loading {
-    color: var(--text-secondary);
-    text-align: center;
-    padding: 2rem;
-}
 
-.empty-state {
-    color: var(--text-secondary);
-    text-align: center;
-    padding: 3rem;
-}
+
+
 
 .error {
     color: var(--neon-red);
@@ -2802,12 +2794,7 @@ textarea.form-control {
 }
 
 /* ── Misc utility refresh ───────────────────────────────────────────────── */
-.loading, .empty-state {
-    padding: 2.5rem 1rem;
-    text-align: center;
-    color: #64748b;
-    font-size: 0.8125rem;
-}
+
 .list-group {
     display: flex;
     flex-direction: column;
@@ -3380,20 +3367,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Empty states ────────────────────────────────────────────────────── */
-.empty-state {
-    padding: 3rem 1.5rem;
-    text-align: center;
-    color: #64748b;
-    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
-    font-size: 0.8125rem;
-}
-.empty-state i {
-    font-size: 2.5rem;
-    color: #475569;
-    opacity: 0.5;
-    margin-bottom: 0.75rem;
-    display: block;
-}
+
+
 /* ══════════════ END PATH B SWEEP ══════════════ */
 
 /* ════════════════════════════════════════════════════════════════════════
@@ -3600,12 +3575,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Empty states */
-[data-mode="light"] .empty-state {
-  color: var(--text-muted) !important;
-}
-[data-mode="light"] .empty-state i {
-  color: var(--text-muted) !important;
-}
+[data-mode="light"] 
+[data-mode="light"] 
 
 /* Mode / toggle switches */
 
