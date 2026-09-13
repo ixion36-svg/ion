@@ -288,7 +288,11 @@ def main() -> int:
         # actionable field so the only valid move is to leave the class alone.
         mapping[name] = {
             "css": body.strip(),
-            "tailwind": "" if kind == "manual" else " ".join(utils),
+            # Order-preserving dedupe. One source rule declares display:none
+            # twice (.ion-s-47c5a3e01b), which produced "hidden flex-1 hidden
+            # flex-col". Semantically fine, but duplicate classes in the markup
+            # are noise a reader will stop to puzzle over.
+            "tailwind": "" if kind == "manual" else " ".join(dict.fromkeys(utils)),
             "kind": kind,
             "unmapped": unmapped,
             **({"partial_do_not_apply": " ".join(utils)} if kind == "manual" and utils else {}),

@@ -1674,7 +1674,7 @@
   "_ion-s-47c5a3e01b": {
     "css": "display:none;flex:1;display:none;flex-direction:column;",
     "kind": "exact",
-    "tailwind": "hidden flex-1 hidden flex-col",
+    "tailwind": "hidden flex-1 flex-col",
     "unmapped": []
   },
   "_ion-s-47e1bff439": {

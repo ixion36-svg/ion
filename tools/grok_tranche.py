@@ -315,8 +315,13 @@ def main() -> int:
             flag = {"OK": "ok  ", "FAILED": "FAIL", "NO_CHANGE": "noop",
                     "TIMEOUT": "TIME", "SKIPPED": "skip"}.get(r["status"], "????")
             extra = f" {r['problems']}" if r["problems"] else ""
+            # lines_before_actual is the file as it was before THIS run;
+            # lines_before comes from the baseline and is the original repo
+            # state, which for an already-touched page is misleading. Reporting
+            # the baseline made a 2-line conversion look like +152 lines.
+            lb = r.get("lines_before_actual", r["lines_before"])
             print(f"[{flag}] {r['page']} ({r.get('elapsed','?')}s)"
-                  f" {r['lines_before']}->{r.get('lines_after','?')}{extra}", flush=True)
+                  f" {lb}->{r.get('lines_after','?')}{extra}", flush=True)
 
     RESULTS.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     ok = sum(1 for r in results if r["status"] == "OK")

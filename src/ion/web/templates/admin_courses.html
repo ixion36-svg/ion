@@ -53,8 +53,8 @@
 <!-- JS opens/closes via element.style.display = 'block'|'none' (CSSOM, allowed).
      daisyUI .modal uses visibility/opacity, so style.display would not reveal it.
      Overlay hashed class hides it until JS shows it. -->
-<div class="_ion-s-2f3e0c5eac" id="ac-create" data-click-action="closeCreateDialog" data-only-self-click>
-  <div class="_ion-s-d85efb1967">
+<div class="hidden fixed inset-0 z-[9999] bg-[rgba(0,0,0,0.7)] [backdrop-filter:blur(4px)]" id="ac-create" data-click-action="closeCreateDialog" data-only-self-click>
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] bg-[#0f172a] border border-[rgba(255,255,255,0.1)] rounded-[12px] p-6">
     <h2 class="text-lg font-semibold mb-4">New course</h2>
     <div class="space-y-3">
       <fieldset class="fieldset p-0">
@@ -97,8 +97,8 @@
 </div>
 
 <!-- Import dialog -->
-<div class="_ion-s-2f3e0c5eac" id="ac-import" data-click-action="closeImportDialog" data-only-self-click>
-  <div class="_ion-s-9e454cc368">
+<div class="hidden fixed inset-0 z-[9999] bg-[rgba(0,0,0,0.7)] [backdrop-filter:blur(4px)]" id="ac-import" data-click-action="closeImportDialog" data-only-self-click>
+  <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[760px] max-h-[80vh] flex flex-col bg-[#0f172a] border border-[rgba(255,255,255,0.1)] rounded-[12px] p-6">
     <h2 class="text-lg font-semibold mb-2">Import course JSON</h2>
     <p class="text-sm text-base-content/60 mb-3">Paste a course payload exported from another ION instance (or hand-crafted following the same shape). Whole import is one transaction — slug must not collide with an existing course.</p>
     <textarea id="im-json" rows="20" class="textarea w-full font-mono text-sm leading-relaxed flex-1" spellcheck="false" placeholder='{ "course": { "title": "...", "level": "L1", "modules": [...] } }'></textarea>
