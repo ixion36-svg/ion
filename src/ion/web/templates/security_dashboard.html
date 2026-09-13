@@ -3,16 +3,16 @@
 {% block title %}Security Dashboard - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-lime"><use href="#i-shield"/></svg>
     <span class="label-tiny text-ion-lime">Posture overview</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Security Dashboard</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Top-level risk and threat posture.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Security Dashboard</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Top-level risk and threat posture.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
         <button class="btn btn-primary" data-click-action="refreshDashboard">Refresh</button>
@@ -21,12 +21,12 @@
 </section>
 
 <!-- Threat Summary Banner -->
-<div class="alert alert-info mb-6 flex flex-wrap items-center justify-between gap-4" id="threat-banner">
-    <div class="threat-level" id="threat-level">
+<div class="alert alert-info mb-6 flex flex-wrap items-center justify-between gap-4" id="threat-banner" role="alert">
+    <div class="threat-level flex items-center gap-4" id="threat-level">
         <span class="threat-icon text-2xl"><i class="icon-shield-alert"></i></span>
         <span class="threat-text text-xl font-semibold">Loading threat assessment...</span>
     </div>
-    <div class="threat-stats flex gap-8" id="threat-stats">
+    <div class="stats stats-horizontal bg-transparent shadow-none" id="threat-stats">
         <!-- Populated by JS -->
     </div>
 </div>
@@ -58,12 +58,12 @@
 <!-- Main Content Grid -->
 <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-6">
     <!-- Events Table -->
-    <div class="card bg-base-200 shadow p-0 min-w-0">
-        <div class="card-body">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-            <h2 class="card-title">Recent Security Events</h2>
+    <div class="card bg-base-200 shadow min-w-0">
+        <div class="card-body p-0">
+            <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+            <h2 class="card-title text-base basis-full md:basis-auto">Recent Security Events</h2>
             <div class="flex items-center gap-2 flex-wrap">
-                <select id="filter-severity" class="select select-sm" data-change-action="loadEvents">
+                <select id="filter-severity" class="select select-sm w-auto" data-change-action="loadEvents">
                     <option value="">All Severities</option>
                     <option value="critical">Critical</option>
                     <option value="high">High</option>
@@ -71,7 +71,7 @@
                     <option value="low">Low</option>
                     <option value="info">Info</option>
                 </select>
-                <select id="filter-hours" class="select select-sm" data-change-action="loadEvents">
+                <select id="filter-hours" class="select select-sm w-auto" data-change-action="loadEvents">
                     <option value="1">Last Hour</option>
                     <option value="24" selected>Last 24 Hours</option>
                     <option value="72">Last 3 Days</option>
@@ -80,22 +80,22 @@
             </div>
             </div>
             <div class="overflow-x-auto">
-            <table class="table table-sm table-zebra min-w-[1100px]" id="events-table">
+            <table class="table table-sm table-zebra min-w-[1100px] whitespace-nowrap" id="events-table">
                 <thead>
                     <tr>
                         <th>Time</th>
                         <th>Severity</th>
                         <th>Type</th>
                         <th>Source IP</th>
-                        <th>Title</th>
-                        <th>Matched Content</th>
+                        <th class="max-w-[200px]">Title</th>
+                        <th class="min-w-[150px] max-w-[300px]">Matched Content</th>
                         <th>Count</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="events-tbody">
-                    <tr><td colspan="9" class="loading">Loading security events...</td></tr>
+                    <tr><td colspan="9"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading security events...</div></td></tr>
                 </tbody>
             </table>
             </div>
@@ -105,34 +105,34 @@
     <!-- Side Panel -->
     <div class="flex flex-col gap-4">
         <!-- Top Attackers -->
-        <div class="card bg-base-200 shadow p-0">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <h3 class="card-title">Top Source IPs</h3>
+                <h3 class="card-title text-base">Top Source IPs</h3>
                 <div id="top-ips-list" class="flex flex-col gap-2">
-                    <div class="loading">Loading...</div>
+                    <div class="flex justify-center items-center gap-2 py-4 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
                 </div>
             </div>
         </div>
 
         <!-- Top Threats -->
-        <div class="card bg-base-200 shadow p-0">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <h3 class="card-title">Threat Types</h3>
+                <h3 class="card-title text-base">Threat Types</h3>
                 <div id="threat-types-list" class="flex flex-col gap-2">
-                    <div class="loading">Loading...</div>
+                    <div class="flex justify-center items-center gap-2 py-4 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
                 </div>
             </div>
         </div>
 
         <!-- Blocked IPs -->
-        <div class="card bg-base-200 shadow p-0">
+        <div class="card bg-base-200 shadow">
             <div class="card-body">
-                <div class="flex items-center justify-between gap-2">
-                <h3 class="card-title">Blocked IPs</h3>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                <h3 class="card-title text-base basis-full md:basis-auto">Blocked IPs</h3>
                 <button class="btn btn-sm btn-primary" data-click-action="showBlockIPModal">+ Block IP</button>
                 </div>
                 <div id="blocked-ips-list" class="flex flex-col gap-2">
-                    <div class="loading">Loading...</div>
+                    <div class="flex justify-center items-center gap-2 py-4 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
                 </div>
             </div>
         </div>
@@ -142,7 +142,7 @@
 <!-- Event Detail Modal -->
 <div class="modal" id="event-modal">
     <div class="modal-box max-w-3xl w-11/12">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">Event Details</h2>
             <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["event-modal"]'>&times;</button>
         </div>
@@ -150,7 +150,7 @@
             <!-- Populated by JS -->
         </div>
         <div class="modal-action">
-            <select id="event-status-select" class="select select-sm" data-change-action="updateEventStatus">
+            <select id="event-status-select" class="select select-sm w-auto" data-change-action="updateEventStatus">
                 <option value="new">New</option>
                 <option value="investigating">Investigating</option>
                 <option value="confirmed">Confirmed</option>
@@ -166,24 +166,24 @@
 <!-- Block IP Modal -->
 <div class="modal" id="block-ip-modal">
     <div class="modal-box">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">Block IP Address</h2>
             <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["block-ip-modal"]'>&times;</button>
         </div>
         <div class="py-4">
             <form id="block-ip-form" class="flex flex-col gap-4" data-submit-action="blockIP" data-args='["$event"]'>
-                <fieldset class="fieldset">
+                <fieldset class="fieldset p-0">
                     <legend class="fieldset-legend">IP Address</legend>
                     <input type="text" class="input w-full" id="block-ip" name="ip_address" required
                            pattern="^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$"
                            placeholder="192.168.1.100">
                 </fieldset>
-                <fieldset class="fieldset">
+                <fieldset class="fieldset p-0">
                     <legend class="fieldset-legend">Reason</legend>
                     <textarea class="textarea w-full" id="block-reason" name="reason" required
                               placeholder="Reason for blocking this IP"></textarea>
                 </fieldset>
-                <fieldset class="fieldset">
+                <fieldset class="fieldset p-0">
                     <legend class="fieldset-legend">Duration (minutes)</legend>
                     <input type="number" class="input w-full" id="block-duration" name="duration_minutes"
                            value="60" min="1" max="525600">
@@ -205,12 +205,12 @@
 <!-- SIEM Export Modal -->
 <div class="modal" id="export-modal">
     <div class="modal-box">
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">Export Security Events</h2>
             <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["export-modal"]'>&times;</button>
         </div>
         <div class="py-4 flex flex-col gap-4">
-            <fieldset class="fieldset">
+            <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Time Period</legend>
                 <select id="export-hours" class="select w-full">
                     <option value="24">Last 24 Hours</option>
@@ -219,7 +219,7 @@
                     <option value="720">Last 30 Days</option>
                 </select>
             </fieldset>
-            <fieldset class="fieldset">
+            <fieldset class="fieldset p-0">
                 <legend class="fieldset-legend">Format</legend>
                 <select id="export-format" class="select w-full">
                     <option value="json">JSON (SIEM Compatible)</option>
@@ -267,26 +267,7 @@
 .threat-level.low { color: var(--color-success); }
 .threat-level.normal { color: var(--color-info); }
 
-/* JS innerHTML: .threat-stat / -value / -label */
-.threat-stat { text-align: center; }
-.threat-stat-value { font-size: 1.5rem; font-weight: 700; }
-.threat-stat-label { font-size: 0.875rem; opacity: 0.8; }
-
-/* JS innerHTML: side-list rows */
-.list-item-ip { font-family: var(--font-mono, ui-monospace, monospace); }
-.list-item-count {
-    display: inline-flex;
-    align-items: center;
-    background: var(--color-primary);
-    color: var(--color-primary-content);
-    padding: 0.25rem 0.5rem;
-    border-radius: var(--radius-selector, 0.25rem);
-    font-size: 0.75rem;
-    font-weight: 600;
-}
-.list-item-actions { display: flex; gap: 0.5rem; align-items: center; }
-
-/* JS innerHTML: severity-${event.severity} — no daisyUI class on those nodes */
+/* JS interpolates severity-${event.severity} — no daisyUI class on those nodes */
 .severity-badge {
     display: inline-flex;
     align-items: center;
@@ -302,7 +283,7 @@
 .severity-low { background: var(--color-success); color: var(--color-success-content); }
 .severity-info { background: var(--color-info); color: var(--color-info-content); }
 
-/* JS innerHTML: status-${event.status} — new uses neon-blue (no daisyUI slot) */
+/* JS interpolates status-${event.status} — new uses neon-blue (no daisyUI slot) */
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -316,85 +297,6 @@
 .status-false-positive { background: color-mix(in oklab, var(--color-secondary) 12%, transparent); color: var(--color-secondary); }
 .status-mitigated { background: color-mix(in oklab, var(--color-success) 12%, transparent); color: var(--color-success); }
 .status-resolved { background: var(--color-base-300); color: var(--color-base-content); opacity: 0.7; }
-
-/* JS innerHTML: event detail modal body */
-.event-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-.event-detail-item {
-    padding: 0.5rem;
-    background: var(--color-base-200);
-    border-radius: var(--radius-selector, 0.25rem);
-}
-.event-detail-label {
-    font-size: 0.75rem;
-    opacity: 0.7;
-    text-transform: uppercase;
-}
-.event-detail-value { font-weight: 500; word-break: break-all; }
-
-.event-patterns {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: var(--color-base-200);
-    border-radius: var(--radius-selector, 0.25rem);
-}
-.event-patterns-title { font-weight: 600; margin-bottom: 0.5rem; }
-.event-patterns-list {
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.875rem;
-    list-style: none;
-    padding: 0;
-}
-.event-patterns-list li {
-    padding: 0.25rem 0;
-    border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
-}
-
-.event-payload {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: var(--color-base-100);
-    border-radius: var(--radius-selector, 0.25rem);
-    border-left: 4px solid var(--color-error);
-}
-.event-payload-title {
-    font-weight: 600;
-    margin-bottom: 0.75rem;
-    color: var(--color-error);
-}
-.event-payload-content { display: flex; flex-direction: column; gap: 0.75rem; }
-.payload-section {
-    background: color-mix(in oklab, var(--color-base-content) 6%, transparent);
-    padding: 0.75rem;
-    border-radius: var(--radius-selector, 0.25rem);
-}
-.payload-label {
-    font-size: 0.75rem;
-    opacity: 0.7;
-    text-transform: uppercase;
-    margin-bottom: 0.5rem;
-}
-.payload-code {
-    background: var(--color-base-100);
-    padding: 0.75rem;
-    border-radius: var(--radius-selector, 0.25rem);
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.8rem;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin: 0;
-    max-height: 200px;
-    overflow-y: auto;
-}
-.payload-code.highlight-danger {
-    background: color-mix(in oklab, var(--color-error) 12%, transparent);
-    border: 1px solid var(--color-error);
-    color: var(--color-error);
-}
 
 /* JS-generated table cells: nowrap + column constraints */
 #events-table th,
@@ -470,25 +372,25 @@ async function loadThreatSummary() {
 
         // Update threat stats
         document.getElementById('threat-stats').innerHTML = `
-            <div class="threat-stat">
-                <div class="threat-stat-value">${data.last_hour.total}</div>
-                <div class="threat-stat-label">Last Hour</div>
+            <div class="stat py-0">
+                <div class="stat-value text-2xl">${data.last_hour.total}</div>
+                <div class="stat-desc">Last Hour</div>
             </div>
-            <div class="threat-stat">
-                <div class="threat-stat-value">${data.active_blocks}</div>
-                <div class="threat-stat-label">Active Blocks</div>
+            <div class="stat py-0">
+                <div class="stat-value text-2xl">${data.active_blocks}</div>
+                <div class="stat-desc">Active Blocks</div>
             </div>
         `;
 
         // Update top threats
         const threatsList = document.getElementById('threat-types-list');
         if (data.top_threats.length === 0) {
-            threatsList.innerHTML = '<div class="empty-state">No threats detected</div>';
+            threatsList.innerHTML = '<div class="text-sm opacity-50 py-2">No threats detected</div>';
         } else {
             threatsList.innerHTML = data.top_threats.map(t => `
-                <div class="list-item">
+                <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
                     <span>${formatEventType(t.type)}</span>
-                    <span class="list-item-count">${t.count}</span>
+                    <span class="badge badge-primary badge-sm">${t.count}</span>
                 </div>
             `).join('');
         }
@@ -496,14 +398,14 @@ async function loadThreatSummary() {
         // Update top IPs
         const ipsList = document.getElementById('top-ips-list');
         if (data.top_attackers.length === 0) {
-            ipsList.innerHTML = '<div class="empty-state">No source IPs</div>';
+            ipsList.innerHTML = '<div class="text-sm opacity-50 py-2">No source IPs</div>';
         } else {
             ipsList.innerHTML = data.top_attackers.map(ip => `
-                <div class="list-item">
-                    <span class="list-item-ip">${escapeHtml(ip.ip)}</span>
-                    <div class="list-item-actions">
-                        <span class="list-item-count">${ip.count}</span>
-                        <button class="btn btn-sm btn-danger" data-click-action="quickBlockIP" data-args='["${escapeHtml(ip.ip)}"]' title="Block IP"><i class="icon-ban"></i></button>
+                <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
+                    <span class="font-mono">${escapeHtml(ip.ip)}</span>
+                    <div class="flex items-center gap-2">
+                        <span class="badge badge-primary badge-sm">${ip.count}</span>
+                        <button class="btn btn-sm btn-error" data-click-action="quickBlockIP" data-args='["${escapeHtml(ip.ip)}"]' title="Block IP"><i class="icon-ban"></i></button>
                     </div>
                 </div>
             `).join('');
@@ -548,7 +450,7 @@ async function loadEvents() {
         const events = await response.json();
 
         if (events.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="empty">No security events found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center opacity-50 py-8">No security events found</td></tr>';
             return;
         }
 
@@ -574,7 +476,7 @@ async function loadEvents() {
                 <td>${formatDateTime(event.created_at)}</td>
                 <td><span class="severity-badge severity-${event.severity}">${event.severity}</span></td>
                 <td>${formatEventType(event.event_type)}</td>
-                <td class="list-item-ip">${escapeHtml(event.source_ip)}</td>
+                <td class="font-mono">${escapeHtml(event.source_ip)}</td>
                 <td>${escapeHtml(event.title)}</td>
                 <td class="matched-content" title="${escapeHtml(matchedContent)}"><code>${escapeHtml(matchedContent)}</code></td>
                 <td>${event.event_count}</td>
@@ -586,7 +488,7 @@ async function loadEvents() {
         `}).join('');
 
     } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="9" class="error">Error loading security events</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9"><div role="alert" class="alert alert-error m-4">Error loading security events</div></td></tr>';
     }
 }
 
@@ -600,24 +502,24 @@ async function loadBlockedIPs() {
         const blocked = await response.json();
 
         if (blocked.length === 0) {
-            container.innerHTML = '<div class="empty-state">No blocked IPs</div>';
+            container.innerHTML = '<div class="text-sm opacity-50 py-2">No blocked IPs</div>';
             return;
         }
 
         container.innerHTML = blocked.map(b => `
-            <div class="list-item">
+            <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
                 <div>
-                    <span class="list-item-ip">${escapeHtml(b.ip_address)}</span>
+                    <span class="font-mono">${escapeHtml(b.ip_address)}</span>
                     <small class="block text-[var(--text-muted)]">
                         ${b.permanent ? 'Permanent' : (b.blocked_until ? 'Until ' + formatDateTime(b.blocked_until) : 'Indefinite')}
                     </small>
                 </div>
-                <button class="btn btn-sm btn-secondary" data-click-action="unblockIP" data-args='["${escapeHtml(b.ip_address)}"]' title="Unblock">&#10006;</button>
+                <button class="btn btn-sm btn-ghost" data-click-action="unblockIP" data-args='["${escapeHtml(b.ip_address)}"]' title="Unblock">&#10006;</button>
             </div>
         `).join('');
 
     } catch (error) {
-        container.innerHTML = '<div class="error">Error loading blocked IPs</div>';
+        container.innerHTML = '<div role="alert" class="alert alert-error">Error loading blocked IPs</div>';
     }
 }
 
@@ -636,100 +538,102 @@ async function showEventDetail(eventId) {
             let payloadSections = '';
             if (event.raw_data.matched_content) {
                 payloadSections += `
-                    <div class="payload-section">
-                        <div class="payload-label">MATCHED MALICIOUS CONTENT:</div>
-                        <pre class="payload-code highlight-danger">${escapeHtml(event.raw_data.matched_content)}</pre>
+                    <div class="bg-base-content/5 p-3 rounded">
+                        <div class="text-xs uppercase opacity-70 mb-2">MATCHED MALICIOUS CONTENT:</div>
+                        <pre class="bg-error/10 text-error border border-error p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(event.raw_data.matched_content)}</pre>
                     </div>`;
             }
             if (event.raw_data.query_string) {
                 let decoded = event.raw_data.query_string;
                 try { decoded = decodeURIComponent(decoded); } catch(e) {}
                 payloadSections += `
-                    <div class="payload-section">
-                        <div class="payload-label">Query String:</div>
-                        <pre class="payload-code">${escapeHtml(decoded)}</pre>
+                    <div class="bg-base-content/5 p-3 rounded">
+                        <div class="text-xs uppercase opacity-70 mb-2">Query String:</div>
+                        <pre class="bg-base-100 p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(decoded)}</pre>
                     </div>`;
             }
             if (event.raw_data.body) {
                 payloadSections += `
-                    <div class="payload-section">
-                        <div class="payload-label">Request Body:</div>
-                        <pre class="payload-code">${escapeHtml(event.raw_data.body)}</pre>
+                    <div class="bg-base-content/5 p-3 rounded">
+                        <div class="text-xs uppercase opacity-70 mb-2">Request Body:</div>
+                        <pre class="bg-base-100 p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(event.raw_data.body)}</pre>
                     </div>`;
             }
             if (event.raw_data.path) {
                 payloadSections += `
-                    <div class="payload-section">
-                        <div class="payload-label">Request Path:</div>
-                        <pre class="payload-code">${escapeHtml(event.raw_data.path)}</pre>
+                    <div class="bg-base-content/5 p-3 rounded">
+                        <div class="text-xs uppercase opacity-70 mb-2">Request Path:</div>
+                        <pre class="bg-base-100 p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(event.raw_data.path)}</pre>
                     </div>`;
             }
             if (payloadSections) {
                 rawDataHtml = `
-                <div class="event-payload">
-                    <div class="event-payload-title"><i class="icon-alert-triangle"></i> Detected Payload / Trigger Data</div>
-                    <div class="event-payload-content">${payloadSections}</div>
+                <div role="alert" class="alert alert-error mb-4">
+                    <div class="w-full">
+                    <div class="font-semibold mb-3"><i class="icon-alert-triangle"></i> Detected Payload / Trigger Data</div>
+                    <div class="flex flex-col gap-3">${payloadSections}</div>
+                    </div>
                 </div>`;
             }
         }
 
         document.getElementById('event-detail-content').innerHTML = `
             ${rawDataHtml}
-            <div class="event-detail-grid">
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Event Type</div>
-                    <div class="event-detail-value">${formatEventType(event.event_type)}</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Event Type</div>
+                    <div class="font-medium break-all">${formatEventType(event.event_type)}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Severity</div>
-                    <div class="event-detail-value"><span class="severity-badge severity-${event.severity}">${event.severity}</span></div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Severity</div>
+                    <div class="font-medium break-all"><span class="severity-badge severity-${event.severity}">${event.severity}</span></div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Source IP</div>
-                    <div class="event-detail-value list-item-ip">${escapeHtml(event.source_ip)}</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Source IP</div>
+                    <div class="font-medium break-all font-mono">${escapeHtml(event.source_ip)}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Username</div>
-                    <div class="event-detail-value">${event.username ? escapeHtml(event.username) : '-'}</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Username</div>
+                    <div class="font-medium break-all">${event.username ? escapeHtml(event.username) : '-'}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Request Path</div>
-                    <div class="event-detail-value">${event.request_path ? escapeHtml(event.request_path) : '-'}</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Request Path</div>
+                    <div class="font-medium break-all">${event.request_path ? escapeHtml(event.request_path) : '-'}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Request Method</div>
-                    <div class="event-detail-value">${event.request_method || '-'}</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Request Method</div>
+                    <div class="font-medium break-all">${event.request_method || '-'}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">First Seen</div>
-                    <div class="event-detail-value">${formatDateTime(event.first_seen)}</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">First Seen</div>
+                    <div class="font-medium break-all">${formatDateTime(event.first_seen)}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Last Seen</div>
-                    <div class="event-detail-value">${formatDateTime(event.last_seen)}</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Last Seen</div>
+                    <div class="font-medium break-all">${formatDateTime(event.last_seen)}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Event Count</div>
-                    <div class="event-detail-value">${event.event_count}</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Event Count</div>
+                    <div class="font-medium break-all">${event.event_count}</div>
                 </div>
-                <div class="event-detail-item">
-                    <div class="event-detail-label">Confidence Score</div>
-                    <div class="event-detail-value">${event.confidence_score}%</div>
+                <div class="p-2 bg-base-200 rounded">
+                    <div class="text-xs uppercase opacity-70">Confidence Score</div>
+                    <div class="font-medium break-all">${event.confidence_score}%</div>
                 </div>
-                <div class="event-detail-item _ion-s-1f61f29863">
-                    <div class="event-detail-label">User Agent</div>
-                    <div class="event-detail-value">${event.user_agent ? escapeHtml(event.user_agent) : '-'}</div>
+                <div class="p-2 bg-base-200 rounded _ion-s-1f61f29863">
+                    <div class="text-xs uppercase opacity-70">User Agent</div>
+                    <div class="font-medium break-all">${event.user_agent ? escapeHtml(event.user_agent) : '-'}</div>
                 </div>
-                <div class="event-detail-item _ion-s-1f61f29863">
-                    <div class="event-detail-label">Description</div>
-                    <div class="event-detail-value">${escapeHtml(event.description)}</div>
+                <div class="p-2 bg-base-200 rounded _ion-s-1f61f29863">
+                    <div class="text-xs uppercase opacity-70">Description</div>
+                    <div class="font-medium break-all">${escapeHtml(event.description)}</div>
                 </div>
             </div>
             ${event.matched_patterns && event.matched_patterns.length > 0 ? `
-            <div class="event-patterns">
-                <div class="event-patterns-title">Matched Detection Patterns</div>
-                <ul class="event-patterns-list">
-                    ${event.matched_patterns.map(p => `<li>${escapeHtml(p)}</li>`).join('')}
+            <div class="mt-4 p-4 bg-base-200 rounded">
+                <div class="font-semibold mb-2">Matched Detection Patterns</div>
+                <ul class="font-mono text-sm list-none p-0">
+                    ${event.matched_patterns.map(p => `<li class="py-1 border-b border-base-content/10">${escapeHtml(p)}</li>`).join('')}
                 </ul>
             </div>
             ` : ''}

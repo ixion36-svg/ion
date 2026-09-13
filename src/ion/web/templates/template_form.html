@@ -3,111 +3,135 @@
 {% block title %}{% if template_id %}Edit Template{% else %}New Template{% endif %} - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<section class="flex items-end justify-between flex-wrap gap-6 mb-8 rise d-1">
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em] mb-6">{% if template_id %}Edit Template{% else %}New Template{% endif %}</h1>
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg>
+            <span class="label-tiny text-ion-cyan">Report templates</span>
+        </div>
+        <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">{% if template_id %}Edit Template{% else %}New Template{% endif %}</h1>
+    </div>
 </section>
 
-<form id="template-form" class="form">
-    <div class="form-group">
-        <label for="name">Name *</label>
-        <input type="text" id="name" name="name" required placeholder="Enter template name" class="ion-input">
-    </div>
+<form id="template-form" class="space-y-6 w-full max-w-4xl">
+    <div class="card bg-base-200 shadow">
+        <div class="card-body gap-4">
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Name <span class="text-error">*</span></legend>
+                <input type="text" id="name" name="name" required placeholder="Enter template name" class="input w-full">
+            </fieldset>
 
-    <div class="form-row">
-        <div class="form-group">
-            <label for="format">Format</label>
-            <select id="format" name="format" class="ion-select">
-                <option value="markdown">Markdown</option>
-                <option value="html">HTML</option>
-                <option value="text">Plain Text</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="document_type">Document Type</label>
-            <select id="document_type" name="document_type" class="ion-select">
-                <option value="">None</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label for="tags">Tags (comma-separated)</label>
-            <input type="text" id="tags" name="tags" placeholder="e.g., work, formal, invoice" class="ion-input">
-        </div>
-    </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Format</legend>
+                    <select id="format" name="format" class="select w-full">
+                        <option value="markdown">Markdown</option>
+                        <option value="html">HTML</option>
+                        <option value="text">Plain Text</option>
+                    </select>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Document Type</legend>
+                    <select id="document_type" name="document_type" class="select w-full">
+                        <option value="">None</option>
+                    </select>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Tags (comma-separated)</legend>
+                    <input type="text" id="tags" name="tags" placeholder="e.g., work, formal, invoice" class="input w-full">
+                </fieldset>
+            </div>
 
-    <div class="form-group">
-        <label for="description">Description</label>
-        <textarea id="description" name="description" rows="2" placeholder="Brief description of the template" class="ion-textarea"></textarea>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Description</legend>
+                <textarea id="description" name="description" rows="2" placeholder="Brief description of the template" class="textarea w-full"></textarea>
+            </fieldset>
+        </div>
     </div>
 
     <!-- Legacy template notice (shown when editing raw templates) -->
-    <div id="legacy-notice" class="se-legacy-notice _ion-s-c8be1ccba6">
-        <p>This template was created with the raw editor. To use the section editor, the existing content will be placed in a single Text section.</p>
-        <button type="button" class="ion-btn btn-sm" data-click-action="convertToSections">Convert to Sections</button>
+    <div id="legacy-notice" role="alert" class="alert alert-warning se-legacy-notice _ion-s-c8be1ccba6">
+        <div>
+            <p class="mb-2">This template was created with the raw editor. To use the section editor, the existing content will be placed in a single Text section.</p>
+            <button type="button" class="btn btn-sm" data-click-action="convertToSections">Convert to Sections</button>
+        </div>
     </div>
 
     <!-- Section Builder -->
-    <div class="se-builder">
-        <div class="se-header">
-            <label>Template Sections</label>
-            <button type="button" class="ion-btn ion-btn-primary btn-sm" data-click-action="openLibrary" data-args='[-1]'>+ Add Section</button>
-        </div>
+    <div class="se-builder card bg-base-200 shadow">
+        <div class="card-body gap-4">
+            <div class="se-header flex flex-wrap items-center justify-between gap-3">
+                <label class="font-semibold basis-full md:basis-auto md:flex-1">Template Sections</label>
+                <button type="button" class="btn btn-primary btn-sm" data-click-action="openLibrary" data-args='[-1]'>+ Add Section</button>
+            </div>
 
-        <div id="sections-container" class="se-sections">
-            <div class="se-empty" id="sections-empty">
-                <p>No sections yet. Click "Add Section" to get started.</p>
+            <div id="sections-container" class="se-sections min-h-[60px]">
+                <div class="se-empty border-2 border-dashed border-base-300 rounded-box p-8 text-center text-base-content/60" id="sections-empty">
+                    <p>No sections yet. Click "Add Section" to get started.</p>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Section Library Panel -->
-    <div id="section-library-overlay" class="se-library-overlay _ion-s-c8be1ccba6" data-click-action="closeLibrary"></div>
-    <div id="section-library" class="se-library _ion-s-c8be1ccba6">
-        <div class="se-library-header">
-            <h3>Section Library</h3>
-            <button type="button" class="se-library-close" data-click-action="closeLibrary">&times;</button>
+    <!-- JS opens/closes via element.style.display (CSSOM, allowed).
+         daisyUI drawer/modal use visibility; style.display would not reveal them.
+         Overlay hashed class hides both until JS shows them. -->
+    <div id="section-library-overlay" class="se-library-overlay fixed inset-0 z-[999] bg-black/40 _ion-s-c8be1ccba6" data-click-action="closeLibrary"></div>
+    <div id="section-library" class="se-library fixed top-0 right-0 z-[1000] flex-col w-[360px] h-screen bg-base-200 border-l border-base-300 shadow-xl _ion-s-c8be1ccba6">
+        <div class="se-library-header flex flex-wrap items-center justify-between gap-3 p-4 border-b border-base-300">
+            <h3 class="text-lg font-semibold m-0">Section Library</h3>
+            <button type="button" class="se-library-close btn btn-ghost btn-sm btn-circle" data-click-action="closeLibrary" aria-label="Close">&times;</button>
         </div>
-        <div class="se-library-body">
-            <h4>Generic</h4>
-            <div class="se-library-grid" id="library-generic"></div>
-            <h4>SOC-Specific</h4>
-            <div class="se-library-grid" id="library-soc"></div>
+        <div class="se-library-body flex-1 overflow-y-auto p-4">
+            <h4 class="text-xs uppercase tracking-wide text-base-content/60 mt-0 mb-2">Generic</h4>
+            <div class="se-library-grid grid grid-cols-2 gap-2" id="library-generic"></div>
+            <h4 class="text-xs uppercase tracking-wide text-base-content/60 mt-3 mb-2">SOC-Specific</h4>
+            <div class="se-library-grid grid grid-cols-2 gap-2" id="library-soc"></div>
         </div>
     </div>
 
     {% if template_id %}
-    <div class="form-row">
-        <div class="form-group">
-            <label for="message">Version Message</label>
-            <input type="text" id="message" name="message" placeholder="Describe your changes" class="ion-input">
-        </div>
-        <div class="form-group">
-            <label for="author">Author</label>
-            <input type="text" id="author" name="author" placeholder="Your name" class="ion-input">
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Version Message</legend>
+                    <input type="text" id="message" name="message" placeholder="Describe your changes" class="input w-full">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Author</legend>
+                    <input type="text" id="author" name="author" placeholder="Your name" class="input w-full">
+                </fieldset>
+            </div>
         </div>
     </div>
     {% endif %}
 
-    <div class="form-actions">
-        <button type="submit" class="ion-btn ion-btn-primary">{% if template_id %}Save Changes{% else %}Create Template{% endif %}</button>
-        <button type="button" class="ion-btn" data-click-action="previewTemplate">Preview</button>
-        <a href="/templates" class="ion-btn ion-btn-ghost">Cancel</a>
+    <div class="form-actions flex flex-wrap gap-3">
+        <button type="submit" class="btn btn-primary">{% if template_id %}Save Changes{% else %}Create Template{% endif %}</button>
+        <button type="button" class="btn" data-click-action="previewTemplate">Preview</button>
+        <a href="/templates" class="btn btn-ghost">Cancel</a>
     </div>
 </form>
 
 <!-- Preview Modal -->
-<div id="preview-modal" class="modal _ion-s-c8be1ccba6">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
-            <h2>Template Preview (Generated Jinja2)</h2>
-            <button class="modal-close" data-click-action="closePreview">&times;</button>
-        </div>
-        <div class="modal-body">
-            <pre id="preview-content" class="code-block ion-mono"></pre>
-        </div>
-        <div class="modal-footer">
-            <button class="ion-btn" data-click-action="closePreview">Close</button>
+<!-- JS opens/closes via element.style.display = 'flex'|'none' (CSSOM, allowed).
+     daisyUI .modal uses visibility/opacity, so style.display would not reveal it.
+     Overlay hashed class hides it until JS shows it. -->
+<div id="preview-modal" class="fixed inset-0 z-50 items-center justify-center bg-black/60 p-4 _ion-s-c8be1ccba6">
+    <div class="card bg-base-100 shadow-xl w-11/12 max-w-5xl max-h-[90vh] flex flex-col">
+        <div class="card-body overflow-hidden flex flex-col gap-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <h2 class="card-title text-lg basis-full md:basis-auto md:flex-1">Template Preview (Generated Jinja2)</h2>
+                <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closePreview" aria-label="Close">&times;</button>
+            </div>
+            <pre id="preview-content" class="code-block ion-mono bg-base-200 rounded-box p-4 text-sm overflow-auto flex-1"></pre>
+            <div class="flex justify-end">
+                <button class="btn" data-click-action="closePreview">Close</button>
+            </div>
         </div>
     </div>
 </div>
@@ -118,33 +142,20 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-/* Section Editor styles */
-.se-builder { margin: 1rem 0; }
-.se-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 0.75rem;
-}
-.se-header label { font-weight: 600; font-size: 1rem; }
-.se-sections { min-height: 60px; }
-.se-empty {
-    text-align: center;
-    padding: 2rem;
-    border: 2px dashed var(--border);
-    border-radius: var(--radius-lg);
-    color: var(--text-muted);
-}
+/* JS builds .se-card / .se-add-inline / .se-field* / .se-library-item at
+   runtime. Those class names are querySelector hooks — they cannot move to
+   daisyUI utilities without changing the script. Theme tokens so light mode
+   flips; sibling-hover and .collapsed have no daisyUI equivalent. */
 
-/* Section card */
+/* Section card (JS-generated) */
 .se-card {
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 1rem);
     margin-bottom: 0.5rem;
-    background: var(--bg-secondary);
+    background: var(--color-base-100);
     transition: box-shadow 0.15s;
 }
-.se-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.se-card:hover { box-shadow: 0 2px 8px oklch(0% 0 0 / 0.15); }
 .se-card-header {
     display: flex;
     align-items: center;
@@ -159,15 +170,15 @@
     justify-content: center;
     width: 32px;
     height: 32px;
-    border-radius: var(--radius);
-    background: var(--primary-color);
-    color: white;
+    border-radius: var(--radius-field, 0.5rem);
+    background: var(--color-primary);
+    color: var(--color-primary-content);
     font-weight: 700;
     font-size: 0.65rem;
     flex-shrink: 0;
 }
 .se-card-title { flex: 1; font-weight: 600; font-size: 0.9rem; }
-.se-card-type { color: var(--text-muted); font-size: 0.75rem; }
+.se-card-type { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 0.75rem; }
 .se-card-actions {
     display: flex;
     gap: 0.25rem;
@@ -175,30 +186,30 @@
 }
 .se-card-actions button {
     background: none;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
+    border: 1px solid var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     cursor: pointer;
     padding: 0.2rem 0.4rem;
-    border-radius: 4px;
+    border-radius: var(--radius-field, 0.5rem);
     font-size: 0.75rem;
     line-height: 1;
 }
 .se-card-actions button:hover {
-    background: var(--primary-dim);
-    color: var(--text-color);
+    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    color: var(--color-base-content);
 }
 .se-card-actions button.se-delete:hover {
-    background: var(--danger);
-    color: white;
-    border-color: var(--danger);
+    background: var(--color-error);
+    color: var(--color-error-content);
+    border-color: var(--color-error);
 }
 .se-card-body {
     padding: 0.75rem;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--color-base-300);
 }
 .se-card-body.collapsed { display: none; }
 
-/* Inline add section button */
+/* Inline add: sibling-hover has no Tailwind equivalent without changing JS. */
 .se-add-inline {
     text-align: center;
     padding: 0.25rem 0;
@@ -209,36 +220,36 @@
 .se-add-inline:hover { opacity: 1; }
 .se-add-inline button {
     background: none;
-    border: 1px dashed var(--border);
-    color: var(--text-muted);
+    border: 1px dashed var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     cursor: pointer;
     padding: 0.15rem 0.75rem;
-    border-radius: 4px;
+    border-radius: var(--radius-field, 0.5rem);
     font-size: 0.75rem;
 }
 .se-add-inline button:hover {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
 }
 
-/* Section fields */
+/* Section fields (JS-generated, no daisyUI input/select classes) */
 .se-field { margin-bottom: 0.5rem; }
 .se-field label {
     display: block;
     font-size: 0.8rem;
     font-weight: 500;
     margin-bottom: 0.2rem;
-    color: var(--text-muted);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
 .se-field input[type="text"],
 .se-field textarea,
 .se-field select {
     width: 100%;
     padding: 0.4rem 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-primary);
-    color: var(--text-color);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.5rem);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
     font-size: 0.85rem;
     font-family: inherit;
 }
@@ -251,9 +262,9 @@
     gap: 0.5rem;
     margin-top: 0.5rem;
     padding: 0.4rem 0.5rem;
-    background: var(--bg-primary);
-    border-radius: 4px;
-    border: 1px solid var(--border);
+    background: var(--color-base-100);
+    border-radius: var(--radius-field, 0.5rem);
+    border: 1px solid var(--color-base-300);
 }
 .se-variable-toggle label {
     font-size: 0.8rem;
@@ -281,33 +292,33 @@
 .se-list-item input {
     flex: 1;
     padding: 0.3rem 0.4rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-primary);
-    color: var(--text-color);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.5rem);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
     font-size: 0.8rem;
 }
 .se-list-item button {
     background: none;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
+    border: 1px solid var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     cursor: pointer;
     padding: 0.2rem 0.35rem;
-    border-radius: 4px;
+    border-radius: var(--radius-field, 0.5rem);
     font-size: 0.75rem;
 }
-.se-list-item button:hover { color: var(--danger); }
+.se-list-item button:hover { color: var(--color-error); }
 .se-list-add {
     background: none;
-    border: 1px dashed var(--border);
-    color: var(--text-muted);
+    border: 1px dashed var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     cursor: pointer;
     padding: 0.25rem 0.6rem;
-    border-radius: 4px;
+    border-radius: var(--radius-field, 0.5rem);
     font-size: 0.75rem;
     margin-top: 0.25rem;
 }
-.se-list-add:hover { border-color: var(--primary-color); color: var(--primary-color); }
+.se-list-add:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
 /* Checkbox field */
 .se-checkbox {
@@ -318,72 +329,19 @@
 }
 .se-checkbox label { font-size: 0.8rem; cursor: pointer; margin: 0; }
 
-/* Section library */
-.se-library-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 999;
-}
-.se-library {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 360px;
-    height: 100vh;
-    background: var(--bg-secondary);
-    border-left: 1px solid var(--border);
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    box-shadow: -2px 0 8px rgba(0,0,0,.15);
-}
-.se-library-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
-    border-bottom: 1px solid var(--border);
-}
-.se-library-header h3 { margin: 0; }
-.se-library-close {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--text-muted);
-    line-height: 1;
-}
-.se-library-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 1rem;
-}
-.se-library-body h4 {
-    margin: 0.75rem 0 0.5rem;
-    font-size: 0.8rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--text-muted);
-}
-.se-library-body h4:first-child { margin-top: 0; }
-.se-library-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.5rem;
-}
+/* Library tiles (JS-generated in buildLibrary) */
 .se-library-item {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.5rem);
     padding: 0.6rem;
     cursor: pointer;
     text-align: center;
     transition: all 0.15s;
-    background: var(--bg-primary);
+    background: var(--color-base-100);
 }
 .se-library-item:hover {
-    border-color: var(--primary-color);
-    background: var(--primary-dim);
+    border-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
 }
 .se-library-item-icon {
     display: inline-flex;
@@ -391,9 +349,9 @@
     justify-content: center;
     width: 36px;
     height: 36px;
-    border-radius: var(--radius-lg);
-    background: var(--primary-color);
-    color: white;
+    border-radius: var(--radius-box, 1rem);
+    background: var(--color-primary);
+    color: var(--color-primary-content);
     font-weight: 700;
     font-size: 0.65rem;
     margin-bottom: 0.35rem;
@@ -405,20 +363,10 @@
 }
 .se-library-item-desc {
     font-size: 0.7rem;
-    color: var(--text-muted);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     display: block;
     margin-top: 0.15rem;
 }
-
-/* Legacy notice */
-.se-legacy-notice {
-    padding: 0.75rem 1rem;
-    background: var(--bg-secondary);
-    border: 1px solid var(--warning);
-    border-radius: var(--radius);
-    margin-bottom: 1rem;
-}
-.se-legacy-notice p { margin: 0 0 0.5rem; font-size: 0.85rem; }
 </style>
 
 <script nonce="{{ csp_nonce }}">

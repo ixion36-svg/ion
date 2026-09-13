@@ -84,11 +84,8 @@ def css_corpus(strict: bool) -> str:
                      for p in files if p.is_file())
 
 
-def check(page: str, css: str) -> list[str]:
-    path = TEMPLATES / page
-    if not path.is_file():
-        return [f"missing file: {page}"]
-    text = path.read_text(encoding="utf-8", errors="replace")
+def check_text(text: str, css: str) -> list[str]:
+    """Findings for one template's content."""
     scripts = "\n".join(SCRIPT.findall(text))
     own_style = "\n".join(STYLE.findall(text))
     markup = SCRIPT.sub("", text)          # markup minus inline JS
@@ -136,6 +133,33 @@ def check(page: str, css: str) -> list[str]:
     return findings
 
 
+def check(page: str, css: str, new_only: bool = False) -> list[str]:
+    """Findings for a page.
+
+    With new_only, report only what this change INTRODUCED. Every pre-existing
+    quirk in this codebase otherwise shows up as a finding and buries the real
+    ones: a class built with createElement+className is never in markup, an id
+    assigned via `el.id = 'x-' + n` is never in markup, and an id defined in
+    base.html is invisible to a checker that reads one template. Three such
+    false positives appeared on four L-band pages, all with identical
+    before/after counts. Diffing against the committed version removes the
+    whole category rather than special-casing each pattern.
+    """
+    path = TEMPLATES / page
+    if not path.is_file():
+        return [f"missing file: {page}"]
+    text = path.read_text(encoding="utf-8", errors="replace")
+    findings = check_text(text, css)
+    if not new_only:
+        return findings
+    before = subprocess.run(["git", "show", f"HEAD:src/ion/web/templates/{page}"],
+                            capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", cwd=REPO).stdout
+    if not before:
+        return findings
+    return [f for f in findings if f not in set(check_text(before, css))]
+
+
 def changed_templates() -> list[str]:
     out = subprocess.run(["git", "status", "--porcelain", "src/ion/web/templates/"],
                          capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=REPO).stdout
@@ -154,6 +178,9 @@ def main() -> int:
     ap.add_argument("--sample", type=int, default=3)
     ap.add_argument("--changed", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--all-findings", action="store_true",
+                    help="include pre-existing findings; default reports only "
+                         "what this change introduced")
     ap.add_argument("--strict", action="store_true",
                     help="check only against ion.css — what breaks when the "
                          "legacy sheets are deleted")
@@ -176,7 +203,7 @@ def main() -> int:
     css = css_corpus(args.strict)
     total = 0
     for page in pages:
-        findings = check(page, css)
+        findings = check(page, css, new_only=not args.all_findings)
         total += len(findings)
         mark = "OK  " if not findings else "LOOK"
         print(f"[{mark}] {page}")

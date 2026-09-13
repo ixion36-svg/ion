@@ -3,108 +3,114 @@
 {% block title %}Arkime Traffic Analytics - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
 <!-- Header -->
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
-      <svg class="w-4 h-4 text-ion-cyan"><use href="#i-activity"/></svg>
-      <span class="label-tiny text-ion-cyan">Network telemetry</span>
+      <svg class="w-4 h-4 text-primary"><use href="#i-activity"/></svg>
+      <span class="label-tiny text-primary">Network telemetry</span>
     </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Traffic Analytics</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Arkime ingress/egress volume, protocol distribution, and top talkers.</p>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Traffic Analytics</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Arkime ingress/egress volume, protocol distribution, and top talkers.</p>
   </div>
-  <!-- Range tabs -->
-  <div class="flex items-center gap-1 bg-slate-900/60 border border-slate-700 rounded-lg p-1" id="range-tabs" role="tablist">
-    <button class="atf-tab px-4 py-1.5 rounded-md text-sm font-medium transition-colors atf-tab-active" data-range="24h" role="tab">24h</button>
-    <button class="atf-tab px-4 py-1.5 rounded-md text-sm font-medium transition-colors" data-range="7d" role="tab">7d</button>
-    <button class="atf-tab px-4 py-1.5 rounded-md text-sm font-medium transition-colors" data-range="30d" role="tab">30d</button>
+  <!-- Range tabs: JS toggles .atf-tab-active (not daisyUI .btn-active). -->
+  <div class="join" id="range-tabs" role="tablist">
+    <button class="btn btn-sm join-item atf-tab atf-tab-active" data-range="24h" role="tab">24h</button>
+    <button class="btn btn-sm join-item atf-tab" data-range="7d" role="tab">7d</button>
+    <button class="btn btn-sm join-item atf-tab" data-range="30d" role="tab">30d</button>
   </div>
 </section>
 
 <!-- Not-configured banner (hidden by default) -->
-<div id="atf-unconfigured" class="hidden mb-6 rounded-lg border border-amber-500/30 bg-amber-900/20 px-5 py-4 text-amber-300 text-sm">
-  <strong>Demo mode</strong> — Arkime not configured, showing synthetic data. Set <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_URL</code>, <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_USERNAME</code>, and <code class="font-mono bg-slate-800 px-1 rounded">ION_ARKIME_PASSWORD</code> to connect live traffic.
+<div id="atf-unconfigured" role="alert" class="alert alert-warning hidden mb-6">
+  <span><strong>Demo mode</strong> — Arkime not configured, showing synthetic data. Set <code class="font-mono bg-base-300 px-1 rounded">ION_ARKIME_URL</code>, <code class="font-mono bg-base-300 px-1 rounded">ION_ARKIME_USERNAME</code>, and <code class="font-mono bg-base-300 px-1 rounded">ION_ARKIME_PASSWORD</code> to connect live traffic.</span>
 </div>
 
 <!-- Controls: filters + exclusions + report -->
-<div class="atf-card mb-6">
-  <div class="flex flex-wrap items-center gap-4">
-    <label class="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-      <input type="checkbox" id="excl-private" checked class="accent-cyan-500">
-      Hide internal-to-internal (RFC-1918) traffic
-    </label>
-    <div class="flex items-center gap-2">
-      <input id="excl-input" type="text" placeholder="Exclude IP or CIDR (e.g. 10.0.0.0/8)"
-             class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 w-64" />
-      <button id="excl-add" class="text-xs px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-slate-100">Add filter</button>
+<div class="card bg-base-200 shadow atf-card mb-6">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center gap-4">
+      <label class="flex items-center gap-2 text-sm cursor-pointer">
+        <input type="checkbox" id="excl-private" checked class="checkbox checkbox-sm checkbox-primary">
+        Hide internal-to-internal (RFC-1918) traffic
+      </label>
+      <div class="flex items-center gap-2">
+        <input id="excl-input" type="text" placeholder="Exclude IP or CIDR (e.g. 10.0.0.0/8)"
+               class="input input-sm w-64" />
+        <button id="excl-add" class="btn btn-sm">Add filter</button>
+      </div>
+      <div id="excl-chips" class="flex flex-wrap gap-1.5 flex-1"></div>
+      <a href="/api/network-correlation-report/html?days=7" target="_blank" rel="noopener"
+         class="btn btn-primary btn-sm">Correlation report ↗</a>
     </div>
-    <div id="excl-chips" class="flex flex-wrap gap-1.5 flex-1"></div>
-    <a href="/api/network-correlation-report/html?days=7" target="_blank" rel="noopener"
-       class="text-xs px-3 py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white">Correlation report ↗</a>
+    <p class="text-xs text-base-content/50">Exclusions filter every chart below at the Arkime query (lead-managed, shared). Geographic + protocol data now populate from any Arkime field layout.</p>
   </div>
-  <p class="mt-2 text-xs text-slate-500">Exclusions filter every chart below at the Arkime query (lead-managed, shared). Geographic + protocol data now populate from any Arkime field layout.</p>
 </div>
 
 <!-- AI traffic-pattern review -->
-<div class="atf-card mb-6">
-  <div class="atf-card-header">
-    <h2 class="atf-card-title">AI traffic review</h2>
-    <div class="flex items-center gap-2">
-      <select id="ai-node" class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200">
-        <option value="">Select a sensor node…</option>
-      </select>
-      <button id="ai-review-btn" class="text-xs px-3 py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white disabled:opacity-50">Review patterns</button>
+<div class="card bg-base-200 shadow atf-card mb-6">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="card-title text-base basis-full md:basis-auto md:flex-1">AI traffic review</h2>
+      <div class="flex items-center gap-2 flex-wrap">
+        <select id="ai-node" class="select select-sm">
+          <option value="">Select a sensor node…</option>
+        </select>
+        <button id="ai-review-btn" class="btn btn-primary btn-sm">Review patterns</button>
+      </div>
     </div>
-  </div>
-  <p class="text-xs text-slate-500 mb-2">Bob (Foundation-Sec) reviews the selected node's traffic over the current range and flags anomalies + PCAP-pull recommendations.</p>
-  <div id="ai-review-out" class="ion-md text-sm text-slate-300 leading-relaxed">
-    <span class="text-slate-500">Pick a node and click “Review patterns”.</span>
+    <p class="text-xs text-base-content/50">Bob (Foundation-Sec) reviews the selected node's traffic over the current range and flags anomalies + PCAP-pull recommendations.</p>
+    <div id="ai-review-out" class="ion-md text-sm leading-relaxed">
+      <span class="text-base-content/50">Pick a node and click “Review patterns”.</span>
+    </div>
   </div>
 </div>
 
 <!-- Stats bar -->
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8" id="atf-stats">
-  <div class="atf-stat-card">
-    <div class="atf-stat-value" id="stat-sessions">—</div>
-    <div class="atf-stat-label">Total Sessions <span id="stat-sessions-delta" class="text-xs"></span></div>
+  <div class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl" id="stat-sessions">—</div>
+    <div class="stat-title">Total Sessions <span id="stat-sessions-delta" class="text-xs normal-case tracking-normal"></span></div>
   </div>
-  <div class="atf-stat-card">
-    <div class="atf-stat-value" id="stat-bytes">—</div>
-    <div class="atf-stat-label">Total Volume <span id="stat-bytes-delta" class="text-xs"></span></div>
+  <div class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl" id="stat-bytes">—</div>
+    <div class="stat-title">Total Volume <span id="stat-bytes-delta" class="text-xs normal-case tracking-normal"></span></div>
   </div>
-  <div class="atf-stat-card">
-    <div class="atf-stat-value text-ion-cyan" id="stat-top-proto">—</div>
-    <div class="atf-stat-label">Top Protocol</div>
+  <div class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl text-primary" id="stat-top-proto">—</div>
+    <div class="stat-title">Top Protocol</div>
   </div>
-  <div class="atf-stat-card">
-    <div class="atf-stat-value" id="stat-top-src">—</div>
-    <div class="atf-stat-label">Top Source IP</div>
+  <div class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl" id="stat-top-src">—</div>
+    <div class="stat-title">Top Source IP</div>
   </div>
-  <div class="atf-stat-card">
-    <div class="atf-stat-value text-emerald-400 font-mono" id="stat-top-src-country">—</div>
-    <div class="atf-stat-label">Top Src Country</div>
+  <div class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl text-success" id="stat-top-src-country">—</div>
+    <div class="stat-title">Top Src Country</div>
   </div>
-  <div class="atf-stat-card">
-    <div class="atf-stat-value text-emerald-400 font-mono" id="stat-top-dst-country">—</div>
-    <div class="atf-stat-label">Top Dst Country</div>
+  <div class="stat bg-base-200 rounded-box shadow p-4">
+    <div class="stat-value font-mono text-2xl text-success" id="stat-top-dst-country">—</div>
+    <div class="stat-title">Top Dst Country</div>
   </div>
 </div>
 
 <!-- Volume chart -->
-<div class="atf-card mb-6">
-  <div class="atf-card-header">
-    <h2 class="atf-card-title">Traffic Volume</h2>
-    <span class="text-slate-500 text-xs" id="vol-subtitle"></span>
-  </div>
-  <div class="relative atf-chart-h-260">
-    <canvas id="vol-chart"></canvas>
-    <div id="vol-loading" class="atf-overlay">
-      <div class="atf-spinner"></div>
+<div class="card bg-base-200 shadow relative overflow-hidden atf-card mb-6">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 class="card-title text-base basis-full md:basis-auto md:flex-1">Traffic Volume</h2>
+      <span class="text-base-content/50 text-xs" id="vol-subtitle"></span>
     </div>
-    <div id="vol-empty" class="atf-overlay hidden text-slate-500 text-sm">No data for this range</div>
+    <div class="relative atf-chart-h-260">
+      <canvas id="vol-chart"></canvas>
+      <div id="vol-loading" class="atf-overlay">
+        <span class="loading loading-spinner loading-md text-primary"></span>
+      </div>
+      <div id="vol-empty" class="atf-overlay hidden text-base-content/50 text-sm">No data for this range</div>
+    </div>
   </div>
 </div>
 
@@ -112,160 +118,172 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
   <!-- Protocol doughnut -->
-  <div class="atf-card">
-    <div class="atf-card-header">
-      <h2 class="atf-card-title">Protocol Mix</h2>
-    </div>
-    <div class="relative atf-chart-h-220">
-      <canvas id="proto-chart"></canvas>
-      <div id="proto-loading" class="atf-overlay">
-        <div class="atf-spinner"></div>
+  <div class="card bg-base-200 shadow relative overflow-hidden atf-card">
+    <div class="card-body">
+      <h2 class="card-title text-base">Protocol Mix</h2>
+      <div class="relative atf-chart-h-220">
+        <canvas id="proto-chart"></canvas>
+        <div id="proto-loading" class="atf-overlay">
+          <span class="loading loading-spinner loading-md text-primary"></span>
+        </div>
+        <div id="proto-empty" class="atf-overlay hidden text-base-content/50 text-sm">No data</div>
       </div>
-      <div id="proto-empty" class="atf-overlay hidden text-slate-500 text-sm">No data</div>
     </div>
   </div>
 
-  <!-- Top talkers -->
-  <div class="atf-card lg:col-span-2">
-    <div class="atf-card-header">
-      <div>
-        <h2 class="atf-card-title">Top Talkers</h2>
-        <p class="text-xs text-slate-500 mt-0.5" id="talkers-method"></p>
+  <!-- Top talkers: JS binds via talkers-table.closest('.atf-card') -->
+  <div class="card bg-base-200 shadow relative overflow-hidden atf-card lg:col-span-2">
+    <div class="card-body">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="basis-full md:basis-auto md:flex-1">
+          <h2 class="card-title text-base">Top Talkers</h2>
+          <p class="text-xs text-base-content/50 mt-0.5" id="talkers-method"></p>
+        </div>
+        <div class="join">
+          <button class="btn btn-sm join-item atf-talker-tab atf-talker-active" data-dir="src">By Source</button>
+          <button class="btn btn-sm join-item atf-talker-tab" data-dir="dst">By Destination</button>
+        </div>
       </div>
-      <div class="flex gap-2">
-        <button class="atf-talker-tab atf-talker-active text-xs px-3 py-1 rounded" data-dir="src">By Source</button>
-        <button class="atf-talker-tab text-xs px-3 py-1 rounded" data-dir="dst">By Destination</button>
+      <div id="talkers-loading" class="atf-overlay"><span class="loading loading-spinner loading-md text-primary"></span></div>
+      <div id="talkers-empty" class="hidden text-base-content/50 text-sm text-center py-8">No data for this range</div>
+      <div class="overflow-x-auto">
+        <table class="table table-sm" id="talkers-table">
+          <thead>
+            <tr>
+              <th>IP Address</th>
+              <th class="text-right">Volume</th>
+              <th class="text-right">Sessions</th>
+            </tr>
+          </thead>
+          <tbody id="talkers-body"></tbody>
+        </table>
       </div>
     </div>
-    <div id="talkers-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
-    <div id="talkers-empty" class="hidden text-slate-500 text-sm text-center py-8">No data for this range</div>
-    <table class="w-full text-sm" id="talkers-table">
-      <thead>
-        <tr class="text-slate-500 text-left border-b border-slate-800">
-          <th class="pb-2 pr-4 font-medium">IP Address</th>
-          <th class="pb-2 pr-4 font-medium text-right">Volume</th>
-          <th class="pb-2 font-medium text-right">Sessions</th>
-        </tr>
-      </thead>
-      <tbody id="talkers-body"></tbody>
-    </table>
   </div>
 
 </div>
 
 <!-- Traffic by Sensor (per Arkime node) -->
-<div class="atf-card mb-6" id="node-card">
-  <div class="atf-card-header">
-    <div>
-      <h2 class="atf-card-title">Traffic by Sensor</h2>
-      <p class="text-xs text-slate-500 mt-0.5" id="node-method-note">Volume per Arkime capture node</p>
+<div class="card bg-base-200 shadow relative overflow-hidden atf-card mb-6" id="node-card">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="basis-full md:basis-auto md:flex-1">
+        <h2 class="card-title text-base">Traffic by Sensor</h2>
+        <p class="text-xs text-base-content/50 mt-0.5" id="node-method-note">Volume per Arkime capture node</p>
+      </div>
+      <span class="text-base-content/50 text-xs" id="retention-note" title=""></span>
     </div>
-    <span class="text-slate-500 text-xs" id="retention-note" title=""></span>
-  </div>
-  <div class="relative atf-chart-h-220">
-    <canvas id="node-chart"></canvas>
-    <div id="node-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
-    <div id="node-empty" class="atf-overlay hidden text-slate-500 text-sm">No sensor data for this range</div>
+    <div class="relative atf-chart-h-220">
+      <canvas id="node-chart"></canvas>
+      <div id="node-loading" class="atf-overlay"><span class="loading loading-spinner loading-md text-primary"></span></div>
+      <div id="node-empty" class="atf-overlay hidden text-base-content/50 text-sm">No sensor data for this range</div>
+    </div>
   </div>
 </div>
 
 <!-- Geographic Distribution -->
-<div class="atf-card mb-6" id="country-card">
-  <div class="atf-card-header">
-    <div>
-      <h2 class="atf-card-title">Geographic Distribution</h2>
-      <p class="text-xs text-slate-500 mt-0.5">Volume by country — sampled from top flows</p>
+<div class="card bg-base-200 shadow relative overflow-hidden atf-card mb-6" id="country-card">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="basis-full md:basis-auto md:flex-1">
+        <h2 class="card-title text-base">Geographic Distribution</h2>
+        <p class="text-xs text-base-content/50 mt-0.5">Volume by country — sampled from top flows</p>
+      </div>
+      <div class="join">
+        <button class="btn btn-sm join-item atf-country-tab atf-country-active" data-cdir="src">By Source</button>
+        <button class="btn btn-sm join-item atf-country-tab" data-cdir="dst">By Destination</button>
+      </div>
     </div>
-    <div class="flex gap-2">
-      <button class="atf-country-tab atf-country-active text-xs px-3 py-1 rounded" data-cdir="src">By Source</button>
-      <button class="atf-country-tab text-xs px-3 py-1 rounded" data-cdir="dst">By Destination</button>
+    <div class="relative atf-map-container">
+      <div id="world-map"></div>
+      <div id="country-loading" class="atf-overlay"><span class="loading loading-spinner loading-md text-primary"></span></div>
+      <div id="country-empty" class="atf-overlay hidden text-base-content/50 text-sm">No geo data for this range</div>
     </div>
-  </div>
-  <div class="relative atf-map-container">
-    <div id="world-map"></div>
-    <div id="country-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
-    <div id="country-empty" class="atf-overlay hidden text-slate-500 text-sm">No geo data for this range</div>
   </div>
 </div>
 
 <!-- Real-Time Monitor (RTMON) detections -->
-<div class="atf-card mb-6" id="rtmon-card">
-  <div class="atf-card-header">
-    <div>
-      <h2 class="atf-card-title">Real-Time Monitor (RTMON)</h2>
-      <p class="text-xs text-slate-500 mt-0.5">Live traffic-detection cases opened by the Arkime real-time monitor over the current range</p>
+<div class="card bg-base-200 shadow relative overflow-hidden atf-card mb-6" id="rtmon-card">
+  <div class="card-body">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div class="basis-full md:basis-auto md:flex-1">
+        <h2 class="card-title text-base">Real-Time Monitor (RTMON)</h2>
+        <p class="text-xs text-base-content/50 mt-0.5">Live traffic-detection cases opened by the Arkime real-time monitor over the current range</p>
+      </div>
+      <span class="text-base-content/50 text-xs" id="rtmon-subtitle"></span>
     </div>
-    <span class="text-slate-500 text-xs" id="rtmon-subtitle"></span>
-  </div>
-  <div id="rtmon-empty" class="hidden text-slate-500 text-sm text-center py-10">
-    RTMON not enabled / no detections in this range.
-  </div>
-  <div id="rtmon-body" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div>
-      <p class="text-xs text-slate-500 mb-2 text-center">By Detector</p>
-      <div class="relative atf-chart-h-220">
-        <canvas id="rtmon-detector-chart"></canvas>
+    <div id="rtmon-empty" class="hidden text-base-content/50 text-sm text-center py-10">
+      RTMON not enabled / no detections in this range.
+    </div>
+    <div id="rtmon-body" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div>
+        <p class="text-xs text-base-content/50 mb-2 text-center">By Detector</p>
+        <div class="relative atf-chart-h-220">
+          <canvas id="rtmon-detector-chart"></canvas>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs text-base-content/50 mb-2 text-center">By Severity</p>
+        <div class="relative atf-chart-h-220">
+          <canvas id="rtmon-severity-chart"></canvas>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs text-base-content/50 mb-2 text-center">Detections / Day</p>
+        <div class="relative atf-chart-h-220">
+          <canvas id="rtmon-daily-chart"></canvas>
+        </div>
       </div>
     </div>
-    <div>
-      <p class="text-xs text-slate-500 mb-2 text-center">By Severity</p>
-      <div class="relative atf-chart-h-220">
-        <canvas id="rtmon-severity-chart"></canvas>
-      </div>
-    </div>
-    <div>
-      <p class="text-xs text-slate-500 mb-2 text-center">Detections / Day</p>
-      <div class="relative atf-chart-h-220">
-        <canvas id="rtmon-daily-chart"></canvas>
-      </div>
-    </div>
+    <div id="rtmon-loading" class="atf-overlay"><span class="loading loading-spinner loading-md text-primary"></span></div>
   </div>
-  <div id="rtmon-loading" class="atf-overlay"><div class="atf-spinner"></div></div>
 </div>
 
 <!-- Packet hunts -->
-<div class="atf-card mb-6" id="hunts-card">
-  <div class="atf-card-header">
+<div class="card bg-base-200 shadow atf-card mb-6" id="hunts-card">
+  <div class="card-body">
     <div>
-      <h2 class="atf-card-title">Packet Hunts</h2>
-      <p class="text-xs text-slate-500 mt-0.5">Arkime packet-search jobs submitted from ION (submitting requires lead permission; the Arkime service user needs packetSearch)</p>
+      <h2 class="card-title text-base">Packet Hunts</h2>
+      <p class="text-xs text-base-content/50 mt-0.5">Arkime packet-search jobs submitted from ION (submitting requires lead permission; the Arkime service user needs packetSearch)</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <input id="hunt-name" type="text" placeholder="Hunt name" maxlength="120"
+             class="input input-sm w-44" />
+      <input id="hunt-search" type="text" placeholder="Packet search (e.g. Mozilla/4.0)" maxlength="512"
+             class="input input-sm flex-1 min-w-56" />
+      <select id="hunt-type" class="select select-sm">
+        <option value="ascii">ascii</option>
+        <option value="asciicase">ascii (case)</option>
+        <option value="hex">hex</option>
+        <option value="regex">regex</option>
+        <option value="hexregex">hex regex</option>
+      </select>
+      <select id="hunt-hours" class="select select-sm">
+        <option value="24">last 24h</option>
+        <option value="72">last 3d</option>
+        <option value="168">last 7d</option>
+      </select>
+      <input id="hunt-expression" type="text" placeholder="Optional Arkime expression (scope)" maxlength="1024"
+             class="input input-sm w-72" />
+      <button id="hunt-submit" class="btn btn-primary btn-sm">Launch hunt</button>
+    </div>
+    <div id="hunts-empty" class="hidden text-base-content/50 text-sm text-center py-6">No hunts submitted yet.</div>
+    <div class="overflow-x-auto">
+      <table class="table table-sm" id="hunts-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Search</th>
+            <th>Status</th>
+            <th class="text-right">Matched</th>
+            <th>Submitted</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="hunts-body"></tbody>
+      </table>
     </div>
   </div>
-  <div class="flex flex-wrap items-center gap-2 mb-4">
-    <input id="hunt-name" type="text" placeholder="Hunt name" maxlength="120"
-           class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 w-44" />
-    <input id="hunt-search" type="text" placeholder="Packet search (e.g. Mozilla/4.0)" maxlength="512"
-           class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 flex-1 min-w-56" />
-    <select id="hunt-type" class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200">
-      <option value="ascii">ascii</option>
-      <option value="asciicase">ascii (case)</option>
-      <option value="hex">hex</option>
-      <option value="regex">regex</option>
-      <option value="hexregex">hex regex</option>
-    </select>
-    <select id="hunt-hours" class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200">
-      <option value="24">last 24h</option>
-      <option value="72">last 3d</option>
-      <option value="168">last 7d</option>
-    </select>
-    <input id="hunt-expression" type="text" placeholder="Optional Arkime expression (scope)" maxlength="1024"
-           class="bg-slate-900/70 border border-slate-700 rounded px-3 py-1.5 text-sm text-slate-200 w-72" />
-    <button id="hunt-submit" class="text-xs px-3 py-1.5 rounded bg-cyan-600/80 hover:bg-cyan-500 text-white disabled:opacity-50">Launch hunt</button>
-  </div>
-  <div id="hunts-empty" class="hidden text-slate-500 text-sm text-center py-6">No hunts submitted yet.</div>
-  <table class="w-full text-sm" id="hunts-table">
-    <thead>
-      <tr class="text-slate-500 text-left border-b border-slate-800">
-        <th class="pb-2 pr-4 font-medium">Name</th>
-        <th class="pb-2 pr-4 font-medium">Search</th>
-        <th class="pb-2 pr-4 font-medium">Status</th>
-        <th class="pb-2 pr-4 font-medium text-right">Matched</th>
-        <th class="pb-2 pr-4 font-medium">Submitted</th>
-        <th class="pb-2 font-medium"></th>
-      </tr>
-    </thead>
-    <tbody id="hunts-body"></tbody>
-  </table>
 </div>
 
 </div><!-- /max-w container -->
@@ -274,98 +292,63 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.atf-tab { color: var(--text-secondary); }
-.atf-tab:hover { color: var(--text-primary); background: rgba(255,255,255,.05); }
-.atf-tab-active { background: var(--primary); color: var(--bg-deep); }
-
-.atf-stat-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1.5rem;
-}
-.atf-stat-value {
-  font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 1.625rem;
-  font-weight: 700;
-  color: var(--text-bright);
-  line-height: 1.2;
-}
-.atf-stat-label {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 0.25rem;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-}
-
-.atf-card {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 1.25rem 1.5rem;
-  position: relative;
-  overflow: hidden;
-}
-.atf-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-}
-.atf-card-title {
-  font-size: 0.875rem;
+/* JS toggles these classes, not daisyUI .btn-active. */
+.atf-tab-active,
+.atf-talker-active,
+.atf-country-active {
+  background-color: var(--color-primary);
+  color: var(--color-primary-content);
   font-weight: 600;
-  color: var(--text-primary);
-  text-transform: uppercase;
-  letter-spacing: .06em;
+  border-color: var(--color-primary);
 }
 
+/* Overlay must beat Tailwind .hidden via the compound selector; JS also
+   sets element.style.display on #talkers-loading. z-index: 5 has no
+   compiled utility equivalent. */
 .atf-overlay {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-lg);
+  background: var(--color-base-200);
+  border-radius: var(--radius-box);
   z-index: 5;
 }
 .atf-overlay.hidden { display: none; }
-.atf-spinner {
-  width: 28px; height: 28px;
-  border: 3px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin .8s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
 
-.atf-talker-tab {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-muted);
-  transition: all .15s;
-}
-.atf-talker-tab:hover { color: var(--text-primary); border-color: var(--border-bright); }
-.atf-talker-active { background: var(--bg-primary); color: var(--primary); border-color: var(--border-bright); }
-
-#talkers-body tr { border-bottom: 1px solid var(--border); }
-#talkers-body tr:last-child { border-bottom: none; }
-#talkers-body td { padding: 0.5rem 0; color: var(--text-primary); }
-#talkers-body td:not(:first-child) { text-align: right; }
-#talkers-body .ip-cell { font-family: var(--font-mono, 'JetBrains Mono', monospace); font-size: 0.8rem; color: var(--primary); }
-#talkers-body .bytes-cell { color: var(--neon-purple); font-variant-numeric: tabular-nums; }
-
-.atf-country-tab { background: transparent; border: 1px solid var(--border); color: var(--text-muted); transition: all .15s; }
-.atf-country-tab:hover { color: var(--text-primary); border-color: var(--border-bright); }
-.atf-country-active { background: var(--bg-primary); color: var(--primary); border-color: var(--border-bright); }
+/* Chart/map heights have no compiled utility at these exact px values. */
 .atf-chart-h-260 { height: 260px; }
 .atf-chart-h-220 { height: 220px; }
 .atf-map-container { height: 420px; }
 #world-map { width: 100%; height: 420px; }
 
-.jvectormap-tip { position: fixed; display: none; background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); padding: 5px 10px; font-size: 12px; border-radius: 4px; pointer-events: none; z-index: 200; white-space: nowrap; }
+/* JS renderTalkers() emits .ip-cell / .bytes-cell without utility classes. */
+#talkers-body .ip-cell {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+  color: var(--color-primary);
+}
+#talkers-body .bytes-cell {
+  color: var(--color-secondary);
+  font-variant-numeric: tabular-nums;
+}
+#talkers-body td:not(:first-child) { text-align: right; }
+
+/* jsvectormap plugin chrome — no daisyUI equivalent. */
+.jvectormap-tip {
+  position: fixed;
+  display: none;
+  background: var(--color-base-100);
+  border: 1px solid var(--color-base-300);
+  color: var(--color-base-content);
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 200;
+  white-space: nowrap;
+}
 .jvectormap-tip.active { display: block; }
 .jvectormap-zoomin, .jvectormap-zoomout { display: none; }
 #world-map svg { max-width: 100%; }
