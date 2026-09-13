@@ -3,7 +3,7 @@
 {% block title %}Documents - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {# Reference tab strip reordered — Notes is now last. #}
 {% set tabs = [
@@ -14,27 +14,28 @@
 {% set active_label = "Documents" %}
 {% include "_nav_tabs.html" %}
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg>
     <span class="label-tiny text-ion-cyan">Generated documents</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Documents</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Rendered reports and exports.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Documents</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Rendered reports and exports.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
         <button class="btn btn-primary" data-click-action="showUploadModal">Upload Document</button>
-        <button class="btn" data-click-action="showFoldersModal">Manage Folders</button>
+        <button class="btn btn-ghost" data-click-action="showFoldersModal">Manage Folders</button>
     </div>
 </section>
 
-<div class="documents-layout">
+<div class="documents-layout flex flex-col lg:flex-row gap-6">
     <!-- Folder Sidebar -->
-    <div class="folder-sidebar">
+    <div class="folder-sidebar card bg-base-200 shadow lg:w-64 lg:shrink-0">
+      <div class="card-body p-4 gap-2">
         <div class="folder-header">
-            <h3>Folders</h3>
+            <h3 class="text-xs font-semibold uppercase tracking-wide text-base-content/60">Folders</h3>
         </div>
-        <div id="folder-tree" class="folder-tree">
+        <div id="folder-tree" class="folder-tree text-sm flex flex-col gap-0.5">
             <div class="folder-item active" data-id="" data-click-action="selectFolder" data-args='[null]'>
                 <span class="folder-icon"><i class="icon-folder"></i></span>
                 <span class="folder-name">All Documents</span>
@@ -45,32 +46,33 @@
             </div>
             <div id="folder-list"></div>
         </div>
+      </div>
     </div>
 
     <!-- Main Content -->
-    <div class="documents-main">
-        <div class="toolbar">
-            <input type="text" id="search-input" placeholder="Search documents..." class="search-input">
-            <select id="format-filter" class="filter-select">
+    <div class="documents-main flex-1 min-w-0">
+        <div class="toolbar flex flex-wrap gap-2 mb-4">
+            <input type="text" id="search-input" placeholder="Search documents..." class="search-input input input-bordered input-sm flex-1 min-w-[180px]">
+            <select id="format-filter" class="filter-select select select-bordered select-sm">
                 <option value="">All Formats</option>
                 <option value="markdown">Markdown</option>
                 <option value="html">HTML</option>
                 <option value="csv">CSV</option>
                 <option value="text">Plain Text</option>
             </select>
-            <select id="status-filter" class="filter-select">
+            <select id="status-filter" class="filter-select select select-bordered select-sm">
                 <option value="">All Status</option>
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
             </select>
-            <select id="tag-filter" class="filter-select">
+            <select id="tag-filter" class="filter-select select select-bordered select-sm">
                 <option value="">All Tags</option>
             </select>
         </div>
 
-        <div id="current-folder-path" class="folder-path"></div>
+        <div id="current-folder-path" class="folder-path text-sm text-base-content/60 mb-4"></div>
 
-        <div id="documents-list" class="card-list">
+        <div id="documents-list" class="card-list flex flex-col gap-3">
             <p class="loading">Loading...</p>
         </div>
     </div>
@@ -78,24 +80,24 @@
 
 <!-- Manage Folders Modal -->
 <div id="folders-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
-            <h2>Manage Folders</h2>
-            <button class="modal-close" data-click-action="closeFoldersModal">&times;</button>
+    <div class="modal-box max-w-[90vw] w-fit min-w-[min(600px,95vw)]">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">Manage Folders</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeFoldersModal">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label>Create New Folder</label>
-                <div class="folder-create-form">
-                    <select id="new-folder-parent" class="form-control">
+        <div class="py-4">
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Create New Folder</legend>
+                <div class="folder-create-form grid grid-cols-1 sm:grid-cols-[150px_1fr_1fr_auto] gap-2 items-center">
+                    <select id="new-folder-parent" class="select select-bordered select-sm">
                         <option value="">Root Level</option>
                     </select>
-                    <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOI, SOP, KB, WI)" class="form-control">
-                    <input type="text" id="new-folder-desc" placeholder="Description" class="form-control">
-                    <button class="btn btn-primary" data-click-action="createFolder">Create</button>
+                    <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOI, SOP, KB, WI)" class="input input-bordered input-sm">
+                    <input type="text" id="new-folder-desc" placeholder="Description" class="input input-bordered input-sm">
+                    <button class="btn btn-primary btn-sm" data-click-action="createFolder">Create</button>
                 </div>
-            </div>
-            <h3>Existing Folders</h3>
+            </fieldset>
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-base-content/60 mt-4 mb-2">Existing Folders</h3>
             <div id="folders-tree-manage" class="folders-manage-tree"></div>
         </div>
     </div>
@@ -103,19 +105,19 @@
 
 <!-- Move Document Modal -->
 <div id="move-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-small">
-        <div class="modal-header">
-            <h2>Move to Folder</h2>
-            <button class="modal-close" data-click-action="closeMoveModal">&times;</button>
+    <div class="modal-box max-w-[400px]">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">Move to Folder</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeMoveModal">&times;</button>
         </div>
-        <div class="modal-body">
-            <select id="move-folder-select" class="form-control">
+        <div class="py-4">
+            <select id="move-folder-select" class="select select-bordered w-full">
                 <option value="">No Folder (Root)</option>
             </select>
-            <div class="modal-actions">
-                <button class="btn" data-click-action="closeMoveModal">Cancel</button>
-                <button class="btn btn-primary" data-click-action="moveDocument">Move</button>
-            </div>
+        </div>
+        <div class="modal-action">
+            <button class="btn btn-ghost" data-click-action="closeMoveModal">Cancel</button>
+            <button class="btn btn-primary" data-click-action="moveDocument">Move</button>
         </div>
     </div>
 </div>
@@ -217,88 +219,88 @@
 
 <!-- Amendment Confirmation Modal -->
 <div id="amendment-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>Confirm Amendment</h2>
-            <button class="modal-close" data-click-action="closeAmendmentModal">&times;</button>
+    <div class="modal-box">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">Confirm Amendment</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeAmendmentModal">&times;</button>
         </div>
-        <div class="modal-body">
+        <div class="py-4 flex flex-col gap-4">
             <p>You are about to create a new version of this document.</p>
-            <div class="form-group">
-                <label for="amendment-reason">Amendment Reason (optional):</label>
-                <input type="text" id="amendment-reason" class="form-control" placeholder="e.g., Updated findings, Fixed typo...">
-            </div>
-            <div class="form-group">
-                <label for="amended-by">Amended By (optional):</label>
-                <input type="text" id="amended-by" class="form-control" placeholder="Your name">
-            </div>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Amendment Reason (optional)</legend>
+                <input type="text" id="amendment-reason" class="input input-bordered w-full" placeholder="e.g., Updated findings, Fixed typo...">
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Amended By (optional)</legend>
+                <input type="text" id="amended-by" class="input input-bordered w-full" placeholder="Your name">
+            </fieldset>
         </div>
-        <div class="modal-footer">
+        <div class="modal-action">
             <button id="confirm-amendment-btn" class="btn btn-success">Confirm Amendment</button>
-            <button class="btn" data-click-action="closeAmendmentModal">Cancel</button>
+            <button class="btn btn-ghost" data-click-action="closeAmendmentModal">Cancel</button>
         </div>
     </div>
 </div>
 
 <!-- Version Preview Modal -->
 <div id="version-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
-            <h2 id="version-modal-title">Version Preview</h2>
-            <button class="modal-close" data-click-action="closeVersionModal">&times;</button>
+    <div class="modal-box max-w-[90vw] w-fit min-w-[min(600px,95vw)]">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h2 id="version-modal-title" class="text-lg font-semibold">Version Preview</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeVersionModal">&times;</button>
         </div>
-        <div class="modal-body">
+        <div class="py-4">
             <div id="version-meta" class="meta-bar"></div>
             <div id="version-content" class="document-content rendered-content"></div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-action">
             <button id="revert-version-btn" class="btn btn-warning">Revert to This Version</button>
-            <button class="btn" data-click-action="closeVersionModal">Close</button>
+            <button class="btn btn-ghost" data-click-action="closeVersionModal">Close</button>
         </div>
     </div>
 </div>
 <!-- Upload Document Modal -->
 <div id="upload-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2>Upload Document</h2>
-            <button class="modal-close" data-click-action="closeUploadModal">&times;</button>
+    <div class="modal-box">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">Upload Document</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeUploadModal">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label for="upload-file">File</label>
-                <input type="file" id="upload-file" accept=".txt,.md,.html,.htm,.csv">
-            </div>
-            <div class="form-group">
-                <label for="upload-name">Document Name <small>(optional, defaults to filename)</small></label>
-                <input type="text" id="upload-name" class="form-control" placeholder="My Document">
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="upload-format">Format</label>
-                    <select id="upload-format" class="form-control">
+        <div class="py-4 flex flex-col gap-4">
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">File</legend>
+                <input type="file" id="upload-file" accept=".txt,.md,.html,.htm,.csv" class="file-input file-input-bordered w-full">
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Document Name <small>(optional, defaults to filename)</small></legend>
+                <input type="text" id="upload-name" class="input input-bordered w-full" placeholder="My Document">
+            </fieldset>
+            <div class="form-row grid grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Format</legend>
+                    <select id="upload-format" class="select select-bordered w-full">
                         <option value="">Auto-detect</option>
                         <option value="markdown">Markdown</option>
                         <option value="html">HTML</option>
                         <option value="csv">CSV</option>
                         <option value="text">Plain Text</option>
                     </select>
-                </div>
-                <div class="form-group">
-                    <label for="upload-folder">Folder</label>
-                    <select id="upload-folder" class="form-control">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Folder</legend>
+                    <select id="upload-folder" class="select select-bordered w-full">
                         <option value="">No Folder</option>
                     </select>
-                </div>
+                </fieldset>
             </div>
-            <div class="form-group">
-                <label for="upload-tags">Tags <small>(comma-separated)</small></label>
-                <input type="text" id="upload-tags" class="form-control" placeholder="e.g. incident-response, soc, network">
-            </div>
-            <div class="modal-actions">
-                <button class="btn" data-click-action="closeUploadModal">Cancel</button>
-                <button class="btn btn-primary" data-click-action="uploadDocument">Upload</button>
-            </div>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Tags <small>(comma-separated)</small></legend>
+                <input type="text" id="upload-tags" class="input input-bordered w-full" placeholder="e.g. incident-response, soc, network">
+            </fieldset>
+        </div>
+        <div class="modal-action">
+            <button class="btn btn-ghost" data-click-action="closeUploadModal">Cancel</button>
+            <button class="btn btn-primary" data-click-action="uploadDocument">Upload</button>
         </div>
     </div>
 </div>
@@ -309,40 +311,27 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.documents-layout {
-    display: flex;
-    gap: 1.5rem;
-}
-.folder-sidebar {
-    width: 250px;
-    flex-shrink: 0;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    padding: 1rem;
-}
-.folder-header h3 {
-    margin: 0 0 1rem 0;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-.folder-tree {
-    font-size: 0.9rem;
-}
+/* .folder-item / .active are emitted both by the static markup above and by
+   selectFolder()'s JS re-render (renderFolderItems in the script block below),
+   so the class names stay exactly as JS expects them -- only the colors move
+   to daisyUI tokens. --primary-color and --bg-hover were never defined
+   anywhere in the loaded stylesheets, so the active/hover states were
+   silently no-ops before this pass; --color-primary/--color-base-300 are
+   real daisyUI theme tokens. */
 .folder-item {
     display: flex;
     align-items: center;
     padding: 0.5rem;
-    border-radius: 4px;
+    border-radius: var(--radius-field);
     cursor: pointer;
     margin-bottom: 2px;
 }
 .folder-item:hover {
-    background: var(--bg-hover);
+    background: var(--color-base-300);
 }
 .folder-item.active {
-    background: var(--primary-color);
-    color: white;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
 }
 .folder-icon {
     margin-right: 0.5rem;
@@ -355,70 +344,34 @@
 }
 .folder-children {
     margin-left: 1.25rem;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--color-base-300);
     padding-left: 0.5rem;
-}
-.documents-main {
-    flex: 1;
-    min-width: 0;
-}
-.folder-path {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
 }
 .folder-path span {
     cursor: pointer;
 }
 .folder-path span:hover {
-    color: var(--primary-color);
-}
-.header-actions {
-    display: flex;
-    gap: 0.5rem;
+    color: var(--color-primary);
 }
 .collection-badge {
-    background: var(--primary-color);
-    color: white;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
     padding: 2px 8px;
-    border-radius: 3px;
+    border-radius: var(--radius-selector);
     font-size: 0.75rem;
     margin-left: 0.5rem;
-}
-.modal-large {
-    max-width: 90vw;
-    width: fit-content;
-    min-width: min(600px, 95vw);
-}
-.modal-small {
-    max-width: 400px;
-}
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-.folder-create-form {
-    display: grid;
-    grid-template-columns: 150px 1fr 1fr auto;
-    gap: 0.5rem;
-    align-items: center;
-}
-.folders-manage-tree {
-    margin-top: 1rem;
 }
 .folder-manage-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field);
     margin-bottom: 0.5rem;
 }
 .folder-manage-item:hover {
-    background: var(--bg-secondary);
+    background: var(--color-base-300);
 }
 .folder-manage-info {
     display: flex;
@@ -427,7 +380,7 @@
 }
 .folder-manage-counts {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
 .folder-manage-children {
     margin-left: 1.5rem;
@@ -436,22 +389,25 @@
     font-size: 0.75rem;
     padding: 2px 6px;
 }
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-}
 .tag-badge {
     display: inline-block;
     padding: 2px 8px;
-    border-radius: 3px;
+    border-radius: var(--radius-selector);
     font-size: 0.7rem;
     font-weight: 500;
-    background: var(--bg-hover);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
+    background: var(--color-base-300);
+    color: var(--color-base-content);
+    border: 1px solid var(--color-base-300);
     margin-left: 4px;
 }
+/* .tags-section / .tags-display / .tag-add-inline / #modal-doc-tags live
+   inside the ion-ws-* document panel shared with /cases (see the Jinja
+   comment above #document-modal) and are left exactly as they were -- no
+   daisyUI substitution, no token changes, to keep parity with that shared
+   design. .tag-chip is that panel's own tag pill, JS-generated
+   (renderDocumentTags) -- kept for the same reason, with only the dead
+   --primary-color reference replaced by the real token so the chip actually
+   renders in the theme's primary color instead of doing nothing. */
 .tags-section {
     margin-top: 0.75rem;
     padding: 0.75rem;
@@ -468,25 +424,6 @@
     flex-wrap: wrap;
     gap: 0.25rem;
     align-items: center;
-}
-.tag-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
-    border-radius: 3px;
-    font-size: 0.75rem;
-    background: var(--primary-color);
-    color: white;
-}
-.tag-chip .tag-remove {
-    cursor: pointer;
-    opacity: 0.7;
-    font-size: 0.85rem;
-    line-height: 1;
-}
-.tag-chip .tag-remove:hover {
-    opacity: 1;
 }
 .tag-add-inline {
     display: inline-flex;
@@ -506,53 +443,107 @@
     padding: 2px 8px;
     font-size: 0.75rem;
 }
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    background: var(--color-primary);
+    color: white;
+}
+.tag-chip .tag-remove {
+    cursor: pointer;
+    opacity: 0.7;
+    font-size: 0.85rem;
+    line-height: 1;
+}
+.tag-chip .tag-remove:hover {
+    opacity: 1;
+}
 .doc-type-badge {
     padding: 2px 8px;
-    border-radius: 3px;
+    border-radius: var(--radius-selector);
     font-size: 0.7rem;
     font-weight: 600;
-    color: white;
+    color: var(--color-white);
     margin-left: 0.5rem;
 }
-.doc-type-SOP { background: var(--neon-blue); }
-.doc-type-SOI { background: var(--primary); }
-.doc-type-WI { background: var(--neon-purple); }
-.doc-type-KB { background: var(--success); }
-.doc-type-RUNBOOK { background: var(--neon-purple); }
-.doc-type-IRP { background: var(--danger); }
-.doc-type-AAR { background: var(--neon-orange); }
-.doc-type-THREAT_ADVISORY { background: var(--warning); color: var(--bg-deep); }
-.doc-type-DETECTION_RULE { background: var(--info); }
-.toolbar {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
+.doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
+.doc-type-SOI { background: var(--color-primary); color: var(--color-primary-content); }
+.doc-type-WI { background: var(--color-ion-iris); color: var(--color-white); }
+.doc-type-KB { background: var(--color-success); color: var(--color-success-content); }
+.doc-type-RUNBOOK { background: var(--color-ion-iris); color: var(--color-white); }
+.doc-type-IRP { background: var(--color-error); color: var(--color-error-content); }
+.doc-type-AAR { background: var(--neon-orange); color: var(--color-white); }
+.doc-type-THREAT_ADVISORY { background: var(--color-warning); color: var(--color-warning-content); }
+.doc-type-DETECTION_RULE { background: var(--color-info); color: var(--color-info-content); }
+
+/* daisyUI's global .loading is a spinner utility (fixed square size, an SVG
+   mask cutout) that collides with this page's plain-text loading / empty /
+   error messages -- loadDocuments/loadVersions/renderFoldersManageTree/etc.
+   all build literal `<p class="loading">`, `.empty-state`, `.error` strings
+   in the script block below, which is out of scope to touch. A tag-qualified
+   selector out-specifies the bare .loading/.empty-state/.error rules so the
+   text renders instead of being masked into a tiny spinner glyph. */
+p.loading,
+p.empty-state,
+p.error {
+    display: block;
+    width: auto;
+    aspect-ratio: auto;
+    background: none;
+    -webkit-mask-image: none;
+            mask-image: none;
+    text-align: center;
+    padding: 2rem 0;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
 }
-.filter-select {
-    padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: var(--bg-primary);
-    color: var(--text-primary);
+p.error {
+    color: var(--color-error);
 }
-/* Document Quill editor */
+
+/* JS sets style.display = 'flex'/'none' directly on these five plain modals
+   (showFoldersModal/closeFoldersModal, showMoveModal/closeMoveModal,
+   showAmendmentModal/closeAmendmentModal, previewVersion/closeVersionModal,
+   showUploadModal/closeUploadModal) rather than toggling a class -- JS is
+   unchanged, see "what NOT to change" in the rewrite spec. daisyUI's .modal
+   is hidden via visibility/opacity/pointer-events, which a bare inline
+   `display` does not override on its own, so bridge the two here. */
+.modal[style*="flex"] {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+.modal[style*="flex"] > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+}
+
+/* Document Quill editor -- third-party widget CSS that can't be expressed as
+   daisyUI components; re-pointed at daisyUI tokens so it follows the theme.
+   Lives inside the ion-ws-* document panel shared with /cases, so only the
+   colors move here -- the layout rule and DOM structure are untouched. */
 .doc-quill-wrap { display: flex; flex-direction: column; min-height: 400px; }
-.doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--border); background: var(--bg-secondary); }
+.doc-quill-wrap .ql-toolbar.ql-snow { border: none; border-bottom: 1px solid var(--color-base-300); background: var(--color-base-200); }
 .doc-quill-wrap .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; max-height: 60vh; }
-.doc-quill-wrap .ql-editor { color: var(--text-primary); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
-.doc-quill-wrap .ql-editor.ql-blank::before { color: var(--text-secondary); font-style: normal; }
-.doc-quill-wrap .ql-snow .ql-stroke { stroke: var(--text-secondary); }
-.doc-quill-wrap .ql-snow .ql-fill { fill: var(--text-secondary); }
-.doc-quill-wrap .ql-snow .ql-picker-label { color: var(--text-secondary); }
-.doc-quill-wrap .ql-snow .ql-picker-options { background: var(--bg-primary); border-color: var(--border); }
-.doc-quill-wrap .ql-snow .ql-picker-item { color: var(--text-primary); }
-.doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--primary); }
-.doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--primary); }
-.doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--text-primary); }
-.doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem; }
-.doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--primary); padding-left: 1rem; color: var(--text-secondary); }
-.doc-quill-wrap .ql-editor a { color: var(--primary); }
-.doc-quill-wrap .ql-editor code { background: var(--bg-secondary); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
+.doc-quill-wrap .ql-editor { color: var(--color-base-content); font-size: 0.875rem; line-height: 1.7; min-height: 300px; }
+.doc-quill-wrap .ql-editor.ql-blank::before { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-style: normal; }
+.doc-quill-wrap .ql-snow .ql-stroke { stroke: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.doc-quill-wrap .ql-snow .ql-fill { fill: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.doc-quill-wrap .ql-snow .ql-picker-label { color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.doc-quill-wrap .ql-snow .ql-picker-options { background: var(--color-base-100); border-color: var(--color-base-300); }
+.doc-quill-wrap .ql-snow .ql-picker-item { color: var(--color-base-content); }
+.doc-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--color-primary); }
+.doc-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--color-primary); }
+.doc-quill-wrap .ql-editor h1, .doc-quill-wrap .ql-editor h2, .doc-quill-wrap .ql-editor h3 { color: var(--color-base-content); }
+.doc-quill-wrap .ql-editor pre.ql-syntax { background: var(--color-base-200); border: 1px solid var(--color-base-300); border-radius: var(--radius-field); padding: 0.75rem; }
+.doc-quill-wrap .ql-editor blockquote { border-left: 3px solid var(--color-primary); padding-left: 1rem; color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+.doc-quill-wrap .ql-editor a { color: var(--color-primary); }
+.doc-quill-wrap .ql-editor code { background: var(--color-base-200); padding: 2px 5px; border-radius: 3px; font-size: 0.8125rem; }
 </style>
 <script nonce="{{ csp_nonce }}">
 {% raw %}
