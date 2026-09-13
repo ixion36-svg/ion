@@ -73,3 +73,49 @@ def test_a_nested_brace_in_an_interpolation_fails_towards_live():
     # Whatever it does, it must not emit a fragment of expression code as a
     # class name that could shadow a real one.
     assert not any(re.search(r"[(){}$`]", t) for t in toks)
+
+
+def test_sees_a_class_in_an_attribute_the_literal_never_closes():
+    """Concatenation closes the attribute, so there is no second quote.
+
+        '<div class="iad-adv iad-adv-kev' + (ransom ? ' is-ransomware' : '')
+
+    The opening `"` gets consumed as the CLOSING quote of `'<div class=`, which
+    drops iad-adv-kev into the gap between two matches. All three of
+    iad-adv-kev, iad2-fpin and iad2-gseg-ai were invisible this way.
+    """
+    src = """h += '<div class="iad-adv iad-adv-kev' + (ransom ? ' is-ransomware' : '') + '">'"""
+    toks = literal_tokens(src)
+    assert "iad-adv" in toks
+    assert "iad-adv-kev" in toks
+
+
+def test_strict_keeps_a_rule_whose_only_dead_class_is_negated():
+    """A dead class inside :not() makes a selector match MORE, not less.
+
+    `.nav-links > li > a:not(.nav-dropdown-toggle)` with no
+    .nav-dropdown-toggle in the app styles every link in the nav, so treating
+    the dead name as proof the rule cannot match deletes the whole nav bar.
+    """
+    from tools.dead_css import strip_rules
+    css = (".nav-links > li > a:not(.nav-dropdown-toggle) { color: red }\n"
+           ".gone .alsogone { color: blue }\n")
+    out, removed = strip_rules(css, {"nav-dropdown-toggle", "gone", "alsogone"},
+                               strict=True)
+    assert "nav-links" in out, "a rule negating a dead class must survive"
+    assert removed == 1, "the genuinely unmatchable rule should still go"
+
+
+def test_strict_drops_a_compound_gated_on_one_dead_class():
+    """`.ds-badge.success` needs BOTH names on one element.
+
+    The timid all-dead rule kept every such pairing alive, because a modifier
+    like .success or .active is live somewhere else in the app. That is what
+    made all thirty selectors of design-system.css unreachable and undeletable
+    at the same time.
+    """
+    from tools.dead_css import strip_rules
+    css = ".ds-badge.success { color: green }\n"
+    out, removed = strip_rules(css, {"ds-badge"}, strict=True)
+    assert removed == 1
+    assert "ds-badge" not in out

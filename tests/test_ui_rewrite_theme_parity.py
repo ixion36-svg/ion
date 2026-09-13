@@ -158,7 +158,7 @@ def test_daisyui_border_width_token_does_not_collide_with_ions_border_colour():
     """
     legacy = [
         Path("src/ion/web/static/css") / f
-        for f in ("style.css", "design-system.css", "ai-chat.css",
+        for f in ("style.css", "ai-chat.css",
                   "alert-detail.css", "ion-workspace.css", "ion-migrated-styles.css")
     ]
     templates = sorted(Path("src/ion/web/templates").rglob("*.html"))
@@ -200,7 +200,7 @@ def test_no_custom_property_is_defined_by_both_the_legacy_sheets_and_ion_css():
         return out
 
     legacy = {}
-    for name in ("style.css", "design-system.css", "ai-chat.css",
+    for name in ("style.css", "ai-chat.css",
                  "alert-detail.css", "ion-workspace.css", "ion-migrated-styles.css"):
         p = css_dir / name
         if p.is_file():

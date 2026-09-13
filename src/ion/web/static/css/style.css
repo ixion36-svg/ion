@@ -498,12 +498,7 @@ body::before {
 
 
 
-.nav-dropdown.has-active > .nav-dropdown-toggle {
-    color: var(--primary);
-    background: var(--primary-dim);
-    border-color: var(--border-bright);
-    box-shadow: inset 0 -2px 0 var(--primary), var(--glow-sm);
-}
+
 
 .nav-chevron {
     display: inline-block;
@@ -762,7 +757,7 @@ body::before {
 
 /* ── Analyst workspace stat bar — colored per section ─────────────────────── */
 
-.stat-cases .stat-icon i       { color: var(--neon-blue) !important; }
+
 
 
 
@@ -1439,10 +1434,6 @@ select option {
 
 
 
-.notif-panel.show {
-    display: flex;
-    flex-direction: column;
-}
 
 
 
@@ -1458,9 +1449,8 @@ select option {
 
 
 
-.notif-item.unread {
-    background: var(--primary-dim);
-}
+
+
 
 
 
@@ -1541,8 +1531,8 @@ select option {
 
 
 
-.ion-bar-fill.warning { background: var(--warning); }
-.ion-bar-fill.info    { background: var(--info); }
+
+
 
 
 /* Thicker bar variant */
@@ -1577,8 +1567,8 @@ select option {
 
 
 
-.ion-stat-value.warning { color: var(--warning); }
-.ion-stat-value.info    { color: var(--info); }
+
+
 
 
 /* ── Empty State ─────────────────────────────────────────────────────────── */

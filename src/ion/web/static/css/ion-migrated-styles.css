@@ -772,8 +772,8 @@ html body #ti-report-panel { width:760px;max-width:92vw; }
    ternary here (invalid CSS, dropped -> no highlight); split into static
    base + .active/:not(.active) state classes applied by the renderer. */
 
-._ion-s-060fd90cff.active { background:rgba(220,38,38,0.18);color:#fecaca;border:1px solid rgba(220,38,38,0.4); }
-._ion-s-060fd90cff:not(.active) { background:var(--bg-primary);color:var(--text-muted);border:1px dashed var(--ion-border); }
+
+
 
 
 

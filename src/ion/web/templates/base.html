@@ -7,7 +7,12 @@
     <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
     <link rel="stylesheet" href="/static/css/lucide.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/style.css?v={{ ion_version }}">
-    <link rel="stylesheet" href="/static/css/design-system.css?v={{ ion_version }}">
+    {# design-system.css was deleted here. Every one of its 30 selectors was
+       gated on a .ds-card / .ds-badge / .ds-bar-fill / .ds-metric-status /
+       .ds-section-label / .ds-skeleton / .ds-toggle-btn ancestor, and no
+       element in the app carries any of those. The ds-* names that DO appear
+       in markup (ds-rag-*, ds-hw-*, ds-cs-*) belong to the standup widgets and
+       are styled elsewhere, which is what made the file look used. #}
     {# ion-ui.css was retired here. It declared `.ion-btn, .btn`,
        `.ion-badge, .badge` and `.ion-table, .table, .data-table` as grouped
        selectors, unlayered and loading after ion.css, so it beat daisyUI's own

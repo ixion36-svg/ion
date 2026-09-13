@@ -48,7 +48,6 @@
     min-height: 0;
 }
 
-.ion-ws-section.tab-hidden,
 .cpanel-section.tab-hidden { display: none; }
 
 .ion-ws-close:hover,
