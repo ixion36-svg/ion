@@ -45,7 +45,10 @@ CSS_CURRENT = [
     REPO / "src/ion/web/static/css/ion.css",
     REPO / "src/ion/web/static/css/ion-migrated-styles.css",
     REPO / "src/ion/web/static/css/style.css",
-    REPO / "src/ion/web/static/css/ion-ui.css",
+    # ion-ui.css was retired: it declared .btn/.badge/.table as grouped
+    # selectors alongside its own ion-* names, unlayered and after ion.css, so
+    # daisyUI's components could never win. Its ion-* and ti-* rules moved into
+    # frontend/ion-daisy-theme.css and are now inside ion.css above.
 ]
 # What will remain once the legacy sheets are retired. --strict checks against
 # this, so it reports what BREAKS when style.css and friends are deleted.

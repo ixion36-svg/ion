@@ -165,3 +165,154 @@
   color: var(--color-primary);
   border-bottom-color: var(--color-primary);
 }
+
+/* ============================================================================
+ * ION component kit - ported from the retired static/css/ion-ui.css.
+ *
+ * ion-ui.css existed to give ION a component vocabulary, and it did so by
+ * declaring `.ion-btn, .btn`, `.ion-badge, .badge` and
+ * `.ion-table, .table, .data-table` as grouped selectors. Those are daisyUI's
+ * own component names, and because the sheet was unlayered and loaded after
+ * ion.css it beat daisyUI's layered components whichever name the markup used.
+ * Three separate pages hit that wall during the rewrite: renaming markup to
+ * daisyUI classes changed nothing on screen, and there was no free property to
+ * layer on top, because the legacy rule already set display, size, padding,
+ * colour, gap and transition.
+ *
+ * So the sheet is gone. The ion-* and ti-* names it uniquely owned are ported
+ * here; the daisyUI-owned aliases are NOT, which is the whole point.
+ *
+ * Values are translated onto daisyUI tokens rather than copied verbatim. The
+ * originals read --primary, --text-muted, --bg-secondary and friends, which are
+ * declared only in style.css; carrying those into ion.css would make the new
+ * stylesheet depend on the old one, which is the dependency this work exists to
+ * remove. Geometry and opacity are preserved exactly.
+ * ========================================================================== */
+
+/* Colour helpers (badge/pill/chip tints). */
+.ion-c-cyan   { background: color-mix(in srgb, var(--color-primary) 12%, transparent); color: var(--color-primary); }
+.ion-c-green  { background: color-mix(in srgb, var(--color-success) 12%, transparent); color: var(--color-success); }
+.ion-c-amber  { background: color-mix(in srgb, var(--color-warning) 12%, transparent); color: var(--color-warning); }
+.ion-c-red    { background: color-mix(in srgb, var(--color-error) 12%, transparent);   color: var(--color-error); }
+.ion-c-purple { background: color-mix(in srgb, var(--color-secondary) 14%, transparent); color: var(--color-secondary); }
+.ion-c-blue   { background: color-mix(in srgb, var(--color-info) 14%, transparent);    color: var(--color-info); }
+.ion-c-muted  { background: color-mix(in srgb, var(--color-base-content) 5%, transparent); color: color-mix(in srgb, var(--color-base-content) 70%, transparent); }
+
+/* Typography helpers. */
+.ion-mono  { font-family: var(--font-mono, ui-monospace, monospace); color: var(--color-primary); }
+.ion-muted { color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+
+/* Page header. */
+.ion-page-header { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--color-base-300); }
+.ion-ph-title { font-size: 21px; font-weight: 500; color: var(--color-base-content); margin: 0; }
+.ion-ph-sub   { font-size: 12px; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); margin-top: 3px; }
+
+/* Buttons. Only the ion-* names survive; .btn and friends now belong to
+   daisyUI. .ion-btn-danger stays because daisyUI spells that one btn-error. */
+.ion-btn { font-family: inherit; font-size: 13px; font-weight: 600; height: 2.25rem; padding: 0 1rem; border-radius: var(--radius-field); border: 1px solid var(--color-base-300); background: color-mix(in srgb, var(--color-base-content) 5%, transparent); color: var(--color-base-content); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 7px; text-decoration: none; transition: background .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease; }
+.ion-btn:hover { background: color-mix(in srgb, var(--color-base-content) 8%, transparent); border-color: var(--color-primary); }
+.ion-btn:active { transform: scale(.985); }
+.ion-btn-primary { background: var(--color-primary); border: none; color: var(--color-primary-content); }
+.ion-btn-primary:hover { filter: brightness(1.08); }
+.ion-btn-danger { background: var(--color-error); border: none; color: var(--color-error-content); }
+.ion-btn-danger:hover { filter: brightness(1.05); }
+.ion-btn-ghost { background: color-mix(in srgb, var(--color-base-content) 5%, transparent); border: 1px solid var(--color-base-300); color: var(--color-base-content); }
+.ion-btn-ghost:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.ion-btn[disabled], .ion-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+/* Badges, pills, severity. */
+.ion-badge { font-size: 10px; font-weight: 700; padding: .25rem .625rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px; background: color-mix(in srgb, var(--color-base-content) 5%, transparent); color: color-mix(in srgb, var(--color-base-content) 70%, transparent); border: 1px solid var(--color-base-300); text-transform: uppercase; letter-spacing: .1em; line-height: 1.4; }
+.ion-pill { font-size: 11px; padding: 3px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px; }
+.ion-sev { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+.ion-sev-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.ion-sev-critical .ion-sev-dot, .ion-sev-dot.is-critical { background: var(--color-error); }
+.ion-sev-high     .ion-sev-dot, .ion-sev-dot.is-high     { background: var(--color-warning); }
+.ion-sev-medium   .ion-sev-dot, .ion-sev-dot.is-medium   { background: var(--color-accent); }
+.ion-sev-low      .ion-sev-dot, .ion-sev-dot.is-low      { background: var(--color-success); }
+.ion-sev-info     .ion-sev-dot, .ion-sev-dot.is-info     { background: var(--color-info); }
+
+/* Quick-add chips. */
+.ion-chip { border: 1px solid var(--color-base-300); border-radius: 999px; font-family: inherit; font-size: 12px; padding: 4px 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+.ion-chip:hover { border-color: var(--color-primary); }
+
+/* Form controls. .form-control is kept: it is an ION name, not a daisyUI one,
+   and 36 elements still carry it. */
+.ion-input, .ion-select, .ion-textarea, .form-control { width: 100%; height: 2.375rem; font-family: inherit; font-size: 13px; color: var(--color-base-content); background: color-mix(in srgb, var(--color-base-content) 4%, transparent); border: 1px solid var(--color-base-300); border-radius: var(--radius-field); padding: 0 .875rem; outline: none; transition: border-color .15s ease, background .15s ease; }
+.ion-textarea, textarea.form-control { height: auto; min-height: 5rem; padding: .625rem .875rem; line-height: 1.5; }
+.ion-input:focus, .ion-select:focus, .ion-textarea:focus, .form-control:focus { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-base-content) 6%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.ion-input::placeholder, .ion-textarea::placeholder, .form-control::placeholder { color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+
+/* Metric card. */
+.ion-metric { background: var(--color-base-200); border-radius: var(--radius-field); padding: 11px 13px; }
+.ion-metric-label { font-size: 11px; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+.ion-metric-value { font-size: 23px; font-weight: 500; color: var(--color-base-content); font-variant-numeric: tabular-nums; margin-top: 1px; }
+.ion-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+
+/* Raised card. Deliberately .ion-card, never .card - style.css already has an
+   unrelated .card component and daisyUI has a third. */
+.ion-card { background: var(--color-base-200); border: 1px solid var(--color-base-300); border-radius: var(--radius-box); padding: 14px 16px; }
+.ion-card-title { font-size: 13px; font-weight: 500; color: var(--color-base-content); margin: 0 0 4px; display: flex; align-items: center; gap: 7px; }
+
+/* Segmented toggle. */
+.ion-toggle { display: inline-flex; border: 1px solid var(--color-base-300); border-radius: var(--radius-field); overflow: hidden; }
+.ion-toggle button { background: none; border: none; color: color-mix(in srgb, var(--color-base-content) 70%, transparent); font-family: inherit; font-size: 13px; padding: 7px 16px; cursor: pointer; }
+.ion-toggle button.on { background: color-mix(in srgb, var(--color-primary) 14%, transparent); color: var(--color-primary); }
+
+/* List row. */
+.ion-row { display: flex; align-items: center; gap: 12px; background: var(--color-base-200); border: 1px solid var(--color-base-300); border-radius: var(--radius-field); padding: 11px 13px; }
+.ion-row--warn  { border-color: color-mix(in srgb, var(--color-warning) 30%, transparent); }
+.ion-row--block { border-color: color-mix(in srgb, var(--color-error) 30%, transparent); }
+.ion-avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 500; flex: none; }
+
+/* Timeline. */
+.ion-timeline { position: relative; padding-left: 60px; }
+.ion-timeline-rail { position: absolute; left: 52px; top: 4px; bottom: 4px; width: 1px; background: var(--color-base-300); }
+.ion-ev { position: relative; margin-bottom: 13px; }
+.ion-ev-time { position: absolute; left: -60px; width: 40px; text-align: right; font-size: 11px; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); font-family: var(--font-mono, ui-monospace, monospace); top: 1px; }
+.ion-ev-dot { position: absolute; left: -12px; top: 3px; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px var(--color-base-100); }
+
+/* Table. .ion-table and .data-table only - .table is daisyUI's. */
+.ion-table, .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ion-table th, .data-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); font-weight: 700; padding: 9px 12px; border-bottom: 1px solid var(--color-base-300); }
+.ion-table td, .data-table td { padding: 10px 12px; border-top: 1px solid var(--color-base-300); color: var(--color-base-content); font-variant-numeric: tabular-nums; }
+.ion-table tbody tr:hover td, .data-table tbody tr:hover td { background: var(--color-base-200); }
+
+/*
+ * Utilities replacing static inline style attributes. CSP sets
+ * style-src-attr 'none', so a markup style="" is refused at render time and the
+ * element simply draws unstyled, with no error and no log line.
+ *
+ * .ion-u-hidden sets the INITIAL state only. Every site using it is toggled
+ * afterwards with el.style.display, a CSSOM write that CSP allows and that
+ * overrides the class, so those toggles keep working.
+ */
+.ion-u-hidden     { display: none; }
+.ion-u-inline-row { display: flex; align-items: center; gap: 6px; }
+.ion-u-mt-3       { margin-top: 3px; }
+.ion-u-mt-4       { margin-top: 4px; }
+.ion-u-mt-16      { margin-top: 16px; }
+.ion-u-mr-auto    { margin-right: auto; }
+.ion-u-mr-sm      { margin-right: 0.5rem; }
+
+/* Threat-intel badges and the KEV catalogue rows. Page-specific, but they were
+   in the shared sheet and the markup that uses them is built by JS, so they
+   cannot move into the page. */
+.ti-badge-ransomware { background: color-mix(in srgb, var(--color-error) 15%, transparent); color: var(--color-error); border-color: color-mix(in srgb, var(--color-error) 35%, transparent); }
+.ti-badge-unknown    { background: color-mix(in srgb, var(--color-base-content) 12%, transparent); color: color-mix(in srgb, var(--color-base-content) 60%, transparent); border-color: color-mix(in srgb, var(--color-base-content) 30%, transparent); }
+.ti-badge-cwe        { background: color-mix(in srgb, var(--color-info) 12%, transparent); color: var(--color-info); border-color: color-mix(in srgb, var(--color-info) 35%, transparent); }
+
+.ti-kev-row { cursor: pointer; }
+.ti-kev-caret { display: inline-block; width: 10px; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); font-size: 10px; transition: transform .15s; }
+.ti-kev-caret.is-open { transform: rotate(90deg); }
+/* collapsed by default: 1,662 entries expanded at once is not a page */
+.ti-kev-detail { display: none; }
+.ti-kev-detail.is-open { display: table-row; }
+.ti-kev-body { padding: 12px 14px 14px 26px; background: color-mix(in srgb, var(--color-base-content) 2%, transparent); font-size: 12.5px; line-height: 1.6; }
+.ti-kev-f { margin-bottom: 11px; }
+.ti-kev-k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .07em; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); margin-bottom: 3px; font-weight: 600; }
+/* the mandated action, next to the due date already in the row above */
+.ti-kev-action { border-left: 3px solid var(--color-warning); padding-left: 10px; }
+/* references are URLs; shown as selectable text rather than links because ION
+   ships to air-gapped sites where an external anchor is a dead end */
+.ti-kev-notes { font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; color: color-mix(in srgb, var(--color-base-content) 80%, transparent); word-break: break-all; user-select: all; }
+.ti-kev-prov { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--color-base-300); font-size: 11px; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); }

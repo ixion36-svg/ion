@@ -8,10 +8,12 @@
     <link rel="stylesheet" href="/static/css/lucide.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/style.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/design-system.css?v={{ ion_version }}">
-    <!-- consolidated ion-* component layer (full re-skin, Phase 0).
-         Additive — pages opt in by using ion-* classes; existing pages are
-         unaffected until migrated. See concepts/reskin-scope.md. -->
-    <link rel="stylesheet" href="/static/css/ion-ui.css?v={{ ion_version }}">
+    {# ion-ui.css was retired here. It declared `.ion-btn, .btn`,
+       `.ion-badge, .badge` and `.ion-table, .table, .data-table` as grouped
+       selectors, unlayered and loading after ion.css, so it beat daisyUI's own
+       components whichever name the markup used — three pages hit that wall
+       during the rewrite. The ion-* and ti-* names it uniquely owned now live
+       in frontend/ion-daisy-theme.css and ship inside ion.css. #}
     <link rel="stylesheet" href="/static/css/ai-chat.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <link rel="stylesheet" href="/static/css/tailwind.css?v={{ ion_version }}">

@@ -79,9 +79,14 @@ def test_rows_are_expandable_and_collapsed_by_default():
     src = TI.read_text(encoding="utf-8")
     assert 'data-click-action="kevToggle"' in src
     assert "window.kevToggle" in src, "the delegated dispatcher resolves via window[name]"
-    css = (ROOT / "src/ion/web/static/css/ion-ui.css").read_text(encoding="utf-8")
+    # The .ti-kev-* rules moved out of the retired ion-ui.css and into
+    # frontend/ion-daisy-theme.css, which is compiled into ion.css.
+    css = (ROOT / "frontend/ion-daisy-theme.css").read_text(encoding="utf-8")
     assert re.search(r"\.ti-kev-detail\s*\{[^}]*display:\s*none", css), \
         "detail rows must start collapsed"
+    built = (ROOT / "src/ion/web/static/css/ion.css").read_text(encoding="utf-8")
+    assert "ti-kev-detail" in built, \
+        "the rule is in the source but was not compiled into ion.css"
 
 
 def test_references_are_text_not_links():
