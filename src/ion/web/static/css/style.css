@@ -518,26 +518,8 @@ body::before {
     position: relative;
 }
 
-.nav-dropdown-toggle {
-    color: var(--text-secondary);
-    text-decoration: none;
-    padding: 0.5rem 0.85rem;
-    border-radius: var(--radius);
-    font-size: 0.82rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    transition: all 0.2s ease;
-    white-space: nowrap;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    user-select: none;
-    border: 1px solid transparent;
-}
 
-.nav-dropdown-toggle:hover,
+
 .nav-dropdown.open > .nav-dropdown-toggle {
     color: var(--primary);
     background: var(--primary-dim);
@@ -663,11 +645,7 @@ body::before {
 
 
 
-.header-actions {
-    display: flex;
-    gap: 0.75rem;
-    align-items: center;
-}
+
 
 /* =============================================================================
    Buttons
@@ -748,31 +726,11 @@ body::before {
 
 
 
-.stat-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1.25rem 1.5rem;
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.2s;
-}
 
-.stat-card:hover {
-    border-color: var(--border-bright);
-}
 
-.stat-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: var(--primary);
-    opacity: 0.6;
-}
+
+
+
 
 .stat-value {
     font-size: 2rem;
@@ -787,27 +745,11 @@ body::before {
 /* Action Cards */
 
 
-.action-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    padding: 1.25rem;
-    text-align: center;
-    text-decoration: none;
-    color: var(--text-primary);
-    transition: all 0.2s ease;
-}
 
-.action-card:hover {
-    border-color: var(--border-bright);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
 
-.action-icon {
-    font-size: 2rem;
-    margin-bottom: 0.75rem;
-}
+
+
+
 
 
 
@@ -816,22 +758,10 @@ body::before {
    ============================================================================= */
 
 /* ── Default: icons inherit the theme accent ──────────────────────────────── */
-.action-icon i,
-.tool-icon i,
-.tool-icon-sm i,
-.stat-icon i,
-.card-icon i {
-    color: var(--primary);
-    transition: color 0.2s, filter 0.2s;
-}
+
 
 /* Subtle glow on card/action hover */
-.action-card:hover .action-icon i,
-.tool-card:hover .tool-icon i,
-.tool-card:hover .tool-icon-sm i,
-.stat-card:hover .stat-icon i {
-    filter: drop-shadow(0 0 6px var(--primary-glow));
-}
+
 
 /* ── Semantic icon colors — override per icon meaning ─────────────────────── */
 
@@ -884,19 +814,13 @@ body::before {
 
 
 /* ── Analyst workspace stat bar — colored per section ─────────────────────── */
-.stat-alerts .stat-icon i      { color: var(--danger) !important; }
+
 .stat-cases .stat-icon i       { color: var(--neon-blue) !important; }
-.stat-observables .stat-icon i { color: var(--neon-yellow) !important; }
-.stat-playbooks .stat-icon i   { color: var(--neon-green) !important; }
+
+
 
 /* ── Light mode adjustments — slightly bolder for readability ─────────────── */
-[data-mode="light"] .action-icon i,
-[data-mode="light"] .tool-icon i,
-[data-mode="light"] .tool-icon-sm i,
-[data-mode="light"] .stat-icon i,
-[data-mode="light"] .card-icon i {
-    filter: saturate(1.1) brightness(0.9);
-}
+
 
 
 
@@ -1360,43 +1284,17 @@ select option {
    Audit Action Badges
    ============================================================================= */
 
-.action-badge {
-    display: inline-block;
-    padding: 0.25rem 0.625rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 4px;
-    background: var(--bg-elevated);
-}
 
-.action-badge.action-login {
-    background: rgba(16, 185, 129, 0.15);
-    color: var(--neon-green);
-}
 
-.action-badge.action-logout {
-    background: rgba(107, 114, 128, 0.15);
-    color: var(--text-muted);
-}
 
-.action-badge.action-login-failed {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--neon-red);
-}
 
-.action-badge.action-password-changed,
-.action-badge.action-password-reset {
-    background: rgba(0, 212, 255, 0.15);
-    color: var(--neon-cyan);
-}
 
-.action-badge.action-user-created,
-.action-badge.action-user-updated,
-.action-badge.action-user-deleted,
-.action-badge.action-user-roles-updated {
-    background: rgba(168, 85, 247, 0.15);
-    color: var(--neon-purple);
-}
+
+
+
+
+
+
 
 /* =============================================================================
    Profile Page
@@ -1651,24 +1549,9 @@ select option {
 
 
 
-.settings-tab {
-    padding: 0.75rem 1rem;
-    background: transparent;
-    border: none;
-    border-right: 2px solid transparent;
-    margin-right: -2px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-    color: var(--text-secondary);
-    text-align: left;
-    transition: all 0.2s;
-}
 
-.settings-tab:hover {
-    color: var(--text-primary);
-    background: var(--bg-secondary);
-}
+
+
 
 .settings-tab.active {
     color: var(--primary);
@@ -1680,20 +1563,7 @@ select option {
    Notification Panel
    ============================================================================= */
 
-.notif-panel {
-    display: none;
-    position: absolute;
-    top: 52px;
-    right: 180px;
-    width: 360px;
-    max-height: 440px;
-    background: var(--bg-card);
-    border: 1px solid var(--ion-border);
-    border-radius: var(--ion-radius-lg);
-    box-shadow: var(--shadow-card);
-    z-index: 1100;
-    overflow: hidden;
-}
+
 
 .notif-panel.show {
     display: flex;
@@ -1710,18 +1580,9 @@ select option {
 
 
 
-.notif-item {
-    display: flex;
-    gap: 10px;
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--ion-border);
-    cursor: pointer;
-    transition: background 0.15s;
-}
 
-.notif-item:hover {
-    background: var(--bg-secondary);
-}
+
+
 
 .notif-item.unread {
     background: var(--primary-dim);
@@ -1759,22 +1620,16 @@ select option {
 
 /* ── Toggle Button Group ─────────────────────────────────────────────────── */
 
-.ion-toggle-btn {
-    padding: 8px 16px; border-radius: 8px; font-size: 10px; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    border: none; cursor: pointer; background: transparent;
-    color: var(--text-secondary); transition: all .2s;
-    display: flex; align-items: center; gap: 6px;
-}
-.ion-toggle-btn:hover { color: var(--text-primary); background: var(--bg-card); }
+
+
 .ion-toggle-btn.active {
     background: var(--primary); color: var(--bg-deep);
     box-shadow: 0 4px 12px var(--primary-glow);
 }
-.ion-toggle-btn.active-success { background: var(--success); color: #fff; box-shadow: 0 4px 12px rgba(16,185,129,.3); }
-.ion-toggle-btn.active-danger  { background: var(--danger); color: #fff; box-shadow: 0 4px 12px rgba(239,68,68,.3); }
-.ion-toggle-btn.active-info    { background: var(--info); color: #fff; box-shadow: 0 4px 12px rgba(14,165,233,.3); }
-.ion-toggle-btn.active-warning { background: var(--warning); color: var(--bg-deep); box-shadow: 0 4px 12px rgba(251,191,36,.3); }
+
+
+
+
 
 /* ── Modern Card ─────────────────────────────────────────────────────────── */
 .ion-card {
@@ -1836,10 +1691,7 @@ select option {
 .ion-metric-value.info    { color: var(--info); }
 
 
-.ion-bar-fill {
-    height: 100%; border-radius: 4px;
-    transition: width .8s ease;
-}
+
 .ion-bar-fill.success { background: var(--success); }
 .ion-bar-fill.danger  { background: var(--danger); }
 .ion-bar-fill.warning { background: var(--warning); }
@@ -1855,13 +1707,10 @@ select option {
 
 /* ── Notes / Detail Panel ────────────────────────────────────────────────── */
 
-.ion-detail-col { flex: 1; }
-.ion-detail-col + .ion-detail-col { border-left: 1px solid var(--ion-border); padding-left: 16px; }
-.ion-detail-col h4 {
-    font-size: 9px; font-weight: 900; color: var(--text-secondary);
-    text-transform: uppercase; letter-spacing: 1px; margin: 0 0 4px;
-}
-.ion-detail-col p { font-size: 12px; color: var(--text-secondary); margin: 0; }
+
+
+
+
 
 /* ── Section Heading (small uppercase) ───────────────────────────────────── */
 
@@ -1869,22 +1718,15 @@ select option {
 
 /* ── Pill Tabs ───────────────────────────────────────────────────────────── */
 
-.ion-pill-tab {
-    padding: 6px 14px; border-radius: 8px; font-size: 11px; font-weight: 600;
-    border: none; cursor: pointer; background: transparent;
-    color: var(--text-secondary); transition: all .2s;
-}
-.ion-pill-tab:hover { color: var(--text-primary); background: var(--bg-card); }
+
+
 .ion-pill-tab.active { background: var(--primary); color: var(--bg-deep); }
 
 /* ── Stat Grid (modernised) ──────────────────────────────────────────────── */
 
 
 
-.ion-stat-value {
-    font-size: 1.75rem; font-weight: 700; color: var(--text-bright);
-    font-family: 'JetBrains Mono', monospace;
-}
+
 .ion-stat-value.primary { color: var(--primary); }
 .ion-stat-value.success { color: var(--success); }
 .ion-stat-value.danger  { color: var(--danger); }
@@ -1914,7 +1756,7 @@ select option {
 }
 @media (max-width: 768px) {
     
-    .ion-detail-col + .ion-detail-col { border-left: none; padding-left: 0; border-top: 1px solid var(--ion-border); padding-top: 12px; }
+    
 }
 
 /* ── Transition helper ───────────────────────────────────────────────────── */
@@ -1941,12 +1783,7 @@ select option {
 
 
 
-.header-actions {
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
+
 
 /* ── Buttons ────────────────────────────────────────────────────────────── */
 
@@ -1993,21 +1830,9 @@ select option {
 
 
 /* ── Stat cards ──────────────────────────────────────────────────────────── */
-.stat-card {
-    background: rgba(10, 12, 18, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 1.5rem 1.5rem;
-    transition: border-color .18s ease, background .18s ease;
-    box-shadow: none;
-    position: relative;
-    overflow: hidden;
-}
-.stat-card::before { display: none; }
-.stat-card:hover {
-    border-color: rgba(255, 255, 255, 0.12);
-    transform: none;
-}
+
+
+
 .stat-value {
     font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
     font-size: 1.75rem;
@@ -2116,11 +1941,7 @@ select option {
 
 /* ── Misc utility refresh ───────────────────────────────────────────────── */
 
-.list-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-}
+
 .list-item {
     padding: 0.625rem 0.75rem;
     border-radius: 0.5rem;
@@ -2161,34 +1982,12 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Action cards (analyst workspace, tools page) ──────────────────────── */
 
-.action-card {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    padding: 1.25rem;
-    background: rgba(10, 12, 18, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    text-decoration: none;
-    color: #cbd5e1;
-    transition: border-color .18s ease, background .18s ease;
-}
-.action-card:hover {
-    border-color: rgba(109, 228, 255, 0.35);
-    background: rgba(109, 228, 255, 0.04);
-}
-.action-card-danger:hover { border-color: rgba(255, 108, 108, 0.35); background: rgba(255, 108, 108, 0.04); }
 
-.action-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.75rem;
-    height: 1.75rem;
-    color: #6de4ff;
-    font-size: 1rem;
-}
-.action-card-danger .action-icon { color: #ff6c6c; }
+
+
+
+
+
 
 
 /* ── Metric cards (training, analytics pages) ──────────────────────────── */
@@ -2287,42 +2086,15 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ── Tool cards (/tools, /analyst) ─────────────────────────────────────── */
-.tool-card {
-    background: rgba(10, 12, 18, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 1.5rem;
-    transition: border-color .18s ease, background .18s ease;
-    cursor: pointer;
-    text-decoration: none;
-    color: inherit;
-    display: flex;
-    flex-direction: column;
-    gap: 0.625rem;
-}
-.tool-card:hover {
-    border-color: rgba(109, 228, 255, 0.35);
-    background: rgba(109, 228, 255, 0.04);
-}
-.tool-icon {
-    width: 2.25rem;
-    height: 2.25rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #6de4ff;
-    font-size: 1.125rem;
-}
-.tool-icon-sm {
-    width: 1.5rem;
-    height: 1.5rem;
-    font-size: 0.875rem;
-}
+
+
+
+
 
 /* ── Tool tabs & panels (tools page, discover, etc.) ──────────────────── */
 
 
-.tool-tab:hover, .tools-tab:hover { color: #cbd5e1; }
+.tool-tab:hover { color: #cbd5e1; }
 .tool-tab.active, .tools-tab.active {
     color: #6de4ff;
     border-bottom-color: #6de4ff;
@@ -2357,23 +2129,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ── Settings tabs (sidebar style) ────────────────────────────────────── */
 
-.settings-tab {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.625rem 0.875rem;
-    border-radius: 0.5rem;
-    background: transparent;
-    border: none;
-    color: #94a3b8;
-    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
-    font-size: 0.8125rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background .15s ease, color .15s ease;
-    text-align: left;
-}
-.settings-tab:hover { background: rgba(255, 255, 255, 0.03); color: #fff; }
+
+
 .settings-tab.active {
     background: rgba(109, 228, 255, 0.08);
     color: #6de4ff;
@@ -2489,11 +2246,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Stat / action / metric / tool / role cards — small tile variants */
 
-[data-mode="light"] .stat-card:hover,
-[data-mode="light"] .action-card:hover,
-[data-mode="light"] .metric-card:hover,
-[data-mode="light"] .tool-card:hover,
-[data-mode="light"] .role-card:hover {
+[data-mode="light"] .metric-card:hover, [data-mode="light"] .role-card:hover {
   border-color: rgba(100, 116, 139, 0.5) !important;
 }
 
@@ -2549,9 +2302,7 @@ h1, h2, h3, h4, h5, h6 {
   border-bottom-color: var(--ion-border) !important;
 }
 
-[data-mode="light"] .section-nav a:hover,
-[data-mode="light"] .tab-btn:hover,
-[data-mode="light"] .nav-tab:hover {
+[data-mode="light"] .section-nav a:hover, [data-mode="light"] .tab-btn:hover {
   color: var(--text-primary) !important;
 }
 
@@ -2591,16 +2342,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Pagination */
-[data-mode="light"] .pagination-btn,
-[data-mode="light"] .page-btn {
-  background: var(--bg-card) !important;
-  border-color: var(--ion-border) !important;
-  color: var(--text-primary) !important;
-}
-[data-mode="light"] .pagination-btn:hover,
-[data-mode="light"] .page-btn:hover {
-  background: var(--bg-secondary) !important;
-}
+
+
 [data-mode="light"] .pagination-btn.active,
 [data-mode="light"] .page-btn.active {
   background: var(--primary) !important;

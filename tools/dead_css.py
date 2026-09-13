@@ -141,10 +141,23 @@ def page_style_blocks() -> str:
 
 
 def css_internal_refs(css: str) -> set[str]:
-    """Classes another surviving rule leans on: `.panel .row`, `.a.b`, `.x:hover`.
+    """Classes another rule pairs with: `.panel .row`, `.a.b`, `.x:hover`.
 
-    A class used only as an ancestor is still load-bearing even if no markup
-    names it directly -- deleting it orphans whatever it scopes.
+    NOT used for liveness any more, and the reason is worth recording. It used
+    to be: keep `.panel` because `.panel .row` depends on it. That is backwards.
+    If no element ever carries `panel`, then `.panel .row` cannot match either,
+    so both are dead and keeping the ancestor keeps a rule that can never fire.
+
+    Worse, it made any class with a compound rule immortal. `.settings-tab.active`
+    kept `.settings-tab` alive purely through its own declaration, even though
+    nothing in the app has ever carried that class -- 0 occurrences in class
+    attributes and 0 in JS strings. That single mistake was holding roughly 19KB
+    of unreachable CSS in style.css.
+
+    Liveness now comes only from markup and JS: a literal token, or a
+    constructed prefix. Kept as a function because the removal step still needs
+    to know which rules pair a dead class with a live one -- those are left
+    alone rather than half-rewritten.
     """
     out: set[str] = set()
     for m in RULE.finditer(mask_comments(css)):
@@ -164,11 +177,8 @@ def analyse(sheet: str, live_tokens: set[str], prefixes: set[str],
     css = path.read_text(encoding="utf-8", errors="replace")
     # A class is live if this sheet leans on it, OR any page's own <style>
     # block does, OR any OTHER shared sheet does.
-    internal = css_internal_refs(css) | css_internal_refs(page_css)
-    for other in SHEETS:
-        if other != sheet and (CSS_DIR / other).is_file():
-            internal |= css_internal_refs(
-                (CSS_DIR / other).read_text(encoding="utf-8", errors="replace"))
+    # Deliberately NOT seeded from other rules -- see css_internal_refs.
+    internal: set[str] = set()
     masked = mask_comments(css)
     # Only names appearing in an actual SELECTOR count as defined. Scanning the
     # whole file swept up `.ion-ws-*` from a comment documenting the naming

@@ -436,11 +436,7 @@
     border-top: 1px solid rgba(255, 255, 255, .08);
 }
 
-.iad-adv-kev {
-    color: var(--sev-critical);
-    border: 1px solid color-mix(in srgb, var(--sev-critical) 40%, transparent);
-    background: color-mix(in srgb, var(--sev-critical) 8%, transparent);
-}
+
 .iad-adv-kev.is-ransomware {
     border-color: var(--sev-critical);
     background: color-mix(in srgb, var(--sev-critical) 15%, transparent);
@@ -671,12 +667,8 @@
 
 /* v2 field pins — row control + Case-context chips */
 .iad2-fpincell { text-align: right; white-space: nowrap; vertical-align: top; }
-.iad2-fpin {
-    font-family: inherit; font-size: 10.5px; padding: 3px 9px;
-    border-radius: 6px; border: 1px solid var(--border-bright);
-    background: var(--bg-tertiary); color: var(--text-muted); cursor: pointer;
-}
-.iad2-fpin:hover { border-color: var(--info); color: var(--info); }
+
+
 .iad2-fpin.on { border-color: rgba(96,165,250,.5); color: var(--info); background: rgba(96,165,250,.1); }
 /* Case-context metadata block in the hero */
 .iad2-context { margin-top: 14px; }
