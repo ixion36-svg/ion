@@ -1,15 +1,15 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.91.0 -->
-<!-- ion-doc:version=0.91.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.92.0 -->
+<!-- ion-doc:version=0.92.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-09 -->
+<!-- ion-doc:date=2026-09-13 -->
 
 # Changelog
 
-## Unreleased
+## v0.92.0 — 2026-09-13
 
 **CSRF protection — token + Origin validation.** Enforcement is **ON by
 default**, unlike ION's feature flags: this restricts behaviour rather than
