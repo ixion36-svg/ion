@@ -1,62 +1,42 @@
 [
   {
-    "page": "de_workbench.html",
-    "lines_before": 369,
-    "exit": 0,
-    "tail": "",
-    "lines_after": 379,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 235
+    "page": "shift_handover.html",
+    "mode": "convert",
+    "lines_before": 308,
+    "exit": 1,
+    "tail": "I'll convert hashed CSP classes in `shift_handover.html` to Tailwind using the lookup table, then audit for new inline styles. First I'll read the template, the map, and any JS references.Hashed classes live in JS-generated HTML, not markup. I'll look up each one in the map and check how similar templates were converted.",
+    "lines_after": 308,
+    "status": "NO_CHANGE",
+    "problems": [
+      "template unchanged"
+    ],
+    "elapsed": 36
   },
   {
-    "page": "stories.html",
-    "lines_before": 322,
-    "exit": 0,
-    "tail": "btn btn-primary` / `btn-ghost` / `btn-error btn-outline` / `btn-sm`\n- Enabled/disabled and run status \u00e2\u2020\u2019 `badge-success` / `badge-ghost` / `badge-error`\n- Editor fields \u00e2\u2020\u2019 `input` / `textarea` / `checkbox` / `fieldset`\n- Validation errors \u00e2\u2020\u2019 `alert alert-error`\n- Recent runs \u00e2\u2020\u2019 `table table-sm` with daisyUI `collapse` for step outputs\n\nNo raw `style=` attributes. Baseline file was not edited.\n",
-    "lines_after": 348,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 334
+    "page": "data_flow.html",
+    "mode": "convert",
+    "lines_before": 625,
+    "exit": 1,
+    "tail": "I'll convert hashed CSP classes in `data_flow.html` using the lookup table, then run the audit. First I'll read the template, the map, and check for JavaScript class references.The hashed classes in the script are in generated HTML, not selectors. I'll check the conversion prompt and look up each class in the map.",
+    "lines_after": 625,
+    "status": "NO_CHANGE",
+    "problems": [
+      "template unchanged"
+    ],
+    "elapsed": 36
   },
   {
-    "page": "network_topology.html",
-    "lines_before": 429,
-    "exit": 0,
-    "tail": "Arkime banner, `card` / `card-body` / `card-title` for the three panels, and `link link-primary` for the traffic-analytics link. The vis-network canvas is **not** a `card` \u00e2\u20ac\u201d daisyUI card is `display: flex`, which would collapse the graph viewport.\n\nI have no browser in this session, so layout was not visually verified. The reviewer should check at a real desktop width, not a downscaled preview.\n",
-    "lines_after": 559,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 367
-  },
-  {
-    "page": "analyst.html",
-    "lines_before": 534,
-    "exit": 0,
-    "tail": "ary`, with semantic colours (`text-primary`, `text-error`, `text-warning`, `text-success`) instead of hardcoded palette utilities.\n\n**4. `_ion-s-*` class count**\n**0 before, 0 after.** This template never had hashed classes. No `style=\"...\"` attributes were introduced.\n\nNo browser tools were available in this session, so layout was not exercised in a live browser. The audit is the check that ran.\n",
-    "lines_after": 546,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 367
-  },
-  {
-    "page": "alert_arkime.html",
-    "lines_before": 503,
-    "exit": 0,
-    "tail": "attributes.\n\nStatic markup is now `card` / `stat` / `table` / `badge` / `btn` / `alert` / `input` / `select`. JS still owns the same ids, `.commit-mode-btn`, `data-mode`, and `hidden` / `grid` / `inline-flex` toggles; only the generated class strings were moved onto daisyUI badges, table rows, and alerts.\n\nI did not load the page in a browser \u00e2\u20ac\u201d it needs a running ION server and a real alert id.\n",
-    "lines_after": 517,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 450
-  },
-  {
-    "page": "daily_work.html",
-    "lines_before": 487,
-    "exit": 0,
-    "tail": "-v-green`, `.dw-dot-*`, `.dw-src`, `.dw-empty`.\n\nJavaScript, every `id`, `data-view` / `data-mode`, and the `/shift-handover` link are unchanged.\n\n**4. `_ion-s-*` count:** **0 before, 0 after.** No raw `style=` attributes.\n\nI could not visually verify in a browser (no browser tools in this session). Closest checks: the rewrite audit and `test_daily_work_defers_to_the_real_handover`, both passing.\n",
-    "lines_after": 581,
-    "status": "OK",
-    "problems": [],
-    "elapsed": 616
+    "page": "security_dashboard.html",
+    "mode": "convert",
+    "lines_before": 1054,
+    "exit": 1,
+    "tail": "es. First I'm reading the template, the map, and any JS that might still select those classes.Four hashed classes sit in JS `innerHTML`, not markup. I'll look them up in the map and check whether any script actually selects them.The map has exact/arbitrary entries for two classes and a manual one for `grid-column: span 2`. I'll check how similar templates handled hashed classes inside `innerHTML`.",
+    "lines_after": 892,
+    "status": "FAILED",
+    "problems": [
+      "3 class(es) not in the map: ['_ion-s-1f61f29863', '_ion-s-8410c989c9', '_ion-s-d598ba9f79']"
+    ],
+    "rolled_back": true,
+    "elapsed": 36
   }
 ]

@@ -101,16 +101,27 @@ def verify(page: str, baseline: dict, mode: str) -> list[str]:
             problems.append(f"lost {len(lost)} hashed class(es): {sorted(lost)[:4]}")
     else:
         cmap = load_map()
-        # Anything still present must be one the table could not map. A
-        # leftover that WAS mappable means the pass silently skipped work.
+        before = set(baseline[page]["hashed_classes"])
+
+        # Mappable classes MUST be gone. A leftover means the pass silently
+        # skipped work, which looks identical to having nothing to do.
         skipped = [c for c in present if cmap.get(c, {}).get("kind") in ("exact", "arbitrary")]
         if skipped:
             problems.append(
                 f"{len(skipped)} mappable class(es) left unconverted: {sorted(skipped)[:4]}"
             )
-        unknown = [c for c in present if c not in cmap]
-        if unknown:
-            problems.append(f"{len(unknown)} class(es) not in the map: {sorted(unknown)[:4]}")
+
+        # Classes the table could NOT map must remain. Removing one deletes a
+        # style with no replacement and renders a silently unstyled element.
+        # Not-in-the-map counts here too — four such classes exist and are dead
+        # (no CSS rule anywhere), but this pass is not where that is decided.
+        must_keep = {c for c in before
+                     if c not in cmap or cmap[c].get("kind") == "manual"}
+        dropped = sorted(must_keep - present)
+        if dropped:
+            problems.append(
+                f"{len(dropped)} unmappable class(es) removed with no replacement: {dropped[:4]}"
+            )
 
     inline_now = len(INLINE_STYLE.findall(text))
     if inline_now > baseline[page]["raw_inline_styles"]:

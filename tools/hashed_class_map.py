@@ -265,11 +265,22 @@ def main() -> int:
                 kinds.append(kind)
         kind = "manual" if "manual" in kinds else ("arbitrary" if "arbitrary" in kinds else "exact")
         counts[kind] += 1
-        mapping[name.lstrip("_")] = {
+        # Key on the class name EXACTLY as it appears in templates, underscore
+        # included. Stripping it produced a map with zero overlap against the
+        # baseline, so Grok looked up `_ion-s-X`, found nothing, and converted
+        # nothing — while the verifier flagged every class as unknown and rolled
+        # the page back. Silent on both sides until the keys were compared.
+        # A "manual" rule has SOME declarations that map and some that do not.
+        # Publishing the partial string invites an agent to apply it and
+        # silently lose the rest — e.g. `display:grid;grid-template-columns:...`
+        # would become `grid gap-3` with the columns quietly dropped. Blank the
+        # actionable field so the only valid move is to leave the class alone.
+        mapping[name] = {
             "css": body.strip(),
-            "tailwind": " ".join(utils),
+            "tailwind": "" if kind == "manual" else " ".join(utils),
             "kind": kind,
             "unmapped": unmapped,
+            **({"partial_do_not_apply": " ".join(utils)} if kind == "manual" and utils else {}),
         }
 
     total = len(rules)
