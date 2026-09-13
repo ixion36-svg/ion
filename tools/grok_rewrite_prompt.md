@@ -69,6 +69,35 @@ If a header needs a text block beside controls, let the row wrap
 `basis-full md:basis-auto md:flex-1`, so it drops to its own line rather than
 being squeezed to nothing.
 
+## daisyUI class collisions — check before you use a component
+
+daisyUI defines some class names ION already uses for something else. Assume a
+collision and check, rather than assuming the component is free.
+
+**`.loading` is the known one.** daisyUI's `.loading` is a masked spinner glyph
+(width 1.5rem, aspect-ratio 1, background-color:currentColor, spinner
+mask-image). ION uses `class="loading"` as PLAIN TEXT in 211 places across 54
+templates: `<p class="loading">Loading...</p>`. A global reset in
+ion-daisy-theme.css already neutralises this for elements without a
+`loading-*` modifier, so do NOT add a per-page workaround, and do NOT "fix" an
+ION loading element by giving it a daisyUI spinner class.
+
+Before using any daisyUI component class on this page, grep the template for
+that class name. If ION already uses it for something else, keep ION's markup
+and pick a different daisyUI component.
+
+## Modals: check how the page actually opens them
+
+daisyUI's `.modal` hides via `visibility`, `opacity` and `pointer-events` — NOT
+via `display`. Several ION pages open a dialog with `el.style.display='flex'`
+or by toggling a class like `.active`. Converting the markup to `.modal` /
+`.modal-box` without checking will stop the dialog opening, with no error
+anywhere.
+
+Read the page's JavaScript first and find how it shows and hides dialogs. If it
+sets `display` or toggles a bespoke class, add a small CSS bridge so daisyUI
+responds to what the JS already does. Do not rewrite the JavaScript.
+
 ## What NOT to change
 
 Keep all of this exactly as it is — this is a restyle, not a refactor:
