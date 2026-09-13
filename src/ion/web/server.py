@@ -197,6 +197,7 @@ app = FastAPI(
 import secrets as _secrets
 
 from ion.web._csp_nonce import _csp_nonce_var, _CSPNonceProxy
+from ion.web._csrf_token import _CSRFTokenProxy
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -382,6 +383,10 @@ templates.env.globals["ion_version"] = ion.__version__
 # request (e.g. CLI template rendering, if any) it resolves to "" which
 # produces a benign empty attribute.
 templates.env.globals["csp_nonce"] = _CSPNonceProxy()
+# CSRF token as a global proxy, same mechanism as csp_nonce above. Templates
+# read it as `{{ csrf_token }}`; it is falsy for anonymous requests so
+# base.html can skip the meta tag entirely.
+templates.env.globals["csrf_token"] = _CSRFTokenProxy()
 
 # Include API routes
 app.include_router(api_router, prefix="/api")
