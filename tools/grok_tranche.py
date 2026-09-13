@@ -50,6 +50,39 @@ INLINE_STYLE = re.compile(r'(?<![-\w])style\s*=\s*["\']')
 # It gets its own dedicated pass, deliberately.
 NEVER_BATCH = {"base.html", "_components.html", "_icons.html", "_nav_tabs.html"}
 
+# Directory prefixes that must never be restyled onto daisyUI.
+#
+# emails/ are standalone documents delivered to mail clients. They do NOT
+# extend base.html and CANNOT load /static/css/ion.css, so their styling has to
+# be inline `style="..."` on table-based markup — exactly what the rewrite
+# prompt forbids everywhere else. A restyle pass stripped all 81 inline styles
+# across the three of them and replaced them with daisyUI classes, which would
+# have rendered every ION notification email completely unstyled. The verifier
+# missed it because inline styles went DOWN and it only flagged increases.
+NEVER_BATCH_PREFIXES = ("emails/",)
+
+# Templates that are SELF-CONTAINED: no `{% extends %}`, no <link rel=stylesheet>.
+# Whatever styling they carry must be inline, because nothing else will ever
+# reach them. Two kinds exist in ION:
+#   emails/*            delivered to mail clients, which load no stylesheet
+#   *_pdf.html          rendered by WeasyPrint through a bare Jinja Environment
+#                       (see _render_scoping_pack_pdf_html) that injects no CSS
+#
+# The restyle prompt forbids inline styles, which is right for every page that
+# loads ion.css and exactly wrong for these. A pass stripped all 84 inline
+# styles across the four of them.
+SELF_CONTAINED = {
+    "emails/alert_digest.html",
+    "emails/case_update.html",
+    "emails/sla_breach.html",
+    "cyab/_scoping_pack_pdf.html",
+}
+
+
+def is_self_contained(text: str) -> bool:
+    """Detect the shape rather than trusting the list above to stay current."""
+    return "{% extends" not in text and "stylesheet" not in text
+
 BANDS = {"XL": (2500, 10**9), "L": (1000, 2500), "M": (300, 1000), "S": (0, 300)}
 
 
@@ -59,7 +92,10 @@ def load_baseline() -> dict:
 
 def pick_band(baseline: dict, band: str) -> list[str]:
     lo, hi = BANDS[band]
-    names = [n for n, v in baseline.items() if lo <= v["lines"] < hi and n not in NEVER_BATCH]
+    names = [n for n, v in baseline.items()
+             if lo <= v["lines"] < hi and n not in NEVER_BATCH
+             and not n.startswith(NEVER_BATCH_PREFIXES)
+             and n not in SELF_CONTAINED]
     # Lowest hashed-class count first: least CSP risk earliest, so an early
     # failure is cheap and tells us the prompt is wrong before the risky pages.
     return sorted(names, key=lambda n: (baseline[n]["hashed_count"], baseline[n]["lines"]))
@@ -145,6 +181,14 @@ def verify(page: str, before_text: str, mode: str) -> list[str]:
     inline_now = len(INLINE_STYLE.findall(text))
     if inline_now > inline_before:
         problems.append(f"raw inline styles {inline_before} -> {inline_now}")
+    # A wholesale REMOVAL is equally suspicious. Checking only for increases let
+    # the email templates through: 25 inline styles became 0, which is correct
+    # for an app page and catastrophic for a document a mail client renders
+    # without any stylesheet.
+    elif inline_before >= 5 and inline_now == 0:
+        problems.append(
+            f"all {inline_before} inline styles removed — intended for an app page, "
+            f"but fatal if this document is rendered without a stylesheet")
     return problems
 
 
@@ -158,6 +202,13 @@ def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
     prompt_file.write_text(build_prompt(page, mode), encoding="utf-8")
 
     result = {"page": page, "mode": mode, "lines_before": baseline[page]["lines"]}
+
+    if mode == "restyle" and is_self_contained(path.read_text(encoding="utf-8", errors="replace")):
+        # Caught by shape, not by name: nothing will ever deliver a stylesheet
+        # to this document, so its inline styles are the only styling it has.
+        result.update(status="SKIPPED", problems=["self-contained (no extends, no stylesheet)"],
+                      elapsed=0)
+        return result
     try:
         proc = subprocess.run(
             [str(GROK), "--cwd", str(REPO), "--permission-mode", "bypassPermissions",
@@ -238,6 +289,17 @@ def main() -> int:
     if args.limit:
         pages = pages[: args.limit]
 
+    blocked = [p for p in pages
+               if p in NEVER_BATCH or p.startswith(NEVER_BATCH_PREFIXES)
+               or p in SELF_CONTAINED]
+    if blocked:
+        # --pages bypasses pick_band, so the exclusion has to be enforced here
+        # too. This is how the email templates got through.
+        print(f"refusing {len(blocked)} excluded page(s): {blocked}", file=sys.stderr)
+        pages = [p for p in pages if p not in blocked]
+        if not pages:
+            return 2
+
     print(f"tranche[{args.mode}]: {len(pages)} page(s), {args.workers} worker(s)")
     for p in pages:
         print(f"  {baseline[p]['lines']:5d} lines  {baseline[p]['hashed_count']:4d} hashed  {p}")
@@ -250,7 +312,8 @@ def main() -> int:
         for fut in as_completed(futures):
             r = fut.result()
             results.append(r)
-            flag = {"OK": "ok  ", "FAILED": "FAIL", "NO_CHANGE": "noop", "TIMEOUT": "TIME"}[r["status"]]
+            flag = {"OK": "ok  ", "FAILED": "FAIL", "NO_CHANGE": "noop",
+                    "TIMEOUT": "TIME", "SKIPPED": "skip"}.get(r["status"], "????")
             extra = f" {r['problems']}" if r["problems"] else ""
             print(f"[{flag}] {r['page']} ({r.get('elapsed','?')}s)"
                   f" {r['lines_before']}->{r.get('lines_after','?')}{extra}", flush=True)
