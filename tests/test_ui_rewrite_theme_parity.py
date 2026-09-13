@@ -273,3 +273,45 @@ def test_light_mode_does_not_restate_the_derived_accents():
             f"{token} is restated for light mode; it derives from ION's token, "
             "which style.css already flips per accent theme"
         )
+
+
+def test_the_content_scan_is_scoped_to_markup():
+    """Without `source(none)` Tailwind scans the whole repo, data files included.
+
+    Tailwind v4 has no `@source` by default: it walks out from the working
+    directory and reads anything not gitignored. `@source` ADDS to that scan
+    rather than replacing it, so listing the template globs alone changed the
+    output by three kilobytes and fixed nothing. `source(none)` on the
+    utilities import is the part that turns the automatic walk off.
+    """
+    css = REWRITE.read_text(encoding="utf-8")
+    assert 'utilities.css" source(none)' in css, (
+        "the utilities import lost `source(none)`, so Tailwind is scanning the "
+        "whole repository again"
+    )
+    for glob in ("../src/ion/web/templates", "../src/ion/web/static/js"):
+        assert f'@source "{glob}"' in css, f"{glob} is no longer scanned"
+
+
+def test_no_utility_is_generated_from_a_javascript_expression():
+    """A class name assembled at runtime cannot have a rule, and looks like one.
+
+    The unscoped scan reached tools/hashed_class_map.json, whose entries are
+    keyed `partial_do_not_apply` precisely because they are NOT safe to apply --
+    they hold fragments such as `flex-['_+_slaCounts.green_+_']`. Tailwind read
+    those as arbitrary-value candidates and emitted
+
+        .flex-\[\'_\+_slaCounts\.green_\+_\'\]{flex:" + slaCounts.green + "}
+
+    which is a rule whose declaration is JavaScript source. Harmless in that no
+    element carries the class, but it is invalid CSS shipped to every browser,
+    and it is the signature of the scan reading something it should not.
+
+    `_+_` is Tailwind's encoding of ` + ` inside an arbitrary value, so its
+    presence in the build means a concatenation was scanned as a class name.
+    """
+    built = BUILT.read_text(encoding="utf-8")
+    assert "_+_" not in built, (
+        "ion.css contains a utility generated from a string concatenation; "
+        "the content scan is reading source code or data, not markup"
+    )

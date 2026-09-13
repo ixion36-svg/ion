@@ -29,7 +29,33 @@
  * Inherited from tailwind.input.css; the same reasoning still applies until
  * style.css itself is retired.
  */
-@import "tailwindcss/utilities.css";
+/*
+ * CONTENT SCAN -- explicit, because the automatic one was not.
+ *
+ * With no `@source`, Tailwind v4 walks the whole repo from the working
+ * directory. That swept in CHANGELOG.md, docs/, the test suite and, worst,
+ * tools/dead_css.py and tools/hashed_class_map.py -- migration tools whose
+ * source contains long literal lists of class names as DATA. Every token that
+ * parsed as a utility got generated, so `@layer utilities` came out at 1.37MB
+ * of a 1.5MB stylesheet: roughly 90% of the file was utilities for classes no
+ * page has ever carried.
+ *
+ * These four globs are every place a class name can reach a page that loads
+ * this sheet. src/ion/web/*.py is here because four API modules build HTML
+ * fragments server-side (case_lifecycle_api, course_api, cyab_api,
+ * daily_standup_api). Deliberately NOT listed: src/ion/services -- the
+ * executive-report and PDF exporters emit standalone documents with their own
+ * inline styling and never load ion.css -- and tools/, which is the data that
+ * caused the problem.
+ *
+ * Adding a new template directory, or emitting markup from a new module, means
+ * adding it here or its utilities will silently not be generated.
+ */
+@source "../src/ion/web/templates";
+@source "../src/ion/web/static/js";
+@source "../src/ion/web/*.py";
+
+@import "tailwindcss/utilities.css" source(none);
 
 /* daisyUI 5 component layer. Vendored at frontend/daisyui.css for the
    air-gap; no CDN reference and no Node resolution. */
