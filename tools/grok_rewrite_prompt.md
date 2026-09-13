@@ -170,3 +170,44 @@ behaviour seen at 640px, and "overlapping" selects that were merely stacked.
 Judge layout by measuring the DOM (`getBoundingClientRect`, computed styles) at
 a realistic desktop width. The preview pane downscales too far for the eye to
 be trusted.
+
+## Never delete a page's `<style>` block wholesale
+
+A page-scoped `<style nonce="{{ csp_nonce }}">` block is not a legacy artifact
+to be cleared out. Once the static markup has been converted to utilities, most
+of its rules do become inert — but some of them are the only styling for markup
+that JavaScript builds at runtime inside template literals, which you are not
+allowed to edit and therefore cannot convert.
+
+`discover.html` was restyled with the whole 317-line block removed. Sixteen
+classes were left with no rules at all: `.modal-overlay` / `.modal-dialog`
+(shared between the static modal and a JS-built one, so the class name has to
+keep meaning something), `.saved-search-*`, `.histogram-bar`, `.health-*`,
+`.found-badge` / `.not-found-badge`, `.index-badge`, `.clickable`,
+`.empty-searches`, `.stat` / `.stat-label` / `.stat-value`.
+
+**Nothing caught it.** `ui_rewrite_audit.py` checks hashed classes and inline
+styles. `ui_spot_check.py` needs a rule to exist somewhere before it can call a
+contract broken, and these had none. Both passed on the stripped page. This is
+the same blind spot that let the email templates get flattened, approached from
+the other direction: that was removal of inline styles, this is removal of a
+style block.
+
+So: **leave the block in place.** Rules for markup that no longer exists cost
+nothing. If you genuinely believe a rule is dead, say so in your report and let
+the reviewer decide — do not delete it yourself.
+
+## Check for CSS custom property collisions, not just class collisions
+
+daisyUI ships design tokens as custom properties on `:root`, and a name that
+means one thing to daisyUI can already mean something else in ION.
+
+daisyUI's `--border` is a border **width** (`1px`). ION's `style.css` had used
+`--border` as a **colour** for years, read by 598 declarations as
+`border: 1px solid var(--border)`. Both sit on an unlayered `:root` and ion.css
+loads after style.css, so daisyUI won and every one of those resolved to
+`1px solid 1px` — not a valid shorthand, so the browser dropped the whole
+declaration. Measured: width 0px, style none. The borders vanished app-wide.
+
+ION's token is now `--ion-border`. If you meet a `var(--…)` that renders wrong,
+check whether ion.css also defines it before assuming the value is wrong.
