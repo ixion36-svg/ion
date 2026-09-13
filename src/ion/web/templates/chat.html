@@ -93,7 +93,7 @@
                     <div class="ai-files-empty">No files attached</div>
                 </div>
                 <label class="flex items-center justify-center gap-[5px] p-1.5 rounded-md border border-dashed border-base-300 text-base-content/50 text-[0.78rem] cursor-pointer transition-colors hover:border-primary hover:text-primary hover:bg-primary/[3%]">
-                    <input class="_ion-s-6b99de8b69" type="file" id="ai-file-input" accept=".txt,.log,.json,.yaml,.yml,.xml,.csv,.py,.js,.ts,.html,.css,.sh,.bash,.ps1,.conf,.cfg,.ini,.toml,.md,.rst,.sql,.kql,.spl,.yar,.yara,.sigma,.rule,.rules">
+                    <input class="hidden" type="file" id="ai-file-input" accept=".txt,.log,.json,.yaml,.yml,.xml,.csv,.py,.js,.ts,.html,.css,.sh,.bash,.ps1,.conf,.cfg,.ini,.toml,.md,.rst,.sql,.kql,.spl,.yar,.yara,.sigma,.rule,.rules">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                         <polyline points="17 8 12 3 7 8"/>
@@ -1887,7 +1887,7 @@
             saveBtn.style.display = 'inline-flex';
             showToast('Document generated successfully', 'success');
         } catch (error) {
-            previewContent.innerHTML = `<div class="_ion-s-af82c00c21">Error: ${escapeHtml(error.message)}</div>`;
+            previewContent.innerHTML = `<div class="text-[var(--danger)] p-3">Error: ${escapeHtml(error.message)}</div>`;
         } finally {
             btn.disabled = false;
             btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Generate Preview';
@@ -2018,14 +2018,14 @@
                         <h3>${escapeHtml(file.name)}</h3>
                         <div class="ai-file-modal-actions">
                             <button class="btn btn-sm" data-click-action="toggleFileEdit" data-args='["$target"]'>Edit</button>
-                            <button class="btn btn-sm btn-primary _ion-s-6b99de8b69" data-click-action="saveFileEdit" data-args='["${file.id}"]' id="save-file-btn">Save</button>
+                            <button class="btn btn-sm btn-primary hidden" data-click-action="saveFileEdit" data-args='["${file.id}"]' id="save-file-btn">Save</button>
                             <button class="btn btn-sm" data-click-action="downloadFile" data-args='["${file.id}"]'>Download</button>
                             <button class="btn btn-sm" data-click-action="closeFileModal">Close</button>
                         </div>
                     </div>
                     <div class="ai-file-modal-body">
                         <pre id="file-content-view">${escapeHtml(file.content)}</pre>
-                        <textarea class="_ion-s-6b99de8b69" id="file-content-edit">${escapeHtml(file.content)}</textarea>
+                        <textarea class="hidden" id="file-content-edit">${escapeHtml(file.content)}</textarea>
                     </div>
                 </div>`;
             modal.addEventListener('click', e => { if (e.target === modal) closeFileModal(); });

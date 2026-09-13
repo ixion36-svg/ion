@@ -1,5 +1,6 @@
 {
   "_components.html": {
+    "convert": true,
     "restyle": true
   },
   "_icons.html": {
@@ -7,6 +8,7 @@
     "restyle": true
   },
   "_nav_tabs.html": {
+    "convert": true,
     "restyle": true
   },
   "admin_course_edit.html": {
@@ -18,6 +20,7 @@
     "restyle": true
   },
   "alert_arkime.html": {
+    "convert": true,
     "restyle": true
   },
   "alert_prompt_templates.html": {
@@ -29,6 +32,7 @@
     "restyle": true
   },
   "analyst.html": {
+    "convert": true,
     "restyle": true
   },
   "analytics.html": {
@@ -40,9 +44,11 @@
     "restyle": true
   },
   "arkime_traffic.html": {
+    "convert": true,
     "restyle": true
   },
   "audit_logs.html": {
+    "convert": true,
     "restyle": true
   },
   "base.html": {
@@ -50,15 +56,19 @@
     "restyle": true
   },
   "bob_eval.html": {
+    "convert": true,
     "restyle": true
   },
   "briefing.html": {
+    "convert": true,
     "restyle": true
   },
   "briefings.html": {
+    "convert": true,
     "restyle": true
   },
   "bug_reports.html": {
+    "convert": true,
     "restyle": true
   },
   "canaries.html": {
@@ -66,6 +76,7 @@
     "restyle": true
   },
   "case_grouper.html": {
+    "convert": true,
     "restyle": true
   },
   "cases.html": {
@@ -73,6 +84,7 @@
     "restyle": true
   },
   "change_requests.html": {
+    "convert": true,
     "restyle": true
   },
   "chat.html": {
@@ -80,90 +92,122 @@
     "restyle": true
   },
   "compliance.html": {
+    "convert": true,
     "restyle": true
   },
   "course_detail.html": {
+    "convert": true,
     "restyle": true
   },
   "courses.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_audit_feed.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_coverage_matrix.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_progress_header.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_scoping_counter.html": {
+    "convert": true,
     "restyle": true
   },
+  "cyab/_scoping_pack_pdf.html": {
+    "convert": true
+  },
   "cyab/_scoping_summary.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_section_nav.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_systems_table.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_wizard_step_1_identity.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_wizard_step_2_intake.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_wizard_step_3_source.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/_wizard_step_4_docs.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/audit.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/coverage.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/onboard.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/overview.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/scoping.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/system_detail.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/systems_list.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_audit_use_cases.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_data_health.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_detection.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_intake.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_overview.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_placeholder.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_signoff.html": {
+    "convert": true,
     "restyle": true
   },
   "cyab/tabs/_sources.html": {
+    "convert": true,
     "restyle": true
   },
   "cyber_range.html": {
@@ -179,6 +223,7 @@
     "restyle": true
   },
   "daily_work.html": {
+    "convert": true,
     "restyle": true
   },
   "dashboard_v2.html": {
@@ -190,18 +235,23 @@
     "restyle": true
   },
   "de_bob.html": {
+    "convert": true,
     "restyle": true
   },
   "de_metrics.html": {
+    "convert": true,
     "restyle": true
   },
   "de_proposals.html": {
+    "convert": true,
     "restyle": true
   },
   "de_quirks.html": {
+    "convert": true,
     "restyle": true
   },
   "de_workbench.html": {
+    "convert": true,
     "restyle": true
   },
   "detection_engineering.html": {
@@ -209,6 +259,7 @@
     "restyle": true
   },
   "detection_health.html": {
+    "convert": true,
     "restyle": true
   },
   "discover.html": {
@@ -216,11 +267,21 @@
     "restyle": true
   },
   "document_analysis.html": {
+    "convert": true,
     "restyle": true
   },
   "documents.html": {
     "convert": true,
     "restyle": true
+  },
+  "emails/alert_digest.html": {
+    "convert": true
+  },
+  "emails/case_update.html": {
+    "convert": true
+  },
+  "emails/sla_breach.html": {
+    "convert": true
   },
   "entity_timeline.html": {
     "convert": true,
@@ -258,6 +319,7 @@
     "restyle": true
   },
   "knowledge_graph.html": {
+    "convert": true,
     "restyle": true
   },
   "lesson.html": {
@@ -281,6 +343,7 @@
     "restyle": true
   },
   "network_topology.html": {
+    "convert": true,
     "restyle": true
   },
   "notes.html": {
@@ -324,9 +387,11 @@
     "restyle": true
   },
   "soc_health.html": {
+    "convert": true,
     "restyle": true
   },
   "soc_roles.html": {
+    "convert": true,
     "restyle": true
   },
   "social.html": {
@@ -334,6 +399,7 @@
     "restyle": true
   },
   "stories.html": {
+    "convert": true,
     "restyle": true
   },
   "template_form.html": {
@@ -357,6 +423,7 @@
     "restyle": true
   },
   "threat_intel_actor.html": {
+    "convert": true,
     "restyle": true
   },
   "tools.html": {
@@ -372,6 +439,7 @@
     "restyle": true
   },
   "verdict_review.html": {
+    "convert": true,
     "restyle": true
   },
   "versions.html": {

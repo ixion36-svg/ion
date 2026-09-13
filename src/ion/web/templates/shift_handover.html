@@ -174,7 +174,7 @@ function renderReport(d) {
 
     // Pending for incoming shift
     html += '<div class="card bg-base-200 shadow mb-4"><div class="card-body"><h3 class="card-title text-xs uppercase tracking-wider opacity-70"><i class="icon-alert-circle text-primary"></i> Pending for Incoming Shift</h3>';
-    html += '<div class="_ion-s-1cc91afd9f">';
+    html += '<div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">';
     const sevOrder = ['critical','high','medium','low','unknown'];
     for (const sev of sevOrder) {
         const cnt = (p.open_cases_by_severity||{})[sev];
@@ -219,12 +219,12 @@ function renderReport(d) {
         for (const t of recent) {
             const stKind = t.status==='closed'?'badge-success':t.status==='acknowledged'?'badge-warning':'badge-error';
             html += `<tr>
-                <td class="font-mono _ion-s-a9d20e46be" title="${esc(t.es_alert_id)}">${esc((t.es_alert_id||'').substring(0,24))}...</td>
+                <td class="font-mono text-xs max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap" title="${esc(t.es_alert_id)}">${esc((t.es_alert_id||'').substring(0,24))}...</td>
                 <td><span class="badge badge-sm ${stKind}">${esc(t.status)}</span></td>
                 <td>${esc(t.priority||'-')}</td>
                 <td>${esc(t.analyst)}</td>
                 <td class="text-xs">${fmtTime(t.updated_at)}</td>
-                <td class="_ion-s-9ab09dae3e" title="${esc(t.notes)}">${esc(t.notes||'-')}</td>
+                <td class="text-[.78rem] max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title="${esc(t.notes)}">${esc(t.notes||'-')}</td>
             </tr>`;
         }
         html += '</tbody></table></div></div></div>';

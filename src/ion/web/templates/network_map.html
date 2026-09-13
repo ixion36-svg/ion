@@ -565,7 +565,7 @@ async function renderGraph() {
   const assets = await fetchGraphAssets();
 
   if (!assets.length) {
-    $('network-graph').innerHTML = '<div class="_ion-s-36838c3eb2">No assets to visualize. Run a sync first.</div>';
+    $('network-graph').innerHTML = '<div class="flex items-center justify-center h-full text-[#64748b] text-[13px]">No assets to visualize. Run a sync first.</div>';
     return;
   }
 

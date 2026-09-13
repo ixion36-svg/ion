@@ -49,7 +49,7 @@ async function cgLoad() {
     const data = await r.json();
     cgRender(data);
   } catch (e) {
-    c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${cgEsc(e.message || 'Failed to load')}</div>`;
+    c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${cgEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 
@@ -125,7 +125,7 @@ function cgRender(s) {
             </tbody>
           </table>
         </div>
-        <div class="px-5 pb-4 _ion-s-a41031e958">
+        <div class="px-5 pb-4 mt-1 text-[var(--text-secondary)] text-xs">
           <span>Toggle via ION_CASE_GROUPER_PUSH_TO_KIBANA / ION_CASE_GROUPER_AUTO_INVESTIGATE.</span>
           <span></span>
         </div>

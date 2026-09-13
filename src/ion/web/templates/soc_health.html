@@ -77,7 +77,7 @@ async function shLoad(){
         if(!r.ok) throw new Error('Failed');
         renderScorecard(await r.json());
     } catch(e) {
-        $('sh-content').innerHTML = `<div role="alert" class="alert alert-error _ion-s-5dd0211252">${esc(e.message)}</div>`;
+        $('sh-content').innerHTML = `<div role="alert" class="alert alert-error text-[var(--sev-critical)]">${esc(e.message)}</div>`;
     }
 }
 
@@ -136,7 +136,7 @@ function renderScorecard(d) {
             if (v != null) detailHtml += `<div><strong>${k.replace(/_/g,' ')}:</strong> ${v}</div>`;
         }
         html += `<div class="card bg-base-200 shadow relative overflow-hidden" data-ion-data-ion-style="--dim-color:${dc}">
-            <div class="_ion-s-8900584d48" data-ion-style="background:${dc}"></div>
+            <div class="absolute top-0 left-0 right-0 h-[3px]" data-ion-style="background:${dc}"></div>
             <div class="stat">
                 <div class="stat-title"><i class="icon-${dimIcons[key] || 'circle'}"></i> ${esc(dim.label)}</div>
                 <div class="stat-value font-mono" data-ion-style="color:${dc}">${dim.score}</div>

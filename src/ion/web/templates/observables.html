@@ -1401,7 +1401,7 @@ function renderObservables() {
     }
 
     tbody.innerHTML = observables.map(obs => `
-        <tr class="_ion-s-8410c989c9" data-click-action="showObservableDetail" data-args='[${obs.id}]'>
+        <tr class="cursor-pointer" data-click-action="showObservableDetail" data-args='[${obs.id}]'>
             <td>
                 <span class="obs-value ${obs.is_whitelisted ? 'whitelisted' : ''} ${obs.is_watched ? 'watched' : ''} ${obs.is_ignored ? 'ignored' : ''}" title="${escapeHtml(obs.value)}">
                     ${obs.is_watched ? '<span class="watched-icon" title="Watched">&#128065;</span>' : ''}
@@ -1452,7 +1452,7 @@ function renderPagination() {
     // Show first page
     if (currentPage > 3) {
         html += `<button data-click-action="goToPage" data-args='[1]'>1</button>`;
-        if (currentPage > 4) html += `<span class="_ion-s-467caed7f1">...</span>`;
+        if (currentPage > 4) html += `<span class="py-0 px-2">...</span>`;
     }
 
     // Show pages around current
@@ -1462,7 +1462,7 @@ function renderPagination() {
 
     // Show last page
     if (currentPage < totalPages - 2) {
-        if (currentPage < totalPages - 3) html += `<span class="_ion-s-467caed7f1">...</span>`;
+        if (currentPage < totalPages - 3) html += `<span class="py-0 px-2">...</span>`;
         html += `<button data-click-action="goToPage" data-args='[${totalPages}]'>${totalPages}</button>`;
     }
 
@@ -1548,13 +1548,13 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                 </div>
                 ` : ''}
                 ${e.threat_actors && e.threat_actors.length ? `
-                <div class="_ion-s-1c09f0c006">
-                    <strong class="_ion-s-40ab419d3e">Threat Actors:</strong><br>
+                <div class="mb-2">
+                    <strong class="text-xs text-[var(--text-muted)]">Threat Actors:</strong><br>
                     ${e.threat_actors.map(ta => `<span class="threat-actor-tag">${escapeHtml(ta.name)}</span>`).join('')}
                 </div>
                 ` : ''}
                 ${e.indicators && e.indicators.length ? `
-                <div class="_ion-s-40ab419d3e">
+                <div class="text-xs text-[var(--text-muted)]">
                     ${e.indicators.length} indicator(s) found
                 </div>
                 ` : ''}
@@ -1562,9 +1562,9 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
         `;
     } else {
         enrichmentHtml = `
-            <div class="_ion-s-3c90cc0741">
+            <div class="text-center p-4 text-[var(--text-muted)]">
                 No enrichment data available.
-                <button class="btn btn-sm btn-primary _ion-s-ec61366f4a" data-click-action="enrichObservable" data-args='[${obs.id}]'>Enrich Now</button>
+                <button class="btn btn-sm btn-primary ml-2" data-click-action="enrichObservable" data-args='[${obs.id}]'>Enrich Now</button>
             </div>
         `;
     }
@@ -1577,17 +1577,17 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                 ${alerts.map(a => `
                     <div class="related-item">
                         <div>
-                            <span class="_ion-s-b9e7b710e1">${escapeHtml(a.es_alert_id.substring(0, 20))}...</span>
+                            <span class="font-mono text-xs">${escapeHtml(a.es_alert_id.substring(0, 20))}...</span>
                             ${a.context ? formatContext(a.context) : ''}
                         </div>
                         <div>
                             <span class="threat-badge ${a.priority || 'unknown'}">${a.priority || 'N/A'}</span>
-                            <span class="_ion-s-78537ac6ae">${timeAgo(a.created_at)}</span>
+                            <span class="text-xs text-[var(--text-muted)] ml-2">${timeAgo(a.created_at)}</span>
                         </div>
                     </div>
                 `).join('')}
             </div>
-            ${obs.alert_count > alerts.length ? `<div class="_ion-s-64f5d7add5">+ ${obs.alert_count - alerts.length} more alerts</div>` : ''}
+            ${obs.alert_count > alerts.length ? `<div class="text-xs text-[var(--text-muted)] mt-2">+ ${obs.alert_count - alerts.length} more alerts</div>` : ''}
         `;
     } else {
         alertsHtml = '<div class="empty-state">No related alerts</div>';
@@ -1602,7 +1602,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                     <div class="related-item">
                         <div>
                             <strong>${escapeHtml(c.case_number)}</strong>
-                            <span class="_ion-s-78537ac6ae">${escapeHtml(c.title)}</span>
+                            <span class="text-xs text-[var(--text-muted)] ml-2">${escapeHtml(c.title)}</span>
                         </div>
                         <span class="threat-badge ${c.severity || 'unknown'}">${c.severity || 'N/A'}</span>
                     </div>
@@ -1618,9 +1618,9 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
     if (coOccurring.length > 0) {
         coHtml = coOccurring.map(co => `
             <span class="co-occur-badge" data-click-action="showObservableDetail" data-args='[${co.id}]'>
-                <span class="obs-type-badge ${co.type} _ion-s-9e7d14ea5b">${co.type}</span>
+                <span class="obs-type-badge ${co.type} min-w-[auto] py-[0.0625rem] px-1">${co.type}</span>
                 ${escapeHtml(co.value.substring(0, 30))}${co.value.length > 30 ? '...' : ''}
-                <span class="_ion-s-bf4b678785">(${co.co_occurrence_count})</span>
+                <span class="text-[var(--text-muted)]">(${co.co_occurrence_count})</span>
             </span>
         `).join('');
     } else {
@@ -1634,7 +1634,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                 <div class="detail-meta">
                     <span class="obs-type-badge ${obs.type}">${obs.type}</span>
                     <span class="threat-badge ${obs.threat_level}">${obs.threat_level}</span>
-                    ${obs.is_whitelisted ? '<span class="_ion-s-fa107ec889">Whitelisted</span>' : ''}
+                    ${obs.is_whitelisted ? '<span class="text-[#22c55e]">Whitelisted</span>' : ''}
                     <span>First seen: ${timeAgo(obs.first_seen)}</span>
                     <span>Sightings: ${obs.sighting_count}</span>
                 </div>
@@ -1665,7 +1665,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
 
         <div class="detail-section">
             <h4>Co-occurring Observables</h4>
-            <div class="_ion-s-84f534c76c">
+            <div class="flex flex-wrap">
                 ${coHtml}
             </div>
         </div>
@@ -1673,7 +1673,7 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
         <div class="detail-section">
             <h4>Notes</h4>
             <textarea class="notes-textarea" id="detail-notes" placeholder="Add analyst notes...">${escapeHtml(obs.notes || '')}</textarea>
-            <button class="btn btn-sm btn-primary _ion-s-0dc8cc6234" data-click-action="saveNotes" data-args='[${obs.id}]'>Save Notes</button>
+            <button class="btn btn-sm btn-primary mt-2" data-click-action="saveNotes" data-args='[${obs.id}]'>Save Notes</button>
         </div>
 
         <div class="detail-section">
@@ -1883,7 +1883,7 @@ function closeGraphModal() {
 
 async function loadGraph(centerId = null) {
     const container = document.getElementById('graph-container');
-    container.innerHTML = '<div class="loading _ion-s-2d957e110b">Loading graph...</div>';
+    container.innerHTML = '<div class="loading flex items-center justify-center h-full">Loading graph...</div>';
 
     try {
         const minCooccur = document.getElementById('graph-min-cooccur').value;
@@ -1901,14 +1901,14 @@ async function loadGraph(centerId = null) {
         graphData = await response.json();
 
         if (graphData.nodes.length === 0) {
-            container.innerHTML = '<div class="empty-state _ion-s-2d957e110b">No relationships found. Try lowering minimum co-occurrence or add more observables.</div>';
+            container.innerHTML = '<div class="empty-state flex items-center justify-center h-full">No relationships found. Try lowering minimum co-occurrence or add more observables.</div>';
             return;
         }
 
         renderGraph(container, graphData);
     } catch (error) {
         console.error('Error loading graph:', error);
-        container.innerHTML = '<div class="error _ion-s-2d957e110b">Error loading graph data.</div>';
+        container.innerHTML = '<div class="error flex items-center justify-center h-full">Error loading graph data.</div>';
     }
 }
 
@@ -2094,7 +2094,7 @@ function renderPatterns(patterns) {
                     <span class="pattern-observable" data-click-action="showObsAndClosePatterns" data-args='[${o.id}]'>
                         <span class="obs-type-badge ${o.type}">${o.type}</span>
                         <span>${escapeHtml(o.value.substring(0, 40))}${o.value.length > 40 ? '...' : ''}</span>
-                        <span class="threat-badge ${o.threat_level} _ion-s-e4ff65d83b">${o.threat_level}</span>
+                        <span class="threat-badge ${o.threat_level} text-[0.5625rem]">${o.threat_level}</span>
                     </span>
                 `).join('')}
             </div>
@@ -2504,11 +2504,11 @@ async function loadTimeline(observableId) {
         if (obsResponse.ok) {
             const obsData = await obsResponse.json();
             infoContainer.innerHTML = `
-                <h4 class="_ion-s-1c09f0c006">
+                <h4 class="mb-2">
                     <span class="badge badge-type">${obsData.type}</span>
                     <code>${escapeHtml(obsData.value)}</code>
                 </h4>
-                <p class="_ion-s-d03c22cc68">
+                <p class="text-[var(--text-muted)] mb-4">
                     First seen: ${formatDate(obsData.first_seen)} |
                     Last seen: ${formatDate(obsData.last_seen)} |
                     Sightings: ${obsData.sighting_count}
@@ -2550,7 +2550,7 @@ async function loadTimeline(observableId) {
                         <div class="timeline-event-icon">E</div>
                         <div class="timeline-event-content">
                             <div class="timeline-event-time">${formatDate(event.timestamp)}</div>
-                            <p><strong>Enrichment</strong> from ${event.source}${event.is_malicious ? ' - <span class="_ion-s-b0eb59c131">MALICIOUS</span>' : ''}</p>
+                            <p><strong>Enrichment</strong> from ${event.source}${event.is_malicious ? ' - <span class="text-[#ef4444]">MALICIOUS</span>' : ''}</p>
                             ${event.score ? `<p>Score: ${event.score}/100</p>` : ''}
                         </div>
                     </div>

@@ -1403,29 +1403,29 @@ function openNlQueryModal() {
         modal.id = 'nl-query-modal';
         modal.className = 'modal-overlay';
         modal.innerHTML = `
-            <div class="modal-dialog _ion-s-29cd8c40c8">
+            <div class="modal-dialog max-w-[560px]">
                 <div class="modal-header">
                     <h3>AI Query Builder</h3>
                     <button class="modal-close" data-click-action="closeNlQueryModal">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-slate-400 mb-3 _ion-s-9e6595fb01">Describe what you're looking for in plain English and AI will generate an Elasticsearch query.</p>
+                    <p class="text-slate-400 mb-3 text-[13px]">Describe what you're looking for in plain English and AI will generate an Elasticsearch query.</p>
                     <div class="form-group">
                         <label for="nl-question">Ask in plain English</label>
                         <input type="text" id="nl-question" class="form-control" placeholder="e.g., show me lateral movement in the last 24h">
                     </div>
-                    <div class="_ion-s-17429b566c" id="nl-query-error"></div>
-                    <div id="nl-query-result" class="mt-3 _ion-s-c8be1ccba6">
-                        <label class="text-slate-400 _ion-s-e71ae94b55">Generated Query</label>
-                        <pre class="_ion-s-d0e84089b5" id="nl-query-output"></pre>
-                        <p id="nl-query-explanation" class="text-slate-400 mt-1 _ion-s-e71ae94b55"></p>
-                        <p id="nl-query-index" class="text-slate-500 mt-1 _ion-s-e48b05836a"></p>
+                    <div class="hidden text-[#f87171] text-[13px] mb-2" id="nl-query-error"></div>
+                    <div id="nl-query-result" class="mt-3 hidden">
+                        <label class="text-slate-400 text-xs">Generated Query</label>
+                        <pre class="bg-[#1e293b] p-2.5 rounded-[6px] text-xs max-h-[240px] overflow-auto text-[#e2e8f0] whitespace-pre-wrap" id="nl-query-output"></pre>
+                        <p id="nl-query-explanation" class="text-slate-400 mt-1 text-xs"></p>
+                        <p id="nl-query-index" class="text-slate-500 mt-1 text-[11px]"></p>
                     </div>
                 </div>
-                <div class="modal-footer _ion-s-b0c6f36498">
+                <div class="modal-footer flex gap-2 justify-end">
                     <button class="btn" data-click-action="closeNlQueryModal">Cancel</button>
                     <button class="btn btn-primary" id="nl-query-generate-btn" data-click-action="generateNlQuery">Generate</button>
-                    <button class="btn btn-primary _ion-s-c8be1ccba6" id="nl-query-apply-btn" data-click-action="applyNlQuery">Apply to Search</button>
+                    <button class="btn btn-primary hidden" id="nl-query-apply-btn" data-click-action="applyNlQuery">Apply to Search</button>
                 </div>
             </div>`;
         document.body.appendChild(modal);

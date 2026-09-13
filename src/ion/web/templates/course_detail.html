@@ -106,7 +106,7 @@ function render(c) {
         <span class="badge badge-sm ${levelBadge} uppercase tracking-wider">${escHtml(c.level)}</span>
         <h1 class="text-2xl font-bold tracking-tight mt-2">${escHtml(c.title)}</h1>
       </div>
-      <div class="_ion-s-690f054c4e">${enrolBtn}</div>
+      <div class="ml-[auto]">${enrolBtn}</div>
     </div>
     <div class="stats stats-vertical sm:stats-horizontal bg-base-200 shadow-sm mb-4 w-full">
       <div class="stat py-3 px-4">
@@ -124,7 +124,7 @@ function render(c) {
         <div class="stat-desc">${completed}/${total} lessons</div>
       </div>
     </div>
-    <div class="h-1.5 rounded-full bg-base-300 overflow-hidden mt-1.5 _ion-s-16884469a8"><div class="h-full bg-gradient-to-r from-primary to-secondary transition-[width] duration-300" data-ion-style="width:${pct}%"></div></div>
+    <div class="h-1.5 rounded-full bg-base-300 overflow-hidden mt-1.5 mb-4"><div class="h-full bg-gradient-to-r from-primary to-secondary transition-[width] duration-300" data-ion-style="width:${pct}%"></div></div>
     <div class="prose-md text-sm leading-relaxed">${md(c.description_md || '')}</div>
     ${modulesHtml}
   `;

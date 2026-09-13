@@ -410,7 +410,7 @@
         return;
       }
       tbody.innerHTML = rows.map(r => `
-        <tr class="_ion-s-3b6a3a65d8" data-click-action="imShowInv" data-args='[${r.id}]'>
+        <tr class="cursor-pointer" data-click-action="imShowInv" data-args='[${r.id}]'>
           <td>${imEscape(imFmtDate(r.created_at))}</td>
           <td><span class="text-white font-medium">${imEscape(r.alert_signature)}</span></td>
           <td>${imEscape(r.host || '-')}</td>

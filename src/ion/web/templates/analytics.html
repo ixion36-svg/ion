@@ -1020,11 +1020,11 @@ function renderEntityRisk(job) {
             return `<tr>
                 <td><strong>${esc(e.entity)}</strong></td>
                 <td><span class="entity-type-badge ${e.type}">${e.type}</span></td>
-                <td class="_ion-s-bed9cea1b3">${e.risk_score}</td>
-                <td class="_ion-s-465bfea3ed"><div class="risk-bar-container"><div class="risk-bar ${cls}" data-pct="${pct}"></div></div></td>
+                <td class="font-bold text-[var(--text)]">${e.risk_score}</td>
+                <td class="w-[120px]"><div class="risk-bar-container"><div class="risk-bar ${cls}" data-pct="${pct}"></div></div></td>
                 <td>${e.alert_count}</td>
                 <td>${e.open_cases}</td>
-                <td class="_ion-s-7fd116b27a" title="${esc((e.rules || []).join(', '))}">${esc((e.rules || []).slice(0, 2).join(', '))}</td>
+                <td class="text-xs max-w-[200px] overflow-hidden text-ellipsis whitespace-nowrap" title="${esc((e.rules || []).join(', '))}">${esc((e.rules || []).slice(0, 2).join(', '))}</td>
             </tr>`;
         }).join('')}</tbody>
     </table>`;
@@ -1042,10 +1042,10 @@ function renderRepeatOffenders(job) {
         <tbody>${offenders.map(o => `<tr>
             <td><strong>${esc(o.entity)}</strong></td>
             <td><span class="entity-type-badge ${o.type}">${o.type}</span></td>
-            <td class="_ion-s-eed0f8fb89">${o.count_7d}</td>
-            <td class="_ion-s-eed0f8fb89">${o.count_30d}</td>
+            <td class="font-semibold">${o.count_7d}</td>
+            <td class="font-semibold">${o.count_30d}</td>
             <td><span class="severity-badge severity-${o.top_severity || 'unknown'}">${o.top_severity || '-'}</span></td>
-            <td class="_ion-s-8113a013f7" title="${esc((o.rules || []).join(', '))}">${(o.rules || []).length} rules</td>
+            <td class="text-xs" title="${esc((o.rules || []).join(', '))}">${(o.rules || []).length} rules</td>
         </tr>`).join('')}</tbody>
     </table>`;
 }
@@ -1059,8 +1059,8 @@ function renderRuleNoise(job) {
     const maxCount = Math.max(...rules.map(r => r.alert_count), 1);
 
     container.innerHTML = `
-        <div class="_ion-s-1a6ff0a2dd">
-            Bar color: <span class="_ion-s-f918b2a5f3">low FP</span> | <span class="_ion-s-bd70d9ce59">medium FP</span> | <span class="_ion-s-b0eb59c131">high FP (&gt;50%)</span>
+        <div class="mb-3 text-xs text-[var(--text-muted)]">
+            Bar color: <span class="text-[#22c55e]">low FP</span> | <span class="text-[#eab308]">medium FP</span> | <span class="text-[#ef4444]">high FP (&gt;50%)</span>
         </div>
         ${rules.map(r => {
             const pct = Math.round((r.alert_count / maxCount) * 100);
@@ -1069,7 +1069,7 @@ function renderRuleNoise(job) {
                 <span class="noise-bar-label" title="${esc(r.rule_name)}">${esc(r.rule_name)}</span>
                 <div class="noise-bar-track"><div class="noise-bar-fill ${fpClass}" data-pct="${pct}"></div></div>
                 <span class="noise-bar-count">${r.alert_count}</span>
-                <span class="noise-bar-count _ion-s-46a161de8c" title="FP ratio">${Math.round(r.fp_ratio * 100)}% FP</span>
+                <span class="noise-bar-count w-[65px]" title="FP ratio">${Math.round(r.fp_ratio * 100)}% FP</span>
             </div>`;
         }).join('')}
     `;
@@ -1097,14 +1097,14 @@ function renderObservableVelocity(job) {
     </tr>`).join('');
 
     container.innerHTML = `
-        <div class="_ion-s-2a9a8404ed">
+        <div class="grid grid-cols-2 gap-4 mb-4">
             <div class="velocity-chart-container">
                 <div class="velocity-chart-title">New Observables / Day (30d)</div>
                 <div class="sparkline">${dailyCounts.map(d => {
                     const h = Math.max(2, Math.round((d.count / maxDay) * 56));
                     return `<div class="sparkline-bar" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
                 }).join('')}</div>
-                <div class="_ion-s-fe9b81727a">
+                <div class="flex justify-between text-[0.6875rem] text-[var(--text-muted)] mt-1.5">
                     <span>${dailyCounts[0]?.date || ''}</span><span>${dailyCounts[dailyCounts.length - 1]?.date || ''}</span>
                 </div>
             </div>
@@ -1116,20 +1116,20 @@ function renderObservableVelocity(job) {
                     return `<div class="threat-dist-row">
                         <span class="threat-dist-label">${level}</span>
                         <div class="_ion-s-8bc7ebe99c">
-                            <div class="threat-dist-bar tl-${level} _ion-s-d4890133af" data-ion-style="width:${pct}%"></div>
+                            <div class="threat-dist-bar tl-${level} h-full" data-ion-style="width:${pct}%"></div>
                         </div>
                         <span class="threat-dist-count">${count}</span>
                     </div>`;
                 }).join('')}
-                <div class="_ion-s-eaa3227f31">Total: ${r.total_observables || 0} | Watched: ${r.total_watched || 0}</div>
+                <div class="mt-2 text-xs text-[var(--text-muted)]">Total: ${r.total_observables || 0} | Watched: ${r.total_watched || 0}</div>
             </div>
         </div>
-        <div class="_ion-s-1f64bfa5da">
-            <div class="metric-card _ion-s-97445a8d93"><div class="metric-value">${r.velocity_7d || 0}</div><div class="metric-label">New IOCs (7d)</div></div>
-            <div class="metric-card _ion-s-97445a8d93"><div class="metric-value">${r.velocity_prev_7d || 0}</div><div class="metric-label">Previous 7d</div></div>
-            <div class="metric-card _ion-s-97445a8d93"><div class="metric-value" data-ion-style="color:${(r.velocity_change || 0) > 0 ? '#ef4444' : '#22c55e'}">${(r.velocity_change || 0) > 0 ? '+' : ''}${r.velocity_change || 0}</div><div class="metric-label">Change</div></div>
+        <div class="flex gap-4 mb-4">
+            <div class="metric-card flex-1"><div class="metric-value">${r.velocity_7d || 0}</div><div class="metric-label">New IOCs (7d)</div></div>
+            <div class="metric-card flex-1"><div class="metric-value">${r.velocity_prev_7d || 0}</div><div class="metric-label">Previous 7d</div></div>
+            <div class="metric-card flex-1"><div class="metric-value" data-ion-style="color:${(r.velocity_change || 0) > 0 ? '#ef4444' : '#22c55e'}">${(r.velocity_change || 0) > 0 ? '+' : ''}${r.velocity_change || 0}</div><div class="metric-label">Change</div></div>
         </div>
-        ${staleList ? `<h3 class="_ion-s-43e49f74cc">Stale Watched IOCs</h3>
+        ${staleList ? `<h3 class="text-[0.9375rem] mb-2">Stale Watched IOCs</h3>
         <table class="analytics-table"><thead><tr><th>Value</th><th>Type</th><th>Threat Level</th><th>Days Stale</th></tr></thead>
         <tbody>${staleList}</tbody></table>` : ''}
     `;
@@ -1152,17 +1152,17 @@ function renderCaseMetrics(job) {
         <div class="metrics-grid">
             <div class="metric-card"><div class="metric-value">${r.mttr_hours != null ? r.mttr_hours : '-'}</div><div class="metric-label">MTTR (hours)</div></div>
             <div class="metric-card"><div class="metric-value">${r.total_cases || 0}</div><div class="metric-label">Total Cases (30d)</div></div>
-            <div class="metric-card"><div class="metric-value _ion-s-bd70d9ce59">${r.open_cases || 0}</div><div class="metric-label">Open</div></div>
-            <div class="metric-card"><div class="metric-value _ion-s-f918b2a5f3">${r.closed_cases || 0}</div><div class="metric-label">Closed</div></div>
+            <div class="metric-card"><div class="metric-value text-[#eab308]">${r.open_cases || 0}</div><div class="metric-label">Open</div></div>
+            <div class="metric-card"><div class="metric-value text-[#22c55e]">${r.closed_cases || 0}</div><div class="metric-label">Closed</div></div>
         </div>
-        <div class="_ion-s-bc67c87324">
+        <div class="grid grid-cols-2 gap-4">
             <div class="velocity-chart-container">
                 <div class="velocity-chart-title">Cases Created / Day</div>
                 <div class="sparkline">${trend.map(d => {
                     const h = Math.max(2, Math.round((d.count / maxTrend) * 56));
-                    return `<div class="sparkline-bar _ion-s-7f581fdb12" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
+                    return `<div class="sparkline-bar bg-[#8b5cf6]" data-ion-style="height:${h}px" title="${d.date}: ${d.count}"></div>`;
                 }).join('')}</div>
-                <div class="_ion-s-fe9b81727a">
+                <div class="flex justify-between text-[0.6875rem] text-[var(--text-muted)] mt-1.5">
                     <span>${trend[0]?.date || ''}</span><span>${trend[trend.length - 1]?.date || ''}</span>
                 </div>
             </div>
@@ -1186,8 +1186,8 @@ function renderCaseMetrics(job) {
 function renderSeverityBreakdown(bySev) {
     const entries = Object.entries(bySev);
     if (!entries.length) return '';
-    return `<div class="_ion-s-0cf8f93b0e">
-        <h3 class="_ion-s-43e49f74cc">Cases by Severity</h3>
+    return `<div class="mt-4">
+        <h3 class="text-[0.9375rem] mb-2">Cases by Severity</h3>
         <table class="analytics-table"><thead><tr><th>Severity</th><th>Open</th><th>Closed</th><th>Total</th></tr></thead>
         <tbody>${entries.sort((a, b) => {
             const order = ['critical','high','medium','low','info'];
@@ -1196,7 +1196,7 @@ function renderSeverityBreakdown(bySev) {
             <td><span class="severity-badge severity-${sev}">${sev}</span></td>
             <td>${data.open || 0}</td>
             <td>${data.closed || 0}</td>
-            <td class="_ion-s-eed0f8fb89">${data.total || 0}</td>
+            <td class="font-semibold">${data.total || 0}</td>
         </tr>`).join('')}</tbody></table>
     </div>`;
 }
@@ -1235,7 +1235,7 @@ function renderStaleInvestigations(job) {
             <h3>Stale Alerts (uncased) <span class="stale-badge">${staleAlerts.length}</span></h3>
             <table class="analytics-table"><thead><tr><th>Alert ID</th><th>Status</th><th>Assigned To</th><th>Last Activity</th><th>Days Stale</th></tr></thead>
             <tbody>${staleAlerts.map(a => `<tr>
-                <td class="_ion-s-b44a174a0b" title="${esc(a.es_alert_id)}">${esc(a.es_alert_id.substring(0, 20))}...</td>
+                <td class="text-xs max-w-[200px] overflow-hidden text-ellipsis" title="${esc(a.es_alert_id)}">${esc(a.es_alert_id.substring(0, 20))}...</td>
                 <td>${a.status}</td>
                 <td>${esc(a.assigned_to || 'Unassigned')}</td>
                 <td class="run-time">${timeAgo(a.last_activity)}</td>
@@ -1254,14 +1254,14 @@ function renderConfig() {
     container.innerHTML = `<table class="config-table">
         <thead><tr><th>Job</th><th>Enabled</th><th>Schedule (min)</th><th>Last Run</th><th>Next Run</th><th>Runs</th><th>Duration</th><th>Status</th><th></th></tr></thead>
         <tbody>${jobsList.map(j => `<tr>
-            <td><strong>${esc(j.display_name)}</strong><div class="_ion-s-acd1bd26b1">${j.job_type}</div></td>
+            <td><strong>${esc(j.display_name)}</strong><div class="text-[0.6875rem] text-[var(--text-muted)]">${j.job_type}</div></td>
             <td><button class="config-toggle ${j.enabled ? 'on' : 'off'}" data-click-action="toggleJob" data-args='["${j.job_type}", ${!j.enabled}]'></button></td>
             <td><input type="number" class="schedule-input" value="${j.schedule_minutes}" min="5" data-change-action="updateSchedule" data-args='["${j.job_type}", "$value"]'></td>
             <td class="run-time">${j.last_run_at ? timeAgo(j.last_run_at) : 'Never'}</td>
             <td class="run-time">${j.next_run_at ? timeAgo(j.next_run_at) : '-'}</td>
             <td>${j.run_count}</td>
             <td class="run-time">${j.last_duration_ms != null ? j.last_duration_ms + 'ms' : '-'}</td>
-            <td>${j.last_error ? '<span class="_ion-s-b0eb59c131" title="' + esc(j.last_error) + '">Error</span>' : (j.has_results ? '<span class="_ion-s-f918b2a5f3">OK</span>' : '<span class="_ion-s-5872de20d5">Pending</span>')}</td>
+            <td>${j.last_error ? '<span class="text-[#ef4444]" title="' + esc(j.last_error) + '">Error</span>' : (j.has_results ? '<span class="text-[#22c55e]">OK</span>' : '<span class="text-[var(--text-muted)]">Pending</span>')}</td>
             <td><button class="btn btn-sm btn-secondary" data-click-action="runJob" data-args='["${j.job_type}"]'>Run Now</button></td>
         </tr>`).join('')}</tbody>
     </table>`;
@@ -1502,7 +1502,7 @@ function renderSystemAnalytics(data) {
 function renderSysTimeline(timeline, interval) {
     const container = document.getElementById('sys-timeline-chart');
     if (!timeline.length) {
-        container.innerHTML = '<div class="_ion-s-b0b5267927">No timeline data</div>';
+        container.innerHTML = '<div class="text-center text-[var(--text-muted)] text-[0.8125rem] p-4">No timeline data</div>';
         return;
     }
     const W = container.clientWidth - 40 || 800;
@@ -1516,8 +1516,8 @@ function renderSysTimeline(timeline, interval) {
     const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
     const areaPath = linePath + ` L${points[points.length-1].x.toFixed(1)},${H-10} L${points[0].x.toFixed(1)},${H-10} Z`;
 
-    container.innerHTML = `<div class="_ion-s-a28c95bdcc">Alert volume (interval: ${interval || 'auto'})</div>
-        <svg class="_ion-s-51ec6bb09a" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    container.innerHTML = `<div class="text-[0.65rem] text-[var(--text-muted)] mb-1">Alert volume (interval: ${interval || 'auto'})</div>
+        <svg class="w-full h-[55px]" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
             <defs><linearGradient id="sys-tl-grad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stop-color="#00d4ff" stop-opacity="0.4"/>
                 <stop offset="100%" stop-color="#00d4ff" stop-opacity="0"/>
@@ -1532,7 +1532,7 @@ function renderSysTimeline(timeline, interval) {
 function renderSysCards(systems) {
     const grid = document.getElementById('sys-cards-grid');
     if (!systems.length) {
-        grid.innerHTML = '<div class="empty-state _ion-s-97294b207c">No systems found. Configure Elasticsearch and CyAB data source namespaces to see system analytics.</div>';
+        grid.innerHTML = '<div class="empty-state col-span-full">No systems found. Configure Elasticsearch and CyAB data source namespaces to see system analytics.</div>';
         return;
     }
     grid.innerHTML = systems.map(sys => buildSysCard(sys)).join('');
@@ -1551,8 +1551,8 @@ function buildSysCard(sys) {
     if (sev.high) sevHtml += `<span class="sys-sev-pill high">H ${sev.high}</span>`;
     if (sev.medium) sevHtml += `<span class="sys-sev-pill med">M ${sev.medium}</span>`;
     if (sev.low) sevHtml += `<span class="sys-sev-pill low">L ${sev.low}</span>`;
-    if (!sevHtml && sys.alert_count > 0) sevHtml = '<span class="sys-sev-pill _ion-s-b8e0b1fa55">No severity data</span>';
-    if (!sevHtml && sys.alert_count === 0) sevHtml = '<span class="_ion-s-1d73b48170">No alerts in time range</span>';
+    if (!sevHtml && sys.alert_count > 0) sevHtml = '<span class="sys-sev-pill text-[var(--text-muted)]">No severity data</span>';
+    if (!sevHtml && sys.alert_count === 0) sevHtml = '<span class="text-[0.7rem] text-[var(--text-muted)]">No alerts in time range</span>';
 
     // Mini sparkline
     const sparkHtml = buildSysSparkline(sys.timeline || [], iconColor);
@@ -1587,14 +1587,14 @@ function buildSysCard(sys) {
             <div class="sys-tide-stats">
                 <span>${t.applied_rules}/${t.total_rules} rules</span>
                 <span>${t.enabled_rules} enabled</span>
-                ${t.disabled_rules ? `<span class="_ion-s-2b051ed7cb">${t.disabled_rules} disabled</span>` : ''}
-                ${t.severity_breakdown?.critical ? `<span class="_ion-s-defa93481e">${t.severity_breakdown.critical} crit</span>` : ''}
-                ${t.severity_breakdown?.high ? `<span class="_ion-s-2b051ed7cb">${t.severity_breakdown.high} high</span>` : ''}
+                ${t.disabled_rules ? `<span class="text-[var(--neon-orange)]">${t.disabled_rules} disabled</span>` : ''}
+                ${t.severity_breakdown?.critical ? `<span class="text-[var(--danger)]">${t.severity_breakdown.critical} crit</span>` : ''}
+                ${t.severity_breakdown?.high ? `<span class="text-[var(--neon-orange)]">${t.severity_breakdown.high} high</span>` : ''}
             </div>
         </div>`;
     } else if (isMapped && sys.cyab && !sys.tide) {
         tideHtml = `<div class="sys-tide-bar">
-            <div class="_ion-s-1d73b48170">CyAB mapped (${esc(sys.cyab.cyab_source_name || '')}), no TIDE system linked</div>
+            <div class="text-[0.7rem] text-[var(--text-muted)]">CyAB mapped (${esc(sys.cyab.cyab_source_name || '')}), no TIDE system linked</div>
         </div>`;
     }
 
@@ -1603,7 +1603,7 @@ function buildSysCard(sys) {
     if (isMapped && sys.cyab) {
         const c = sys.cyab;
         const readColor = (c.readiness_score || 0) >= 70 ? 'var(--neon-green)' : (c.readiness_score || 0) >= 40 ? 'var(--neon-yellow)' : 'var(--neon-red)';
-        cyabHtml = `<div class="sys-meta _ion-s-04cdf78d3c">
+        cyabHtml = `<div class="sys-meta mt-1">
             <span title="CyAB System">${esc(c.cyab_system_name || c.cyab_source_name || '')}</span>
             <span data-ion-style="color:${readColor}" title="Readiness">${c.readiness_score || 0}% ready</span>
             <span title="Use Case Status">${esc(c.use_case_status || 'Not reviewed')}</span>

@@ -733,7 +733,7 @@ function buildColumnsField(f, columns, idx) {
 function buildMetadataFieldsField(f, fields, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="metadata">';
     fields.forEach((fld, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input class="_ion-s-8ff9961267" type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(fld.label || '') + '" placeholder="Label" data-list-idx="' + i + '" data-pair="label"><input class="font-mono" type="text" value="' + escapeHtml(fld.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
     html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "metadata"]\'>+ Add Field</button>';
     html += '</div></div>';
@@ -743,7 +743,7 @@ function buildMetadataFieldsField(f, fields, idx) {
 function buildSignatureRolesField(f, roles, idx) {
     let html = '<div class="se-field"><label>' + escapeHtml(f.label) + '</label><div class="se-list-field" data-idx="' + idx + '" data-field="' + f.name + '" data-list-type="signatures">';
     roles.forEach((r, i) => {
-        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input class="_ion-s-8ff9961267" type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
+        html += '<div class="se-list-item"><input type="text" value="' + escapeHtml(r.role_name || '') + '" placeholder="Role" data-list-idx="' + i + '" data-pair="role_name"><input class="font-mono" type="text" value="' + escapeHtml(r.variable_name || '') + '" placeholder="variable_name" data-list-idx="' + i + '" data-pair="variable_name"><button type="button" data-click-action="removeListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', ' + i + ']\'>&#10005;</button></div>';
     });
     html += '<button type="button" class="se-list-add" data-click-action="addListItem" data-args=\'[' + idx + ', ' + JSON.stringify(f.name) + ', "signatures"]\'>+ Add Role</button>';
     html += '</div></div>';

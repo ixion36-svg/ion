@@ -88,7 +88,7 @@
 </div>
 
 <!-- ==================== ALL INVESTIGATIONS TAB ==================== -->
-<div class="fr-panel _ion-s-c8be1ccba6" id="panel-investigations">
+<div class="fr-panel hidden" id="panel-investigations">
     <div class="flex flex-col sm:flex-row gap-3 mb-4 w-full">
         <input type="text" id="filter-search" class="ion-input flex-1" placeholder="Search case number or title..." data-input-action="debouncedFilter">
         <select id="filter-status" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadCases">
@@ -114,12 +114,12 @@
             <thead><tr><th>Case #</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Lead</th><th>Progress</th><th>SLA</th><th>Lock</th><th>Created</th></tr></thead>
             <tbody id="cases-tbody"></tbody>
         </table>
-        <div class="text-center py-10 text-base-content/60 _ion-s-c8be1ccba6" id="cases-empty">No investigations found</div>
+        <div class="text-center py-10 text-base-content/60 hidden" id="cases-empty">No investigations found</div>
     </div>
 </div>
 
 <!-- ==================== EVIDENCE TAB ==================== -->
-<div class="fr-panel _ion-s-c8be1ccba6" id="panel-evidence">
+<div class="fr-panel hidden" id="panel-evidence">
     <div class="flex flex-col sm:flex-row gap-3 mb-4 w-full">
         <select id="evidence-case-select" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadEvidenceForCase"><option value="">Select an investigation...</option></select>
     </div>
@@ -133,7 +133,7 @@
 </div>
 
 <!-- ==================== PLAYBOOKS TAB ==================== -->
-<div class="fr-panel _ion-s-c8be1ccba6" id="panel-playbooks">
+<div class="fr-panel hidden" id="panel-playbooks">
     <div class="flex justify-between items-center mb-3">
         <select id="pb-filter-type" class="ion-select sm:min-w-[150px] sm:w-auto" data-change-action="loadPlaybooks"><option value="">All Types</option></select>
         <button class="ion-btn ion-btn-primary" data-click-action="showNewPlaybookModal">+ New Playbook</button>
@@ -143,19 +143,19 @@
             <thead><tr><th>Name</th><th>Investigation Type</th><th>Steps</th><th>Active</th><th>Created By</th><th>Actions</th></tr></thead>
             <tbody id="playbooks-tbody"></tbody>
         </table>
-        <div class="text-center py-10 text-base-content/60 _ion-s-c8be1ccba6" id="playbooks-empty">No forensic playbooks found</div>
+        <div class="text-center py-10 text-base-content/60 hidden" id="playbooks-empty">No forensic playbooks found</div>
     </div>
 </div>
 
 <!-- ==================== REFERENCE DOCS TAB ==================== -->
-<div class="fr-panel _ion-s-c8be1ccba6" id="panel-reference">
+<div class="fr-panel hidden" id="panel-reference">
     <div class="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4 w-full" id="ref-docs-grid"></div>
 </div>
 
 <!-- ==================== MODALS ==================== -->
 
 <!-- New Investigation Modal (Wizard: playbook → details) -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-new-case">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-new-case">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[700px] max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">New Forensic Investigation</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-new-case"]'>&times;</button></div>
         <div class="p-5">
@@ -197,7 +197,7 @@
 </div>
 
 <!-- Case Detail Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-case-detail">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-case-detail">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[960px] max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl">
             <h2 id="cd-title" class="text-[1.1rem] m-0 cursor-pointer border-b border-dashed border-transparent hover:border-primary transition-colors duration-200" data-click-action="startEditTitle" title="Click to edit title">Investigation Detail</h2>
@@ -246,24 +246,24 @@
                 <div id="cd-sections-list"></div>
                 <button class="btn btn-secondary mt-2" data-click-action="showAddStepModal">+ Add Section</button>
             </div>
-            <div class="_ion-s-c8be1ccba6" id="cd-tab-evidence">
+            <div class="hidden" id="cd-tab-evidence">
                 <button class="btn btn-primary mb-3" data-click-action="showAddEvidenceModal">+ Add Evidence</button>
                 <div id="cd-evidence-list"></div>
             </div>
-            <div class="_ion-s-c8be1ccba6" id="cd-tab-timeline">
+            <div class="hidden" id="cd-tab-timeline">
                 <div class="flex gap-2 mb-3">
-                    <input type="text" id="cd-note-input" class="input w-full _ion-s-7623f05545" placeholder="Add a timeline note...">
+                    <input type="text" id="cd-note-input" class="input w-full flex-1" placeholder="Add a timeline note...">
                     <button class="btn btn-primary" data-click-action="addTimelineNote">Add</button>
                 </div>
                 <div class="max-h-[400px] overflow-y-auto" id="cd-timeline"></div>
             </div>
-            <div class="_ion-s-c8be1ccba6" id="cd-tab-report">
+            <div class="hidden" id="cd-tab-report">
                 <div class="whitespace-pre-wrap font-mono bg-[var(--bg-secondary)] p-4 rounded-[8px] max-h-[500px] overflow-y-auto" id="cd-report-content"></div>
             </div>
             <!-- Annotations Tab — separate from ForensicTimelineEntry items (spec 4.7) -->
-            <div class="_ion-s-c8be1ccba6" id="cd-tab-annotations">
+            <div class="hidden" id="cd-tab-annotations">
                 <div class="mb-2" id="forensic-annotations-body">
-                    <div class="_ion-s-4d90051488">Loading annotations...</div>
+                    <div class="text-[var(--text-secondary)] text-[.8rem]">Loading annotations...</div>
                 </div>
                 <div class="hidden mt-2" id="forensic-ann-form">
                     <input class="w-full mb-1.5 bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-1 px-2 text-[var(--text-primary)] text-[.85rem]" type="datetime-local" id="forensic-ann-ts">
@@ -280,7 +280,7 @@
 </div>
 
 <!-- Close Investigation Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-close-case">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-close-case">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[600px]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Close Investigation</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-close-case"]'>&times;</button></div>
         <div class="p-5">
@@ -297,7 +297,7 @@
 </div>
 
 <!-- Add Evidence Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-add-evidence">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-add-evidence">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[600px]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Add Evidence</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-add-evidence"]'>&times;</button></div>
         <div class="p-5">
@@ -317,7 +317,7 @@
 </div>
 
 <!-- Custody Action Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-custody">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-custody">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[500px]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Log Custody Action</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-custody"]'>&times;</button></div>
         <div class="p-5">
@@ -334,7 +334,7 @@
 </div>
 
 <!-- Custody Log Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-custody-log">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-custody-log">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[700px]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="cl-title" class="text-[1.1rem] m-0">Chain of Custody</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-custody-log"]'>&times;</button></div>
         <div class="p-5"><div class="max-h-[500px] overflow-y-auto" id="cl-entries"></div></div>
@@ -342,7 +342,7 @@
 </div>
 
 <!-- Add Section Modal (ad-hoc step) -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-add-step">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-add-step">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[500px]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Add Investigation Section</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-add-step"]'>&times;</button></div>
         <div class="p-5">
@@ -358,7 +358,7 @@
 </div>
 
 <!-- IOC Extract Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-ioc-extract">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-ioc-extract">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[700px] max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 class="text-[1.1rem] m-0">Extract IOCs</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-ioc-extract"]'>&times;</button></div>
         <div class="p-5">
@@ -366,8 +366,8 @@
                 <div id="ioc-upload-prompt">
                     <div class="text-[2rem] mb-2">&#128196;</div>
                     <div class="font-semibold mb-1">Drop a file here or click to upload</div>
-                    <div class="_ion-s-2f96ca6c07">CSV, TXT, LOG, JSON, TSV, IOC (max 10 MB)</div>
-                    <input class="_ion-s-c8be1ccba6" type="file" id="ioc-file-input" accept=".csv,.txt,.log,.json,.md,.tsv,.ioc">
+                    <div class="text-[.8rem] text-[var(--text-secondary)]">CSV, TXT, LOG, JSON, TSV, IOC (max 10 MB)</div>
+                    <input class="hidden" type="file" id="ioc-file-input" accept=".csv,.txt,.log,.json,.md,.tsv,.ioc">
                 </div>
                 <div class="hidden font-semibold" id="ioc-file-name"></div>
             </div>
@@ -389,7 +389,7 @@
 </div>
 
 <!-- New/Edit Playbook Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-playbook">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-playbook">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[700px] max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="pb-modal-title" class="text-[1.1rem] m-0">New Forensic Playbook</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-playbook"]'>&times;</button></div>
         <div class="p-5">
@@ -409,7 +409,7 @@
 </div>
 
 <!-- Report Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-report">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-report">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[800px] max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="rpt-title" class="text-[1.1rem] m-0">Investigation Report</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-report"]'>&times;</button></div>
         <div class="p-5"><div class="whitespace-pre-wrap font-mono bg-[var(--bg-secondary)] p-4 rounded-[8px]" id="rpt-content"></div></div>
@@ -421,7 +421,7 @@
 </div>
 
 <!-- Reference Doc Viewer Modal -->
-<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm _ion-s-c8be1ccba6" id="modal-ref-doc">
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/80 backdrop-blur-sm hidden" id="modal-ref-doc">
     <div class="bg-base-200 border border-base-300 rounded-xl w-[90%] max-w-[600px] max-h-[90vh] overflow-auto shadow-md max-w-[800px] max-h-[90vh] overflow-y-auto">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300 bg-base-100 rounded-t-xl"><h2 id="ref-doc-title" class="text-[1.1rem] m-0">Reference Document</h2><button class="bg-transparent border-0 text-2xl cursor-pointer text-base-content/60 hover:text-error transition-colors" data-click-action="closeModal" data-args='["modal-ref-doc"]'>&times;</button></div>
         <div class="p-5"><div id="ref-doc-content" class="ref-doc-body"></div></div>
@@ -846,13 +846,13 @@ function onPlaybookSelect() {
     stepsDiv.innerHTML = (pb.steps || []).map((s, i) => {
         const fc = (s.fields||[]).length;
         return `<div class="_ion-s-5eaab7cb30">
-            <span class="section-num _ion-s-9abe6668ed">${i+1}</span>
-            <div class="_ion-s-bce30e92dc">
-                <strong>${esc(s.title)}</strong>${s.is_required?' <span class="_ion-s-88b7273505">REQUIRED</span>':''}${fc?' <span class="_ion-s-8e39e0514f">'+fc+' fields</span>':''}
-                ${s.description?'<div class="_ion-s-5012c8138f">'+esc(s.description)+'</div>':''}
+            <span class="section-num min-w-[24px] h-[24px] text-[.7rem]">${i+1}</span>
+            <div class="flex-1 text-[.85rem]">
+                <strong>${esc(s.title)}</strong>${s.is_required?' <span class="text-[#f0c000] text-[.7rem]">REQUIRED</span>':''}${fc?' <span class="text-[var(--text-secondary)] text-[.7rem]">'+fc+' fields</span>':''}
+                ${s.description?'<div class="text-[var(--text-secondary)] text-[.8rem] mt-0.5">'+esc(s.description)+'</div>':''}
             </div>
         </div>`;
-    }).join('') || '<div class="_ion-s-4d90051488">No steps defined</div>';
+    }).join('') || '<div class="text-[var(--text-secondary)] text-[.8rem]">No steps defined</div>';
 }
 
 // ======== CASES ========
@@ -869,11 +869,11 @@ function stepProgress(c) {
     if (!c.step_count) return '';
     const pct = c.step_count > 0 ? Math.round((c.steps_completed / c.step_count) * 100) : 0;
     const color = pct === 100 ? 'var(--mitre-covered)' : pct > 0 ? 'var(--primary)' : '#6e7681';
-    return `<div class="_ion-s-ac86ac1128" title="${c.steps_completed}/${c.step_count} sections">
+    return `<div class="flex items-center gap-1.5" title="${c.steps_completed}/${c.step_count} sections">
         <div class="_ion-s-a55ef5c079">
-            <div class="_ion-s-6e624bb262" data-ion-style="width:${pct}%; background:${color}"></div>
+            <div class="h-full rounded-[3px]" data-ion-style="width:${pct}%; background:${color}"></div>
         </div>
-        <span class="_ion-s-78f8e7f1d2" data-ion-style="color:${color}">${c.steps_completed}/${c.step_count}</span>
+        <span class="text-[.7rem]" data-ion-style="color:${color}">${c.steps_completed}/${c.step_count}</span>
     </div>`;
 }
 
@@ -890,7 +890,7 @@ function renderCasesTable(){
         <td>${esc(c.lead_investigator_username||'Unassigned')}</td>
         <td>${stepProgress(c)}</td>
         <td>${renderSlaCell(c)}</td>
-        <td>${c.is_locked?'<span class="_ion-s-5d1c01077f" title="Locked by '+esc(c.locked_by_username||'')+'">Locked</span>':'-'}</td>
+        <td>${c.is_locked?'<span class="text-[#f0c000]" title="Locked by '+esc(c.locked_by_username||'')+'">Locked</span>':'-'}</td>
         <td>${fmtDate(c.created_at)}</td></tr>`).join('');
 }
 
@@ -920,12 +920,12 @@ function renderPipeline(){
             <div class="fr-card-title">${esc(c.title)}</div>
             ${stepProgress(c)}
             <div class="fr-card-meta">
-                <span class="badge badge-${c.priority} _ion-s-e5f79bea0b">${c.priority}</span>
+                <span class="badge badge-${c.priority} text-[.65rem] py-[1px] px-1.5">${c.priority}</span>
                 <span>${esc(c.lead_investigator_username||'Unassigned')}</span>
                 ${c.is_locked?'<span class="fr-card-lock" title="Locked">Locked</span>':''}
                 ${renderSlaCell(c)}
             </div>
-        </div>`).join('')||'<div class="_ion-s-fc6a2a39eb">No cases</div>';
+        </div>`).join('')||'<div class="text-center p-5 text-[var(--text-secondary)] text-[.8rem]">No cases</div>';
     });
 }
 
@@ -957,7 +957,7 @@ function renderCaseDetail(c){
     // Lock
     const lockInd=document.getElementById('cd-lock-indicator');
     const lockBtn=document.getElementById('cd-lock-btn');
-    if(c.is_locked){lockInd.innerHTML='<span class="_ion-s-5d1c01077f">Locked by '+esc(c.locked_by_username||'unknown')+' ('+fmtDateTime(c.locked_at)+')</span>';lockBtn.textContent='Unlock';lockBtn.style.color='#f0c000'}
+    if(c.is_locked){lockInd.innerHTML='<span class="text-[#f0c000]">Locked by '+esc(c.locked_by_username||'unknown')+' ('+fmtDateTime(c.locked_at)+')</span>';lockBtn.textContent='Unlock';lockBtn.style.color='#f0c000'}
     else{lockInd.innerHTML='';lockBtn.textContent='Lock';lockBtn.style.color=''}
     // SLA
     const slaDiv=document.getElementById('cd-sla-badges');slaDiv.innerHTML='';
@@ -993,19 +993,19 @@ function renderFieldInput(field, value, stepId) {
             const items = Array.isArray(value) ? value : [];
             let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-list" id="${fid}" data-field-key="${k}" data-field-type="list">`;
             items.forEach((v,i) => { html += `<div class="sf-list-row"><input class="form-input sf-input" value="${esc(v)}" placeholder="${ph}"><button type="button" class="btn-icon sf-list-remove" data-remove-parent title="Remove">&times;</button></div>`; });
-            html += `</div><button type="button" class="btn btn-secondary _ion-s-a7e651bd47" data-click-action="addListItem" data-args='["${fid}", "${ph}"]'>+ Add</button></div>`;
+            html += `</div><button type="button" class="btn btn-secondary py-[3px] px-2.5 text-xs mt-1" data-click-action="addListItem" data-args='["${fid}", "${ph}"]'>+ Add</button></div>`;
             return html;
         }
         case 'table': {
             const cols = field.columns || [];
             const rows = Array.isArray(value) ? value : [];
             let html = `<div class="sf-group"><label class="sf-label">${lbl}</label><div class="sf-table-wrap" id="${fid}" data-field-key="${k}" data-field-type="table" data-cols='${JSON.stringify(cols)}'>`;
-            html += `<table class="sf-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th class="_ion-s-322e3f5e05"></th></tr></thead><tbody>`;
+            html += `<table class="sf-table"><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}<th class="w-[30px]"></th></tr></thead><tbody>`;
             rows.forEach(row => {
                 html += `<tr>${cols.map(c=>`<td><input class="form-input sf-input" value="${esc(row[c]||'')}" data-col="${esc(c)}"></td>`).join('')}<td><button type="button" class="btn-icon sf-list-remove" data-remove-closest="tr" title="Remove">&times;</button></td></tr>`;
             });
             html += `</tbody></table>`;
-            html += `<button type="button" class="btn btn-secondary _ion-s-a7e651bd47" data-click-action="addTableRow" data-args='["${fid}"]'>+ Add Row</button></div></div>`;
+            html += `<button type="button" class="btn btn-secondary py-[3px] px-2.5 text-xs mt-1" data-click-action="addTableRow" data-args='["${fid}"]'>+ Add Row</button></div></div>`;
             return html;
         }
         case 'select': {
@@ -1103,13 +1103,13 @@ function renderSections(steps) {
                     <textarea class="form-input sf-input" id="section-content-${s.id}" rows="${hasFields ? 3 : 6}" placeholder="Enter your findings, analysis, and documentation...">${esc(s.content || '')}</textarea>
                 </div>
                 <div class="section-card-actions">
-                    <button class="btn btn-primary _ion-s-e992d6326c" data-click-action="saveSection" data-args='[${s.id}]'>Save</button>
+                    <button class="btn btn-primary py-1.5 px-4" data-click-action="saveSection" data-args='[${s.id}]'>Save</button>
                     ${!s.is_completed
-                        ? `<button class="btn btn-secondary _ion-s-eb4cdd53a8" data-click-action="completeSection" data-args='[${s.id}]'>Mark Complete</button>`
-                        : `<button class="btn btn-secondary _ion-s-72978b0cd4" data-click-action="reopenSection" data-args='[${s.id}]'>Reopen</button>`
+                        ? `<button class="btn btn-secondary py-1.5 px-4 text-[var(--mitre-covered)]" data-click-action="completeSection" data-args='[${s.id}]'>Mark Complete</button>`
+                        : `<button class="btn btn-secondary py-1.5 px-4 text-[#f0c000]" data-click-action="reopenSection" data-args='[${s.id}]'>Reopen</button>`
                     }
                     <button class="btn-extract-ioc" data-click-action="showIOCExtractModal" data-args='[${s.id}]'>&#128269; Extract IOCs</button>
-                    ${!s.playbook_step_id ? `<button class="btn btn-secondary _ion-s-c14802f8b6" data-click-action="deleteSection" data-args='[${s.id}]'>Delete</button>` : ''}
+                    ${!s.playbook_step_id ? `<button class="btn btn-secondary py-1.5 px-4 text-[var(--sev-critical)] ml-[auto]" data-click-action="deleteSection" data-args='[${s.id}]'>Delete</button>` : ''}
                 </div>
             </div>
         </div>`;
@@ -1294,7 +1294,7 @@ function renderIOCResults(data) {
     badge.style.color = total > 0 ? 'var(--mitre-covered)' : 'var(--sev-critical)';
 
     if (total === 0) {
-        body.innerHTML = '<div class="empty-state _ion-s-cf37034751">No IOCs found in the provided content.</div>';
+        body.innerHTML = '<div class="empty-state p-4">No IOCs found in the provided content.</div>';
         resultsDiv.style.display = '';
         return;
     }
@@ -1460,7 +1460,7 @@ function renderTimeline(entries){
 function renderDetailEvidence(items){
     const d=document.getElementById('cd-evidence-list');
     if(!items.length){d.innerHTML='<div class="empty-state">No evidence items</div>';return}
-    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'} _ion-s-bf17975318">${fmtLabel(e.status)}</span></div><div class="_ion-s-1d8943fa86"><button class="btn btn-secondary _ion-s-072a519577" data-click-action="showCustodyLog" data-args='[${e.id}, "${esc(e.evidence_number)}"]'>Custody (${e.custody_entries||0})</button><button class="btn btn-secondary _ion-s-072a519577" data-click-action="showCustodyModal" data-args='[${e.id}]'>+ Action</button></div></div><div class="_ion-s-2f96ca6c07">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
+    d.innerHTML=items.map(e=>`<div class="ev-card"><div class="ev-card-header"><div><strong>${esc(e.evidence_number)}</strong> &mdash; ${esc(e.name)} <span class="badge badge-${e.status==='under_analysis'?'analysis':'intake'} text-[.7rem]">${fmtLabel(e.status)}</span></div><div class="flex gap-1.5"><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="showCustodyLog" data-args='[${e.id}, "${esc(e.evidence_number)}"]'>Custody (${e.custody_entries||0})</button><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="showCustodyModal" data-args='[${e.id}]'>+ Action</button></div></div><div class="text-[.8rem] text-[var(--text-secondary)]">${fmtLabel(e.evidence_type)} &middot; ${esc(e.source||'N/A')} &middot; ${esc(e.storage_location||'N/A')}</div>${e.hash_sha256?`<div class="ev-card-hash">SHA256: ${e.hash_sha256}</div>`:''}${e.hash_md5?`<div class="ev-card-hash">MD5: ${e.hash_md5}</div>`:''}</div>`).join('');
 }
 
 // ======== CASE ACTIONS ========
@@ -1542,7 +1542,7 @@ async function loadEvidenceForCase(){
 function renderEvidenceTable(items){
     const tbody=document.getElementById('evidence-tbody'),empty=document.getElementById('evidence-empty');
     if(!items.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash _ion-s-188cf2a080">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" data-click-action="showCustodyLog" data-stop-propagation data-args='[${e.id}, "${esc(e.evidence_number)}"]'>${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary _ion-s-072a519577" data-click-action="showCustodyModal" data-stop-propagation data-args='[${e.id}]'>+ Custody</button></td></tr>`).join('');
+    tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash max-w-[150px] overflow-hidden text-ellipsis">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" data-click-action="showCustodyLog" data-stop-propagation data-args='[${e.id}, "${esc(e.evidence_number)}"]'>${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="showCustodyModal" data-stop-propagation data-args='[${e.id}]'>+ Custody</button></td></tr>`).join('');
 }
 function showAddEvidenceModal(){['ae-name','ae-source','ae-storage','ae-md5','ae-sha256','ae-description'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-add-evidence').style.display='flex'}
 async function addEvidence(){
@@ -1570,7 +1570,7 @@ async function loadPlaybooks(){
 function renderPlaybooksTable(pbs){
     const tbody=document.getElementById('playbooks-tbody'),empty=document.getElementById('playbooks-empty');
     if(!pbs.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
-    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span class="_ion-s-3ef7cdf8ea">Active</span>':'<span class="_ion-s-491883b797">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary _ion-s-072a519577" data-click-action="editPlaybook" data-args='[${p.id}]'>Edit</button> <button class="btn btn-secondary _ion-s-995639d86c" data-click-action="deletePlaybook" data-args='[${p.id}]'>Delete</button></td></tr>`).join('');
+    tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span class="text-[var(--mitre-covered)]">Active</span>':'<span class="text-[#6e7681]">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="editPlaybook" data-args='[${p.id}]'>Edit</button> <button class="btn btn-secondary py-0.5 px-2 text-xs text-[var(--sev-critical)]" data-click-action="deletePlaybook" data-args='[${p.id}]'>Delete</button></td></tr>`).join('');
 }
 function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').innerHTML='';addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
 async function editPlaybook(id){
@@ -1578,7 +1578,7 @@ async function editPlaybook(id){
 }
 function addPlaybookStepRow(data){
     const div=document.getElementById('pb-steps-list'),idx=div.children.length+1,row=document.createElement('div');row.className='pb-step-row';
-    row.innerHTML=`<span class="pb-step-num">${idx}</span><div class="_ion-s-7623f05545"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc _ion-s-a3a5568692" rows="2" placeholder="Description">${esc((data&&data.description)||'')}</textarea><div class="_ion-s-f8699a709d"><label class="_ion-s-253ab4603a"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label class="_ion-s-253ab4603a">Est. hours: <input type="number" class="pb-step-hours _ion-s-2b12d8628e" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary _ion-s-636166ba3e" data-click-action="removeStepAndRenumber">&times;</button>`;
+    row.innerHTML=`<span class="pb-step-num">${idx}</span><div class="flex-1"><input type="text" class="form-input pb-step-title" placeholder="Step title" value="${esc((data&&data.title)||'')}"><textarea class="form-input pb-step-desc mt-1" rows="2" placeholder="Description">${esc((data&&data.description)||'')}</textarea><div class="flex gap-3 items-center mt-1"><label class="m-0 text-[.8rem]"><input type="checkbox" class="pb-step-req" ${data&&data.is_required?'checked':''}> Required</label><label class="m-0 text-[.8rem]">Est. hours: <input type="number" class="pb-step-hours w-[60px]" step="0.5" min="0" value="${(data&&data.expected_duration_hours)||''}"></label></div></div><button class="btn btn-secondary py-0.5 px-2 text-[var(--sev-critical)] self-start" data-click-action="removeStepAndRenumber">&times;</button>`;
     div.appendChild(row);
 }
 function renumberSteps(){document.querySelectorAll('#pb-steps-list .pb-step-num').forEach((el,i)=>el.textContent=i+1)}
@@ -1633,7 +1633,7 @@ async function loadForensicAnnotations(caseId) {
     if (!body) return;
     try {
         var resp = await fetch('/api/forensics/cases/' + caseId + '/annotations');
-        if (!resp.ok) { body.innerHTML = '<div class="_ion-s-4d90051488">Failed to load annotations</div>'; return; }
+        if (!resp.ok) { body.innerHTML = '<div class="text-[var(--text-secondary)] text-[.8rem]">Failed to load annotations</div>'; return; }
         var data = await resp.json();
         var annotations = data.annotations || [];
         renderForensicAnnotations(annotations);
@@ -1644,21 +1644,21 @@ function renderForensicAnnotations(annotations) {
     var body = document.getElementById('forensic-annotations-body');
     if (!body) return;
     if (!annotations.length) {
-        body.innerHTML = '<div class="_ion-s-4d90051488">No annotations yet.</div>';
+        body.innerHTML = '<div class="text-[var(--text-secondary)] text-[.8rem]">No annotations yet.</div>';
         return;
     }
     var html = annotations.map(function(a) {
         var ts = a.timeline_ts ? new Date(a.timeline_ts).toLocaleString() : '';
         var author = a.created_by_username || 'unknown';
-        return '<div class="_ion-s-1a5a5c03c0" id="fann-' + a.id + '">'
-            + '<div class="_ion-s-d072a9e0e0">'
-            + '<span class="_ion-s-d176fb5b81">' + (ts||'') + '</span>'
+        return '<div class="border-l-[3px] border-l-[#6366f1] pt-1.5 pr-1.5 pb-1.5 pl-2.5 mb-2 bg-[rgba(99,102,241,0.06)] rounded-[0_4px_4px_0]" id="fann-' + a.id + '">'
+            + '<div class="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] mb-1">'
+            + '<span class="text-[#818cf8] font-semibold">' + (ts||'') + '</span>'
             + '<span>&middot;</span><span>' + (author||'') + '</span>'
-            + '<span class="_ion-s-1b34e7eaf1">'
-            + `<button class="_ion-s-2185cbd5dd" type="button" data-click-action="editForensicAnnotation" data-args='[${a.id}, ${JSON.stringify(a.body || '')}]'>&#9998;</button>`
-            + `<button class="_ion-s-2185cbd5dd" type="button" data-click-action="deleteForensicAnnotation" data-args='[${a.id}]'>&times;</button>`
+            + '<span class="ml-[auto] flex gap-1">'
+            + `<button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[3px] text-[.8rem]" type="button" data-click-action="editForensicAnnotation" data-args='[${a.id}, ${JSON.stringify(a.body || '')}]'>&#9998;</button>`
+            + `<button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[3px] text-[.8rem]" type="button" data-click-action="deleteForensicAnnotation" data-args='[${a.id}]'>&times;</button>`
             + '</span></div>'
-            + '<div class="_ion-s-68cd4ee40d">' + (a.body||'') + '</div>'
+            + '<div class="text-[.8rem] text-[var(--text-primary)] whitespace-pre-wrap">' + (a.body||'') + '</div>'
             + '</div>';
     }).join('');
     body.innerHTML = html;

@@ -23,7 +23,7 @@
   </section>
 
   <!-- Attention Banner (JS-populated) -->
-  <div id="attn-banner" class="mb-4 rounded-[12px] border border-ion-amber/30 bg-ion-amber/5 px-5 py-4 flex flex-col gap-3 _ion-s-c8be1ccba6">
+  <div id="attn-banner" class="mb-4 rounded-[12px] border border-ion-amber/30 bg-ion-amber/5 px-5 py-4 flex flex-col gap-3 hidden">
     <div class="attn-banner-header flex items-center justify-between">
       <span class="flex items-center gap-2 text-[13px] text-ion-amber font-medium">
         <svg class="w-4 h-4"><use href="#i-alert-triangle"/></svg>
@@ -184,7 +184,7 @@
 </div>
 
 <!-- Create Case Modal -->
-<div class="cases-modal-overlay _ion-s-c8be1ccba6" id="create-case-overlay" data-click-action="closeCreateCaseModal" data-only-self-click>
+<div class="cases-modal-overlay hidden" id="create-case-overlay" data-click-action="closeCreateCaseModal" data-only-self-click>
     <div class="bg-base-200 border border-base-300 rounded-lg w-[90%] max-w-[480px] max-h-[80vh] overflow-auto shadow-[0_2px_8px_rgba(0,0,0,.15)]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300">
             <h3 class="m-0 text-[1.05rem]">Create New Case</h3>
@@ -225,7 +225,7 @@
 </div>
 
 <!-- Closure Modal -->
-<div class="cases-modal-overlay _ion-s-c8be1ccba6" id="closure-modal-overlay" data-click-action="cancelClosure" data-only-self-click>
+<div class="cases-modal-overlay hidden" id="closure-modal-overlay" data-click-action="cancelClosure" data-only-self-click>
     <div class="bg-base-200 border border-base-300 rounded-lg w-[90%] max-w-[480px] max-h-[80vh] overflow-auto shadow-[0_2px_8px_rgba(0,0,0,.15)]">
         <div class="flex justify-between items-center px-5 py-4 border-b border-base-300">
             <h3 id="closure-modal-title" class="m-0 text-[1.05rem]">Close Case</h3>
@@ -2760,7 +2760,7 @@ async function openCaseDetail(caseId) {
     // Show panel with loading
     panel.classList.add('open');
     overlay.classList.add('open');
-    body.innerHTML = '<p class="_ion-s-bca8b928a3">Loading...</p>';
+    body.innerHTML = '<p class="text-[var(--text-secondary)] text-center p-8">Loading...</p>';
 
     try {
         const resp = await fetch('/api/cases/' + caseId);
@@ -2812,7 +2812,7 @@ async function openCaseDetail(caseId) {
         // Timeline annotations
         loadAnnotations(c.id);
     } catch (e) {
-        body.innerHTML = '<p class="_ion-s-263eca2cbb">Failed to load case details</p>';
+        body.innerHTML = '<p class="text-[#ef4444] text-center p-8">Failed to load case details</p>';
     }
 }
 
@@ -2914,7 +2914,7 @@ function _appendCaseOnlySections(host, alertId, caseId, alert) {
       +   '<button class="cpanel-pin-btn" type="button" '
       +     'data-click-action="pinAlertToCase" data-args=\'[' + caseId + ',"' + esc(alertId) + '","'
       +       esc(pinTitle) + '","' + esc(pinSev) + '"]\'>'
-      +     '<i class="icon-bookmark _ion-s-782b602101"></i>Pin as evidence</button>'
+      +     '<i class="icon-bookmark text-[0.6rem] mr-[0.2rem]"></i>Pin as evidence</button>'
       + '</section>';
 
     if (aside) {
@@ -3409,7 +3409,7 @@ function renderPanelContent(c) {
     // before scanning the rail of events.
     html += '<div class="cpanel-section" data-tab="timeline">';
     html += '<div class="cpanel-section-title">Attack Story Timeline</div>';
-    html += '<div class="_ion-s-65382d79e2" id="case-timeline-container">Loading…</div>';
+    html += '<div class="text-[0.8rem] text-[var(--text-secondary)]" id="case-timeline-container">Loading…</div>';
     html += '</div>';
 
     // ── Attack Path (Bob Pathfinding) — Phase 1 kill-chain graph ─
@@ -3426,7 +3426,7 @@ function renderPanelContent(c) {
     // ── Similar Cases (pgvector-backed, loaded async) ──────
     html += '<div class="cpanel-section" data-tab="overview">';
     html += '<div class="cpanel-section-title">Similar Closed Cases</div>';
-    html += '<div class="_ion-s-65382d79e2" id="similar-cases-container">Loading…</div>';
+    html += '<div class="text-[0.8rem] text-[var(--text-secondary)]" id="similar-cases-container">Loading…</div>';
     html += '</div>';
 
     // ── v0.10.19: Cross-case observable sightings ─────────────
@@ -3437,7 +3437,7 @@ function renderPanelContent(c) {
     // server-side.
     html += '<div class="cpanel-section" data-tab="observables">';
     html += '<div class="cpanel-section-title">Cross-Case Observable Sightings</div>';
-    html += '<div class="_ion-s-65382d79e2" id="similar-observables-container">Loading…</div>';
+    html += '<div class="text-[0.8rem] text-[var(--text-secondary)]" id="similar-observables-container">Loading…</div>';
     html += '</div>';
 
     // ── Linked Alerts — the two-column workspace ───────────
@@ -3518,7 +3518,7 @@ function renderPanelContent(c) {
     if (c.kibana_case_id) {
         html += '<div class="cpanel-section" data-tab="notes">';
         html += '<div class="cpanel-section-title">Kibana Comments <span class="cpanel-section-badge" id="kibana-comment-count">...</span></div>';
-        html += '<div id="kibana-comments-container"><p class="_ion-s-65382d79e2">Loading comments...</p></div>';
+        html += '<div id="kibana-comments-container"><p class="text-[0.8rem] text-[var(--text-secondary)]">Loading comments...</p></div>';
         html += '</div>';
     }
 
@@ -3547,8 +3547,8 @@ function renderPanelContent(c) {
             // rendered markdown with a plain-text translation.
             const noteId = 'cnote-' + (n.id != null ? n.id : Math.random().toString(36).slice(2,9));
             html += '<div class="cpanel-note">'
-                + '<div class="cpanel-note-header _ion-s-c2e70fe5d0">'
-                +   '<span class="cpanel-note-user"><i class="icon-user _ion-s-04095862d9"></i>' + esc(n.user || 'Unknown') + '</span>'
+                + '<div class="cpanel-note-header flex items-center gap-2">'
+                +   '<span class="cpanel-note-user"><i class="icon-user text-[0.65rem] mr-[0.2rem]"></i>' + esc(n.user || 'Unknown') + '</span>'
                 +   '<span>' + fmtDate(n.created_at) + '</span>'
                 +   '<button class="cpanel-note-translate" type="button" data-click-action="translateCaseNote" data-args=\'["' + noteId + '"]\'>Translate</button>'
                 + '</div>'
@@ -3561,7 +3561,7 @@ function renderPanelContent(c) {
     }
     html += '<div class="cpanel-add-note">'
         + '<textarea id="panel-note-input" placeholder="Add a note..." rows="2"></textarea>'
-        + '<button class="btn btn-primary _ion-s-38e0e241ec" data-click-action="addPanelNote" data-args=\'[' + c.id + ']\'>Add</button>'
+        + '<button class="btn btn-primary self-end text-[0.8rem] py-[0.4rem] px-3" data-click-action="addPanelNote" data-args=\'[' + c.id + ']\'>Add</button>'
         + '</div>';
     html += '</div>';
 
@@ -3569,10 +3569,10 @@ function renderPanelContent(c) {
     // Renders an empty container that loadWorkbench() fills async after the
     // panel paint. Avoids blocking the rest of the panel on the verify call.
     html += '<div class="cpanel-section" data-tab="timeline" id="workbench-section-' + c.id + '">'
-        +   '<div class="cpanel-section-title _ion-s-c2e70fe5d0">'
+        +   '<div class="cpanel-section-title flex items-center gap-2">'
         +     '<i class="icon-bookmark"></i> Workbench'
         +     '<span class="cpanel-section-badge" id="workbench-pin-count-' + c.id + '">…</span>'
-        +     '<span id="workbench-verify-banner-' + c.id + '" class="workbench-verify-banner _ion-s-690f054c4e">verifying…</span>'
+        +     '<span id="workbench-verify-banner-' + c.id + '" class="workbench-verify-banner ml-[auto]">verifying…</span>'
         +   '</div>'
         +   '<div id="workbench-add-' + c.id + '" class="workbench-add-row">'
         +     '<input type="text" id="workbench-add-title-' + c.id + '" placeholder="Add observation (free-form pin)" maxlength="500">'
@@ -3584,10 +3584,10 @@ function renderPanelContent(c) {
         +       '<option value="low">low</option>'
         +       '<option value="info">info</option>'
         +     '</select>'
-        +     '<button type="button" class="btn btn-primary _ion-s-64eefd923e" data-click-action="addObservationPin" data-args=\'[' + c.id + ']\'>Pin</button>'
+        +     '<button type="button" class="btn btn-primary text-xs py-[0.35rem] px-3" data-click-action="addObservationPin" data-args=\'[' + c.id + ']\'>Pin</button>'
         +   '</div>'
         +   '<div id="workbench-kanban-' + c.id + '" class="workbench-kanban">'
-        +     '<div class="cpanel-empty-hint _ion-s-97294b207c">Loading workbench…</div>'
+        +     '<div class="cpanel-empty-hint col-span-full">Loading workbench…</div>'
         +   '</div>'
         + '</div>';
 
@@ -3595,7 +3595,7 @@ function renderPanelContent(c) {
     // Indigo left-border accent distinguishes narrative from evidence pins.
     // Loaded async via loadAnnotations() after panel paint.
     html += '<div class="cpanel-section" data-tab="timeline" id="annotations-section-' + c.id + '">'
-        + '<div class="cpanel-section-title _ion-s-c2e70fe5d0">'
+        + '<div class="cpanel-section-title flex items-center gap-2">'
         + '<i class="icon-clock"></i> Timeline Annotations'
         + '<span class="cpanel-section-badge" id="annotations-count-' + c.id + '">'
         + '</span>'
@@ -3607,14 +3607,14 @@ function renderPanelContent(c) {
 
     // On-demand Bob analysis panel (rendered into when analyst clicks
     // "Get Bob's Analysis"). Empty until then.
-    html += '<div id="bob-analysis-panel-' + c.id + '" class="cpanel-section _ion-s-c8be1ccba6" data-tab="notes">'
-        +   '<div class="cpanel-section-title _ion-s-c2e70fe5d0">'
+    html += '<div id="bob-analysis-panel-' + c.id + '" class="cpanel-section hidden" data-tab="notes">'
+        +   '<div class="cpanel-section-title flex items-center gap-2">'
         +     '<i class="icon-sparkles"></i> Bob\'s analysis'
-        +     '<span class="_ion-s-816484d7f1" id="bob-analysis-meta-' + c.id + '"></span>'
+        +     '<span class="ml-[auto] text-[0.7rem] text-[#94a3b8] font-normal" id="bob-analysis-meta-' + c.id + '"></span>'
         +   '</div>'
         +   '<div id="bob-analysis-body-' + c.id + '" class="bob-analysis-body">'
         +   '</div>'
-        +   '<div class="_ion-s-a0946a50e0">'
+        +   '<div class="flex gap-2 mt-2 flex-wrap">'
         +     '<button class="btn bob-action-btn" data-click-action="saveBobAnalysisAsNote" data-args=\'[' + c.id + ']\'>Save as note</button>'
         +     '<button class="btn bob-action-btn" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\'>Re-run</button>'
         +     '<button class="btn bob-action-btn bob-action-btn-ghost" data-click-action="hideBobAnalysis" data-args=\'[' + c.id + ']\'>Dismiss</button>'
@@ -3623,12 +3623,12 @@ function renderPanelContent(c) {
 
     // Auto-Investigate panel (cited multi-source verdict). Empty/hidden
     // until the analyst clicks "Auto-Investigate".
-    html += '<div id="autoinv-panel-' + c.id + '" class="cpanel-section _ion-s-c8be1ccba6" data-tab="notes">'
-        +   '<div class="cpanel-section-title _ion-s-c2e70fe5d0">'
+    html += '<div id="autoinv-panel-' + c.id + '" class="cpanel-section hidden" data-tab="notes">'
+        +   '<div class="cpanel-section-title flex items-center gap-2">'
         +     '<i class="icon-search"></i> Bob Auto-Investigate'
         +   '</div>'
         +   '<div id="autoinv-body-' + c.id + '" class="autoinv-report-wrap"></div>'
-        +   '<div class="_ion-s-a0946a50e0">'
+        +   '<div class="flex gap-2 mt-2 flex-wrap">'
         +     '<button class="btn bob-action-btn" data-click-action="saveAutoInvestigateAsNote" data-args=\'[' + c.id + ']\'>Save as note</button>'
         +     '<button class="btn bob-action-btn" data-click-action="runCaseAutoInvestigate" data-args=\'[' + c.id + ']\'>Re-run</button>'
         +     '<button class="btn bob-action-btn bob-action-btn-ghost" data-click-action="hideAutoInvestigate" data-args=\'[' + c.id + ']\'>Dismiss</button>'
@@ -3654,7 +3654,7 @@ function renderPanelContent(c) {
     html += '<button class="btn" data-click-action="toggleCasePlaybookBrowser" data-args=\'[' + c.id + ']\'>Start Playbook</button>';
     html += '<a class="btn" href="/api/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
     html += '</div>';
-    html += '<div class="_ion-s-c8be1ccba6" id="case-playbook-browser-' + c.id + '"></div>';
+    html += '<div class="hidden" id="case-playbook-browser-' + c.id + '"></div>';
 
     return html;
 }
@@ -3690,11 +3690,11 @@ async function loadSimilarCases(caseId) {
         container.innerHTML = items.map(s => {
             const c = closureColors[s.closure_reason] || closureColors.not_applicable;
             const pct = Math.round((s.similarity || 0) * 100) + '%';
-            return '<div class="cpanel-alert-card _ion-s-63d058f849" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\'>'
+            return '<div class="cpanel-alert-card cursor-pointer" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\'>'
                 +   '<div class="cpanel-alert-card-header">'
                 +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
                 +     '<div class="cpanel-alert-badges">'
-                +       '<span class="cpanel-alert-badge _ion-s-b71f15de6d" title="Cosine similarity">' + esc(pct) + '</span>'
+                +       '<span class="cpanel-alert-badge bg-[rgba(109,228,255,.12)] text-[#6de4ff]" title="Cosine similarity">' + esc(pct) + '</span>'
                 +       '<span class="cpanel-alert-badge _ion-s-899842b393">' + esc((s.closure_reason || '').replace(/_/g, ' ')) + '</span>'
                 +     '</div>'
                 +   '</div>'
@@ -3999,25 +3999,25 @@ async function loadCaseTimeline(caseId) {
                 inconclusive: { bg: 'rgba(148,163,184,.14)', color: '#cbd5e1' },
             };
             const vc = verdictColors[verdict] || verdictColors.inconclusive;
-            html += '<div class="_ion-s-8f5f6c59aa">'
-                +     '<div class="_ion-s-1afe60aa91">'
-                +       '<span class="_ion-s-51034f146c">🤖 Bob\'s take</span>';
+            html += '<div class="py-[0.6rem] px-3 mb-[0.6rem] bg-[rgba(109,228,255,0.06)] border border-[rgba(109,228,255,0.2)] rounded-[0.4rem]">'
+                +     '<div class="flex items-center gap-[0.4rem] mb-[0.35rem] flex-wrap">'
+                +       '<span class="text-[0.6rem] font-bold tracking-[0.04em] uppercase text-[#6de4ff]">🤖 Bob\'s take</span>';
             if (verdict) {
                 html +=   '<span class="cpanel-alert-badge _ion-s-dc86a0be5b">' + esc(verdict.replace(/_/g, ' ')) + '</span>';
             }
             html +=     '</div>'
-                +     '<div class="_ion-s-bd8dd7e33e">' + esc((narrative.summary || '').slice(0, 600)) + '</div>';
+                +     '<div class="text-[0.78rem] text-[var(--text-primary)] leading-[1.45]">' + esc((narrative.summary || '').slice(0, 600)) + '</div>';
             if ((narrative.citations || []).length > 0) {
-                html += '<div class="_ion-s-6ae26b9f1f">';
+                html += '<div class="mt-[0.45rem] flex flex-col gap-1">';
                 narrative.citations.forEach(function(c) {
                     if (!c || typeof c !== 'object') return;
                     const f = c.field || '';
                     const v = (c.value || '').toString().slice(0, 80);
                     const sig = c.significance || '';
-                    html += '<div class="_ion-s-7e9b1ae3aa">'
-                          +   '<code class="_ion-s-0b0b4e1e11">' + esc(f) + '</code> = '
-                          +   '<code class="_ion-s-6fe3f36ec6">' + esc(v) + '</code>'
-                          +   (sig ? ' <span class="_ion-s-01556d8058">— ' + esc(sig) + '</span>' : '')
+                    html += '<div class="text-[0.7rem] text-[var(--text-muted)] pl-2 border-l-[2px] border-l-[rgba(109,228,255,0.4)]">'
+                          +   '<code class="text-[#6de4ff] text-[0.68rem]">' + esc(f) + '</code> = '
+                          +   '<code class="text-[0.68rem]">' + esc(v) + '</code>'
+                          +   (sig ? ' <span class="italic">— ' + esc(sig) + '</span>' : '')
                           + '</div>';
                 });
                 html += '</div>';
@@ -4026,11 +4026,11 @@ async function loadCaseTimeline(caseId) {
         }
 
         // Counts strip
-        html += '<div class="_ion-s-ff735ba18a">'
+        html += '<div class="flex gap-[0.4rem] mb-2 flex-wrap text-[0.65rem] text-[var(--text-muted)]">'
               +   '<span><strong>' + (counts.total || 0) + '</strong> events</span>'
-              +   '<span class="_ion-s-25936702eb"><strong>' + (counts.bob || 0) + '</strong> Bob</span>'
-              +   '<span class="_ion-s-1bf397b0f0"><strong>' + (counts.analyst || 0) + '</strong> analyst</span>'
-              +   '<span class="_ion-s-41940aabaa"><strong>' + (counts.system || 0) + '</strong> system</span>'
+              +   '<span class="text-[rgba(109,228,255,0.8)]"><strong>' + (counts.bob || 0) + '</strong> Bob</span>'
+              +   '<span class="text-[rgba(245,158,11,0.8)]"><strong>' + (counts.analyst || 0) + '</strong> analyst</span>'
+              +   '<span class="text-[rgba(148,163,184,0.8)]"><strong>' + (counts.system || 0) + '</strong> system</span>'
               + '</div>';
 
         if (events.length === 0) {
@@ -4047,21 +4047,21 @@ async function loadCaseTimeline(caseId) {
             system:  { color: '#94a3b8', label: 'SYSTEM',  bg: 'rgba(148,163,184,0.04)' },
         };
 
-        html += '<div class="_ion-s-957b6fa7a0">';
+        html += '<div class="relative pl-2 border-l-[2px] border-l-[var(--ion-border)]">';
         events.forEach(function(e, idx) {
             const km = kindMeta[e.kind] || kindMeta.system;
             const ts = e.ts ? new Date(e.ts).toLocaleString() : '';
             html += '<div class="_ion-s-0a1c7436f5">'
                   +   '<div class="_ion-s-e080dc03bc"></div>'
-                  +   '<div class="_ion-s-90e37dcc1f">'
+                  +   '<div class="flex items-center gap-[0.4rem] mb-[0.2rem] flex-wrap">'
                   +     '<span class="_ion-s-e62e34ae9b">' + km.label + '</span>'
-                  +     '<span class="_ion-s-880a7fd7dd">' + esc(ts) + '</span>'
+                  +     '<span class="text-[0.65rem] text-[var(--text-muted)] font-mono">' + esc(ts) + '</span>'
                   +   '</div>'
-                  +   '<div class="_ion-s-1c39fa74be">' + esc(e.title || '') + '</div>';
+                  +   '<div class="text-[0.78rem] text-[var(--text-primary)] font-medium">' + esc(e.title || '') + '</div>';
             if (e.detail) {
                 const truncated = String(e.detail).length > 220;
                 const shown = String(e.detail).slice(0, 220);
-                html += '<div class="_ion-s-0917ebf9a4">' + esc(shown) + (truncated ? '…' : '') + '</div>';
+                html += '<div class="text-[0.7rem] text-[var(--text-muted)] mt-[0.2rem] leading-[1.4] whitespace-pre-wrap">' + esc(shown) + (truncated ? '…' : '') + '</div>';
             }
             html += '</div>';
         });
@@ -4101,27 +4101,27 @@ async function loadSimilarObservables(caseId) {
             const o = row.observable;
             const tlp = tlpColors[o.tlp] || tlpColors.amber;
             const iocBadge = o.is_ioc
-                ? '<span class="cpanel-alert-badge _ion-s-26a38c5a29" title="Marked as IOC">IOC</span>'
+                ? '<span class="cpanel-alert-badge bg-[rgba(239,68,68,.14)] text-[#fca5a5]" title="Marked as IOC">IOC</span>'
                 : '';
             const sightingsList = (row.sightings || []).slice(0, 6).map(s => {
-                return '<div class="cpanel-alert-card _ion-s-09bafa87f4" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\'>'
+                return '<div class="cpanel-alert-card cursor-pointer mt-[0.3rem]" data-click-action="openCaseDetail" data-args=\'[' + s.case_id + ']\'>'
                     +   '<div class="cpanel-alert-card-header">'
                     +     '<a class="cpanel-alert-id" href="javascript:openCaseDetail(' + s.case_id + ')">' + esc(s.case_number || ('#' + s.case_id)) + '</a>'
-                    +     '<span class="cpanel-alert-badge _ion-s-ad3cc7f934">' + esc(s.status || '?') + '</span>'
+                    +     '<span class="cpanel-alert-badge bg-[rgba(148,163,184,.14)] text-[#cbd5e1]">' + esc(s.status || '?') + '</span>'
                     +   '</div>'
                     +   '<div class="cpanel-alert-card-meta">' + esc((s.title || '').slice(0, 100)) + '</div>'
                     + '</div>';
             }).join('');
             const more = (row.sightings || []).length > 6
-                ? '<div class="_ion-s-0f52b7b61e">' + ((row.sightings || []).length - 6) + ' more…</div>'
+                ? '<div class="text-[0.7rem] text-[var(--text-muted)] mt-[0.3rem]">' + ((row.sightings || []).length - 6) + ' more…</div>'
                 : '';
-            return '<div class="_ion-s-9ef106cdfa">'
-                +   '<div class="_ion-s-0f75305047">'
+            return '<div class="mb-[0.85rem] pb-[0.65rem] border-b-[1px] border-b-[var(--ion-border)]">'
+                +   '<div class="flex items-center gap-[0.4rem] flex-wrap mb-[0.35rem]">'
                 +     '<span class="cpanel-alert-badge _ion-s-1f6be90690" title="TLP">' + esc((o.tlp || '').toUpperCase()) + '</span>'
                 +     iocBadge
-                +     '<code class="_ion-s-1d73b48170">' + esc(o.type) + '</code>'
-                +     '<code class="_ion-s-1116d4ad96">' + esc(o.value) + '</code>'
-                +     '<span class="cpanel-alert-badge _ion-s-b71f15de6d" title="Total sightings">' + (o.sighting_count || 1) + 'x</span>'
+                +     '<code class="text-[0.7rem] text-[var(--text-muted)]">' + esc(o.type) + '</code>'
+                +     '<code class="text-xs text-[var(--text-primary)] break-all flex-1">' + esc(o.value) + '</code>'
+                +     '<span class="cpanel-alert-badge bg-[rgba(109,228,255,.12)] text-[#6de4ff]" title="Total sightings">' + (o.sighting_count || 1) + 'x</span>'
                 +   '</div>'
                 +   sightingsList
                 +   more
@@ -4154,14 +4154,14 @@ async function loadKibanaComments(kibanaId) {
         container.innerHTML = comments.map(cm => {
             return '<div class="cpanel-comment">'
                 + '<div class="cpanel-comment-header">'
-                +   '<span class="cpanel-comment-user"><i class="icon-message-square _ion-s-04095862d9"></i>' + esc(cm.created_by || 'kibana') + '</span>'
+                +   '<span class="cpanel-comment-user"><i class="icon-message-square text-[0.65rem] mr-[0.2rem]"></i>' + esc(cm.created_by || 'kibana') + '</span>'
                 +   '<span class="cpanel-comment-time">' + fmtDate(cm.created_at) + '</span>'
                 + '</div>'
                 + '<div class="cpanel-comment-body">' + esc(cm.comment || '') + '</div>'
                 + '</div>';
         }).join('');
     } catch (e) {
-        container.innerHTML = '<div class="cpanel-empty-hint _ion-s-0e42856cf0">Could not load Kibana comments</div>';
+        container.innerHTML = '<div class="cpanel-empty-hint text-[var(--text-secondary)]">Could not load Kibana comments</div>';
         if (badge) badge.textContent = '-';
     }
 }
@@ -4676,7 +4676,7 @@ async function toggleCasePlaybookBrowser(caseId) {
         return;
     }
 
-    panel.innerHTML = '<div class="_ion-s-82327282be">Loading playbooks...</div>';
+    panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[var(--text-muted)]">Loading playbooks...</div>';
     panel.style.display = 'block';
 
     try {
@@ -4687,7 +4687,7 @@ async function toggleCasePlaybookBrowser(caseId) {
         casePlaybookData[caseId] = playbooks;
         renderCasePlaybookBrowser(caseId, playbooks);
     } catch (e) {
-        panel.innerHTML = '<div class="_ion-s-92dec5183f">Failed to load playbooks</div>';
+        panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[#f44336]">Failed to load playbooks</div>';
     }
 }
 
@@ -4707,7 +4707,7 @@ function renderCasePlaybookBrowser(caseId, playbooks, filter) {
     if (!filtered.length) {
         panel.innerHTML = '<div class="cpanel-playbook-browser">'
             + '<div class="cpanel-playbook-browser-search"><input type="text" placeholder="Filter playbooks..." data-input-action="filterCasePlaybooks" data-args=\'[' + caseId + ',"$value"]\' value="' + (filter || '') + '"></div>'
-            + '<div class="_ion-s-82327282be">No matching playbooks</div></div>';
+            + '<div class="p-2 text-[0.8125rem] text-[var(--text-muted)]">No matching playbooks</div></div>';
         return;
     }
 
@@ -4735,7 +4735,7 @@ function renderCasePlaybookItem(caseId, p, isActive) {
         + '<div class="cpanel-pb-item-desc">' + desc + ' &middot; ' + p.step_count + ' steps</div>'
         + '</div>'
         + '<span class="cpanel-pb-badge ' + (isActive ? 'active' : 'inactive') + '">' + (isActive ? 'Active' : 'Library') + '</span>'
-        + '<button class="btn _ion-s-8da07bcc0f" data-click-action="startPlaybookForCase" data-args=\'[' + caseId + ',' + p.id + ',"' + esc(p.name) + '"]\'>Start</button>'
+        + '<button class="btn text-xs py-1 px-2" data-click-action="startPlaybookForCase" data-args=\'[' + caseId + ',' + p.id + ',"' + esc(p.name) + '"]\'>Start</button>'
         + '</div>';
 }
 
@@ -4932,7 +4932,7 @@ function renderDonutChart(containerId, data, colors, centerLabel) {
 
     const total = data.reduce((s, d) => s + d.value, 0);
     if (!total) {
-        container.innerHTML = '<p class="_ion-s-65382d79e2">No data</p>';
+        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No data</p>';
         return;
     }
 
@@ -4969,7 +4969,7 @@ function renderDonutChart(containerId, data, colors, centerLabel) {
         legend += '<div class="donut-legend-item">'
             + '<span class="donut-legend-dot _ion-s-efb05bbd3b"></span>'
             + '<span class="donut-legend-label">' + d.label + '</span>'
-            + '<span class="donut-legend-val">' + d.value + ' <span class="_ion-s-e6e7462a5b">' + pctLabel + '%</span></span>'
+            + '<span class="donut-legend-val">' + d.value + ' <span class="font-normal text-[var(--text-secondary)] text-[0.65rem]">' + pctLabel + '%</span></span>'
             + '</div>';
     });
     legend += '</div>';
@@ -4998,10 +4998,10 @@ function renderSummaryStrip() {
     }).length;
 
     strip.innerHTML = ''
-        + '<div class="summary-chip"><span class="summary-chip-dot _ion-s-e431500fc7"></span><span class="summary-chip-label">Critical/High Active</span><span class="summary-chip-value _ion-s-defa93481e">' + critHigh + '</span></div>'
-        + '<div class="summary-chip"><span class="summary-chip-dot _ion-s-afe0dc34ed"></span><span class="summary-chip-label">Unassigned</span><span class="summary-chip-value _ion-s-3dfa1048c0">' + unassigned + '</span></div>'
+        + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--danger)]"></span><span class="summary-chip-label">Critical/High Active</span><span class="summary-chip-value text-[var(--danger)]">' + critHigh + '</span></div>'
+        + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--warning)]"></span><span class="summary-chip-label">Unassigned</span><span class="summary-chip-value text-[var(--warning)]">' + unassigned + '</span></div>'
         + '<div class="summary-chip"><span class="summary-chip-dot _ion-s-0f3cce5268"></span><span class="summary-chip-label">Oldest Active</span><span class="summary-chip-value">' + oldestDays + 'd</span></div>'
-        + '<div class="summary-chip"><span class="summary-chip-dot _ion-s-27649b76d2"></span><span class="summary-chip-label">Closed Today</span><span class="summary-chip-value _ion-s-6221ced1fe">' + closedToday + '</span></div>';
+        + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--success)]"></span><span class="summary-chip-label">Closed Today</span><span class="summary-chip-value text-[var(--success)]">' + closedToday + '</span></div>';
 }
 
 // ── Severity Donut ─────────────────────────────────────────
@@ -5040,7 +5040,7 @@ function renderClosureDonut() {
     const entries = Object.entries(counts);
     if (!entries.length) {
         const el = document.getElementById('analytics-closure-donut');
-        if (el) el.innerHTML = '<p class="_ion-s-65382d79e2">No closed cases</p>';
+        if (el) el.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No closed cases</p>';
         return;
     }
 
@@ -5071,7 +5071,7 @@ function renderWorkloadBars() {
     if (!container) return;
     const data = teamMetricsCache.cases_by_assignee || [];
     if (!data.length) {
-        container.innerHTML = '<p class="_ion-s-65382d79e2">No data</p>';
+        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No data</p>';
         return;
     }
     const max = Math.max(...data.map(d => d.open_count), 1);
@@ -5103,7 +5103,7 @@ function renderSLAIndicators() {
     const top8 = active.slice(0, 8);
 
     if (!top8.length) {
-        container.innerHTML = '<p class="_ion-s-65382d79e2">No active cases</p>';
+        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No active cases</p>';
         return;
     }
 
@@ -5119,23 +5119,23 @@ function renderSLAIndicators() {
         else slaCounts.red++;
     });
     const slaTotal = active.length || 1;
-    let slaBar = '<div class="_ion-s-2e8f9d24fb">';
+    let slaBar = '<div class="flex gap-1 mb-3 text-[0.7rem]">';
     if (slaCounts.green) slaBar += '<div class="_ion-s-09b0c9a2e1" title="<24h: ' + slaCounts.green + '"></div>';
     if (slaCounts.yellow) slaBar += '<div class="_ion-s-b2ff45bb5d" title="24-72h: ' + slaCounts.yellow + '"></div>';
     if (slaCounts.orange) slaBar += '<div class="_ion-s-d28cf57fed" title="72h-7d: ' + slaCounts.orange + '"></div>';
     if (slaCounts.red) slaBar += '<div class="_ion-s-eaadf28b85" title=">7d: ' + slaCounts.red + '"></div>';
     slaBar += '</div>';
-    slaBar += '<div class="_ion-s-ca02fd2e7e">'
-        + '<span><span class="sla-dot sla-green _ion-s-f39986f489"></span>&lt;24h: ' + slaCounts.green + '</span>'
-        + '<span><span class="sla-dot sla-yellow _ion-s-f39986f489"></span>1-3d: ' + slaCounts.yellow + '</span>'
-        + '<span><span class="sla-dot sla-orange _ion-s-f39986f489"></span>3-7d: ' + slaCounts.orange + '</span>'
-        + '<span><span class="sla-dot sla-red _ion-s-f39986f489"></span>&gt;7d: ' + slaCounts.red + '</span>'
+    slaBar += '<div class="flex gap-3 mb-2 text-[0.65rem] text-[var(--text-secondary)]">'
+        + '<span><span class="sla-dot sla-green inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>&lt;24h: ' + slaCounts.green + '</span>'
+        + '<span><span class="sla-dot sla-yellow inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>1-3d: ' + slaCounts.yellow + '</span>'
+        + '<span><span class="sla-dot sla-orange inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>3-7d: ' + slaCounts.orange + '</span>'
+        + '<span><span class="sla-dot sla-red inline-block w-[6px] h-[6px] align-middle mr-0.5"></span>&gt;7d: ' + slaCounts.red + '</span>'
         + '</div>';
 
     container.innerHTML = slaBar + top8.map(c => {
         const ageMs = now - new Date(c.created_at).getTime();
         const colorClass = getSLAColor(ageMs);
-        const sevBadge = '<span class="cw-sevtag sev-' + esc(c.severity || 'medium') + ' _ion-s-1b7b7cb248">' + esc(c.severity || 'med') + '</span>';
+        const sevBadge = '<span class="cw-sevtag sev-' + esc(c.severity || 'medium') + ' mr-1">' + esc(c.severity || 'med') + '</span>';
         return '<div class="sla-row" data-click-action="openCaseDetail" data-args=\'[' + c.id + ']\'>'
             + '<span class="sla-dot ' + colorClass + '"></span>'
             + sevBadge
@@ -5151,14 +5151,14 @@ function renderRecentClosures() {
     if (!container) return;
     const closures = (teamMetricsCache.recent_closures || []).slice(0, 5);
     if (!closures.length) {
-        container.innerHTML = '<p class="_ion-s-65382d79e2">No recent closures</p>';
+        container.innerHTML = '<p class="text-[0.8rem] text-[var(--text-secondary)]">No recent closures</p>';
         return;
     }
     container.innerHTML = closures.map(c => {
         const reasonLabel = closureReasonLabels[c.closure_reason] || c.closure_reason || '-';
         const reasonClass = c.closure_reason ? 'reason-' + c.closure_reason : '';
         const sevBadge = c.severity
-            ? '<span class="cw-sevtag sev-' + esc(c.severity) + ' _ion-s-aa98f0a520">' + esc(c.severity) + '</span>'
+            ? '<span class="cw-sevtag sev-' + esc(c.severity) + ' mr-[0.35rem]">' + esc(c.severity) + '</span>'
             : '';
         return '<div class="rclosure-row">'
             + sevBadge
@@ -5234,7 +5234,7 @@ async function loadWorkbench(caseId) {
         renderWorkbenchVerifyBanner(caseId, verify);
     } catch (e) {
         const kanban = document.getElementById('workbench-kanban-' + caseId);
-        if (kanban) kanban.innerHTML = '<div class="cpanel-empty-hint _ion-s-97294b207c">Failed to load workbench</div>';
+        if (kanban) kanban.innerHTML = '<div class="cpanel-empty-hint col-span-full">Failed to load workbench</div>';
     }
 }
 
@@ -5439,33 +5439,33 @@ function renderAnnotations(caseId, annotations) {
     var body = document.getElementById('annotations-body-' + caseId);
     if (!body) return;
     var html = annotations.map(function(a) { return renderAnnotationCard(caseId, a); }).join('');
-    html += '<div class="_ion-s-c9ef2a58eb"><button type="button" class="btn btn-secondary _ion-s-e0a3556052" data-click-action="toggleAnnotationForm" data-args=\'[' + caseId + ']\'>+ Add annotation</button></div>';
+    html += '<div class="mt-2"><button type="button" class="btn btn-secondary text-xs py-[0.3rem] px-[0.65rem]" data-click-action="toggleAnnotationForm" data-args=\'[' + caseId + ']\'>+ Add annotation</button></div>';
     html += renderAnnotationFormHtml(caseId);
     body.innerHTML = html;
 }
 
 function renderAnnotationFormHtml(caseId) {
-    return '<div class="_ion-s-25292bcdb5" id="annotation-form-' + caseId + '">'
-        + '<input class="_ion-s-8623144b35" type="datetime-local" id="ann-ts-' + caseId + '">'
-        + '<textarea class="_ion-s-4a4f4c1bd8" id="ann-body-' + caseId + '" rows="3" placeholder="Add a timeline annotation..."></textarea>'
-        + '<div class="_ion-s-f38ec1590c">'
-        + '<button type="button" class="btn btn-primary _ion-s-1ee178cde8" data-click-action="submitAnnotation" data-args=\'[' + caseId + ']\'>Save</button>'
-        + '<button type="button" class="btn _ion-s-1ee178cde8" data-click-action="toggleAnnotationForm" data-args=\'[' + caseId + ']\'>Cancel</button>'
+    return '<div class="hidden mt-[0.6rem]" id="annotation-form-' + caseId + '">'
+        + '<input class="w-full mb-[0.4rem] bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-[0.3rem] px-2 text-[var(--text-primary)] text-[0.8rem]" type="datetime-local" id="ann-ts-' + caseId + '">'
+        + '<textarea class="w-full bg-[var(--bg-secondary)] border border-[rgba(255,255,255,.12)] rounded-[4px] py-[0.4rem] px-[0.6rem] text-[var(--text-primary)] text-[0.8rem] resize-y box-border" id="ann-body-' + caseId + '" rows="3" placeholder="Add a timeline annotation..."></textarea>'
+        + '<div class="flex gap-[0.4rem] mt-[0.35rem]">'
+        + '<button type="button" class="btn btn-primary text-xs py-[0.3rem] px-[0.7rem]" data-click-action="submitAnnotation" data-args=\'[' + caseId + ']\'>Save</button>'
+        + '<button type="button" class="btn text-xs py-[0.3rem] px-[0.7rem]" data-click-action="toggleAnnotationForm" data-args=\'[' + caseId + ']\'>Cancel</button>'
         + '</div></div>';
 }
 
 function renderAnnotationCard(caseId, a) {
     var ts = a.timeline_ts ? new Date(a.timeline_ts).toLocaleString() : '';
     var author = a.created_by_username || 'unknown';
-    return '<div class="cpanel-ann-card _ion-s-eee674690e" id="ann-card-' + caseId + '-' + a.id + '">'
-        + '<div class="_ion-s-8dc48b22eb">'
-        + '<span class="_ion-s-d176fb5b81">' + esc(ts) + '</span>'
+    return '<div class="cpanel-ann-card border-l-[3px] border-l-[#6366f1] pt-2 pr-2 pb-2 pl-3 mb-2 bg-[rgba(99,102,241,0.06)] rounded-[0_4px_4px_0]" id="ann-card-' + caseId + '-' + a.id + '">'
+        + '<div class="flex items-center gap-2 text-xs text-[var(--text-secondary)] mb-1">'
+        + '<span class="text-[#818cf8] font-semibold">' + esc(ts) + '</span>'
         + '<span>&middot;</span><span>' + esc(author) + '</span>'
-        + '<span class="_ion-s-3499a56e0c">'
-        + '<button class="_ion-s-5a78813db9" type="button" title="Edit" data-click-action="editAnnotation" data-args=\'[' + caseId + ',' + a.id + ']\'>&#9998;</button>'
-        + '<button class="_ion-s-5a78813db9" type="button" title="Delete" data-click-action="deleteAnnotation" data-args=\'[' + caseId + ',' + a.id + ']\'>&times;</button>'
+        + '<span class="ml-[auto] flex gap-[0.35rem]">'
+        + '<button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[0.2rem] text-[0.8rem]" type="button" title="Edit" data-click-action="editAnnotation" data-args=\'[' + caseId + ',' + a.id + ']\'>&#9998;</button>'
+        + '<button class="bg-transparent border-0 text-[#94a3b8] cursor-pointer py-0 px-[0.2rem] text-[0.8rem]" type="button" title="Delete" data-click-action="deleteAnnotation" data-args=\'[' + caseId + ',' + a.id + ']\'>&times;</button>'
         + '</span></div>'
-        + '<div class="_ion-s-02af76ef38">' + esc(a.body) + '</div>'
+        + '<div class="text-[0.8rem] text-[var(--text-primary)] whitespace-pre-wrap">' + esc(a.body) + '</div>'
         + '</div>';
 }
 

@@ -81,7 +81,7 @@ async function brfLoad(withAI) {
         if (!r.ok) throw new Error('Briefing request failed');
         brfRender(await r.json());
     } catch (e) {
-        c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${brfEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${brfEsc(e.message)}</div>`;
     }
 }
 
@@ -163,7 +163,7 @@ function brfRender(b) {
     if ((octi.actors || []).length) {
         html += '<div class="overflow-x-auto"><table class="table table-sm"><tbody>';
         for (const a of octi.actors) {
-            html += `<tr><td>${brfEsc(a.name || '-')}${a.aliases && a.aliases.length ? ' <em class="_ion-s-18f820e713">(' + a.aliases.map(brfEsc).join(', ') + ')</em>' : ''}</td></tr>`;
+            html += `<tr><td>${brfEsc(a.name || '-')}${a.aliases && a.aliases.length ? ' <em class="text-[var(--text-secondary)] text-[.7rem]">(' + a.aliases.map(brfEsc).join(', ') + ')</em>' : ''}</td></tr>`;
         }
         html += '</tbody></table></div>';
     } else {
@@ -183,7 +183,7 @@ function brfRender(b) {
             <tr><td>Avg quality score</td><td class="font-mono font-semibold text-primary text-right">${tide.quality_avg ?? '-'}</td></tr>
         </tbody></table></div>`;
     } else {
-        html += '<div class="text-sm opacity-50 p-3 text-center italic">TIDE not configured. Add it in <a class="link link-primary _ion-s-dc2e428fc7" href="/settings#tide">Settings</a>.</div>';
+        html += '<div class="text-sm opacity-50 p-3 text-center italic">TIDE not configured. Add it in <a class="link link-primary text-[var(--primary)]" href="/settings#tide">Settings</a>.</div>';
     }
     html += '</div></div>';
 
@@ -193,7 +193,7 @@ function brfRender(b) {
         html += `<div class="alert alert-warning mb-4">
             <div>
             <div class="text-xs font-bold uppercase tracking-wider">AI Briefing</div>
-            <div class="_ion-s-71bebebb15">AI summary unavailable — Ollama is not configured or not reachable. Check Settings → AI to configure.</div>
+            <div class="text-[var(--sev-medium,#d29922)]">AI summary unavailable — Ollama is not configured or not reachable. Check Settings → AI to configure.</div>
             </div>
         </div>`;
     } else if (!b.narrative) {

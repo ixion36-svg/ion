@@ -77,7 +77,7 @@ async function cmpRefresh() {
         _cmpAll = await r.json();
         cmpRender();
     } catch (e) {
-        c.innerHTML = `<div role="alert" class="alert alert-error _ion-s-3c9b2ebd4d">${cmpEsc(e.message)}</div>`;
+        c.innerHTML = `<div role="alert" class="alert alert-error text-[var(--sev-critical,#f85149)]">${cmpEsc(e.message)}</div>`;
     }
 }
 
@@ -106,7 +106,7 @@ function cmpRender() {
 
     let banner = '';
     if (_cmpAll && _cmpAll.error) {
-        banner = `<div role="alert" class="alert alert-warning mb-4"><span><strong>${cmpEsc(_cmpAll.error)}.</strong> Configure TIDE in <a class="_ion-s-0510f285a6" href="/settings#tide">Settings</a> to compute live coverage.</span></div>`;
+        banner = `<div role="alert" class="alert alert-warning mb-4"><span><strong>${cmpEsc(_cmpAll.error)}.</strong> Configure TIDE in <a class="text-[inherit] underline" href="/settings#tide">Settings</a> to compute live coverage.</span></div>`;
     }
 
     let html = banner + `<div role="alert" class="alert alert-info mb-4">
@@ -156,7 +156,7 @@ function cmpRenderDetail(f) {
         <div class="flex flex-wrap items-center justify-between gap-4 px-5 py-3 border-b border-base-300">
             <div class="basis-full md:basis-auto md:flex-1">
                 <h2 class="card-title text-base">${cmpEsc(f.framework)}</h2>
-                <div class="text-xs opacity-50 mt-1">${cmpEsc(f.version)} &middot; <a class="_ion-s-1cdc0f83d3" href="${cmpEsc(f.url||'#')}" target="_blank" rel="noopener noreferrer">official spec &rarr;</a></div>
+                <div class="text-xs opacity-50 mt-1">${cmpEsc(f.version)} &middot; <a class="text-[var(--primary)] no-underline" href="${cmpEsc(f.url||'#')}" target="_blank" rel="noopener noreferrer">official spec &rarr;</a></div>
             </div>
             <div class="flex flex-wrap gap-4 text-sm">
                 <span class="opacity-70"><strong class="font-mono">${f.overall_score||0}%</strong> overall</span>
@@ -165,7 +165,7 @@ function cmpRenderDetail(f) {
                 <span class="text-error">blind <strong class="font-mono">${s.no_coverage||0}</strong></span>
             </div>
         </div>
-        <div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th class="_ion-s-c6fffdfe96">Control</th><th>Name</th><th class="_ion-s-ec6626e1ed">Score</th><th class="_ion-s-8573bae381">State</th><th>Techniques</th></tr></thead><tbody>`;
+        <div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th class="w-[130px]">Control</th><th>Name</th><th class="w-[70px]">Score</th><th class="w-[80px]">State</th><th>Techniques</th></tr></thead><tbody>`;
     for (const ctl of (f.controls || [])) {
         const tids = [];
         for (const t of (ctl.covered_techniques||[])) tids.push(`<span class="badge badge-sm badge-outline badge-success font-mono">${cmpEsc(t)}</span>`);
@@ -173,7 +173,7 @@ function cmpRenderDetail(f) {
         html += `<tr>
             <td><span class="font-mono font-semibold text-primary">${cmpEsc(ctl.control_id)}</span></td>
             <td>${cmpEsc(ctl.name)}</td>
-            <td><span class="_ion-s-d0c0aa23fa" data-ion-style="color:${cmpScoreColor(ctl.score||0)}">${ctl.score||0}%</span></td>
+            <td><span class="font-mono font-bold" data-ion-style="color:${cmpScoreColor(ctl.score||0)}">${ctl.score||0}%</span></td>
             <td><span class="badge badge-sm ${cmpStateBadge(ctl.state)}">${cmpEsc(ctl.state)}</span></td>
             <td><div class="flex flex-wrap gap-1">${tids.join('')}</div></td>
         </tr>`;

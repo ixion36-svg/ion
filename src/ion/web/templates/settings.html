@@ -2332,7 +2332,7 @@ async function loadDatabaseStats() {
                 <div class="info-card-label">Total Rows</div>
                 <div class="info-card-value">${formatNumber(stats.total_rows || 0)}</div>
             </div>
-            <div class="info-card _ion-s-d5b43342a2">
+            <div class="info-card col-span-full">
                 <div class="info-card-label">Tables</div>
                 <div class="table-stats">
                     ${stats.tables.map(t => `
@@ -2364,7 +2364,7 @@ async function loadBackups() {
         const data = await response.json();
 
         if (data.backups.length === 0) {
-            container.innerHTML = '<div class="loading _ion-s-ef7142f76c">No backups found. Click "Create Backup" to create one.</div>';
+            container.innerHTML = '<div class="loading p-4">No backups found. Click "Create Backup" to create one.</div>';
             return;
         }
 
@@ -2552,7 +2552,7 @@ async function loadSystemInfo() {
                 <div class="info-card-label">PCAP Analysis</div>
                 <div class="info-card-value">dpkt ${info.packages['dpkt'] || ''}</div>
             </div>
-            <div class="info-card _ion-s-d5b43342a2">
+            <div class="info-card col-span-full">
                 <div class="info-card-label">Key Dependencies</div>
                 <div class="packages-list">
                     ${Object.entries(info.packages).map(([name, version]) =>
@@ -2636,7 +2636,7 @@ async function loadSystemLogs() {
         const data = await response.json();
 
         if (!data.logs || data.logs.length === 0) {
-            container.innerHTML = '<div class="_ion-s-5e084f50f9">No log entries found</div>';
+            container.innerHTML = '<div class="p-8 text-center text-[var(--text-muted)]">No log entries found</div>';
             countEl.textContent = '';
             return;
         }
@@ -2667,7 +2667,7 @@ async function loadSystemLogs() {
         countEl.textContent = `Showing ${data.logs.length} entries (newest first)`;
 
     } catch (error) {
-        container.innerHTML = `<div class="_ion-s-75c5100a5b">Failed to load logs: ${escapeHtml(error.message)}</div>`;
+        container.innerHTML = `<div class="p-4 text-[var(--sev-critical)]">Failed to load logs: ${escapeHtml(error.message)}</div>`;
         countEl.textContent = '';
     }
 

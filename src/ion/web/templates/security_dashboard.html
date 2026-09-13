@@ -620,11 +620,11 @@ async function showEventDetail(eventId) {
                     <div class="text-xs uppercase opacity-70">Confidence Score</div>
                     <div class="font-medium break-all">${event.confidence_score}%</div>
                 </div>
-                <div class="p-2 bg-base-200 rounded _ion-s-1f61f29863">
+                <div class="p-2 bg-base-200 rounded col-span-2">
                     <div class="text-xs uppercase opacity-70">User Agent</div>
                     <div class="font-medium break-all">${event.user_agent ? escapeHtml(event.user_agent) : '-'}</div>
                 </div>
-                <div class="p-2 bg-base-200 rounded _ion-s-1f61f29863">
+                <div class="p-2 bg-base-200 rounded col-span-2">
                     <div class="text-xs uppercase opacity-70">Description</div>
                     <div class="font-medium break-all">${escapeHtml(event.description)}</div>
                 </div>

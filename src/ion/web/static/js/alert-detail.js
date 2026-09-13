@@ -236,7 +236,7 @@
 
   function renderSystemBadge(a) {
       if (!a.source_system && !a.cyab_system_name && !a.tide_system_name) {
-          return '<span class="_ion-s-b8e0b1fa55">-</span>';
+          return '<span class="text-[var(--text-muted)]">-</span>';
       }
       const cyabName = a.cyab_system_name;
       const tideName = a.tide_system_name;
@@ -876,7 +876,7 @@
                       </div>
                   </div>
               `}).join('')}
-              ${alerts.length > 10 ? `<div class="_ion-s-d5293cce9b">...and ${alerts.length - 10} more</div>` : ''}
+              ${alerts.length > 10 ? `<div class="p-2 text-[var(--text-muted)] text-xs">...and ${alerts.length - 10} more</div>` : ''}
           </div>
       `;
   }
@@ -1179,25 +1179,25 @@
                   .then(data => {
                       const events = data.events || [];
                       if (!events.length) {
-                          seqEl.innerHTML = '<div class="empty-state _ion-s-c8739bb5cb">No sequence events — this is not an EQL/correlation alert, or building blocks are not available.</div>';
+                          seqEl.innerHTML = '<div class="empty-state p-5 text-center text-[#64748b]">No sequence events — this is not an EQL/correlation alert, or building blocks are not available.</div>';
                           return;
                       }
-                      let html = '<div class="_ion-s-1b291a2eeb">' + events.length + ' events in this sequence</div>';
+                      let html = '<div class="text-[11px] text-[#64748b] mb-3">' + events.length + ' events in this sequence</div>';
                       html += '<div class="sequence-timeline">';
                       events.forEach((ev, i) => {
                           const ts = ev.timestamp ? new Date(ev.timestamp).toLocaleString() : '';
-                          html += '<div class="_ion-s-11d17c6fcf">';
-                          html += '<div class="_ion-s-1412b0aeb4"></div>';
-                          html += '<div class="_ion-s-ba1f79c91c">Step ' + (i+1) + ' &middot; ' + escapeHtml(ts) + '</div>';
-                          if (ev.process_name) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Process:</span> <span class="_ion-s-df570f8a04">' + escapeHtml(ev.process_name) + '</span></div>';
-                          if (ev.command_line) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Command:</span> <span class="_ion-s-ac046f947e">' + escapeHtml(ev.command_line) + '</span></div>';
-                          if (ev.parent_process) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Parent:</span> <span class="_ion-s-de3b9d4658">' + escapeHtml(ev.parent_process) + '</span></div>';
-                          if (ev.file_name) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">File:</span> <span class="_ion-s-df570f8a04">' + escapeHtml(ev.file_name) + '</span></div>';
-                          if (ev.file_hash) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Hash:</span> <span class="_ion-s-83a55422b8">' + escapeHtml(ev.file_hash) + '</span></div>';
-                          if (ev.source_ip || ev.destination_ip) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Network:</span> <span class="_ion-s-df570f8a04">' + escapeHtml(ev.source_ip || '') + ' &rarr; ' + escapeHtml(ev.destination_ip || '') + '</span></div>';
-                          if (ev.host) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">Host:</span> <span class="_ion-s-8d655b9a89">' + escapeHtml(ev.host) + '</span></div>';
-                          if (ev.user) html += '<div class="_ion-s-c188ad004a"><span class="_ion-s-081bc4f452">User:</span> <span class="_ion-s-8d655b9a89">' + escapeHtml(ev.user) + '</span></div>';
-                          if (ev.event_action) html += '<div><span class="_ion-s-081bc4f452">Action:</span> <span class="_ion-s-8d3d885daf">' + escapeHtml(ev.event_action) + '</span></div>';
+                          html += '<div class="border-l-[2px] border-l-[#334155] pt-2 pr-0 pb-2 pl-4 ml-2 relative">';
+                          html += '<div class="absolute left-[-5px] top-[12px] w-[8px] h-[8px] rounded-[50%] bg-[#6de4ff]"></div>';
+                          html += '<div class="text-[10px] text-[#64748b] mb-1">Step ' + (i+1) + ' &middot; ' + escapeHtml(ts) + '</div>';
+                          if (ev.process_name) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Process:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.process_name) + '</span></div>';
+                          if (ev.command_line) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Command:</span> <span class="text-[#f8b33a] font-mono text-[10px] break-all">' + escapeHtml(ev.command_line) + '</span></div>';
+                          if (ev.parent_process) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Parent:</span> <span class="text-[#94a3b8] font-mono text-[11px]">' + escapeHtml(ev.parent_process) + '</span></div>';
+                          if (ev.file_name) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">File:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.file_name) + '</span></div>';
+                          if (ev.file_hash) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Hash:</span> <span class="text-[#64748b] font-mono text-[10px]">' + escapeHtml(ev.file_hash) + '</span></div>';
+                          if (ev.source_ip || ev.destination_ip) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Network:</span> <span class="text-[#e2e8f0] font-mono text-[11px]">' + escapeHtml(ev.source_ip || '') + ' &rarr; ' + escapeHtml(ev.destination_ip || '') + '</span></div>';
+                          if (ev.host) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">Host:</span> <span class="text-[#e2e8f0] text-[11px]">' + escapeHtml(ev.host) + '</span></div>';
+                          if (ev.user) html += '<div class="mb-0.5"><span class="text-[#94a3b8] text-[10px]">User:</span> <span class="text-[#e2e8f0] text-[11px]">' + escapeHtml(ev.user) + '</span></div>';
+                          if (ev.event_action) html += '<div><span class="text-[#94a3b8] text-[10px]">Action:</span> <span class="text-[#6de4ff] text-[11px]">' + escapeHtml(ev.event_action) + '</span></div>';
                           html += '</div>';
                       });
                       html += '</div>';
@@ -1307,7 +1307,7 @@
     // alerts.html and nowhere else.
     let html = _opts.triageBar === false
         ? ''
-        : `<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage...</span></div>`;
+        : `<div class="triage-bar" id="triage-bar"><span class="text-[var(--text-muted)] text-[0.8125rem]">Loading triage...</span></div>`;
 
     html += _advisoriesHtml(alert);
 
@@ -1367,11 +1367,11 @@
 
     // Message — wrap so the v0.17.0 Translate button can replace its body in place.
     html += `<div class="alert-message-box" id="alert-message-box" data-original-message="${escapeHtml(alert.message || '')}">${escapeHtml(alert.message)}</div>`;
-    html += `<div class="alert-msg-translate-row _ion-s-379195f8b9">
-        <button class="btn btn-ghost btn-sm _ion-s-938b812d49" type="button" data-click-action="translateAlertMessage">
+    html += `<div class="alert-msg-translate-row mt-[-4px] mr-0 mb-2 ml-0 flex items-center gap-2 text-[11px] text-[#94a3b8]">
+        <button class="btn btn-ghost btn-sm text-[11px] py-0.5 px-2" type="button" data-click-action="translateAlertMessage">
             Translate
         </button>
-        <select class="_ion-s-d81e1fcfa4" id="alert-msg-translate-target">
+        <select class="bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[#cbd5e1] text-[11px] h-[22px] py-0 px-1.5 rounded-[3px]" id="alert-msg-translate-target">
             <option value="en" selected>→ English</option>
             <option value="ru">→ Russian</option>
             <option value="zh">→ Chinese</option>
@@ -1380,8 +1380,8 @@
             <option value="fr">→ French</option>
             <option value="de">→ German</option>
         </select>
-        <span class="_ion-s-93e6231cbb" id="alert-msg-translate-status"></span>
-        <button class="_ion-s-df01b7ca34" id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage">show original</button>
+        <span class="text-[#64748b]" id="alert-msg-translate-status"></span>
+        <button class="hidden bg-transparent border-0 text-[#64748b] cursor-pointer text-[11px] underline" id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage">show original</button>
     </div>`;
 
     // Tags
@@ -1395,7 +1395,7 @@
             <span class="mitre-badge auto" data-click-action="__filterMitreAndClose" data-tech-id="${escapeHtml(alert.mitre_technique_id)}" title="Click to filter by this technique">
                 <strong>${escapeHtml(alert.mitre_technique_id)}</strong>
                 ${alert.mitre_technique_name ? ` - ${escapeHtml(alert.mitre_technique_name)}` : ''}
-                ${alert.mitre_tactic_name ? ` <span class="_ion-s-68433eba3d">(${escapeHtml(alert.mitre_tactic_name)})</span>` : ''}
+                ${alert.mitre_tactic_name ? ` <span class="opacity-70">(${escapeHtml(alert.mitre_tactic_name)})</span>` : ''}
             </span>
         </div>`;
     }
@@ -1404,7 +1404,7 @@
     if (_opts.aiAvailable) {
         html += `<div class="ai-analysis-bar">
             <button class="ai-assist-btn" data-click-action="aiAnalyzeAlert" data-args='["${escapeHtml(alert.id)}"]'>&#9733; AI Analyze</button>
-            <button class="ai-assist-btn _ion-s-f34a398ced" data-click-action="openAIChatWithContext" data-args='["${escapeHtml(alert.id)}"]'>&#9993; Discuss with AI</button>
+            <button class="ai-assist-btn bg-[rgba(16,185,129,0.15)] border-[rgba(16,185,129,0.3)] text-[#10b981]" data-click-action="openAIChatWithContext" data-args='["${escapeHtml(alert.id)}"]'>&#9993; Discuss with AI</button>
             <div class="ai-analysis-result" id="ai-analysis-result"></div>
         </div>`;
     }
@@ -1416,7 +1416,7 @@
         _tuneRegistry[alert.id] = { rule_name: alert.rule_name };
         html += `<div class="ai-analysis-bar">
             <button class="ai-assist-btn" data-click-action="requestTuningOpen" data-args='["${escapeHtml(alert.id)}"]'>&#9881; Request tuning</button>
-            <span class="_ion-s-e23b35fe83">Rule: ${escapeHtml(alert.rule_name)}</span>
+            <span class="text-[var(--ion-text-secondary)] text-xs ml-2">Rule: ${escapeHtml(alert.rule_name)}</span>
         </div>`;
     }
 
@@ -1425,13 +1425,13 @@
         const arkimeHint = alert.network_community_id
             ? `Community ID: ${escapeHtml(alert.network_community_id)}`
             : `IP search: ${escapeHtml(alert.source_ip || alert.destination_ip || '')}`;
-        html += `<div class="ai-analysis-bar _ion-s-04cdf78d3c">
-            <a class="ai-assist-btn _ion-s-5acbd5004f" href="/alerts/${encodeURIComponent(alert.id)}/arkime"
+        html += `<div class="ai-analysis-bar mt-1">
+            <a class="ai-assist-btn bg-[rgba(109,228,255,0.12)] border-[rgba(109,228,255,0.3)] text-[#6de4ff] no-underline" href="/alerts/${encodeURIComponent(alert.id)}/arkime"
 >
-                <svg class="_ion-s-a574d58441" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
+                <svg class="align-middle mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="16" y="16" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="9" y="2" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/></svg>
                 Arkime PCAP Analysis
             </a>
-            <span class="_ion-s-e23b35fe83">${arkimeHint}</span>
+            <span class="text-[var(--ion-text-secondary)] text-xs ml-2">${arkimeHint}</span>
         </div>`;
     }
     return html;
@@ -1519,7 +1519,7 @@
     return '<div class="iad2-head">'
       + _heroV2(alert)
       + (_opts.triageBar === false ? ''
-          : '<div class="triage-bar" id="triage-bar"><span class="_ion-s-75f6ba34af">Loading triage…</span></div>')
+          : '<div class="triage-bar" id="triage-bar"><span class="text-[var(--text-muted)] text-[0.8125rem]">Loading triage…</span></div>')
       + _headExtrasV2(alert)
       + '</div>';
   }
@@ -1534,14 +1534,14 @@
       + '<div class="alert-message-box iad2-reason" id="alert-message-box" data-original-message="'
       +   escapeHtml(alert.message || '') + '">' + escapeHtml(alert.message || '') + '</div>'
       + '<div class="alert-msg-translate-row iad2-translate">'
-      +   '<button class="btn btn-ghost btn-sm _ion-s-938b812d49" type="button" data-click-action="translateAlertMessage">Translate</button>'
-      +   '<select class="_ion-s-d81e1fcfa4" id="alert-msg-translate-target">'
+      +   '<button class="btn btn-ghost btn-sm text-[11px] py-0.5 px-2" type="button" data-click-action="translateAlertMessage">Translate</button>'
+      +   '<select class="bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] text-[#cbd5e1] text-[11px] h-[22px] py-0 px-1.5 rounded-[3px]" id="alert-msg-translate-target">'
       +     '<option value="en" selected>→ EN</option><option value="ru">→ RU</option>'
       +     '<option value="zh">→ ZH</option><option value="ar">→ AR</option>'
       +     '<option value="es">→ ES</option><option value="fr">→ FR</option>'
       +     '<option value="de">→ DE</option></select>'
-      +   '<span class="_ion-s-93e6231cbb" id="alert-msg-translate-status"></span>'
-      +   '<button class="_ion-s-df01b7ca34" id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage">original</button>'
+      +   '<span class="text-[#64748b]" id="alert-msg-translate-status"></span>'
+      +   '<button class="hidden bg-transparent border-0 text-[#64748b] cursor-pointer text-[11px] underline" id="alert-msg-translate-revert" type="button" data-click-action="revertAlertMessage">original</button>'
       + '</div></div>';
 
     if (alert.tags && alert.tags.length) {

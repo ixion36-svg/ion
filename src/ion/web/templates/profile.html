@@ -394,7 +394,7 @@ async function resolveElasticUid() {
                     document.getElementById('id-elastic-username').value = result.matched_username;
                 }
                 showToast(`Resolved Elastic UID via "${result.matched_username}"`, 'success');
-                resultDiv.innerHTML = `<div class="alert alert-success _ion-s-4dbb3ddbaa">
+                resultDiv.innerHTML = `<div class="alert alert-success text-[0.8125rem]">
                     Matched as <strong>${escapeHtml(result.matched_username)}</strong>
                     &mdash; UID: <code>${escapeHtml(result.elastic_uid)}</code>
                 </div>`;
@@ -402,12 +402,12 @@ async function resolveElasticUid() {
                 showToast('Could not resolve Elastic UID', 'error');
                 let profilesHtml = '';
                 if (result.profiles_found && result.profiles_found.length) {
-                    profilesHtml = '<p class="_ion-s-c9ef2a58eb">Available profiles found:</p><ul class="_ion-s-3245fd5a1a">' +
+                    profilesHtml = '<p class="mt-2">Available profiles found:</p><ul class="mt-1 mr-0 mb-0 ml-4">' +
                         result.profiles_found.map(p =>
                             `<li><strong>${escapeHtml(p.username)}</strong> (${escapeHtml(p.full_name || p.email || '')})</li>`
-                        ).join('') + '</ul><p class="_ion-s-c9ef2a58eb">Set your <em>Elastic Username</em> to one of these and try again.</p>';
+                        ).join('') + '</ul><p class="mt-2">Set your <em>Elastic Username</em> to one of these and try again.</p>';
                 }
-                resultDiv.innerHTML = `<div class="alert alert-warning _ion-s-4dbb3ddbaa">
+                resultDiv.innerHTML = `<div class="alert alert-warning text-[0.8125rem]">
                     No exact match found. Tried: ${result.candidates_tried.map(c => `"${escapeHtml(c)}"`).join(', ')}
                     ${profilesHtml}
                 </div>`;

@@ -414,7 +414,7 @@ async function _loadLabHistory() {
                 </div>`;
       }).join('');
       const criteriaBlock = criteriaRows
-        ? `<div class="_ion-s-ebfdcc23be" id="${cardId}-crit">${criteriaRows}</div>`
+        ? `<div class="hidden mt-[0.4rem] py-[0.3rem] px-2 border-t-[1px] border-t-[rgba(255,255,255,0.06)]" id="${cardId}-crit">${criteriaRows}</div>`
         : '';
       const toggle = criteriaRows
         ? `<button class="btn btn-ghost btn-xs bg-transparent border-0 text-[#a5b4fc] cursor-pointer text-[0.74rem] p-0" data-click-action="toggleCardCriteria" data-args='[${JSON.stringify(cardId)}]'>Show breakdown ▾</button>`

@@ -517,91 +517,91 @@
         }
 
         document.getElementById('panel-overview').innerHTML =
-            `<h3 class="_ion-s-7b85582290">Protocol Distribution</h3>${bars}` +
-            `<h3 class="_ion-s-aa82ed175a">Top Conversations</h3>${convBars || '<p class="_ion-s-4b49548152">No conversations recorded.</p>'}`;
+            `<h3 class="mt-0 mr-0 mb-3 ml-0 text-[.95rem]">Protocol Distribution</h3>${bars}` +
+            `<h3 class="mt-5 mr-0 mb-3 ml-0 text-[.95rem]">Top Conversations</h3>${convBars || '<p class="text-[var(--text-secondary)] text-[.85rem]">No conversations recorded.</p>'}`;
     }
 
     function renderNetwork(d) {
-        let html = '<div class="_ion-s-2e5f767e14">';
-        html += '<div><h3 class="_ion-s-87ccc4da73">Top Source IPs</h3>' + ipTable(d.top_src_ips) + '</div>';
-        html += '<div><h3 class="_ion-s-87ccc4da73">Top Destination IPs</h3>' + ipTable(d.top_dst_ips) + '</div>';
+        let html = '<div class="grid grid-cols-2 gap-5">';
+        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Source IPs</h3>' + ipTable(d.top_src_ips) + '</div>';
+        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Destination IPs</h3>' + ipTable(d.top_dst_ips) + '</div>';
         html += '</div>';
-        html += '<div class="_ion-s-008d8eee3d">';
-        html += '<div><h3 class="_ion-s-87ccc4da73">Top Source Ports</h3>' + portTable(d.top_src_ports) + '</div>';
-        html += '<div><h3 class="_ion-s-87ccc4da73">Top Destination Ports</h3>' + portTable(d.top_dst_ports) + '</div>';
+        html += '<div class="grid grid-cols-2 gap-5 mt-5">';
+        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Source Ports</h3>' + portTable(d.top_src_ports) + '</div>';
+        html += '<div><h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">Top Destination Ports</h3>' + portTable(d.top_dst_ports) + '</div>';
         html += '</div>';
         document.getElementById('panel-network').innerHTML = html;
     }
 
     function ipTable(items) {
-        if (!items || !items.length) return '<p class="_ion-s-4b49548152">No data</p>';
+        if (!items || !items.length) return '<p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>';
         const top = items.slice(0, 15);
         const max = Math.max(...top.map(i => i.count), 1);
         let rows = top.map(i => {
             const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td class="_ion-s-72126da263">${esc(i.ip)}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
+            return `<tr><td class="font-mono">${esc(i.ip)}</td><td class="text-right bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
         }).join('');
-        return `<table class="pcap-table"><thead><tr><th>IP Address</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
+        return `<table class="pcap-table"><thead><tr><th>IP Address</th><th class="text-right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function portTable(items) {
-        if (!items || !items.length) return '<p class="_ion-s-4b49548152">No data</p>';
+        if (!items || !items.length) return '<p class="text-[var(--text-secondary)] text-[.85rem]">No data</p>';
         const top = items.slice(0, 15);
         const max = Math.max(...top.map(i => i.count), 1);
         let rows = top.map(i => {
             const pct = (i.count / max * 100).toFixed(1);
-            return `<tr><td>${i.port}</td><td class="_ion-s-54c2afb7ba bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
+            return `<tr><td>${i.port}</td><td class="text-right bar-cell"><span class="mini-bar" data-ion-style="width:${pct}%"></span><span class="mini-val">${fmtNum(i.count)}</span></td></tr>`;
         }).join('');
-        return `<table class="pcap-table"><thead><tr><th>Port</th><th class="_ion-s-54c2afb7ba">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
+        return `<table class="pcap-table"><thead><tr><th>Port</th><th class="text-right">Packets</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderDns(d) {
         const items = d.dns_queries || [];
         if (!items.length) {
-            document.getElementById('panel-dns').innerHTML = '<p class="_ion-s-ff64cacc49">No DNS queries captured.</p>';
+            document.getElementById('panel-dns').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No DNS queries captured.</p>';
             return;
         }
         let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="_ion-s-6ec2942442">${esc(i.query)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
+            `<tr><td class="font-mono break-all">${esc(i.query)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
         ).join('');
         document.getElementById('panel-dns').innerHTML =
-            `<h3 class="_ion-s-87ccc4da73">DNS Queries (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Query</th><th class="_ion-s-54c2afb7ba">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">DNS Queries (${items.length} unique)</h3>` +
+            `<table class="pcap-table"><thead><tr><th>Query</th><th class="text-right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderHttp(d) {
         const items = d.http_requests || [];
         if (!items.length) {
-            document.getElementById('panel-http').innerHTML = '<p class="_ion-s-ff64cacc49">No HTTP requests captured.</p>';
+            document.getElementById('panel-http').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No HTTP requests captured.</p>';
             return;
         }
         let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="_ion-s-6ec2942442">${esc(i.request)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
+            `<tr><td class="font-mono break-all">${esc(i.request)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
         ).join('');
         document.getElementById('panel-http').innerHTML =
-            `<h3 class="_ion-s-87ccc4da73">HTTP Requests (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>Request</th><th class="_ion-s-54c2afb7ba">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">HTTP Requests (${items.length} unique)</h3>` +
+            `<table class="pcap-table"><thead><tr><th>Request</th><th class="text-right">Count</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderTls(d) {
         const items = d.tls_handshakes || [];
         if (!items.length) {
-            document.getElementById('panel-tls').innerHTML = '<p class="_ion-s-ff64cacc49">No TLS handshakes captured.</p>';
+            document.getElementById('panel-tls').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No TLS handshakes captured.</p>';
             return;
         }
         let rows = items.slice(0, 40).map(i =>
-            `<tr><td class="_ion-s-72126da263">${esc(i.sni)}</td><td class="_ion-s-54c2afb7ba">${fmtNum(i.count)}</td></tr>`
+            `<tr><td class="font-mono">${esc(i.sni)}</td><td class="text-right">${fmtNum(i.count)}</td></tr>`
         ).join('');
         document.getElementById('panel-tls').innerHTML =
-            `<h3 class="_ion-s-87ccc4da73">TLS Server Name Indications (${items.length} unique)</h3>` +
-            `<table class="pcap-table"><thead><tr><th>SNI</th><th class="_ion-s-54c2afb7ba">Handshakes</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">TLS Server Name Indications (${items.length} unique)</h3>` +
+            `<table class="pcap-table"><thead><tr><th>SNI</th><th class="text-right">Handshakes</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderData(d) {
         const dt = d.data_transfer || {};
         const byIp = dt.by_ip || [];
         if (!byIp.length) {
-            document.getElementById('panel-data').innerHTML = '<p class="_ion-s-ff64cacc49">No data transfer information.</p>';
+            document.getElementById('panel-data').innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No data transfer information.</p>';
             return;
         }
         const top = byIp.slice(0, 20);
@@ -625,19 +625,19 @@
             const total = i.sent + i.received;
             const ratio = i.received > 0 ? (i.sent / i.received).toFixed(1) : '∞';
             return `<tr>
-                <td class="_ion-s-72126da263">${esc(i.ip)}</td>
-                <td class="_ion-s-54c2afb7ba">${fmtBytes(i.sent)}</td>
-                <td class="_ion-s-54c2afb7ba">${fmtBytes(i.received)}</td>
-                <td class="_ion-s-54c2afb7ba">${fmtBytes(total)}</td>
-                <td class="_ion-s-54c2afb7ba">${ratio}:1</td>
+                <td class="font-mono">${esc(i.ip)}</td>
+                <td class="text-right">${fmtBytes(i.sent)}</td>
+                <td class="text-right">${fmtBytes(i.received)}</td>
+                <td class="text-right">${fmtBytes(total)}</td>
+                <td class="text-right">${ratio}:1</td>
             </tr>`;
         }).join('');
         document.getElementById('panel-data').innerHTML =
-            `<h3 class="_ion-s-18bb30f105">Data Transfer</h3>` +
-            `<p class="_ion-s-18b8744731">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
+            `<h3 class="mt-0 mr-0 mb-1 ml-0 text-[.95rem]">Data Transfer</h3>` +
+            `<p class="text-[var(--text-secondary)] text-[.82rem] mt-0 mr-0 mb-3 ml-0">Total: ${fmtBytes(dt.total_bytes || 0)}</p>` +
             `<div class="dt-legend"><span class="dt-l-sent">Sent (outbound)</span><span class="dt-l-recv">Received (inbound)</span></div>` +
             bars +
-            `<table class="pcap-table ion-u-mt-16"><thead><tr><th>IP</th><th class="_ion-s-54c2afb7ba">Sent</th><th class="_ion-s-54c2afb7ba">Received</th><th class="_ion-s-54c2afb7ba">Total</th><th class="_ion-s-54c2afb7ba">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
+            `<table class="pcap-table ion-u-mt-16"><thead><tr><th>IP</th><th class="text-right">Sent</th><th class="text-right">Received</th><th class="text-right">Total</th><th class="text-right">Send:Recv</th></tr></thead><tbody>${rows}</tbody></table>`;
     }
 
     function renderIsakmp(d) {
@@ -651,23 +651,23 @@
         tab.style.display = '';
         const statusClass = s => s.toLowerCase().replace(/\s+/g, '-');
         let rows = items.map(s => {
-            const errStr = (s.errors || []).length ? `<br><span class="_ion-s-480b2c6894">${s.errors.map(esc).join(', ')}</span>` : '';
+            const errStr = (s.errors || []).length ? `<br><span class="text-[var(--sev-critical)] text-xs">${s.errors.map(esc).join(', ')}</span>` : '';
             return `<tr>
                 <td><span class="ike-status ${statusClass(s.status)}">${esc(s.status)}</span>${errStr}</td>
-                <td class="_ion-s-3d24b78687" title="Init: ${esc(s.init_spi)}">${esc(s.initiator || '-')}</td>
-                <td class="_ion-s-3d24b78687">${esc(s.responder || '-')}</td>
+                <td class="font-mono text-xs" title="Init: ${esc(s.init_spi)}">${esc(s.initiator || '-')}</td>
+                <td class="font-mono text-xs">${esc(s.responder || '-')}</td>
                 <td>${esc(s.ike_version)}</td>
-                <td class="_ion-s-f63147b2ed">${(s.exchanges || []).map(esc).join(', ')}</td>
-                <td class="_ion-s-91a87015f4">${s.initiator_packets}i / ${s.responder_packets}r</td>
-                <td class="_ion-s-91a87015f4">${s.retransmits}</td>
-                <td class="_ion-s-54c2afb7ba">${s.duration}s</td>
+                <td class="text-[.78rem]">${(s.exchanges || []).map(esc).join(', ')}</td>
+                <td class="text-center">${s.initiator_packets}i / ${s.responder_packets}r</td>
+                <td class="text-center">${s.retransmits}</td>
+                <td class="text-right">${s.duration}s</td>
             </tr>`;
         }).join('');
         const established = items.filter(s => s.status === 'Established').length;
         const failed = items.filter(s => s.status === 'Failed').length;
         const noResp = items.filter(s => s.status === 'No Response').length;
         const incomplete = items.filter(s => s.status === 'Incomplete').length;
-        let summary = `<div class="_ion-s-9ed45fb488">`;
+        let summary = `<div class="flex gap-4 mb-3 flex-wrap">`;
         summary += `<span><strong>${items.length}</strong> session(s)</span>`;
         if (established) summary += `<span><span class="ike-status established">Established</span> ${established}</span>`;
         if (failed) summary += `<span><span class="ike-status failed">Failed</span> ${failed}</span>`;
@@ -675,12 +675,12 @@
         if (incomplete) summary += `<span><span class="ike-status incomplete">Incomplete</span> ${incomplete}</span>`;
         summary += '</div>';
         document.getElementById('panel-isakmp').innerHTML =
-            `<h3 class="_ion-s-87ccc4da73">ISAKMP / IKE Sessions</h3>` +
+            `<h3 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">ISAKMP / IKE Sessions</h3>` +
             summary +
             `<table class="pcap-table"><thead><tr>
                 <th>Status</th><th>Initiator</th><th>Responder</th><th>IKE Ver</th>
-                <th>Exchanges</th><th class="_ion-s-91a87015f4">Packets</th>
-                <th class="_ion-s-91a87015f4">Retrans</th><th class="_ion-s-54c2afb7ba">Duration</th>
+                <th>Exchanges</th><th class="text-center">Packets</th>
+                <th class="text-center">Retrans</th><th class="text-right">Duration</th>
             </tr></thead><tbody>${rows}</tbody></table>`;
     }
 
@@ -697,14 +697,14 @@
 
         const panel = document.getElementById('panel-files');
         panel.innerHTML = `<h3>Extracted Files (${files.length})</h3>
-        <p class="_ion-s-0648c015b2">Files carved from reassembled TCP streams by magic byte signature.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Files carved from reassembled TCP streams by magic byte signature.</p>
         <table class="pcap-table"><thead><tr><th>File</th><th>Type</th><th>Size</th><th>MD5</th><th>SHA-256</th><th>Source</th><th>Destination</th></tr></thead><tbody>
         ${files.map(f => `<tr>
             <td><strong>${esc(f.filename)}</strong></td>
             <td>${esc(f.mime_type)}</td>
             <td>${fmtBytes(f.size)}</td>
-            <td><code class="_ion-s-bc426706c0">${esc(f.md5)}</code></td>
-            <td><code class="_ion-s-d1b8f9c0d0">${esc(f.sha256)}</code></td>
+            <td><code class="text-[.7rem] break-all">${esc(f.md5)}</code></td>
+            <td><code class="text-[.65rem] break-all">${esc(f.sha256)}</code></td>
             <td>${esc(f.src_ip)}</td>
             <td>${esc(f.dst_ip)}</td>
         </tr>`).join('')}
@@ -725,14 +725,14 @@
 
         const panel = document.getElementById('panel-ja3');
         panel.innerHTML = `<h3>JA3 TLS Fingerprints (${fps.length})</h3>
-        <p class="_ion-s-0648c015b2">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">TLS ClientHello fingerprints computed from the PCAP. Known-malware matches are highlighted.</p>
         <table class="pcap-table"><thead><tr><th>JA3 Hash</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
         ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="_ion-s-dbd68c1058">${esc(f.ja3_hash)}</code></td>
+            <td><code class="text-[.72rem]">${esc(f.ja3_hash)}</code></td>
             <td>${esc(f.sni || '-')}</td>
             <td>${esc(f.src_ip)}</td>
             <td>${esc(f.dst_ip)}:${f.dst_port}</td>
-            <td>${f.known_malware ? `<span class="_ion-s-09ef8b0d06">${esc(f.known_malware)}</span>` : '<span class="_ion-s-ce14cb276b">No match</span>'}</td>
+            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
         </tr>`).join('')}
         </tbody></table>`;
     }
@@ -750,15 +750,15 @@
 
         const panel = document.getElementById('panel-creds');
         panel.innerHTML = `<h3>Captured Credentials (${creds.length})</h3>
-        <p class="_ion-s-47bf303051">Credentials and authentication hashes found in cleartext or weak protocols.</p>
+        <p class="text-[var(--sev-critical)] text-[.82rem] mb-3 font-semibold">Credentials and authentication hashes found in cleartext or weak protocols.</p>
         <table class="pcap-table"><thead><tr><th>Protocol</th><th>Username</th><th>Credential / Hash</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${creds.map(c => `<tr class="_ion-s-616924856b">
+        ${creds.map(c => `<tr class="bg-[rgba(248,81,73,.05)]">
             <td><strong>${esc(c.protocol)}</strong></td>
             <td><code>${esc(c.username)}</code></td>
-            <td><code class="_ion-s-a59edec31f">${esc(c.credential)}</code></td>
+            <td><code class="text-[.7rem] break-all max-w-[200px] inline-block overflow-hidden text-ellipsis">${esc(c.credential)}</code></td>
             <td>${esc(c.src_ip)}</td>
             <td>${esc(c.dst_ip)}</td>
-            <td class="_ion-s-a975440d91">${esc(c.detail)}</td>
+            <td class="text-[.78rem] text-[var(--text-secondary)]">${esc(c.detail)}</td>
         </tr>`).join('')}
         </tbody></table>`;
     }
@@ -775,12 +775,12 @@
         badge.textContent = fps.length;
         badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
         document.getElementById('panel-ja3s').innerHTML = `<h3>JA3S Server Fingerprints (${fps.length})</h3>
-        <p class="_ion-s-0648c015b2">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">TLS ServerHello fingerprints. Pairs with JA3 for C2 server identification.</p>
         <table class="pcap-table"><thead><tr><th>JA3S Hash</th><th>Server</th><th>Client</th><th>Port</th><th>Malware Match</th></tr></thead><tbody>
         ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="_ion-s-dbd68c1058">${esc(f.ja3s_hash)}</code></td>
+            <td><code class="text-[.72rem]">${esc(f.ja3s_hash)}</code></td>
             <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port}</td>
-            <td>${f.known_malware ? `<span class="_ion-s-75d955e5ec">${esc(f.known_malware)}</span>` : '<span class="_ion-s-ce14cb276b">No match</span>'}</td>
+            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -795,13 +795,13 @@
         badge.textContent = fps.length;
         badge.style.cssText = 'display:inline;background:var(--primary);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-hassh').innerHTML = `<h3>HASSH SSH Fingerprints (${fps.length})</h3>
-        <p class="_ion-s-0648c015b2">SSH KEX_INIT fingerprints for client and server identification.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SSH KEX_INIT fingerprints for client and server identification.</p>
         <table class="pcap-table"><thead><tr><th>HASSH Hash</th><th>Direction</th><th>Source</th><th>Destination</th><th>SSH Version</th><th>Match</th></tr></thead><tbody>
         ${fps.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-            <td><code class="_ion-s-dbd68c1058">${esc(f.hassh_hash)}</code></td>
+            <td><code class="text-[.72rem]">${esc(f.hassh_hash)}</code></td>
             <td>${esc(f.direction)}</td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
-            <td class="_ion-s-f63147b2ed">${esc(f.ssh_version || '-')}</td>
-            <td>${f.known_malware ? `<span class="_ion-s-75d955e5ec">${esc(f.known_malware)}</span>` : '-'}</td>
+            <td class="text-[.78rem]">${esc(f.ssh_version || '-')}</td>
+            <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '-'}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -820,24 +820,24 @@
         badge.style.cssText = `display:inline;background:${badCount ? 'var(--sev-critical)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
 
         let html = `<h3>JA4 / JA4S TLS Fingerprints (${total})</h3>
-        <p class="_ion-s-0648c015b2">FoxIO JA4+ fingerprints. JA4 (client) and JA4S (server) are robust to TLS field reordering, unlike JA3. Known-malware matches are highlighted.</p>`;
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">FoxIO JA4+ fingerprints. JA4 (client) and JA4S (server) are robust to TLS field reordering, unlike JA3. Known-malware matches are highlighted.</p>`;
         if (cli.length) {
-            html += `<h4 class="_ion-s-87ccc4da73">JA4 Client (${cli.length})</h4>
+            html += `<h4 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">JA4 Client (${cli.length})</h4>
             <table class="pcap-table"><thead><tr><th>JA4</th><th>SNI</th><th>Source</th><th>Destination</th><th>Malware Match</th></tr></thead><tbody>
             ${cli.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-                <td><code class="_ion-s-dbd68c1058">${esc(f.ja4)}</code></td>
+                <td><code class="text-[.72rem]">${esc(f.ja4)}</code></td>
                 <td>${esc(f.sni || '-')}</td>
                 <td>${esc(f.src_ip)}</td>
                 <td>${esc(f.dst_ip)}${f.dst_port ? ':' + f.dst_port : ''}</td>
-                <td>${f.known_malware ? `<span class="_ion-s-09ef8b0d06">${esc(f.known_malware)}</span>` : '<span class="_ion-s-ce14cb276b">No match</span>'}</td>
+                <td>${f.known_malware ? `<span class="text-[var(--sev-critical)] font-bold">${esc(f.known_malware)}</span>` : '<span class="text-[var(--text-secondary)]">No match</span>'}</td>
             </tr>`).join('')}
             </tbody></table>`;
         }
         if (srv.length) {
-            html += `<h4 class="_ion-s-87ccc4da73">JA4S Server (${srv.length})</h4>
+            html += `<h4 class="mt-0 mr-0 mb-2.5 ml-0 text-[.95rem]">JA4S Server (${srv.length})</h4>
             <table class="pcap-table"><thead><tr><th>JA4S</th><th>Server</th><th>Client</th><th>Port</th></tr></thead><tbody>
             ${srv.map(f => `<tr data-ion-style="${f.known_malware ? 'background:rgba(248,81,73,.08);' : ''}">
-                <td><code class="_ion-s-dbd68c1058">${esc(f.ja4s)}</code></td>
+                <td><code class="text-[.72rem]">${esc(f.ja4s)}</code></td>
                 <td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td><td>${f.src_port || '-'}</td>
             </tr>`).join('')}
             </tbody></table>`;
@@ -857,15 +857,15 @@
         badge.textContent = certs.length;
         badge.style.cssText = `display:inline;background:${flagged ? 'var(--sev-medium)' : 'var(--primary)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
         document.getElementById('panel-certs').innerHTML = `<h3>TLS Certificates (${certs.length})</h3>
-        <p class="_ion-s-0648c015b2">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Leaf X.509 certificates carved from TLS server handshakes. Self-signed and known-malicious (e.g. Cobalt Strike) certs are flagged.</p>
         <table class="pcap-table"><thead><tr><th>Server</th><th>Subject</th><th>Issuer</th><th>Self-signed</th><th>Validity</th><th>Serial</th></tr></thead><tbody>
         ${certs.map(c => `<tr>
             <td>${esc(c.server_ip || '-')}</td>
-            <td class="_ion-s-72126da263">${esc(c.subject || '-')}</td>
-            <td class="_ion-s-72126da263">${esc(c.issuer || '-')}</td>
-            <td>${c.self_signed ? '<span class="_ion-s-09ef8b0d06">yes</span>' : '<span class="_ion-s-ce14cb276b">no</span>'}</td>
+            <td class="font-mono">${esc(c.subject || '-')}</td>
+            <td class="font-mono">${esc(c.issuer || '-')}</td>
+            <td>${c.self_signed ? '<span class="text-[var(--sev-critical)] font-bold">yes</span>' : '<span class="text-[var(--text-secondary)]">no</span>'}</td>
             <td>${c.validity_days != null ? Math.round(c.validity_days / 365) + 'y' : '-'}</td>
-            <td><code class="_ion-s-dbd68c1058">${esc(c.serial || '-')}</code></td>
+            <td><code class="text-[.72rem]">${esc(c.serial || '-')}</code></td>
         </tr>`).join('')}
         </tbody></table>`;
     }
@@ -881,17 +881,17 @@
         badge.textContent = hosts.length;
         badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-hosts').innerHTML = `<h3>Host Profiles (${hosts.length})</h3>
-        <p class="_ion-s-0648c015b2">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Per-host rollup: passive OS fingerprint (p0f-style, from TCP SYN), client/server role, fingerprints, SNIs, beacons, and finding count.</p>
         <table class="pcap-table"><thead><tr><th>Host</th><th>OS</th><th>Role</th><th>Sent</th><th>Received</th><th>SNIs</th><th>Beacons</th><th>Findings</th></tr></thead><tbody>
         ${hosts.map(h => `<tr>
             <td><strong>${esc(h.ip)}</strong></td>
-            <td>${esc(h.os || '-')}${h.os_evidence ? ` <span class="_ion-s-f63147b2ed">(${esc(h.os_evidence)})</span>` : ''}</td>
+            <td>${esc(h.os || '-')}${h.os_evidence ? ` <span class="text-[.78rem]">(${esc(h.os_evidence)})</span>` : ''}</td>
             <td>${(h.role || []).map(r => esc(r)).join(', ')}</td>
-            <td class="_ion-s-54c2afb7ba">${fmtBytes(h.sent || 0)}</td>
-            <td class="_ion-s-54c2afb7ba">${fmtBytes(h.received || 0)}</td>
-            <td class="_ion-s-f63147b2ed">${(h.snis || []).slice(0, 4).map(s => esc(s)).join(', ') || '-'}</td>
-            <td class="_ion-s-54c2afb7ba">${h.beacons || 0}</td>
-            <td class="_ion-s-54c2afb7ba">${h.findings || 0}</td>
+            <td class="text-right">${fmtBytes(h.sent || 0)}</td>
+            <td class="text-right">${fmtBytes(h.received || 0)}</td>
+            <td class="text-[.78rem]">${(h.snis || []).slice(0, 4).map(s => esc(s)).join(', ') || '-'}</td>
+            <td class="text-right">${h.beacons || 0}</td>
+            <td class="text-right">${h.findings || 0}</td>
         </tr>`).join('')}
         </tbody></table>`;
     }
@@ -908,13 +908,13 @@
         badge.textContent = beacons.length;
         badge.style.cssText = `display:inline;background:${strong ? 'var(--sev-high)' : 'var(--sev-medium)'};color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;`;
         document.getElementById('panel-beacons').innerHTML = `<h3>Beaconing Candidates (${beacons.length})</h3>
-        <p class="_ion-s-0648c015b2">RITA-style scoring of connection regularity (interval + payload-size consistency). A near-1.0 score is metronome-regular traffic — a hallmark of automated C2.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">RITA-style scoring of connection regularity (interval + payload-size consistency). A near-1.0 score is metronome-regular traffic — a hallmark of automated C2.</p>
         <table class="pcap-table"><thead><tr><th>Source</th><th>Destination</th><th>Port</th><th>Score</th><th>Connections</th><th>Interval</th></tr></thead><tbody>
-        ${beacons.map(b => `<tr class="_ion-s-616924856b">
+        ${beacons.map(b => `<tr class="bg-[rgba(248,81,73,.05)]">
             <td>${esc(b.src)}</td><td>${esc(b.dst)}</td><td>${b.port}</td>
             <td><strong>${b.score}</strong></td>
-            <td class="_ion-s-54c2afb7ba">${b.connections}</td>
-            <td class="_ion-s-54c2afb7ba">~${b.interval_s}s</td>
+            <td class="text-right">${b.connections}</td>
+            <td class="text-right">~${b.interval_s}s</td>
         </tr>`).join('')}
         </tbody></table>`;
     }
@@ -930,9 +930,9 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--warning);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-smb').innerHTML = `<h3>SMB File Operations (${items.length})</h3>
-        <p class="_ion-s-0648c015b2">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">SMB/CIFS file operations detected on port 445/139. May indicate lateral movement.</p>
         <table class="pcap-table"><thead><tr><th>Command</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(s => `<tr><td><strong>${esc(s.command)}</strong></td><td>${esc(s.src_ip)}</td><td>${esc(s.dst_ip)}</td><td class="_ion-s-a975440d91">${esc(s.detail)}</td></tr>`).join('')}
+        ${items.map(s => `<tr><td><strong>${esc(s.command)}</strong></td><td>${esc(s.src_ip)}</td><td>${esc(s.dst_ip)}</td><td class="text-[.78rem] text-[var(--text-secondary)]">${esc(s.detail)}</td></tr>`).join('')}
         </tbody></table>`;
     }
 
@@ -947,9 +947,9 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--info);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-kerberos').innerHTML = `<h3>Kerberos Traffic (${items.length})</h3>
-        <p class="_ion-s-0648c015b2">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Kerberos authentication messages on port 88. AS-REP/TGS-REP may contain extractable tickets.</p>
         <table class="pcap-table"><thead><tr><th>Type</th><th>Source</th><th>Destination</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(k => `<tr><td><strong>${esc(k.msg_type)}</strong></td><td>${esc(k.src_ip)}</td><td>${esc(k.dst_ip)}</td><td class="_ion-s-f63147b2ed">${esc(k.detail)}</td></tr>`).join('')}
+        ${items.map(k => `<tr><td><strong>${esc(k.msg_type)}</strong></td><td>${esc(k.src_ip)}</td><td>${esc(k.dst_ip)}</td><td class="text-[.78rem]">${esc(k.detail)}</td></tr>`).join('')}
         </tbody></table>`;
     }
 
@@ -964,11 +964,11 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-httpfiles').innerHTML = `<h3>HTTP File Transfers (${items.length})</h3>
-        <p class="_ion-s-0648c015b2">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Files reconstructed from HTTP response bodies via Content-Type headers.</p>
         <table class="pcap-table"><thead><tr><th>Filename</th><th>Content-Type</th><th>Size</th><th>MD5</th><th>Source</th><th>Destination</th></tr></thead><tbody>
         ${items.map(f => `<tr>
             <td><strong>${esc(f.filename)}</strong></td><td>${esc(f.content_type)}</td><td>${fmtBytes(f.size)}</td>
-            <td><code class="_ion-s-652db75ef3">${esc(f.md5)}</code></td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
+            <td><code class="text-[.7rem]">${esc(f.md5)}</code></td><td>${esc(f.src_ip)}</td><td>${esc(f.dst_ip)}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -983,12 +983,12 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--sev-critical);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-arp').innerHTML = `<h3>ARP Anomalies (${items.length})</h3>
-        <p class="_ion-s-47bf303051">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
+        <p class="text-[var(--sev-critical)] text-[.82rem] mb-3 font-semibold">MAC addresses claiming multiple IPs — possible ARP spoofing / MITM.</p>
         <table class="pcap-table"><thead><tr><th>MAC</th><th>IPs Claimed</th><th>Severity</th><th>Detail</th></tr></thead><tbody>
-        ${items.map(a => `<tr class="_ion-s-616924856b">
+        ${items.map(a => `<tr class="bg-[rgba(248,81,73,.05)]">
             <td><code>${esc(a.mac)}</code></td><td>${(a.ips||[]).map(ip => esc(ip)).join(', ')}</td>
-            <td><span class="_ion-s-70b267b459" data-ion-style="color:var(--sev-${a.severity})">${esc(a.severity)}</span></td>
-            <td class="_ion-s-f63147b2ed">${esc(a.detail)}</td>
+            <td><span class="font-bold" data-ion-style="color:var(--sev-${a.severity})">${esc(a.severity)}</span></td>
+            <td class="text-[.78rem]">${esc(a.detail)}</td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -1003,12 +1003,12 @@
         badge.textContent = items.length;
         badge.style.cssText = 'display:inline;background:var(--sev-high);color:#fff;padding:1px 6px;border-radius:8px;font-size:.7rem;margin-left:4px;';
         document.getElementById('panel-b64').innerHTML = `<h3>Base64 Encoded Payloads (${items.length})</h3>
-        <p class="_ion-s-0648c015b2">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
+        <p class="text-[var(--text-secondary)] text-[.82rem] mb-3">Base64-encoded scripts or binary payloads found in HTTP streams. May indicate obfuscated C2 or malware delivery.</p>
         <table class="pcap-table"><thead><tr><th>Type</th><th>Encoded Size</th><th>Decoded Size</th><th>Source</th><th>Destination</th><th>Preview</th></tr></thead><tbody>
-        ${items.map(b => `<tr class="_ion-s-616924856b">
+        ${items.map(b => `<tr class="bg-[rgba(248,81,73,.05)]">
             <td><strong>${esc(b.type)}</strong></td><td>${fmtBytes(b.encoded_length)}</td><td>${fmtBytes(b.decoded_length)}</td>
             <td>${esc(b.src_ip)}</td><td>${esc(b.dst_ip)}:${b.port}</td>
-            <td><code class="_ion-s-12ac31e016">${esc(b.preview)}</code></td>
+            <td><code class="text-[.68rem] break-all max-w-[300px] inline-block overflow-hidden text-ellipsis">${esc(b.preview)}</code></td>
         </tr>`).join('')}</tbody></table>`;
     }
 
@@ -1057,22 +1057,22 @@
         const graph = d.network_graph || {};
         const panel = document.getElementById('panel-graph');
         if (!graph.nodes || !graph.nodes.length) {
-            panel.innerHTML = '<p class="_ion-s-6a1903f856">No graph data available.</p>';
+            panel.innerHTML = '<p class="text-[var(--text-secondary)] p-5 text-center">No graph data available.</p>';
             return;
         }
         const stats = graph.stats || {};
         panel.innerHTML = `
-            <div class="_ion-s-1924594b52">
-                <h3 class="_ion-s-1da9facb4d">Network Graph</h3>
-                <div class="_ion-s-6912997656">
+            <div class="flex justify-between items-center mb-2.5 flex-wrap gap-2">
+                <h3 class="m-0">Network Graph</h3>
+                <div class="text-xs text-[var(--text-secondary)]">
                     ${stats.total_nodes||0} hosts &middot;
                     ${stats.total_edges||0} connections &middot;
-                    <span class="_ion-s-dc2e428fc7">${stats.internal_nodes||0} internal</span> &middot;
-                    <span class="_ion-s-da17fe6440">${stats.external_nodes||0} external</span>
-                    ${stats.suspicious_nodes ? ` &middot; <span class="_ion-s-5dd0211252">${stats.suspicious_nodes} suspicious</span>` : ''}
+                    <span class="text-[var(--primary)]">${stats.internal_nodes||0} internal</span> &middot;
+                    <span class="text-[var(--mitre-covered,#3fb950)]">${stats.external_nodes||0} external</span>
+                    ${stats.suspicious_nodes ? ` &middot; <span class="text-[var(--sev-critical)]">${stats.suspicious_nodes} suspicious</span>` : ''}
                 </div>
             </div>
-            <div class="_ion-s-253aa86019" id="pcap-graph-canvas"></div>
+            <div class="h-[500px] bg-[var(--bg-tertiary)] border border-[var(--ion-border)] rounded-[var(--radius-lg)]" id="pcap-graph-canvas"></div>
         `;
         // Load vis-network and render
         const script = document.createElement('script');
@@ -1131,7 +1131,7 @@
         _findingsFilter = null;
         if (!items.length) {
             panel.innerHTML =
-                '<div class="_ion-s-c282580208"><div class="_ion-s-8e1d1fec4a"><i class="icon-shield-check"></i></div><p class="_ion-s-d87618fbb5">No suspicious findings detected</p></div>';
+                '<div class="text-center p-10"><div class="text-[2rem] mb-2"><i class="icon-shield-check"></i></div><p class="text-[var(--text-secondary)] text-[.9rem]">No suspicious findings detected</p></div>';
             return;
         }
         const sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -1197,14 +1197,14 @@
         const badge = document.getElementById('ti-count-badge');
 
         if (!ti || ti.error) {
-            panel.innerHTML = '<p class="_ion-s-ff64cacc49">' +
+            panel.innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">' +
                 (ti && ti.error ? 'Enrichment error: ' + esc(ti.error) : 'No threat intelligence data — OpenCTI may not be configured.') + '</p>';
             return;
         }
 
         const obs = ti.observables || [];
         if (!obs.length) {
-            panel.innerHTML = '<p class="_ion-s-ff64cacc49">No external IPs or domains found to enrich.</p>';
+            panel.innerHTML = '<p class="text-[var(--text-secondary)] text-[.85rem] p-5">No external IPs or domains found to enrich.</p>';
             return;
         }
 
@@ -1217,7 +1217,7 @@
 
         const threatColors = { unknown: 'var(--sev-low)', benign: 'var(--mitre-covered)', low: 'var(--info)', medium: 'var(--sev-medium)', high: 'var(--sev-high)', critical: 'var(--sev-critical)' };
 
-        let html = `<div class="_ion-s-a6c636e764">
+        let html = `<div class="mb-3 flex gap-4 flex-wrap text-[.85rem] text-[var(--text-secondary)]">
             <span>IPs checked: <strong>${ti.ips_checked}</strong></span>
             <span>Domains checked: <strong>${ti.domains_checked}</strong></span>
             <span>Total observables: <strong>${ti.total}</strong></span>
@@ -1236,10 +1236,10 @@
             const rowBg = e && e.is_malicious ? 'background:rgba(248,81,73,0.06);' : '';
 
             html += `<tr data-ion-style="${rowBg}">
-                <td><span class="_ion-s-de8dfac73b">${esc(o.type)}</span></td>
-                <td class="_ion-s-6ec2942442"><a class="_ion-s-b17605f04d" href="/observables?q=${encodeURIComponent(o.value)}">${esc(o.value)}</a></td>
-                <td><span class="_ion-s-a8287752f9" data-ion-style="color:${color}">${esc(level)}</span></td>
-                <td class="_ion-s-91a87015f4">${score}</td>
+                <td><span class="text-xs uppercase text-[var(--text-secondary)]">${esc(o.type)}</span></td>
+                <td class="font-mono break-all"><a class="_ion-s-b17605f04d" href="/observables?q=${encodeURIComponent(o.value)}">${esc(o.value)}</a></td>
+                <td><span class="font-semibold text-[.8rem]" data-ion-style="color:${color}">${esc(level)}</span></td>
+                <td class="text-center">${score}</td>
                 <td>${labels}</td>
                 <td>${actors}</td>
             </tr>`;

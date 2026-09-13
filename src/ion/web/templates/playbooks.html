@@ -117,11 +117,11 @@
                 <div class="mb-6 pb-6 border-b border-base-300 last:border-b-0 last:mb-0">
                     <h4 class="mb-4 text-primary">Basic Information</h4>
                     <div class="form-row">
-                        <div class="form-group _ion-s-c2d2e263dc">
+                        <div class="form-group flex-[2]">
                             <label for="playbook-name">Name *</label>
                             <input type="text" id="playbook-name" class="ion-input" required>
                         </div>
-                        <div class="form-group _ion-s-ee3d55bf99">
+                        <div class="form-group flex-1">
                             <label for="playbook-priority">Priority</label>
                             <input type="number" id="playbook-priority" class="ion-input" value="0" min="0">
                         </div>
@@ -159,11 +159,11 @@
                     </div>
 
                     <div class="form-row">
-                        <div class="form-group _ion-s-ee3d55bf99">
+                        <div class="form-group flex-1">
                             <label for="trigger-mitre-techniques">MITRE Techniques (comma-separated)</label>
                             <input type="text" id="trigger-mitre-techniques" class="ion-input" placeholder="T1078, T1110">
                         </div>
-                        <div class="form-group _ion-s-ee3d55bf99">
+                        <div class="form-group flex-1">
                             <label for="trigger-mitre-tactics">MITRE Tactics (comma-separated)</label>
                             <input type="text" id="trigger-mitre-tactics" class="ion-input" placeholder="initial-access, persistence">
                         </div>
@@ -883,7 +883,7 @@ function displayExecutions() {
                     <span class="alert-id-display" title="${escapeHtml(e.es_alert_id || '')}">${escapeHtml(alertShort)}</span>
                     ${caseInfo ? `<br>${caseInfo}` : ''}
                 </td>
-                <td class="_ion-s-c7f080acfc">
+                <td class="min-w-[120px]">
                     <div class="progress-bar-container">
                         <div class="progress-bar-fill status-${e.status}" data-ion-style="width:${e.progress_pct}%"></div>
                     </div>
@@ -892,10 +892,10 @@ function displayExecutions() {
                 <td>
                     <span class="exec-status ${e.status}">${e.status.replace('_', ' ')}</span>
                     ${e.outcome ? `<br><span class="exec-outcome ${e.outcome}">${e.outcome.replace(/_/g, ' ')}</span>` : ''}
-                    ${e.report_document_id ? `<br><a class="_ion-s-4500b7ef55" href="/documents">View Report</a>` : ''}
+                    ${e.report_document_id ? `<br><a class="text-[0.7rem]" href="/documents">View Report</a>` : ''}
                 </td>
                 <td>${escapeHtml(e.executed_by_username || '-')}</td>
-                <td class="_ion-s-94db95e1b0">${startedAt}</td>
+                <td class="text-[0.8rem]">${startedAt}</td>
                 <td>
                     <button class="btn btn-sm" data-click-action="toggleExecDetail" data-args='[${e.id}]'>${isExpanded ? 'Close' : 'Work'}</button>
                 </td>
@@ -981,17 +981,17 @@ function renderExecDetail(exec) {
     }).join('');
 
     const caseHtml = exec.case_number
-        ? `<div class="_ion-s-16884469a8"><strong>Case:</strong> <a class="case-link" href="/alerts">${escapeHtml(exec.case_number)} - ${escapeHtml(exec.case_title || '')}</a></div>`
+        ? `<div class="mb-4"><strong>Case:</strong> <a class="case-link" href="/alerts">${escapeHtml(exec.case_number)} - ${escapeHtml(exec.case_title || '')}</a></div>`
         : '';
 
-    const alertHtml = `<div class="_ion-s-04985cf77c"><strong>Alert:</strong> <span class="text-secondary">${escapeHtml(exec.es_alert_id || '-')}</span></div>`;
+    const alertHtml = `<div class="mb-4 text-[0.85rem]"><strong>Alert:</strong> <span class="text-secondary">${escapeHtml(exec.es_alert_id || '-')}</span></div>`;
 
     const completedSteps = Object.values(stepStatuses).filter(s => s.status === 'completed' || s.status === 'skipped').length;
     const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
 
     const progressHtml = `
-        <div class="_ion-s-16884469a8">
-            <div class="progress-bar-container _ion-s-90fcfd6fce">
+        <div class="mb-4">
+            <div class="progress-bar-container h-[12px]">
                 <div class="progress-bar-fill status-${exec.status}" data-ion-style="width:${progress}%"></div>
             </div>
             <div class="progress-text">${completedSteps}/${steps.length} steps completed (${progress}%)</div>
@@ -1009,7 +1009,7 @@ function renderExecDetail(exec) {
     } else if (exec.status === 'completed') {
         const outcomeLabel = exec.outcome ? exec.outcome.replace(/_/g, ' ') : '';
         actionsHtml = `
-            <div class="exec-actions-bar _ion-s-1ca832ca6c">
+            <div class="exec-actions-bar items-center">
                 ${exec.outcome ? `<span class="exec-outcome ${exec.outcome}">${outcomeLabel}</span>` : ''}
                 ${exec.report_document_id ? `<a href="/documents" class="btn btn-sm">View Report</a>` : ''}
                 ${exec.report_document_id ? `<button class="btn btn-sm" data-click-action="execRegenerateReport" data-args='[${exec.id}]'>Regenerate Report</button>` : ''}
@@ -1021,7 +1021,7 @@ function renderExecDetail(exec) {
         ${caseHtml}
         ${alertHtml}
         ${progressHtml}
-        <div class="_ion-s-5c5a34d68a">Steps</div>
+        <div class="mb-2 font-semibold">Steps</div>
         ${stepsHtml || '<div class="text-secondary">No steps defined</div>'}
         ${actionsHtml}
     `;
@@ -1298,7 +1298,7 @@ async function viewPlaybook(id) {
         </div>
         <div class="view-section">
             <h4>Trigger Conditions</h4>
-            <div class="trigger-tags _ion-s-06489498ed">
+            <div class="trigger-tags gap-2">
                 ${triggers.map(t => `<span class="trigger-tag">${escapeHtml(t)}</span>`).join('')}
             </div>
         </div>
@@ -1385,19 +1385,19 @@ function addStep(stepData = null) {
                 </div>
             </div>
             <div class="step-row">
-                <div class="form-group _ion-s-ee3d55bf99">
+                <div class="form-group flex-1">
                     <label>Type *</label>
                     <select class="form-control step-type" data-change-action="onStepTypeChange" data-args='[${stepCounter}]'>
                         ${stepTypes.map(t => `<option value="${t.value}" ${stepData && stepData.step_type === t.value ? 'selected' : ''}>${t.label}</option>`).join('')}
                     </select>
                 </div>
-                <div class="form-group _ion-s-c2d2e263dc">
+                <div class="form-group flex-[2]">
                     <label>Title *</label>
                     <input type="text" class="form-control step-title" value="${stepData ? escapeHtml(stepData.title) : ''}" required>
                 </div>
             </div>
             <div class="step-row">
-                <div class="form-group _ion-s-ee3d55bf99">
+                <div class="form-group flex-1">
                     <label>Description</label>
                     <input type="text" class="form-control step-description" value="${stepData ? escapeHtml(stepData.description || '') : ''}">
                 </div>
@@ -1494,13 +1494,13 @@ function loadStepParams(stepNum, type, existingParams = null) {
             const priorities = ['low', 'medium', 'high', 'critical'];
             paramsHtml = `
                 <div class="step-row">
-                    <div class="form-group _ion-s-ee3d55bf99">
+                    <div class="form-group flex-1">
                         <label>New Status</label>
                         <select class="form-control step-new-status">
                             ${statuses.map(s => `<option value="${s}" ${existingParams && existingParams.new_status === s ? 'selected' : ''}>${s}</option>`).join('')}
                         </select>
                     </div>
-                    <div class="form-group _ion-s-ee3d55bf99">
+                    <div class="form-group flex-1">
                         <label>Priority</label>
                         <select class="form-control step-new-priority">
                             ${priorities.map(p => `<option value="${p}" ${existingParams && existingParams.priority === p ? 'selected' : ''}>${p}</option>`).join('')}
@@ -1513,11 +1513,11 @@ function loadStepParams(stepNum, type, existingParams = null) {
         case 'auto_create_case':
             paramsHtml = `
                 <div class="step-row">
-                    <div class="form-group _ion-s-c2d2e263dc">
+                    <div class="form-group flex-[2]">
                         <label>Title Template</label>
                         <input type="text" class="form-control step-case-title" value="${existingParams ? escapeHtml(existingParams.title_template || '') : 'Case: {rule_name}'}" placeholder="Case: {rule_name}">
                     </div>
-                    <div class="form-group _ion-s-ee3d55bf99">
+                    <div class="form-group flex-1">
                         <label>Severity</label>
                         <select class="form-control step-case-severity">
                             <option value="low" ${existingParams && existingParams.severity === 'low' ? 'selected' : ''}>Low</option>

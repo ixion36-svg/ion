@@ -3464,7 +3464,7 @@ async function rmShowHistory() {
             <label class="block text-[0.78rem] text-base-content/70 mb-1 font-semibold">Auto-populate certs from roles (optional — select one or more)</label>
             <div class="flex flex-wrap gap-[0.35rem] max-h-[160px] overflow-y-auto p-2 bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[6px] mt-1" id="tp-new-roles-multi">
             </div>
-            <span class="_ion-s-2620b95a9c">Select roles to include their certifications. Build a custom pathway across any combination of roles.</span>
+            <span class="text-[0.68rem] text-[var(--text-muted)]">Select roles to include their certifications. Build a custom pathway across any combination of roles.</span>
         </div>
         <div class="mb-4">
             <label class="block text-[0.78rem] text-base-content/70 mb-1 font-semibold">Notes (optional)</label>
@@ -3491,7 +3491,7 @@ async function rmShowHistory() {
     <div class="hidden" id="cal-plan-schedule">
         <div class="flex justify-between items-center mb-3">
             <h3 class="m-0 text-[0.95rem] text-[var(--text-bright)]">Study Schedule</h3>
-            <span class="_ion-s-1d73b48170">Set study periods for each certification, then view on the calendar below</span>
+            <span class="text-[0.7rem] text-[var(--text-muted)]">Set study periods for each certification, then view on the calendar below</span>
         </div>
         <div id="cal-plan-items" class="flex flex-col gap-2 mb-6"></div>
     </div>
@@ -5416,7 +5416,7 @@ function renderDetailPanel() {
         let fromHtml = '';
 
         if (reachable.size === 0) {
-            fromHtml = '<p class="detail-desc _ion-s-09ff090cca">This is a terminal specialization \u2014 no further standard progressions mapped. Consider lateral moves or leadership paths.</p>';
+            fromHtml = '<p class="detail-desc italic text-[var(--text-muted)]">This is a terminal specialization \u2014 no further standard progressions mapped. Consider lateral moves or leadership paths.</p>';
         } else {
             // Sort by tier
             const sorted = [...reachable.entries()].sort((a, b) => {
@@ -5438,7 +5438,7 @@ function renderDetailPanel() {
             <div class="detail-section">
                 <h3>Career Pathways</h3>
                 ${modeToggleHtml}
-                <p class="detail-desc _ion-s-bba5e32d4a">Roles reachable from <strong>${esc(role.title)}</strong>:</p>
+                <p class="detail-desc mb-[0.6rem]">Roles reachable from <strong>${esc(role.title)}</strong>:</p>
                 ${fromHtml}
             </div>
         `;
@@ -5472,7 +5472,7 @@ function renderDetailPanel() {
             ? '<span class="cert-funding cs-funded">CS Funded</span>'
             : '<span class="cert-funding self-fund">Self-Fund</span>';
         const isSansContractor = certFilter === 'contractor' && c.provider === 'GIAC / SANS';
-        const sansNote = isSansContractor ? ' <span class="_ion-s-38c7eddb35">(uncommon for contractors)</span>' : '';
+        const sansNote = isSansContractor ? ' <span class="text-[0.6rem] text-[var(--neon-yellow)] italic">(uncommon for contractors)</span>' : '';
         if (!certPassesFilter(c)) return '';
         const inPlan = tpIsCertInActivePlan(c.name);
         const addBtnCls = inPlan ? 'cert-add-plan added' : 'cert-add-plan';
@@ -5541,7 +5541,7 @@ function renderDetailPanel() {
         const singleFiltered = role.certs.filter(certPassesFilter);
         certsHtml += singleFiltered.map(renderCertCard).join('');
         if (singleFiltered.length === 0) {
-            certsHtml += '<p class="detail-desc _ion-s-09ff090cca">No certifications match this filter for this role.</p>';
+            certsHtml += '<p class="detail-desc italic text-[var(--text-muted)]">No certifications match this filter for this role.</p>';
         }
     }
 
@@ -5560,11 +5560,11 @@ function renderDetailPanel() {
         ${(() => {
             const modEq = getModEquivalents(activeRole);
             if (!modEq) return '';
-            const soldierHtml = modEq.soldier.map(s => `<span class="mod-detail-pill _ion-s-63d058f849" data-click-action="modShowDetail" data-args='["${s.id}"]' title="${s.sub}">${esc(s.label)}</span>`).join('');
-            const officerHtml = modEq.officer.map(o => `<span class="mod-detail-pill _ion-s-63d058f849" data-click-action="modShowDetail" data-args='["${o.id}"]' title="${o.sub}">${esc(o.label)}</span>`).join('');
+            const soldierHtml = modEq.soldier.map(s => `<span class="mod-detail-pill cursor-pointer" data-click-action="modShowDetail" data-args='["${s.id}"]' title="${s.sub}">${esc(s.label)}</span>`).join('');
+            const officerHtml = modEq.officer.map(o => `<span class="mod-detail-pill cursor-pointer" data-click-action="modShowDetail" data-args='["${o.id}"]' title="${o.sub}">${esc(o.label)}</span>`).join('');
             if (!soldierHtml && !officerHtml) return '';
-            return `<div class="detail-fw-equiv _ion-s-291b7bbb01">
-                <span class="_ion-s-3cf033a00d" title="Military equivalent at SFIA ${modEq.sfia}">MOD:</span>
+            return `<div class="detail-fw-equiv mt-0">
+                <span class="text-[0.58rem] text-[var(--text-muted)] mr-[0.2rem]" title="Military equivalent at SFIA ${modEq.sfia}">MOD:</span>
                 ${soldierHtml}${officerHtml}
             </div>`;
         })()}
@@ -5607,11 +5607,11 @@ function renderDetailPanel() {
             ${certsHtml}
         </div>
 
-        <div class="detail-section _ion-s-857a2220aa">
-            <button class="tp-btn tp-btn-primary _ion-s-e9b04ec844" data-click-action="tpCreateFromPathway">
+        <div class="detail-section border-t-[1px] border-t-[var(--ion-border)] pt-4 mt-4">
+            <button class="tp-btn tp-btn-primary w-full p-3 text-[0.9rem]" data-click-action="tpCreateFromPathway">
                 Create "${esc(role.title)}" Training Plan (${filteredKpiCerts.length} certs, ~\u00a3${filteredKpiCost.toLocaleString()})
             </button>
-            <p class="_ion-s-a9c14c732f">Auto-creates a plan named after this role with all ${certFilter !== 'all' ? (certFilter === 'cs' ? 'CS-funded' : certFilter === 'mod' ? 'MOD-funded' : 'contractor') + ' ' : ''}certs</p>
+            <p class="text-center text-[0.7rem] text-[var(--text-muted)] mt-2">Auto-creates a plan named after this role with all ${certFilter !== 'all' ? (certFilter === 'cs' ? 'CS-funded' : certFilter === 'mod' ? 'MOD-funded' : 'contractor') + ' ' : ''}certs</p>
         </div>
     `;
 
@@ -5696,18 +5696,18 @@ function modShowDetail(roleId) {
             const arrow = i < steps.length - 1 ? '<span class="pathway-arrow">\u2192</span>' : '';
             const sr = MOD_ROLES[s];
             const fw = sr ? `SFIA ${sr.sfia}` : '';
-            return `<span class="${cls} _ion-s-63d058f849" data-click-action="modShowDetail" data-args='["${s}"]'>${esc(MOD_SHORT_NAMES[s] || s)}<span class="step-fw _ion-s-09080638ea">${fw}</span></span>${arrow}`;
+            return `<span class="${cls} cursor-pointer" data-click-action="modShowDetail" data-args='["${s}"]'>${esc(MOD_SHORT_NAMES[s] || s)}<span class="step-fw block text-[0.5rem] opacity-60">${fw}</span></span>${arrow}`;
         }).join('');
         pathwayHtml = `
             <div class="detail-section">
                 <h3>Career Progression</h3>
-                <div class="pathway-steps _ion-s-54e57e6b52">${stepsHtml}</div>
+                <div class="pathway-steps flex flex-wrap items-center gap-[0.35rem]">${stepsHtml}</div>
             </div>`;
     } else {
         pathwayHtml = `
             <div class="detail-section">
                 <h3>Career Progression</h3>
-                <p class="detail-desc _ion-s-09ff090cca">Entry point for the ${role.track === 'soldier' ? 'Soldier' : 'Officer'} track.</p>
+                <p class="detail-desc italic text-[var(--text-muted)]">Entry point for the ${role.track === 'soldier' ? 'Soldier' : 'Officer'} track.</p>
             </div>`;
     }
 
@@ -5732,13 +5732,13 @@ function modShowDetail(roleId) {
             </div>`;
         }).join('');
     } else {
-        certsHtml = '<p class="detail-desc _ion-s-09ff090cca">No specific certifications at this level \u2014 focus is on strategic leadership and governance.</p>';
+        certsHtml = '<p class="detail-desc italic text-[var(--text-muted)]">No specific certifications at this level \u2014 focus is on strategic leadership and governance.</p>';
     }
 
     const html = `
         <div class="detail-title">${esc(role.title)}</div>
         <div class="detail-fw-row">
-            <span class="detail-fw-badge _ion-s-cb78430065">${esc(role.nato)}</span>
+            <span class="detail-fw-badge text-[#fbbf24] border border-[rgba(251,191,36,0.5)]">${esc(role.nato)}</span>
             <span class="detail-fw-badge fw-sfia">SFIA ${esc(role.sfia)}</span>
             ${role.ukcsc !== '-' ? `<span class="detail-fw-badge fw-ukcsc">UKCSC ${esc(role.ukcsc)}</span>` : ''}
         </div>
@@ -5749,9 +5749,9 @@ function modShowDetail(roleId) {
         </div>
         ${(() => {
             const civRoles = getCivilianEquivalents(roleId);
-            if (!civRoles || civRoles.length === 0) return '<div class="detail-fw-equiv _ion-s-291b7bbb01"><span class="_ion-s-d7176cb4c5">Equivalent Roles:</span> <span class="_ion-s-62ea4328d9">No direct civilian SOC role at this level</span></div>';
-            return '<div class="detail-fw-equiv _ion-s-291b7bbb01"><span class="_ion-s-3cf033a00d">Equivalent Roles:</span>' +
-                civRoles.map(r => `<span class="mod-detail-pill _ion-s-63d058f849" data-click-action="__switchToPathwaysAndShowRole" data-role-id="${r.id}">${esc(r.label)}</span>`).join('') +
+            if (!civRoles || civRoles.length === 0) return '<div class="detail-fw-equiv mt-0"><span class="text-[0.58rem] text-[var(--text-muted)]">Equivalent Roles:</span> <span class="text-[0.58rem] text-[var(--text-muted)] italic">No direct civilian SOC role at this level</span></div>';
+            return '<div class="detail-fw-equiv mt-0"><span class="text-[0.58rem] text-[var(--text-muted)] mr-[0.2rem]">Equivalent Roles:</span>' +
+                civRoles.map(r => `<span class="mod-detail-pill cursor-pointer" data-click-action="__switchToPathwaysAndShowRole" data-role-id="${r.id}">${esc(r.label)}</span>`).join('') +
                 '</div>';
         })()}
 
@@ -5826,11 +5826,11 @@ function modShowDetail(roleId) {
         </div>
 
         ${role.certs && role.certs.length > 0 ? `
-        <div class="detail-section _ion-s-857a2220aa">
-            <button class="tp-btn tp-btn-primary _ion-s-e9b04ec844" data-click-action="tpCreateFromModRole" data-args='["${roleId}"]'>
+        <div class="detail-section border-t-[1px] border-t-[var(--ion-border)] pt-4 mt-4">
+            <button class="tp-btn tp-btn-primary w-full p-3 text-[0.9rem]" data-click-action="tpCreateFromModRole" data-args='["${roleId}"]'>
                 Create "${esc(role.title)}" Training Plan (${role.certs.length} certs, ~\u00a3${role.certs.reduce((s,c)=>s+c.price,0).toLocaleString()})
             </button>
-            <p class="_ion-s-a9c14c732f">Auto-creates a plan with all MOD-funded certifications for this role</p>
+            <p class="text-center text-[0.7rem] text-[var(--text-muted)] mt-2">Auto-creates a plan with all MOD-funded certifications for this role</p>
         </div>` : ''}
     `;
 
@@ -6074,7 +6074,7 @@ function renderForecast() {
 
     const targetRole = careerGoal.target_role;
     if (!targetRole || !ROLES[targetRole]) {
-        container.innerHTML = '<div class="sa-forecast"><h3>Training Forecast</h3><p class="_ion-s-bdf5e241f2">Select a target role to see your training forecast.</p></div>';
+        container.innerHTML = '<div class="sa-forecast"><h3>Training Forecast</h3><p class="text-[var(--text-muted)] italic">Select a target role to see your training forecast.</p></div>';
         return;
     }
 
@@ -6114,7 +6114,7 @@ function renderForecast() {
             <span class="sa-gap-skill">${esc(g.name)}</span>
             <div class="sa-gap-detail">
                 <span class="sa-gap-badge">Gap -${g.gap}</span>
-                <span class="_ion-s-b8e0b1fa55">${g.rating} → ${g.target}</span>
+                <span class="text-[var(--text-muted)]">${g.rating} → ${g.target}</span>
                 <span class="sa-gap-time">${estTime(g.gap)}</span>
             </div>
         </div>`).join('');
@@ -6122,30 +6122,30 @@ function renderForecast() {
     // Recommended certs from target role
     const targetCerts = ROLES[targetRole]?.certs || [];
     const certHtml = targetCerts.map(c =>
-        `<div class="cert-card _ion-s-a99ff7411d">
+        `<div class="cert-card mb-[0.3rem]">
             <div class="cert-header">
-                <span class="cert-name _ion-s-94db95e1b0">${esc(c.name)}</span>
-                <span class="cert-price _ion-s-05b6f964ff">~\u00a3${c.price.toLocaleString()}</span>
+                <span class="cert-name text-[0.8rem]">${esc(c.name)}</span>
+                <span class="cert-price text-[0.72rem]">~\u00a3${c.price.toLocaleString()}</span>
             </div>
-            <span class="cert-provider _ion-s-6fe3f36ec6">${esc(c.provider)}</span>
-            <span class="cert-difficulty ${c.difficulty} _ion-s-ca1460ac25">${c.difficulty}</span>
+            <span class="cert-provider text-[0.68rem]">${esc(c.provider)}</span>
+            <span class="cert-difficulty ${c.difficulty} ml-2">${c.difficulty}</span>
         </div>`
     ).join('');
 
     container.innerHTML = `
         <div class="sa-forecast">
             <h3>Training Forecast — ${esc(ROLES[targetRole].title)}</h3>
-            <div class="_ion-s-fac8722d73">Readiness: ${readiness}%</div>
+            <div class="mb-[0.3rem] text-[0.82rem] text-[var(--text-secondary)]">Readiness: ${readiness}%</div>
             <div class="sa-readiness-bar">
                 <div class="sa-readiness-fill ${readinessClass}" data-ion-style="width:${Math.max(readiness, 5)}%">${readiness}%</div>
             </div>
             ${gaps.length > 0 ? `
                 <div class="sa-gap-list">
-                    <div class="_ion-s-da08cb4e28">Skills Gaps (${gaps.length})</div>
+                    <div class="text-xs font-bold text-[var(--text-muted)] uppercase mb-2">Skills Gaps (${gaps.length})</div>
                     ${gapHtml}
-                    ${gaps.length > 15 ? `<div class="_ion-s-3d784e966a">+ ${gaps.length - 15} more...</div>` : ''}
+                    ${gaps.length > 15 ? `<div class="text-[var(--text-muted)] text-xs pt-[0.3rem]">+ ${gaps.length - 15} more...</div>` : ''}
                 </div>
-            ` : '<div class="_ion-s-cc9917000f">You meet or exceed all skill targets for this role!</div>'}
+            ` : '<div class="text-[var(--neon-green)] text-[0.9rem] mt-4">You meet or exceed all skill targets for this role!</div>'}
             ${targetCerts.length > 0 ? `
                 <div class="sa-rec-certs">
                     <h4>Recommended Certifications</h4>
@@ -6432,7 +6432,7 @@ async function loadTeamData() {
     try {
         const resp = await fetch('/api/skills/team-overview');
         if (!resp.ok) {
-            document.getElementById('team-heatmap').innerHTML = '<p class="_ion-s-bdf5e241f2">Access denied or no data available.</p>';
+            document.getElementById('team-heatmap').innerHTML = '<p class="text-[var(--text-muted)] italic">Access denied or no data available.</p>';
             return;
         }
         teamData = await resp.json();
@@ -6494,7 +6494,7 @@ function renderTeamComposition() {
     });
 
     // Separator + SOC function breakdown
-    html += `<div class="tc-card _ion-s-580618c3c8"><div class="tc-card-value _ion-s-3487fffb98">SOC Roles</div><div class="tc-card-label _ion-s-ad3960a546">by function</div></div>`;
+    html += `<div class="tc-card border-l-[2px] border-l-[var(--primary)]"><div class="tc-card-value text-[0.78rem] text-[var(--primary)] font-bold">SOC Roles</div><div class="tc-card-label text-[0.62rem]">by function</div></div>`;
     Object.entries(funcCounts).sort((a, b) => b[1] - a[1]).forEach(([roleKey, count]) => {
         const role = ROLES[roleKey];
         html += `<div class="tc-card"><div class="tc-card-value">${count}</div><div class="tc-card-label">${esc(role ? role.title : roleKey)}</div></div>`;
@@ -6582,7 +6582,7 @@ function renderHeatmap() {
 
     const members = teamData.members || [];
     if (members.length === 0) {
-        container.innerHTML = '<p class="_ion-s-bdf5e241f2">No team members have completed assessments yet.</p>';
+        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No team members have completed assessments yet.</p>';
         return;
     }
 
@@ -6601,7 +6601,7 @@ function renderHeatmap() {
     // Skills rows grouped by category
     Object.entries(SKILLS_MATRIX).forEach(([catName, skills]) => {
         // Category header spans full width
-        html += `<div class="hm-cell hm-cat-header _ion-s-d5b43342a2">${esc(catName)}</div>`;
+        html += `<div class="hm-cell hm-cat-header col-span-full">${esc(catName)}</div>`;
 
         Object.entries(skills).forEach(([key, skill]) => {
             html += `<div class="hm-cell hm-skill-name">${esc(skill.name)}</div>`;
@@ -6640,7 +6640,7 @@ async function simulateDeparture() {
 
     try {
         const resp = await fetch(`/api/skills/team-overview/departure-impact?user_id=${userId}`);
-        if (!resp.ok) { container.innerHTML = '<p class="_ion-s-9dd1207e58">Failed to load impact data.</p>'; return; }
+        if (!resp.ok) { container.innerHTML = '<p class="text-[#ef4444]">Failed to load impact data.</p>'; return; }
         const data = await resp.json();
 
         const critCount = data.impacts.filter(i => i.severity === 'critical').length;
@@ -6649,7 +6649,7 @@ async function simulateDeparture() {
         let html = `
             <div class="departure-readiness">
                 <div class="departure-readiness-item">
-                    <div class="dr-value _ion-s-79b6246059">${data.readiness_before}%</div>
+                    <div class="dr-value text-[var(--text-bright)]">${data.readiness_before}%</div>
                     <div class="dr-label">Readiness Before</div>
                 </div>
                 <div class="departure-readiness-item">
@@ -6657,11 +6657,11 @@ async function simulateDeparture() {
                     <div class="dr-label">Readiness After</div>
                 </div>
                 <div class="departure-readiness-item">
-                    <div class="dr-value _ion-s-9dd1207e58">${critCount}</div>
+                    <div class="dr-value text-[#ef4444]">${critCount}</div>
                     <div class="dr-label">Critical</div>
                 </div>
                 <div class="departure-readiness-item">
-                    <div class="dr-value _ion-s-227931efe5">${warnCount}</div>
+                    <div class="dr-value text-[#f97316]">${warnCount}</div>
                     <div class="dr-label">Warning</div>
                 </div>
             </div>
@@ -6679,7 +6679,7 @@ async function simulateDeparture() {
         html += '</div>';
         container.innerHTML = html;
     } catch (e) {
-        container.innerHTML = '<p class="_ion-s-9dd1207e58">Error loading departure impact.</p>';
+        container.innerHTML = '<p class="text-[#ef4444]">Error loading departure impact.</p>';
     }
 }
 
@@ -6692,7 +6692,7 @@ function renderSparklines() {
 
     const snapshots = teamData.snapshots || [];
     if (snapshots.length === 0) {
-        container.innerHTML = '<p class="_ion-s-bdf5e241f2">No snapshot history yet. Snapshots are created daily on server startup.</p>';
+        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No snapshot history yet. Snapshots are created daily on server startup.</p>';
         return;
     }
 
@@ -6737,14 +6737,14 @@ function renderSparklines() {
 
         html += `
             <div class="sparkline-card">
-                <div class="sparkline-label">${esc(catName)} <span class="_ion-s-55894701aa">${lastVal}</span></div>
+                <div class="sparkline-label">${esc(catName)} <span class="text-[var(--primary)] text-[0.68rem]">${lastVal}</span></div>
                 <svg class="sparkline-svg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
                     <polyline points="${polyline}" fill="none" stroke="var(--primary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
             </div>`;
     });
 
-    container.innerHTML = html || '<p class="_ion-s-bdf5e241f2">Not enough snapshot data for trends.</p>';
+    container.innerHTML = html || '<p class="text-[var(--text-muted)] italic">Not enough snapshot data for trends.</p>';
 }
 
 // =========================================================================
@@ -6859,13 +6859,13 @@ function renderKnowledge() {
     const memberOpts = members.map(m => `<option value="${m.user_id}">${esc(m.display_name || m.username)}</option>`).join('');
 
     let html = `<table class="km-doc-table"><thead><tr>
-        <th class="_ion-s-b450225efd">Document</th><th>Status</th><th>Owner</th><th>Notes</th><th class="_ion-s-9a1962ff83">Template</th>
+        <th class="min-w-[200px]">Document</th><th>Status</th><th>Owner</th><th>Notes</th><th class="w-[3rem]">Template</th>
     </tr></thead><tbody>`;
 
     Object.entries(SOC_DOCUMENTS).forEach(([catName, docs]) => {
         // Category header row
         const catDone = docs.filter(d => (saved[d.key]||{}).doc_status === 'comprehensive').length;
-        html += `<tr class="km-cat-row"><td colspan="5">${esc(catName)} <span class="_ion-s-4efc2f326c">(${catDone}/${docs.length} approved)</span></td></tr>`;
+        html += `<tr class="km-cat-row"><td colspan="5">${esc(catName)} <span class="font-normal text-[0.65rem] text-[var(--text-muted)]">(${catDone}/${docs.length} approved)</span></td></tr>`;
 
         docs.forEach(d => {
             const s = saved[d.key] || {};
@@ -6873,7 +6873,7 @@ function renderKnowledge() {
             const tplId = kmTemplateMap[d.name] || null;
             const tplLink = tplId
                 ? `<a href="/templates/${tplId}" target="_blank" class="km-tpl-link" title="Open template"><i class="icon-file-text"></i></a>`
-                : `<span class="_ion-s-a646f63f6c">--</span>`;
+                : `<span class="text-[var(--text-muted)] text-[0.65rem]">--</span>`;
             html += `<tr data-doc="${esc(d.key)}">
                 <td><div class="km-doc-name">${esc(d.name)}</div><div class="km-doc-desc">${esc(d.desc)}</div></td>
                 <td><select class="km-select" data-doc="${esc(d.key)}" data-field="doc_status" data-change-action="saveKnowledgeDebounced">
@@ -6885,7 +6885,7 @@ function renderKnowledge() {
                     <option value="">--</option>${memberOpts}
                 </select></td>
                 <td><textarea class="km-notes-edit" data-doc="${esc(d.key)}" data-field="notes" placeholder="..." data-change-action="saveKnowledgeDebounced" data-input-action="saveKnowledgeDebounced" rows="1">${esc(s.notes || '')}</textarea></td>
-                <td class="_ion-s-dac4fe6c9b">${tplLink}</td>
+                <td class="text-center">${tplLink}</td>
             </tr>`;
         });
     });
@@ -6912,15 +6912,15 @@ function renderKnowledgeProgress(saved) {
     const missing = total - approved - draft;
     const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
     progEl.innerHTML = `
-        <div class="_ion-s-f5e2699332">
-            <span class="_ion-s-7b4cc7e1f8">${pct}% Complete</span>
-            <span class="_ion-s-2620b95a9c">${total} documents expected</span>
+        <div class="flex justify-between items-baseline mb-[0.35rem]">
+            <span class="text-[0.82rem] font-bold text-[var(--text-bright)]">${pct}% Complete</span>
+            <span class="text-[0.68rem] text-[var(--text-muted)]">${total} documents expected</span>
         </div>
         <div class="km-progress-bar"><div class="km-progress-fill" data-ion-style="width:${pct}%"></div></div>
         <div class="km-summary">
-            <div class="km-summary-item"><span class="km-summary-num _ion-s-6fe47583b2">${approved}</span> Approved</div>
-            <div class="km-summary-item"><span class="km-summary-num _ion-s-b270adeed3">${draft}</span> Draft</div>
-            <div class="km-summary-item"><span class="km-summary-num _ion-s-9dd1207e58">${missing}</span> Missing</div>
+            <div class="km-summary-item"><span class="km-summary-num text-[#22c55e]">${approved}</span> Approved</div>
+            <div class="km-summary-item"><span class="km-summary-num text-[#eab308]">${draft}</span> Draft</div>
+            <div class="km-summary-item"><span class="km-summary-num text-[#ef4444]">${missing}</span> Missing</div>
         </div>
     `;
 }
@@ -7079,7 +7079,7 @@ function renderCalStats() {
     if (calSource === 'plan') {
         const plan = tpPlans.find(p => p.id === tpActivePlanId);
         if (!plan || !plan.items || plan.items.length === 0) {
-            container.innerHTML = '<p class="_ion-s-bdf5e241f2">Create a training plan (My Training Plan tab) or switch to Auto-Generated mode.</p>';
+            container.innerHTML = '<p class="text-[var(--text-muted)] italic">Create a training plan (My Training Plan tab) or switch to Auto-Generated mode.</p>';
             return;
         }
         const activeItems = plan.items.filter(i => i.status !== 'skipped');
@@ -7117,7 +7117,7 @@ function renderCalStats() {
     // Auto-generated mode
     const targetRole = careerGoal.target_role;
     if (!targetRole || !ROLES[targetRole]) {
-        container.innerHTML = '<p class="_ion-s-bdf5e241f2">Select a target role in the Skills Assessment tab to generate your training calendar.</p>';
+        container.innerHTML = '<p class="text-[var(--text-muted)] italic">Select a target role in the Skills Assessment tab to generate your training calendar.</p>';
         return;
     }
 
@@ -7238,7 +7238,7 @@ function renderCalMonth() {
             html += `<div class="cal-event ${ev.css}" title="${esc(ev.label)}">${esc(ev.label)}</div>`;
         });
         if (events.length > 3) {
-            html += `<div class="cal-event _ion-s-484bdcd4c6">+${events.length - 3} more</div>`;
+            html += `<div class="cal-event text-[var(--text-muted)] bg-transparent">+${events.length - 3} more</div>`;
         }
         html += '</div>';
     }
@@ -7267,7 +7267,7 @@ function renderGantt() {
     const allItems = [...skillItems, ...certItems];
 
     if (allItems.length === 0) {
-        container.innerHTML = '<p class="_ion-s-bdf5e241f2">No training items to display. Select a target role in Skills Assessment.</p>';
+        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No training items to display. Select a target role in Skills Assessment.</p>';
         return;
     }
 
@@ -7315,7 +7315,7 @@ function renderGantt() {
         html += `<div class="gantt-row-label" title="${esc(item.name)}">${esc(item.name)}</div>`;
         html += `<div class="gantt-row-bar-area">`;
         // Today line
-        html += `<div class="_ion-s-cc4da19013" data-ion-style="left:${todayPct}%"></div>`;
+        html += `<div class="absolute top-0 bottom-0 w-[1px] bg-[var(--primary)] opacity-40 z-[1]" data-ion-style="left:${todayPct}%"></div>`;
         html += `<div class="gantt-bar ${item.catCss}" data-ion-style="left:${leftPct}%; width:${widthPct}%" title="${esc(label)}">${esc(item.type === 'skill' ? '' : item.name)}</div>`;
         html += `</div></div>`;
     });
@@ -7385,7 +7385,7 @@ async function loadScheduleData() {
     try {
         const resp = await fetch(`/api/skills/schedule?month=${monthStr}`);
         if (!resp.ok) {
-            document.getElementById('sched-grid').innerHTML = '<p class="_ion-s-bdf5e241f2">Access denied or no data.</p>';
+            document.getElementById('sched-grid').innerHTML = '<p class="text-[var(--text-muted)] italic">Access denied or no data.</p>';
             return;
         }
         const data = await resp.json();
@@ -7448,7 +7448,7 @@ function renderScheduleSummary() {
     // Card 1: Staff on duty
     html += `<div class="ss-card">
         <div class="ss-card-header">\u{1F4CB} Today &mdash; ${esc(todayLabel)}</div>
-        <div class="ss-big-num ${workPct >= 60 ? 'green' : workPct >= 40 ? 'amber' : 'red'}">${working.length}<span class="_ion-s-979262995c">/${total}</span></div>
+        <div class="ss-big-num ${workPct >= 60 ? 'green' : workPct >= 40 ? 'amber' : 'red'}">${working.length}<span class="text-[0.9rem] text-[var(--text-muted)]">/${total}</span></div>
         <div class="ss-sub">staff on duty (${workPct}%)</div>
     </div>`;
 
@@ -7457,12 +7457,12 @@ function renderScheduleSummary() {
     html += `<div class="ss-card">
         <div class="ss-card-header">\u{1F6AB} Not Available</div>`;
     if (absent.length === 0) {
-        html += '<div class="ss-sub _ion-s-7b6cad76b3">Everyone is working today</div>';
+        html += '<div class="ss-sub mt-[0.3rem]">Everyone is working today</div>';
     } else {
         html += '<ul class="ss-list">';
-        onLeave.forEach(m => { html += `<li><span class="ss-dot ss-dot-blue"></span>${esc(m.display_name)} <span class="_ion-s-b8e0b1fa55">&mdash; Leave</span></li>`; });
-        sick.forEach(m => { html += `<li><span class="ss-dot ss-dot-red"></span>${esc(m.display_name)} <span class="_ion-s-b8e0b1fa55">&mdash; Sick</span></li>`; });
-        training.forEach(m => { html += `<li><span class="ss-dot ss-dot-purple"></span>${esc(m.display_name)} <span class="_ion-s-b8e0b1fa55">&mdash; Training</span></li>`; });
+        onLeave.forEach(m => { html += `<li><span class="ss-dot ss-dot-blue"></span>${esc(m.display_name)} <span class="text-[var(--text-muted)]">&mdash; Leave</span></li>`; });
+        sick.forEach(m => { html += `<li><span class="ss-dot ss-dot-red"></span>${esc(m.display_name)} <span class="text-[var(--text-muted)]">&mdash; Sick</span></li>`; });
+        training.forEach(m => { html += `<li><span class="ss-dot ss-dot-purple"></span>${esc(m.display_name)} <span class="text-[var(--text-muted)]">&mdash; Training</span></li>`; });
         html += '</ul>';
     }
     html += '</div>';
@@ -7472,9 +7472,9 @@ function renderScheduleSummary() {
         <div class="ss-card-header">\u{1F6E1} Capability Status</div>`;
     if (atRisk.length > 0) {
         html += `<div class="ss-big-num red">${atRisk.length}</div>
-            <div class="ss-sub _ion-s-e802b7a103">at-risk capabilities</div>`;
+            <div class="ss-sub mb-[0.4rem]">at-risk capabilities</div>`;
         atRisk.forEach(([name, s]) => {
-            html += `<div class="ss-cap-row"><span class="ss-cap-badge ${levelClasses[s.level]}">${levelLabels[s.level]}</span> <span class="_ion-s-0e42856cf0">${esc(name)}</span></div>`;
+            html += `<div class="ss-cap-row"><span class="ss-cap-badge ${levelClasses[s.level]}">${levelLabels[s.level]}</span> <span class="text-[var(--text-secondary)]">${esc(name)}</span></div>`;
         });
     } else {
         html += `<div class="ss-big-num green">\u2714</div>
@@ -7510,7 +7510,7 @@ function renderScheduleGrid() {
     if (!container) return;
 
     if (schedMembers.length === 0) {
-        container.innerHTML = '<p class="_ion-s-bdf5e241f2">No team members found. Run the seed script first.</p>';
+        container.innerHTML = '<p class="text-[var(--text-muted)] italic">No team members found. Run the seed script first.</p>';
         return;
     }
 
@@ -7525,7 +7525,7 @@ function renderScheduleGrid() {
     let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
 
     // Header row: Name + day numbers with day-of-week
-    html += `<div class="sg-cell sg-header sg-name _ion-s-07e09bd50b">Team Member</div>`;
+    html += `<div class="sg-cell sg-header sg-name justify-start">Team Member</div>`;
     for (let d = 1; d <= daysInMonth; d++) {
         const dt = new Date(y, m, d);
         const dow = dt.getDay();
@@ -7533,12 +7533,12 @@ function renderScheduleGrid() {
         const dayName = dt.toLocaleDateString('en-GB', { weekday: 'short' }).substring(0, 2);
         const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const isToday = dateStr === todayStr;
-        html += `<div class="sg-cell sg-header ${isWeekend ? 'sg-header-weekend' : ''} ${isToday ? 'sg-today-marker' : ''} _ion-s-63d058f849" title="Click to view daily roster: ${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'})}" data-click-action="openDayRoster" data-args='["${dateStr}"]'><span class="sg-hdr-day">${dayName}</span><span class="sg-hdr-num">${d}</span></div>`;
+        html += `<div class="sg-cell sg-header ${isWeekend ? 'sg-header-weekend' : ''} ${isToday ? 'sg-today-marker' : ''} cursor-pointer" title="Click to view daily roster: ${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'long'})}" data-click-action="openDayRoster" data-args='["${dateStr}"]'><span class="sg-hdr-day">${dayName}</span><span class="sg-hdr-num">${d}</span></div>`;
     }
 
     // One row per team member
     schedMembers.forEach(member => {
-        html += `<div class="sg-cell sg-name _ion-s-63d058f849" title="Click to view ${esc(member.display_name)}'s skill profile" data-click-action="openMemberProfile" data-args='[${member.user_id}]'>${esc(member.display_name)}</div>`;
+        html += `<div class="sg-cell sg-name cursor-pointer" title="Click to view ${esc(member.display_name)}'s skill profile" data-click-action="openMemberProfile" data-args='[${member.user_id}]'>${esc(member.display_name)}</div>`;
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
             const key = `${member.user_id}-${dateStr}`;
@@ -7554,7 +7554,7 @@ function renderScheduleGrid() {
             const shift = entry && entry.shift ? ` (${entry.shift})` : '';
             const tooltip = `${member.display_name}\n${dt.toLocaleDateString('en-GB', {weekday:'long', day:'numeric', month:'short'})}\nStatus: ${info.label}${shift}${entry && entry.notes ? '\nNote: ' + entry.notes : ''}`;
 
-            const shiftMark = entry && entry.shift ? `<span class="_ion-s-6afc24a75b">${entry.shift.charAt(0).toUpperCase()}</span>` : '';
+            const shiftMark = entry && entry.shift ? `<span class="text-[0.45rem] block leading-[1] opacity-70">${entry.shift.charAt(0).toUpperCase()}</span>` : '';
             html += `<div class="${cellCls}" title="${esc(tooltip)}" data-uid="${member.user_id}" data-date="${dateStr}" data-click-action="openSchedulePicker" data-args='["$target"]'><span class="sg-status-icon">${info.icon}</span>${shiftMark}</div>`;
         }
     });
@@ -7789,7 +7789,7 @@ function openDayRoster(dateStr) {
         caps.forEach(c => {
             html += `<span class="dr-cap-badge ${c.cls}" title="${c.name}: avg ${c.avg.toFixed(1)}">${c.icon} ${esc(c.name)}</span>`;
         });
-        if (caps.length === 0) html += '<span class="_ion-s-eced3559d0">No assessments</span>';
+        if (caps.length === 0) html += '<span class="text-[0.65rem] text-[var(--text-muted)]">No assessments</span>';
         html += `</div></div>`;
     });
 
@@ -7799,16 +7799,16 @@ function openDayRoster(dateStr) {
         absentMembers.forEach(m => {
             const caps = getMemberCaps(m);
             const topCaps = caps.slice(0, 3);
-            html += `<div class="dr-member-card _ion-s-8e2aee9a5d">
+            html += `<div class="dr-member-card opacity-60">
                 <div>
                     <div class="dr-member-name">${esc(m.display_name)}</div>
                     <div class="dr-member-role">${m.statusIcon} ${m.statusLabel}</div>
                 </div>
                 <div class="dr-member-caps">`;
             topCaps.forEach(c => {
-                html += `<span class="dr-cap-badge ${c.cls} _ion-s-f23d205606">${c.icon} ${esc(c.name)}</span>`;
+                html += `<span class="dr-cap-badge ${c.cls} opacity-50">${c.icon} ${esc(c.name)}</span>`;
             });
-            if (topCaps.length < caps.length) html += `<span class="_ion-s-881402e26a">+${caps.length - topCaps.length} more</span>`;
+            if (topCaps.length < caps.length) html += `<span class="text-[0.6rem] text-[var(--text-muted)]">+${caps.length - topCaps.length} more</span>`;
             html += `</div></div>`;
         });
     }
@@ -7980,7 +7980,7 @@ function renderCapCoverageGrid() {
     let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
 
     // Header
-    html += `<div class="sg-cell sg-header sc-cap-name _ion-s-c28bd948da">Capability</div>`;
+    html += `<div class="sg-cell sg-header sc-cap-name text-left">Capability</div>`;
     for (let d = 1; d <= daysInMonth; d++) {
         const dt = new Date(y, m, d);
         const dow = dt.getDay();
@@ -8034,7 +8034,7 @@ function renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLa
     let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
 
     // Header
-    html += `<div class="sg-cell sg-header sc-cap-name _ion-s-c28bd948da">Capability</div>`;
+    html += `<div class="sg-cell sg-header sc-cap-name text-left">Capability</div>`;
     weeks.forEach(w => {
         html += `<div class="sg-cell sc-week-header">${w.start}-${w.end} ${schedMonth.toLocaleDateString('en-GB',{month:'short'})}</div>`;
     });
@@ -8072,7 +8072,7 @@ function renderCapCoverageWeekly(container, capNames, y, m, daysInMonth, levelLa
             else level = 4;
             const peopleArr = Array.from(allPeople).slice(0, 3);
             const tooltip = `${capName}\nWeek ${w.start}-${w.end}: ${levelLabels[level]}\nAvg proficiency: ${weekAvg.toFixed(1)}\n~${weekCover} staff/day at 3+${peopleArr.length > 0 ? '\nKey: ' + peopleArr.join(', ') : ''}`;
-            html += `<div class="sg-cell sc-cov-${level} _ion-s-5b9186f299" title="${esc(tooltip)}"><span class="sc-level-label">${levelLabels[level]}</span><span class="_ion-s-d7176cb4c5">${weekAvg.toFixed(1)}</span></div>`;
+            html += `<div class="sg-cell sc-cov-${level} text-[0.72rem] flex-col" title="${esc(tooltip)}"><span class="sc-level-label">${levelLabels[level]}</span><span class="text-[0.58rem] text-[var(--text-muted)]">${weekAvg.toFixed(1)}</span></div>`;
         });
     });
 
@@ -8121,7 +8121,7 @@ function renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelL
     const monthName = schedMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     const gridCols = `minmax(140px,200px) minmax(90px,1fr) minmax(90px,1fr)`;
     let html = `<div class="sched-grid" data-grid-cols="${gridCols}">`;
-    html += `<div class="sg-cell sg-header sc-cap-name _ion-s-c28bd948da">Capability</div>`;
+    html += `<div class="sg-cell sg-header sc-cap-name text-left">Capability</div>`;
     html += `<div class="sg-cell sc-week-header">${esc(monthName)} (avg)</div>`;
     html += `<div class="sg-cell sc-week-header">Worst day</div>`;
 
@@ -8137,8 +8137,8 @@ function renderCapCoverageMonthly(container, capNames, y, m, daysInMonth, levelL
         const avgRounded = Math.round(avgLvl);
         const worstLvl = n > 0 ? worst : 0;
         html += `<div class="sg-cell sc-cap-name">${icon} ${esc(capName)}</div>`;
-        html += `<div class="sg-cell sc-cov-${avgRounded} _ion-s-5b9186f299" title="${esc(capName)}: month-average coverage"><span class="sc-level-label">${levelLabels[avgRounded]}</span><span class="_ion-s-d7176cb4c5">${avgLvl.toFixed(1)}</span></div>`;
-        html += `<div class="sg-cell sc-cov-${worstLvl} _ion-s-5b9186f299" title="Lowest single-day coverage this month"><span class="sc-level-label">${levelLabels[worstLvl]}</span></div>`;
+        html += `<div class="sg-cell sc-cov-${avgRounded} text-[0.72rem] flex-col" title="${esc(capName)}: month-average coverage"><span class="sc-level-label">${levelLabels[avgRounded]}</span><span class="text-[0.58rem] text-[var(--text-muted)]">${avgLvl.toFixed(1)}</span></div>`;
+        html += `<div class="sg-cell sc-cov-${worstLvl} text-[0.72rem] flex-col" title="Lowest single-day coverage this month"><span class="sc-level-label">${levelLabels[worstLvl]}</span></div>`;
     });
     html += '</div>';
     container.innerHTML = html;
@@ -8925,7 +8925,7 @@ function renderCalPlanSchedule() {
         const statusLabel = { planned: 'Planned', in_progress: 'Studying', completed: 'Passed', skipped: 'Skipped' }[item.status] || item.status;
         return `
         <div class="cal-sched-row">
-            <div class="_ion-s-156273fa3a">
+            <div class="flex-1 min-w-[150px]">
                 <div class="tp-item-name">${esc(item.cert_name)}</div>
                 <div class="tp-item-provider">${esc(item.provider || '')} - ~\u00a3${item.price.toLocaleString()}</div>
             </div>
@@ -9029,11 +9029,11 @@ async function tpLoadForecast() {
                 <div class="tp-summary-label">Total Certifications</div>
             </div>
             <div class="tp-summary-card">
-                <div class="tp-summary-value _ion-s-397ebe261c">\u00a3${t.total.toLocaleString()}</div>
+                <div class="tp-summary-value text-[var(--neon-cyan)]">\u00a3${t.total.toLocaleString()}</div>
                 <div class="tp-summary-label">Total Forecast</div>
             </div>
             <div class="tp-summary-card">
-                <div class="tp-summary-value _ion-s-227931efe5">\u00a3${companyLiability.toLocaleString()}</div>
+                <div class="tp-summary-value text-[#f97316]">\u00a3${companyLiability.toLocaleString()}</div>
                 <div class="tp-summary-label">Est. Company Liability</div>
             </div>
             <div class="tp-summary-card">
@@ -9060,23 +9060,23 @@ async function tpLoadForecast() {
         if (empEl) {
             const empTypes = data.by_employment_type || {};
             if (Object.keys(empTypes).length === 0) {
-                empEl.innerHTML = '<div class="tp-empty _ion-s-c951e35a79">No data yet.</div>';
+                empEl.innerHTML = '<div class="tp-empty p-4">No data yet.</div>';
             } else {
-                let empHtml = '<div class="_ion-s-304a1ef2c2">';
+                let empHtml = '<div class="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">';
                 for (const [type, d] of Object.entries(empTypes)) {
                     const label = EMP_TYPE_LABELS[type] || type;
                     const color = EMP_TYPE_COLORS[type] || '#8b949e';
                     const liability = d.company + (d.split * 0.5) + d.tbd;
                     empHtml += `
-                    <div class="_ion-s-68e3d8f449" data-ion-style="border-left:3px solid ${color}">
-                        <div class="_ion-s-de22ce35b8" data-ion-style="color:${color}">${esc(label)}</div>
-                        <div class="_ion-s-20d867efdd">
-                            <span class="_ion-s-b8e0b1fa55">Personnel</span><span class="_ion-s-8e53798e1a">${d.headcount}</span>
-                            <span class="_ion-s-b8e0b1fa55">Certifications</span><span class="_ion-s-8e53798e1a">${d.certs}</span>
-                            <span class="_ion-s-b8e0b1fa55">Total Cost</span><span class="_ion-s-aa7dfecebc">\u00a3${d.total.toLocaleString()}</span>
-                            <span class="_ion-s-b8e0b1fa55">Company</span><span class="_ion-s-0b87e9e0af">\u00a3${d.company.toLocaleString()}</span>
-                            <span class="_ion-s-b8e0b1fa55">Self</span><span class="_ion-s-0b87e9e0af">\u00a3${d.self.toLocaleString()}</span>
-                            <span class="_ion-s-b8e0b1fa55">Est. Liability</span><span class="_ion-s-b5c55e9fe2">\u00a3${liability.toLocaleString()}</span>
+                    <div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[8px] p-4" data-ion-style="border-left:3px solid ${color}">
+                        <div class="font-bold text-[0.9rem] mb-2" data-ion-style="color:${color}">${esc(label)}</div>
+                        <div class="grid grid-cols-2 gap-[0.25rem_1rem] text-[0.78rem]">
+                            <span class="text-[var(--text-muted)]">Personnel</span><span class="text-[var(--text-primary)] font-semibold">${d.headcount}</span>
+                            <span class="text-[var(--text-muted)]">Certifications</span><span class="text-[var(--text-primary)] font-semibold">${d.certs}</span>
+                            <span class="text-[var(--text-muted)]">Total Cost</span><span class="text-[var(--neon-cyan)] font-semibold">\u00a3${d.total.toLocaleString()}</span>
+                            <span class="text-[var(--text-muted)]">Company</span><span class="font-semibold">\u00a3${d.company.toLocaleString()}</span>
+                            <span class="text-[var(--text-muted)]">Self</span><span class="font-semibold">\u00a3${d.self.toLocaleString()}</span>
+                            <span class="text-[var(--text-muted)]">Est. Liability</span><span class="text-[#f97316] font-semibold">\u00a3${liability.toLocaleString()}</span>
                         </div>
                     </div>`;
                 }
@@ -9097,11 +9097,11 @@ async function tpLoadForecast() {
             const empLabel = EMP_TYPE_LABELS[f.employment_type] || f.employment_type || 'CS';
             const empColor = EMP_TYPE_COLORS[f.employment_type] || '#8b949e';
             return `<tr>
-                <td><strong>${esc(f.display_name)}</strong><br><span class="_ion-s-1d73b48170">${esc(f.username)}</span></td>
-                <td><span class="_ion-s-3bdd529feb" data-ion-style="background:${empColor}22; color:${empColor}">${esc(empLabel)}</span></td>
+                <td><strong>${esc(f.display_name)}</strong><br><span class="text-[0.7rem] text-[var(--text-muted)]">${esc(f.username)}</span></td>
+                <td><span class="inline-block py-[0.15rem] px-2 rounded-[4px] text-[0.7rem] font-semibold" data-ion-style="background:${empColor}22; color:${empColor}">${esc(empLabel)}</span></td>
                 <td>${esc(f.plan_name)}</td>
                 <td>${esc(targetTitle)}</td>
-                <td class="_ion-s-dac4fe6c9b">${f.item_count}</td>
+                <td class="text-center">${f.item_count}</td>
                 <td class="fc-cost">\u00a3${f.total_cost.toLocaleString()}</td>
                 <td class="fc-cost">\u00a3${f.company_cost.toLocaleString()}</td>
                 <td class="fc-cost">\u00a3${f.self_cost.toLocaleString()}</td>
@@ -9113,10 +9113,10 @@ async function tpLoadForecast() {
         }).join('');
 
         tableEl.innerHTML = `
-            <div class="_ion-s-d0698c48c3">
+            <div class="overflow-x-auto">
             <table class="fc-table">
                 <thead><tr>
-                    <th>Person</th><th>Type</th><th>Plan</th><th>Target Role</th><th class="_ion-s-dac4fe6c9b">Certs</th>
+                    <th>Person</th><th>Type</th><th>Plan</th><th>Target Role</th><th class="text-center">Certs</th>
                     <th>Total</th><th>Company</th><th>Self</th><th>Progress</th>
                 </tr></thead>
                 <tbody>${rows}</tbody>
@@ -9415,7 +9415,7 @@ function crShowDetail(certId) {
             </div>
             <div class="cr-d-stat">
                 <span class="cr-d-stat-label">Domain</span>
-                <span class="cr-d-stat-value">${domainInfo ? `<i class="${domainInfo.icon} _ion-s-2df5d63a05" data-ion-style="color:${domainInfo.color}"></i>${domainInfo.name}` : cert.domain}</span>
+                <span class="cr-d-stat-value">${domainInfo ? `<i class="${domainInfo.icon} mr-[0.3rem]" data-ion-style="color:${domainInfo.color}"></i>${domainInfo.name}` : cert.domain}</span>
             </div>
             <div class="cr-d-stat">
                 <span class="cr-d-stat-label">Duration</span>

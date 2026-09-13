@@ -217,7 +217,7 @@
     // the source has degraded — different from a clean empty state.
     const isFallback = a.source === 'ion_fallback';
     const fallback = isFallback
-      ? `<div class="alert alert-warning _ion-s-c3593ed150">
+      ? `<div class="alert alert-warning mb-[2vh] py-2.5 px-4 bg-[rgba(251,191,36,0.08)] border-l-[3px] border-l-[var(--ion-amber)] rounded-[4px] text-xs text-[var(--ion-amber)]">
            <span><strong>ION-local fallback active</strong> ·
            ${esc(a.fallback_reason || 'ES returned no critical-severity matches')}</span>
          </div>`
@@ -248,7 +248,7 @@
       html: slideShell('data-slide="criticals"', `
         ${eyebrow('Section 2 · ' + (isFallback ? 'ION-Tracked Alerts' : 'Critical Alerts') + ' (Last 24h)')}
         ${hTitle(isFallback ? 'Recent Alerts' : 'Critical Alerts')}
-        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] _ion-s-4423649d52">
+        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] grid-cols-[minmax(220px,_320px)]">
           <div class="stats w-full bg-base-200 shadow">
             <div class="stat"><div class="stat-title">${isFallback ? 'Open (ION)' : 'Critical'}</div>
             ${statVal('crit', '', esc(a.critical_count ?? 0))}
@@ -285,7 +285,7 @@
           <td class="font-mono">${esc(r.hours_open ?? 0)}h</td>
         </tr>`;
       }).join('');
-      body = `<div class="card bg-base-200 shadow _ion-s-2289ace819">
+      body = `<div class="card bg-base-200 shadow max-h-[56vh] overflow-y-auto rounded-[12px]">
         <table class="table table-sm"><thead><tr>
           <th>Case</th><th>Title</th><th>Triggered Rules</th><th>Severity</th><th>Open</th>
         </tr></thead><tbody>${rows}</tbody></table>
@@ -296,7 +296,7 @@
       html: slideShell('data-slide="stale-cases"', `
         ${eyebrow('Section 3 · Stale Cases (Open &gt; 24h, all)')}
         ${hTitle('Stale Cases')}
-        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] _ion-s-4423649d52">
+        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] grid-cols-[minmax(220px,_320px)]">
           <div class="stats w-full bg-base-200 shadow">
             <div class="stat"><div class="stat-title">Open beyond threshold</div>
             ${statVal(list.length ? 'warn' : 'ok', '', esc(c.count ?? list.length))}</div>
@@ -411,7 +411,7 @@
         <td class="font-mono">${esc((x.last_failure || '').slice(0, 16).replace('T', ' '))}</td>
         <td>${sevPill(x.last_status || 'failure')}</td>
       </tr>`).join('');
-      body = `<div class="card bg-base-200 shadow _ion-s-2289ace819">
+      body = `<div class="card bg-base-200 shadow max-h-[56vh] overflow-y-auto rounded-[12px]">
         <table class="table table-sm"><thead><tr>
           <th>Rule</th><th>Failures (24h)</th><th>Last failure</th><th>Status</th>
         </tr></thead><tbody>${rows}</tbody></table>
@@ -422,7 +422,7 @@
       html: slideShell('data-slide="rule-failures"', `
         ${eyebrow('Section 7 · Detection Rule Failures (Last 24h)')}
         ${hTitle('Rule Failures')}
-        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] _ion-s-4423649d52">
+        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] grid-cols-[minmax(220px,_320px)]">
           <div class="stats w-full bg-base-200 shadow">
             <div class="stat"><div class="stat-title">Failing rules</div>
             ${statVal(list.length ? 'crit' : 'ok', '', esc(r.count ?? list.length))}</div>
@@ -449,7 +449,7 @@
   function slideThreatSummary() {
     const text = _readLS('ion.standup.ai_summary');
     const body = text
-      ? `<div class="card bg-base-200 shadow _ion-s-4f2d370f62">${esc(text)}</div>`
+      ? `<div class="card bg-base-200 shadow text-[clamp(15px,_1.4vw,_20px)] text-[var(--deck-text)] leading-[1.6] whitespace-pre-wrap bg-[var(--deck-card)] border border-[var(--deck-line)] rounded-[12px] py-7 px-8 max-h-[56vh] overflow-y-auto [backdrop-filter:blur(6px)]">${esc(text)}</div>`
       : `<div class="alert alert-info mt-[4vh]">
            No AI threat summary available.<br>
            <span class="text-[0.6em] text-[var(--deck-faint)]">
@@ -469,7 +469,7 @@
   function slideAOB() {
     const text = _readLS('ion.standup.aob');
     const body = text
-      ? `<div class="card bg-base-200 shadow _ion-s-e4873e3c1b">${esc(text)}</div>`
+      ? `<div class="card bg-base-200 shadow text-[clamp(16px,_1.6vw,_24px)] text-[var(--deck-text)] leading-[1.6] whitespace-pre-wrap bg-[var(--deck-card)] border border-[var(--deck-line)] rounded-[12px] py-8 px-9 max-h-[56vh] overflow-y-auto [backdrop-filter:blur(6px)]">${esc(text)}</div>`
       : `<div class="alert alert-info mt-[4vh]">
            No AOB items recorded.<br>
            <span class="text-[0.6em] text-[var(--deck-faint)]">

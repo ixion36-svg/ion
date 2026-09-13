@@ -673,7 +673,7 @@ function renderLogHealth(prefix, data) {
     return '<div class="ds-host-widget ' + widgetClass + '" title="' + tooltip + '">'
       + '<div class="ds-hw-light ' + lightClass + '"></div>'
       + '<div class="ds-hw-name">' + esc(name) + '</div>'
-      + '<div class="ds-hw-meta">' + events + (gaps > 0 ? '<br><span class="_ion-s-9dd1207e58">' + gaps + 'h gap</span>' : '') + '</div>'
+      + '<div class="ds-hw-meta">' + events + (gaps > 0 ? '<br><span class="text-[#ef4444]">' + gaps + 'h gap</span>' : '') + '</div>'
       + '</div>';
   }).join('');
 }
@@ -698,13 +698,13 @@ function renderArkime(countries) {
       if (count > 0 && c.nodes && c.nodes.length) {
         let html = '';
         c.nodes.forEach(n => {
-          html += '<div class="_ion-s-39c5d3e3a3">';
-          html += '<span class="_ion-s-a9768081c1">' + esc(n.node) + '</span>: ' + n.session_count + ' session' + (n.session_count !== 1 ? 's' : '');
+          html += '<div class="text-[9px] text-[#94a3b8] mt-1 text-left w-full">';
+          html += '<span class="text-[#6de4ff]">' + esc(n.node) + '</span>: ' + n.session_count + ' session' + (n.session_count !== 1 ? 's' : '');
           if (n.sessions && n.sessions.length) {
             n.sessions.forEach(s => {
               const proto = s.protocol || '?';
               const bytes = s.bytes ? (s.bytes > 1048576 ? (s.bytes/1048576).toFixed(1)+'MB' : s.bytes > 1024 ? (s.bytes/1024).toFixed(0)+'KB' : s.bytes+'B') : '0B';
-              html += '<div class="_ion-s-8485d4bd42">' + esc(s.src_ip||'?') + ' &rarr; ' + esc(s.dst_ip||'?') + ' [' + esc(proto) + '] ' + bytes + '</div>';
+              html += '<div class="pl-2 text-[#64748b]">' + esc(s.src_ip||'?') + ' &rarr; ' + esc(s.dst_ip||'?') + ' [' + esc(proto) + '] ' + bytes + '</div>';
             });
           }
           html += '</div>';

@@ -712,50 +712,50 @@ data-click-action="tiCloseReport"></div>
 
             // Tactic chips
             if (d.tactic_ids && d.tactic_ids.length) {
-                sections.push(`<div class="_ion-s-a82d7062cc">
-                    <div class="_ion-s-accf379c51">Tactics</div>
+                sections.push(`<div class="mb-3.5">
+                    <div class="text-[.72rem] text-[var(--text-secondary)] uppercase tracking-[.05em] mb-1.5">Tactics</div>
                     ${d.tactic_ids.map(t =>
-                        `<span class="_ion-s-057eff9b07">${escapeHtml(t)}</span>`
+                        `<span class="inline-block py-0.5 px-2 bg-[rgba(109,228,255,0.1)] border border-[rgba(109,228,255,0.3)] rounded-[4px] text-[.72rem] text-[var(--ion-cyan,#6de4ff)] mr-1 font-mono">${escapeHtml(t)}</span>`
                     ).join('')}
                 </div>`);
             }
             if (d.is_subtechnique && d.parent_id) {
-                sections.push(`<div class="_ion-s-8cc2e5263b">
-                    Sub-technique of <a class="_ion-s-03d0be992c" href="javascript:void(0)" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(d.parent_id)}]'>${escapeHtml(d.parent_id)}</a>
+                sections.push(`<div class="text-[.78rem] text-[var(--text-secondary)] mb-3.5">
+                    Sub-technique of <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="javascript:void(0)" data-click-action="tiCloseAndDrillTechnique" data-args='[${JSON.stringify(d.parent_id)}]'>${escapeHtml(d.parent_id)}</a>
                 </div>`);
             }
 
             // Local cases
-            sections.push(`<div class="_ion-s-a82d7062cc">
-                <h4 class="_ion-s-0f7d025040">Local Cases <span class="_ion-s-84bbf7f5de">(last 90 days)</span></h4>
+            sections.push(`<div class="mb-3.5">
+                <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">Local Cases <span class="text-[var(--text-secondary)] font-normal text-xs">(last 90 days)</span></h4>
                 ${!d.local_cases.length
-                    ? '<em class="_ion-s-6e06904f9e">No cases triggered this technique in the last 90 days.</em>'
-                    : '<ul class="_ion-s-e7184d9d11">' + d.local_cases.map(c => `
-                        <li class="_ion-s-67b52d7eff">
-                            <a class="_ion-s-03d0be992c" href="/cases?selected=${c.id}">${escapeHtml(c.case_number)}</a>
-                            <span class="_ion-s-199aeed353">${escapeHtml(c.title)}</span>
-                            <span class="sev-badge sev-${escapeHtml(c.severity)} _ion-s-058f0f3331">${escapeHtml(c.severity)}</span>
+                    ? '<em class="text-[.78rem] text-[var(--text-secondary)]">No cases triggered this technique in the last 90 days.</em>'
+                    : '<ul class="list-none p-0 m-0">' + d.local_cases.map(c => `
+                        <li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]">
+                            <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="/cases?selected=${c.id}">${escapeHtml(c.case_number)}</a>
+                            <span class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(c.title)}</span>
+                            <span class="sev-badge sev-${escapeHtml(c.severity)} ml-1.5 text-[.7rem]">${escapeHtml(c.severity)}</span>
                         </li>`).join('') + '</ul>'
                 }
             </div>`);
 
             // Actors
-            sections.push(`<div class="_ion-s-a82d7062cc">
-                <h4 class="_ion-s-0f7d025040">Actors Using This Technique <span class="_ion-s-84bbf7f5de">(OpenCTI)</span></h4>
+            sections.push(`<div class="mb-3.5">
+                <h4 class="text-[.85rem] mt-0 mr-0 mb-2 ml-0 text-[var(--text-primary)]">Actors Using This Technique <span class="text-[var(--text-secondary)] font-normal text-xs">(OpenCTI)</span></h4>
                 ${d.actors_error
-                    ? `<em class="_ion-s-6e06904f9e">OpenCTI lookup unavailable: ${escapeHtml(d.actors_error)}</em>`
+                    ? `<em class="text-[.78rem] text-[var(--text-secondary)]">OpenCTI lookup unavailable: ${escapeHtml(d.actors_error)}</em>`
                     : !d.actors.length
-                        ? '<em class="_ion-s-6e06904f9e">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>'
-                        : '<ul class="_ion-s-e7184d9d11">' + d.actors.map(a => `
-                            <li class="_ion-s-a24e8f22c9">
-                                <span class="_ion-s-d34d5c53e4">${escapeHtml(a.name || a.id || '')}</span>
+                        ? '<em class="text-[.78rem] text-[var(--text-secondary)]">No actors mapped to this technique in OpenCTI, or actor-by-technique lookup is not supported by this OpenCTI service build.</em>'
+                        : '<ul class="list-none p-0 m-0">' + d.actors.map(a => `
+                            <li class="py-1 px-0 text-[.8rem]">
+                                <span class="text-[var(--ion-cyan,#6de4ff)]">${escapeHtml(a.name || a.id || '')}</span>
                             </li>`).join('') + '</ul>'
                 }
             </div>`);
 
             body.innerHTML = sections.join('');
         } catch(e) {
-            body.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
+            body.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
         }
     };
 
@@ -791,7 +791,7 @@ data-click-action="tiCloseReport"></div>
             if (d.types && d.types.length) meta.push(d.types.join(', '));
             if (d.source) meta.push('Source: ' + escapeHtml(d.source));
             if (d.confidence != null) meta.push('Confidence: ' + d.confidence + '%');
-            if (meta.length) secs.push('<div class="_ion-s-adac18b9c4 ti-detail-section">' + meta.join(' · ') + '</div>');
+            if (meta.length) secs.push('<div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono ti-detail-section">' + meta.join(' · ') + '</div>');
 
             // Labels
             if (d.labels && d.labels.length) {
@@ -809,9 +809,9 @@ data-click-action="tiCloseReport"></div>
             // Threat actors
             if (d.related_actors && d.related_actors.length) {
                 secs.push('<div class="ti-detail-section"><h4>Threat Actors</h4>' +
-                    '<ul class="_ion-s-e7184d9d11">' + d.related_actors.map(a =>
-                        '<li class="_ion-s-a24e8f22c9"><span class="_ion-s-d34d5c53e4">' + escapeHtml(a.name) + '</span>' +
-                        (a.aliases && a.aliases.length ? ' <span class="_ion-s-199aeed353">(' + escapeHtml(a.aliases.join(', ')) + ')</span>' : '') +
+                    '<ul class="list-none p-0 m-0">' + d.related_actors.map(a =>
+                        '<li class="py-1 px-0 text-[.8rem]"><span class="text-[var(--ion-cyan,#6de4ff)]">' + escapeHtml(a.name) + '</span>' +
+                        (a.aliases && a.aliases.length ? ' <span class="ml-1.5 text-[var(--text-primary)]">(' + escapeHtml(a.aliases.join(', ')) + ')</span>' : '') +
                         '</li>'
                     ).join('') + '</ul></div>');
             }
@@ -856,16 +856,16 @@ data-click-action="tiCloseReport"></div>
             // Indicators
             if (d.related_indicators && d.related_indicators.length) {
                 const shown = d.related_indicators.slice(0, 10);
-                secs.push('<div class="ti-detail-section"><h4>Indicators <span class="_ion-s-84bbf7f5de">(' +
+                secs.push('<div class="ti-detail-section"><h4>Indicators <span class="text-[var(--text-secondary)] font-normal text-xs">(' +
                     shown.length + (d.related_indicators.length > 10 ? '+' : '') + ')</span></h4>' +
-                    '<ul class="_ion-s-e7184d9d11">' + shown.map(i =>
-                        `<li class="_ion-s-67b52d7eff"><code class="_ion-s-fcf3b313f7">${escapeHtml(i.pattern)}</code></li>`
+                    '<ul class="list-none p-0 m-0">' + shown.map(i =>
+                        `<li class="py-1.5 px-0 border-b-[1px] border-b-[var(--ion-border)] text-[.8rem]"><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.pattern)}</code></li>`
                     ).join('') + '</ul></div>');
             }
 
-            body.innerHTML = secs.join('') || '<em class="_ion-s-6e06904f9e">No content available.</em>';
+            body.innerHTML = secs.join('') || '<em class="text-[.78rem] text-[var(--text-secondary)]">No content available.</em>';
         } catch(e) {
-            body.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
+            body.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e.message || e)) + '</div>';
         }
     };
 
@@ -892,12 +892,12 @@ data-click-action="tiCloseReport"></div>
             if (!d.observables.length) {
                 obsEl.innerHTML = '<em>No observable activity in the last 30 days.</em>';
             } else {
-                obsEl.innerHTML = '<ul class="_ion-s-e7184d9d11">' +
+                obsEl.innerHTML = '<ul class="list-none p-0 m-0">' +
                     d.observables.map(o =>
-                        `<li class="_ion-s-a0850f2f6f">
-                            <span><code class="_ion-s-fcf3b313f7">${o.type}</code>
-                            <code class="_ion-s-199aeed353">${escapeHtml(o.value)}</code></span>
-                            <span class="_ion-s-7edf4c5397">${o.count}×</span>
+                        `<li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
+                            <span><code class="text-xs text-[var(--text-muted)]">${o.type}</code>
+                            <code class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(o.value)}</code></span>
+                            <span class="text-[var(--accent)] font-mono text-xs">${o.count}×</span>
                         </li>`
                     ).join('') + '</ul>';
             }
@@ -905,13 +905,13 @@ data-click-action="tiCloseReport"></div>
                 techEl.innerHTML = '<em>No MITRE techniques tagged in the last 30 days.</em>';
             } else {
                 // each technique chip is now click-to-drill.
-                techEl.innerHTML = '<ul class="_ion-s-e7184d9d11">' +
+                techEl.innerHTML = '<ul class="list-none p-0 m-0">' +
                     d.techniques.map(t =>
-                        `<li class="_ion-s-a0850f2f6f">
-                            <a class="_ion-s-03d0be992c" href="javascript:void(0)" data-click-action="tiDrillTechnique" data-args='["${escapeHtml(t.id)}"]'
+                        `<li class="py-1 px-0 border-b-[1px] border-b-[var(--ion-border)] flex justify-between gap-2">
+                            <a class="text-[var(--ion-cyan,#6de4ff)] no-underline font-mono" href="javascript:void(0)" data-click-action="tiDrillTechnique" data-args='["${escapeHtml(t.id)}"]'
  
  title="Drill into this technique">${escapeHtml(t.id)}</a>
-                            <span class="_ion-s-7edf4c5397">${t.count}×</span>
+                            <span class="text-[var(--accent)] font-mono text-xs">${t.count}×</span>
                         </li>`
                     ).join('') + '</ul>';
             }
@@ -946,46 +946,46 @@ data-click-action="tiCloseReport"></div>
             const d = await r.json();
             const sections = [];
             if (d.actors.length) {
-                sections.push(`<h4 class="_ion-s-51ab1975aa">Threat Actors (${d.actors.length})</h4>` +
-                    '<ul class="_ion-s-e7184d9d11">' + d.actors.map(a =>
-                        `<li class="_ion-s-249f2c8531">
+                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">Threat Actors (${d.actors.length})</h4>` +
+                    '<ul class="list-none p-0 m-0">' + d.actors.map(a =>
+                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px]">
                             ${escapeHtml(a.name || a.id || '')}
                         </li>`
                     ).join('') + '</ul>');
             }
             if (d.campaigns.length) {
-                sections.push(`<h4 class="_ion-s-51ab1975aa">Campaigns (${d.campaigns.length})</h4>` +
-                    '<ul class="_ion-s-e7184d9d11">' + d.campaigns.map(c =>
-                        `<li class="_ion-s-249f2c8531">
+                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">Campaigns (${d.campaigns.length})</h4>` +
+                    '<ul class="list-none p-0 m-0">' + d.campaigns.map(c =>
+                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px]">
                             ${escapeHtml(c.name || c.id || '')}
                         </li>`
                     ).join('') + '</ul>');
             }
             if (d.iocs.length) {
-                sections.push(`<h4 class="_ion-s-51ab1975aa">IOCs (${d.iocs.length})</h4>` +
-                    '<ul class="_ion-s-e7184d9d11">' + d.iocs.map(i =>
-                        `<li class="_ion-s-c00a097226">
-                            <span><code class="_ion-s-fcf3b313f7">${escapeHtml(i.type)}</code>
-                            <code class="_ion-s-199aeed353">${escapeHtml(i.value)}</code></span>
-                            <a class="_ion-s-d9dc6ea16c" href="/observables/${i.id}">→ open</a>
+                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">IOCs (${d.iocs.length})</h4>` +
+                    '<ul class="list-none p-0 m-0">' + d.iocs.map(i =>
+                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px] flex justify-between gap-2">
+                            <span><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.type)}</code>
+                            <code class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(i.value)}</code></span>
+                            <a class="text-[var(--accent)] text-xs no-underline" href="/observables/${i.id}">→ open</a>
                         </li>`
                     ).join('') + '</ul>');
             }
             if (d.cases.length) {
-                sections.push(`<h4 class="_ion-s-51ab1975aa">Cases (${d.cases.length})</h4>` +
-                    '<ul class="_ion-s-e7184d9d11">' + d.cases.map(c =>
-                        `<li class="_ion-s-c00a097226">
-                            <span><code class="_ion-s-fcf3b313f7">${escapeHtml(c.case_number)}</code>
-                            <span class="_ion-s-199aeed353">${escapeHtml(c.title)}</span></span>
-                            <a class="_ion-s-d9dc6ea16c" href="/cases?selected=${c.id}">→ open</a>
+                sections.push(`<h4 class="text-[.85rem] mt-2 mr-0 mb-1.5 ml-0 text-[var(--accent)]">Cases (${d.cases.length})</h4>` +
+                    '<ul class="list-none p-0 m-0">' + d.cases.map(c =>
+                        `<li class="py-1 px-2 bg-[var(--bg-secondary)] mb-0.5 rounded-[4px] flex justify-between gap-2">
+                            <span><code class="text-xs text-[var(--text-muted)]">${escapeHtml(c.case_number)}</code>
+                            <span class="ml-1.5 text-[var(--text-primary)]">${escapeHtml(c.title)}</span></span>
+                            <a class="text-[var(--accent)] text-xs no-underline" href="/cases?selected=${c.id}">→ open</a>
                         </li>`
                     ).join('') + '</ul>');
             }
             if (!sections.length) {
                 out.innerHTML = `<div class="ti-empty">No matches for "${escapeHtml(q)}".</div>`;
             } else {
-                out.innerHTML = `<div class="_ion-s-4456b466c8">
-                    <div class="_ion-s-3a570f8ef8">${d.total} result${d.total === 1 ? '' : 's'} for "${escapeHtml(q)}"</div>
+                out.innerHTML = `<div class="bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--radius-lg)] p-4">
+                    <div class="text-[.78rem] text-[var(--text-secondary)] mb-2">${d.total} result${d.total === 1 ? '' : 's'} for "${escapeHtml(q)}"</div>
                     ${sections.join('')}
                 </div>`;
             }
@@ -1021,16 +1021,16 @@ data-click-action="tiCloseReport"></div>
             tbody.innerHTML = iocs.map((i, idx) => {
                 const score = i.score || 0;
                 const labels = (i.labels || []).slice(0, 3).map(l =>
-                    `<span class="_ion-s-868f8caae5">${escapeHtml(l.value || l)}</span>`
+                    `<span class="inline-block py-[1px] px-1.5 rounded-[3px] text-[.7rem] bg-[rgba(255,255,255,0.04)] border border-[var(--ion-border)] mr-0.5">${escapeHtml(l.value || l)}</span>`
                 ).join('');
                 const sparkId = 'ti-spark-' + idx;
                 return `<tr>
                     <td><strong data-ion-style="color:${score >= 90 ? 'var(--danger)' : score >= 70 ? 'var(--neon-orange)' : 'var(--text-secondary)'}">${score}</strong></td>
-                    <td><code class="_ion-s-fcf3b313f7">${escapeHtml(i.ioc_type)}</code></td>
-                    <td><code class="_ion-s-55289dc131">${escapeHtml(i.ioc_value)}</code></td>
-                    <td>${labels || '<span class="_ion-s-b8e0b1fa55">—</span>'}</td>
+                    <td><code class="text-xs text-[var(--text-muted)]">${escapeHtml(i.ioc_type)}</code></td>
+                    <td><code class="text-[var(--text-primary)]">${escapeHtml(i.ioc_value)}</code></td>
+                    <td>${labels || '<span class="text-[var(--text-muted)]">—</span>'}</td>
                     <td>${escapeHtml(i.source || '—')}</td>
-                    <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span class="_ion-s-a7d8dedd23">…</span></span></td>
+                    <td><span id="${sparkId}" data-ioc="${escapeHtml(i.ioc_value)}" class="ti-spark"><span class="text-[.7rem] text-[var(--text-muted)]">…</span></span></td>
                     <td>
                         <button class="ti-btn-outline ti-btn-sm" data-click-action="tiCopyIOC" data-args='["$event", ${JSON.stringify(i.ioc_value)}]'>Copy</button>
                     </td>
@@ -1041,7 +1041,7 @@ data-click-action="tiCloseReport"></div>
             // to 6 at a time to keep the OpenCTI backend honest.
             tiLoadSparklines();
         } catch(e) {
-            tbody.innerHTML = '<tr><td colspan="7" class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e)) + '</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</td></tr>';
         }
     };
 
@@ -1061,12 +1061,12 @@ data-click-action="tiCloseReport"></div>
         if (!value) return;
         try {
             const r = await fetch(API + '/ioc-sightings?value=' + encodeURIComponent(value) + '&months=12');
-            if (!r.ok) { spark.innerHTML = '<span class="_ion-s-a7d8dedd23">—</span>'; return; }
+            if (!r.ok) { spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]">—</span>'; return; }
             const d = await r.json();
             const series = d.series || [];
             const total = d.total_sightings || 0;
             if (!series.length || total === 0) {
-                spark.innerHTML = '<span class="_ion-s-a7d8dedd23" title="No local sightings in the last 12 months">—</span>';
+                spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]" title="No local sightings in the last 12 months">—</span>';
                 return;
             }
             // Inline SVG sparkline: 12 bars, max bar = 14px tall.
@@ -1081,9 +1081,9 @@ data-click-action="tiCloseReport"></div>
                 const col = b.count === max ? 'var(--ion-cyan, #6de4ff)' : 'var(--text-secondary)';
                 return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${col}"><title>${b.month}: ${b.count}</title></rect>`;
             }).join('');
-            spark.innerHTML = `<svg class="_ion-s-7adb5e919d" width="${w}" height="${h}" title="${total} local sightings in last 12 months">${bars}</svg> <span class="_ion-s-09790ead9c">${total}</span>`;
+            spark.innerHTML = `<svg class="align-middle" width="${w}" height="${h}" title="${total} local sightings in last 12 months">${bars}</svg> <span class="text-[.7rem] text-[var(--text-muted)] ml-1">${total}</span>`;
         } catch(e) {
-            spark.innerHTML = '<span class="_ion-s-a7d8dedd23">—</span>';
+            spark.innerHTML = '<span class="text-[.7rem] text-[var(--text-muted)]">—</span>';
         }
     }
 
@@ -1108,14 +1108,14 @@ data-click-action="tiCloseReport"></div>
             }
             host.innerHTML = reports.map(rep => {
                 const published = rep.published ? new Date(rep.published).toLocaleDateString() : '-';
-                return `<div class="_ion-s-d2d7bfa40f ti-report-card" data-click-action="tiOpenReport" data-args='[${JSON.stringify(rep.id)}]'>
-                    <div class="_ion-s-176f60fe66">${escapeHtml(rep.name || 'Untitled')}</div>
-                    <div class="_ion-s-6912997656">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
-                    <div class="_ion-s-adac18b9c4">${escapeHtml(rep.report_type || 'report')} · ${published}</div>
+                return `<div class="p-3 border border-[var(--ion-border)] border-l-[3px] border-l-[var(--ion-cyan,#6de4ff)] rounded-[var(--radius)] mb-2 bg-[var(--bg-secondary)] ti-report-card" data-click-action="tiOpenReport" data-args='[${JSON.stringify(rep.id)}]'>
+                    <div class="text-[.9rem] font-semibold text-[var(--ion-cyan,#6de4ff)] mb-1">${escapeHtml(rep.name || 'Untitled')}</div>
+                    <div class="text-xs text-[var(--text-secondary)]">${escapeHtml((rep.description || '').slice(0, 200))}${(rep.description || '').length > 200 ? '…' : ''}</div>
+                    <div class="text-[.72rem] text-[var(--text-muted)] mt-1.5 font-mono">${escapeHtml(rep.report_type || 'report')} · ${published}</div>
                 </div>`;
             }).join('');
         } catch(e) {
-            host.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e)) + '</div>';
+            host.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</div>';
         }
     };
 
@@ -1137,28 +1137,28 @@ data-click-action="tiCloseReport"></div>
             host.innerHTML = stories.map(s => {
                 const tacticsSet = new Set(s.tactics_progression || []);
                 const chainHtml = chainOrder.length
-                    ? `<div class="_ion-s-533efdbbfb">
+                    ? `<div class="flex gap-0 items-center overflow-x-auto my-2 mx-0">
                         ${chainOrder.map((stage, i) => {
                             const active = tacticsSet.has(stage);
-                            return (i > 0 ? '<span class="_ion-s-20db64ea41">→</span>' : '') +
-                                `<span class="_ion-s-060fd90cff${active ? ' active' : ''}">${escapeHtml(stage)}</span>`;
+                            return (i > 0 ? '<span class="py-0 px-1 text-[var(--text-muted)] text-[.8rem]">→</span>' : '') +
+                                `<span class="py-[3px] px-2 rounded-[4px] text-[.7rem] font-semibold uppercase whitespace-nowrap${active ? ' active' : ''}">${escapeHtml(stage)}</span>`;
                         }).join('')}
                        </div>`
                     : '';
-                return `<div class="_ion-s-009e279592">
-                    <div class="_ion-s-2983292b2e">
-                        <div class="_ion-s-1e744822b5">${s.score}</div>
-                        <div class="_ion-s-7623f05545">
-                            <div class="_ion-s-0ea732aed5">${escapeHtml(s.entity)} <small class="_ion-s-4304983f97">(${escapeHtml(s.entity_type)})</small></div>
-                            <div class="_ion-s-56828649e7">${s.alert_count} alerts · ${(s.unique_techniques||[]).length} techniques · ${s.time_span_hours}h span · <span class="sev-badge sev-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span></div>
+                return `<div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[var(--radius-lg)] py-3.5 px-4 mb-3">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="w-[42px] h-[42px] rounded-[50%] flex items-center justify-center font-bold font-mono text-[.85rem] bg-[rgba(220,38,38,0.15)] text-[#fecaca] border-[2px] border-[rgba(220,38,38,0.4)] shrink-0">${s.score}</div>
+                        <div class="flex-1">
+                            <div class="text-[.95rem] font-bold text-[var(--text-primary)]">${escapeHtml(s.entity)} <small class="text-[.72rem] text-[var(--text-secondary)] font-normal">(${escapeHtml(s.entity_type)})</small></div>
+                            <div class="text-xs text-[var(--text-secondary)] mt-0.5">${s.alert_count} alerts · ${(s.unique_techniques||[]).length} techniques · ${s.time_span_hours}h span · <span class="sev-badge sev-${escapeHtml(s.severity)}">${escapeHtml(s.severity)}</span></div>
                         </div>
                     </div>
-                    <div class="_ion-s-53033bb1a8">${escapeHtml(s.narrative)}</div>
+                    <div class="py-2.5 px-3 bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--radius)] text-[.82rem] leading-[1.55] text-[var(--text-primary)]">${escapeHtml(s.narrative)}</div>
                     ${chainHtml}
                 </div>`;
             }).join('');
         } catch(e) {
-            host.innerHTML = '<div class="ti-empty _ion-s-defa93481e">Failed: ' + escapeHtml(String(e)) + '</div>';
+            host.innerHTML = '<div class="ti-empty text-[var(--danger)]">Failed: ' + escapeHtml(String(e)) + '</div>';
         }
     };
 
@@ -1174,11 +1174,11 @@ data-click-action="tiCloseReport"></div>
             const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
             const entityName = d.watch_name || '-';
             const entityType = d.entity_type ? d.entity_type.replace('_', ' ') : '-';
-            const readBtn = m.is_read ? '<span class="_ion-s-362a950cb6">Read</span>' :
+            const readBtn = m.is_read ? '<span class="text-[var(--text-secondary)] text-xs">Read</span>' :
                 `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
             return `<tr${cls}>
                 <td>${esc(time)}</td>
-                <td><code>${esc(m.observable_value || '-')}</code> <span class="_ion-s-bc0077da71">(${esc(m.observable_type || '')})</span></td>
+                <td><code>${esc(m.observable_value || '-')}</code> <span class="text-[var(--text-secondary)] text-[.72rem]">(${esc(m.observable_type || '')})</span></td>
                 <td>${esc(entityName)}</td>
                 ${showType ? `<td>${esc(entityType)}</td>` : ''}
                 <td>${readBtn}</td>
@@ -1226,12 +1226,12 @@ data-click-action="tiCloseReport"></div>
                 // entity_class param tells the profile endpoint which
                 // OpenCTI lookup path to use (most APTs are intrusion sets).
                 const klass = (a.threat_actor_types || []).includes('intrusion-set') ? 'intrusion_set' : 'threat_actor';
-                const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm _ion-s-f89ec2babf" title="Open deep-dive profile">↗ Profile</a>`;
+                const profileLink = `<a href="/threat-intel/actors/${encodeURIComponent(a.id)}?entity_class=${klass}" class="ti-btn-outline ti-btn-sm ml-1.5" title="Open deep-dive profile">↗ Profile</a>`;
                 html += `<tr>
                     <td class="ti-name-cell" data-click-action="toggleActorDetail" data-args='[${idx}]'>${esc(a.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="_ion-s-5872de20d5">-</span>'}</td>
+                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="text-[var(--text-muted)]">-</span>'}</td>
                     <td>${esc(types)}</td>
-                    <td>${esc(aliases)}${moreAliases ? `<span class="_ion-s-ce14cb276b">${moreAliases}</span>` : ''}</td>
+                    <td>${esc(aliases)}${moreAliases ? `<span class="text-[var(--text-secondary)]">${moreAliases}</span>` : ''}</td>
                     <td><span class="ti-confidence ${confCls}">${conf}</span></td>
                     <td>${formatDate(a.first_seen)}</td>
                     <td>${formatDate(a.last_seen)}</td>
@@ -1285,7 +1285,7 @@ data-click-action="tiCloseReport"></div>
                 html += '</div></div>';
             }
             if (!detail.description && !(detail.campaigns||[]).length && !(detail.ttps||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty _ion-s-59bdf7cb33">No additional detail available.</div>';
+                html += '<div class="ti-empty p-2.5">No additional detail available.</div>';
             }
             html += '</td>';
             row.innerHTML = html;
@@ -1395,7 +1395,7 @@ data-click-action="tiCloseReport"></div>
                 html += '</div></div>';
             }
             if (!detail.description && !(detail.threat_actors||[]).length && !(detail.indicators||[]).length) {
-                html += '<div class="ti-empty _ion-s-59bdf7cb33">No additional detail available.</div>';
+                html += '<div class="ti-empty p-2.5">No additional detail available.</div>';
             }
             html += '</td>';
             row.innerHTML = html;
@@ -1449,8 +1449,8 @@ data-click-action="tiCloseReport"></div>
                 const flag = w.country_flag || '';
                 const countryName = w.country_name || '';
                 return `<tr>
-                    <td class="_ion-s-eed0f8fb89">${esc(w.name)}</td>
-                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="_ion-s-5872de20d5">-</span>'}</td>
+                    <td class="font-semibold">${esc(w.name)}</td>
+                    <td>${flag ? `<span class="country-flag" title="${esc(countryName)}">${flag}</span> ${esc(countryName)}` : '<span class="text-[var(--text-muted)]">-</span>'}</td>
                     <td>${esc(type)}</td>
                     <td>${w.match_count}</td>
                     <td>${esc(lastSeen)}</td>
@@ -1478,13 +1478,13 @@ data-click-action="tiCloseReport"></div>
                 const d = m.details || {};
                 const cls = m.is_read ? '' : ' class="ti-unread"';
                 const time = m.created_at ? new Date(m.created_at).toLocaleString() : '-';
-                const readBtn = m.is_read ? '<span class="_ion-s-362a950cb6">Read</span>' :
+                const readBtn = m.is_read ? '<span class="text-[var(--text-secondary)] text-xs">Read</span>' :
                     `<button class="ti-btn-outline ti-btn-sm" data-click-action="markRead" data-args='[${m.id}]'>Mark Read</button>`;
                 return `<tr${cls}>
                     <td>${esc(time)}</td>
                     <td><code>${esc(m.observable_value || '-')}</code></td>
                     <td>${esc(d.watch_name || '-')}</td>
-                    <td>${m.is_read ? 'Read' : '<strong class="_ion-s-a805525bfd">Unread</strong>'}</td>
+                    <td>${m.is_read ? 'Read' : '<strong class="text-[var(--accent)]">Unread</strong>'}</td>
                     <td>${readBtn}</td>
                 </tr>`;
             }).join('');

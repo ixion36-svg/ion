@@ -1875,7 +1875,7 @@ async function loadServerLogsMetrics() {
                     <div class="server-logs-stat-label">Errors</div>
                 </div>
             </div>
-            <div class="_ion-s-dab43fb936">
+            <div class="mt-4">
                 <div class="metric-row">
                     <span class="metric-label">HTTP 2xx/3xx</span>
                     <span class="metric-value good">${successCount}</span>
@@ -1906,7 +1906,7 @@ async function loadWebhooks() {
         const webhooks = await ionFetchJson('/api/integrations/webhooks', 'webhooks');
 
         if (webhooks.length === 0) {
-            container.innerHTML = '<p class="loading _ion-s-ef7142f76c">No webhooks configured</p>';
+            container.innerHTML = '<p class="loading p-4">No webhooks configured</p>';
             return;
         }
 
@@ -2597,22 +2597,22 @@ function renderDetailCards() {
             metricsHtml += `
                 <div class="topo-metric">
                     <div class="topo-metric-label">Model</div>
-                    <div class="topo-metric-value _ion-s-a5982facce">${escapeHtml(d.model)}</div>
+                    <div class="topo-metric-value text-xs">${escapeHtml(d.model)}</div>
                 </div>`;
         }
         if (d.url) {
             const shortUrl = d.url.replace(/^https?:\/\//, '').replace(/\/$/, '');
             metricsHtml += `
-                <div class="topo-metric _ion-s-90e9d2a572">
+                <div class="topo-metric col-span-full">
                     <div class="topo-metric-label">Endpoint</div>
-                    <div class="topo-metric-value _ion-s-a5982facce">${escapeHtml(shortUrl)}</div>
+                    <div class="topo-metric-value text-xs">${escapeHtml(shortUrl)}</div>
                 </div>`;
         }
         if (d.error) {
             metricsHtml += `
-                <div class="topo-metric _ion-s-90e9d2a572">
+                <div class="topo-metric col-span-full">
                     <div class="topo-metric-label">Error</div>
-                    <div class="topo-metric-value _ion-s-d873f81784">${escapeHtml(String(d.error))}</div>
+                    <div class="topo-metric-value text-[#ef4444] text-xs">${escapeHtml(String(d.error))}</div>
                 </div>`;
         }
 
@@ -2624,8 +2624,8 @@ function renderDetailCards() {
                         <div class="topo-detail-title">${svc.name}</div>
                         <div class="topo-detail-status">
                             <span class="status-text ${h.status}">${statusLabel[h.status] || h.status}</span>
-                            <span class="_ion-s-0e42856cf0">·</span>
-                            <span class="_ion-s-2243767b95">${svc.description}</span>
+                            <span class="text-[var(--text-secondary)]">·</span>
+                            <span class="text-[var(--text-secondary)] text-[.72rem]">${svc.description}</span>
                         </div>
                     </div>
                 </div>
@@ -2828,7 +2828,7 @@ function createFlowSlide() {
         } else {
             el.innerHTML = `
                 <div class="flow-stage-card" data-ion-style="border-color:${stage.color}33">
-                    <div class="_ion-s-7f433a77d0" data-ion-style="background:${stage.color}"></div>
+                    <div class="absolute top-0 left-0 right-0 h-[3px] rounded-[10px_10px_0_0]" data-ion-style="background:${stage.color}"></div>
                     <div class="flow-stage-icon" data-ion-style="background:${stage.color}22; color:${stage.color}">
                         <i class="${stage.icon}"></i>
                     </div>
