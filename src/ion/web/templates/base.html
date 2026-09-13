@@ -15,6 +15,12 @@
     <link rel="stylesheet" href="/static/css/ai-chat.css?v={{ ion_version }}">
     <link rel="stylesheet" href="/static/css/quill.snow.css">
     <link rel="stylesheet" href="/static/css/tailwind.css?v={{ ion_version }}">
+    {# UI rewrite stylesheet: Tailwind v4 + daisyUI + the ION theme.
+       Loaded AFTER tailwind.css and additively — unmigrated pages keep every
+       sheet they had. Loading it later also means those pages inherit the
+       light-mode --color-ion-* contrast fix for free. See
+       frontend/tailwind-daisy.input.css. #}
+    <link rel="stylesheet" href="/static/css/ion.css?v={{ ion_version }}">
     <!-- previously-inline `style="..."` attributes migrated to hashed
          CSS classes by tools/migrate_inline_styles.py. Loading this file
          here means the styles apply before paint (no FOUC). Same-origin so
