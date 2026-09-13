@@ -34,10 +34,15 @@ from pathlib import Path
 import pytest
 
 ALERTS = Path("src/ion/web/templates/alerts.html")
-MIGRATED = Path("src/ion/web/static/css/ion-migrated-styles.css")
+BUILT = Path("src/ion/web/static/css/ion.css")
 
 DRAWER_ID = "analytics-dashboard"
-HIDING_CLASS = "_ion-s-c8be1ccba6"
+# Was `_ion-s-c8be1ccba6` from the v0.31.21 inline-style migration. Pass 2 of
+# the UI rewrite converted that hashed class to Tailwind's `hidden`, which is
+# also `display:none` from a CLASS -- so the bug this file documents is
+# unchanged and the reasoning below still holds. Only the name moved, and with
+# it the sheet that defines it: ion.css rather than ion-migrated-styles.css.
+HIDING_CLASS = "hidden"
 
 
 def _strip(src: str) -> str:
@@ -55,9 +60,15 @@ def test_the_drawer_is_still_hidden_by_a_class_not_an_inline_style(page):
     """The whole bug rests on this. If the hiding ever moves to an inline
     style the reasoning changes, and this test should be revisited rather than
     silently kept passing."""
-    assert HIDING_CLASS in page, "drawer no longer carries the hashed hiding class"
-    css = MIGRATED.read_text(encoding="utf-8")
-    rule = re.search(re.escape(HIDING_CLASS) + r"\s*\{[^}]*\}", css)
+    drawer = re.search(r'<div[^>]*id="' + DRAWER_ID + r'"[^>]*>', page)
+    assert drawer, f"#{DRAWER_ID} is gone"
+    assert HIDING_CLASS in (re.search(r'class="([^"]*)"', drawer.group(0))
+                            or re.match("", "")).group(1).split(), (
+        f"the drawer no longer carries the {HIDING_CLASS} class; if the hiding "
+        "moved to an inline style, this file's reasoning must be revisited"
+    )
+    css = BUILT.read_text(encoding="utf-8")
+    rule = re.search(r"\." + re.escape(HIDING_CLASS) + r"\s*\{[^}]*\}", css)
     assert rule and "display:none" in rule.group(0).replace(" ", ""), (
         "the hiding class no longer sets display:none"
     )

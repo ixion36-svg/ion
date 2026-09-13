@@ -59,16 +59,29 @@ def test_no_template_literals_survive_in_the_stylesheet():
 
 def test_static_declarations_were_preserved_not_deleted():
     """Rules that mixed static and dynamic declarations had to keep the static
-    part — those DO apply today, and dropping them would be a visual regression."""
-    css = CSS.read_text(encoding="utf-8")
-    # a known mixed rule: the alerts outcome badge kept padding/border/font
-    assert "_ion-s-e78d4016b2" in css
-    m = re.search(r"\._ion-s-e78d4016b2\s*\{([^}]*)\}", css)
-    assert m, "the mixed rule should still exist for its static declarations"
-    body = m.group(1)
-    for prop in ("padding", "border-radius", "font-size", "font-weight"):
-        assert prop in body, f"static {prop} was lost in the sweep"
-    assert "${" not in body
+    part — those DO apply today, and dropping them would be a visual regression.
+
+    The example this used to check, `_ion-s-e78d4016b2` on the alerts outcome
+    badge, no longer exists as a rule. Pass 2 of the UI rewrite converted it to
+    `py-0.5 px-1.5 rounded-[3px] text-[0.625rem] font-semibold uppercase` and the
+    now-dead rule was removed, so asserting the rule is still in the sheet would
+    only assert that the rewrite had not happened.
+
+    The invariant it was defending is unchanged and worth keeping: the static
+    declarations must still reach the element. So this now checks the badge
+    carries utilities for the same four properties, wherever they come from.
+    """
+    alerts = Path("src/ion/web/templates/alerts.html").read_text(encoding="utf-8")
+    assert "_ion-s-e78d4016b2" not in alerts, (
+        "the hashed class is back; either pass 2 was reverted or a new inline "
+        "style was migrated into it — check which before touching this test"
+    )
+    # padding, border-radius, font-size and font-weight, as utilities.
+    for pattern, prop in ((r"\bp[xy]?-[\d.]+", "padding"),
+                          (r"\brounded(-\[[^\]]+\]|-\w+)?\b", "border-radius"),
+                          (r"\btext-(\[[^\]]+\]|xs|sm|base|lg)\b", "font-size"),
+                          (r"\bfont-(semibold|bold|medium|normal)\b", "font-weight")):
+        assert re.search(pattern, alerts), f"no utility carries static {prop}"
 
 
 # ── the runtime applier ──────────────────────────────────────────────────
