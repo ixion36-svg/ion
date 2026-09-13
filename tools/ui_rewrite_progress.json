@@ -257,6 +257,9 @@
     "convert": true,
     "restyle": true
   },
+  "observables.html": {
+    "restyle": true
+  },
   "pcap.html": {
     "restyle": true
   },

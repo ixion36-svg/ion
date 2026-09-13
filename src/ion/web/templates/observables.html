@@ -63,9 +63,9 @@
   </div>
 
 <!-- Filters -->
-<div class="observables-filters">
-    <input type="text" id="search-input" class="search-input" placeholder="Search observables..." data-input-action="debouncedSearch">
-    <select id="type-filter" data-change-action="applyFilters">
+<div class="flex flex-wrap items-center gap-3 mb-6">
+    <input type="text" id="search-input" class="ion-input flex-1 min-w-[250px]" placeholder="Search observables..." data-input-action="debouncedSearch">
+    <select id="type-filter" class="py-2 px-3 rounded-lg border border-base-300 text-sm" data-change-action="applyFilters">
         <option value="">All Types</option>
         <option value="ipv4">IPv4</option>
         <option value="ipv6">IPv6</option>
@@ -81,7 +81,7 @@
         <option value="mac">MAC Address</option>
         <option value="cve">CVE</option>
     </select>
-    <select id="threat-filter" data-change-action="applyFilters">
+    <select id="threat-filter" class="py-2 px-3 rounded-lg border border-base-300 text-sm" data-change-action="applyFilters">
         <option value="">All Threat Levels</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -90,17 +90,17 @@
         <option value="benign">Benign</option>
         <option value="unknown">Unknown</option>
     </select>
-    <select id="whitelist-filter" data-change-action="applyFilters">
+    <select id="whitelist-filter" class="py-2 px-3 rounded-lg border border-base-300 text-sm" data-change-action="applyFilters">
         <option value="">All</option>
         <option value="true">Whitelisted</option>
         <option value="false">Not Whitelisted</option>
     </select>
-    <select id="enriched-filter" data-change-action="applyFilters">
+    <select id="enriched-filter" class="py-2 px-3 rounded-lg border border-base-300 text-sm" data-change-action="applyFilters">
         <option value="">All</option>
         <option value="true">Enriched Only</option>
         <option value="false">Not Enriched</option>
     </select>
-    <select id="ignored-filter" data-change-action="applyFilters" title="Analyst-ignored observables are hidden by default">
+    <select id="ignored-filter" class="py-2 px-3 rounded-lg border border-base-300 text-sm" data-change-action="applyFilters" title="Analyst-ignored observables are hidden by default">
         <option value="">Hide ignored</option>
         <option value="include">Include ignored</option>
         <option value="only">Only ignored</option>
@@ -156,21 +156,21 @@
             <button class="modal-close" data-click-action="closeGraphModal">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="graph-controls">
-                <label>Min Co-occurrence: <input type="number" id="graph-min-cooccur" value="2" min="1" max="50" data-change-action="loadGraph"></label>
-                <label>Max Nodes: <input type="number" id="graph-max-nodes" value="50" min="10" max="200" data-change-action="loadGraph"></label>
+            <div class="flex flex-wrap items-center gap-4 mb-3">
+                <label class="flex items-center gap-2 text-[13px]">Min Co-occurrence: <input type="number" id="graph-min-cooccur" value="2" min="1" max="50" class="w-[60px] px-2 py-1 rounded border border-base-300 bg-base-200 text-base-content text-sm" data-change-action="loadGraph"></label>
+                <label class="flex items-center gap-2 text-[13px]">Max Nodes: <input type="number" id="graph-max-nodes" value="50" min="10" max="200" class="w-[60px] px-2 py-1 rounded border border-base-300 bg-base-200 text-base-content text-sm" data-change-action="loadGraph"></label>
                 <button class="ion-btn" data-click-action="loadGraph">Refresh</button>
                 <button class="ion-btn" data-click-action="resetGraphView">Reset View</button>
             </div>
-            <div class="graph-legend">
-                <span class="legend-item"><span class="legend-dot _ion-s-868f8b60c1"></span> IP</span>
-                <span class="legend-item"><span class="legend-dot _ion-s-350816fec6"></span> Domain</span>
-                <span class="legend-item"><span class="legend-dot _ion-s-c0414be229"></span> Hostname</span>
-                <span class="legend-item"><span class="legend-dot _ion-s-6e6abd54ea"></span> URL</span>
-                <span class="legend-item"><span class="legend-dot _ion-s-a9d427a1d6"></span> Email</span>
-                <span class="legend-item"><span class="legend-dot _ion-s-84b70af496"></span> User</span>
+            <div class="flex flex-wrap gap-4 mb-3 text-xs">
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-868f8b60c1"></span> IP</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-350816fec6"></span> Domain</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-c0414be229"></span> Hostname</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-6e6abd54ea"></span> URL</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-a9d427a1d6"></span> Email</span>
+                <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full _ion-s-84b70af496"></span> User</span>
             </div>
-            <div id="graph-container" class="graph-container">
+            <div id="graph-container" class="flex-1 border border-base-300 rounded-[14px] bg-base-200 min-h-[400px] shadow-[0_2px_8px_rgba(0,0,0,.15)]">
                 <div class="loading">Loading graph...</div>
             </div>
         </div>
@@ -185,12 +185,12 @@
             <button class="modal-close" data-click-action="closePatternsModal">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="patterns-controls">
-                <label>Min Occurrences: <input type="number" id="pattern-min-occur" value="3" min="2" max="50" data-change-action="loadPatterns"></label>
+            <div class="flex flex-wrap items-center gap-4 mb-3">
+                <label class="flex items-center gap-2 text-[13px]">Min Occurrences: <input type="number" id="pattern-min-occur" value="3" min="2" max="50" class="w-[60px] px-2 py-1 rounded border border-base-300 bg-base-200 text-base-content text-sm" data-change-action="loadPatterns"></label>
                 <button class="ion-btn" data-click-action="loadPatterns">Refresh</button>
             </div>
-            <p class="patterns-desc">Patterns are groups of observables that frequently appear together in alerts.</p>
-            <div id="patterns-list" class="patterns-list">
+            <p class="text-[13px] text-base-content/60 mb-4">Patterns are groups of observables that frequently appear together in alerts.</p>
+            <div id="patterns-list" class="max-h-[60vh] overflow-y-auto">
                 <div class="loading">Analyzing patterns...</div>
             </div>
         </div>
@@ -227,18 +227,18 @@
             <button class="modal-close" data-click-action="closeImportModal">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="import-tabs">
+            <div class="flex gap-2 mb-4 border-b border-base-300 pb-2">
                 <button class="import-tab active" data-click-action="switchImportTab" data-args='["csv"]'>CSV Import</button>
                 <button class="import-tab" data-click-action="switchImportTab" data-args='["stix"]'>STIX Import</button>
             </div>
 
             <div id="csv-import-tab" class="import-tab-content">
                 <p>Import observables from CSV. Expected format:</p>
-                <pre class="import-example">type,value,tags,notes
+                <pre class="bg-base-200 p-3 rounded text-[0.85rem] overflow-x-auto mb-4">type,value,tags,notes
 ipv4,192.168.1.1,"malware,apt","Suspicious IP"
 domain,evil.com,,
 sha256,abc123...,c2,</pre>
-                <div class="form-group">
+                <div class="mb-4">
                     <label>Default Type (if not in CSV):</label>
                     <select id="import-default-type" class="ion-select">
                         <option value="">-- Select --</option>
@@ -253,26 +253,26 @@ sha256,abc123...,c2,</pre>
                         <option value="user_account">User Account</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="mb-4">
                     <label>CSV Data:</label>
                     <textarea id="import-csv-data" rows="10" placeholder="Paste CSV data here..."></textarea>
                 </div>
-                <div class="form-group">
+                <div class="mb-4">
                     <label>Additional Tags (comma-separated):</label>
                     <input type="text" id="import-tags" class="ion-input" placeholder="e.g., imported, threat-intel">
                 </div>
-                <div class="form-group">
-                    <label><input type="checkbox" id="import-auto-enrich"> Auto-enrich imported observables</label>
+                <div class="mb-4">
+                    <label class="flex items-center gap-2"><input type="checkbox" id="import-auto-enrich" class="checkbox checkbox-sm"> Auto-enrich imported observables</label>
                 </div>
             </div>
 
             <div id="stix-import-tab" class="import-tab-content _ion-s-6b99de8b69">
                 <p>Import from STIX 2.1 bundle JSON:</p>
-                <div class="form-group">
+                <div class="mb-4">
                     <label>STIX Bundle JSON:</label>
                     <textarea id="import-stix-data" rows="15" placeholder='{"type": "bundle", "objects": [...]}'></textarea>
                 </div>
-                <div class="form-group">
+                <div class="mb-4">
                     <label>Additional Tags (comma-separated):</label>
                     <input type="text" id="import-stix-tags" class="ion-input" placeholder="e.g., stix-import, threat-intel">
                 </div>
@@ -327,15 +327,15 @@ sha256,abc123...,c2,</pre>
             <button class="modal-close" data-click-action="closeWatchlistAlertsModal">&times;</button>
         </div>
         <div class="modal-body">
-            <div class="watchlist-alerts-filter">
-                <select id="watchlist-alerts-filter" data-change-action="loadWatchlistAlerts">
+            <div class="flex flex-wrap gap-4 mb-4">
+                <select id="watchlist-alerts-filter" class="py-2 px-3 rounded-lg border border-base-300 text-sm" data-change-action="loadWatchlistAlerts">
                     <option value="">All Alerts</option>
                     <option value="false">Unread Only</option>
                     <option value="true">Read Only</option>
                 </select>
                 <button class="ion-btn" data-click-action="markAllAlertsRead">Mark All Read</button>
             </div>
-            <div id="watchlist-alerts-list" class="watchlist-alerts-list">
+            <div id="watchlist-alerts-list" class="max-h-[60vh] overflow-y-auto">
                 <div class="loading">Loading alerts...</div>
             </div>
         </div>
@@ -351,8 +351,8 @@ sha256,abc123...,c2,</pre>
         </div>
         <div class="modal-body">
             <div id="timeline-observable-info"></div>
-            <div id="timeline-heatmap" class="timeline-heatmap"></div>
-            <div id="timeline-events" class="timeline-events">
+            <div id="timeline-heatmap" class="flex flex-wrap gap-[3px] mb-6 p-4 bg-base-200 rounded-[14px]"></div>
+            <div id="timeline-events" class="max-h-[50vh] overflow-y-auto">
                 <div class="loading">Loading timeline...</div>
             </div>
         </div>
