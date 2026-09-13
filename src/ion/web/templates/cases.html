@@ -8,7 +8,7 @@
 
   <!-- Header row -->
   <section class="ion-page-header flex-wrap gap-6 mb-8 rise d-1">
-    <div class="flex-1 min-w-0">
+    <div class="basis-full md:basis-auto md:flex-1 min-w-0">
       <div class="flex items-center gap-3 mb-4">
         <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
         <span class="label-tiny text-ion-cyan">Investigation workflow</span>
@@ -73,9 +73,9 @@
   </div>
 
 <!-- Filters Bar -->
-<div class="cases-filters-bar">
-    <input type="text" id="filter-search" class="cases-filter-input" placeholder="Search case number or title..." data-input-action="debouncedFilter">
-    <select id="filter-severity" class="cases-filter-select" data-change-action="filterCases">
+<div class="flex flex-col sm:flex-row gap-3 mb-4">
+    <input type="text" id="filter-search" class="flex-1 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content placeholder:text-base-content/50 focus:outline-none focus:border-primary" placeholder="Search case number or title..." data-input-action="debouncedFilter">
+    <select id="filter-severity" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="filterCases">
         <option value="">All Severities</option>
         <option value="critical">Critical</option>
         <option value="high">High</option>
@@ -85,33 +85,33 @@
     {# status filter. /api/cases already returns open, acknowledged
        AND closed — the board just had no way to narrow to one of them, so a
        closed case could only be found by scrolling past the live ones. #}
-    <select id="filter-status" class="cases-filter-select" data-change-action="filterCases">
+    <select id="filter-status" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="filterCases">
         <option value="">All Statuses</option>
         <option value="open">Open</option>
         <option value="acknowledged">Acknowledged</option>
         <option value="closed">Closed</option>
     </select>
-    <select id="filter-assignee" class="cases-filter-select" data-change-action="filterCases">
+    <select id="filter-assignee" class="min-w-[150px] px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="filterCases">
         <option value="">All Assignees</option>
     </select>
 </div>
 
 <!-- Board toolbar (sort + page-size + showing count) -->
-<div class="cases-board-toolbar">
-    <div class="cases-showing">Showing <b id="cases-shown">0</b> of <b id="cases-total">0</b> cases</div>
-    <span class="cases-toolbar-spring"></span>
-    <label class="cases-toolbar-field">
+<div class="flex flex-wrap items-center gap-3 mb-4">
+    <div class="text-xs text-base-content/60 tabular-nums">Showing <b id="cases-shown" class="text-base-content font-mono">0</b> of <b id="cases-total" class="text-base-content font-mono">0</b> cases</div>
+    <span class="flex-1"></span>
+    <label class="flex items-center gap-2 text-xs text-base-content/60">
         <span>Sort</span>
-        <select id="cases-sort" class="cases-filter-select" data-change-action="changeSort">
+        <select id="cases-sort" class="min-w-0 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="changeSort">
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="severity">Severity</option>
             <option value="alerts">Most alerts</option>
         </select>
     </label>
-    <label class="cases-toolbar-field">
+    <label class="flex items-center gap-2 text-xs text-base-content/60">
         <span>Page size</span>
-        <select id="cases-pagesize" class="cases-filter-select" data-change-action="changePageSize">
+        <select id="cases-pagesize" class="min-w-0 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content focus:outline-none focus:border-primary" data-change-action="changePageSize">
             <option value="12">12 at a time</option>
             <option value="24" selected>24 at a time</option>
             <option value="48">48 at a time</option>
@@ -121,12 +121,12 @@
 
 <!-- Case widget board (replaces the drag-drop Kanban; status changes now on
      each widget's inline control — same PATCH path the Kanban drop used). -->
-<div class="cases-board" id="cases-board"></div>
+<div class="grid grid-cols-[repeat(auto-fill,minmax(380px,1fr))] max-[640px]:grid-cols-1 gap-4 items-start" id="cases-board"></div>
 
 <!-- Load-more cap -->
-<div class="cases-loadmore" id="cases-loadmore" hidden>
-    <button type="button" class="cases-loadmore-btn" data-click-action="loadMoreCases">Load more cases</button>
-    <p class="cases-loadmore-note">Widgets render in pages of your chosen size, so a queue of hundreds of
+<div class="flex flex-col items-center gap-2.5 mt-[26px]" id="cases-loadmore" hidden>
+    <button type="button" class="font-semibold text-[13px] text-primary bg-primary/[0.12] border border-primary/40 rounded-[10px] px-[22px] py-[11px] cursor-pointer transition hover:bg-primary/20" data-click-action="loadMoreCases">Load more cases</button>
+    <p class="text-[11.5px] text-base-content/50 text-center max-w-[56ch] m-0">Widgets render in pages of your chosen size, so a queue of hundreds of
         cases opens instantly. The rest stay ready until requested.</p>
 </div>
 
@@ -137,33 +137,33 @@
 </div>
 <div class="analytics-panel" id="analytics-panel-body">
     <!-- Summary Strip -->
-    <div class="analytics-summary-strip" id="analytics-summary-strip"></div>
-    <div class="analytics-row-donuts">
-        <div class="analytics-card analytics-card-accent-danger">
-            <h4>Severity Distribution</h4>
+    <div class="grid grid-cols-4 max-[1100px]:grid-cols-2 max-[900px]:grid-cols-1 gap-3 mb-4" id="analytics-summary-strip"></div>
+    <div class="grid grid-cols-3 max-[1100px]:grid-cols-2 max-[900px]:grid-cols-1 gap-4 mb-4">
+        <div class="bg-base-100 border border-base-300 border-t-2 border-t-error rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Severity Distribution</h4>
             <div id="analytics-severity-donut" class="donut-container"></div>
         </div>
-        <div class="analytics-card analytics-card-accent-purple">
-            <h4>Closure Reasons</h4>
+        <div class="bg-base-100 border border-base-300 border-t-2 border-t-secondary rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Closure Reasons</h4>
             <div id="analytics-closure-donut" class="donut-container"></div>
         </div>
-        <div class="analytics-card analytics-card-accent-info">
-            <h4>Status Breakdown</h4>
+        <div class="bg-base-100 border border-base-300 border-t-2 border-t-info rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Status Breakdown</h4>
             <div id="analytics-status-donut" class="donut-container"></div>
         </div>
     </div>
-    <div class="analytics-grid">
-        <div class="analytics-card analytics-card-accent-blue">
-            <h4>Analyst Workload</h4>
+    <div class="grid grid-cols-2 max-[900px]:grid-cols-1 gap-4 mb-4">
+        <div class="bg-base-100 border border-base-300 border-t-2 border-t-primary rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Analyst Workload</h4>
             <div id="analytics-workload"></div>
         </div>
-        <div class="analytics-card analytics-card-accent-warning">
-            <h4>SLA / Case Age</h4>
+        <div class="bg-base-100 border border-base-300 border-t-2 border-t-warning rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
+            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">SLA / Case Age</h4>
             <div id="analytics-sla"></div>
         </div>
     </div>
-    <div class="analytics-card-full">
-        <h4>Recent Closures</h4>
+    <div class="bg-base-100 border border-base-300 rounded-lg p-4">
+        <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Recent Closures</h4>
         <div id="analytics-recent"></div>
     </div>
 </div>
@@ -185,23 +185,23 @@
 
 <!-- Create Case Modal -->
 <div class="cases-modal-overlay _ion-s-c8be1ccba6" id="create-case-overlay" data-click-action="closeCreateCaseModal" data-only-self-click>
-    <div class="cases-modal">
-        <div class="cases-modal-header">
-            <h3>Create New Case</h3>
-            <button class="cases-modal-close" data-click-action="closeCreateCaseModal">&times;</button>
+    <div class="bg-base-200 border border-base-300 rounded-lg w-[90%] max-w-[480px] max-h-[80vh] overflow-auto shadow-[0_2px_8px_rgba(0,0,0,.15)]">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300">
+            <h3 class="m-0 text-[1.05rem]">Create New Case</h3>
+            <button class="bg-transparent border-0 text-[1.5rem] leading-none text-base-content/60 hover:text-base-content cursor-pointer" data-click-action="closeCreateCaseModal">&times;</button>
         </div>
-        <div class="cases-modal-body">
-            <div class="form-group">
-                <label>Title *</label>
+        <div class="p-5">
+            <div class="mb-3">
+                <label class="block text-[0.85rem] font-medium text-base-content mb-1">Title *</label>
                 <input type="text" id="new-case-title" class="form-control" placeholder="Case title...">
             </div>
-            <div class="form-group">
-                <label>Description</label>
-                <textarea id="new-case-description" class="form-control" rows="3" placeholder="Describe the investigation..."></textarea>
+            <div class="mb-3">
+                <label class="block text-[0.85rem] font-medium text-base-content mb-1">Description</label>
+                <textarea id="new-case-description" class="form-control resize-y" rows="3" placeholder="Describe the investigation..."></textarea>
             </div>
-            <div class="form-row">
-                <div class="form-group _ion-s-7623f05545">
-                    <label>Severity</label>
+            <div class="flex gap-3">
+                <div class="mb-3 _ion-s-7623f05545">
+                    <label class="block text-[0.85rem] font-medium text-base-content mb-1">Severity</label>
                     <select id="new-case-severity" class="form-control">
                         <option value="medium">Medium</option>
                         <option value="low">Low</option>
@@ -209,15 +209,15 @@
                         <option value="critical">Critical</option>
                     </select>
                 </div>
-                <div class="form-group _ion-s-7623f05545">
-                    <label>Assign To</label>
+                <div class="mb-3 _ion-s-7623f05545">
+                    <label class="block text-[0.85rem] font-medium text-base-content mb-1">Assign To</label>
                     <select id="new-case-assignee" class="form-control">
                         <option value="">Unassigned</option>
                     </select>
                 </div>
             </div>
         </div>
-        <div class="cases-modal-footer">
+        <div class="flex justify-end gap-2 px-5 py-3 border-t border-base-300">
             <button class="btn" data-click-action="closeCreateCaseModal">Cancel</button>
             <button class="btn btn-primary" data-click-action="submitCreateCase">Create Case</button>
         </div>
@@ -226,14 +226,14 @@
 
 <!-- Closure Modal -->
 <div class="cases-modal-overlay _ion-s-c8be1ccba6" id="closure-modal-overlay" data-click-action="cancelClosure" data-only-self-click>
-    <div class="cases-modal">
-        <div class="cases-modal-header">
-            <h3 id="closure-modal-title">Close Case</h3>
-            <button class="cases-modal-close" data-click-action="cancelClosure">&times;</button>
+    <div class="bg-base-200 border border-base-300 rounded-lg w-[90%] max-w-[480px] max-h-[80vh] overflow-auto shadow-[0_2px_8px_rgba(0,0,0,.15)]">
+        <div class="flex justify-between items-center px-5 py-4 border-b border-base-300">
+            <h3 id="closure-modal-title" class="m-0 text-[1.05rem]">Close Case</h3>
+            <button class="bg-transparent border-0 text-[1.5rem] leading-none text-base-content/60 hover:text-base-content cursor-pointer" data-click-action="cancelClosure">&times;</button>
         </div>
-        <div class="cases-modal-body">
-            <div class="form-group">
-                <label>Closure Reason *</label>
+        <div class="p-5">
+            <div class="mb-3">
+                <label class="block text-[0.85rem] font-medium text-base-content mb-1">Closure Reason *</label>
                 <select id="closure-reason" class="form-control">
                     <option value="">Select reason...</option>
                     <option value="true_positive">True Positive</option>
@@ -244,19 +244,19 @@
                     <option value="not_applicable">Not Applicable</option>
                 </select>
             </div>
-            <div class="form-group">
-                <div class="closure-notes-label-row">
-                    <label>Closure Notes</label>
-                    <button type="button" class="closure-ai-btn" id="closure-ai-rewrite"
+            <div class="mb-3">
+                <div class="flex items-center justify-between gap-2">
+                    <label class="block text-[0.85rem] font-medium text-base-content mb-1">Closure Notes</label>
+                    <button type="button" class="inline-flex items-center gap-[0.3rem] bg-transparent border border-primary text-primary rounded-[6px] text-[0.72rem] px-2 py-[0.15rem] cursor-pointer transition hover:bg-primary/10 disabled:opacity-55 disabled:cursor-progress" id="closure-ai-rewrite"
                             data-click-action="rewriteClosureNotes"
                             title="Use AI to tighten your closing comment into a clear, defensible rationale">
-                        <i class="icon-sparkles"></i> AI rewrite
+                        <i class="icon-sparkles text-[0.8rem]"></i> AI rewrite
                     </button>
                 </div>
-                <textarea id="closure-notes" class="form-control" rows="3" placeholder="Closure details..."></textarea>
+                <textarea id="closure-notes" class="form-control resize-y" rows="3" placeholder="Closure details..."></textarea>
             </div>
         </div>
-        <div class="cases-modal-footer">
+        <div class="flex justify-end gap-2 px-5 py-3 border-t border-base-300">
             <button class="btn" data-click-action="cancelClosure">Cancel</button>
             <button class="btn btn-primary" data-click-action="confirmClosure">Confirm</button>
         </div>
