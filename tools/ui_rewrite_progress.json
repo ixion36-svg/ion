@@ -335,6 +335,9 @@
   "tools.html": {
     "restyle": true
   },
+  "training.html": {
+    "restyle": true
+  },
   "users.html": {
     "convert": true,
     "restyle": true
