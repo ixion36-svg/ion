@@ -1,0 +1,100 @@
+/*
+ * ION theme for daisyUI 5 — maps daisyUI's semantic slots onto ION's own
+ * design tokens, so `btn-primary` renders ION cyan rather than daisyUI violet.
+ *
+ * WHY THIS FILE EXISTS RATHER THAN `@plugin "daisyui/theme"`:
+ * ION has no Node toolchain. Tailwind is built by the standalone
+ * `frontend/tailwindcss.exe`, which cannot resolve npm plugins. daisyUI's dist
+ * CSS is therefore pulled in with a plain `@import`, and its themes are plain
+ * CSS custom properties — so a theme is just an override of those properties.
+ *
+ * WHY UNLAYERED: daisyUI declares its themes inside `@layer base`. In the CSS
+ * cascade any unlayered declaration beats any layered one regardless of
+ * specificity, so this bare `:root` block wins without needing `!important` or
+ * a specificity war. This is the same cascade property the main
+ * tailwind.input.css already relies on for utilities vs style.css's reset.
+ *
+ * Source of truth for the hex values is the `@theme` block in
+ * tailwind.input.css. Keep the two in step: if a token changes there, change it
+ * here. They are duplicated deliberately — `@theme` feeds Tailwind's utility
+ * generation, this feeds daisyUI's components, and the two systems read
+ * different variable names.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces — ION is dark-first. base-100 is the page, 200/300 step up. */
+  --color-base-100: #0a0c12;  /* ink-900 */
+  --color-base-200: #11141c;  /* ink-800 */
+  --color-base-300: #171b24;  /* ink-700 */
+  --color-base-content: #e6e9ef;
+
+  /* Brand. Every ION accent is a light colour, so its content pair is ink. */
+  --color-primary: #6de4ff;   /* ion-cyan */
+  --color-primary-content: #07080c;
+  --color-secondary: #9a8cff; /* ion-iris */
+  --color-secondary-content: #07080c;
+  --color-accent: #f8b33a;    /* ion-amber */
+  --color-accent-content: #07080c;
+
+  --color-neutral: #1e232e;   /* ink-600 */
+  --color-neutral-content: #e6e9ef;
+
+  /* Status. Mapped to ION's severity palette so a daisyUI alert and an ION
+     severity badge cannot drift apart. */
+  --color-info: #6de4ff;      /* ion-cyan */
+  --color-info-content: #07080c;
+  --color-success: #86f0a0;   /* ion-lime */
+  --color-success-content: #07080c;
+  --color-warning: #f8b33a;   /* ion-amber */
+  --color-warning-content: #07080c;
+  --color-error: #ff6c6c;     /* ion-coral */
+  --color-error-content: #07080c;
+
+  /* Geometry and effects. Squarer and flatter than daisyUI's defaults, which
+     are rounded and glossy — ION reads as an instrument, not a consumer app. */
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+/*
+ * Light mode. ION flips on [data-mode="light"] (set by static/js/theme-init.js),
+ * NOT on daisyUI's own [data-theme] attribute, so the override is keyed to
+ * ION's existing mechanism rather than introducing a second one.
+ */
+:root[data-mode="light"] {
+  color-scheme: light;
+
+  --color-base-100: #ffffff;
+  --color-base-200: #f4f6f9;
+  --color-base-300: #e6e9ef;
+  --color-base-content: #11141c;
+
+  /* Accents darken in light mode: the dark-mode values are tuned to glow
+     against ink and would be illegible on white. */
+  --color-primary: #0b7c99;
+  --color-primary-content: #ffffff;
+  --color-secondary: #5a49d6;
+  --color-secondary-content: #ffffff;
+  --color-accent: #a56c00;
+  --color-accent-content: #ffffff;
+
+  --color-neutral: #e6e9ef;
+  --color-neutral-content: #11141c;
+
+  --color-info: #0b7c99;
+  --color-info-content: #ffffff;
+  --color-success: #1c7a3a;
+  --color-success-content: #ffffff;
+  --color-warning: #a56c00;
+  --color-warning-content: #ffffff;
+  --color-error: #c02828;
+  --color-error-content: #ffffff;
+}

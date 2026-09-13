@@ -1,0 +1,64 @@
+/*
+ * ION Tailwind + daisyUI input — the rewrite's stylesheet entry point.
+ *
+ * Build:
+ *   ./frontend/tailwindcss.exe \
+ *     -i ./frontend/tailwind-daisy.input.css \
+ *     -o ./src/ion/web/static/css/ion.css \
+ *     --minify
+ *
+ * Parallel to tailwind.input.css, which still drives the current
+ * static/css/tailwind.css. Both exist during the rewrite; tailwind.input.css
+ * retires when the last page moves over.
+ *
+ * ORDER MATTERS:
+ *   1. Tailwind theme + preflight + utilities
+ *   2. daisyUI components (plain @import — no npm plugin, see ion-daisy-theme)
+ *   3. ION's theme override, unlayered so it beats daisyUI's @layer base
+ */
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/preflight.css" layer(base);
+
+/*
+ * Utilities are imported WITHOUT a layer, deliberately. static/css/style.css
+ * carries an unlayered `* { margin:0; padding:0 }` reset, and in the CSS
+ * cascade any unlayered declaration beats any layered one regardless of
+ * specificity — so layered utilities were being nuked by that reset. Keeping
+ * utilities unlayered lets them cascade normally and win on specificity.
+ * Inherited from tailwind.input.css; the same reasoning still applies until
+ * style.css itself is retired.
+ */
+@import "tailwindcss/utilities.css";
+
+/* daisyUI 5 component layer. Vendored at frontend/daisyui.css for the
+   air-gap; no CDN reference and no Node resolution. */
+@import "./daisyui.css";
+
+/* ION's semantic mapping. Must come after daisyui.css. */
+@import "./ion-daisy-theme.css";
+
+/*
+ * Tokens for Tailwind utility generation (bg-ink-900, text-ion-cyan, ...).
+ * Kept in step with ion-daisy-theme.css by hand — see the note in that file
+ * explaining why the two are deliberately separate.
+ */
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-ink-950: #07080c;
+  --color-ink-900: #0a0c12;
+  --color-ink-850: #0d1017;
+  --color-ink-800: #11141c;
+  --color-ink-700: #171b24;
+  --color-ink-600: #1e232e;
+  --color-ink-500: #2a2f3a;
+  --color-ink-400: #3b414d;
+
+  --color-ion-cyan:  #6de4ff;
+  --color-ion-amber: #f8b33a;
+  --color-ion-coral: #ff6c6c;
+  --color-ion-lime:  #86f0a0;
+  --color-ion-iris:  #9a8cff;
+}
