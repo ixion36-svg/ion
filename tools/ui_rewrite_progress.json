@@ -55,6 +55,9 @@
   "change_requests.html": {
     "restyle": true
   },
+  "chat.html": {
+    "restyle": true
+  },
   "compliance.html": {
     "restyle": true
   },

@@ -3,13 +3,13 @@
 {% block title %}AI Assistant - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<div class="ai-chat-page">
-    <div class="ai-chat-container">
+<div class="h-[calc(100vh-100px)] -m-[10px] p-0 md:h-[calc(100vh-120px)] md:-m-5 md:p-5">
+    <div class="flex h-full bg-base-200 rounded-none md:rounded-xl overflow-hidden border border-base-300 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
         <!-- Sidebar -->
-        <div class="ai-chat-sidebar">
-            <div class="ai-sidebar-brand">
+        <div class="w-[280px] bg-base-100 border-r border-base-300 hidden md:flex md:flex-col overflow-hidden">
+            <div class="flex items-center gap-2.5 p-4 border-b border-base-300 bg-gradient-to-br from-primary/[5%] to-secondary/[5%]">
                 <div class="ai-brand-icon">
                     <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5">
                         <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
@@ -18,9 +18,9 @@
                         <path d="M9 17h6"/>
                     </svg>
                 </div>
-                <div class="ai-brand-text">
-                    <span class="ai-brand-title">ION AI</span>
-                    <span class="ai-brand-sub" id="ai-model-status-dot">
+                <div class="flex-1 min-w-0">
+                    <span class="block text-base font-bold text-base-content tracking-[0.02em]">ION AI</span>
+                    <span class="flex items-center gap-[5px] text-[0.7rem] text-base-content/50" id="ai-model-status-dot">
                         <span class="status-dot"></span>
                         <span id="ai-model-status-text">Checking...</span>
                     </span>
@@ -34,7 +34,7 @@
             </div>
 
             <!-- Mode Tabs: Chat vs Document Generator -->
-            <div class="ai-mode-tabs">
+            <div class="flex p-2 gap-1 border-b border-base-300">
                 <button class="ai-mode-tab active" data-mode="chat">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
@@ -53,9 +53,9 @@
             </div>
 
             <!-- Context Selector -->
-            <div class="ai-section" id="chat-context-section">
-                <div class="ai-section-label">Context Mode</div>
-                <div class="ai-context-grid">
+            <div class="px-4 py-3 border-b border-base-300" id="chat-context-section">
+                <div class="text-[0.7rem] font-semibold uppercase tracking-wide text-base-content/50 mb-2">Context Mode</div>
+                <div class="grid grid-cols-2 gap-1">
                     <button class="ai-ctx-btn active" data-context="security">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -87,12 +87,12 @@
             </div>
 
             <!-- Uploaded Files -->
-            <div class="ai-section" id="chat-files-section">
-                <div class="ai-section-label">Files</div>
-                <div class="ai-files-list" id="ai-files-list">
+            <div class="px-4 py-3 border-b border-base-300" id="chat-files-section">
+                <div class="text-[0.7rem] font-semibold uppercase tracking-wide text-base-content/50 mb-2">Files</div>
+                <div class="flex flex-col gap-[3px] max-h-[120px] overflow-y-auto mb-1.5" id="ai-files-list">
                     <div class="ai-files-empty">No files attached</div>
                 </div>
-                <label class="ai-upload-area">
+                <label class="flex items-center justify-center gap-[5px] p-1.5 rounded-md border border-dashed border-base-300 text-base-content/50 text-[0.78rem] cursor-pointer transition-colors hover:border-primary hover:text-primary hover:bg-primary/[3%]">
                     <input class="_ion-s-6b99de8b69" type="file" id="ai-file-input" accept=".txt,.log,.json,.yaml,.yml,.xml,.csv,.py,.js,.ts,.html,.css,.sh,.bash,.ps1,.conf,.cfg,.ini,.toml,.md,.rst,.sql,.kql,.spl,.yar,.yara,.sigma,.rule,.rules">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -104,39 +104,39 @@
             </div>
 
             <!-- AI Knowledge Sources -->
-            <div class="ai-section" id="chat-rag-section">
-                <div class="ai-section-label ai-collapsible" data-click-action="toggleSettingsPanel">
+            <div class="px-4 py-3 border-b border-base-300" id="chat-rag-section">
+                <div class="text-[0.7rem] font-semibold uppercase tracking-wide text-base-content/50 mb-2 cursor-pointer flex justify-between items-center" data-click-action="toggleSettingsPanel">
                     Knowledge Sources
                     <svg class="ai-chevron" id="ai-settings-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"></polyline>
                     </svg>
                 </div>
-                <div class="ai-settings-panel _ion-s-f2892a2e8a" id="ai-settings-panel">
-                    <label class="ai-check"><input type="checkbox" id="pref-rag-kb" data-change-action="saveAIPreferences"> Knowledge Base</label>
-                    <label class="ai-check"><input type="checkbox" id="pref-rag-notes" data-change-action="saveAIPreferences"> Analyst Notes</label>
-                    <label class="ai-check"><input type="checkbox" id="pref-rag-playbooks" data-change-action="saveAIPreferences"> Playbooks</label>
-                    <div class="ai-settings-divider"></div>
-                    <label class="ai-check"><input type="checkbox" id="pref-show-citations" checked data-change-action="saveAIPreferences"> Show citations</label>
-                    <div class="ai-settings-row">
+                <div class="pt-2 _ion-s-f2892a2e8a" id="ai-settings-panel">
+                    <label class="flex items-center gap-[7px] text-[0.78rem] text-base-content/70 cursor-pointer mb-[5px]"><input type="checkbox" class="accent-primary w-3.5 h-3.5" id="pref-rag-kb" data-change-action="saveAIPreferences"> Knowledge Base</label>
+                    <label class="flex items-center gap-[7px] text-[0.78rem] text-base-content/70 cursor-pointer mb-[5px]"><input type="checkbox" class="accent-primary w-3.5 h-3.5" id="pref-rag-notes" data-change-action="saveAIPreferences"> Analyst Notes</label>
+                    <label class="flex items-center gap-[7px] text-[0.78rem] text-base-content/70 cursor-pointer mb-[5px]"><input type="checkbox" class="accent-primary w-3.5 h-3.5" id="pref-rag-playbooks" data-change-action="saveAIPreferences"> Playbooks</label>
+                    <div class="h-px bg-base-300 my-2"></div>
+                    <label class="flex items-center gap-[7px] text-[0.78rem] text-base-content/70 cursor-pointer mb-[5px]"><input type="checkbox" class="accent-primary w-3.5 h-3.5" id="pref-show-citations" checked data-change-action="saveAIPreferences"> Show citations</label>
+                    <div class="flex items-center justify-between text-[0.78rem] text-base-content/70 mb-[5px]">
                         <span>Max references</span>
-                        <select id="pref-max-refs" data-change-action="saveAIPreferences">
+                        <select id="pref-max-refs" class="px-1.5 py-0.5 bg-base-200 text-base-content border border-base-300 rounded text-[0.78rem]" data-change-action="saveAIPreferences">
                             <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
                         </select>
                     </div>
-                    <div class="ai-settings-divider"></div>
+                    <div class="h-px bg-base-300 my-2"></div>
                     <textarea id="pref-custom-instructions" maxlength="500" placeholder="Custom instructions for the AI..." data-change-action="saveAIPreferences" data-input-action="updateCharCount"></textarea>
-                    <div class="ai-char-count" id="ai-char-count">0/500</div>
+                    <div class="text-[0.65rem] text-base-content/50 text-right" id="ai-char-count">0/500</div>
                 </div>
             </div>
 
             <!-- Quick Prompts -->
-            <div class="ai-section" id="chat-prompts-section">
-                <div class="ai-section-label">Quick Prompts</div>
-                <div class="ai-quick-list" id="ai-quick-prompts"></div>
+            <div class="px-4 py-3 border-b border-base-300" id="chat-prompts-section">
+                <div class="text-[0.7rem] font-semibold uppercase tracking-wide text-base-content/50 mb-2">Quick Prompts</div>
+                <div class="flex flex-col gap-[3px] max-h-40 overflow-y-auto" id="ai-quick-prompts"></div>
             </div>
 
             <!-- Model Info -->
-            <div class="ai-model-footer">
+            <div class="mt-auto flex items-center gap-1.5 px-4 py-2.5 border-t border-base-300 text-[0.75rem] text-base-content/50">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>
                     <rect x="9" y="9" width="6" height="6"/>
@@ -145,23 +145,23 @@
                     <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
                     <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
                 </svg>
-                <span class="ai-model-name" id="ai-model-name">Loading...</span>
+                <span class="font-mono text-[0.72rem]" id="ai-model-name">Loading...</span>
             </div>
         </div>
 
         <!-- Main Chat Area -->
-        <div class="ai-main" id="ai-main-chat">
-            <div class="ai-main-header">
-                <div class="ai-header-left">
-                    <div class="ai-header-icon">
+        <div class="flex-1 flex flex-col min-w-0 bg-base-100" id="ai-main-chat">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-base-300 bg-gradient-to-br from-primary/[3%] to-secondary/[3%]">
+                <div class="flex items-center gap-2.5 text-[0.95rem] font-semibold text-base-content">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-primary/15 to-secondary/15 border border-primary/20 text-primary">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                         </svg>
                     </div>
                     <span id="ai-chat-context-title">Cyber Security Expert</span>
                 </div>
-                <div class="ai-header-actions">
-                    <button class="ai-icon-btn" data-click-action="exportPageAIChat" title="Export Chat">
+                <div class="flex items-center gap-2">
+                    <button class="w-8 h-8 rounded-md border border-base-300 bg-transparent text-base-content/50 flex items-center justify-center transition-colors hover:bg-base-200 hover:text-base-content hover:border-primary" data-click-action="exportPageAIChat" title="Export Chat">
                         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                             <polyline points="7 10 12 15 17 10"/>
@@ -171,7 +171,7 @@
                 </div>
             </div>
 
-            <div class="ai-messages" id="ai-page-messages">
+            <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4" id="ai-page-messages">
                 <div class="ai-welcome">
                     <div class="ai-welcome-orb">
                         <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -183,46 +183,46 @@
                     </div>
                     <h2>ION AI Assistant</h2>
                     <p>Security analysis, threat investigation, and technical guidance — powered by your local LLM.</p>
-                    <div class="ai-welcome-cards">
+                    <div class="flex flex-col gap-2 w-full">
                         <div class="ai-wcard" data-prompt="Explain common indicators of compromise for ransomware attacks">
-                            <div class="ai-wcard-icon">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 text-primary">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                             </div>
-                            <div class="ai-wcard-text">
-                                <strong>Threat Indicators</strong>
-                                <span>Analyse IOCs and threat intelligence</span>
+                            <div>
+                                <strong class="block text-[0.85rem] text-base-content mb-px">Threat Indicators</strong>
+                                <span class="text-[0.75rem] text-base-content/50">Analyse IOCs and threat intelligence</span>
                             </div>
                         </div>
                         <div class="ai-wcard" data-prompt="Help me write a Python script to parse Windows event logs">
-                            <div class="ai-wcard-icon">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 text-primary">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
                             </div>
-                            <div class="ai-wcard-text">
-                                <strong>Script Assistance</strong>
-                                <span>Generate detection scripts and parsers</span>
+                            <div>
+                                <strong class="block text-[0.85rem] text-base-content mb-px">Script Assistance</strong>
+                                <span class="text-[0.75rem] text-base-content/50">Generate detection scripts and parsers</span>
                             </div>
                         </div>
                         <div class="ai-wcard" data-prompt="What are the MITRE ATT&CK techniques for credential access?">
-                            <div class="ai-wcard-icon">
+                            <div class="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-primary/10 text-primary">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                             </div>
-                            <div class="ai-wcard-text">
-                                <strong>MITRE ATT&CK</strong>
-                                <span>Techniques, tactics, and procedures</span>
+                            <div>
+                                <strong class="block text-[0.85rem] text-base-content mb-px">MITRE ATT&CK</strong>
+                                <span class="text-[0.75rem] text-base-content/50">Techniques, tactics, and procedures</span>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="ai-input-area">
+            <div class="px-5 pb-4 border-t border-base-300">
                 <div class="ai-typing _ion-s-f2892a2e8a" id="ai-page-typing">
                     <span class="dot"></span><span class="dot"></span><span class="dot"></span>
                     <span class="ai-typing-label">AI is thinking...</span>
                 </div>
-                <form class="ai-input-form" id="ai-chat-form">
-                    <div class="ai-input-row">
-                        <textarea id="ai-page-input" placeholder="Ask me anything about security, threats, or technical topics..." rows="1"></textarea>
+                <form class="pt-3" id="ai-chat-form">
+                    <div class="flex items-end gap-2 bg-base-200 border border-base-300 rounded-[10px] py-2 pr-2 pl-3.5 transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/10">
+                        <textarea id="ai-page-input" class="flex-1 border-0 bg-transparent text-base-content text-sm leading-normal resize-none max-h-40 outline-none placeholder:text-base-content/50" placeholder="Ask me anything about security, threats, or technical topics..." rows="1"></textarea>
                         <button type="submit" class="ai-send-btn" id="ai-send-btn">
                             <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -230,18 +230,18 @@
                             </svg>
                         </button>
                     </div>
-                    <div class="ai-input-meta">
-                        <kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> new line
+                    <div class="pt-1 px-1 text-[0.65rem] text-base-content/50">
+                        <kbd class="bg-base-200 border border-base-300 px-1 py-px rounded-[3px] text-[0.65rem] font-sans not-italic">Enter</kbd> send &middot; <kbd class="bg-base-200 border border-base-300 px-1 py-px rounded-[3px] text-[0.65rem] font-sans not-italic">Shift+Enter</kbd> new line
                     </div>
                 </form>
             </div>
         </div>
 
         <!-- Document Generator Panel (hidden by default) -->
-        <div class="ai-main _ion-s-f2892a2e8a" id="ai-main-docgen">
-            <div class="ai-main-header">
-                <div class="ai-header-left">
-                    <div class="ai-header-icon docgen">
+        <div class="flex-1 flex flex-col min-w-0 bg-base-100 _ion-s-f2892a2e8a" id="ai-main-docgen">
+            <div class="flex items-center justify-between px-5 py-3 border-b border-base-300 bg-gradient-to-br from-primary/[3%] to-secondary/[3%]">
+                <div class="flex items-center gap-2.5 text-[0.95rem] font-semibold text-base-content">
+                    <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br from-success/15 to-primary/15 border border-success/20 text-success">
                         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                             <polyline points="14 2 14 8 20 8"/>
@@ -253,46 +253,46 @@
                 </div>
             </div>
 
-            <div class="docgen-body">
-                <div class="docgen-form-area">
-                    <div class="docgen-section">
-                        <label class="docgen-label">What would you like to generate?</label>
-                        <textarea id="docgen-prompt" class="docgen-textarea" placeholder="e.g. Write an incident response playbook for ransomware attacks, including detection, containment, eradication, and recovery phases..." rows="4"></textarea>
+            <div class="flex-1 flex flex-col overflow-hidden">
+                <div class="p-5 overflow-y-auto flex-1">
+                    <div class="mb-4">
+                        <label class="block text-[0.88rem] font-semibold text-base-content mb-2">What would you like to generate?</label>
+                        <textarea id="docgen-prompt" class="w-full px-3 py-3 bg-base-200 text-base-content border border-base-300 rounded-lg text-[0.85rem] leading-normal resize-y min-h-[80px] transition-colors outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 placeholder:text-base-content/50" placeholder="e.g. Write an incident response playbook for ransomware attacks, including detection, containment, eradication, and recovery phases..." rows="4"></textarea>
                     </div>
 
-                    <div class="docgen-options">
-                        <div class="docgen-opt">
-                            <label>Format</label>
-                            <select id="docgen-format">
+                    <div class="flex gap-3 mb-4 flex-wrap">
+                        <div class="flex-1 min-w-[140px]">
+                            <label class="block text-[0.72rem] font-semibold uppercase tracking-wide text-base-content/50 mb-1">Format</label>
+                            <select id="docgen-format" class="w-full px-2.5 py-2 bg-base-200 text-base-content border border-base-300 rounded-md text-[0.82rem] outline-none focus:border-primary">
                                 <option value="markdown">Markdown</option>
                                 <option value="html">HTML</option>
                                 <option value="csv">CSV / Data</option>
                                 <option value="text">Plain Text</option>
                             </select>
                         </div>
-                        <div class="docgen-opt">
-                            <label>Style</label>
-                            <select id="docgen-style">
+                        <div class="flex-1 min-w-[140px]">
+                            <label class="block text-[0.72rem] font-semibold uppercase tracking-wide text-base-content/50 mb-1">Style</label>
+                            <select id="docgen-style" class="w-full px-2.5 py-2 bg-base-200 text-base-content border border-base-300 rounded-md text-[0.82rem] outline-none focus:border-primary">
                                 <option value="professional">Professional</option>
                                 <option value="concise">Concise</option>
                                 <option value="formal">Formal</option>
                                 <option value="technical">Technical</option>
                             </select>
                         </div>
-                        <div class="docgen-opt">
-                            <label>Document Name</label>
-                            <input type="text" id="docgen-name" placeholder="Auto-generated if blank">
+                        <div class="flex-1 min-w-[140px]">
+                            <label class="block text-[0.72rem] font-semibold uppercase tracking-wide text-base-content/50 mb-1">Document Name</label>
+                            <input type="text" id="docgen-name" class="w-full px-2.5 py-2 bg-base-200 text-base-content border border-base-300 rounded-md text-[0.82rem] outline-none focus:border-primary placeholder:text-base-content/50" placeholder="Auto-generated if blank">
                         </div>
                     </div>
 
-                    <div class="docgen-actions">
+                    <div class="flex gap-2 mb-5">
                         <button class="btn-gen" id="docgen-stream-btn" data-click-action="streamGenerateDocument">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
                             </svg>
                             Generate Preview
                         </button>
-                        <button class="btn-gen-save _ion-s-f2892a2e8a" id="docgen-save-btn" data-click-action="generateAndSaveDocument">
+                        <button class="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg bg-success text-success-content text-[0.85rem] font-semibold transition-all hover:-translate-y-px hover:shadow-[0_0_16px_var(--color-success)] _ion-s-f2892a2e8a" id="docgen-save-btn" data-click-action="generateAndSaveDocument">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
                                 <polyline points="17 21 17 13 7 13 7 21"/>
@@ -302,9 +302,9 @@
                         </button>
                     </div>
 
-                    <div class="docgen-templates">
-                        <div class="ai-section-label">Quick Templates</div>
-                        <div class="docgen-template-grid">
+                    <div class="mt-1">
+                        <div class="text-[0.7rem] font-semibold uppercase tracking-wide text-base-content/50 mb-2">Quick Templates</div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-1.5">
                             <button class="docgen-tpl" data-prompt="Write an incident response playbook for ransomware attacks. Include detection criteria, initial response steps, containment procedures, eradication steps, recovery procedures, and lessons learned sections." data-format="markdown">IR Playbook</button>
                             <button class="docgen-tpl" data-prompt="Create a security advisory document for a critical vulnerability. Include executive summary, affected systems, risk assessment, remediation steps, detection signatures, and timeline." data-format="markdown">Security Advisory</button>
                             <button class="docgen-tpl" data-prompt="Write a post-incident review (after-action report) template. Include incident summary, timeline of events, root cause analysis, impact assessment, response evaluation, and recommendations." data-format="markdown">After-Action Report</button>
@@ -315,14 +315,14 @@
                     </div>
                 </div>
 
-                <div class="docgen-preview-area _ion-s-f2892a2e8a" id="docgen-preview-area">
-                    <div class="docgen-preview-header">
+                <div class="border-t border-base-300 flex flex-col max-h-[50%] min-h-[200px] _ion-s-f2892a2e8a" id="docgen-preview-area">
+                    <div class="flex items-center justify-between px-4 py-2 text-[0.78rem] font-semibold text-base-content/50 uppercase tracking-wide border-b border-base-300 bg-base-200">
                         <span>Preview</span>
-                        <div class="docgen-preview-actions">
-                            <button class="ai-icon-btn" data-click-action="copyDocgenContent" title="Copy to clipboard">
+                        <div class="flex gap-1">
+                            <button class="w-8 h-8 rounded-md border border-base-300 bg-transparent text-base-content/50 flex items-center justify-center transition-colors hover:bg-base-200 hover:text-base-content hover:border-primary" data-click-action="copyDocgenContent" title="Copy to clipboard">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                             </button>
-                            <button class="ai-icon-btn" data-click-action="exportDocgenPdf" title="Export as PDF">
+                            <button class="w-8 h-8 rounded-md border border-base-300 bg-transparent text-base-content/50 flex items-center justify-center transition-colors hover:bg-base-200 hover:text-base-content hover:border-primary" data-click-action="exportDocgenPdf" title="Export as PDF">
                                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                             </button>
                         </div>
