@@ -43,7 +43,7 @@
 .ds-card {
     background: var(--bg-secondary);
     border: 1px solid var(--ion-border);
-    border-radius: var(--radius-lg);
+    border-radius: var(--ion-radius-lg);
     padding: 24px;
     transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }

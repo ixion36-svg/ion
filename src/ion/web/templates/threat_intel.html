@@ -30,7 +30,7 @@
 .ti-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
 .ti-stat-card {
     background: var(--bg-secondary); border: 1px solid var(--ion-border);
-    border-radius: var(--radius-lg); padding: 16px 20px; text-align: center;
+    border-radius: var(--ion-radius-lg); padding: 16px 20px; text-align: center;
 }
 .ti-stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
 .ti-stat-label { font-size: .78rem; color: var(--text-secondary); margin-top: 4px; }
@@ -984,7 +984,7 @@ data-click-action="tiCloseReport"></div>
             if (!sections.length) {
                 out.innerHTML = `<div class="ti-empty">No matches for "${escapeHtml(q)}".</div>`;
             } else {
-                out.innerHTML = `<div class="bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--radius-lg)] p-4">
+                out.innerHTML = `<div class="bg-[var(--bg-primary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)] p-4">
                     <div class="text-[.78rem] text-[var(--text-secondary)] mb-2">${d.total} result${d.total === 1 ? '' : 's'} for "${escapeHtml(q)}"</div>
                     ${sections.join('')}
                 </div>`;
@@ -1145,7 +1145,7 @@ data-click-action="tiCloseReport"></div>
                         }).join('')}
                        </div>`
                     : '';
-                return `<div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[var(--radius-lg)] py-3.5 px-4 mb-3">
+                return `<div class="bg-[var(--bg-secondary)] border border-[var(--ion-border)] rounded-[var(--ion-radius-lg)] py-3.5 px-4 mb-3">
                     <div class="flex items-center gap-3 mb-2">
                         <div class="w-[42px] h-[42px] rounded-[50%] flex items-center justify-center font-bold font-mono text-[.85rem] bg-[rgba(220,38,38,0.15)] text-[#fecaca] border-[2px] border-[rgba(220,38,38,0.4)] shrink-0">${s.score}</div>
                         <div class="flex-1">

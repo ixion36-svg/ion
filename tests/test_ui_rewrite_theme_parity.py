@@ -172,3 +172,55 @@ def test_daisyui_border_width_token_does_not_collide_with_ions_border_colour():
         "these still use the bare --border token, which daisyUI defines as a "
         f"1px width; their borders will vanish: {offenders}"
     )
+
+
+def test_no_custom_property_is_defined_by_both_the_legacy_sheets_and_ion_css():
+    """A token defined in both is decided by load order, not by intent.
+
+    --border was the destructive case: daisyUI's border WIDTH beat ION's border
+    COLOUR, `1px solid var(--border)` became `1px solid 1px`, and the browser
+    dropped the declaration -- borders gone app-wide, measured at 0px.
+
+    --radius-lg was the quiet one. ION said 14px, Tailwind says 0.5rem, and
+    ion.css loads last, so every `rounded-lg` in the app silently rendered at
+    Tailwind's 8px while every legacy rule reading var(--radius-lg) got 8px too
+    instead of the 14px it was written for. Two lengths disagreeing renders
+    something plausible, which is why it went unnoticed until the radius was
+    measured in a browser.
+
+    ION's is now --ion-radius-lg. This catches the next one.
+    """
+    css_dir = Path("src/ion/web/static/css")
+    decl = re.compile(r"(--[A-Za-z0-9_-]+)\s*:\s*([^;{}]+)")
+
+    def tokens(path):
+        out = {}
+        for m in decl.finditer(path.read_text(encoding="utf-8", errors="replace")):
+            out.setdefault(m.group(1), set()).add(m.group(2).strip())
+        return out
+
+    legacy = {}
+    for name in ("style.css", "design-system.css", "ai-chat.css",
+                 "alert-detail.css", "ion-workspace.css", "ion-migrated-styles.css"):
+        p = css_dir / name
+        if p.is_file():
+            for k, v in tokens(p).items():
+                legacy.setdefault(k, set()).update(v)
+
+    built = css_dir / "ion.css"
+    if not built.is_file():
+        return
+    theirs = tokens(built)
+    clashes = {k: (sorted(legacy[k]), sorted(theirs[k]))
+               for k in set(legacy) & set(theirs) if legacy[k] != theirs[k]}
+    assert not clashes, (
+        "custom properties defined by both the legacy sheets and ion.css with "
+        f"different values; load order silently picks a winner: {clashes}"
+    )
+
+
+def test_tailwinds_radius_lg_is_not_shadowed_by_ions():
+    """ION's large radius must live under its own name."""
+    style = Path("src/ion/web/static/css/style.css").read_text(encoding="utf-8")
+    assert not re.search(r"(?<![-\w])--radius-lg(?![-\w])", style), \
+        "style.css is redefining Tailwind's --radius-lg; use --ion-radius-lg"
