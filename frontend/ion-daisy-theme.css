@@ -262,12 +262,36 @@
 .ion-chip { border: 1px solid var(--color-base-300); border-radius: 999px; font-family: inherit; font-size: 12px; padding: 4px 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
 .ion-chip:hover { border-color: var(--color-primary); }
 
-/* Form controls. .form-control is kept: it is an ION name, not a daisyUI one,
-   and 36 elements still carry it. */
-.ion-input, .ion-select, .ion-textarea, .form-control { width: 100%; height: 2.375rem; font-family: inherit; font-size: 13px; color: var(--color-base-content); background: color-mix(in srgb, var(--color-base-content) 4%, transparent); border: 1px solid var(--color-base-300); border-radius: var(--radius-field); padding: 0 .875rem; outline: none; transition: border-color .15s ease, background .15s ease; }
-.ion-textarea, textarea.form-control { height: auto; min-height: 5rem; padding: .625rem .875rem; line-height: 1.5; }
-.ion-input:focus, .ion-select:focus, .ion-textarea:focus, .form-control:focus { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-base-content) 6%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 10%, transparent); }
-.ion-input::placeholder, .ion-textarea::placeholder, .form-control::placeholder { color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+/*
+ * Form controls. .form-control is kept: it is an ION name, not a daisyUI one,
+ * and 36 elements still carry it.
+ *
+ * The `.form-group X` selectors came out of style.css, which styled bare
+ * inputs by descent rather than by class. Its rules already listed
+ * .form-control alongside them, so the two sheets were describing the same
+ * control twice and this one -- loading later -- was already winning for every
+ * property they shared. Merging the selector lists ends the duplication.
+ *
+ * One deliberate change: style.css gave these a 0.5rem radius while ION's own
+ * inputs use --radius-field (0.25rem). They now match the rest of the app.
+ */
+.ion-input, .ion-select, .ion-textarea, .form-control,
+.form-group input[type="text"], .form-group input[type="email"],
+.form-group input[type="password"], .form-group input[type="number"],
+.form-group input[type="file"], .form-group input[type="url"],
+.form-group input[type="date"], .form-group input[type="datetime-local"],
+.form-group select, .form-group textarea { width: 100%; height: 2.375rem; font-family: inherit; font-size: 13px; color: var(--color-base-content); background: color-mix(in srgb, var(--color-base-content) 4%, transparent); border: 1px solid var(--color-base-300); border-radius: var(--radius-field); padding: 0 .875rem; outline: none; transition: border-color .15s ease, background .15s ease; }
+.ion-textarea, textarea.form-control, .form-group textarea { height: auto; min-height: 5rem; padding: .625rem .875rem; line-height: 1.5; }
+.ion-input:focus, .ion-select:focus, .ion-textarea:focus, .form-control:focus,
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-base-content) 6%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.ion-input::placeholder, .ion-textarea::placeholder, .form-control::placeholder,
+.form-group input::placeholder, .form-group textarea::placeholder { color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+
+/* The group wrapper and its label. The label colour was a hardcoded #64748b,
+   which is --text-muted; against base-content it flips for light mode without
+   the patch style.css needed. */
+.form-group { margin-bottom: 1.25rem; }
+.form-group label { display: block; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
 
 /* Metric card. */
 .ion-metric { background: var(--color-base-200); border-radius: var(--radius-field); padding: 11px 13px; }
