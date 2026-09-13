@@ -3256,8 +3256,8 @@ function rmRenderResult(a) {
     const rec = a.recommendations || {};
 
     let html = '<div class="rm-result-overall">'
-        + '<div class="rm-result-ring _ion-s-0d131543ef" data-ion-style="background:conic-gradient(' + color + ' ' + pct + '%, rgba(99,110,123,.2) ' + pct + '%)">'
-        + '<div class="rm-result-inner"><div class="rm-result-pct _ion-s-999e54c893" data-ion-style="color:' + color + '">' + pct + '%</div><div class="rm-result-label">Match</div></div>'
+        + '<div class="rm-result-ring" data-ion-style="background:conic-gradient(' + color + ' ' + pct + '%, rgba(99,110,123,.2) ' + pct + '%)">'
+        + '<div class="rm-result-inner"><div class="rm-result-pct" data-ion-style="color:' + color + '">' + pct + '%</div><div class="rm-result-label">Match</div></div>'
         + '</div>'
         + '<div class="rm-result-text"><h3>' + rmEsc(a.overall_level) + ' — ' + rmEsc(a.role_name) + '</h3>'
         + '<p>Taken ' + (a.taken_at ? new Date(a.taken_at).toLocaleString() : '-') + ' · saved as your target role</p></div>'
@@ -3268,8 +3268,8 @@ function rmRenderResult(a) {
         const aColor = rmPctColor(aScore.pct);
         html += '<div class="rm-area-bar"><div class="rm-area-bar-head">'
             + '<span class="rm-area-bar-name">' + rmEsc(aScore.name || aid) + '</span>'
-            + '<span class="rm-area-bar-pct _ion-s-83ebd10300" data-ion-style="color:' + aColor + '">' + aScore.pct + '%</span>'
-            + '</div><div class="rm-bar"><div class="rm-bar-fill _ion-s-3ff4f72529" data-ion-style="width:' + aScore.pct + '%;background:' + aColor + '"></div></div></div>';
+            + '<span class="rm-area-bar-pct" data-ion-style="color:' + aColor + '">' + aScore.pct + '%</span>'
+            + '</div><div class="rm-bar"><div class="rm-bar-fill" data-ion-style="width:' + aScore.pct + '%;background:' + aColor + '"></div></div></div>';
     }
     html += '</div>';
 
@@ -3334,7 +3334,7 @@ async function rmShowHistory() {
             html += '<tr data-click-action="rmRenderResult" data-args="[' + JSON.stringify(a).replace(/"/g,'&quot;') + ']">'
                 + '<td>' + (a.taken_at ? new Date(a.taken_at).toLocaleDateString() : '-') + '</td>'
                 + '<td>' + rmEsc(a.role_name) + '</td>'
-                + '<td><strong class="_ion-s-999e54c893" data-ion-style="color:' + color + '">' + pct + '%</strong></td>'
+                + '<td><strong data-ion-style="color:' + color + '">' + pct + '%</strong></td>'
                 + '<td>' + rmEsc(a.overall_level) + '</td>'
                 + '<td><button class="btn btn-secondary btn-sm" data-click-action="rmRenderResult" data-stop-propagation data-args="[' + JSON.stringify(a).replace(/"/g,'&quot;') + ']">View</button></td>'
                 + '</tr>';

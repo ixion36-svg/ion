@@ -523,9 +523,9 @@
     function updateLabels(cx, cy, r1, r2, r3) {
         var container = document.getElementById('labels-container');
         container.innerHTML = ''
-            + '<div class="ring-label _ion-s-be6a8d314f" data-ion-style="top:' + (cy - r1 - 55) + 'px">Core Cluster</div>'
-            + '<div class="ring-label _ion-s-5245a21b9b" data-ion-style="top:' + (cy - r2 - 55) + 'px">System Services</div>'
-            + '<div class="ring-label _ion-s-83122ec640" data-ion-style="top:' + (cy - r3 - 55) + 'px">External Integrations</div>';
+            + '<div class="ring-label" data-ion-style="top:' + (cy - r1 - 55) + 'px">Core Cluster</div>'
+            + '<div class="ring-label" data-ion-style="top:' + (cy - r2 - 55) + 'px">System Services</div>'
+            + '<div class="ring-label" data-ion-style="top:' + (cy - r3 - 55) + 'px">External Integrations</div>';
     }
 
     // Event delegation for sidebar clicks

@@ -637,7 +637,7 @@ function buildFieldsHTML(section, idx, st) {
         const varName = c.variable_name || suggestVarName(section, st);
         html += '<div class="se-variable-toggle">';
         html += '<label><input type="checkbox" data-idx="' + idx + '" data-field="variable" ' + (isVar ? 'checked' : '') + '> Make variable</label>';
-        html += '<input class="_ion-s-eb85f508da" data-ion-style="' + (isVar ? '' : 'display:none') + '" type="text" data-idx="' + idx + '" data-field="variable_name" value="' + escapeHtml(varName) + '" placeholder="variable_name">';
+        html += '<input data-ion-style="' + (isVar ? '' : 'display:none') + '" type="text" data-idx="' + idx + '" data-field="variable_name" value="' + escapeHtml(varName) + '" placeholder="variable_name">';
         html += '</div>';
     }
 

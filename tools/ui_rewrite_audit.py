@@ -91,6 +91,19 @@ def check(baseline: dict, current: dict) -> list[str]:
             c for c in lost
             if c not in cmap or cmap[c].get("kind") == "manual"
         )
+        # A utility is not the only legitimate replacement. Where the original
+        # style was computed at runtime -- `flex:' + slaCounts.green + '` -- no
+        # static class can express it, and the correct destination is a
+        # data-ion-style hook applied through el.style.setProperty. Those
+        # classes SHOULD disappear, and counting them as losses reports the
+        # repair as the damage.
+        #
+        # Matched on the count of hooks the template gained rather than per
+        # class, because by the time the class is gone there is nothing left to
+        # tie it to the element that replaced it.
+        gained_hooks = cur["ion_style_hooks"] - base["ion_style_hooks"]
+        if gained_hooks > 0:
+            unreplaceable = unreplaceable[max(0, gained_hooks):]
         if unreplaceable:
             problems.append(
                 f"{name}: lost {len(unreplaceable)} class(es) with NO utility "

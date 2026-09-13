@@ -90,6 +90,22 @@ def split_decls(body: str) -> list[str]:
     return out
 
 
+def drop_class(text: str, cls: str) -> str:
+    """Remove one class name from every class attribute that carries it.
+
+    An attribute left holding nothing is removed along with the space in front
+    of it, rather than left as `class=""`, which reads to the next person like
+    a mistake someone forgot to finish. Line count is unaffected either way,
+    and the caller checks that.
+    """
+    def fix(m: re.Match) -> str:
+        names = [n for n in m.group(1).split() if n != cls]
+        return ' class="' + " ".join(names) + '"' if names else ""
+    return re.sub(r'\s*class="([^"]*)"',
+                  lambda m: fix(m) if cls in m.group(1).split() else m.group(0),
+                  text)
+
+
 def broken_rules(css: str):
     """(class, selector, whole match, static decls, dynamic decls)."""
     for m in re.finditer(r"(?P<sel>[^{}]+)\{(?P<body>[^{}]*)\}", css, re.S):
@@ -161,6 +177,15 @@ def main() -> int:
             sel = m.group("sel")
             css_out.append(f"{sel}{{ {'; '.join(static)}; }}")
         else:
+            # Nothing static was left, so the rule goes -- and with it the
+            # reason the class exists. Leaving the name on the element is not
+            # harmless bookkeeping: tests/test_migrated_css_sweep.py asserts
+            # every _ion-s-* class at a call site still resolves, precisely so
+            # that a half-finished migration cannot hide behind a class that
+            # looks meaningful and does nothing. Verified first that no
+            # querySelector, classList or closest() call reads any of them.
+            for p in list(edits):
+                edits[p] = drop_class(edits[p], cls)
             emptied += 1
         last = m.end()
         fixed += 1
