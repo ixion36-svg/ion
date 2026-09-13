@@ -152,6 +152,10 @@ def run_one(page: str, baseline: dict, timeout: int, mode: str) -> dict:
             [str(GROK), "--cwd", str(REPO), "--permission-mode", "bypassPermissions",
              "--max-turns", "60", "--prompt-file", str(prompt_file)],
             capture_output=True, text=True, timeout=timeout,
+            # Grok emits UTF-8; without this Windows decodes as cp1252 and the
+            # reader thread dies on the first non-ASCII byte, losing the output
+            # tail used for diagnostics. Seen on the 27-page M-band run.
+            encoding="utf-8", errors="replace",
         )
         result["exit"] = proc.returncode
         result["tail"] = (proc.stdout or "")[-400:]

@@ -118,8 +118,18 @@ def check(page: str, css: str) -> list[str]:
         # template literals that generate HTML at runtime. Stripping <script>
         # first produced six false positives on stories.html, where every id was
         # present and unchanged but emitted from a template literal.
-        if not re.search(r'id="' + re.escape(el_id) + r'"', text) \
-           and not re.search(r"id='" + re.escape(el_id) + r"'", text):
+        #
+        # An id ending in a separator is a CONCATENATION PREFIX, not a whole id:
+        #   getElementById('mat-domain-score-' + domainId)
+        #   id="mat-domain-score-${domain.id}"
+        # Demanding an exact match on the prefix produced 16 false positives
+        # across 8 pages, so match it as a prefix instead.
+        if el_id.endswith(("-", "_")):
+            found = re.search(r'id=["\']' + re.escape(el_id), text)
+        else:
+            found = re.search(r'id="' + re.escape(el_id) + r'"', text) \
+                 or re.search(r"id='" + re.escape(el_id) + r"'", text)
+        if not found:
             findings.append(
                 f"ID      #{el_id} — JS looks it up, no such id anywhere in the template")
 

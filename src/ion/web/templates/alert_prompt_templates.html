@@ -3,7 +3,7 @@
 {% block title %}Alert Prompt Templates - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {% set tabs = [
     {"label": "Alert Prompts", "href": "/alert-prompts"},
@@ -13,15 +13,15 @@
 {% include "_nav_tabs.html" %}
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
       <span class="h-1.5 w-1.5 rounded-full bg-ion-iris pulse-cyan"></span>
       <span class="label-tiny text-ion-iris">LLM investigation prompts</span>
     </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Alert Prompt Templates</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Per-rule investigation guides that the AI analyst auto-selects for each alert.</p>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Alert Prompt Templates</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Per-rule investigation guides that the AI analyst auto-selects for each alert.</p>
   </div>
-  <button id="btn-new-prompt" data-click-action="showCreateModal" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+  <button id="btn-new-prompt" data-click-action="showCreateModal" class="btn btn-primary">
     + New Template
   </button>
 </section>
@@ -30,134 +30,141 @@
    That page rendered nothing this table didn't already show per-template — same
    endpoint, same fields, same tuning flag — and linked back here for every
    action. These four tiles were its only unique content. #}
-<section class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
-  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
-    <div class="label-tiny text-slate-500">Templates with data</div>
-    <div id="sc-kpi-templates" class="text-[24px] font-semibold text-white mt-1">—</div>
+<section class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+  <div class="stat">
+    <div class="stat-title">Templates with data</div>
+    <div id="sc-kpi-templates" class="stat-value text-primary">—</div>
   </div>
-  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
-    <div class="label-tiny text-slate-500">Feedback rows (30d)</div>
-    <div id="sc-kpi-samples" class="text-[24px] font-semibold text-white mt-1">—</div>
+  <div class="stat">
+    <div class="stat-title">Feedback rows (30d)</div>
+    <div id="sc-kpi-samples" class="stat-value">—</div>
   </div>
-  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
-    <div class="label-tiny text-slate-500">Overall agreement</div>
-    <div id="sc-kpi-agreement" class="text-[24px] font-semibold text-white mt-1">—</div>
+  <div class="stat">
+    <div class="stat-title">Overall agreement</div>
+    <div id="sc-kpi-agreement" class="stat-value text-success">—</div>
   </div>
-  <div class="rounded-md border border-white/5 bg-ink-900/70 p-4">
-    <div class="label-tiny text-slate-500">Needs tuning</div>
-    <div id="sc-kpi-tuning" class="text-[24px] font-semibold text-white mt-1">—</div>
+  <div class="stat">
+    <div class="stat-title">Needs tuning</div>
+    <div id="sc-kpi-tuning" class="stat-value text-warning">—</div>
   </div>
 </section>
 
-<section class="section">
-    <div class="section-header">
-        <h2>Templates</h2>
-        <div class="filter-controls">
-            <label class="checkbox-label">
-                <input type="checkbox" id="filter-enabled-only" data-change-action="loadPrompts">
-                Enabled only
-            </label>
-            <button class="ion-btn" data-click-action="showResolveModal">Test match</button>
+<section class="card bg-base-200 shadow">
+    <div class="card-body p-0">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 border-b border-base-300">
+            <h2 class="card-title text-base">Templates</h2>
+            <div class="flex flex-wrap items-center gap-4">
+                <label class="flex items-center gap-2 cursor-pointer text-sm">
+                    <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="filter-enabled-only" data-change-action="loadPrompts">
+                    Enabled only
+                </label>
+                <button class="btn btn-ghost btn-sm" data-click-action="showResolveModal">Test match</button>
+            </div>
         </div>
-    </div>
-    <div class="table-container">
-        <table class="ion-table" id="prompts-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Rule IDs</th>
-                    <th>Rule Groups</th>
-                    <th>Pattern</th>
-                    <th>Priority</th>
-                    <th>Severity</th>
-                    <th>AI Scorecard (30d)</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="prompts-body">
-                <tr><td colspan="9" class="loading">Loading templates...</td></tr>
-            </tbody>
-        </table>
+        <div class="overflow-x-auto">
+            <table class="table table-sm" id="prompts-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Rule IDs</th>
+                        <th>Rule Groups</th>
+                        <th>Pattern</th>
+                        <th>Priority</th>
+                        <th>Severity</th>
+                        <th>AI Scorecard (30d)</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="prompts-body">
+                    <tr><td colspan="9" class="text-center text-base-content/50 py-8">Loading templates...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </section>
 
 <!-- Create / Edit Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="prompt-modal">
-    <div class="modal-dialog modal-large">
-        <div class="modal-header">
-            <h3 id="prompt-modal-title">New Alert Prompt Template</h3>
-            <button class="modal-close" data-click-action="closeModal">&times;</button>
+<!-- JS opens/closes via element.style.display = 'flex'|'none' (CSSOM, allowed).
+     daisyUI .modal uses visibility/opacity, so style.display would not reveal it.
+     Overlay stays a flex layer; hashed class hides it until JS shows it. -->
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 _ion-s-c8be1ccba6" id="prompt-modal">
+    <div class="card bg-base-100 shadow-xl w-full max-w-[880px] max-h-[92vh] overflow-y-auto">
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-base-300">
+            <h3 id="prompt-modal-title" class="text-lg font-semibold">New Alert Prompt Template</h3>
+            <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body">
+        <div class="px-6 py-5">
             <form id="prompt-form" data-prevent-default>
                 <input type="hidden" id="prompt-id" value="">
 
-                <div class="form-section">
-                    <h4>Identity</h4>
-                    <div class="form-row">
-                        <div class="form-group _ion-s-c2d2e263dc">
-                            <label for="prompt-name">Name *</label>
-                            <input type="text" id="prompt-name" class="ion-input" required>
+                <div class="mb-5 pb-5 border-b border-base-300">
+                    <h4 class="text-primary font-semibold mb-3">Identity</h4>
+                    <div class="flex flex-wrap gap-4">
+                        <div class="mb-3 _ion-s-c2d2e263dc">
+                            <label for="prompt-name" class="label text-sm text-base-content/60 py-1">Name *</label>
+                            <input type="text" id="prompt-name" class="input w-full" required>
                         </div>
-                        <div class="form-group _ion-s-ee3d55bf99">
-                            <label for="prompt-priority">Priority (lower = higher)</label>
-                            <input type="number" id="prompt-priority" class="ion-input" value="100" min="0">
+                        <div class="mb-3 _ion-s-ee3d55bf99">
+                            <label for="prompt-priority" class="label text-sm text-base-content/60 py-1">Priority (lower = higher)</label>
+                            <input type="number" id="prompt-priority" class="input w-full" value="100" min="0">
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="prompt-description">Description</label>
-                        <textarea id="prompt-description" class="ion-textarea" rows="2"></textarea>
+                    <div class="mb-3">
+                        <label for="prompt-description" class="label text-sm text-base-content/60 py-1">Description</label>
+                        <textarea id="prompt-description" class="textarea w-full font-mono text-sm" rows="2"></textarea>
                     </div>
-                    <div class="checkbox-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="prompt-enabled" checked>
+                    <div class="flex flex-wrap gap-4">
+                        <label class="flex items-center gap-2 cursor-pointer text-sm">
+                            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="prompt-enabled" checked>
                             Enabled
                         </label>
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <h4>Matching Rules</h4>
-                    <p class="form-help">At least one matcher should be populated. Match order: exact rule ID &rarr; regex pattern &rarr; MITRE technique (parent&rarr;sub tolerant) &rarr; MITRE tactic &rarr; rule.groups overlap.</p>
-                    <div class="form-group">
-                        <label for="prompt-rule-ids">Exact Rule IDs (one per line)</label>
-                        <textarea id="prompt-rule-ids" class="ion-textarea" rows="3" placeholder="1100&#10;5710"></textarea>
+                <div class="mb-5 pb-5 border-b border-base-300">
+                    <h4 class="text-primary font-semibold mb-3">Matching Rules</h4>
+                    <div role="alert" class="alert alert-info mb-4">
+                        <span>At least one matcher should be populated. Match order: exact rule ID &rarr; regex pattern &rarr; MITRE technique (parent&rarr;sub tolerant) &rarr; MITRE tactic &rarr; rule.groups overlap.</span>
                     </div>
-                    <div class="form-group">
-                        <label for="prompt-rule-groups">Rule Groups (one per line)</label>
-                        <textarea id="prompt-rule-groups" class="ion-textarea" rows="3" placeholder="sysmon_event_1&#10;authentication_failed"></textarea>
+                    <div class="mb-3">
+                        <label for="prompt-rule-ids" class="label text-sm text-base-content/60 py-1">Exact Rule IDs (one per line)</label>
+                        <textarea id="prompt-rule-ids" class="textarea w-full font-mono text-sm" rows="3" placeholder="1100&#10;5710"></textarea>
                     </div>
-                    <div class="form-group">
-                        <label for="prompt-rule-pattern">Rule ID Regex</label>
-                        <input type="text" id="prompt-rule-pattern" class="ion-input" placeholder="^sysmon_event_\d+$">
+                    <div class="mb-3">
+                        <label for="prompt-rule-groups" class="label text-sm text-base-content/60 py-1">Rule Groups (one per line)</label>
+                        <textarea id="prompt-rule-groups" class="textarea w-full font-mono text-sm" rows="3" placeholder="sysmon_event_1&#10;authentication_failed"></textarea>
                     </div>
-                    <div class="form-group">
-                        <label for="prompt-mitre-techniques">MITRE ATT&amp;CK Techniques (one per line)</label>
-                        <textarea id="prompt-mitre-techniques" class="ion-textarea" rows="3" placeholder="T1059&#10;T1059.001&#10;T1110.003"></textarea>
-                        <p class="form-help">Parent technique (<code>T1059</code>) matches alerts tagged with any sub-technique (<code>T1059.001</code>), and vice-versa.</p>
+                    <div class="mb-3">
+                        <label for="prompt-rule-pattern" class="label text-sm text-base-content/60 py-1">Rule ID Regex</label>
+                        <input type="text" id="prompt-rule-pattern" class="input w-full font-mono" placeholder="^sysmon_event_\d+$">
                     </div>
-                    <div class="form-group">
-                        <label for="prompt-mitre-tactics">MITRE ATT&amp;CK Tactics (one per line)</label>
-                        <textarea id="prompt-mitre-tactics" class="ion-textarea" rows="2" placeholder="TA0002&#10;execution"></textarea>
-                        <p class="form-help">Accepts tactic IDs (<code>TA0002</code>) or lowercase names (<code>execution</code>). Case-insensitive.</p>
+                    <div class="mb-3">
+                        <label for="prompt-mitre-techniques" class="label text-sm text-base-content/60 py-1">MITRE ATT&amp;CK Techniques (one per line)</label>
+                        <textarea id="prompt-mitre-techniques" class="textarea w-full font-mono text-sm" rows="3" placeholder="T1059&#10;T1059.001&#10;T1110.003"></textarea>
+                        <p class="text-sm text-base-content/60 mt-1">Parent technique (<code>T1059</code>) matches alerts tagged with any sub-technique (<code>T1059.001</code>), and vice-versa.</p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="prompt-mitre-tactics" class="label text-sm text-base-content/60 py-1">MITRE ATT&amp;CK Tactics (one per line)</label>
+                        <textarea id="prompt-mitre-tactics" class="textarea w-full font-mono text-sm" rows="2" placeholder="TA0002&#10;execution"></textarea>
+                        <p class="text-sm text-base-content/60 mt-1">Accepts tactic IDs (<code>TA0002</code>) or lowercase names (<code>execution</code>). Case-insensitive.</p>
                     </div>
                 </div>
 
-                <div class="form-section">
-                    <h4>Prompt Content</h4>
-                    <div class="form-group">
-                        <label for="prompt-text">System Prompt Addition *</label>
-                        <textarea id="prompt-text" class="ion-textarea" rows="8" required placeholder="You are investigating ..."></textarea>
+                <div>
+                    <h4 class="text-primary font-semibold mb-3">Prompt Content</h4>
+                    <div class="mb-3">
+                        <label for="prompt-text" class="label text-sm text-base-content/60 py-1">System Prompt Addition *</label>
+                        <textarea id="prompt-text" class="textarea w-full font-mono text-sm" rows="8" required placeholder="You are investigating ..."></textarea>
                     </div>
-                    <div class="form-group">
-                        <label for="prompt-checklist">Investigation Checklist</label>
-                        <textarea id="prompt-checklist" class="ion-textarea" rows="6" placeholder="- What is the parent process?&#10;- ..."></textarea>
+                    <div class="mb-3">
+                        <label for="prompt-checklist" class="label text-sm text-base-content/60 py-1">Investigation Checklist</label>
+                        <textarea id="prompt-checklist" class="textarea w-full font-mono text-sm" rows="6" placeholder="- What is the parent process?&#10;- ..."></textarea>
                     </div>
-                    <div class="form-row">
-                        <div class="form-group _ion-s-ee3d55bf99">
-                            <label for="prompt-severity">Severity Hint</label>
-                            <select id="prompt-severity" class="ion-select">
+                    <div class="flex flex-wrap gap-4">
+                        <div class="mb-3 _ion-s-ee3d55bf99">
+                            <label for="prompt-severity" class="label text-sm text-base-content/60 py-1">Severity Hint</label>
+                            <select id="prompt-severity" class="select w-full">
                                 <option value="">(none)</option>
                                 <option value="low">low</option>
                                 <option value="medium">medium</option>
@@ -165,94 +172,61 @@
                                 <option value="critical">critical</option>
                             </select>
                         </div>
-                        <div class="form-group _ion-s-c2d2e263dc">
-                            <label for="prompt-outputs">Expected Output Fields (one per line)</label>
-                            <textarea id="prompt-outputs" class="ion-textarea" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
+                        <div class="mb-3 _ion-s-c2d2e263dc">
+                            <label for="prompt-outputs" class="label text-sm text-base-content/60 py-1">Expected Output Fields (one per line)</label>
+                            <textarea id="prompt-outputs" class="textarea w-full font-mono text-sm" rows="3" placeholder="verdict&#10;recommended_actions&#10;ioc_confidence"></textarea>
                         </div>
                     </div>
                     <!-- (L6): row hidden for users without system:settings; -->
                     <!-- backend also enforces the gate so this is defence-in-depth. -->
-                    <div class="form-row _ion-s-c8be1ccba6" id="prompt-confidence-threshold-row">
-                        <div class="form-group _ion-s-ee3d55bf99">
-                            <label for="prompt-confidence-threshold">Confidence Threshold Override (0-100)</label>
-                            <input type="number" id="prompt-confidence-threshold" class="ion-input" min="0" max="100" placeholder="e.g. 70 — leave blank to use global default">
-                            <p class="form-help">When set, Bob must reach this confidence score to write a verdict for alerts matched by this template. Overrides ION_BOB_CONFIDENCE_THRESHOLD (default 60).</p>
+                    <div class="flex flex-wrap gap-4 _ion-s-c8be1ccba6" id="prompt-confidence-threshold-row">
+                        <div class="mb-3 _ion-s-ee3d55bf99">
+                            <label for="prompt-confidence-threshold" class="label text-sm text-base-content/60 py-1">Confidence Threshold Override (0-100)</label>
+                            <input type="number" id="prompt-confidence-threshold" class="input w-full" min="0" max="100" placeholder="e.g. 70 — leave blank to use global default">
+                            <p class="text-sm text-base-content/60 mt-1">When set, Bob must reach this confidence score to write a verdict for alerts matched by this template. Overrides ION_BOB_CONFIDENCE_THRESHOLD (default 60).</p>
                         </div>
                     </div>
                 </div>
             </form>
         </div>
-        <div class="modal-footer">
-            <button class="ion-btn" data-click-action="closeModal">Cancel</button>
-            <button class="ion-btn ion-btn-primary" data-click-action="saveTemplate">Save</button>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-base-300">
+            <button type="button" class="btn btn-ghost" data-click-action="closeModal">Cancel</button>
+            <button type="button" class="btn btn-primary" data-click-action="saveTemplate">Save</button>
         </div>
     </div>
 </div>
 
 <!-- Resolve / Test Match Modal -->
-<div class="modal-overlay _ion-s-c8be1ccba6" id="resolve-modal">
-    <div class="modal-dialog modal-large">
-        <div class="modal-header">
-            <h3>Test Match</h3>
-            <button class="modal-close" data-click-action="closeResolveModal">&times;</button>
+<div class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4 _ion-s-c8be1ccba6" id="resolve-modal">
+    <div class="card bg-base-100 shadow-xl w-full max-w-[880px] max-h-[92vh] overflow-y-auto">
+        <div class="flex items-center justify-between gap-4 px-6 py-4 border-b border-base-300">
+            <h3 class="text-lg font-semibold">Test Match</h3>
+            <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeResolveModal" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body">
-            <p class="form-help">Paste an alert JSON (or a minimal <code>{"rule": {"id": "...", "groups": [...]}}</code>) and see which template would be selected.</p>
-            <div class="form-group">
-                <label for="resolve-input">Alert JSON</label>
-                <textarea id="resolve-input" class="ion-textarea" rows="10">{
+        <div class="px-6 py-5">
+            <div role="alert" class="alert alert-info mb-4">
+                <span>Paste an alert JSON (or a minimal <code>{"rule": {"id": "...", "groups": [...]}}</code>) and see which template would be selected.</span>
+            </div>
+            <div class="mb-3">
+                <label for="resolve-input" class="label text-sm text-base-content/60 py-1">Alert JSON</label>
+                <textarea id="resolve-input" class="textarea w-full font-mono text-sm" rows="10">{
   "rule": {
     "id": "1100",
     "groups": ["sysmon_event_1"]
   }
 }</textarea>
             </div>
-            <div class="form-group">
-                <label>Result</label>
-                <pre class="_ion-s-f72ff42b6c" id="resolve-output">(click Resolve)</pre>
+            <div class="mb-3">
+                <label class="label text-sm text-base-content/60 py-1">Result</label>
+                <pre class="font-mono text-sm _ion-s-f72ff42b6c" id="resolve-output">(click Resolve)</pre>
             </div>
         </div>
-        <div class="modal-footer">
-            <button class="ion-btn" data-click-action="closeResolveModal">Close</button>
-            <button class="ion-btn ion-btn-primary" data-click-action="runResolve">Resolve</button>
+        <div class="flex justify-end gap-2 px-6 py-4 border-t border-base-300">
+            <button type="button" class="btn btn-ghost" data-click-action="closeResolveModal">Close</button>
+            <button type="button" class="btn btn-primary" data-click-action="runResolve">Resolve</button>
         </div>
     </div>
 </div>
-
-<style nonce="{{ csp_nonce }}">
-.section { background: var(--bg-secondary); border-radius: var(--radius-lg, 8px); padding: 1.5rem; margin-bottom: 1.5rem; }
-.section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; }
-.filter-controls { display:flex; gap:1rem; align-items:center; }
-.table-container { overflow-x:auto; }
-.loading { text-align:center; color: var(--text-secondary); padding: 2rem; }
-
-.sev-critical { color:var(--sev-critical); font-weight:600; }
-.sev-high { color:var(--sev-high); }
-.sev-medium { color:var(--sev-medium); }
-.sev-low { color:var(--sev-low); }
-/* Inter-chip spacing; tint/shape/mono now come from .ion-pill .ion-c-muted .ion-mono */
-.chip { margin: 0 0.2rem 0.2rem 0; }
-
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; z-index: 1000; }
-.modal-dialog { background: var(--bg-primary); border-radius: var(--radius-lg, 8px); width:100%; max-width: 640px; max-height: 92vh; overflow-y:auto; box-shadow: 0 2px 12px rgba(0,0,0,0.35); }
-.modal-dialog.modal-large { max-width: 880px; }
-.modal-header { display:flex; align-items:center; justify-content:space-between; padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); }
-.modal-header h3 { margin:0; }
-.modal-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color: var(--text-secondary); }
-.modal-body { padding: 1.25rem 1.5rem; }
-.modal-footer { display:flex; justify-content:flex-end; gap: 0.5rem; padding: 1rem 1.5rem; border-top: 1px solid var(--border); }
-.form-section { margin-bottom: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border); }
-.form-section:last-child { border-bottom: none; margin-bottom:0; }
-.form-section h4 { margin: 0 0 0.75rem 0; color: var(--accent-color, var(--ion-cyan, #6de4ff)); }
-.form-row { display:flex; gap: 1rem; }
-.form-group { margin-bottom: 0.75rem; flex: 1; }
-.form-group label { display:block; margin-bottom: 0.2rem; font-size: 0.82rem; color: var(--text-secondary); }
-/* Line-list / JSON textareas keep the monospace treatment over the kit base. */
-textarea.ion-textarea { font-family: var(--font-mono, monospace); font-size: 0.85rem; }
-.form-help { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.75rem; }
-.checkbox-label { display:flex; align-items:center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer; }
-.checkbox-group { display:flex; gap: 1rem; flex-wrap: wrap; }
-</style>
 
 <script nonce="{{ csp_nonce }}">
 // ---------------------------------------------------------------------------
@@ -287,7 +261,7 @@ async function loadPrompts() {
     ]);
     if (!resp.ok) {
         document.getElementById('prompts-body').innerHTML =
-            `<tr><td colspan="9" class="loading">Failed to load: ${resp.status}</td></tr>`;
+            `<tr><td colspan="9" class="text-center text-base-content/50 py-8">Failed to load: ${resp.status}</td></tr>`;
         return;
     }
     const data = await resp.json();
@@ -324,20 +298,20 @@ function renderScorecard(tplId) {
 function renderPrompts(items) {
     const body = document.getElementById('prompts-body');
     if (!items.length) {
-        body.innerHTML = `<tr><td colspan="9" class="loading">No templates yet. Click "+ New Template" to create one.</td></tr>`;
+        body.innerHTML = `<tr><td colspan="9" class="text-center text-base-content/50 py-8">No templates yet. Click "+ New Template" to create one.</td></tr>`;
         return;
     }
     body.innerHTML = items.map(t => {
-        const ruleIds = (t.rule_ids || []).map(r => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(r)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
-        const ruleGroups = (t.rule_groups || []).map(g => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(g)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
+        const ruleIds = (t.rule_ids || []).map(r => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(r)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
+        const ruleGroups = (t.rule_groups || []).map(g => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(g)}</span>`).join('') || '<span class="_ion-s-0e42856cf0">—</span>';
         const pattern = t.rule_id_pattern ? `<code>${esc(t.rule_id_pattern)}</code>` : '<span class="_ion-s-0e42856cf0">—</span>';
-        const sevClass = t.severity_hint ? `sev-${t.severity_hint}` : '';
-        const sev = t.severity_hint ? `<span class="${sevClass}">${esc(t.severity_hint)}</span>` : '<span class="_ion-s-0e42856cf0">—</span>';
+        const sevMap = { critical: 'badge-error', high: 'badge-warning', medium: 'badge-info', low: 'badge-success' };
+        const sev = t.severity_hint ? `<span class="badge badge-sm ${sevMap[t.severity_hint] || 'badge-ghost'}">${esc(t.severity_hint)}</span>` : '<span class="_ion-s-0e42856cf0">—</span>';
         const statusBadge = t.enabled
-            ? `<span class="ion-badge ion-c-green">Enabled</span>`
-            : `<span class="ion-badge ion-c-muted">Disabled</span>`;
-        const techChips = (t.mitre_techniques || []).map(x => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(x)}</span>`).join('');
-        const tacticChips = (t.mitre_tactics || []).map(x => `<span class="ion-pill ion-c-muted ion-mono chip">${esc(x)}</span>`).join('');
+            ? `<span class="badge badge-success badge-sm">Enabled</span>`
+            : `<span class="badge badge-ghost badge-sm">Disabled</span>`;
+        const techChips = (t.mitre_techniques || []).map(x => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(x)}</span>`).join('');
+        const tacticChips = (t.mitre_tactics || []).map(x => `<span class="badge badge-ghost badge-sm font-mono mr-[0.2rem] mb-[0.2rem]">${esc(x)}</span>`).join('');
         const mitreLine = (techChips || tacticChips)
             ? `<div class="_ion-s-6def4d2d95"><span class="_ion-s-0e42856cf0">MITRE:</span> ${techChips}${tacticChips}</div>`
             : '';
@@ -352,8 +326,8 @@ function renderPrompts(items) {
                 <td>${renderScorecard(t.id)}</td>
                 <td>${statusBadge}</td>
                 <td>
-                    <button class="ion-btn" data-click-action="editTemplate" data-args='[${t.id}]'>Edit</button>
-                    <button class="ion-btn ion-btn-danger" data-click-action="deleteTemplate" data-args='[${t.id}]'>Delete</button>
+                    <button class="btn btn-ghost btn-sm" data-click-action="editTemplate" data-args='[${t.id}]'>Edit</button>
+                    <button class="btn btn-ghost btn-sm btn-error" data-click-action="deleteTemplate" data-args='[${t.id}]'>Delete</button>
                 </td>
             </tr>`;
     }).join('');

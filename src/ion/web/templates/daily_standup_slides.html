@@ -17,6 +17,7 @@
 #}
 
 <style nonce="{{ csp_nonce }}">
+  /* Hashed _ion-s-* rules in ion-migrated-styles.css read these tokens. */
   :root {
     --deck-bg-1: #0a0e14;
     --deck-bg-2: #0d121b;
@@ -33,22 +34,19 @@
     --ion-emerald: #4ade80;
   }
   body { background: var(--deck-bg-1); }
+  /* JS adds .presenting; daisyUI cannot hide the inherited chrome. */
   body.presenting nav,
   body.presenting header { display: none !important; }
   body.presenting main,
   body.presenting [class*="ion-tw-page"] { padding: 0 !important; }
 
+  /* Dual radial wash + masked grid. No Tailwind utility covers ::before. */
   .deck-host {
-    position: fixed; inset: 0; z-index: 50;
-    display: flex; flex-direction: column;
-    color: var(--deck-text);
-    font-family: ui-sans-serif, system-ui, sans-serif;
     background:
       radial-gradient(circle at 15% 12%, rgba(109,228,255,0.06) 0%, transparent 45%),
       radial-gradient(circle at 88% 90%, rgba(167,139,250,0.05) 0%, transparent 45%),
       linear-gradient(180deg, var(--deck-bg-1) 0%, var(--deck-bg-2) 100%);
   }
-  /* Subtle grid texture — same vibe as the dashboard */
   .deck-host::before {
     content: ""; position: absolute; inset: 0; pointer-events: none;
     background-image:
@@ -59,250 +57,64 @@
     mask-image: radial-gradient(circle at center, black 50%, transparent 100%);
   }
 
-  /* Brand mark — appears top-left on every slide */
-  .deck-brand {
-    position: absolute; top: 3.5vh; left: 4vw;
-    display: flex; align-items: center; gap: 10px; z-index: 2;
-  }
-  .deck-brand-mark {
-    width: 28px; height: 28px; border-radius: 6px;
+  /* Brand mark glow — gradient fill + box-shadow, not a daisyUI component. */
+  .deck-brand-mark,
+  .deck-brand-big {
     background: linear-gradient(135deg, var(--ion-cyan) 0%, var(--ion-iris) 100%);
-    display: grid; place-items: center;
-    font-family: ui-monospace, monospace; font-weight: 700;
-    color: #0a0e14; font-size: 14px;
-    box-shadow: 0 0 24px -6px rgba(109,228,255,0.45);
   }
-  .deck-brand-text { font-family: ui-monospace, monospace; font-weight: 600;
-                     letter-spacing: -0.01em; font-size: 14px; color: #f1f5f9; }
-  .deck-brand-sep { color: var(--deck-faint); margin: 0 2px; }
-  .deck-brand-section { color: var(--deck-dim); font-size: 13px;
-                        letter-spacing: 0.04em; }
-
-  /* Top-right meta — date, version */
-  .deck-meta {
-    position: absolute; top: 3.5vh; right: 4vw;
-    color: var(--deck-dim); font-size: 12px; z-index: 2;
-    font-family: ui-monospace, monospace;
-    text-align: right;
-  }
-  .deck-meta-date { color: #cbd5e1; font-size: 13px; margin-bottom: 2px; }
-
-  /* Slide layout */
-  .deck-slide {
-    flex: 1; position: relative;
-    display: flex; flex-direction: column;
-    padding: 14vh 6vw 10vh 6vw; overflow: hidden;
-  }
-  .deck-slide.hidden { display: none; }
-  .deck-eyebrow {
-    color: var(--ion-cyan); font-size: 12px;
-    letter-spacing: 0.22em; text-transform: uppercase; font-weight: 600;
-    margin-bottom: 1.6vh;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .deck-eyebrow::before {
-    content: ""; display: inline-block;
-    width: 22px; height: 1px; background: var(--ion-cyan);
-  }
-  .deck-title {
-    font-size: clamp(32px, 5vw, 64px); font-weight: 600;
-    color: #f8fafc; margin-bottom: 4vh;
-    line-height: 1.05; letter-spacing: -0.02em;
-  }
-  .deck-subtitle {
-    font-size: clamp(16px, 1.6vw, 22px); color: var(--deck-muted);
-    margin-bottom: 4vh; line-height: 1.4;
-  }
-
-  /* KPI cards — bordered, subtle gradient, accent values */
-  .deck-kpi-row {
-    display: grid; gap: 2vw;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    margin-bottom: 4vh;
-  }
-  .deck-kpi {
-    background: var(--deck-card);
-    border: 1px solid var(--deck-line);
-    border-radius: 12px;
-    padding: 22px 26px;
-    display: flex; flex-direction: column; gap: 12px;
-    backdrop-filter: blur(6px);
-    transition: border-color 0.2s;
-  }
-  .deck-kpi:hover { border-color: rgba(109,228,255,0.35); }
-  .deck-kpi-label {
-    color: var(--deck-dim); font-size: 11px;
-    text-transform: uppercase; letter-spacing: 0.16em; font-weight: 600;
-  }
-  .deck-kpi-value {
-    font-size: clamp(40px, 6vw, 80px); font-weight: 700;
-    line-height: 1; font-variant-numeric: tabular-nums;
-    letter-spacing: -0.02em;
-  }
-  .deck-kpi-sub { color: var(--deck-faint); font-size: 12px; margin-top: 2px; }
-  .deck-kpi-value.crit  { color: var(--ion-coral); }
-  .deck-kpi-value.warn  { color: var(--ion-amber); }
-  .deck-kpi-value.ok    { color: var(--ion-emerald); }
-  .deck-kpi-value.muted { color: #cbd5e1; }
-  .deck-kpi-value.brand {
-    background: linear-gradient(135deg, var(--ion-cyan) 0%, var(--ion-iris) 100%);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  /* Tables */
-  .deck-table {
-    width: 100%; font-size: clamp(13px, 1.15vw, 17px);
-    border-collapse: collapse;
-    background: var(--deck-card);
-    border: 1px solid var(--deck-line);
-    border-radius: 12px;
-    overflow: hidden;
-    backdrop-filter: blur(6px);
-  }
-  .deck-table th {
-    text-align: left; color: var(--deck-dim); font-weight: 600;
-    padding: 12px 18px; text-transform: uppercase;
-    font-size: 11px; letter-spacing: 0.14em;
-    background: rgba(15, 23, 42, 0.5);
-    border-bottom: 1px solid var(--deck-line);
-  }
-  .deck-table td {
-    padding: 12px 18px;
-    border-bottom: 1px solid var(--deck-line);
-    color: #cbd5e1;
-  }
-  .deck-table tr:last-child td { border-bottom: none; }
-  .deck-table tr:hover td { background: rgba(255,255,255,0.02); }
-  .deck-table .truncate {
-    max-width: 30vw; overflow: hidden;
-    text-overflow: ellipsis; white-space: nowrap;
-  }
-  .deck-table .mono { font-family: ui-monospace, monospace; color: #e2e8f0; }
-  .deck-empty {
-    color: var(--deck-dim); font-size: clamp(18px, 2vw, 26px);
-    margin-top: 4vh;
-    background: var(--deck-card);
-    border: 1px dashed var(--deck-line);
-    border-radius: 12px;
-    padding: 4vh 4vw;
-    text-align: center;
-  }
-
-  /* Severity / status pills */
-  .pill {
-    display: inline-block; padding: 3px 10px;
-    border-radius: 999px; font-size: 11px; font-weight: 600;
-    text-transform: uppercase; letter-spacing: 0.08em;
-  }
-  .pill.crit  { background: rgba(248,113,113,0.15); color: var(--ion-coral); }
-  .pill.warn  { background: rgba(251,191,36,0.15); color: var(--ion-amber); }
-  .pill.ok    { background: rgba(74,222,128,0.15); color: var(--ion-emerald); }
-  .pill.muted { background: rgba(148,163,184,0.12); color: var(--deck-muted); }
-
-  /* Footer — progress dots + counter + actions */
-  .deck-footer {
-    position: absolute; bottom: 3vh; left: 4vw; right: 4vw;
-    display: flex; justify-content: space-between; align-items: center;
-    color: var(--deck-faint); font-size: 12px; z-index: 2;
-  }
-  .deck-progress { display: flex; gap: 6px; }
-  .deck-progress-dot {
-    width: 24px; height: 3px; border-radius: 2px;
-    background: rgba(148,163,184,0.18); transition: background 0.25s;
-  }
-  .deck-progress-dot.active { background: linear-gradient(90deg, var(--ion-cyan), var(--ion-iris)); }
-  .deck-progress-dot.passed { background: rgba(148,163,184,0.45); }
-  .deck-counter {
-    font-family: ui-monospace, monospace; font-size: 11px;
-    letter-spacing: 0.1em; color: var(--deck-dim);
-  }
-  .deck-footer-actions { display: flex; align-items: center; gap: 14px; }
-  .deck-footer-actions a {
-    color: var(--deck-muted); text-decoration: none;
-    transition: color 0.15s;
-  }
-  .deck-footer-actions a:hover { color: var(--ion-cyan); }
-  .deck-footer-actions .sep { color: var(--deck-faint); }
-  .deck-footer-actions kbd {
-    font-family: ui-monospace, monospace; font-size: 10px;
-    padding: 2px 6px; border-radius: 4px;
-    background: rgba(148,163,184,0.12);
-    border: 1px solid var(--deck-line);
-    color: var(--deck-muted);
-  }
-
-  /* Title slide — special layout */
-  .deck-slide.title-slide {
-    align-items: center; justify-content: center;
-    text-align: center; padding: 0;
-  }
-  .deck-slide.title-slide .deck-brand-big {
-    width: 96px; height: 96px; border-radius: 22px;
-    background: linear-gradient(135deg, var(--ion-cyan) 0%, var(--ion-iris) 100%);
-    display: grid; place-items: center;
-    font-family: ui-monospace, monospace; font-weight: 700;
-    color: #0a0e14; font-size: 48px;
+  .deck-brand-mark { box-shadow: 0 0 24px -6px rgba(109,228,255,0.45); }
+  .deck-brand-big {
     box-shadow:
       0 0 80px -10px rgba(109,228,255,0.55),
       0 0 40px -8px rgba(167,139,250,0.35);
-    margin-bottom: 5vh;
   }
+
+  /* JS toggles .hidden on a flex slide; equal-specificity utilities fight. */
+  .deck-slide.hidden { display: none; }
+
+  /* Title-slide wordmark uses background-clip text. */
   .deck-slide.title-slide .deck-title {
-    font-size: clamp(48px, 8vw, 110px);
-    margin-bottom: 2vh;
     background: linear-gradient(180deg, #f8fafc 0%, #94a3b8 100%);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent;
   }
-  .deck-slide.title-slide .deck-subtitle {
-    font-size: clamp(18px, 2vw, 28px); color: var(--deck-muted);
-  }
-  .deck-slide.title-slide .deck-eyebrow { justify-content: center; }
-  .deck-slide.title-slide .deck-eyebrow::before { display: none; }
 
-  /* Loading / error state */
-  .deck-loading {
-    display: flex; align-items: center; justify-content: center;
-    flex: 1; color: var(--deck-dim);
-    font-size: 18px; flex-direction: column; gap: 12px;
+  /* JS toggles .active / .passed on these dots. */
+  .deck-progress-dot {
+    width: 24px; height: 3px; border-radius: 2px;
+    background: rgba(148, 163, 184, 0.18); transition: background 0.25s;
   }
-  .deck-loading-spinner {
-    width: 36px; height: 36px; border-radius: 50%;
-    border: 2px solid var(--deck-line);
-    border-top-color: var(--ion-cyan);
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+  .deck-progress-dot.active { background: linear-gradient(90deg, var(--ion-cyan), var(--ion-iris)); }
+  .deck-progress-dot.passed { background: rgba(148, 163, 184, 0.45); }
 </style>
 
-<div class="deck-host" id="deck-host">
-  <div class="deck-brand">
-    <div class="deck-brand-mark">I</div>
-    <div class="deck-brand-text">ION</div>
-    <div class="deck-brand-sep">/</div>
-    <div class="deck-brand-section" id="deck-section-name">Daily Standup</div>
+<div class="deck-host fixed inset-0 z-50 flex flex-col font-sans text-base-content" id="deck-host">
+  <div class="absolute top-[3.5vh] left-[4vw] z-[2] flex flex-wrap items-center gap-2.5">
+    <div class="deck-brand-mark grid h-7 w-7 place-items-center rounded-md font-mono text-sm font-bold text-primary-content">I</div>
+    <div class="font-mono text-sm font-semibold tracking-tight">ION</div>
+    <div class="mx-0.5 text-base-content/30">/</div>
+    <div class="text-[13px] tracking-wide text-base-content/50" id="deck-section-name">Daily Standup</div>
   </div>
-  <div class="deck-meta">
-    <div class="deck-meta-date" id="deck-meta-date">—</div>
+  <div class="absolute top-[3.5vh] right-[4vw] z-[2] text-right font-mono text-xs text-base-content/50">
+    <div class="mb-0.5 text-[13px] text-base-content" id="deck-meta-date">—</div>
     <div>v{{ ion_version }} · /daily-standup</div>
   </div>
 
-  <div class="deck-loading" id="deck-loading">
-    <div class="deck-loading-spinner"></div>
+  <div class="flex flex-1 flex-col items-center justify-center gap-3 text-lg text-base-content/50" id="deck-loading">
+    <span class="loading loading-spinner loading-lg text-primary"></span>
     <div>Running checks…</div>
   </div>
-  <div id="deck-content"></div>
+  <div class="flex min-h-0 flex-1 flex-col" id="deck-content"></div>
 
-  <div class="deck-footer">
-    <div class="deck-progress" id="deck-progress"></div>
-    <div class="deck-counter" id="deck-counter">—</div>
-    <div class="deck-footer-actions">
-      <a href="#" data-click-action="dsDownloadPptx" data-args='["$event"]' title="Download as PowerPoint">.pptx</a>
-      <span class="sep">·</span>
-      <span><kbd>F</kbd> fullscreen</span>
-      <span class="sep">·</span>
-      <a href="/daily-standup">Exit <kbd>Esc</kbd></a>
+  <div class="absolute bottom-[3vh] left-[4vw] right-[4vw] z-[2] flex flex-wrap items-center justify-between gap-3 text-xs text-base-content/40">
+    <div class="flex gap-1.5" id="deck-progress"></div>
+    <div class="font-mono text-[11px] tracking-widest text-base-content/50" id="deck-counter">—</div>
+    <div class="flex flex-wrap items-center gap-3">
+      <a href="#" class="btn btn-ghost btn-xs" data-click-action="dsDownloadPptx" data-args='["$event"]' title="Download as PowerPoint">.pptx</a>
+      <span class="text-base-content/30">·</span>
+      <span><kbd class="kbd kbd-xs">F</kbd> fullscreen</span>
+      <span class="text-base-content/30">·</span>
+      <a href="/daily-standup" class="btn btn-ghost btn-xs">Exit <kbd class="kbd kbd-xs">Esc</kbd></a>
     </div>
   </div>
 </div>
@@ -331,13 +143,32 @@
   };
   const sevPill = (s) => {
     const sev = String(s || '').toLowerCase();
-    const cls = sev === 'critical' ? 'crit'
-              : sev === 'high' ? 'warn'
-              : sev === 'medium' ? 'muted'
-              : sev === 'low' ? 'ok'
-              : 'muted';
-    return `<span class="pill ${cls}">${esc(s || '—')}</span>`;
+    const cls = sev === 'critical' ? 'badge-error'
+              : sev === 'high' ? 'badge-warning'
+              : sev === 'medium' ? 'badge-info'
+              : sev === 'low' ? 'badge-success'
+              : 'badge-ghost';
+    return `<span class="badge badge-sm ${cls}">${esc(s || '—')}</span>`;
   };
+  const kpiTone = (kind) =>
+    kind === 'crit' ? 'text-error'
+    : kind === 'warn' ? 'text-warning'
+    : kind === 'ok' ? 'text-success'
+    : kind === 'brand' ? 'text-primary'
+    : 'text-base-content';
+
+  const slideShell = (attrs, body) =>
+    `<div class="deck-slide relative flex flex-1 flex-col overflow-hidden px-[6vw] pb-[10vh] pt-[14vh]" ${attrs}>${body}</div>`;
+  const titleShell = (attrs, body) =>
+    `<div class="deck-slide title-slide relative flex flex-1 flex-col items-center justify-center overflow-hidden p-0 text-center" ${attrs}>${body}</div>`;
+  const eyebrow = (text) =>
+    `<div class="mb-[1.6vh] flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary"><span class="inline-block h-px w-[22px] bg-primary"></span>${text}</div>`;
+  const titleEyebrow = (text) =>
+    `<div class="mb-[1.6vh] flex items-center justify-center gap-2.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary">${text}</div>`;
+  const hTitle = (text) =>
+    `<div class="mb-[4vh] text-[clamp(32px,5vw,64px)] font-semibold leading-[1.05] tracking-tight">${text}</div>`;
+  const statVal = (tone, extra, inner) =>
+    `<div class="stat-value tabular-nums text-[clamp(40px,6vw,80px)] leading-none ${kpiTone(tone)} ${extra}">${inner}</div>`;
 
   // --- slide builders --------------------------------------------
   function slideTitle(d) {
@@ -347,12 +178,12 @@
     });
     return {
       name: 'Daily Standup',
-      html: `<div class="deck-slide title-slide" data-slide="title">
-        <div class="deck-brand-big">I</div>
-        <div class="deck-eyebrow">Daily SOC Standup</div>
-        <div class="deck-title">${esc(dateLong)}</div>
-        <div class="deck-subtitle">Operations briefing · automated checks · sign-off</div>
-      </div>`
+      html: titleShell('data-slide="title"', `
+        <div class="deck-brand-big mb-[5vh] grid h-24 w-24 place-items-center rounded-[22px] font-mono text-5xl font-bold text-primary-content">I</div>
+        ${titleEyebrow('Daily SOC Standup')}
+        <div class="deck-title mb-[2vh] text-[clamp(48px,8vw,110px)] font-semibold leading-[1.05] tracking-tight">${esc(dateLong)}</div>
+        <div class="text-[clamp(18px,2vw,28px)] text-base-content/60">Operations briefing · automated checks · sign-off</div>
+      `)
     };
   }
 
@@ -362,20 +193,20 @@
     const cls = status === 'green' ? 'ok' : status === 'yellow' ? 'warn' : 'crit';
     return {
       name: 'Cluster Health',
-      html: `<div class="deck-slide" data-slide="cluster">
-        <div class="deck-eyebrow">Section 1 · Elasticsearch Health</div>
-        <div class="deck-title">Cluster ${esc(c.cluster_name || '—')}</div>
-        <div class="deck-kpi-row">
-          <div class="deck-kpi"><div class="deck-kpi-label">Status</div>
-            <div class="deck-kpi-value ${cls}">${esc(c.status || '—')}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Indices</div>
-            <div class="deck-kpi-value muted">${esc(c.indices_count ?? '—')}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Storage</div>
-            <div class="deck-kpi-value muted _ion-s-df72aa4fcb">${esc(c.store_size || '—')}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Unassigned shards</div>
-            <div class="deck-kpi-value ${(c.unassigned_shards || 0) > 0 ? 'crit' : 'ok'}">${esc(c.unassigned_shards ?? '—')}</div></div>
+      html: slideShell('data-slide="cluster"', `
+        ${eyebrow('Section 1 · Elasticsearch Health')}
+        ${hTitle('Cluster ' + esc(c.cluster_name || '—'))}
+        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
+          <div class="stat"><div class="stat-title">Status</div>
+            ${statVal(cls, '', esc(c.status || '—'))}</div>
+          <div class="stat"><div class="stat-title">Indices</div>
+            ${statVal('muted', '', esc(c.indices_count ?? '—'))}</div>
+          <div class="stat"><div class="stat-title">Storage</div>
+            ${statVal('muted', '_ion-s-df72aa4fcb', esc(c.store_size || '—'))}</div>
+          <div class="stat"><div class="stat-title">Unassigned shards</div>
+            ${statVal((c.unassigned_shards || 0) > 0 ? 'crit' : 'ok', '', esc(c.unassigned_shards ?? '—'))}</div>
         </div>
-      </div>`
+      `)
     };
   }
 
@@ -386,45 +217,47 @@
     // the source has degraded — different from a clean empty state.
     const isFallback = a.source === 'ion_fallback';
     const fallback = isFallback
-      ? `<div class="_ion-s-c3593ed150">
-           <strong>ION-local fallback active</strong> ·
-           ${esc(a.fallback_reason || 'ES returned no critical-severity matches')}
+      ? `<div class="alert alert-warning _ion-s-c3593ed150">
+           <span><strong>ION-local fallback active</strong> ·
+           ${esc(a.fallback_reason || 'ES returned no critical-severity matches')}</span>
          </div>`
       : '';
     let body;
     if (a.error) {
-      body = `<div class="deck-empty">Critical-alert check failed: ${esc(a.error)}</div>`;
+      body = `<div class="alert alert-error mt-[4vh]">Critical-alert check failed: ${esc(a.error)}</div>`;
     } else if (!list.length) {
-      body = `<div class="deck-empty">✓ No critical alerts in the last 24 hours.</div>`;
+      body = `<div class="alert alert-success mt-[4vh]">✓ No critical alerts in the last 24 hours.</div>`;
     } else {
       // final fallback to alert id so the Rule cell is
       // never blank on the slide — matches the standup page change.
       const rows = list.slice(0, 10).map(r => {
         const ruleLabel = r.rule_name || r.title || r.id || '(unnamed)';
         return `<tr>
-        <td class="mono">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
+        <td class="font-mono">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
         <td>${sevPill(r.severity)}</td>
-        <td class="truncate" title="${esc(ruleLabel)}">${esc(ruleLabel)}</td>
-        <td class="mono">${esc(r.host || '')}</td>
+        <td class="max-w-[30vw] truncate" title="${esc(ruleLabel)}">${esc(ruleLabel)}</td>
+        <td class="font-mono">${esc(r.host || '')}</td>
       </tr>`;
       }).join('');
-      body = `<table class="deck-table"><thead><tr>
+      body = `<div class="card bg-base-200 shadow"><div class="overflow-x-auto"><table class="table table-sm"><thead><tr>
         <th>Time</th><th>Severity</th><th>Rule</th><th>Host</th>
-      </tr></thead><tbody>${rows}</tbody></table>`;
+      </tr></thead><tbody>${rows}</tbody></table></div></div>`;
     }
     return {
       name: 'Critical Alerts',
-      html: `<div class="deck-slide" data-slide="criticals">
-        <div class="deck-eyebrow">Section 2 · ${isFallback ? 'ION-Tracked Alerts' : 'Critical Alerts'} (Last 24h)</div>
-        <div class="deck-title">${isFallback ? 'Recent Alerts' : 'Critical Alerts'}</div>
-        <div class="deck-kpi-row _ion-s-4423649d52">
-          <div class="deck-kpi"><div class="deck-kpi-label">${isFallback ? 'Open (ION)' : 'Critical'}</div>
-            <div class="deck-kpi-value crit">${esc(a.critical_count ?? 0)}</div>
-            <div class="deck-kpi-sub">in last 24 hours</div></div>
+      html: slideShell('data-slide="criticals"', `
+        ${eyebrow('Section 2 · ' + (isFallback ? 'ION-Tracked Alerts' : 'Critical Alerts') + ' (Last 24h)')}
+        ${hTitle(isFallback ? 'Recent Alerts' : 'Critical Alerts')}
+        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] _ion-s-4423649d52">
+          <div class="stats w-full bg-base-200 shadow">
+            <div class="stat"><div class="stat-title">${isFallback ? 'Open (ION)' : 'Critical'}</div>
+            ${statVal('crit', '', esc(a.critical_count ?? 0))}
+            <div class="stat-desc">in last 24 hours</div></div>
+          </div>
         </div>
         ${fallback}
         ${body}
-      </div>`
+      `)
     };
   }
 
@@ -433,7 +266,7 @@
     const list = c.cases || [];
     let body;
     if (!list.length) {
-      body = `<div class="deck-empty">✓ No stale cases.</div>`;
+      body = `<div class="alert alert-success mt-[4vh]">✓ No stale cases.</div>`;
     } else {
       // render every stale case (no .slice cap) and wrap
       // the table in a scrollable container so 50+ rows don't blow
@@ -445,30 +278,32 @@
             + (r.triggered_rules.length > 3 ? ` +${r.triggered_rules.length - 3}` : '')
           : '<span class="_ion-s-e0b6f683ff">—</span>';
         return `<tr>
-          <td class="mono">${esc(r.case_number || '')}</td>
-          <td class="truncate">${esc(r.title || '')}</td>
-          <td class="truncate _ion-s-5d05e2e124">${rules}</td>
+          <td class="font-mono">${esc(r.case_number || '')}</td>
+          <td class="max-w-[30vw] truncate">${esc(r.title || '')}</td>
+          <td class="max-w-[30vw] truncate _ion-s-5d05e2e124">${rules}</td>
           <td>${sevPill(r.severity)}</td>
-          <td class="mono">${esc(r.hours_open ?? 0)}h</td>
+          <td class="font-mono">${esc(r.hours_open ?? 0)}h</td>
         </tr>`;
       }).join('');
-      body = `<div class="_ion-s-2289ace819">
-        <table class="deck-table"><thead><tr>
+      body = `<div class="card bg-base-200 shadow _ion-s-2289ace819">
+        <table class="table table-sm"><thead><tr>
           <th>Case</th><th>Title</th><th>Triggered Rules</th><th>Severity</th><th>Open</th>
         </tr></thead><tbody>${rows}</tbody></table>
       </div>`;
     }
     return {
       name: 'Stale Cases',
-      html: `<div class="deck-slide" data-slide="stale-cases">
-        <div class="deck-eyebrow">Section 3 · Stale Cases (Open &gt; 24h, all)</div>
-        <div class="deck-title">Stale Cases</div>
-        <div class="deck-kpi-row _ion-s-4423649d52">
-          <div class="deck-kpi"><div class="deck-kpi-label">Open beyond threshold</div>
-            <div class="deck-kpi-value ${list.length ? 'warn' : 'ok'}">${esc(c.count ?? list.length)}</div></div>
+      html: slideShell('data-slide="stale-cases"', `
+        ${eyebrow('Section 3 · Stale Cases (Open &gt; 24h, all)')}
+        ${hTitle('Stale Cases')}
+        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] _ion-s-4423649d52">
+          <div class="stats w-full bg-base-200 shadow">
+            <div class="stat"><div class="stat-title">Open beyond threshold</div>
+            ${statVal(list.length ? 'warn' : 'ok', '', esc(c.count ?? list.length))}</div>
+          </div>
         </div>
         ${body}
-      </div>`
+      `)
     };
   }
 
@@ -477,32 +312,32 @@
     if (a.total == null) {
       return {
         name: 'Alert Backlog',
-        html: `<div class="deck-slide" data-slide="backlog">
-          <div class="deck-eyebrow">Section 4 · Alert Backlog (30 days)</div>
-          <div class="deck-title">Alert Backlog</div>
-          <div class="deck-empty">No data.</div>
-        </div>`
+        html: slideShell('data-slide="backlog"', `
+          ${eyebrow('Section 4 · Alert Backlog (30 days)')}
+          ${hTitle('Alert Backlog')}
+          <div class="alert alert-info mt-[4vh]">No data.</div>
+        `)
       };
     }
     const stillOpen = a.still_open_pct ?? 0;
     const cls = stillOpen >= 30 ? 'crit' : stillOpen >= 15 ? 'warn' : 'ok';
     return {
       name: 'Alert Backlog',
-      html: `<div class="deck-slide" data-slide="backlog">
-        <div class="deck-eyebrow">Section 4 · Alert Backlog (Last 30 Days)</div>
-        <div class="deck-title">Alert Backlog</div>
-        <div class="deck-kpi-row">
-          <div class="deck-kpi"><div class="deck-kpi-label">Total alerts</div>
-            <div class="deck-kpi-value muted">${(a.total ?? 0).toLocaleString()}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Still open</div>
-            <div class="deck-kpi-value ${cls}">${(a.open ?? 0).toLocaleString()}</div>
-            <div class="deck-kpi-sub">${esc(stillOpen)}% of 30-day total</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Acknowledged</div>
-            <div class="deck-kpi-value warn">${(a.acknowledged ?? 0).toLocaleString()}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Closed</div>
-            <div class="deck-kpi-value ok">${(a.closed ?? 0).toLocaleString()}</div></div>
+      html: slideShell('data-slide="backlog"', `
+        ${eyebrow('Section 4 · Alert Backlog (Last 30 Days)')}
+        ${hTitle('Alert Backlog')}
+        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
+          <div class="stat"><div class="stat-title">Total alerts</div>
+            ${statVal('muted', '', (a.total ?? 0).toLocaleString())}</div>
+          <div class="stat"><div class="stat-title">Still open</div>
+            ${statVal(cls, '', (a.open ?? 0).toLocaleString())}
+            <div class="stat-desc">${esc(stillOpen)}% of 30-day total</div></div>
+          <div class="stat"><div class="stat-title">Acknowledged</div>
+            ${statVal('warn', '', (a.acknowledged ?? 0).toLocaleString())}</div>
+          <div class="stat"><div class="stat-title">Closed</div>
+            ${statVal('ok', '', (a.closed ?? 0).toLocaleString())}</div>
         </div>
-      </div>`
+      `)
     };
   }
 
@@ -513,20 +348,20 @@
     // closed_24h is "closed in last 24h regardless of created date".
     return {
       name: 'Case Status',
-      html: `<div class="deck-slide" data-slide="case-status">
-        <div class="deck-eyebrow">Section 5 · Cases (Last 24h)</div>
-        <div class="deck-title">Case Status — Today</div>
-        <div class="deck-kpi-row">
-          <div class="deck-kpi"><div class="deck-kpi-label">Opened (24h, still open)</div>
-            <div class="deck-kpi-value warn">${esc(cs.open ?? 0)}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">In progress</div>
-            <div class="deck-kpi-value muted">${esc(cs.in_progress ?? 0)}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Closed in 24h</div>
-            <div class="deck-kpi-value ok">${esc(cs.closed_24h ?? 0)}</div></div>
-          <div class="deck-kpi"><div class="deck-kpi-label">Intake (24h)</div>
-            <div class="deck-kpi-value brand">${esc(cs.intake_24h ?? 0)}</div></div>
+      html: slideShell('data-slide="case-status"', `
+        ${eyebrow('Section 5 · Cases (Last 24h)')}
+        ${hTitle('Case Status — Today')}
+        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
+          <div class="stat"><div class="stat-title">Opened (24h, still open)</div>
+            ${statVal('warn', '', esc(cs.open ?? 0))}</div>
+          <div class="stat"><div class="stat-title">In progress</div>
+            ${statVal('muted', '', esc(cs.in_progress ?? 0))}</div>
+          <div class="stat"><div class="stat-title">Closed in 24h</div>
+            ${statVal('ok', '', esc(cs.closed_24h ?? 0))}</div>
+          <div class="stat"><div class="stat-title">Intake (24h)</div>
+            ${statVal('brand', '', esc(cs.intake_24h ?? 0))}</div>
         </div>
-      </div>`
+      `)
     };
   }
 
@@ -541,22 +376,22 @@
       const silent = x.hosts_with_gaps ?? 0;
       const total = x.host_count ?? 0;
       const cls = silent > 0 ? 'crit' : 'ok';
-      return `<div class="deck-kpi">
-        <div class="deck-kpi-label">${esc(label)}</div>
-        <div class="deck-kpi-value ${cls}">${esc(silent)} <span class="_ion-s-1fd9776cf9">/ ${esc(total)}</span></div>
-        <div class="deck-kpi-sub">silent / total hosts</div>
+      return `<div class="stat">
+        <div class="stat-title">${esc(label)}</div>
+        ${statVal(cls, '', esc(silent) + ' <span class="_ion-s-1fd9776cf9">/ ' + esc(total) + '</span>')}
+        <div class="stat-desc">silent / total hosts</div>
       </div>`;
     };
     return {
       name: 'Log Sources',
-      html: `<div class="deck-slide" data-slide="log-health">
-        <div class="deck-eyebrow">Section 6 · Log-Source Health</div>
-        <div class="deck-title">Log Sources</div>
-        <div class="deck-kpi-row">
+      html: slideShell('data-slide="log-health"', `
+        ${eyebrow('Section 6 · Log-Source Health')}
+        ${hTitle('Log Sources')}
+        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
           ${block('Domain Controllers', dc)}
           ${block('Windows Event Forwarding', wef)}
         </div>
-      </div>`
+      `)
     };
   }
 
@@ -565,34 +400,36 @@
     const list = r.rules || [];
     let body;
     if (!list.length) {
-      body = `<div class="deck-empty">✓ No detection-rule execution failures.</div>`;
+      body = `<div class="alert alert-success mt-[4vh]">✓ No detection-rule execution failures.</div>`;
     } else {
       // was reading x.name + x.last_status but API was
       // emitting rule_name + failure_count, so every row rendered
       // blank. Aligned now — name + failures + last_failure shown.
       const rows = list.map(x => `<tr>
-        <td class="truncate">${esc(x.name || x.rule_name || '(unnamed)')}</td>
-        <td class="mono">${esc(x.failures ?? x.failure_count ?? 0)}</td>
-        <td class="mono">${esc((x.last_failure || '').slice(0, 16).replace('T', ' '))}</td>
+        <td class="max-w-[30vw] truncate">${esc(x.name || x.rule_name || '(unnamed)')}</td>
+        <td class="font-mono">${esc(x.failures ?? x.failure_count ?? 0)}</td>
+        <td class="font-mono">${esc((x.last_failure || '').slice(0, 16).replace('T', ' '))}</td>
         <td>${sevPill(x.last_status || 'failure')}</td>
       </tr>`).join('');
-      body = `<div class="_ion-s-2289ace819">
-        <table class="deck-table"><thead><tr>
+      body = `<div class="card bg-base-200 shadow _ion-s-2289ace819">
+        <table class="table table-sm"><thead><tr>
           <th>Rule</th><th>Failures (24h)</th><th>Last failure</th><th>Status</th>
         </tr></thead><tbody>${rows}</tbody></table>
       </div>`;
     }
     return {
       name: 'Rule Failures',
-      html: `<div class="deck-slide" data-slide="rule-failures">
-        <div class="deck-eyebrow">Section 7 · Detection Rule Failures (Last 24h)</div>
-        <div class="deck-title">Rule Failures</div>
-        <div class="deck-kpi-row _ion-s-4423649d52">
-          <div class="deck-kpi"><div class="deck-kpi-label">Failing rules</div>
-            <div class="deck-kpi-value ${list.length ? 'crit' : 'ok'}">${esc(r.count ?? list.length)}</div></div>
+      html: slideShell('data-slide="rule-failures"', `
+        ${eyebrow('Section 7 · Detection Rule Failures (Last 24h)')}
+        ${hTitle('Rule Failures')}
+        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] _ion-s-4423649d52">
+          <div class="stats w-full bg-base-200 shadow">
+            <div class="stat"><div class="stat-title">Failing rules</div>
+            ${statVal(list.length ? 'crit' : 'ok', '', esc(r.count ?? list.length))}</div>
+          </div>
         </div>
         ${body}
-      </div>`
+      `)
     };
   }
 
@@ -612,8 +449,8 @@
   function slideThreatSummary() {
     const text = _readLS('ion.standup.ai_summary');
     const body = text
-      ? `<div class="_ion-s-4f2d370f62">${esc(text)}</div>`
-      : `<div class="deck-empty">
+      ? `<div class="card bg-base-200 shadow _ion-s-4f2d370f62">${esc(text)}</div>`
+      : `<div class="alert alert-info mt-[4vh]">
            No AI threat summary available.<br>
            <span class="_ion-s-d900a9388d">
              Click <strong>Generate Summary</strong> on /daily-standup, then refresh this deck.
@@ -621,19 +458,19 @@
          </div>`;
     return {
       name: 'AI Threat Summary',
-      html: `<div class="deck-slide" data-slide="threat-summary">
-        <div class="deck-eyebrow">Section 8 · Threat Landscape</div>
-        <div class="deck-title">AI Threat Summary</div>
+      html: slideShell('data-slide="threat-summary"', `
+        ${eyebrow('Section 8 · Threat Landscape')}
+        ${hTitle('AI Threat Summary')}
         ${body}
-      </div>`
+      `)
     };
   }
 
   function slideAOB() {
     const text = _readLS('ion.standup.aob');
     const body = text
-      ? `<div class="_ion-s-e4873e3c1b">${esc(text)}</div>`
-      : `<div class="deck-empty">
+      ? `<div class="card bg-base-200 shadow _ion-s-e4873e3c1b">${esc(text)}</div>`
+      : `<div class="alert alert-info mt-[4vh]">
            No AOB items recorded.<br>
            <span class="_ion-s-d900a9388d">
              Add notes via the <strong>Additional Notes</strong> field on /daily-standup, then refresh this deck.
@@ -641,28 +478,28 @@
          </div>`;
     return {
       name: 'Any Other Business',
-      html: `<div class="deck-slide" data-slide="aob">
-        <div class="deck-eyebrow">Section 9 · Any Other Business</div>
-        <div class="deck-title">AOB</div>
+      html: slideShell('data-slide="aob"', `
+        ${eyebrow('Section 9 · Any Other Business')}
+        ${hTitle('AOB')}
         ${body}
-      </div>`
+      `)
     };
   }
 
   function slideClose() {
     return {
       name: 'Close',
-      html: `<div class="deck-slide title-slide" data-slide="close">
-        <div class="deck-brand-big">I</div>
-        <div class="deck-eyebrow">End of Standup</div>
-        <div class="deck-title">Questions? Action items?</div>
-        <div class="deck-subtitle">
-          <kbd class="_ion-s-bc1acd9238">←</kbd>
+      html: titleShell('data-slide="close"', `
+        <div class="deck-brand-big mb-[5vh] grid h-24 w-24 place-items-center rounded-[22px] font-mono text-5xl font-bold text-primary-content">I</div>
+        ${titleEyebrow('End of Standup')}
+        <div class="deck-title mb-[2vh] text-[clamp(48px,8vw,110px)] font-semibold leading-[1.05] tracking-tight">Questions? Action items?</div>
+        <div class="text-[clamp(18px,2vw,28px)] text-base-content/60">
+          <kbd class="kbd kbd-sm _ion-s-bc1acd9238">←</kbd>
           to revisit any section ·
-          <kbd class="_ion-s-bc1acd9238">Esc</kbd>
+          <kbd class="kbd kbd-sm _ion-s-bc1acd9238">Esc</kbd>
           to exit
         </div>
-      </div>`
+      `)
     };
   }
 
@@ -766,7 +603,7 @@
     .then(render)
     .catch(err => {
       loading.innerHTML =
-        '<div class="_ion-s-02d8d99c2c">Failed to load: ' + esc(err.message) + '</div>';
+        '<div class="alert alert-error _ion-s-02d8d99c2c">Failed to load: ' + esc(err.message) + '</div>';
     });
 })();
 </script>

@@ -3,7 +3,7 @@
 {% block title %}ION Guide - Training & Reference{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {% set tabs = [
     {"label": "ION Guide", "href": "/guide"},
@@ -15,47 +15,47 @@
 {% set active_label = "ION Guide" %}
 {% include "_nav_tabs.html" %}
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
-    <svg class="w-4 h-4 text-ion-iris"><use href="#i-book-open"/></svg>
-    <span class="label-tiny text-ion-iris">Operator guide</span>
+    <svg class="w-4 h-4 text-primary"><use href="#i-book-open"/></svg>
+    <span class="label-tiny text-primary">Operator guide</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">ION Guide</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Getting started, workflows and reference.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">ION Guide</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Getting started, workflows and reference.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
         <button class="btn btn-secondary" data-window-print><i class="icon-printer"></i> Print</button>
     </div>
 </section>
 
-<!-- Role selector -->
-<div class="g-role-bar">
-    <span class="g-role-label">I am a:</span>
-    <button class="g-role-btn active" data-role="all" data-click-action="gSetRole" data-args='["all"]'>Everyone</button>
-    <button class="g-role-btn" data-role="analyst" data-click-action="gSetRole" data-args='["analyst"]'>L1 Analyst</button>
-    <button class="g-role-btn" data-role="senior" data-click-action="gSetRole" data-args='["senior"]'>L2/L3 Analyst</button>
-    <button class="g-role-btn" data-role="lead" data-click-action="gSetRole" data-args='["lead"]'>SOC Lead</button>
-    <button class="g-role-btn" data-role="engineer" data-click-action="gSetRole" data-args='["engineer"]'>Engineer</button>
-    <button class="g-role-btn" data-role="dfir" data-click-action="gSetRole" data-args='["dfir"]'>DFIR</button>
+<!-- Role selector. JS toggles .active on .g-role-btn and reads data-role. -->
+<div class="g-role-bar flex flex-wrap items-center gap-2 p-3 mb-4 bg-base-200 border border-base-300 rounded-box">
+    <span class="text-xs font-bold uppercase tracking-wide text-base-content/60 mr-1">I am a:</span>
+    <button class="btn btn-sm btn-ghost g-role-btn active" data-role="all" data-click-action="gSetRole" data-args='["all"]'>Everyone</button>
+    <button class="btn btn-sm btn-ghost g-role-btn" data-role="analyst" data-click-action="gSetRole" data-args='["analyst"]'>L1 Analyst</button>
+    <button class="btn btn-sm btn-ghost g-role-btn" data-role="senior" data-click-action="gSetRole" data-args='["senior"]'>L2/L3 Analyst</button>
+    <button class="btn btn-sm btn-ghost g-role-btn" data-role="lead" data-click-action="gSetRole" data-args='["lead"]'>SOC Lead</button>
+    <button class="btn btn-sm btn-ghost g-role-btn" data-role="engineer" data-click-action="gSetRole" data-args='["engineer"]'>Engineer</button>
+    <button class="btn btn-sm btn-ghost g-role-btn" data-role="dfir" data-click-action="gSetRole" data-args='["dfir"]'>DFIR</button>
 </div>
 
-<!-- Quick nav -->
-<div class="g-quicknav" id="g-quicknav">
-    <a href="#section-getting-started">Getting Started</a>
-    <a href="#section-dashboard">Dashboard</a>
-    <a href="#section-alerts">Alerts & Triage</a>
-    <a href="#section-cases">Cases</a>
-    <a href="#section-observables">Observables</a>
-    <a href="#section-threat-intel">Threat Intel</a>
-    <a href="#section-attack-stories">Attack Stories</a>
-    <a href="#section-playbooks">Playbooks</a>
-    <a href="#section-detection">Detection Engineering</a>
-    <a href="#section-forensics">DFIR</a>
-    <a href="#section-analytics">Analytics</a>
-    <a href="#section-tools">Tools & Utilities</a>
-    <a href="#section-admin">Admin & Settings</a>
-    <a href="#section-workflows">Key Workflows</a>
-    <a href="#section-shortcuts">Quick Reference</a>
+<!-- Quick nav. JS binds click on .g-quicknav a. -->
+<div class="g-quicknav flex flex-wrap gap-1 p-2 mb-5 bg-base-200 border border-base-300 rounded-box" id="g-quicknav">
+    <a href="#section-getting-started" class="btn btn-ghost btn-xs">Getting Started</a>
+    <a href="#section-dashboard" class="btn btn-ghost btn-xs">Dashboard</a>
+    <a href="#section-alerts" class="btn btn-ghost btn-xs">Alerts & Triage</a>
+    <a href="#section-cases" class="btn btn-ghost btn-xs">Cases</a>
+    <a href="#section-observables" class="btn btn-ghost btn-xs">Observables</a>
+    <a href="#section-threat-intel" class="btn btn-ghost btn-xs">Threat Intel</a>
+    <a href="#section-attack-stories" class="btn btn-ghost btn-xs">Attack Stories</a>
+    <a href="#section-playbooks" class="btn btn-ghost btn-xs">Playbooks</a>
+    <a href="#section-detection" class="btn btn-ghost btn-xs">Detection Engineering</a>
+    <a href="#section-forensics" class="btn btn-ghost btn-xs">DFIR</a>
+    <a href="#section-analytics" class="btn btn-ghost btn-xs">Analytics</a>
+    <a href="#section-tools" class="btn btn-ghost btn-xs">Tools & Utilities</a>
+    <a href="#section-admin" class="btn btn-ghost btn-xs">Admin & Settings</a>
+    <a href="#section-workflows" class="btn btn-ghost btn-xs">Key Workflows</a>
+    <a href="#section-shortcuts" class="btn btn-ghost btn-xs">Quick Reference</a>
 </div>
 
 <div class="g-content" id="g-content">
@@ -63,461 +63,845 @@
 <!-- ============================================================ -->
 <!-- GETTING STARTED -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-getting-started" data-roles="all analyst senior lead engineer dfir">
-    <h2 class="g-section-title"><i class="icon-play-circle"></i> Getting Started</h2>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-getting-started" data-roles="all analyst senior lead engineer dfir">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-play-circle text-primary"></i> Getting Started</h2>
 
-    <div class="g-intro">
-        <p><strong>ION</strong> (Intelligent Operating Network) is a Security Operations Center platform built for the <strong>Guarded Glass</strong> team. It connects your Elasticsearch alerts, OpenCTI threat intelligence, TIDE detection rules, and Ollama AI into a single workspace.</p>
+    <div class="text-sm text-base-content/70 leading-relaxed mb-5">
+        <p><strong class="text-primary">ION</strong> (Intelligent Operating Network) is a Security Operations Center platform built for the <strong>Guarded Glass</strong> team. It connects your Elasticsearch alerts, OpenCTI threat intelligence, TIDE detection rules, and Ollama AI into a single workspace.</p>
     </div>
 
     <div class="g-cards">
-        <div class="g-card">
-            <div class="g-card-icon _ion-s-dc2e428fc7"><i class="icon-log-in"></i></div>
-            <h3>1. Log In</h3>
-            <p>Navigate to ION and enter your credentials. Your dashboard will load based on your role.</p>
-            <div class="g-tip">First login? Your credentials are set by your SOC administrator.</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <div class="text-2xl _ion-s-dc2e428fc7"><i class="icon-log-in"></i></div>
+            <h3 class="card-title text-base">1. Log In</h3>
+            <p class="text-sm text-base-content/70">Navigate to ION and enter your credentials. Your dashboard will load based on your role.</p>
+            <div role="alert" class="alert alert-warning text-xs py-2 mt-2">First login? Your credentials are set by your SOC administrator.</div>
+            </div>
         </div>
-        <div class="g-card">
-            <div class="g-card-icon _ion-s-2b7a4b6404"><i class="icon-layout-dashboard"></i></div>
-            <h3>2. Your Dashboard</h3>
-            <p>The dashboard is role-specific. Analysts see alert queues. Leads see team metrics. Engineers see system status.</p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <div class="text-2xl _ion-s-2b7a4b6404"><i class="icon-layout-dashboard"></i></div>
+            <h3 class="card-title text-base">2. Your Dashboard</h3>
+            <p class="text-sm text-base-content/70">The dashboard is role-specific. Analysts see alert queues. Leads see team metrics. Engineers see system status.</p>
+            </div>
         </div>
-        <div class="g-card">
-            <div class="g-card-icon _ion-s-cb40bcf14a"><i class="icon-users"></i></div>
-            <h3>3. Focus Mode</h3>
-            <p>Have multiple roles? Use the <strong>Focus Mode</strong> pill buttons on the dashboard to switch between role views.</p>
-            <div class="g-tip">Focus mode restricts permissions to one role at a time for clarity.</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <div class="text-2xl _ion-s-cb40bcf14a"><i class="icon-users"></i></div>
+            <h3 class="card-title text-base">3. Focus Mode</h3>
+            <p class="text-sm text-base-content/70">Have multiple roles? Use the <strong>Focus Mode</strong> pill buttons on the dashboard to switch between role views.</p>
+            <div role="alert" class="alert alert-warning text-xs py-2 mt-2">Focus mode restricts permissions to one role at a time for clarity.</div>
+            </div>
         </div>
-        <div class="g-card">
-            <div class="g-card-icon _ion-s-9e62ba231b"><i class="icon-navigation"></i></div>
-            <h3>4. Navigation</h3>
-            <p>The top nav has dropdown menus: <strong>Knowledge</strong>, <strong>Analyst</strong>, <strong>Engineering</strong>, <strong>DFIR</strong>, and <strong>Settings</strong>. Items show/hide based on your role.</p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <div class="text-2xl _ion-s-9e62ba231b"><i class="icon-navigation"></i></div>
+            <h3 class="card-title text-base">4. Navigation</h3>
+            <p class="text-sm text-base-content/70">The top nav has dropdown menus: <strong>Knowledge</strong>, <strong>Analyst</strong>, <strong>Engineering</strong>, <strong>DFIR</strong>, and <strong>Settings</strong>. Items show/hide based on your role.</p>
+            </div>
         </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- DASHBOARD -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-dashboard" data-roles="all analyst senior lead engineer">
-    <h2 class="g-section-title"><i class="icon-layout-dashboard"></i> Dashboard</h2>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-dashboard" data-roles="all analyst senior lead engineer">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-layout-dashboard text-primary"></i> Dashboard</h2>
 
     <!-- Visual mockup -->
-    <div class="g-mockup">
-        <div class="g-mockup-title">Dashboard Overview (Analyst View)</div>
-        <div class="g-mockup-body">
-            <div class="g-mock-stats">
-                <div class="g-mock-stat"><span class="g-mock-val _ion-s-5dd0211252">12</span><span class="g-mock-label">Critical Alerts</span></div>
-                <div class="g-mock-stat"><span class="g-mock-val _ion-s-633a57b5af">28</span><span class="g-mock-label">High Alerts</span></div>
-                <div class="g-mock-stat"><span class="g-mock-val _ion-s-b00112b508">6</span><span class="g-mock-label">Cases Open</span></div>
-                <div class="g-mock-stat"><span class="g-mock-val">3</span><span class="g-mock-label">Assigned to Me</span></div>
+    <div class="card bg-base-100 border border-base-300 overflow-hidden my-4">
+        <div class="px-4 py-2 bg-base-200 text-xs font-bold uppercase tracking-wide text-base-content/50 border-b border-base-300">Dashboard Overview (Analyst View)</div>
+        <div>
+            <div class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 shadow">
+                <div class="stat">
+                    <div class="stat-value font-mono text-error _ion-s-5dd0211252">12</div>
+                    <div class="stat-desc">Critical Alerts</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value font-mono text-warning _ion-s-633a57b5af">28</div>
+                    <div class="stat-desc">High Alerts</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value font-mono text-success _ion-s-b00112b508">6</div>
+                    <div class="stat-desc">Cases Open</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value font-mono">3</div>
+                    <div class="stat-desc">Assigned to Me</div>
+                </div>
             </div>
-            <div class="g-mock-grid">
-                <div class="g-mock-panel"><div class="g-mock-panel-title">Recent Alerts</div><div class="g-mock-rows"><div class="g-mock-row"><span class="g-mock-sev crit"></span>Credential Dumping Detected<span class="g-mock-time">2m ago</span></div><div class="g-mock-row"><span class="g-mock-sev high"></span>Suspicious PowerShell Execution<span class="g-mock-time">15m ago</span></div><div class="g-mock-row"><span class="g-mock-sev med"></span>Unusual Login Location<span class="g-mock-time">1h ago</span></div></div></div>
-                <div class="g-mock-panel"><div class="g-mock-panel-title">My Cases</div><div class="g-mock-rows"><div class="g-mock-row">CASE-0042 Ransomware Investigation<span class="g-mock-badge _ion-s-5dd0211252">CRITICAL</span></div><div class="g-mock-row">CASE-0041 Phishing Campaign<span class="g-mock-badge _ion-s-633a57b5af">HIGH</span></div></div></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 p-3">
+                <div class="card bg-base-200 border border-base-300">
+                    <div class="card-body p-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wide text-base-content/50 mb-2">Recent Alerts</h3>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">
+                            <span class="badge badge-xs badge-error p-0 w-2 h-2"></span>Credential Dumping Detected<span class="ml-auto font-mono text-xs text-base-content/50">2m ago</span>
+                        </div>
+                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">
+                            <span class="badge badge-xs badge-warning p-0 w-2 h-2"></span>Suspicious PowerShell Execution<span class="ml-auto font-mono text-xs text-base-content/50">15m ago</span>
+                        </div>
+                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">
+                            <span class="badge badge-xs badge-info p-0 w-2 h-2"></span>Unusual Login Location<span class="ml-auto font-mono text-xs text-base-content/50">1h ago</span>
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                <div class="card bg-base-200 border border-base-300">
+                    <div class="card-body p-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wide text-base-content/50 mb-2">My Cases</h3>
+                    <div class="flex flex-col gap-1">
+                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">CASE-0042 Ransomware Investigation<span class="badge badge-error badge-sm ml-auto _ion-s-5dd0211252">CRITICAL</span></div>
+                        <div class="flex items-center gap-2 py-1 text-sm border-b border-base-300">CASE-0041 Phishing Campaign<span class="badge badge-warning badge-sm ml-auto _ion-s-633a57b5af">HIGH</span></div>
+                    </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="g-mockup-callouts">
-            <div class="g-callout"><span class="g-callout-num">1</span> Stat cards show severity-coded alert counts and your workload</div>
-            <div class="g-callout"><span class="g-callout-num">2</span> Recent alerts auto-refresh and link to the full alert detail</div>
-            <div class="g-callout"><span class="g-callout-num">3</span> Your assigned cases show status and severity at a glance</div>
+        <div class="px-4 py-3 bg-base-200 border-t border-base-300 flex flex-col gap-2">
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">1</span> Stat cards show severity-coded alert counts and your workload</div>
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">2</span> Recent alerts auto-refresh and link to the full alert detail</div>
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">3</span> Your assigned cases show status and severity at a glance</div>
         </div>
     </div>
 
-    <div class="g-role-note lead">
-        <strong>Lead View:</strong> Leads see team metrics — KPIs, analyst workload distribution, severity breakdown, and team schedule.
+    <div role="alert" class="alert alert-warning g-role-note lead my-2">
+        <span><strong>Lead View:</strong> Leads see team metrics — KPIs, analyst workload distribution, severity breakdown, and team schedule.</span>
     </div>
-    <div class="g-role-note engineer">
-        <strong>Engineer View:</strong> Engineers see system status — integration health, ES connectivity, Kibana sync status, and configuration overview.
+    <div role="alert" class="alert alert-info g-role-note engineer my-2">
+        <span><strong>Engineer View:</strong> Engineers see system status — integration health, ES connectivity, Kibana sync status, and configuration overview.</span>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- ALERTS & TRIAGE -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-alerts" data-roles="all analyst senior lead">
-    <h2 class="g-section-title"><i class="icon-alert-triangle"></i> Alerts & Triage</h2>
-    <p class="g-desc">The Alerts page (<code>/alerts</code>) is your primary investigation workspace. Alerts flow from Elasticsearch, enriched with MITRE ATT&CK mappings and severity scores.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-alerts" data-roles="all analyst senior lead">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-alert-triangle text-primary"></i> Alerts & Triage</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">The Alerts page (<code>/alerts</code>) is your primary investigation workspace. Alerts flow from Elasticsearch, enriched with MITRE ATT&CK mappings and severity scores.</p>
 
-    <div class="g-mockup">
-        <div class="g-mockup-title">Alerts Workspace</div>
-        <div class="g-mockup-body">
-            <div class="g-mock-toolbar">
-                <span class="g-mock-input">Search alerts...</span>
-                <span class="g-mock-select">Severity: All</span>
-                <span class="g-mock-select">Status: Open</span>
-                <span class="g-mock-btn-primary">Filter</span>
+    <div class="card bg-base-100 border border-base-300 overflow-hidden my-4">
+        <div class="px-4 py-2 bg-base-200 text-xs font-bold uppercase tracking-wide text-base-content/50 border-b border-base-300">Alerts Workspace</div>
+        <div>
+            <div class="flex flex-wrap items-center gap-2 p-3 border-b border-base-300">
+                <span class="input input-sm input-bordered flex-1 min-w-[150px] pointer-events-none text-base-content/40">Search alerts...</span>
+                <span class="select select-sm select-bordered pointer-events-none w-auto">Severity: All</span>
+                <span class="select select-sm select-bordered pointer-events-none w-auto">Status: Open</span>
+                <span class="btn btn-primary btn-sm pointer-events-none">Filter</span>
             </div>
-            <div class="g-mock-table">
-                <div class="g-mock-thead">
-                    <span class="_ion-s-5043024f04">Severity</span><span class="_ion-s-4b3de78f23">Alert Title</span><span class="_ion-s-97445a8d93">Rule</span><span class="_ion-s-efc7236c7f">Host</span><span class="_ion-s-efc7236c7f">Status</span><span class="_ion-s-efc7236c7f">Time</span>
-                </div>
-                <div class="g-mock-trow _ion-s-40d92da530">
-                    <span class="sev-badge sev-critical _ion-s-5043024f04">CRIT</span><span class="_ion-s-4b3de78f23">Credential Dumping via LSASS</span><span class="_ion-s-1af4896571">Credential Access</span><span class="_ion-s-ecfa55ff14">SRV-DC01</span><span class="_ion-s-efc7236c7f"><span class="sev-badge sev-critical">OPEN</span></span><span class="_ion-s-ec2cddedba">2 min ago</span>
-                </div>
-                <div class="g-mock-trow _ion-s-2fb8daf4f3">
-                    <span class="sev-badge sev-high _ion-s-5043024f04">HIGH</span><span class="_ion-s-4b3de78f23">Suspicious PowerShell Encoded Command</span><span class="_ion-s-1af4896571">Execution</span><span class="_ion-s-ecfa55ff14">WS-042</span><span class="_ion-s-efc7236c7f"><span class="sev-badge sev-medium">ACK</span></span><span class="_ion-s-ec2cddedba">15 min ago</span>
-                </div>
-                <div class="g-mock-trow _ion-s-ebd4006129">
-                    <span class="sev-badge sev-medium _ion-s-5043024f04">MED</span><span class="_ion-s-4b3de78f23">Unusual Login from New Geolocation</span><span class="_ion-s-1af4896571">Initial Access</span><span class="_ion-s-ecfa55ff14">-</span><span class="_ion-s-efc7236c7f"><span class="sev-badge sev-critical">OPEN</span></span><span class="_ion-s-ec2cddedba">1h ago</span>
-                </div>
+            <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th class="_ion-s-5043024f04">Severity</th>
+                        <th class="_ion-s-4b3de78f23">Alert Title</th>
+                        <th class="_ion-s-97445a8d93">Rule</th>
+                        <th class="_ion-s-efc7236c7f">Host</th>
+                        <th class="_ion-s-efc7236c7f">Status</th>
+                        <th class="_ion-s-efc7236c7f">Time</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <tr class="hover _ion-s-40d92da530">
+                    <td><span class="badge badge-error badge-sm _ion-s-5043024f04">CRIT</span></td>
+                    <td class="_ion-s-4b3de78f23">Credential Dumping via LSASS</td>
+                    <td class="_ion-s-1af4896571">Credential Access</td>
+                    <td class="font-mono _ion-s-ecfa55ff14">SRV-DC01</td>
+                    <td class="_ion-s-efc7236c7f"><span class="badge badge-error badge-sm">OPEN</span></td>
+                    <td class="_ion-s-ec2cddedba">2 min ago</td>
+                </tr>
+                <tr class="hover _ion-s-2fb8daf4f3">
+                    <td><span class="badge badge-warning badge-sm _ion-s-5043024f04">HIGH</span></td>
+                    <td class="_ion-s-4b3de78f23">Suspicious PowerShell Encoded Command</td>
+                    <td class="_ion-s-1af4896571">Execution</td>
+                    <td class="font-mono _ion-s-ecfa55ff14">WS-042</td>
+                    <td class="_ion-s-efc7236c7f"><span class="badge badge-info badge-sm">ACK</span></td>
+                    <td class="_ion-s-ec2cddedba">15 min ago</td>
+                </tr>
+                <tr class="hover _ion-s-ebd4006129">
+                    <td><span class="badge badge-info badge-sm _ion-s-5043024f04">MED</span></td>
+                    <td class="_ion-s-4b3de78f23">Unusual Login from New Geolocation</td>
+                    <td class="_ion-s-1af4896571">Initial Access</td>
+                    <td class="font-mono _ion-s-ecfa55ff14">-</td>
+                    <td class="_ion-s-efc7236c7f"><span class="badge badge-error badge-sm">OPEN</span></td>
+                    <td class="_ion-s-ec2cddedba">1h ago</td>
+                </tr>
+                </tbody>
+            </table>
             </div>
         </div>
-        <div class="g-mockup-callouts">
-            <div class="g-callout"><span class="g-callout-num">1</span> <strong>Filter bar</strong> — search by keyword, filter by severity/status/time range</div>
-            <div class="g-callout"><span class="g-callout-num">2</span> <strong>Severity stripe</strong> — left border color = severity at a glance</div>
-            <div class="g-callout"><span class="g-callout-num">3</span> <strong>Click any alert</strong> to expand the detail panel: raw data, MITRE mapping, triage actions</div>
+        <div class="px-4 py-3 bg-base-200 border-t border-base-300 flex flex-col gap-2">
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">1</span> <strong>Filter bar</strong> — search by keyword, filter by severity/status/time range</div>
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">2</span> <strong>Severity stripe</strong> — left border color = severity at a glance</div>
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">3</span> <strong>Click any alert</strong> to expand the detail panel: raw data, MITRE mapping, triage actions</div>
         </div>
     </div>
 
-    <h3>Triage Actions</h3>
-    <div class="g-steps">
-        <div class="g-step"><span class="g-step-num">1</span><div><strong>Acknowledge</strong> — Claim the alert. Status changes to "acknowledged" and syncs to Elasticsearch.</div></div>
-        <div class="g-step"><span class="g-step-num">2</span><div><strong>Investigate</strong> — Check the alert detail, related alerts, observables, and MITRE context.</div></div>
-        <div class="g-step"><span class="g-step-num">3</span><div><strong>Escalate or Close</strong> — Create a case for investigation, or close with a reason (True Positive, False Positive, Benign).</div></div>
+    <h3 class="text-lg font-semibold mt-4 mb-2">Triage Actions</h3>
+    <div class="flex flex-col gap-2 my-3">
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">1</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Acknowledge</strong> — Claim the alert. Status changes to "acknowledged" and syncs to Elasticsearch.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">2</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Investigate</strong> — Check the alert detail, related alerts, observables, and MITRE context.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">3</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Escalate or Close</strong> — Create a case for investigation, or close with a reason (True Positive, False Positive, Benign).</div>
+            </div>
+        </div>
     </div>
 
-    <div class="g-tip-box">
-        <strong>Triage Suggestions:</strong> ION now suggests triage actions based on historical closure data. If a rule was closed as FP 80% of the time, you'll see a suggestion badge. Access via <code>GET /api/triage-suggestions?rule_name=X</code>.
+    <div role="alert" class="alert alert-info my-3">
+        <span><strong>Triage Suggestions:</strong> ION now suggests triage actions based on historical closure data. If a rule was closed as FP 80% of the time, you'll see a suggestion badge. Access via <code>GET /api/triage-suggestions?rule_name=X</code>.</span>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- CASES -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-cases" data-roles="all analyst senior lead">
-    <h2 class="g-section-title"><i class="icon-folder"></i> Cases</h2>
-    <p class="g-desc">Cases group related alerts into investigations. Create cases from alerts, attach observables, track affected hosts/users, and close with documented reasoning.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-cases" data-roles="all analyst senior lead">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-folder text-primary"></i> Cases</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">Cases group related alerts into investigations. Create cases from alerts, attach observables, track affected hosts/users, and close with documented reasoning.</p>
 
-    <div class="g-mockup">
-        <div class="g-mockup-title">Case Detail View</div>
-        <div class="g-mockup-body _ion-s-cc781baac3">
+    <div class="card bg-base-100 border border-base-300 overflow-hidden my-4">
+        <div class="px-4 py-2 bg-base-200 text-xs font-bold uppercase tracking-wide text-base-content/50 border-b border-base-300">Case Detail View</div>
+        <div class="_ion-s-cc781baac3">
             <div class="_ion-s-23ad769d3d">
                 <span class="_ion-s-d266b93868">CASE-0042</span>
                 <span class="_ion-s-47e1bff439">Ransomware Precursor Activity on SRV-MAIL01</span>
-                <span class="sev-badge sev-critical">CRITICAL</span>
-                <span class="sev-badge sev-high _ion-s-a856045d15">ACKNOWLEDGED</span>
+                <span class="badge badge-error badge-sm">CRITICAL</span>
+                <span class="badge badge-warning badge-sm _ion-s-a856045d15">ACKNOWLEDGED</span>
             </div>
-            <div class="g-mock-grid _ion-s-cb7c5c70a2">
-                <div class="g-mock-mini-stat"><span class="_ion-s-9d76215db2">ASSIGNED TO</span><br><strong>analyst1</strong></div>
-                <div class="g-mock-mini-stat"><span class="_ion-s-9d76215db2">AFFECTED HOSTS</span><br><strong>SRV-MAIL01, WS-042</strong></div>
-                <div class="g-mock-mini-stat"><span class="_ion-s-9d76215db2">ALERTS</span><br><strong>5 linked</strong></div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2 _ion-s-cb7c5c70a2">
+                <div class="stat bg-base-200 rounded-box border border-base-300 p-2">
+                    <div class="stat-title _ion-s-9d76215db2">ASSIGNED TO</div>
+                    <div class="stat-value text-base">analyst1</div>
+                </div>
+                <div class="stat bg-base-200 rounded-box border border-base-300 p-2">
+                    <div class="stat-title _ion-s-9d76215db2">AFFECTED HOSTS</div>
+                    <div class="stat-value text-base">SRV-MAIL01, WS-042</div>
+                </div>
+                <div class="stat bg-base-200 rounded-box border border-base-300 p-2">
+                    <div class="stat-title _ion-s-9d76215db2">ALERTS</div>
+                    <div class="stat-value text-base">5 linked</div>
+                </div>
             </div>
             <div class="_ion-s-b0c83daf84">
                 <strong class="_ion-s-3c6f5e4b4e">Notes:</strong> LSASS dump detected followed by lateral movement to mail server. Checking for data exfiltration...
             </div>
         </div>
-        <div class="g-mockup-callouts">
-            <div class="g-callout"><span class="g-callout-num">1</span> Case header shows severity, status, and assignment</div>
-            <div class="g-callout"><span class="g-callout-num">2</span> Affected hosts and linked alerts provide investigation context</div>
-            <div class="g-callout"><span class="g-callout-num">3</span> <strong>Similar Cases:</strong> ION finds past cases with matching rules/hosts/observables via <code>/api/case-similarity/{id}</code></div>
+        <div class="px-4 py-3 bg-base-200 border-t border-base-300 flex flex-col gap-2">
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">1</span> Case header shows severity, status, and assignment</div>
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">2</span> Affected hosts and linked alerts provide investigation context</div>
+            <div class="flex items-center gap-2 text-sm text-base-content/70"><span class="badge badge-primary badge-sm font-bold">3</span> <strong>Similar Cases:</strong> ION finds past cases with matching rules/hosts/observables via <code>/api/case-similarity/{id}</code></div>
         </div>
     </div>
 
-    <h3>Closure Reasons</h3>
+    <h3 class="text-lg font-semibold mt-4 mb-2">Closure Reasons</h3>
     <div class="g-grid-3">
-        <div class="g-mini-card _ion-s-bd21ced526"><strong>True Positive</strong><br><span class="g-muted">Confirmed real attack. Document findings.</span></div>
-        <div class="g-mini-card _ion-s-40d92da530"><strong>False Positive</strong><br><span class="g-muted">Not a real threat. Consider rule tuning.</span></div>
-        <div class="g-mini-card _ion-s-ebd4006129"><strong>Benign True Positive</strong><br><span class="g-muted">Real activity but authorized/expected.</span></div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-bd21ced526">
+            <div class="card-body p-3">
+                <strong>True Positive</strong>
+                <p class="text-sm text-base-content/50">Confirmed real attack. Document findings.</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-40d92da530">
+            <div class="card-body p-3">
+                <strong>False Positive</strong>
+                <p class="text-sm text-base-content/50">Not a real threat. Consider rule tuning.</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-ebd4006129">
+            <div class="card-body p-3">
+                <strong>Benign True Positive</strong>
+                <p class="text-sm text-base-content/50">Real activity but authorized/expected.</p>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- OBSERVABLES -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-observables" data-roles="all analyst senior lead dfir">
-    <h2 class="g-section-title"><i class="icon-search"></i> Observables (IOC Tracking)</h2>
-    <p class="g-desc">Track IPs, domains, hashes, emails, and URLs across your investigations. Enrich from OpenCTI, track sighting counts, and flag stale IOCs.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-observables" data-roles="all analyst senior lead dfir">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-search text-primary"></i> Observables (IOC Tracking)</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">Track IPs, domains, hashes, emails, and URLs across your investigations. Enrich from OpenCTI, track sighting counts, and flag stale IOCs.</p>
 
     <div class="g-features">
-        <div class="g-feature"><i class="icon-globe _ion-s-dc2e428fc7"></i><div><strong>Batch Enrichment</strong><br>Select multiple observables and enrich them all from OpenCTI in one click.</div></div>
-        <div class="g-feature"><i class="icon-clock _ion-s-416321c716"></i><div><strong>Staleness Tracking</strong><br>IOCs not re-enriched in 30+ days are flagged. Check <code>/api/ioc-staleness</code>.</div></div>
-        <div class="g-feature"><i class="icon-shield _ion-s-b00112b508"></i><div><strong>Whitelisting</strong><br>Mark known-good observables to prevent false alerting.</div></div>
-        <div class="g-feature"><i class="icon-link _ion-s-cb40bcf14a"></i><div><strong>Case Linking</strong><br>Observables auto-link to cases and alerts where they appear.</div></div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-globe text-xl shrink-0 _ion-s-dc2e428fc7"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Batch Enrichment</strong><br>Select multiple observables and enrich them all from OpenCTI in one click.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-clock text-xl shrink-0 _ion-s-416321c716"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Staleness Tracking</strong><br>IOCs not re-enriched in 30+ days are flagged. Check <code>/api/ioc-staleness</code>.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-shield text-xl shrink-0 _ion-s-b00112b508"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Whitelisting</strong><br>Mark known-good observables to prevent false alerting.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-link text-xl shrink-0 _ion-s-cb40bcf14a"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Case Linking</strong><br>Observables auto-link to cases and alerts where they appear.</div>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- THREAT INTEL -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-threat-intel" data-roles="all analyst senior lead">
-    <h2 class="g-section-title"><i class="icon-eye"></i> Threat Intelligence</h2>
-    <p class="g-desc">Search OpenCTI for threat actors and campaigns, add them to your watchlist, and get automatic detection gap alerts when watched actors have TTPs your TIDE rules don't cover.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-threat-intel" data-roles="all analyst senior lead">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-eye text-primary"></i> Threat Intelligence</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">Search OpenCTI for threat actors and campaigns, add them to your watchlist, and get automatic detection gap alerts when watched actors have TTPs your TIDE rules don't cover.</p>
 
-    <div class="g-mockup">
-        <div class="g-mockup-title">Threat Actor Search with Country Attribution</div>
-        <div class="g-mockup-body">
-            <div class="g-mock-table">
-                <div class="g-mock-thead"><span class="_ion-s-0ea45ef96f">Name</span><span class="_ion-s-97445a8d93">Origin</span><span class="_ion-s-97445a8d93">Type</span><span class="_ion-s-efc7236c7f">Confidence</span><span class="_ion-s-efc7236c7f">Watch</span></div>
-                <div class="g-mock-trow"><span class="_ion-s-bec3a17547">APT28</span><span class="_ion-s-97445a8d93">&#x1F1F7;&#x1F1FA; Russia</span><span class="_ion-s-5ee28ecf33">Intrusion Set</span><span class="_ion-s-efc7236c7f"><span class="sev-badge sev-high">85</span></span><span class="_ion-s-efc7236c7f"><span class="_ion-s-1b4f657f9e">Watched</span></span></div>
-                <div class="g-mock-trow"><span class="_ion-s-bec3a17547">Lazarus Group</span><span class="_ion-s-97445a8d93">&#x1F1F0;&#x1F1F5; North Korea</span><span class="_ion-s-5ee28ecf33">Intrusion Set</span><span class="_ion-s-efc7236c7f"><span class="sev-badge sev-high">80</span></span><span class="_ion-s-3c78344d54">+ Watch</span></span></div>
-                <div class="g-mock-trow"><span class="_ion-s-bec3a17547">Charming Kitten</span><span class="_ion-s-97445a8d93">&#x1F1EE;&#x1F1F7; Iran</span><span class="_ion-s-5ee28ecf33">Threat Actor</span><span class="_ion-s-efc7236c7f"><span class="sev-badge sev-medium">65</span></span><span class="_ion-s-3c78344d54">+ Watch</span></span></div>
-            </div>
+    <div class="card bg-base-100 border border-base-300 overflow-hidden my-4">
+        <div class="px-4 py-2 bg-base-200 text-xs font-bold uppercase tracking-wide text-base-content/50 border-b border-base-300">Threat Actor Search with Country Attribution</div>
+        <div class="overflow-x-auto">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th class="_ion-s-0ea45ef96f">Name</th>
+                        <th class="_ion-s-97445a8d93">Origin</th>
+                        <th class="_ion-s-97445a8d93">Type</th>
+                        <th class="_ion-s-efc7236c7f">Confidence</th>
+                        <th class="_ion-s-efc7236c7f">Watch</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <tr class="hover">
+                    <td class="_ion-s-bec3a17547">APT28</td>
+                    <td class="_ion-s-97445a8d93">&#x1F1F7;&#x1F1FA; Russia</td>
+                    <td class="_ion-s-5ee28ecf33">Intrusion Set</td>
+                    <td class="_ion-s-efc7236c7f"><span class="badge badge-warning badge-sm">85</span></td>
+                    <td class="_ion-s-efc7236c7f"><span class="badge badge-success badge-sm _ion-s-1b4f657f9e">Watched</span></td>
+                </tr>
+                <tr class="hover">
+                    <td class="_ion-s-bec3a17547">Lazarus Group</td>
+                    <td class="_ion-s-97445a8d93">&#x1F1F0;&#x1F1F5; North Korea</td>
+                    <td class="_ion-s-5ee28ecf33">Intrusion Set</td>
+                    <td class="_ion-s-efc7236c7f"><span class="badge badge-warning badge-sm">80</span></td>
+                    <td class="_ion-s-3c78344d54">+ Watch</td>
+                </tr>
+                <tr class="hover">
+                    <td class="_ion-s-bec3a17547">Charming Kitten</td>
+                    <td class="_ion-s-97445a8d93">&#x1F1EE;&#x1F1F7; Iran</td>
+                    <td class="_ion-s-5ee28ecf33">Threat Actor</td>
+                    <td class="_ion-s-efc7236c7f"><span class="badge badge-info badge-sm">65</span></td>
+                    <td class="_ion-s-3c78344d54">+ Watch</td>
+                </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
-    <div class="g-tip-box">
-        <strong>Watch Gap Analysis:</strong> When you watch an actor, ION compares their TTPs against your TIDE rule coverage to show which techniques you cannot currently detect. Query it via <code>GET /api/threat-intel/watches/gaps</code>.
+    <div role="alert" class="alert alert-info my-3">
+        <span><strong>Watch Gap Analysis:</strong> When you watch an actor, ION compares their TTPs against your TIDE rule coverage to show which techniques you cannot currently detect. Query it via <code>GET /api/threat-intel/watches/gaps</code>.</span>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- ATTACK STORIES -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-attack-stories" data-roles="all analyst senior lead">
-    <h2 class="g-section-title"><i class="icon-book-open"></i> Attack Stories</h2>
-    <p class="g-desc">ION automatically correlates alerts by host/user into "attack stories" — multi-step attack narratives with kill chain visualization. No other SIEM does this.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-attack-stories" data-roles="all analyst senior lead">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-book-open text-primary"></i> Attack Stories</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">ION automatically correlates alerts by host/user into "attack stories" — multi-step attack narratives with kill chain visualization. No other SIEM does this.</p>
 
-    <div class="g-mockup">
-        <div class="g-mockup-title">Attack Story: SRV-DC01 (Score: 78/100)</div>
-        <div class="g-mockup-body _ion-s-cc781baac3">
+    <div class="card bg-base-100 border border-base-300 overflow-hidden my-4">
+        <div class="px-4 py-2 bg-base-200 text-xs font-bold uppercase tracking-wide text-base-content/50 border-b border-base-300">Attack Story: SRV-DC01 (Score: 78/100)</div>
+        <div class="_ion-s-cc781baac3">
             <div class="_ion-s-b57c922c95">
                 Entity <strong>SRV-DC01</strong> was targeted across <strong>4 stages</strong> of the kill chain over <strong>2.5 hours</strong>. Starting with <em>initial-access</em>, progressing through <em>execution</em> and <em>credential-access</em>, reaching <em>lateral-movement</em>. 5 unique detection rules fired.
             </div>
             <div class="_ion-s-023463e7b5">
-                <span class="g-kc-node inactive">recon</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node active">initial-access</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node active">execution</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node inactive">persistence</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node inactive">priv-esc</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node inactive">defense-evasion</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node active">credential-access</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node inactive">discovery</span><span class="g-kc-arrow">&rarr;</span>
-                <span class="g-kc-node active">lateral-movement</span>
+                <span class="badge badge-ghost badge-sm">recon</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-error badge-sm">initial-access</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-error badge-sm">execution</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-ghost badge-sm">persistence</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-ghost badge-sm">priv-esc</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-ghost badge-sm">defense-evasion</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-error badge-sm">credential-access</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-ghost badge-sm">discovery</span><span class="text-base-content/40 px-1">&rarr;</span>
+                <span class="badge badge-error badge-sm">lateral-movement</span>
             </div>
         </div>
     </div>
-    <p>Navigate to <code>/attack-stories</code> and select a time window. Stories are scored 0-100 based on kill chain coverage and alert severity.</p>
+    <p class="text-sm">Navigate to <code>/attack-stories</code> and select a time window. Stories are scored 0-100 based on kill chain coverage and alert severity.</p>
+    </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- PLAYBOOKS -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-playbooks" data-roles="all analyst senior lead dfir">
-    <h2 class="g-section-title"><i class="icon-list-checks"></i> Playbooks</h2>
-    <p class="g-desc">Step-by-step response procedures for common scenarios. Execute playbooks during investigations, track step completion, and measure effectiveness.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-playbooks" data-roles="all analyst senior lead dfir">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-list-checks text-primary"></i> Playbooks</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">Step-by-step response procedures for common scenarios. Execute playbooks during investigations, track step completion, and measure effectiveness.</p>
 
-    <div class="g-steps">
-        <div class="g-step"><span class="g-step-num">1</span><div><strong>Browse Playbooks</strong> — 25+ SOC playbooks across 8 categories (Phishing, Malware, Ransomware, etc.)</div></div>
-        <div class="g-step"><span class="g-step-num">2</span><div><strong>Start Execution</strong> — Link a playbook to a case and work through each step</div></div>
-        <div class="g-step"><span class="g-step-num">3</span><div><strong>Track Progress</strong> — Each step can be marked complete. The playbook tracks overall completion.</div></div>
-        <div class="g-step"><span class="g-step-num">4</span><div><strong>Effectiveness</strong> — Check <code>/api/playbook-analytics</code> to see which playbooks lead to faster case resolution.</div></div>
+    <div class="flex flex-col gap-2 my-3">
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">1</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Browse Playbooks</strong> — 25+ SOC playbooks across 8 categories (Phishing, Malware, Ransomware, etc.)</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">2</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Start Execution</strong> — Link a playbook to a case and work through each step</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">3</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Track Progress</strong> — Each step can be marked complete. The playbook tracks overall completion.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">4</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Effectiveness</strong> — Check <code>/api/playbook-analytics</code> to see which playbooks lead to faster case resolution.</div>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- DETECTION ENGINEERING -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-detection" data-roles="all senior lead engineer">
-    <h2 class="g-section-title"><i class="icon-shield"></i> Detection Engineering</h2>
-    <p class="g-desc">7-tab analytics page integrating TIDE detection rules, Elasticsearch alerts, and OpenCTI threat intelligence.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-detection" data-roles="all senior lead engineer">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-shield text-primary"></i> Detection Engineering</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">7-tab analytics page integrating TIDE detection rules, Elasticsearch alerts, and OpenCTI threat intelligence.</p>
 
-    <div class="g-tabs-mockup">
-        <div class="g-tab-mock active">Posture</div>
-        <div class="g-tab-mock">Kill Chains</div>
-        <div class="g-tab-mock">Rules</div>
-        <div class="g-tab-mock">Execution</div>
-        <div class="g-tab-mock">Actor Readiness</div>
-        <div class="g-tab-mock">Kill Chain</div>
-        <div class="g-tab-mock">Gaps</div>
+    <div role="tablist" class="tabs tabs-border mb-4">
+        <span role="tab" class="tab tab-active">Posture</span>
+        <span role="tab" class="tab">Kill Chains</span>
+        <span role="tab" class="tab">Rules</span>
+        <span role="tab" class="tab">Execution</span>
+        <span role="tab" class="tab">Actor Readiness</span>
+        <span role="tab" class="tab">Kill Chain</span>
+        <span role="tab" class="tab">Gaps</span>
     </div>
 
     <div class="g-grid-2">
-        <div class="g-feature-card">
-            <h4 class="_ion-s-dc2e428fc7">Posture</h4>
-            <p>Rule totals, severity breakdown, quality distribution, MITRE coverage (142/159 techniques)</p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base _ion-s-dc2e428fc7">Posture</h4>
+            <p class="text-sm text-base-content/70">Rule totals, severity breakdown, quality distribution, MITRE coverage (142/159 techniques)</p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4 class="_ion-s-633a57b5af">Actor Readiness</h4>
-            <p>Per-actor TTP coverage with country flags, readiness gauges, system-specific breakdowns, PDF reports</p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base _ion-s-633a57b5af">Actor Readiness</h4>
+            <p class="text-sm text-base-content/70">Per-actor TTP coverage with country flags, readiness gauges, system-specific breakdowns, PDF reports</p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4 class="_ion-s-b00112b508">Kill Chains</h4>
-            <p>Playbook kill chain visualizations (Insider Threat, Ransomware) with per-step coverage state</p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base _ion-s-b00112b508">Kill Chains</h4>
+            <p class="text-sm text-base-content/70">Playbook kill chain visualizations (Insider Threat, Ransomware) with per-step coverage state</p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4 class="_ion-s-416321c716">Gaps</h4>
-            <p>Blind spots by tactic, unmapped rules, quick wins — disabled critical/high rules to enable</p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base _ion-s-416321c716">Gaps</h4>
+            <p class="text-sm text-base-content/70">Blind spots by tactic, unmapped rules, quick wins — disabled critical/high rules to enable</p>
+            </div>
         </div>
     </div>
 
-    <div class="g-tip-box">
-        <strong>MITRE Navigator Export:</strong> Download a Navigator layer JSON at <code>/api/mitre-navigator/layer</code> — open it in the standard MITRE ATT&CK Navigator tool for visual coverage analysis.
+    <div role="alert" class="alert alert-info my-3">
+        <span><strong>MITRE Navigator Export:</strong> Download a Navigator layer JSON at <code>/api/mitre-navigator/layer</code> — open it in the standard MITRE ATT&CK Navigator tool for visual coverage analysis.</span>
     </div>
 
-    <h3>Rule Tuning</h3>
-    <p>The <strong>Rule Tuning</strong> page (<code>/rule-tuning</code>) cross-references TIDE rules with case closure outcomes to identify:</p>
+    <h3 class="text-lg font-semibold mt-4 mb-2">Rule Tuning</h3>
+    <p class="text-sm mb-2">The <strong>Rule Tuning</strong> page (<code>/rule-tuning</code>) cross-references TIDE rules with case closure outcomes to identify:</p>
     <div class="g-grid-3">
-        <div class="g-mini-card _ion-s-40d92da530"><strong>FP-Heavy Rules</strong><br><span class="g-muted">Rules closed as false positive > 60% of the time</span></div>
-        <div class="g-mini-card _ion-s-bd21ced526"><strong>High-Value Rules</strong><br><span class="g-muted">Rules consistently producing true positives</span></div>
-        <div class="g-mini-card _ion-s-fcaaa6f0c8"><strong>Silent Rules</strong><br><span class="g-muted">Enabled in TIDE but never firing — misconfigured?</span></div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-40d92da530">
+            <div class="card-body p-3">
+                <strong>FP-Heavy Rules</strong>
+                <p class="text-sm text-base-content/50">Rules closed as false positive > 60% of the time</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-bd21ced526">
+            <div class="card-body p-3">
+                <strong>High-Value Rules</strong>
+                <p class="text-sm text-base-content/50">Rules consistently producing true positives</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-fcaaa6f0c8">
+            <div class="card-body p-3">
+                <strong>Silent Rules</strong>
+                <p class="text-sm text-base-content/50">Enabled in TIDE but never firing — misconfigured?</p>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- DFIR -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-forensics" data-roles="all dfir lead">
-    <h2 class="g-section-title"><i class="icon-microscope"></i> Digital Forensics (DFIR)</h2>
-    <p class="g-desc">Full forensic investigation workflow: cases, evidence chain of custody, timeline analysis, playbook-driven sections, IOC extraction, and PCAP analysis.</p>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-forensics" data-roles="all dfir lead">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-microscope text-primary"></i> Digital Forensics (DFIR)</h2>
+    <p class="text-sm text-base-content/60 mb-4 leading-relaxed">Full forensic investigation workflow: cases, evidence chain of custody, timeline analysis, playbook-driven sections, IOC extraction, and PCAP analysis.</p>
 
     <div class="g-features">
-        <div class="g-feature"><i class="icon-shield-check _ion-s-b00112b508"></i><div><strong>Chain of Custody</strong><br>Every evidence item logged with collection metadata and custody transfers.</div></div>
-        <div class="g-feature"><i class="icon-clock _ion-s-dc2e428fc7"></i><div><strong>Timeline Builder</strong><br>Reconstruct events chronologically across evidence sources.</div></div>
-        <div class="g-feature"><i class="icon-file-search _ion-s-cb40bcf14a"></i><div><strong>PCAP Analyzer</strong><br>Upload packet captures for automated protocol analysis (12 heuristic detectors).</div></div>
-        <div class="g-feature"><i class="icon-scan _ion-s-9e62ba231b"></i><div><strong>IOC Extraction</strong><br>Auto-extract IPs, domains, hashes from investigation notes.</div></div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-shield-check text-xl shrink-0 _ion-s-b00112b508"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Chain of Custody</strong><br>Every evidence item logged with collection metadata and custody transfers.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-clock text-xl shrink-0 _ion-s-dc2e428fc7"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Timeline Builder</strong><br>Reconstruct events chronologically across evidence sources.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-file-search text-xl shrink-0 _ion-s-cb40bcf14a"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">PCAP Analyzer</strong><br>Upload packet captures for automated protocol analysis (12 heuristic detectors).</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-scan text-xl shrink-0 _ion-s-9e62ba231b"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">IOC Extraction</strong><br>Auto-extract IPs, domains, hashes from investigation notes.</div>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- ANALYTICS -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-analytics" data-roles="all senior lead engineer">
-    <h2 class="g-section-title"><i class="icon-bar-chart-2"></i> Analytics & Reporting</h2>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-analytics" data-roles="all senior lead engineer">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-bar-chart-2 text-primary"></i> Analytics & Reporting</h2>
 
     <div class="g-grid-2">
-        <div class="g-feature-card">
-            <h4><i class="icon-activity _ion-s-dc2e428fc7"></i> Analytics Engine</h4>
-            <p>6 automated analytics jobs: entity risk scoring, repeat offenders, rule noise, observable velocity, case metrics, stale investigations.</p>
-            <p class="g-muted">Navigate to <code>/analytics</code></p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base"><i class="icon-activity _ion-s-dc2e428fc7"></i> Analytics Engine</h4>
+            <p class="text-sm text-base-content/70">6 automated analytics jobs: entity risk scoring, repeat offenders, rule noise, observable velocity, case metrics, stale investigations.</p>
+            <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/analytics</code></p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4><i class="icon-users _ion-s-2b7a4b6404"></i> Analyst Efficiency</h4>
-            <p>Per-analyst MTTR, FP rates, cases per shift, hourly activity timeline. Find your most efficient analysts.</p>
-            <p class="g-muted">Navigate to <code>/analyst-efficiency</code></p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base"><i class="icon-users _ion-s-2b7a4b6404"></i> Analyst Efficiency</h4>
+            <p class="text-sm text-base-content/70">Per-analyst MTTR, FP rates, cases per shift, hourly activity timeline. Find your most efficient analysts.</p>
+            <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/analyst-efficiency</code></p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4><i class="icon-heart-pulse _ion-s-5dd0211252"></i> SOC Health Scorecard</h4>
-            <p>Living maturity assessment: detection coverage, operational efficiency, team readiness, knowledge, integrations. Graded A-F.</p>
-            <p class="g-muted">Navigate to <code>/soc-health</code></p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base"><i class="icon-heart-pulse _ion-s-5dd0211252"></i> SOC Health Scorecard</h4>
+            <p class="text-sm text-base-content/70">Living maturity assessment: detection coverage, operational efficiency, team readiness, knowledge, integrations. Graded A-F.</p>
+            <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/soc-health</code></p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4><i class="icon-file-text _ion-s-416321c716"></i> Executive Report</h4>
-            <p>Auto-generated weekly/monthly summary: cases, MTTR trends, notable incidents, team metrics. PDF or HTML.</p>
-            <p class="g-muted">Navigate to <code>/executive-report</code></p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base"><i class="icon-file-text _ion-s-416321c716"></i> Executive Report</h4>
+            <p class="text-sm text-base-content/70">Auto-generated weekly/monthly summary: cases, MTTR trends, notable incidents, team metrics. PDF or HTML.</p>
+            <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/executive-report</code></p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4><i class="icon-clipboard-list _ion-s-9e62ba231b"></i> Shift Handover</h4>
-            <p>End-of-shift summary: what was triaged, open cases, active kill chains, pending items for the incoming shift.</p>
-            <p class="g-muted">Navigate to <code>/shift-handover</code></p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base"><i class="icon-clipboard-list _ion-s-9e62ba231b"></i> Shift Handover</h4>
+            <p class="text-sm text-base-content/70">End-of-shift summary: what was triaged, open cases, active kill chains, pending items for the incoming shift.</p>
+            <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/shift-handover</code></p>
+            </div>
         </div>
-        <div class="g-feature-card">
-            <h4><i class="icon-git-commit _ion-s-cb40bcf14a"></i> Entity Timeline</h4>
-            <p>Search any host/IP/user and see a unified timeline across all data sources: cases, triage, observables, enrichments, audit log.</p>
-            <p class="g-muted">Navigate to <code>/entity-timeline</code></p>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4">
+            <h4 class="card-title text-base"><i class="icon-git-commit _ion-s-cb40bcf14a"></i> Entity Timeline</h4>
+            <p class="text-sm text-base-content/70">Search any host/IP/user and see a unified timeline across all data sources: cases, triage, observables, enrichments, audit log.</p>
+            <p class="text-sm text-base-content/50 mt-1">Navigate to <code>/entity-timeline</code></p>
+            </div>
         </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- TOOLS -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-tools" data-roles="all analyst senior">
-    <h2 class="g-section-title"><i class="icon-wrench"></i> Tools & Utilities</h2>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-tools" data-roles="all analyst senior">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-wrench text-primary"></i> Tools & Utilities</h2>
 
     <div class="g-grid-3">
-        <div class="g-mini-card"><strong>SOC Tools</strong><br><span class="g-muted">CyberChef-style utilities: base64, URL decode, hash lookup, defang, etc.</span></div>
-        <div class="g-mini-card"><strong>Discover</strong><br><span class="g-muted">Raw Elasticsearch query builder. Write ECS queries against alert indices.</span></div>
-        <div class="g-mini-card"><strong>AI Chat</strong><br><span class="g-muted">Ollama-powered analysis. Ask questions, generate docs, get triage suggestions.</span></div>
-        <div class="g-mini-card"><strong>Notes</strong><br><span class="g-muted">Personal analyst notepad. Organize in folders, auto-save, pinnable.</span></div>
-        <div class="g-mini-card"><strong>Knowledge Base</strong><br><span class="g-muted">590+ articles across SOC, blue team, forensics, and security fundamentals.</span></div>
-        <div class="g-mini-card"><strong>Social Hub</strong><br><span class="g-muted">Team announcements, good work recognition, certifications, emoji reactions.</span></div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-3">
+                <strong>SOC Tools</strong>
+                <p class="text-sm text-base-content/50">CyberChef-style utilities: base64, URL decode, hash lookup, defang, etc.</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-3">
+                <strong>Discover</strong>
+                <p class="text-sm text-base-content/50">Raw Elasticsearch query builder. Write ECS queries against alert indices.</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-3">
+                <strong>AI Chat</strong>
+                <p class="text-sm text-base-content/50">Ollama-powered analysis. Ask questions, generate docs, get triage suggestions.</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-3">
+                <strong>Notes</strong>
+                <p class="text-sm text-base-content/50">Personal analyst notepad. Organize in folders, auto-save, pinnable.</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-3">
+                <strong>Knowledge Base</strong>
+                <p class="text-sm text-base-content/50">590+ articles across SOC, blue team, forensics, and security fundamentals.</p>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-3">
+                <strong>Social Hub</strong>
+                <p class="text-sm text-base-content/50">Team announcements, good work recognition, certifications, emoji reactions.</p>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- ADMIN -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-admin" data-roles="all engineer lead">
-    <h2 class="g-section-title"><i class="icon-settings"></i> Admin & Settings</h2>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-admin" data-roles="all engineer lead">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-settings text-primary"></i> Admin & Settings</h2>
 
     <div class="g-features">
-        <div class="g-feature"><i class="icon-users _ion-s-dc2e428fc7"></i><div><strong>User Management</strong><br>Create/edit users, assign multiple roles, manage focus mode. (<code>/users</code>)</div></div>
-        <div class="g-feature"><i class="icon-plug _ion-s-2b7a4b6404"></i><div><strong>Integrations</strong><br>Configure Elasticsearch, OpenCTI, TIDE, Kibana, GitLab, Ollama connections. (<code>/integrations</code>)</div></div>
-        <div class="g-feature"><i class="icon-shield _ion-s-5dd0211252"></i><div><strong>Security</strong><br>Active sessions, attack detection, security event timeline. (<code>/security</code>)</div></div>
-        <div class="g-feature"><i class="icon-file-text _ion-s-416321c716"></i><div><strong>Audit Logs</strong><br>Full action history per user. Every triage, case change, and login. (<code>/audit-logs</code>)</div></div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-users text-xl shrink-0 _ion-s-dc2e428fc7"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">User Management</strong><br>Create/edit users, assign multiple roles, manage focus mode. (<code>/users</code>)</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-plug text-xl shrink-0 _ion-s-2b7a4b6404"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Integrations</strong><br>Configure Elasticsearch, OpenCTI, TIDE, Kibana, GitLab, Ollama connections. (<code>/integrations</code>)</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-shield text-xl shrink-0 _ion-s-5dd0211252"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Security</strong><br>Active sessions, attack detection, security event timeline. (<code>/security</code>)</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <i class="icon-file-text text-xl shrink-0 _ion-s-416321c716"></i>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Audit Logs</strong><br>Full action history per user. Every triage, case change, and login. (<code>/audit-logs</code>)</div>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- KEY WORKFLOWS -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-workflows" data-roles="all analyst senior lead">
-    <h2 class="g-section-title"><i class="icon-git-branch"></i> Key Workflows</h2>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-workflows" data-roles="all analyst senior lead">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-git-branch text-primary"></i> Key Workflows</h2>
 
-    <h3>Workflow 1: Triage an Alert</h3>
-    <div class="g-workflow">
-        <div class="g-wf-step"><div class="g-wf-num">1</div><div class="g-wf-content"><strong>Go to Alerts</strong><br>Open <code>/alerts</code>, filter by Open status and severity</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step"><div class="g-wf-num">2</div><div class="g-wf-content"><strong>Review Alert</strong><br>Click to expand. Check MITRE mapping, host, user, raw data</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step"><div class="g-wf-num">3</div><div class="g-wf-content"><strong>Check Triage Suggestion</strong><br>ION shows historical closure data for this rule. 80% FP? Probably FP.</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step"><div class="g-wf-num">4</div><div class="g-wf-content"><strong>Acknowledge</strong><br>Click "Acknowledge" to claim. Add notes about your findings.</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step choice"><div class="g-wf-num _ion-s-8c75d59ed6">?</div><div class="g-wf-content"><strong>Decision Point</strong><br><em>True Positive?</em> &rarr; Create Case &rarr; Investigate<br><em>False Positive?</em> &rarr; Close as FP &rarr; Note why</div></div>
+    <h3 class="text-lg font-semibold mt-4 mb-2">Workflow 1: Triage an Alert</h3>
+    <div class="flex flex-col gap-0 my-3">
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">1</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Go to Alerts</strong><br>Open <code>/alerts</code>, filter by Open status and severity</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">2</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Review Alert</strong><br>Click to expand. Check MITRE mapping, host, user, raw data</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">3</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Check Triage Suggestion</strong><br>ION shows historical closure data for this rule. 80% FP? Probably FP.</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">4</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Acknowledge</strong><br>Click "Acknowledge" to claim. Add notes about your findings.</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border-2 border-dashed border-warning">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-circle btn-sm pointer-events-none no-animation text-primary-content _ion-s-8c75d59ed6">?</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Decision Point</strong><br><em class="text-warning">True Positive?</em> &rarr; Create Case &rarr; Investigate<br><em class="text-warning">False Positive?</em> &rarr; Close as FP &rarr; Note why</div>
+            </div>
+        </div>
     </div>
 
-    <h3>Workflow 2: Investigate a Case</h3>
-    <div class="g-workflow">
-        <div class="g-wf-step"><div class="g-wf-num">1</div><div class="g-wf-content"><strong>Open Case</strong><br>Go to <code>/cases</code>, select your assigned case</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step"><div class="g-wf-num">2</div><div class="g-wf-content"><strong>Check Entity Timeline</strong><br>Go to <code>/entity-timeline</code>, search the affected host. See all related events across data sources.</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step"><div class="g-wf-num">3</div><div class="g-wf-content"><strong>Check Similar Cases</strong><br>ION shows past cases with matching patterns. How were they resolved? What was the MTTR?</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step"><div class="g-wf-num">4</div><div class="g-wf-content"><strong>Run Playbook</strong><br>Attach a playbook and work through steps. Extract IOCs. Enrich observables.</div></div>
-        <div class="g-wf-arrow">&darr;</div>
-        <div class="g-wf-step"><div class="g-wf-num">5</div><div class="g-wf-content"><strong>Close Case</strong><br>Document findings, select closure reason, close. MTTR is automatically tracked.</div></div>
+    <h3 class="text-lg font-semibold mt-4 mb-2">Workflow 2: Investigate a Case</h3>
+    <div class="flex flex-col gap-0 my-3">
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">1</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Open Case</strong><br>Go to <code>/cases</code>, select your assigned case</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">2</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Check Entity Timeline</strong><br>Go to <code>/entity-timeline</code>, search the affected host. See all related events across data sources.</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">3</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Check Similar Cases</strong><br>ION shows past cases with matching patterns. How were they resolved? What was the MTTR?</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">4</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Run Playbook</strong><br>Attach a playbook and work through steps. Extract IOCs. Enrich observables.</div>
+            </div>
+        </div>
+        <div class="text-center text-base-content/40 text-base py-0.5 pl-3">&darr;</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">5</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Close Case</strong><br>Document findings, select closure reason, close. MTTR is automatically tracked.</div>
+            </div>
+        </div>
     </div>
 
-    <h3>Workflow 3: Shift Handover</h3>
-    <div class="g-workflow _ion-s-c861988e89">
-        <div class="g-wf-step _ion-s-7b1dd1f4df"><div class="g-wf-num">1</div><div class="g-wf-content"><strong>Generate Report</strong><br>Go to <code>/shift-handover</code>. Select 8h window. Click Generate.</div></div>
-        <div class="g-wf-step _ion-s-7b1dd1f4df"><div class="g-wf-num">2</div><div class="g-wf-content"><strong>Review Highlights</strong><br>Check the highlights banner for critical items the incoming shift needs.</div></div>
-        <div class="g-wf-step _ion-s-7b1dd1f4df"><div class="g-wf-num">3</div><div class="g-wf-content"><strong>Print or Share</strong><br>Click Print for a clean printable version. Walk the incoming shift through it.</div></div>
+    <h3 class="text-lg font-semibold mt-4 mb-2">Workflow 3: Shift Handover</h3>
+    <div class="flex gap-2 my-3 _ion-s-c861988e89">
+        <div class="card bg-base-100 border border-base-300 _ion-s-7b1dd1f4df">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">1</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Generate Report</strong><br>Go to <code>/shift-handover</code>. Select 8h window. Click Generate.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-7b1dd1f4df">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">2</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Review Highlights</strong><br>Check the highlights banner for critical items the incoming shift needs.</div>
+            </div>
+        </div>
+        <div class="card bg-base-100 border border-base-300 _ion-s-7b1dd1f4df">
+            <div class="card-body flex-row items-start gap-3 p-3">
+                <span class="btn btn-primary btn-circle btn-sm pointer-events-none no-animation">3</span>
+                <div class="text-sm text-base-content/70"><strong class="text-base-content">Print or Share</strong><br>Click Print for a clean printable version. Walk the incoming shift through it.</div>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
 <!-- ============================================================ -->
 <!-- QUICK REFERENCE -->
 <!-- ============================================================ -->
-<section class="g-section" id="section-shortcuts" data-roles="all analyst senior lead engineer dfir">
-    <h2 class="g-section-title"><i class="icon-zap"></i> Quick Reference Cards</h2>
+<section class="g-section card bg-base-200 shadow mb-5" id="section-shortcuts" data-roles="all analyst senior lead engineer dfir">
+    <div class="card-body">
+    <h2 class="card-title"><i class="icon-zap text-primary"></i> Quick Reference Cards</h2>
 
     <div class="g-grid-2">
-        <div class="g-ref-card">
-            <h4>Alert Statuses</h4>
-            <div class="g-ref-row"><span class="sev-badge sev-critical">OPEN</span> Not yet reviewed</div>
-            <div class="g-ref-row"><span class="sev-badge sev-medium">ACKNOWLEDGED</span> Claimed by an analyst</div>
-            <div class="g-ref-row"><span class="sev-badge sev-low">CLOSED</span> Resolved with a reason</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body">
+            <h4 class="card-title text-base text-primary border-b border-base-300 pb-2">Alert Statuses</h4>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><span class="badge badge-error badge-sm">OPEN</span> Not yet reviewed</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><span class="badge badge-info badge-sm">ACKNOWLEDGED</span> Claimed by an analyst</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><span class="badge badge-success badge-sm">CLOSED</span> Resolved with a reason</div>
+            </div>
         </div>
-        <div class="g-ref-card">
-            <h4>Severity Levels</h4>
-            <div class="g-ref-row"><span class="sev-badge sev-critical">CRITICAL</span> Immediate action required</div>
-            <div class="g-ref-row"><span class="sev-badge sev-high">HIGH</span> Investigate within 1 hour</div>
-            <div class="g-ref-row"><span class="sev-badge sev-medium">MEDIUM</span> Investigate within 4 hours</div>
-            <div class="g-ref-row"><span class="sev-badge sev-low">LOW</span> Investigate within 24 hours</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body">
+            <h4 class="card-title text-base text-primary border-b border-base-300 pb-2">Severity Levels</h4>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><span class="badge badge-error badge-sm">CRITICAL</span> Immediate action required</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><span class="badge badge-warning badge-sm">HIGH</span> Investigate within 1 hour</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><span class="badge badge-info badge-sm">MEDIUM</span> Investigate within 4 hours</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><span class="badge badge-success badge-sm">LOW</span> Investigate within 24 hours</div>
+            </div>
         </div>
-        <div class="g-ref-card">
-            <h4>Key API Endpoints</h4>
-            <div class="g-ref-row"><code>/api/triage-suggestions?rule_name=X</code> Triage hint</div>
-            <div class="g-ref-row"><code>/api/case-similarity/{id}</code> Similar cases</div>
-            <div class="g-ref-row"><code>/api/attack-stories?hours=24</code> Attack stories</div>
-            <div class="g-ref-row"><code>/api/entity-timeline/search?q=X</code> Entity search</div>
-            <div class="g-ref-row"><code>/api/mitre-navigator/layer</code> Navigator export</div>
-            <div class="g-ref-row"><code>/api/executive-report/pdf</code> Executive PDF</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body">
+            <h4 class="card-title text-base text-primary border-b border-base-300 pb-2">Key API Endpoints</h4>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><code>/api/triage-suggestions?rule_name=X</code> Triage hint</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><code>/api/case-similarity/{id}</code> Similar cases</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><code>/api/attack-stories?hours=24</code> Attack stories</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><code>/api/entity-timeline/search?q=X</code> Entity search</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><code>/api/mitre-navigator/layer</code> Navigator export</div>
+            <div class="flex items-center gap-2 py-1 text-sm text-base-content/70 border-b border-base-300"><code>/api/executive-report/pdf</code> Executive PDF</div>
+            </div>
         </div>
-        <div class="g-ref-card">
-            <h4>RBAC Roles</h4>
-            <div class="g-ref-row"><strong>Analyst (L1)</strong> — Alert triage, cases, observables, playbooks</div>
-            <div class="g-ref-row"><strong>Senior Analyst (L2)</strong> — L1 + escalated cases, observable trends</div>
-            <div class="g-ref-row"><strong>Principal Analyst (L3)</strong> — L2 + SLA compliance, mentoring</div>
-            <div class="g-ref-row"><strong>Forensic</strong> — Forensic investigations, evidence, chain of custody</div>
-            <div class="g-ref-row"><strong>Lead</strong> — All analyst + forensic + team management</div>
-            <div class="g-ref-row"><strong>Engineering</strong> — Integrations, system config, detection eng</div>
-            <div class="g-ref-row"><strong>Admin</strong> — Full access + user management</div>
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body">
+            <h4 class="card-title text-base text-primary border-b border-base-300 pb-2">RBAC Roles</h4>
+            <div class="py-1 text-sm text-base-content/70 border-b border-base-300"><strong class="text-base-content">Analyst (L1)</strong> — Alert triage, cases, observables, playbooks</div>
+            <div class="py-1 text-sm text-base-content/70 border-b border-base-300"><strong class="text-base-content">Senior Analyst (L2)</strong> — L1 + escalated cases, observable trends</div>
+            <div class="py-1 text-sm text-base-content/70 border-b border-base-300"><strong class="text-base-content">Principal Analyst (L3)</strong> — L2 + SLA compliance, mentoring</div>
+            <div class="py-1 text-sm text-base-content/70 border-b border-base-300"><strong class="text-base-content">Forensic</strong> — Forensic investigations, evidence, chain of custody</div>
+            <div class="py-1 text-sm text-base-content/70 border-b border-base-300"><strong class="text-base-content">Lead</strong> — All analyst + forensic + team management</div>
+            <div class="py-1 text-sm text-base-content/70 border-b border-base-300"><strong class="text-base-content">Engineering</strong> — Integrations, system config, detection eng</div>
+            <div class="py-1 text-sm text-base-content/70 border-b border-base-300"><strong class="text-base-content">Admin</strong> — Full access + user management</div>
+            </div>
         </div>
+    </div>
     </div>
 </section>
 
@@ -529,141 +913,41 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-/* ── Guide Layout ─────────────────────────────────── */
-.g-role-bar{display:flex;gap:6px;align-items:center;margin-bottom:16px;flex-wrap:wrap;padding:10px 14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg)}
-.g-role-label{font-size:.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;margin-right:8px}
-.g-role-btn{padding:6px 14px;border:1px solid var(--border);border-radius:20px;background:transparent;color:var(--text-secondary);cursor:pointer;font-size:.78rem;font-weight:600;transition:all .15s}
-.g-role-btn:hover{border-color:var(--primary);color:var(--text-primary)}
-.g-role-btn.active{background:var(--primary-dim);border-color:var(--primary);color:var(--primary)}
-
-.g-quicknav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:20px;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius)}
-.g-quicknav a{padding:4px 10px;border-radius:4px;font-size:.72rem;font-weight:600;color:var(--text-secondary);text-decoration:none;transition:all .15s}
-.g-quicknav a:hover{background:var(--primary-dim);color:var(--primary)}
-
-.g-section{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:20px}
-.g-section-title{font-size:1.1rem;font-weight:700;color:var(--text-primary);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.g-section-title i{color:var(--primary)}
-.g-desc{font-size:.88rem;color:var(--text-secondary);margin-bottom:16px;line-height:1.6}
-.g-intro{font-size:.9rem;color:var(--text-secondary);line-height:1.7;margin-bottom:20px}
-.g-intro strong{color:var(--primary)}
-.g-muted{font-size:.78rem;color:var(--text-muted)}
-
-/* Cards */
-.g-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
-.g-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
-.g-card h3{font-size:.9rem;margin:8px 0 6px;color:var(--text-primary)}
-.g-card p{font-size:.82rem;color:var(--text-secondary);line-height:1.5}
-.g-card-icon{font-size:1.4rem}
-.g-tip{font-size:.72rem;color:var(--sev-medium);margin-top:8px;padding:6px 8px;background:var(--sev-medium-bg);border-radius:var(--radius);border-left:2px solid var(--sev-medium)}
-
-/* Visual mockups */
-.g-mockup{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin:16px 0}
-.g-mockup-title{padding:8px 14px;background:var(--bg-card);font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
-.g-mockup-body{background:var(--bg-primary);padding:0}
-.g-mockup-callouts{padding:10px 14px;background:var(--bg-secondary);border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
-.g-callout{font-size:.78rem;color:var(--text-secondary);display:flex;align-items:center;gap:8px}
-.g-callout-num{width:20px;height:20px;border-radius:50%;background:var(--primary);color:var(--bg-deep);font-size:.68rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-
-/* Mock UI elements */
-.g-mock-stats{display:flex;gap:8px;padding:12px;flex-wrap:wrap}
-.g-mock-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;text-align:center;flex:1;min-width:100px}
-.g-mock-val{font-size:1.2rem;font-weight:700;font-family:'JetBrains Mono',monospace;display:block}
-.g-mock-label{font-size:.62rem;color:var(--text-muted);text-transform:uppercase}
-.g-mock-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}
-.g-mock-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:10px}
-.g-mock-panel-title{font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:8px}
-.g-mock-rows{display:flex;flex-direction:column;gap:4px}
-.g-mock-row{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text-primary);padding:4px 0;border-bottom:1px solid rgba(99,110,123,.1)}
-.g-mock-sev{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.g-mock-sev.crit{background:var(--sev-critical)}.g-mock-sev.high{background:var(--sev-high)}.g-mock-sev.med{background:var(--sev-medium)}
-.g-mock-time{margin-left:auto;font-size:.68rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace}
-.g-mock-badge{margin-left:auto;font-size:.62rem;font-weight:700;text-transform:uppercase}
-.g-mock-toolbar{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap}
-.g-mock-input{flex:1;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);font-size:.78rem;color:var(--text-muted);min-width:150px}
-.g-mock-select{padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);font-size:.78rem;color:var(--text-muted)}
-.g-mock-btn-primary{padding:6px 14px;background:var(--primary);color:var(--bg-deep);border-radius:var(--radius);font-size:.78rem;font-weight:700}
-.g-mock-table{padding:0}
-.g-mock-thead{display:flex;padding:8px 12px;font-size:.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;border-bottom:1px solid var(--border)}
-.g-mock-trow{display:flex;align-items:center;padding:8px 12px;font-size:.82rem;border-bottom:1px solid rgba(99,110,123,.1)}
-.g-mock-trow:hover{background:rgba(0,212,255,.03)}
-.g-mock-mini-stat{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:8px;font-size:.82rem}
-
-/* Kill chain nodes */
-.g-kc-node{padding:4px 10px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase;white-space:nowrap}
-.g-kc-node.active{background:var(--sev-critical-dim);color:var(--sev-critical);border:1px solid var(--sev-critical)}
-.g-kc-node.inactive{background:var(--bg-primary);color:var(--text-muted);border:1px dashed var(--border)}
-.g-kc-arrow{padding:0 4px;color:var(--text-muted);font-size:.8rem}
-
-/* Features grid */
-.g-features{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:16px 0}
-.g-feature{display:flex;gap:12px;padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)}
-.g-feature i{font-size:1.2rem;flex-shrink:0;margin-top:2px}
-.g-feature div{font-size:.82rem;color:var(--text-secondary);line-height:1.5}
-.g-feature strong{color:var(--text-primary)}
-
-.g-grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:12px 0}
-.g-grid-3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
-.g-feature-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
-.g-feature-card h4{font-size:.88rem;margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.g-feature-card p{font-size:.82rem;color:var(--text-secondary);line-height:1.5;margin-top:4px}
-.g-mini-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;font-size:.82rem;color:var(--text-primary)}
-
-/* Steps */
-.g-steps{display:flex;flex-direction:column;gap:8px;margin:12px 0}
-.g-step{display:flex;gap:12px;align-items:flex-start;padding:10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)}
-.g-step-num{width:28px;height:28px;border-radius:50%;background:var(--primary);color:var(--bg-deep);font-size:.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.g-step div{font-size:.85rem;color:var(--text-secondary);line-height:1.5}
-.g-step strong{color:var(--text-primary)}
-
-/* Tip box */
-.g-tip-box{padding:12px 16px;background:var(--primary-dim);border:1px solid var(--primary);border-radius:var(--radius);font-size:.85rem;color:var(--text-primary);margin:12px 0;border-left:3px solid var(--primary)}
-.g-tip-box strong{color:var(--primary)}
-.g-tip-box code{background:rgba(0,0,0,.3);padding:1px 5px;border-radius:3px;font-size:.78rem}
-
-/* Tabs mockup */
-.g-tabs-mockup{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:16px}
-.g-tab-mock{padding:8px 16px;font-size:.78rem;font-weight:600;color:var(--text-secondary);border-bottom:2px solid transparent}
-.g-tab-mock.active{color:var(--primary);border-bottom-color:var(--primary)}
-
-/* Workflow */
-.g-workflow{display:flex;flex-direction:column;gap:0;margin:12px 0}
-.g-wf-step{display:flex;gap:12px;align-items:flex-start;padding:12px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius)}
-.g-wf-step.choice{border-color:var(--sev-medium);border-style:dashed}
-.g-wf-num{width:28px;height:28px;border-radius:50%;background:var(--primary);color:var(--bg-deep);font-size:.8rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.g-wf-content{font-size:.85rem;color:var(--text-secondary);line-height:1.5}
-.g-wf-content strong{color:var(--text-primary)}
-.g-wf-content em{color:var(--sev-medium)}
-.g-wf-arrow{text-align:center;color:var(--text-muted);font-size:1rem;padding:2px 0 2px 13px}
-
-/* Reference cards */
-.g-ref-card{background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px}
-.g-ref-card h4{font-size:.88rem;color:var(--primary);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-.g-ref-row{font-size:.82rem;color:var(--text-secondary);padding:4px 0;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(99,110,123,.08)}
-.g-ref-row code{background:var(--bg-secondary);padding:2px 6px;border-radius:3px;font-size:.72rem;color:var(--primary)}
-.g-ref-row strong{color:var(--text-primary)}
-
-/* Role notes */
-.g-role-note{padding:10px 14px;border-radius:var(--radius);font-size:.82rem;margin:8px 0;display:none}
-.g-role-note.lead{background:var(--sev-high-bg);border-left:3px solid var(--sev-high);color:var(--sev-high)}
-.g-role-note.engineer{background:var(--sev-info-bg);border-left:3px solid var(--sev-info);color:var(--sev-info)}
-
-/* Role filtering */
-.g-section[data-hidden="true"]{display:none}
-
-/* Print styles */
-@media print{
-    .navbar,.g-role-bar,.g-quicknav,.header-actions,.chat-widget,.chat-toggle{display:none!important}
-    body{background:#fff!important;color:#333!important}
-    .g-section{break-inside:avoid;border-color:#ddd;background:#fff}
-    .g-mockup-body{background:#f8f9fa}
-    .g-section-title{color:#000}
-    .g-section-title i{color:#0969da}
+/* JS toggles .active on .g-role-btn — daisyUI btn-active is a different class. */
+.g-role-btn.active {
+    background: color-mix(in oklab, var(--color-primary) 18%, transparent);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
 }
 
-@media(max-width:768px){
-    .g-mock-grid{grid-template-columns:1fr}
-    .g-grid-2,.g-grid-3{grid-template-columns:1fr}
-    .g-kc-node{font-size:.6rem;padding:3px 6px}
+/* JS sets data-hidden on .g-section — not a daisyUI visibility slot. */
+.g-section[data-hidden="true"] { display: none; }
+
+/* Hidden until JS sets element.style.display. JS matches .g-role-note and .lead/.engineer. */
+.g-role-note { display: none; }
+
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+.g-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; }
+.g-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.g-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
+.g-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
+
+/* no daisyUI <code> component */
+#g-content code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.72rem;
+    background: var(--color-base-300);
+    padding: 1px 5px;
+    border-radius: 0.25rem;
+}
+
+/* Print: hide chrome. No daisyUI print primitive. */
+@media print {
+    .navbar, .g-role-bar, .g-quicknav, .header-actions, .chat-widget, .chat-toggle { display: none !important; }
+    body { background: #fff !important; color: #333 !important; }
+    .g-section { break-inside: avoid; border-color: #ddd; background: #fff; }
+    .card-title { color: #000; }
+    .card-title i { color: #0969da; }
 }
 </style>
 <script nonce="{{ csp_nonce }}">

@@ -3,84 +3,100 @@
 {% block title %}Render Template - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<section class="flex items-end justify-between flex-wrap gap-6 mb-8 rise d-1">
-    <h1>Render: <span id="template-name">Loading...</span></h1>
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
+        <div class="flex items-center gap-3 mb-4">
+            <svg class="w-4 h-4 text-primary"><use href="#i-file-text"/></svg>
+            <span class="label-tiny text-primary">Template render</span>
+        </div>
+        <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Render: <span id="template-name">Loading...</span></h1>
+    </div>
     <div class="flex items-center gap-2 flex-wrap">
-        <button type="button" id="settings-btn" class="ion-btn" title="User Preferences">Settings</button>
-        <a href="/templates/{{ template_id }}" class="ion-btn">Back to Template</a>
+        <button type="button" id="settings-btn" class="btn btn-ghost" title="User Preferences">
+            <svg class="w-4 h-4"><use href="#i-settings"/></svg>
+            Settings
+        </button>
+        <a href="/templates/{{ template_id }}" class="btn btn-ghost">Back to Template</a>
     </div>
 </section>
 
-<div class="render-layout">
-    <div class="render-input">
-        <div class="tabs">
-            <button type="button" class="tab-btn active" data-tab="form">Form View</button>
-            <button type="button" class="tab-btn" data-tab="json">JSON View</button>
-        </div>
-
-        <div id="form-tab" class="tab-content active">
-            <h3>Template Variables</h3>
-            <div id="variables-form" class="variables-form">
-                <p class="loading">Loading template variables...</p>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <div role="tablist" class="tabs tabs-box mb-4">
+                <button type="button" role="tab" class="tab tab-btn active" data-tab="form">Form View</button>
+                <button type="button" role="tab" class="tab tab-btn" data-tab="json">JSON View</button>
             </div>
 
-            <div class="_ion-s-c8be1ccba6" id="sections-area">
-                <div class="_ion-s-6c510461f1">
-                    <h3 class="_ion-s-1da9facb4d">Document Sections</h3>
-                    <div class="_ion-s-33344b8d5b">
-                        <button type="button" class="ion-btn btn-sm" id="expand-all-btn" title="Expand all sections">Expand All</button>
-                        <button type="button" class="ion-btn btn-sm" id="collapse-all-btn" title="Collapse all sections">Collapse All</button>
+            <div id="form-tab" class="tab-content active">
+                <h3 class="card-title text-base">Template Variables</h3>
+                <div id="variables-form" class="variables-form">
+                    <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
+                        <span class="loading loading-spinner loading-sm text-primary"></span>
+                        Loading template variables...
                     </div>
                 </div>
-                <p class="muted _ion-s-989f425c4c">Click any section to expand it. Use the Edit tab to modify content before saving.</p>
-                <div id="section-cards"></div>
-            </div>
-        </div>
 
-        <div id="json-tab" class="tab-content _ion-s-f2892a2e8a">
-            <h3>Input Data (JSON)</h3>
-            <div class="form-group">
-                <textarea id="data-input" rows="15" placeholder='{"name": "John", "company": "Acme"}' class="ion-textarea">{}</textarea>
+                <div class="_ion-s-c8be1ccba6 border-t-2 border-base-300 pt-4 mt-4" id="sections-area">
+                    <div class="_ion-s-6c510461f1 flex-wrap gap-2">
+                        <h3 class="_ion-s-1da9facb4d card-title text-base">Document Sections</h3>
+                        <div class="_ion-s-33344b8d5b">
+                            <button type="button" class="btn btn-ghost btn-sm" id="expand-all-btn" title="Expand all sections">Expand All</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="collapse-all-btn" title="Collapse all sections">Collapse All</button>
+                        </div>
+                    </div>
+                    <p class="text-sm text-base-content/50 _ion-s-989f425c4c">Click any section to expand it. Use the Edit tab to modify content before saving.</p>
+                    <div id="section-cards"></div>
+                </div>
             </div>
-        </div>
 
-        <div class="form-actions">
-            <button type="button" id="autofill-btn" class="ion-btn">Auto-fill Defaults</button>
-            <button type="button" id="preview-btn" class="ion-btn ion-btn-primary">Preview</button>
-            <button type="button" id="render-btn" class="ion-btn btn-success">Save as Document</button>
+            <div id="json-tab" class="tab-content _ion-s-f2892a2e8a">
+                <h3 class="card-title text-base mb-3">Input Data (JSON)</h3>
+                <fieldset class="fieldset p-0">
+                    <textarea id="data-input" rows="15" placeholder='{"name": "John", "company": "Acme"}' class="textarea w-full font-mono text-sm">{}</textarea>
+                </fieldset>
+            </div>
+
+            <div class="flex flex-wrap gap-2 mt-6">
+                <button type="button" id="autofill-btn" class="btn btn-ghost">Auto-fill Defaults</button>
+                <button type="button" id="preview-btn" class="btn btn-primary">Preview</button>
+                <button type="button" id="render-btn" class="btn btn-success">Save as Document</button>
+            </div>
         </div>
     </div>
 
-    <div class="render-output">
-        <h3 class="_ion-s-59b87fdbd1">Output Preview</h3>
-        <div id="output-container" class="output-box">
-            <p class="muted">Fill in the fields and click "Preview" to see the rendered output</p>
+    <div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-base _ion-s-59b87fdbd1">Output Preview</h3>
+            <div id="output-container" class="bg-base-300 rounded-box p-5 min-h-[300px] overflow-auto font-mono text-sm">
+                <p class="text-base-content/50">Fill in the fields and click "Preview" to see the rendered output</p>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- Settings Modal -->
 <div id="settings-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content _ion-s-72fca94264">
-        <div class="modal-header">
-            <h2>User Preferences</h2>
-            <button class="modal-close" data-click-action="closeSettingsModal">&times;</button>
+    <div class="modal-box _ion-s-72fca94264">
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">User Preferences</h2>
+            <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeSettingsModal" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body">
-            <p class="muted _ion-s-f267e3ca68">These values will be auto-filled in author/preparer fields.</p>
-            <div class="form-group">
-                <label for="pref-author">Your Name / Author</label>
-                <input type="text" id="pref-author" placeholder="e.g., John Smith" class="ion-input">
-            </div>
-            <div class="form-group">
-                <label for="pref-organization">Organization</label>
-                <input type="text" id="pref-organization" placeholder="e.g., Cyber Division" class="ion-input">
-            </div>
-            <div class="form-group">
-                <label for="pref-classification">Default Classification</label>
-                <select id="pref-classification" class="ion-select">
+        <div class="py-4 flex flex-col gap-3">
+            <p class="text-sm text-base-content/50 _ion-s-f267e3ca68">These values will be auto-filled in author/preparer fields.</p>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Your Name / Author</legend>
+                <input type="text" id="pref-author" placeholder="e.g., John Smith" class="input w-full">
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Organization</legend>
+                <input type="text" id="pref-organization" placeholder="e.g., Cyber Division" class="input w-full">
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Default Classification</legend>
+                <select id="pref-classification" class="select w-full">
                     <option value="">-- Select --</option>
                     <option value="UNCLASSIFIED">UNCLASSIFIED</option>
                     <option value="FOUO">FOR OFFICIAL USE ONLY</option>
@@ -88,50 +104,215 @@
                     <option value="SECRET">SECRET</option>
                     <option value="TOP SECRET">TOP SECRET</option>
                 </select>
-            </div>
+            </fieldset>
         </div>
-        <div class="modal-footer">
-            <button class="ion-btn ion-btn-primary" data-click-action="savePreferences">Save Preferences</button>
-            <button class="ion-btn" data-click-action="closeSettingsModal">Cancel</button>
+        <div class="modal-action">
+            <button type="button" class="btn btn-ghost" data-click-action="closeSettingsModal">Cancel</button>
+            <button type="button" class="btn btn-primary" data-click-action="savePreferences">Save Preferences</button>
         </div>
     </div>
 </div>
-<style nonce="{{ csp_nonce }}">
-.se-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:0.75rem;overflow:hidden;transition:border-color .2s}
-.se-card.se-editing{border-color:var(--primary)}
-.se-header{display:flex;align-items:center;justify-content:space-between;padding:0.6rem 1rem;cursor:pointer;user-select:none;gap:0.5rem}
-.se-header:hover{background:var(--bg-secondary)}
-.se-title{font-weight:600;font-size:0.9rem;color:var(--text-primary);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.se-num{background:var(--primary-dim);color:var(--primary);font-size:0.75rem;font-weight:700;padding:0.15rem 0.5rem;border-radius:var(--radius);min-width:1.8rem;text-align:center;flex-shrink:0}
-.se-chevron{color:var(--text-muted);transition:transform .2s;flex-shrink:0}
-.se-card.se-open .se-chevron{transform:rotate(180deg)}
-.se-body{display:none;border-top:1px solid var(--border)}
-.se-card.se-open .se-body{display:block}
-.se-edit-btn{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1rem;padding:0.1rem 0.4rem;border-radius:var(--radius);transition:all .15s;flex-shrink:0}
-.se-edit-btn:hover{color:var(--primary);background:var(--primary-dim)}
-.se-card.se-editing .se-edit-btn{color:var(--primary)}
-.se-rendered{padding:1rem;max-height:600px;overflow-y:auto}
-.se-rendered table{width:100%;border-collapse:collapse;font-size:0.82rem;margin:0.5rem 0}
-.se-rendered th,.se-rendered td{padding:0.35rem 0.6rem;border:1px solid var(--border);text-align:left}
-.se-rendered th{background:var(--bg-secondary);font-weight:600;white-space:nowrap}
-.se-rendered h3,.se-rendered h4{margin:0.8rem 0 0.4rem;color:var(--primary)}
-.se-rendered p{margin:0.3rem 0;line-height:1.5}
-.se-rendered ul,.se-rendered ol{padding-left:1.5rem;margin:0.3rem 0}
-.se-edit-area{display:none;padding:0.75rem}
-.se-edit-area textarea{width:100%;min-height:200px;max-height:600px;resize:vertical;font-family:var(--font-mono,'Consolas','Monaco',monospace);font-size:0.82rem;line-height:1.5;background:var(--bg-deep);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius);padding:0.75rem;tab-size:4}
-.se-edit-area textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px var(--primary-dim)}
-.se-meta-header{padding:0}
-.se-meta-header .se-rendered{padding:1rem}
-.se-meta-header .rendered-content{font-size:0.85rem}
-#sections-area{border-top:2px solid var(--border);padding-top:1rem;margin-top:1rem}
-.btn-sm{padding:0.25rem 0.6rem;font-size:0.75rem}
-</style>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}
+<style nonce="{{ csp_nonce }}">
+/* JS toggles .active on .tab-btn, not daisyUI .tab-active. */
+.tabs-box > .tab.tab-btn.active {
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+}
+
+/* JS openSettingsModal()/closeSettingsModal() set style.display = 'flex'/'none',
+   not daisyUI .modal-open. The hashed display:none class keeps the overlay
+   hidden until then. Bridge so daisyUI .modal still presents when display is flex. */
+#settings-modal.modal {
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    align-items: center;
+    justify-content: center;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+#settings-modal > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+}
+
+/* JS buildVariablesForm() emits .form-group / .variable-input / .auto-badge /
+   .field-hint / .required — class names are fixed in script. */
+#variables-form .form-group { margin-bottom: 1rem; }
+#variables-form label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+#variables-form .variable-input {
+    width: 100%;
+    border: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    border-radius: var(--radius-field, 0.25rem);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+#variables-form textarea.variable-input {
+    min-height: 6rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    resize: vertical;
+}
+#variables-form .variable-input:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-color: var(--color-primary);
+}
+#variables-form .required { color: var(--color-error); }
+#variables-form .auto-badge {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    background: color-mix(in oklab, var(--color-info) 20%, transparent);
+    color: var(--color-info);
+}
+#variables-form .field-hint {
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-top: 0.25rem;
+}
+
+/* JS buildSectionCards() emits .se-card / .se-open / .se-editing / .se-header /
+   .se-title / .se-num / .se-chevron / .se-body / .se-edit-btn / .se-rendered /
+   .se-edit-area / .se-meta-header — class names are fixed in script.
+   Open/edit state, chevron rotation, 600px pane cap and textarea auto-height
+   have no daisyUI equivalent. */
+.se-card {
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    transition: border-color .2s;
+}
+.se-card.se-editing { border-color: var(--color-primary); }
+.se-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    gap: 0.5rem;
+}
+.se-header:hover { background: var(--color-base-200); }
+.se-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--color-base-content);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.se-num {
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    min-width: 1.8rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+.se-chevron {
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    transition: transform .2s;
+    flex-shrink: 0;
+}
+.se-card.se-open .se-chevron { transform: rotate(180deg); }
+.se-body { display: none; border-top: 1px solid var(--color-base-300); }
+.se-card.se-open .se-body { display: block; }
+.se-edit-btn {
+    background: none;
+    border: none;
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    transition: all .15s;
+    flex-shrink: 0;
+}
+.se-edit-btn:hover {
+    color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+.se-card.se-editing .se-edit-btn { color: var(--color-primary); }
+.se-rendered { padding: 1rem; max-height: 600px; overflow-y: auto; }
+.se-rendered table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin: 0.5rem 0;
+}
+.se-rendered th,
+.se-rendered td {
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--color-base-300);
+    text-align: left;
+}
+.se-rendered th {
+    background: var(--color-base-200);
+    font-weight: 600;
+    white-space: nowrap;
+}
+.se-rendered h3,
+.se-rendered h4 { margin: 0.8rem 0 0.4rem; color: var(--color-primary); }
+.se-rendered p { margin: 0.3rem 0; line-height: 1.5; }
+.se-rendered ul,
+.se-rendered ol { padding-left: 1.5rem; margin: 0.3rem 0; }
+.se-edit-area { display: none; padding: 0.75rem; }
+.se-edit-area textarea {
+    width: 100%;
+    min-height: 200px;
+    max-height: 600px;
+    resize: vertical;
+    font-family: var(--font-mono, 'Consolas', 'Monaco', monospace);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    background: var(--color-base-200);
+    color: var(--color-base-content);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.25rem);
+    padding: 0.75rem;
+    tab-size: 4;
+}
+.se-edit-area textarea:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
+.se-meta-header { padding: 0; }
+.se-meta-header .se-rendered { padding: 1rem; }
+.se-meta-header .rendered-content { font-size: 0.85rem; }
+
+/* JS innerHTML injects .rendered-content / .rendered-output / .error into the preview. */
+#output-container .rendered-content {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+#output-container .error { color: var(--color-error); }
+</style>
 <script nonce="{{ csp_nonce }}">
 {% raw %}
 const templateId = {% endraw %}{{ template_id }}{% raw %};

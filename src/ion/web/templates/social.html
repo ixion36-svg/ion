@@ -4,129 +4,147 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <style nonce="{{ csp_nonce }}">
-    .social-hub { max-width: 800px; margin: 0 auto; padding: 24px 16px; }
-    .social-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
-    .social-header h1 { font-size: 1.5rem; color: var(--text-primary); margin: 0; }
+/* JS toggles .active on .social-filter-pill, not daisyUI .btn-active. Bridge the two. */
+.social-filter-pill.active {
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+    font-weight: 600;
+}
 
-    /* Compose card (surface from .ion-card; page-unique spacing + shadow below) */
-    .social-compose {
-        padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    }
-    .social-compose-row { display: flex; gap: 12px; margin-bottom: 12px; }
-    .social-compose-row input { flex: 1; }
-    .social-compose textarea { resize: vertical; min-height: 80px; }
-    .social-compose-footer { display: flex; justify-content: flex-end; margin-top: 12px; }
+/* JS innerHTML: feed cards. Category accents map onto daisyUI slots
+   (warning = ION amber = former --neon-orange; secondary = ION iris =
+   former --neon-purple). */
+.social-post {
+    background: var(--color-base-200);
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+    border-radius: var(--radius-box, 0.5rem);
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+.social-post.pinned { border-color: var(--color-warning); }
+.social-post-accent { height: 3px; width: 100%; }
+.social-post-accent.announcement { background: var(--color-warning); }
+.social-post-accent.good_work { background: var(--color-primary); }
+.social-post-accent.certification { background: var(--color-secondary); }
+.social-post-accent.general { background: var(--color-base-300); }
 
-    /* Filters */
-    .social-filters { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
-    .social-filter-pill {
-        padding: 6px 16px; border-radius: 20px; border: 1px solid var(--border);
-        background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer;
-        font-size: 0.8rem; font-weight: 500; transition: all 0.15s;
-    }
-    .social-filter-pill:hover { border-color: var(--primary); color: var(--text-primary); }
-    .social-filter-pill.active { background: var(--primary); color: var(--bg-deep); border-color: var(--primary); }
+.social-post-body { padding: 1rem 1.25rem; }
+.social-post-meta {
+    display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; font-size: 0.8rem;
+}
+.social-post-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: var(--color-primary); font-size: 0.85rem; flex-shrink: 0;
+}
+.social-post-author { font-weight: 600; color: var(--color-base-content); }
+.social-post-time { color: color-mix(in oklab, var(--color-base-content) 45%, transparent); }
+.social-post-pin { color: var(--color-warning); font-size: 0.75rem; font-weight: 600; }
+.social-category-badge {
+    display: inline-flex; align-items: center; padding: 0.125rem 0.625rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.social-category-badge.announcement {
+    background: color-mix(in oklab, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
+}
+.social-category-badge.good_work {
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+}
+.social-category-badge.certification {
+    background: color-mix(in oklab, var(--color-secondary) 15%, transparent);
+    color: var(--color-secondary);
+}
+.social-category-badge.general {
+    background: var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
 
-    /* Post card */
-    .social-post {
-        background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg);
-        margin-bottom: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.15);
-    }
-    .social-post.pinned { border-color: var(--neon-orange); }
-    .social-post-accent {
-        height: 3px; width: 100%;
-    }
-    .social-post-accent.announcement { background: var(--neon-orange); }
-    .social-post-accent.good_work { background: var(--primary); }
-    .social-post-accent.certification { background: var(--neon-purple); }
-    .social-post-accent.general { background: var(--border); }
+.social-post-title { font-size: 1.05rem; font-weight: 700; color: var(--color-base-content); margin: 0.5rem 0 0.375rem; }
+.social-post-content { color: color-mix(in oklab, var(--color-base-content) 75%, transparent); font-size: 0.9rem; line-height: 1.6; }
+.social-post-content p { margin: 0 0 0.5rem; }
 
-    .social-post-body { padding: 16px 20px; }
-    .social-post-meta {
-        display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 0.8rem;
-    }
-    .social-post-avatar {
-        width: 32px; height: 32px; border-radius: 50%; background: var(--primary-dim);
-        display: flex; align-items: center; justify-content: center;
-        font-weight: 700; color: var(--primary); font-size: 0.85rem; flex-shrink: 0;
-    }
-    .social-post-author { font-weight: 600; color: var(--text-primary); }
-    .social-post-time { color: var(--text-muted); }
-    .social-post-pin { color: var(--neon-orange); font-size: 0.75rem; font-weight: 600; }
-    .social-category-badge {
-        display: inline-block; padding: 2px 10px; border-radius: 10px;
-        font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
-    }
-    .social-category-badge.announcement { background: rgba(249,115,22,0.15); color: var(--neon-orange); }
-    .social-category-badge.good_work { background: var(--primary-dim); color: var(--primary); }
-    .social-category-badge.certification { background: rgba(168,85,247,0.15); color: var(--neon-purple); }
-    .social-category-badge.general { background: var(--bg-secondary); color: var(--text-muted); }
+/* JS querySelector('.social-post-actions') / .social-post-admin-actions;
+   innerHTML rebuilds reaction buttons with .reacted. */
+.social-post-actions {
+    display: flex; align-items: center; gap: 0.25rem; padding: 0.5rem 1.25rem 0.75rem;
+    border-top: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+    flex-wrap: wrap;
+}
+.social-react-btn {
+    padding: 0.25rem 0.625rem; border-radius: 1rem;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+    background: var(--color-base-200); cursor: pointer; font-size: 0.8rem;
+    display: flex; align-items: center; gap: 0.25rem;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+.social-react-btn:hover { border-color: var(--color-primary); }
+.social-react-btn.reacted {
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    border-color: var(--color-primary); color: var(--color-primary);
+}
+.social-react-btn .count { font-weight: 600; }
+.social-comment-toggle {
+    margin-left: auto; padding: 0.25rem 0.75rem; border-radius: 1rem;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+    background: var(--color-base-200); cursor: pointer; font-size: 0.8rem;
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}
+.social-comment-toggle:hover { border-color: var(--color-primary); color: var(--color-base-content); }
+.social-post-admin-actions { margin-left: 0.5rem; display: flex; gap: 0.25rem; }
+.social-admin-btn {
+    padding: 0.25rem 0.5rem; border-radius: var(--radius-field, 0.25rem);
+    border: none; background: none; cursor: pointer; font-size: 0.75rem;
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}
+.social-admin-btn:hover { color: var(--color-primary); background: var(--color-base-300); }
 
-    .social-post-title { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin: 8px 0 6px; }
-    .social-post-content { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.6; }
-    .social-post-content p { margin: 0 0 8px; }
+/* JS classList toggles .show on .social-comments, not daisyUI / Tailwind .hidden. */
+.social-comments { padding: 0 1.25rem 1rem; display: none; }
+.social-comments.show { display: block; }
+.social-comment-item {
+    display: flex; gap: 0.5rem; padding: 0.5rem 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 8%, transparent);
+}
+.social-comment-item:last-child { border-bottom: none; }
+.social-comment-avatar {
+    width: 24px; height: 24px; border-radius: 50%; background: var(--color-base-300);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.65rem; font-weight: 700;
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent); flex-shrink: 0;
+}
+.social-comment-body { flex: 1; }
+.social-comment-author { font-weight: 600; font-size: 0.8rem; color: var(--color-base-content); }
+.social-comment-text { font-size: 0.85rem; color: color-mix(in oklab, var(--color-base-content) 75%, transparent); margin-top: 2px; }
+.social-comment-time { font-size: 0.65rem; color: color-mix(in oklab, var(--color-base-content) 45%, transparent); margin-top: 2px; }
+.social-comment-delete { background: none; border: none; color: color-mix(in oklab, var(--color-base-content) 50%, transparent); cursor: pointer; font-size: 0.7rem; }
+.social-comment-delete:hover { color: var(--color-error); }
 
-    /* Actions bar */
-    .social-post-actions {
-        display: flex; align-items: center; gap: 4px; padding: 8px 20px 12px;
-        border-top: 1px solid var(--border); flex-wrap: wrap;
-    }
-    .social-react-btn {
-        padding: 4px 10px; border-radius: 16px; border: 1px solid var(--border);
-        background: var(--bg-secondary); cursor: pointer; font-size: 0.8rem;
-        display: flex; align-items: center; gap: 4px; transition: all 0.15s;
-        color: var(--text-secondary);
-    }
-    .social-react-btn:hover { border-color: var(--primary); }
-    .social-react-btn.reacted { background: var(--primary-dim); border-color: var(--primary); color: var(--primary); }
-    .social-react-btn .count { font-weight: 600; }
-    .social-comment-toggle {
-        margin-left: auto; padding: 4px 12px; border-radius: 16px; border: 1px solid var(--border);
-        background: var(--bg-secondary); cursor: pointer; font-size: 0.8rem; color: var(--text-muted);
-    }
-    .social-comment-toggle:hover { border-color: var(--primary); color: var(--text-primary); }
-    .social-post-admin-actions { margin-left: 8px; display: flex; gap: 4px; }
-    .social-admin-btn {
-        padding: 4px 8px; border-radius: var(--radius); border: none; background: none;
-        cursor: pointer; font-size: 0.75rem; color: var(--text-muted);
-    }
-    .social-admin-btn:hover { color: var(--primary); background: var(--bg-secondary); }
+/* JS innerHTML: comment composer is a bare <input> + <button>, no daisyUI classes. */
+.social-comment-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+.social-comment-form input {
+    flex: 1; padding: 0.5rem 0.75rem;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+    border-radius: var(--radius-field, 0.25rem);
+    background: var(--color-base-200); color: var(--color-base-content); font-size: 0.85rem;
+}
+.social-comment-form input:focus { outline: none; border-color: var(--color-primary); }
+.social-comment-form button {
+    padding: 0.5rem 1rem; background: var(--color-primary); color: var(--color-primary-content);
+    border: none; border-radius: var(--radius-field, 0.25rem); cursor: pointer;
+    font-size: 0.85rem; font-weight: 600;
+}
 
-    /* Comments section */
-    .social-comments { padding: 0 20px 16px; display: none; }
-    .social-comments.show { display: block; }
-    .social-comment-item {
-        display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border);
-    }
-    .social-comment-item:last-child { border-bottom: none; }
-    .social-comment-avatar {
-        width: 24px; height: 24px; border-radius: 50%; background: var(--bg-secondary);
-        display: flex; align-items: center; justify-content: center;
-        font-size: 0.65rem; font-weight: 700; color: var(--text-muted); flex-shrink: 0;
-    }
-    .social-comment-body { flex: 1; }
-    .social-comment-author { font-weight: 600; font-size: 0.8rem; color: var(--text-primary); }
-    .social-comment-text { font-size: 0.85rem; color: var(--text-secondary); margin-top: 2px; }
-    .social-comment-time { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
-    .social-comment-delete { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.7rem; }
-    .social-comment-delete:hover { color: var(--danger); }
-
-    .social-comment-form { display: flex; gap: 8px; margin-top: 12px; }
-    .social-comment-form input {
-        flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius);
-        background: var(--bg-secondary); color: var(--text-primary); font-size: 0.85rem;
-    }
-    .social-comment-form input:focus { outline: none; border-color: var(--primary); }
-    .social-comment-form button {
-        padding: 8px 16px; background: var(--primary); color: var(--bg-deep); border: none;
-        border-radius: var(--radius); cursor: pointer; font-size: 0.85rem; font-weight: 600;
-    }
-
-    .social-empty { text-align: center; padding: 48px 16px; color: var(--text-muted); }
-    .social-empty i { font-size: 3rem; display: block; margin-bottom: 12px; }
+/* JS innerHTML: empty feed uses .social-empty (no daisyUI class on that node). */
+.social-empty { text-align: center; padding: 3rem 1rem; color: color-mix(in oklab, var(--color-base-content) 50%, transparent); }
+.social-empty i { font-size: 3rem; display: block; margin-bottom: 0.75rem; }
 </style>
 
-<div class="social-hub">
+<div class="max-w-[800px] mx-auto">
     <section class="mb-8 rise d-1">
       <div class="flex items-center gap-3 mb-4">
         <svg class="w-4 h-4 text-ion-iris"><use href="#i-users"/></svg>
@@ -137,29 +155,31 @@
     </section>
 
     <!-- Compose -->
-    <div class="social-compose ion-card">
-        <div class="social-compose-row">
-            <input type="text" id="social-title" class="ion-input" placeholder="Post title...">
-            <select id="social-category" class="ion-select">
-                <option value="general">General</option>
-                <option value="announcement">Announcement</option>
-                <option value="good_work">Good Work</option>
-                <option value="certification">Certification</option>
-            </select>
-        </div>
-        <textarea id="social-body" class="ion-textarea" placeholder="Share an update, shoutout, or announcement... (supports markdown)"></textarea>
-        <div class="social-compose-footer">
-            <button class="ion-btn ion-btn-primary" data-click-action="createSocialPost">Post</button>
+    <div class="card bg-base-200 shadow mb-5">
+        <div class="card-body gap-3">
+            <div class="flex flex-wrap gap-3">
+                <input type="text" id="social-title" class="input w-full md:flex-1 md:w-auto" placeholder="Post title...">
+                <select id="social-category" class="select w-full md:w-auto">
+                    <option value="general">General</option>
+                    <option value="announcement">Announcement</option>
+                    <option value="good_work">Good Work</option>
+                    <option value="certification">Certification</option>
+                </select>
+            </div>
+            <textarea id="social-body" class="textarea w-full min-h-20 resize-y" placeholder="Share an update, shoutout, or announcement... (supports markdown)"></textarea>
+            <div class="card-actions justify-end">
+                <button class="btn btn-primary" data-click-action="createSocialPost">Post</button>
+            </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="social-filters">
-        <button class="social-filter-pill active" data-cat="" data-click-action="filterPosts" data-args='["$target", ""]'>All</button>
-        <button class="social-filter-pill" data-cat="announcement" data-click-action="filterPosts" data-args='["$target", "announcement"]'>Announcements</button>
-        <button class="social-filter-pill" data-cat="good_work" data-click-action="filterPosts" data-args='["$target", "good_work"]'>Good Work</button>
-        <button class="social-filter-pill" data-cat="certification" data-click-action="filterPosts" data-args='["$target", "certification"]'>Certifications</button>
-        <button class="social-filter-pill" data-cat="general" data-click-action="filterPosts" data-args='["$target", "general"]'>General</button>
+    <div class="flex flex-wrap gap-2 mb-5">
+        <button class="btn btn-sm social-filter-pill active" data-cat="" data-click-action="filterPosts" data-args='["$target", ""]'>All</button>
+        <button class="btn btn-sm social-filter-pill" data-cat="announcement" data-click-action="filterPosts" data-args='["$target", "announcement"]'>Announcements</button>
+        <button class="btn btn-sm social-filter-pill" data-cat="good_work" data-click-action="filterPosts" data-args='["$target", "good_work"]'>Good Work</button>
+        <button class="btn btn-sm social-filter-pill" data-cat="certification" data-click-action="filterPosts" data-args='["$target", "certification"]'>Certifications</button>
+        <button class="btn btn-sm social-filter-pill" data-cat="general" data-click-action="filterPosts" data-args='["$target", "general"]'>General</button>
     </div>
 
     <!-- Feed -->

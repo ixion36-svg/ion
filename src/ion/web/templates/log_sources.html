@@ -12,7 +12,7 @@
 {% set active_label = "Sources" %}
 {% include "_nav_tabs.html" %}
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-lime"><use href="#i-activity"/></svg>
     <span class="label-tiny text-ion-lime">Ingestion health</span>
@@ -21,73 +21,73 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Index lag, source volume and configured pipelines.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary" data-click-action="lsRefresh">Run Health Check</button>
+        <button class="btn btn-ghost" data-click-action="lsRefresh">Run Health Check</button>
         <button class="btn btn-primary" data-click-action="lsOpenForm">+ New Source</button>
     </div>
 </section>
 
-<div id="ls-content"><div class="ls-loading"><span class="ls-spinner"></span> Loading...</div></div>
+<div id="ls-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div></div>
 
-<div class="ls-modal-bg" id="ls-modal-bg">
-    <div class="ls-modal">
-        <div class="ls-modal-head">
-            <div class="ls-modal-title" id="ls-modal-title">New Log Source</div>
-            <button class="ls-modal-close" data-click-action="lsCloseForm" aria-label="Close">&times;</button>
+<div class="modal" id="ls-modal-bg">
+    <div class="modal-box">
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold" id="ls-modal-title">New Log Source</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="lsCloseForm" aria-label="Close">&times;</button>
         </div>
-        <form class="ls-modal-body" id="ls-form" data-validating-submit-action="lsSubmit">
+        <form class="pt-4" id="ls-form" data-validating-submit-action="lsSubmit">
             <input type="hidden" id="ls-id" value="">
 
-            <div class="ls-row">
-                <div class="ls-field">
-                    <label>Name *</label>
-                    <input id="ls-name" class="ion-input" type="text" required maxlength="200" placeholder="Sysmon (Windows endpoints)">
-                </div>
-                <div class="ls-field">
-                    <label>Category *</label>
-                    <select id="ls-category" class="ion-select" required></select>
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Name *</legend>
+                    <input id="ls-name" class="input w-full" type="text" required maxlength="200" placeholder="Sysmon (Windows endpoints)">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Category *</legend>
+                    <select id="ls-category" class="select w-full" required></select>
+                </fieldset>
             </div>
 
-            <div class="ls-row">
-                <div class="ls-field">
-                    <label>Match field *</label>
-                    <input id="ls-match-field" class="ion-input" type="text" required placeholder="event.module">
-                </div>
-                <div class="ls-field">
-                    <label>Match value *</label>
-                    <input id="ls-match-value" class="ion-input" type="text" required placeholder="sysmon">
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Match field *</legend>
+                    <input id="ls-match-field" class="input w-full" type="text" required placeholder="event.module">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Match value *</legend>
+                    <input id="ls-match-value" class="input w-full" type="text" required placeholder="sysmon">
+                </fieldset>
             </div>
 
-            <div class="ls-row">
-                <div class="ls-field">
-                    <label>Index pattern</label>
-                    <input id="ls-index" class="ion-input" type="text" placeholder="logs-*-* (optional)">
-                </div>
-                <div class="ls-field">
-                    <label>Expected interval (minutes) *</label>
-                    <input id="ls-interval" class="ion-input" type="number" required min="1" max="10080" value="30">
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Index pattern</legend>
+                    <input id="ls-index" class="input w-full" type="text" placeholder="logs-*-* (optional)">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Expected interval (minutes) *</legend>
+                    <input id="ls-interval" class="input w-full" type="number" required min="1" max="10080" value="30">
+                </fieldset>
             </div>
 
-            <div class="ls-row">
-                <div class="ls-field">
-                    <label>Criticality</label>
-                    <select id="ls-crit" class="ion-select"></select>
-                </div>
-                <div class="ls-field">
-                    <label>Owner</label>
-                    <input id="ls-owner" class="ion-input" type="text" placeholder="Platform team">
-                </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Criticality</legend>
+                    <select id="ls-crit" class="select w-full"></select>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Owner</legend>
+                    <input id="ls-owner" class="input w-full" type="text" placeholder="Platform team">
+                </fieldset>
             </div>
 
-            <div class="ls-field">
-                <label>Description</label>
-                <textarea id="ls-desc" class="ion-textarea" rows="3"></textarea>
-            </div>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Description</legend>
+                <textarea id="ls-desc" class="textarea w-full" rows="3"></textarea>
+            </fieldset>
 
-            <div class="ls-form-actions">
-                <button type="button" class="btn btn-secondary" data-click-action="lsCloseForm">Cancel</button>
+            <div class="modal-action">
+                <button type="button" class="btn btn-ghost" data-click-action="lsCloseForm">Cancel</button>
                 <button type="submit" class="btn btn-primary">Save</button>
             </div>
         </form>
@@ -100,69 +100,35 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.ls-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.ls-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:ls-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes ls-spin{to{transform:rotate(360deg)}}
-.ls-empty{text-align:center;padding:60px 24px;color:var(--text-secondary)}
-.ls-empty h3{color:var(--text-primary);margin-bottom:8px}
-.ls-empty button{margin-top:14px}
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+#ls-modal-bg.show {
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+#ls-modal-bg.show > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 640px;
+    max-height: 90vh;
+}
 
-.ls-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px}
-.ls-stat{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;text-align:center}
-.ls-stat-val{font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--primary)}
-.ls-stat-val.good{color:var(--mitre-covered)}
-.ls-stat-val.warn{color:var(--sev-medium)}
-.ls-stat-val.crit{color:var(--sev-critical)}
-.ls-stat-val.muted{color:var(--text-secondary)}
-.ls-stat-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:4px}
-
-.ls-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}
-.ls-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;border-left:4px solid var(--border);position:relative}
-.ls-card.healthy{border-left-color:var(--mitre-covered)}
-.ls-card.stale{border-left-color:var(--sev-medium)}
-.ls-card.silent{border-left-color:var(--sev-critical)}
-.ls-card.never{border-left-color:var(--text-secondary)}
-.ls-card.error{border-left-color:var(--sev-high)}
-.ls-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
-.ls-card-name{font-size:.95rem;font-weight:700;color:var(--text-primary);line-height:1.2}
-.ls-card-cat{font-size:.66rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
-.ls-card-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0}
-.ls-card-status.healthy{background:var(--mitre-covered-bg);color:var(--mitre-covered)}
-.ls-card-status.stale{background:var(--sev-medium-bg);color:var(--sev-medium)}
-.ls-card-status.silent{background:var(--sev-critical-bg);color:var(--sev-critical)}
-.ls-card-status.never{background:rgba(99,110,123,.18);color:var(--text-secondary)}
-.ls-card-status.error{background:var(--sev-high-bg);color:var(--sev-high)}
-.ls-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;font-size:.72rem;color:var(--text-secondary)}
-.ls-card-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
-.ls-card-actions{margin-top:10px;display:flex;gap:6px;justify-content:flex-end}
-.ls-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:3px 9px;border-radius:var(--radius);cursor:pointer;font-size:.7rem;font-weight:600}
-.ls-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
-.ls-iconbtn.danger:hover{border-color:var(--sev-critical);color:var(--sev-critical)}
-
-/* Modal */
-.ls-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
-.ls-modal-bg.show{display:flex}
-.ls-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:640px;width:100%;max-height:90vh;overflow:auto}
-.ls-modal-head{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-secondary)}
-.ls-modal-title{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
-.ls-modal-close{background:none;border:none;color:var(--text-secondary);font-size:1.4rem;cursor:pointer;padding:0;line-height:1}
-.ls-modal-body{padding:20px 22px}
-.ls-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-.ls-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
-.ls-field label{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
-.ls-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
-.ls-banner{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 14px;margin-bottom:14px;font-size:.78rem;color:var(--text-secondary)}
-.ls-banner.warn{border-color:var(--sev-medium-dim);background:var(--sev-medium-bg)}
+/* JS adds status classes — five-colour left stripe has no daisyUI equivalent. */
+#ls-content .ls-card {
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: var(--color-base-300);
+}
+#ls-content .ls-card.healthy { border-left-color: var(--color-success); }
+#ls-content .ls-card.stale { border-left-color: var(--color-warning); }
+#ls-content .ls-card.silent { border-left-color: var(--color-error); }
+#ls-content .ls-card.never { border-left-color: color-mix(in oklab, var(--color-base-content) 40%, transparent); }
+#ls-content .ls-card.error { border-left-color: var(--sev-high); }
 
 @media (max-width: 768px) {
-    .ls-summary { grid-template-columns: repeat(2, 1fr); }
-    .ls-grid { grid-template-columns: 1fr; }
-    .ls-row { grid-template-columns: 1fr; }
-    .ls-card-meta { grid-template-columns: 1fr; }
-}
-@media (max-width: 480px) {
-    .ls-summary { gap: 8px; }
-    .ls-stat-val { font-size: 1.2rem; }
+    #ls-modal-bg.show > .modal-box { max-height: 95vh; }
 }
 </style>
 <script nonce="{{ csp_nonce }}">
@@ -183,33 +149,36 @@ async function lsBootstrap() {
 
 async function lsLoad() {
     const c = document.getElementById('ls-content');
-    c.innerHTML = '<div class="ls-loading"><span class="ls-spinner"></span> Loading sources...</div>';
+    c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading sources...</div>';
     try {
         const list = await fetch(LS_API).then(r => r.json());
         lsCache = list.sources || [];
         if (lsCache.length === 0) {
-            c.innerHTML = `<div class="ls-empty">
-                <h3>No log sources yet</h3>
+            c.innerHTML = `<div class="card bg-base-200 shadow">
+                <div class="card-body items-center text-center py-14">
+                <h3 class="card-title">No log sources yet</h3>
                 <p>Define the ingestion sources you expect ION to see, and we'll continuously check whether they're alive in Elasticsearch.</p>
-                <button class="btn btn-secondary" data-click-action="lsSeedDefaults">Seed 8 Common Sources</button>
+                <div class="flex flex-wrap gap-2 justify-center">
+                <button class="btn btn-ghost" data-click-action="lsSeedDefaults">Seed 8 Common Sources</button>
                 <button class="btn btn-primary _ion-s-5dd2a67868" data-click-action="lsOpenForm">+ Add Manually</button>
-            </div>`;
+                </div>
+            </div></div>`;
             return;
         }
         await lsRefresh();
     } catch (e) {
-        c.innerHTML = `<div class="ls-loading _ion-s-3c9b2ebd4d">${lsEsc(e.message || 'Failed to load')}</div>`;
+        c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${lsEsc(e.message || 'Failed to load')}</div>`;
     }
 }
 
 async function lsRefresh() {
     const c = document.getElementById('ls-content');
-    c.innerHTML = '<div class="ls-loading"><span class="ls-spinner"></span> Querying Elasticsearch for each source...</div>';
+    c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Querying Elasticsearch for each source...</div>';
     try {
         const r = await fetch(LS_API + '/health').then(r => r.json());
         lsRender(r);
     } catch (e) {
-        c.innerHTML = `<div class="ls-loading _ion-s-3c9b2ebd4d">${lsEsc(e.message)}</div>`;
+        c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${lsEsc(e.message)}</div>`;
     }
 }
 
@@ -226,42 +195,48 @@ function lsRender(data) {
 
     let banner = '';
     if (data.es_configured === false) {
-        banner = '<div class="ls-banner warn"><strong>Elasticsearch not configured.</strong> Health column shows the last cached check (if any). Configure ES in <a class="_ion-s-0510f285a6" href="/settings#elasticsearch">Settings</a> for live data.</div>';
+        banner = '<div class="alert alert-warning mb-4"><strong>Elasticsearch not configured.</strong> Health column shows the last cached check (if any). Configure ES in <a class="link _ion-s-0510f285a6" href="/settings#elasticsearch">Settings</a> for live data.</div>';
     }
 
-    let html = banner + `<div class="ls-summary">
-        <div class="ls-stat"><div class="ls-stat-val">${summary.healthy_pct||0}%</div><div class="ls-stat-label">Healthy %</div></div>
-        <div class="ls-stat"><div class="ls-stat-val good">${summary.healthy_count||0}</div><div class="ls-stat-label">Healthy</div></div>
-        <div class="ls-stat"><div class="ls-stat-val warn">${summary.stale_count||0}</div><div class="ls-stat-label">Stale</div></div>
-        <div class="ls-stat"><div class="ls-stat-val crit">${summary.silent_count||0}</div><div class="ls-stat-label">Silent</div></div>
-        <div class="ls-stat"><div class="ls-stat-val muted">${summary.never_count||0}</div><div class="ls-stat-label">Never Seen</div></div>
-        <div class="ls-stat"><div class="ls-stat-val muted">${summary.error_count||0}</div><div class="ls-stat-label">Errors</div></div>
+    let html = banner + `<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+        <div class="stat"><div class="stat-title">Healthy %</div><div class="stat-value text-primary">${summary.healthy_pct||0}%</div></div>
+        <div class="stat"><div class="stat-title">Healthy</div><div class="stat-value text-success">${summary.healthy_count||0}</div></div>
+        <div class="stat"><div class="stat-title">Stale</div><div class="stat-value text-warning">${summary.stale_count||0}</div></div>
+        <div class="stat"><div class="stat-title">Silent</div><div class="stat-value text-error">${summary.silent_count||0}</div></div>
+        <div class="stat"><div class="stat-title">Never Seen</div><div class="stat-value text-base-content/50">${summary.never_count||0}</div></div>
+        <div class="stat"><div class="stat-title">Errors</div><div class="stat-value text-base-content/50">${summary.error_count||0}</div></div>
     </div>`;
 
     // Sort: silent + never first, then stale, then healthy
     const order = { silent: 0, never: 1, stale: 2, error: 3, healthy: 4 };
     sources.sort((a, b) => (order[a.status] ?? 5) - (order[b.status] ?? 5));
 
-    html += '<div class="ls-grid">';
+    html += '<div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">';
     for (const s of sources) {
         const status = s.status || 'never';
-        html += `<div class="ls-card ${lsEsc(status)}">
-            <div class="ls-card-head">
+        const badgeKind = status === 'healthy' ? 'badge-success'
+            : status === 'stale' ? 'badge-warning'
+            : (status === 'silent' || status === 'error') ? 'badge-error'
+            : 'badge-ghost';
+        html += `<div class="card bg-base-200 shadow ls-card ${lsEsc(status)}">
+            <div class="card-body p-4">
+            <div class="flex flex-wrap justify-between items-start gap-3">
                 <div>
-                    <div class="ls-card-name">${lsEsc(s.name)}</div>
-                    <div class="ls-card-cat">${lsEsc(s.category)} &middot; ${lsEsc(s.criticality)}</div>
+                    <div class="font-semibold leading-tight">${lsEsc(s.name)}</div>
+                    <div class="text-xs uppercase tracking-wide opacity-50 mt-0.5">${lsEsc(s.category)} &middot; ${lsEsc(s.criticality)}</div>
                 </div>
-                <span class="ls-card-status ${lsEsc(status)}">${lsEsc(status)}</span>
+                <span class="badge ${badgeKind} shrink-0">${lsEsc(status)}</span>
             </div>
-            <div class="ls-card-meta">
-                <div>Last event: <strong>${lsEsc(lsFmtTime(s.last_event_at))}</strong></div>
-                <div>Window: <strong>${s.expected_interval_minutes||0}m</strong></div>
-                <div>Events 24h: <strong>${s.event_count_24h ?? '-'}</strong></div>
-                <div>Owner: <strong>${lsEsc(s.owner || '-')}</strong></div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-2 text-xs opacity-70">
+                <div>Last event: <strong class="font-mono text-base-content">${lsEsc(lsFmtTime(s.last_event_at))}</strong></div>
+                <div>Window: <strong class="font-mono text-base-content">${s.expected_interval_minutes||0}m</strong></div>
+                <div>Events 24h: <strong class="font-mono text-base-content">${s.event_count_24h ?? '-'}</strong></div>
+                <div>Owner: <strong class="font-mono text-base-content">${lsEsc(s.owner || '-')}</strong></div>
             </div>
-            <div class="ls-card-actions">
-                <button class="ls-iconbtn" data-click-action="lsEdit" data-args='[${s.id}]'>Edit</button>
-                <button class="ls-iconbtn danger" data-click-action="lsDelete" data-args='[${s.id}]'>Delete</button>
+            <div class="flex gap-2 justify-end mt-2">
+                <button class="btn btn-ghost btn-sm" data-click-action="lsEdit" data-args='[${s.id}]'>Edit</button>
+                <button class="btn btn-ghost btn-sm btn-error" data-click-action="lsDelete" data-args='[${s.id}]'>Delete</button>
+            </div>
             </div>
         </div>`;
     }

@@ -14,7 +14,7 @@
 {% set active_label = "Templates" %}
 {% include "_nav_tabs.html" %}
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-cyan"><use href="#i-file-text"/></svg>
     <span class="label-tiny text-ion-cyan">Report templates</span>
@@ -23,48 +23,48 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Document templates for playbooks and reports.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="ion-btn" data-click-action="showFoldersModal">Manage Folders</button>
-        <a href="/templates/new" class="ion-btn ion-btn-primary">New Template</a>
+        <button class="btn btn-ghost" data-click-action="showFoldersModal">Manage Folders</button>
+        <a href="/templates/new" class="btn btn-primary">New Template</a>
     </div>
 </section>
 
-<div class="templates-layout">
+<div class="flex flex-col lg:flex-row gap-6">
     <!-- Folder Sidebar -->
-    <div class="folder-sidebar">
-        <div class="folder-header">
-            <h3>Folders</h3>
-        </div>
-        <div id="folder-tree" class="folder-tree">
-            <div class="folder-item active" data-id="" data-click-action="selectFolder" data-args='[null]'>
-                <span class="folder-icon"><i class="icon-folder"></i></span>
-                <span class="folder-name">All Templates</span>
+    <aside class="card bg-base-200 shadow w-full lg:w-[250px] lg:shrink-0">
+        <div class="card-body p-4">
+            <h3 class="text-sm font-semibold uppercase tracking-wide opacity-60">Folders</h3>
+            <div id="folder-tree" class="folder-tree">
+                <div class="folder-item active" data-id="" data-click-action="selectFolder" data-args='[null]'>
+                    <span class="folder-icon"><i class="icon-folder"></i></span>
+                    <span class="folder-name">All Templates</span>
+                </div>
+                <div class="folder-item" data-id="uncategorized" data-click-action="selectFolder" data-args='["uncategorized"]'>
+                    <span class="folder-icon"><i class="icon-file-text"></i></span>
+                    <span class="folder-name">Uncategorized</span>
+                </div>
+                <div id="folder-list"></div>
             </div>
-            <div class="folder-item" data-id="uncategorized" data-click-action="selectFolder" data-args='["uncategorized"]'>
-                <span class="folder-icon"><i class="icon-file-text"></i></span>
-                <span class="folder-name">Uncategorized</span>
-            </div>
-            <div id="folder-list"></div>
         </div>
-    </div>
+    </aside>
 
     <!-- Main Content -->
-    <div class="templates-main">
-        <div class="toolbar">
-            <input type="text" id="search-input" placeholder="Search templates..." class="search-input">
-            <select id="format-filter" class="filter-select">
+    <div class="flex-1 min-w-0">
+        <div class="flex flex-wrap items-center gap-2 mb-4">
+            <input type="text" id="search-input" placeholder="Search templates..." class="input input-sm flex-1 min-w-48">
+            <select id="format-filter" class="select select-sm">
                 <option value="">All Formats</option>
                 <option value="markdown">Markdown</option>
                 <option value="html">HTML</option>
                 <option value="text">Plain Text</option>
             </select>
-            <select id="doctype-filter" class="filter-select">
+            <select id="doctype-filter" class="select select-sm">
                 <option value="">All Types</option>
             </select>
         </div>
 
-        <div id="current-folder-path" class="folder-path"></div>
+        <div id="current-folder-path" class="folder-path text-sm opacity-60 mb-4"></div>
 
-        <div id="templates-list" class="card-list">
+        <div id="templates-list" class="card-list flex flex-col gap-4">
             <p class="loading">Loading...</p>
         </div>
     </div>
@@ -72,43 +72,43 @@
 
 <!-- Manage Folders Modal -->
 <div id="folders-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
-            <h2>Manage Folders</h2>
-            <button class="modal-close" data-click-action="closeFoldersModal">&times;</button>
+    <div class="modal-box w-11/12 max-w-3xl">
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">Manage Folders</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeFoldersModal">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label>Create New Folder</label>
-                <div class="folder-create-form">
-                    <select id="new-folder-parent" class="form-control">
+        <div class="py-4">
+            <fieldset class="fieldset">
+                <legend class="fieldset-legend">Create New Folder</legend>
+                <div class="folder-create-form flex flex-wrap items-center gap-2">
+                    <select id="new-folder-parent" class="select select-sm w-full sm:w-36">
                         <option value="">Root Level</option>
                     </select>
-                    <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOP, KB, WI)" class="form-control">
-                    <input type="text" id="new-folder-desc" placeholder="Description" class="form-control">
-                    <button class="ion-btn ion-btn-primary" data-click-action="createFolder">Create</button>
+                    <input type="text" id="new-folder-name" placeholder="Folder name (e.g., SOP, KB, WI)" class="input input-sm flex-1 min-w-40">
+                    <input type="text" id="new-folder-desc" placeholder="Description" class="input input-sm flex-1 min-w-40">
+                    <button class="btn btn-primary btn-sm" data-click-action="createFolder">Create</button>
                 </div>
-            </div>
-            <h3>Existing Folders</h3>
-            <div id="folders-tree-manage" class="folders-manage-tree"></div>
+            </fieldset>
+            <h3 class="font-semibold mt-4">Existing Folders</h3>
+            <div id="folders-tree-manage" class="folders-manage-tree mt-4"></div>
         </div>
     </div>
 </div>
 
 <!-- Move Template Modal -->
 <div id="move-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-small">
-        <div class="modal-header">
-            <h2>Move to Folder</h2>
-            <button class="modal-close" data-click-action="closeMoveModal">&times;</button>
+    <div class="modal-box max-w-md">
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">Move to Folder</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeMoveModal">&times;</button>
         </div>
-        <div class="modal-body">
-            <select id="move-folder-select" class="form-control">
+        <div class="py-4">
+            <select id="move-folder-select" class="select w-full">
                 <option value="">No Folder (Root)</option>
             </select>
-            <div class="modal-actions">
-                <button class="ion-btn" data-click-action="closeMoveModal">Cancel</button>
-                <button class="ion-btn ion-btn-primary" data-click-action="moveTemplate">Move</button>
+            <div class="modal-action">
+                <button class="btn btn-ghost" data-click-action="closeMoveModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="moveTemplate">Move</button>
             </div>
         </div>
     </div>
@@ -120,44 +120,41 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.templates-layout {
-    display: flex;
-    gap: 1.5rem;
+/* JS showFoldersModal()/showMoveModal() set style.display = 'flex', not daisyUI
+   .modal-open. The hashed display:none class on each overlay keeps them hidden
+   until then. Bridge so daisyUI .modal still presents when display is flex. */
+#folders-modal.modal,
+#move-modal.modal {
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    align-items: center;
+    justify-content: center;
+    background-color: oklch(0% 0 0 / 0.4);
 }
-.folder-sidebar {
-    width: 250px;
-    flex-shrink: 0;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
-    padding: 1rem;
+#folders-modal .modal-box,
+#move-modal .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
 }
-.folder-header h3 {
-    margin: 0 0 1rem 0;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    color: var(--text-muted);
-}
-.folder-tree {
-    font-size: 0.9rem;
-}
+
+/* JS querySelectorAll('.folder-item') toggles .active; innerHTML emits these. */
+.folder-tree { font-size: 0.9rem; }
 .folder-item {
     display: flex;
     align-items: center;
-    padding: 0.5rem;
-    border-radius: 4px;
+    padding: 0.5rem 0.75rem;
+    border-radius: var(--radius-selector, 0.25rem);
     cursor: pointer;
     margin-bottom: 2px;
 }
-.folder-item:hover {
-    background: var(--primary-dim);
-}
+.folder-item:hover { background: var(--color-base-300); }
 .folder-item.active {
-    background: var(--primary-color);
-    color: white;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
 }
-.folder-icon {
-    margin-right: 0.5rem;
-}
+.folder-icon { margin-right: 0.5rem; }
 .folder-name {
     flex: 1;
     overflow: hidden;
@@ -166,84 +163,75 @@
 }
 .folder-children {
     margin-left: 1.25rem;
-    border-left: 1px solid var(--border);
+    border-left: 1px solid var(--color-base-300);
     padding-left: 0.5rem;
 }
-.templates-main {
-    flex: 1;
-    min-width: 0;
-}
-.folder-path {
-    font-size: 0.875rem;
-    color: var(--text-muted);
-    margin-bottom: 1rem;
-}
-.folder-path span {
-    cursor: pointer;
-}
-.folder-path span:hover {
-    color: var(--primary-color);
-}
-.header-actions {
-    display: flex;
-    gap: 0.5rem;
-}
+
+/* JS writes breadcrumb <span>s into #current-folder-path. */
+.folder-path span { cursor: pointer; }
+.folder-path span:hover { color: var(--color-primary); }
+
+/* JS innerHTML: collection-badge / doc-type-${type} — class names are concatenated. */
 .collection-badge {
-    background: var(--primary-color);
-    color: white;
+    background: var(--color-primary);
+    color: var(--color-primary-content);
     padding: 2px 8px;
-    border-radius: 3px;
+    border-radius: var(--radius-selector, 0.25rem);
     font-size: 0.75rem;
     margin-left: 0.5rem;
 }
-.modal-large {
-    max-width: 700px;
+.doc-type-badge {
+    padding: 2px 8px;
+    border-radius: var(--radius-selector, 0.25rem);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #fff;
+    margin-left: 0.5rem;
 }
-.modal-small {
-    max-width: 400px;
-}
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.5rem;
-    margin-top: 1rem;
-}
-.folder-create-form {
-    display: grid;
-    grid-template-columns: 150px 1fr 1fr auto;
-    gap: 0.5rem;
-    align-items: center;
-}
-.folders-manage-tree {
-    margin-top: 1rem;
-}
+.doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
+.doc-type-SOI { background: var(--color-success); color: var(--color-success-content); }
+.doc-type-WI { background: #6366f1; color: #fff; }
+.doc-type-KB { background: var(--color-success); color: var(--color-success-content); }
+.doc-type-RUNBOOK { background: #a855f7; color: #fff; }
+.doc-type-IRP { background: var(--color-error); color: var(--color-error-content); }
+.doc-type-AAR { background: var(--neon-orange); color: var(--color-warning-content); }
+.doc-type-THREAT_ADVISORY { background: var(--color-warning); color: var(--color-warning-content); }
+.doc-type-DETECTION_RULE { background: var(--color-info); color: var(--color-info-content); }
+
+/* JS renderFolderManageItems() / renderFolderItems() emit these class names. */
 .folder-manage-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0.5rem;
-    border: 1px solid var(--border);
-    border-radius: 4px;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-selector, 0.25rem);
     margin-bottom: 0.5rem;
 }
-.folder-manage-item:hover {
-    background: var(--primary-dim);
-}
+.folder-manage-item:hover { background: var(--color-base-300); }
 .folder-manage-info {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
 .folder-manage-path {
-    color: var(--text-muted);
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
     font-size: 0.8rem;
 }
 .folder-manage-counts {
     font-size: 0.75rem;
-    color: var(--text-muted);
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
 }
-.folder-manage-children {
-    margin-left: 1.5rem;
+.folder-manage-children { margin-left: 1.5rem; }
+
+/* JS renderTemplates() emits .card / .card-header / .card-body / .card-footer /
+   .move-btn / .tag — class names are fixed in script, so restyle them here. */
+#templates-list > .card {
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    padding: 1rem 1.25rem;
+    box-shadow: none;
 }
 .card-header {
     display: flex;
@@ -251,27 +239,43 @@
     flex-wrap: wrap;
     gap: 0.5rem;
 }
+#templates-list .card-title { color: var(--color-base-content); }
+#templates-list .card-title:hover { color: var(--color-primary); }
+#templates-list .card-body { padding: 0; gap: 0; }
+#templates-list .card-description {
+    font-size: 0.875rem;
+    opacity: 0.8;
+}
+#templates-list .card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-top: 0.5rem;
+}
+#templates-list .card-tags { margin-top: 0.75rem; }
+#templates-list .tag {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    font-size: 0.7rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+    margin-right: 0.25rem;
+}
+#templates-list .card-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    border-top: 1px solid var(--color-base-300);
+    padding-top: 0.75rem;
+    margin-top: 0.75rem;
+}
 .move-btn {
     font-size: 0.75rem;
     padding: 2px 6px;
 }
-.doc-type-badge {
-    padding: 2px 8px;
-    border-radius: 3px;
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: white;
-    margin-left: 0.5rem;
-}
-.doc-type-SOP { background: var(--info); }
-.doc-type-SOI { background: var(--success); }
-.doc-type-WI { background: #6366f1; }
-.doc-type-KB { background: var(--success); }
-.doc-type-RUNBOOK { background: #a855f7; }
-.doc-type-IRP { background: var(--danger); }
-.doc-type-AAR { background: var(--neon-orange); }
-.doc-type-THREAT_ADVISORY { background: var(--warning); color: #1a1a1a; }
-.doc-type-DETECTION_RULE { background: var(--info); }
 </style>
 <script nonce="{{ csp_nonce }}">
 {% raw %}

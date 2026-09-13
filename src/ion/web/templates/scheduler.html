@@ -3,88 +3,90 @@
 {% block title %}Job Scheduler - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
-      <svg class="w-4 h-4 text-ion-lime"><use href="#i-activity"/></svg>
-      <span class="label-tiny text-ion-lime">Automation</span>
+      <svg class="w-4 h-4 text-success"><use href="#i-activity"/></svg>
+      <span class="label-tiny text-success">Automation</span>
     </div>
-    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Job Scheduler</h1>
-    <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Run arbitrary handlers on a cron schedule. Every dispatch is recorded with duration, status and output.</p>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Job Scheduler</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Run arbitrary handlers on a cron schedule. Every dispatch is recorded with duration, status and output.</p>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
-    <button class="btn btn-secondary" data-click-action="schRefresh">Refresh</button>
+    <button class="btn btn-ghost" data-click-action="schRefresh">Refresh</button>
     <button class="btn btn-primary" data-click-action="schOpenForm">+ New Job</button>
   </div>
 </section>
 
-<div id="sch-content"><div class="sch-loading"><span class="sch-spinner"></span> Loading jobs...</div></div>
+<div id="sch-content">
+  <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading jobs...</div>
+</div>
 
-<div class="sch-modal-bg" id="sch-modal-bg">
-  <div class="sch-modal">
-    <div class="sch-modal-head">
-      <div class="sch-modal-title" id="sch-modal-title">New Job</div>
-      <button class="sch-modal-close" data-click-action="schCloseForm" aria-label="Close">&times;</button>
+<div class="modal" id="sch-modal-bg">
+  <div class="modal-box max-w-3xl">
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="text-lg font-semibold" id="sch-modal-title">New Job</h2>
+      <button class="btn btn-ghost btn-sm btn-circle" data-click-action="schCloseForm" aria-label="Close">&times;</button>
     </div>
-    <form class="sch-modal-body" id="sch-form" data-validating-submit-action="schSubmit">
+    <form class="pt-4 flex flex-col gap-3" id="sch-form" data-validating-submit-action="schSubmit">
       <input type="hidden" id="sch-id" value="">
 
-      <div class="sch-row">
-        <div class="sch-field">
-          <label>Name *</label>
-          <input id="sch-name" class="ion-input" type="text" required maxlength="200" placeholder="Daily IOC sync">
-        </div>
-        <div class="sch-field">
-          <label>Handler *</label>
-          <select id="sch-handler" class="ion-select" required></select>
-        </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Name *</legend>
+          <input id="sch-name" class="input w-full" type="text" required maxlength="200" placeholder="Daily IOC sync">
+        </fieldset>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Handler *</legend>
+          <select id="sch-handler" class="select w-full" required></select>
+        </fieldset>
       </div>
 
-      <div class="sch-row">
-        <div class="sch-field">
-          <label>Cron expression *</label>
-          <input id="sch-cron" class="ion-input" type="text" required maxlength="120" placeholder="*/5 * * * *">
-          <small class="sch-hint">5-field crontab (min hour dom mon dow). Example: <code>0 3 * * *</code> = 3am daily.</small>
-        </div>
-        <div class="sch-field">
-          <label>Enabled</label>
-          <select id="sch-enabled" class="ion-select">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Cron expression *</legend>
+          <input id="sch-cron" class="input w-full font-mono" type="text" required maxlength="120" placeholder="*/5 * * * *">
+          <p class="text-xs opacity-50">5-field crontab (min hour dom mon dow). Example: <code class="bg-base-300 px-1 rounded font-mono">0 3 * * *</code> = 3am daily.</p>
+        </fieldset>
+        <fieldset class="fieldset p-0">
+          <legend class="fieldset-legend">Enabled</legend>
+          <select id="sch-enabled" class="select w-full">
             <option value="true">Yes</option>
             <option value="false">No</option>
           </select>
-        </div>
+        </fieldset>
       </div>
 
-      <div class="sch-field">
-        <label>Description</label>
-        <textarea id="sch-desc" class="ion-textarea" rows="2" placeholder="What does this job do?"></textarea>
-      </div>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Description</legend>
+        <textarea id="sch-desc" class="textarea w-full" rows="2" placeholder="What does this job do?"></textarea>
+      </fieldset>
 
-      <div class="sch-field">
-        <label>Params (JSON)</label>
-        <textarea id="sch-params" class="ion-textarea" rows="4" placeholder='{"foo": "bar"}'></textarea>
-        <small class="sch-hint">Passed to the handler as a dict. Leave blank for {}.</small>
-      </div>
+      <fieldset class="fieldset p-0">
+        <legend class="fieldset-legend">Params (JSON)</legend>
+        <textarea id="sch-params" class="textarea w-full font-mono text-sm" rows="4" placeholder='{"foo": "bar"}'></textarea>
+        <p class="text-xs opacity-50">Passed to the handler as a dict. Leave blank for {}.</p>
+      </fieldset>
 
-      <div class="sch-form-actions">
-        <button type="button" class="btn btn-secondary" data-click-action="schCloseForm">Cancel</button>
+      <div class="modal-action">
+        <button type="button" class="btn btn-ghost" data-click-action="schCloseForm">Cancel</button>
         <button type="submit" class="btn btn-primary">Save</button>
       </div>
     </form>
   </div>
 </div>
 
-<div class="sch-modal-bg" id="sch-exec-bg">
-  <div class="sch-modal">
-    <div class="sch-modal-head">
-      <div class="sch-modal-title" id="sch-exec-title">Recent executions</div>
-      <button class="sch-modal-close" data-click-action="schCloseExec" aria-label="Close">&times;</button>
+<div class="modal" id="sch-exec-bg">
+  <div class="modal-box max-w-3xl">
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="text-lg font-semibold" id="sch-exec-title">Recent executions</h2>
+      <button class="btn btn-ghost btn-sm btn-circle" data-click-action="schCloseExec" aria-label="Close">&times;</button>
     </div>
-    <div class="sch-modal-body" id="sch-exec-body">
-      <div class="sch-loading"><span class="sch-spinner"></span> Loading...</div>
+    <div class="pt-4" id="sch-exec-body">
+      <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
     </div>
   </div>
 </div>
@@ -95,62 +97,49 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.sch-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.sch-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sch-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes sch-spin{to{transform:rotate(360deg)}}
-.sch-empty{text-align:center;padding:60px 24px;color:var(--text-secondary)}
-.sch-empty h3{color:var(--text-primary);margin-bottom:8px}
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+#sch-modal-bg.show,
+#sch-exec-bg.show {
+  pointer-events: auto;
+  visibility: visible;
+  opacity: 1;
+  background-color: oklch(0% 0 0 / 0.4);
+}
+#sch-modal-bg.show > .modal-box,
+#sch-exec-bg.show > .modal-box {
+  opacity: 1;
+  scale: 1;
+  translate: 0;
+  max-width: 720px;
+  max-height: 90vh;
+}
 
-.sch-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px}
-.sch-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px 16px;border-left:4px solid var(--border);position:relative}
-.sch-card.ok{border-left-color:var(--mitre-covered)}
-.sch-card.err{border-left-color:var(--sev-critical)}
-.sch-card.off{border-left-color:var(--text-secondary);opacity:.7}
-.sch-card.run{border-left-color:var(--sev-medium)}
+/* Job-card / exec-row left stripe has no daisyUI equivalent. */
+.sch-card,
+.sch-exec-row {
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-left-color: var(--color-base-300);
+}
+.sch-card.ok, .sch-exec-row.ok { border-left-color: var(--color-success); }
+.sch-card.err, .sch-exec-row.err { border-left-color: var(--color-error); }
+.sch-card.run, .sch-exec-row.run { border-left-color: var(--color-warning); }
+.sch-card.off {
+  border-left-color: color-mix(in oklab, var(--color-base-content) 40%, transparent);
+  opacity: 0.7;
+}
 
-.sch-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:6px}
-.sch-card-name{font-size:.95rem;font-weight:700;color:var(--text-primary);line-height:1.2}
-.sch-card-handler{font-size:.66rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;font-family:'JetBrains Mono',monospace}
-.sch-card-status{font-size:.66rem;text-transform:uppercase;letter-spacing:.5px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0}
-.sch-card-status.ok{background:var(--mitre-covered-bg);color:var(--mitre-covered)}
-.sch-card-status.err{background:var(--sev-critical-bg);color:var(--sev-critical)}
-.sch-card-status.off{background:rgba(99,110,123,.18);color:var(--text-secondary)}
-.sch-card-status.run{background:var(--sev-medium-bg);color:var(--sev-medium)}
-.sch-card-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin-top:8px;font-size:.72rem;color:var(--text-secondary)}
-.sch-card-meta strong{color:var(--text-primary);font-family:'JetBrains Mono',monospace}
-.sch-card-cron{grid-column:1/-1;font-family:'JetBrains Mono',monospace;background:var(--bg-tertiary);padding:4px 8px;border-radius:var(--radius);display:inline-block;width:fit-content}
-.sch-card-actions{margin-top:10px;display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
-.sch-iconbtn{background:none;border:1px solid var(--border);color:var(--text-secondary);padding:3px 9px;border-radius:var(--radius);cursor:pointer;font-size:.7rem;font-weight:600}
-.sch-iconbtn:hover{border-color:var(--primary);color:var(--primary)}
-.sch-iconbtn.danger:hover{border-color:var(--sev-critical);color:var(--sev-critical)}
-
-.sch-modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);display:none;z-index:1000;align-items:center;justify-content:center;padding:24px}
-.sch-modal-bg.show{display:flex}
-.sch-modal{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);max-width:720px;width:100%;max-height:90vh;overflow:auto}
-.sch-modal-head{padding:16px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--bg-secondary)}
-.sch-modal-title{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
-.sch-modal-close{background:none;border:none;color:var(--text-secondary);font-size:1.4rem;cursor:pointer;padding:0;line-height:1}
-.sch-modal-body{padding:20px 22px}
-.sch-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-.sch-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
-.sch-field label{font-size:.72rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
-.sch-field textarea{font-family:'JetBrains Mono',monospace;font-size:.78rem}
-.sch-hint{color:var(--text-secondary);font-size:.7rem;margin-top:2px}
-.sch-hint code{background:var(--bg-tertiary);padding:1px 5px;border-radius:3px;font-family:'JetBrains Mono',monospace}
-.sch-form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
-
-.sch-exec-row{border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:8px;font-size:.78rem}
-.sch-exec-row.ok{border-left:4px solid var(--mitre-covered)}
-.sch-exec-row.err{border-left:4px solid var(--sev-critical)}
-.sch-exec-row.run{border-left:4px solid var(--sev-medium)}
-.sch-exec-head{display:flex;justify-content:space-between;gap:8px;margin-bottom:4px;color:var(--text-primary);font-weight:600}
-.sch-exec-meta{color:var(--text-secondary);font-family:'JetBrains Mono',monospace;font-size:.72rem}
-.sch-exec-err{color:var(--sev-critical);margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:.72rem;white-space:pre-wrap;word-break:break-word}
+/* auto-fit card grid: minmax(340px) is not a daisyUI token. */
+.sch-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0.75rem;
+}
 
 @media (max-width: 768px) {
   .sch-grid { grid-template-columns: 1fr; }
-  .sch-row { grid-template-columns: 1fr; }
-  .sch-card-meta { grid-template-columns: 1fr; }
+  #sch-modal-bg.show > .modal-box,
+  #sch-exec-bg.show > .modal-box { max-height: 95vh; }
 }
 </style>
 <script nonce="{{ csp_nonce }}">
@@ -174,7 +163,7 @@ async function schBootstrap() {
 
 async function schLoad() {
   const c = document.getElementById('sch-content');
-  c.innerHTML = '<div class="sch-loading"><span class="sch-spinner"></span> Loading jobs...</div>';
+  c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading jobs...</div>';
   try {
     const r = await fetch(SCH_API + '/jobs');
     if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -182,43 +171,47 @@ async function schLoad() {
     schCache = data.jobs || [];
     schRender();
   } catch (e) {
-    c.innerHTML = `<div class="sch-loading _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
+    c.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 
 function schRender() {
   const c = document.getElementById('sch-content');
   if (!schCache.length) {
-    c.innerHTML = `<div class="sch-empty">
-      <h3>No scheduled jobs yet</h3>
+    c.innerHTML = `<div class="card bg-base-200 shadow">
+      <div class="card-body items-center text-center py-14">
+      <h3 class="card-title">No scheduled jobs yet</h3>
       <p>Create a job to run a registered handler on a cron schedule.</p>
       <button class="btn btn-primary _ion-s-d6f2af6e0a" data-click-action="schOpenForm">+ New Job</button>
-    </div>`;
+    </div></div>`;
     return;
   }
   const cards = schCache.map(j => {
     let cls = j.enabled ? (j.last_status === 'error' ? 'err' : (j.last_status === 'running' ? 'run' : 'ok')) : 'off';
     let statusTxt = !j.enabled ? 'disabled' : (j.last_status || 'pending');
+    const badge = cls === 'ok' ? 'badge-success' : cls === 'err' ? 'badge-error' : cls === 'run' ? 'badge-warning' : 'badge-ghost';
     return `
-      <div class="sch-card ${cls}">
-        <div class="sch-card-head">
-          <div>
-            <div class="sch-card-name">${schEsc(j.name)}</div>
-            <div class="sch-card-handler">${schEsc(j.handler_key)}</div>
+      <div class="card bg-base-200 shadow sch-card ${cls}">
+        <div class="card-body p-4">
+          <div class="flex justify-between items-start gap-3">
+            <div>
+              <div class="font-semibold">${schEsc(j.name)}</div>
+              <div class="font-mono text-xs uppercase tracking-wide opacity-50">${schEsc(j.handler_key)}</div>
+            </div>
+            <span class="badge ${badge} shrink-0">${schEsc(statusTxt)}</span>
           </div>
-          <span class="sch-card-status ${cls}">${schEsc(statusTxt)}</span>
-        </div>
-        ${j.description ? `<div class="_ion-s-d027def9f2">${schEsc(j.description)}</div>` : ''}
-        <div class="sch-card-meta">
-          <span class="sch-card-cron">${schEsc(j.cron_expr)}</span>
-          <span>next: <strong>${schFmtTime(j.next_run_at)}</strong></span>
-          <span>last: <strong>${schFmtTime(j.last_run_at)}</strong></span>
-        </div>
-        <div class="sch-card-actions">
-          <button class="sch-iconbtn" data-click-action="schRun" data-args='[${j.id}]'>Run now</button>
-          <button class="sch-iconbtn" data-click-action="schShowExec" data-args='[${j.id}, "${schEsc(j.name)}"]'>History</button>
-          <button class="sch-iconbtn" data-click-action="schOpenForm" data-args='[${j.id}]'>Edit</button>
-          <button class="sch-iconbtn danger" data-click-action="schDelete" data-args='[${j.id}]'>Delete</button>
+          ${j.description ? `<div class="_ion-s-d027def9f2">${schEsc(j.description)}</div>` : ''}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 mt-2 text-xs opacity-70">
+            <span class="col-span-full font-mono bg-base-300 px-2 py-1 rounded w-fit">${schEsc(j.cron_expr)}</span>
+            <span>next: <strong class="font-mono text-base-content">${schFmtTime(j.next_run_at)}</strong></span>
+            <span>last: <strong class="font-mono text-base-content">${schFmtTime(j.last_run_at)}</strong></span>
+          </div>
+          <div class="card-actions justify-end mt-2 flex-wrap">
+            <button class="btn btn-ghost btn-sm" data-click-action="schRun" data-args='[${j.id}]'>Run now</button>
+            <button class="btn btn-ghost btn-sm" data-click-action="schShowExec" data-args='[${j.id}, "${schEsc(j.name)}"]'>History</button>
+            <button class="btn btn-ghost btn-sm" data-click-action="schOpenForm" data-args='[${j.id}]'>Edit</button>
+            <button class="btn btn-ghost btn-sm btn-error" data-click-action="schDelete" data-args='[${j.id}]'>Delete</button>
+          </div>
         </div>
       </div>`;
   }).join('');
@@ -318,7 +311,7 @@ async function schRun(id) {
 async function schShowExec(id, name) {
   document.getElementById('sch-exec-title').textContent = 'Executions — ' + name;
   const body = document.getElementById('sch-exec-body');
-  body.innerHTML = '<div class="sch-loading"><span class="sch-spinner"></span> Loading...</div>';
+  body.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>';
   document.getElementById('sch-exec-bg').classList.add('show');
   try {
     const r = await fetch(`${SCH_API}/jobs/${id}/executions?limit=50`);
@@ -326,22 +319,29 @@ async function schShowExec(id, name) {
     const data = await r.json();
     const execs = data.executions || [];
     if (!execs.length) {
-      body.innerHTML = '<div class="sch-empty"><h3>No executions yet</h3><p>Trigger the job manually or wait for the next scheduled run.</p></div>';
+      body.innerHTML = `<div class="card bg-base-200 shadow">
+        <div class="card-body items-center text-center py-10">
+        <h3 class="card-title">No executions yet</h3>
+        <p>Trigger the job manually or wait for the next scheduled run.</p>
+      </div></div>`;
       return;
     }
     body.innerHTML = execs.map(e => {
       const cls = e.status === 'success' ? 'ok' : (e.status === 'error' ? 'err' : 'run');
-      return `<div class="sch-exec-row ${cls}">
-        <div class="sch-exec-head">
-          <span>${schEsc(e.status)}</span>
-          <span class="sch-exec-meta">${schFmtTime(e.started_at)}${e.duration_ms != null ? ' · ' + e.duration_ms + 'ms' : ''}</span>
+      const badge = cls === 'ok' ? 'badge-success' : cls === 'err' ? 'badge-error' : 'badge-warning';
+      return `<div class="card bg-base-200 shadow sch-exec-row ${cls} mb-2">
+        <div class="card-body p-3 text-sm">
+          <div class="flex justify-between gap-2">
+            <span class="badge ${badge}">${schEsc(e.status)}</span>
+            <span class="font-mono text-xs opacity-60">${schFmtTime(e.started_at)}${e.duration_ms != null ? ' · ' + e.duration_ms + 'ms' : ''}</span>
+          </div>
+          <div class="font-mono text-xs opacity-60">started: ${schEsc(e.started_at || '')} · completed: ${schEsc(e.completed_at || '—')}</div>
+          ${e.error_text ? `<div class="text-error font-mono text-xs whitespace-pre-wrap break-words mt-1.5">${schEsc(e.error_text)}</div>` : ''}
         </div>
-        <div class="sch-exec-meta">started: ${schEsc(e.started_at || '')} · completed: ${schEsc(e.completed_at || '—')}</div>
-        ${e.error_text ? `<div class="sch-exec-err">${schEsc(e.error_text)}</div>` : ''}
       </div>`;
     }).join('');
   } catch (e) {
-    body.innerHTML = `<div class="sch-loading _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
+    body.innerHTML = `<div class="alert alert-error _ion-s-3c9b2ebd4d">${schEsc(e.message || 'Failed to load')}</div>`;
   }
 }
 

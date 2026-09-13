@@ -6,39 +6,23 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1600px] w-full px-4 sm:px-6 py-8 md:py-10">
 
-  <a href="/admin/courses" class="inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-white mb-3">← All courses</a>
+  <a href="/admin/courses" class="btn btn-ghost btn-sm mb-3">← All courses</a>
 
   <div id="ce-root">
-    <div class="text-slate-500 text-[13px] py-8 text-center">Loading…</div>
+    <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50">
+      <span class="loading loading-spinner loading-sm text-primary"></span> Loading…
+    </div>
   </div>
 </div>
 </div>
 
 <style nonce="{{ csp_nonce }}">
-.ce-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.45rem;padding:1rem 1.2rem;margin-bottom:0.85rem}
-.ce-card-header{display:flex;align-items:center;justify-content:space-between;gap:0.6rem;flex-wrap:wrap;margin-bottom:0.6rem}
-.ce-row{display:flex;align-items:center;gap:0.55rem;flex-wrap:wrap}
-.ce-label{font-size:0.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em}
-.ce-input,.ce-textarea,.ce-select{background:var(--bg-deep);border:1px solid var(--border);border-radius:0.3rem;padding:0.4rem 0.6rem;font-size:0.82rem;color:var(--text-primary);font-family:inherit}
-.ce-input:focus,.ce-textarea:focus,.ce-select:focus{outline:none;border-color:var(--primary)}
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+.ce-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.6rem}
+/* Specific min-heights + mono body vs inherit on the lesson editor. */
 .ce-textarea{min-height:6rem;resize:vertical;font-family:'JetBrains Mono','Fira Code',monospace;line-height:1.5}
 .ce-textarea-md{min-height:14rem;font-family:inherit}
-.ce-btn{background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:0.3rem;padding:0.4rem 0.85rem;font-size:0.75rem;font-weight:600;cursor:pointer;transition:background .12s}
-.ce-btn:hover{background:var(--bg-secondary)}
-.ce-btn-primary{background:var(--primary);color:var(--bg-deep);border:none}
-.ce-btn-primary:hover{filter:brightness(1.1)}
-.ce-btn-danger{color:var(--danger);border-color:var(--danger)}
-.ce-btn-danger:hover{background:rgba(239,68,68,0.08)}
-.ce-mod{padding:0.85rem 1rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:0.4rem;margin-top:0.6rem}
-.ce-lesson{padding:0.7rem 0.85rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.35rem;margin-top:0.5rem}
-.ce-lesson-summary{display:flex;align-items:center;gap:0.5rem;cursor:pointer}
-.ce-lesson-summary:hover{background:var(--primary-dim)}
-.ce-question{padding:0.65rem 0.8rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:0.3rem;margin-top:0.4rem;font-size:0.78rem}
-.ce-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.6rem}
-.ce-status-pill{display:inline-block;padding:0.18rem 0.55rem;font-size:0.6rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;border-radius:9999px}
-.ce-pill-reading{background:rgba(148,163,184,0.16);color:#cbd5e1}
-.ce-pill-quiz{background:rgba(109,228,255,0.14);color:#6de4ff}
-.ce-pill-lab{background:rgba(245,158,11,0.14);color:#fbbf24}
+/* marked.parse emits h2/code/pre/mermaid with no classes we can attach. */
 .ce-mdpreview{background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.3rem;padding:0.75rem 1rem;min-height:6rem;font-size:0.85rem;line-height:1.55}
 .ce-mdpreview h2,.ce-mdpreview h3,.ce-mdpreview h4{font-weight:700;margin-top:0.6rem;margin-bottom:0.35rem;color:var(--text-primary)}
 .ce-mdpreview h2{font-size:1.15rem}.ce-mdpreview h3{font-size:1rem}
@@ -67,7 +51,7 @@ async function loadCourse(){
     _course.id=COURSE_ID;
     render();
   }catch(e){
-    document.getElementById('ce-root').innerHTML='<div class="text-ion-coral py-8 text-center text-[13px]">Failed to load course: '+escHtml(e.message)+'</div>';
+    document.getElementById('ce-root').innerHTML='<div role="alert" class="alert alert-error"><span>Failed to load course: '+escHtml(e.message)+'</span></div>';
   }
 }
 
@@ -75,52 +59,63 @@ function render(){
   const c=_course;
   const lvlOpts=['L1','L2','L3','L4'].map(l=>`<option value="${l}"${l===c.level?' selected':''}>${l}</option>`).join('');
   const html=`
-    <div class="flex justify-between items-baseline mb-4 flex-wrap gap-2">
-      <h1 class="text-[24px] font-semibold text-white">${escHtml(c.title||'(untitled course)')}</h1>
-      <div class="flex gap-2">
-        <a href="/courses/${escHtml(c.slug)}" target="_blank" class="ce-btn">Preview as analyst →</a>
-        <button class="ce-btn-danger ce-btn" data-click-action="deleteCourse">Delete course</button>
+    <div class="flex flex-wrap items-baseline justify-between gap-3 mb-6">
+      <h1 class="basis-full md:basis-auto md:flex-1 text-2xl font-semibold">${escHtml(c.title||'(untitled course)')}</h1>
+      <div class="flex flex-wrap gap-2">
+        <a href="/courses/${escHtml(c.slug)}" target="_blank" class="btn btn-ghost btn-sm">Preview as analyst →</a>
+        <button class="btn btn-ghost btn-sm btn-error" data-click-action="deleteCourse">Delete course</button>
       </div>
     </div>
 
     <!-- Course metadata card -->
-    <div class="ce-card">
-      <div class="ce-grid">
-        <div><div class="ce-label">Title</div><input class="ce-input w-full" id="ce-title" value="${escHtml(c.title)}"></div>
-        <div><div class="ce-label">Slug</div><input class="ce-input w-full font-mono" id="ce-slug" value="${escHtml(c.slug)}"></div>
-        <div><div class="ce-label">Level</div><select class="ce-select w-full" id="ce-level">${lvlOpts}</select></div>
-        <div><div class="ce-label">Estimated hours</div><input type="number" class="ce-input w-full" id="ce-hours" value="${c.estimated_hours}"></div>
-        <div><div class="ce-label">Pass threshold (%)</div><input type="number" class="ce-input w-full" id="ce-pass" value="${c.pass_threshold}"></div>
-        <div><div class="ce-label">Order in level</div><input type="number" class="ce-input w-full" id="ce-order" value="${c.order_in_level}"></div>
-        <div><div class="ce-label">Published</div>
-          <label class="inline-flex items-center gap-2 mt-1.5 text-[12px] text-slate-300">
-            <input type="checkbox" id="ce-pub" ${c.published?'checked':''}> Visible to analysts
-          </label>
+    <div class="card bg-base-200 shadow mb-4">
+      <div class="card-body">
+        <div class="ce-grid">
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Title</div><input class="input input-sm w-full" id="ce-title" value="${escHtml(c.title)}"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Slug</div><input class="input input-sm w-full font-mono" id="ce-slug" value="${escHtml(c.slug)}"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Level</div><select class="select select-sm w-full" id="ce-level">${lvlOpts}</select></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Estimated hours</div><input type="number" class="input input-sm w-full" id="ce-hours" value="${c.estimated_hours}"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Pass threshold (%)</div><input type="number" class="input input-sm w-full" id="ce-pass" value="${c.pass_threshold}"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Order in level</div><input type="number" class="input input-sm w-full" id="ce-order" value="${c.order_in_level}"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Published</div>
+            <label class="label cursor-pointer justify-start gap-2 mt-1.5">
+              <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="ce-pub" ${c.published?'checked':''}>
+              <span class="label-text">Visible to analysts</span>
+            </label>
+          </div>
         </div>
+        <div class="mt-3"><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Description (markdown)</div>
+          <textarea class="textarea w-full ce-textarea" id="ce-desc">${escHtml(c.description_md||'')}</textarea>
+        </div>
+        <div class="card-actions justify-end mt-3"><button class="btn btn-primary btn-sm" data-click-action="saveCourse">Save course metadata</button></div>
       </div>
-      <div class="mt-3"><div class="ce-label">Description (markdown)</div>
-        <textarea class="ce-textarea w-full" id="ce-desc">${escHtml(c.description_md||'')}</textarea>
-      </div>
-      <div class="mt-3 flex justify-end"><button class="ce-btn-primary ce-btn" data-click-action="saveCourse">Save course metadata</button></div>
     </div>
 
     <!-- Modules -->
-    <div class="ce-card">
-      <div class="ce-card-header">
-        <h2 class="text-[16px] font-semibold text-white">Modules (${(c.modules||[]).length})</h2>
-        <button class="ce-btn-primary ce-btn" data-click-action="addModule">+ Module</button>
+    <div class="card bg-base-200 shadow mb-4">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h2 class="card-title text-base">Modules (${(c.modules||[]).length})</h2>
+          <button class="btn btn-primary btn-sm" data-click-action="addModule">+ Module</button>
+        </div>
+        ${(c.modules||[]).map((m,mi)=>renderModule(m,mi)).join('')}
+        ${(c.modules||[]).length===0?'<div role="alert" class="alert alert-info mt-2"><span>No modules yet. Click + Module to add one.</span></div>':''}
       </div>
-      ${(c.modules||[]).map((m,mi)=>renderModule(m,mi)).join('')}
-      ${(c.modules||[]).length===0?'<p class="text-slate-500 text-[12px]">No modules yet. Click + Module to add one.</p>':''}
     </div>
 
     <!-- Image upload -->
-    <div class="ce-card">
-      <div class="ce-card-header"><h2 class="text-[16px] font-semibold text-white">Images</h2></div>
-      <p class="text-[12px] text-slate-400 mb-3">Upload PNG/JPG/SVG/WebP/GIF (5 MB max). After upload, paste the markdown snippet into any lesson body.</p>
-      <input type="file" id="ce-img" class="text-[12px]" accept="image/*">
-      <button class="ce-btn ml-2" data-click-action="uploadImage">Upload</button>
-      <div id="ce-img-out" class="mt-3 text-[12px]"></div>
+    <div class="card bg-base-200 shadow mb-4">
+      <div class="card-body">
+        <h2 class="card-title text-base">Images</h2>
+        <div role="alert" class="alert alert-info">
+          <span>Upload PNG/JPG/SVG/WebP/GIF (5 MB max). After upload, paste the markdown snippet into any lesson body.</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 mt-3">
+          <input type="file" id="ce-img" class="file-input file-input-bordered file-input-sm" accept="image/*">
+          <button class="btn btn-ghost btn-sm" data-click-action="uploadImage">Upload</button>
+        </div>
+        <div id="ce-img-out" class="mt-3 text-sm"></div>
+      </div>
     </div>
   `;
   document.getElementById('ce-root').innerHTML=html;
@@ -132,18 +127,20 @@ function renderModule(m,mi){
   const id=m.id||('new-'+mi);
   const lessons=(m.lessons||[]).map((l,li)=>renderLesson(l,m,mi,li)).join('');
   return `
-    <div class="ce-mod" data-mid="${id}">
-      <div class="ce-row _ion-s-59b87fdbd1">
+    <div class="ce-mod card bg-base-300 shadow-sm mt-3" data-mid="${id}">
+      <div class="card-body p-4">
+      <div class="flex flex-wrap items-center gap-2 _ion-s-59b87fdbd1">
         <div class="_ion-s-65e3af54b5">
-          <input class="ce-input w-full" data-field="title" value="${escHtml(m.title)}" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]'>
+          <input class="input input-sm w-full" data-field="title" value="${escHtml(m.title)}" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]'>
         </div>
-        <input type="number" class="ce-input _ion-s-7fce3abc18" data-field="estimated_minutes" value="${m.estimated_minutes}" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]' title="Minutes">
-        <button class="ce-btn-primary ce-btn" data-click-action="saveModule" data-args='[${m.id||-1}, ${mi}]'>Save</button>
-        <button class="ce-btn" data-click-action="addLesson" data-args='[${m.id||-1}, ${mi}]'>+ Lesson</button>
-        ${m.id?`<button class="ce-btn-danger ce-btn" data-click-action="deleteModule" data-args='[${m.id}]'>Delete module</button>`:''}
+        <input type="number" class="input input-sm _ion-s-7fce3abc18" data-field="estimated_minutes" value="${m.estimated_minutes}" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]' title="Minutes">
+        <button class="btn btn-primary btn-sm" data-click-action="saveModule" data-args='[${m.id||-1}, ${mi}]'>Save</button>
+        <button class="btn btn-ghost btn-sm" data-click-action="addLesson" data-args='[${m.id||-1}, ${mi}]'>+ Lesson</button>
+        ${m.id?`<button class="btn btn-ghost btn-sm btn-error" data-click-action="deleteModule" data-args='[${m.id}]'>Delete module</button>`:''}
       </div>
-      <textarea class="ce-textarea w-full" data-field="description_md" placeholder="Module description (markdown)" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]'>${escHtml(m.description_md||'')}</textarea>
-      ${lessons||'<p class="text-slate-500 text-[12px] mt-2">No lessons yet.</p>'}
+      <textarea class="textarea w-full ce-textarea" data-field="description_md" placeholder="Module description (markdown)" data-input-action="markModuleDirty" data-args='[${m.id||-1}, "$target"]'>${escHtml(m.description_md||'')}</textarea>
+      ${lessons||'<p class="text-sm opacity-50 mt-2">No lessons yet.</p>'}
+      </div>
     </div>
   `;
 }
@@ -153,35 +150,38 @@ function renderLesson(l,m,mi,li){
   const typeOpts=['reading','quiz','lab'].map(t=>`<option value="${t}"${t===l.lesson_type?' selected':''}>${t}</option>`).join('');
   const isExpanded=_editing[id]==='edit';
   const qcount=(l.questions||[]).length;
+  const typeBadge=l.lesson_type==='quiz'?'badge-info':l.lesson_type==='lab'?'badge-warning':'badge-ghost';
   return `
-    <div class="ce-lesson" data-lid="${id}">
-      <div class="ce-lesson-summary" data-click-action="toggleLesson" data-args='["${id}"]'>
-        <span class="ce-status-pill ce-pill-${l.lesson_type}">${l.lesson_type}</span>
+    <div class="ce-lesson card bg-base-200 shadow-sm mt-2" data-lid="${id}">
+      <div class="card-body p-3">
+      <div class="flex flex-wrap items-center gap-2 cursor-pointer hover:bg-primary/10 rounded-md px-1" data-click-action="toggleLesson" data-args='["${id}"]'>
+        <span class="badge badge-sm ${typeBadge}">${l.lesson_type}</span>
         <strong>${escHtml(l.title||'(untitled lesson)')}</strong>
-        <span class="text-slate-500 text-[11px] ml-auto">~${l.duration_min}m · ${qcount} q</span>
+        <span class="text-xs opacity-50 ml-auto">~${l.duration_min}m · ${qcount} q</span>
       </div>
       <div class="ce-lesson-body _ion-s-22df499f68" data-ion-style="display:${isExpanded?'block':'none'}">
         <div class="ce-grid _ion-s-bba5e32d4a">
-          <div><div class="ce-label">Title</div><input class="ce-input w-full" data-field="title" value="${escHtml(l.title)}"></div>
-          <div><div class="ce-label">Type</div><select class="ce-select w-full" data-field="lesson_type">${typeOpts}</select></div>
-          <div><div class="ce-label">Duration (min)</div><input type="number" class="ce-input w-full" data-field="duration_min" value="${l.duration_min}"></div>
-          <div><div class="ce-label">Lab target URL</div><input class="ce-input w-full" data-field="lab_target_url" value="${escHtml(l.lab_target_url||'')}" placeholder="/cases/1"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Title</div><input class="input input-sm w-full" data-field="title" value="${escHtml(l.title)}"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Type</div><select class="select select-sm w-full" data-field="lesson_type">${typeOpts}</select></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Duration (min)</div><input type="number" class="input input-sm w-full" data-field="duration_min" value="${l.duration_min}"></div>
+          <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Lab target URL</div><input class="input input-sm w-full" data-field="lab_target_url" value="${escHtml(l.lab_target_url||'')}" placeholder="/cases/1"></div>
         </div>
-        <div class="ce-label">Content (markdown — supports \`\`\`mermaid blocks)</div>
-        <textarea class="ce-textarea ce-textarea-md w-full" data-field="content_md" placeholder="Lesson body in markdown…" data-input-action="updateMdPreview" data-args='["${id}", "$value"]'>${escHtml(l.content_md||'')}</textarea>
-        <div class="ce-label _ion-s-c9ef2a58eb">Live preview</div>
+        <div class="text-xs font-semibold uppercase tracking-wide opacity-60">Content (markdown — supports \`\`\`mermaid blocks)</div>
+        <textarea class="textarea w-full ce-textarea ce-textarea-md" data-field="content_md" placeholder="Lesson body in markdown…" data-input-action="updateMdPreview" data-args='["${id}", "$value"]'>${escHtml(l.content_md||'')}</textarea>
+        <div class="text-xs font-semibold uppercase tracking-wide opacity-60 _ion-s-c9ef2a58eb">Live preview</div>
         <div class="ce-mdpreview" id="ce-md-${id}">${md(l.content_md||'')}</div>
 
-        <div class="ce-card-header _ion-s-62a1d0e646">
-          <h3 class="text-[13px] font-semibold text-white">Questions (${qcount})</h3>
-          <button class="ce-btn" data-click-action="addQuestion" data-args='[${l.id||-1}, ${mi}, ${li}]'>+ Question</button>
+        <div class="flex flex-wrap items-center justify-between gap-2 _ion-s-62a1d0e646">
+          <h3 class="text-sm font-semibold">Questions (${qcount})</h3>
+          <button class="btn btn-ghost btn-sm" data-click-action="addQuestion" data-args='[${l.id||-1}, ${mi}, ${li}]'>+ Question</button>
         </div>
         ${(l.questions||[]).map((q,qi)=>renderQuestion(q,l,mi,li,qi)).join('')}
 
-        <div class="ce-row _ion-s-a26d92bbf4">
-          <button class="ce-btn-primary ce-btn" data-click-action="saveLesson" data-args='[${l.id||-1}, ${mi}, ${li}]'>Save lesson</button>
-          ${l.id?`<button class="ce-btn-danger ce-btn _ion-s-690f054c4e" data-click-action="deleteLesson" data-args='[${l.id}]'>Delete lesson</button>`:''}
+        <div class="flex flex-wrap items-center gap-2 _ion-s-a26d92bbf4">
+          <button class="btn btn-primary btn-sm" data-click-action="saveLesson" data-args='[${l.id||-1}, ${mi}, ${li}]'>Save lesson</button>
+          ${l.id?`<button class="btn btn-ghost btn-sm btn-error _ion-s-690f054c4e" data-click-action="deleteLesson" data-args='[${l.id}]'>Delete lesson</button>`:''}
         </div>
+      </div>
       </div>
     </div>
   `;
@@ -193,25 +193,27 @@ function renderQuestion(q,l,mi,li,qi){
   const optsJson=q.options?JSON.stringify(q.options,null,2):'[\n  {"value":"a","label":"Option A"},\n  {"value":"b","label":"Option B"}\n]';
   const corrJson=JSON.stringify(q.correct_answer);
   return `
-    <div class="ce-question" data-qid="${id}">
-      <div class="ce-row _ion-s-e802b7a103">
-        <select class="ce-select" data-field="kind">${kindOpts}</select>
-        <input type="number" class="ce-input _ion-s-81c26f8ca5" data-field="points" value="${q.points}" title="Points">
-        <span class="text-slate-500 text-[10px] ml-auto">#${qi+1}</span>
+    <div class="ce-question card bg-base-300 shadow-sm mt-2 text-sm" data-qid="${id}">
+      <div class="card-body p-3">
+      <div class="flex flex-wrap items-center gap-2 _ion-s-e802b7a103">
+        <select class="select select-sm" data-field="kind">${kindOpts}</select>
+        <input type="number" class="input input-sm _ion-s-81c26f8ca5" data-field="points" value="${q.points}" title="Points">
+        <span class="text-xs opacity-50 ml-auto">#${qi+1}</span>
       </div>
-      <div class="ce-label">Stem (markdown)</div>
-      <textarea class="ce-textarea w-full" data-field="stem_md">${escHtml(q.stem_md||'')}</textarea>
+      <div class="text-xs font-semibold uppercase tracking-wide opacity-60">Stem (markdown)</div>
+      <textarea class="textarea w-full ce-textarea" data-field="stem_md">${escHtml(q.stem_md||'')}</textarea>
       <div class="ce-grid _ion-s-c9ef2a58eb">
-        <div><div class="ce-label">Options (JSON array of {value, label})</div>
-          <textarea class="ce-textarea w-full _ion-s-4500b7ef55" data-field="options">${escHtml(optsJson)}</textarea></div>
-        <div><div class="ce-label">Correct answer (JSON: string for single/truefalse, list for multi/shortanswer)</div>
-          <textarea class="ce-textarea w-full _ion-s-4500b7ef55" data-field="correct_answer">${escHtml(corrJson)}</textarea></div>
+        <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Options (JSON array of {value, label})</div>
+          <textarea class="textarea w-full ce-textarea _ion-s-4500b7ef55" data-field="options">${escHtml(optsJson)}</textarea></div>
+        <div><div class="text-xs font-semibold uppercase tracking-wide opacity-60">Correct answer (JSON: string for single/truefalse, list for multi/shortanswer)</div>
+          <textarea class="textarea w-full ce-textarea _ion-s-4500b7ef55" data-field="correct_answer">${escHtml(corrJson)}</textarea></div>
       </div>
-      <div class="ce-label _ion-s-09e8c5ac29">Explanation (markdown, shown after submit)</div>
-      <textarea class="ce-textarea w-full" data-field="explanation_md">${escHtml(q.explanation_md||'')}</textarea>
-      <div class="ce-row _ion-s-09e8c5ac29">
-        <button class="ce-btn-primary ce-btn" data-click-action="saveQuestion" data-args='[${q.id||-1}, ${l.id||-1}, ${mi}, ${li}, ${qi}]'>Save question</button>
-        ${q.id?`<button class="ce-btn-danger ce-btn _ion-s-690f054c4e" data-click-action="deleteQuestion" data-args='[${q.id}]'>Delete</button>`:''}
+      <div class="text-xs font-semibold uppercase tracking-wide opacity-60 _ion-s-09e8c5ac29">Explanation (markdown, shown after submit)</div>
+      <textarea class="textarea w-full ce-textarea" data-field="explanation_md">${escHtml(q.explanation_md||'')}</textarea>
+      <div class="flex flex-wrap items-center gap-2 _ion-s-09e8c5ac29">
+        <button class="btn btn-primary btn-sm" data-click-action="saveQuestion" data-args='[${q.id||-1}, ${l.id||-1}, ${mi}, ${li}, ${qi}]'>Save question</button>
+        ${q.id?`<button class="btn btn-ghost btn-sm btn-error _ion-s-690f054c4e" data-click-action="deleteQuestion" data-args='[${q.id}]'>Delete</button>`:''}
+      </div>
       </div>
     </div>
   `;
@@ -389,8 +391,12 @@ async function uploadImage(){
     const r=await fetch('/api/courses/'+_course.slug+'/images',{method:'POST',body:fd});
     const d=await r.json();
     if(!r.ok){showToast(d.detail||'Upload failed','error');return;}
-    document.getElementById('ce-img-out').innerHTML=`<div class="text-slate-300">Uploaded <a href="${d.url}" target="_blank" class="underline text-ion-cyan">${d.url}</a> · ${d.bytes} bytes</div>
-      <div class="mt-2"><strong>Markdown:</strong> <code class="bg-ink-deep px-2 py-1 rounded">${escHtml(d.markdown)}</code></div>`;
+    document.getElementById('ce-img-out').innerHTML=`<div role="alert" class="alert alert-success">
+      <div>
+        <div>Uploaded <a href="${d.url}" target="_blank" class="link link-primary">${d.url}</a> · ${d.bytes} bytes</div>
+        <div class="mt-2"><strong>Markdown:</strong> <code class="bg-base-300 px-2 py-1 rounded text-xs">${escHtml(d.markdown)}</code></div>
+      </div>
+    </div>`;
     showToast('Uploaded','success');
   }catch(e){showToast('Upload failed: '+e.message,'error');}
 }

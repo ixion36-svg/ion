@@ -3,121 +3,122 @@
 {% block title %}Profile - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-<section class="mb-8 rise d-1">
-<div class="flex-1 min-w-0">
-  <div class="flex items-center gap-3 mb-4">
-    <svg class="w-4 h-4 text-ion-cyan"><use href="#i-user"/></svg>
-    <span class="label-tiny text-ion-cyan">My account</span>
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="basis-full md:basis-auto md:flex-1">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-primary"><use href="#i-user"/></svg>
+      <span class="label-tiny text-primary">My account</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Profile</h1>
+    <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Your profile, preferences and notification settings.</p>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Profile</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Your profile, preferences and notification settings.</p>
-</div>
 </section>
 
-<div class="profile-grid">
-    <div class="card">
-        <div class="card-header">
-            <h2>Account Information</h2>
-        </div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="card bg-base-200 shadow">
         <div class="card-body">
+            <h2 class="card-title">Account Information</h2>
             <div class="profile-info" id="profile-info">
-                <div class="loading">Loading profile...</div>
+                <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
+                    <span class="loading loading-spinner loading-sm text-primary"></span> Loading profile...
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h2>Identity Mapping</h2>
-        </div>
+    <div class="card bg-base-200 shadow">
         <div class="card-body">
+            <h2 class="card-title">Identity Mapping</h2>
             <p class="_ion-s-29c8400ca7">
                 Map your ION account to external services. These are used to sync case assignments to Kibana and filter GitLab issues.
             </p>
-            <form id="identity-mapping-form" data-submit-action="saveIdentityMapping" data-args='["$event"]'>
-                <div class="form-group">
-                    <label for="id-elastic-username">Elastic / Kibana Username</label>
-                    <input type="text" id="id-elastic-username" placeholder="Your Kibana username (if different from ION)">
-                </div>
-                <div class="form-group">
-                    <label for="id-gitlab-username">GitLab Username</label>
-                    <input type="text" id="id-gitlab-username" placeholder="Your GitLab username for 'My Issues' filtering">
-                </div>
-                <div class="form-group">
-                    <label>Elastic UID <span class="_ion-s-db99344e35">(auto-resolved)</span></label>
+            <form id="identity-mapping-form" class="flex flex-col gap-3" data-submit-action="saveIdentityMapping" data-args='["$event"]'>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Elastic / Kibana Username</legend>
+                    <input class="input w-full" type="text" id="id-elastic-username" placeholder="Your Kibana username (if different from ION)">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">GitLab Username</legend>
+                    <input class="input w-full" type="text" id="id-gitlab-username" placeholder="Your GitLab username for 'My Issues' filtering">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Elastic UID <span class="_ion-s-db99344e35">(auto-resolved)</span></legend>
                     <div class="_ion-s-8c300d3751">
-                        <input class="_ion-s-38e03a289e" type="text" id="id-elastic-uid" readonly>
-                        <button type="button" class="ion-btn _ion-s-a9efa5449f" data-click-action="resolveElasticUid" id="resolve-btn">Resolve</button>
+                        <input class="input min-w-0 _ion-s-38e03a289e" type="text" id="id-elastic-uid" readonly>
+                        <button type="button" class="btn btn-sm _ion-s-a9efa5449f" data-click-action="resolveElasticUid" id="resolve-btn">Resolve</button>
                     </div>
-                </div>
-                <div class="form-group">
-                    <label>Keycloak Subject ID <span class="_ion-s-db99344e35">(auto-set on OIDC login)</span></label>
-                    <input class="_ion-s-68433eba3d" type="text" id="id-keycloak-sub" readonly>
-                </div>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Keycloak Subject ID <span class="_ion-s-db99344e35">(auto-set on OIDC login)</span></legend>
+                    <input class="input w-full _ion-s-68433eba3d" type="text" id="id-keycloak-sub" readonly>
+                </fieldset>
                 <div class="_ion-s-4cdac52ae4" id="resolve-result"></div>
-                <button type="submit" class="ion-btn ion-btn-primary">Save Mappings</button>
+                <button type="submit" class="btn btn-primary">Save Mappings</button>
             </form>
         </div>
     </div>
 
-    <div class="card" id="change-password-card">
-        <div class="card-header">
-            <h2>Change Password</h2>
-        </div>
+    <div class="card bg-base-200 shadow" id="change-password-card">
         <div class="card-body">
-            <div id="password-change-required" class="alert alert-warning _ion-s-f2892a2e8a">
+            <h2 class="card-title">Change Password</h2>
+            <div id="password-change-required" role="alert" class="alert alert-warning _ion-s-f2892a2e8a">
                 You must change your password before continuing.
             </div>
-            <form id="change-password-form" data-submit-action="changePassword" data-args='["$event"]'>
-                <div class="form-group">
-                    <label for="current-password">Current Password</label>
-                    <input type="password" id="current-password" required>
-                </div>
-                <div class="form-group">
-                    <label for="new-password">New Password</label>
-                    <input type="password" id="new-password" required minlength="8">
-                </div>
-                <div class="form-group">
-                    <label for="confirm-password">Confirm New Password</label>
-                    <input type="password" id="confirm-password" required minlength="8">
-                </div>
-                <button type="submit" class="ion-btn ion-btn-primary">Change Password</button>
+            <form id="change-password-form" class="flex flex-col gap-3" data-submit-action="changePassword" data-args='["$event"]'>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Current Password</legend>
+                    <input class="input w-full" type="password" id="current-password" required>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">New Password</legend>
+                    <input class="input w-full" type="password" id="new-password" required minlength="8">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Confirm New Password</legend>
+                    <input class="input w-full" type="password" id="confirm-password" required minlength="8">
+                </fieldset>
+                <button type="submit" class="btn btn-primary">Change Password</button>
             </form>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h2>Session Information</h2>
-        </div>
+    <div class="card bg-base-200 shadow">
         <div class="card-body">
-            <div class="session-info">
-                <p><strong>Current IP:</strong> <span id="current-ip">-</span></p>
-                <p><strong>Browser:</strong> <span id="current-browser">-</span></p>
-                <p><strong>Session started:</strong> <span id="session-started">-</span></p>
+            <h2 class="card-title">Session Information</h2>
+            <div class="stats stats-vertical w-full bg-base-200 shadow-none">
+                <div class="stat px-0 py-3">
+                    <div class="stat-title">Current IP</div>
+                    <div class="stat-value text-base font-mono font-normal" id="current-ip">-</div>
+                </div>
+                <div class="stat px-0 py-3">
+                    <div class="stat-title">Browser</div>
+                    <div class="stat-value text-base font-normal truncate" id="current-browser">-</div>
+                </div>
+                <div class="stat px-0 py-3">
+                    <div class="stat-title">Session started</div>
+                    <div class="stat-value text-base font-normal" id="session-started">-</div>
+                </div>
             </div>
-            <button class="ion-btn" data-click-action="logout">Sign Out</button>
+            <button class="btn btn-ghost" data-click-action="logout">Sign Out</button>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h2>Appearance</h2>
-        </div>
+    <div class="card bg-base-200 shadow lg:col-span-2">
         <div class="card-body">
-            <div class="mode-toggle">
-                <h4>Mode</h4>
-                <div class="mode-switch">
-                    <button class="mode-btn" data-mode="dark" data-click-action="setMode" data-args='["dark"]'>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <h2 class="card-title">Appearance</h2>
+            <div class="flex flex-col gap-2">
+                <h3 class="text-sm font-semibold">Mode</h3>
+                <div class="join">
+                    <button type="button" class="btn btn-sm join-item mode-btn gap-2" data-mode="dark" data-click-action="setMode" data-args='["dark"]'>
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                         </svg>
                         Dark
                     </button>
-                    <button class="mode-btn" data-mode="light" data-click-action="setMode" data-args='["light"]'>
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button type="button" class="btn btn-sm join-item mode-btn gap-2" data-mode="light" data-click-action="setMode" data-args='["light"]'>
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="5"/>
                             <line x1="12" y1="1" x2="12" y2="3"/>
                             <line x1="12" y1="21" x2="12" y2="23"/>
@@ -132,8 +133,8 @@
                     </button>
                 </div>
             </div>
-            <div class="theme-switcher">
-                <h4>Accent Color</h4>
+            <div class="flex flex-col gap-2">
+                <h3 class="text-sm font-semibold">Accent Color</h3>
                 <div class="theme-options">
                     <button class="theme-option" data-theme="cyan" title="Cyan (Default)" data-click-action="setTheme" data-args='["cyan"]'></button>
                     <button class="theme-option" data-theme="blue" title="Blue" data-click-action="setTheme" data-args='["blue"]'></button>
@@ -154,6 +155,40 @@
 {% endblock %}
 
 {% block scripts %}
+<style nonce="{{ csp_nonce }}">
+/* JS toggles .active on .mode-btn; daisyUI uses btn-active. */
+.mode-btn.active {
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+}
+
+/* JS injects .profile-field / .error; cannot add daisyUI classes without changing JS. */
+#profile-info .profile-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+    border-radius: 0;
+}
+#profile-info .profile-field:last-child { border-bottom: 0; }
+#profile-info .profile-field label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.55;
+}
+#profile-info > .error {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-box, 0.5rem);
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+}
+</style>
 <script nonce="{{ csp_nonce }}">
 let currentUser = null;
 

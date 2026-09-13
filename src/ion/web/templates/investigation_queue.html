@@ -3,143 +3,151 @@
 {% block title %}Investigation Queue · ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 
   <!-- Header -->
-  <section class="ion-page-header flex-wrap gap-6 mb-8 rise d-1">
-    <div class="flex-1 min-w-0">
+  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+    <div class="basis-full md:basis-auto md:flex-1">
       <div class="flex items-center gap-3 mb-4">
-        <span class="h-1.5 w-1.5 rounded-full bg-ion-lime pulse-cyan"></span>
-        <span class="label-tiny text-ion-lime">Autonomous investigation</span>
+        <span class="h-1.5 w-1.5 rounded-full bg-success pulse-cyan"></span>
+        <span class="label-tiny text-success">Autonomous investigation</span>
       </div>
-      <h1 class="ion-ph-title font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Investigation Queue</h1>
-      <p class="ion-ph-sub mt-3 text-[13px] max-w-2xl">Live view of the autonomous investigation pipeline. Running jobs, recently completed verdicts, and on-demand controls.</p>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Investigation Queue</h1>
+      <p class="mt-3 text-[15px] text-base-content/60 max-w-2xl">Live view of the autonomous investigation pipeline. Running jobs, recently completed verdicts, and on-demand controls.</p>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-      <button id="iq-pause-btn" data-click-action="iqTogglePause" class="ion-btn">
+      <button id="iq-pause-btn" data-click-action="iqTogglePause" class="btn btn-ghost">
         <span id="iq-pause-label">Pause loop</span>
       </button>
-      <button data-click-action="iqCancelAllPending" class="ion-btn ion-btn-danger">
+      <button data-click-action="iqCancelAllPending" class="btn btn-error">
         Cancel all pending
       </button>
-      <button data-click-action="iqRefresh" class="ion-btn">
+      <button data-click-action="iqRefresh" class="btn btn-ghost">
         <svg class="w-3.5 h-3.5"><use href="#i-refresh"/></svg>Refresh
       </button>
-      <button data-click-action="iqRunSweep" class="ion-btn ion-btn-primary">
+      <button data-click-action="iqRunSweep" class="btn btn-primary">
         <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>Run sweep now
       </button>
     </div>
   </section>
 
   <!-- loop pause banner -->
-  <div id="iq-pause-banner" class="rounded-[12px] border border-amber-500/30 bg-amber-500/10 p-3 mb-4 text-amber-300 text-[12px] _ion-s-c8be1ccba6">
+  <div id="iq-pause-banner" class="alert alert-warning mb-4 _ion-s-c8be1ccba6">
     Sweep loop is <strong>paused</strong>. New investigations will not be auto-queued until you resume. Existing pending rows remain — click <em>Cancel all pending</em> if you want to clear the backlog.
   </div>
 
   <!-- Manual-trigger card -->
-  <section class="ion-card mb-6">
-    <div class="flex items-center gap-3 mb-3">
-      <span class="label-tiny text-slate-500">Manual trigger</span>
+  <section class="card bg-base-200 shadow mb-6">
+    <div class="card-body">
+      <div class="flex items-center gap-3 mb-3">
+        <span class="label-tiny text-base-content/50">Manual trigger</span>
+      </div>
+      <form id="iq-manual-form" data-submit-action="iqManualSubmit" data-args='["$event"]' class="flex flex-wrap items-end gap-3">
+        <fieldset class="fieldset p-0 flex-1 min-w-[280px]">
+          <legend class="fieldset-legend">Alert ID (ES <code>_id</code>)</legend>
+          <input name="alert_id" required class="input input-sm w-full" placeholder="e.g. 7c4fd2abc…">
+        </fieldset>
+        <label class="label cursor-pointer justify-start gap-2">
+          <input name="force" type="checkbox" class="checkbox checkbox-primary checkbox-sm">
+          Force re-run
+        </label>
+        <button type="submit" class="btn btn-primary">Investigate alert</button>
+        <span id="iq-manual-status" class="text-sm text-base-content/50"></span>
+      </form>
     </div>
-    <form id="iq-manual-form" data-submit-action="iqManualSubmit" data-args='["$event"]' class="flex flex-wrap items-end gap-3">
-      <label class="flex flex-col gap-1 text-[12px] text-slate-300 flex-1 min-w-[280px]">
-        Alert ID (ES <code>_id</code>)
-        <input name="alert_id" required class="ion-input" placeholder="e.g. 7c4fd2abc…">
-      </label>
-      <label class="flex items-center gap-2 text-[12px] text-slate-300">
-        <input name="force" type="checkbox" class="accent-ion-cyan">
-        Force re-run
-      </label>
-      <button type="submit" class="ion-btn ion-btn-primary">Investigate alert</button>
-      <span id="iq-manual-status" class="text-[12px] text-slate-400"></span>
-    </form>
   </section>
 
   <!-- Counts / summary strip -->
-  <div class="ion-metrics-grid mb-6">
-    <div class="ion-metric">
-      <div class="ion-metric-label">Running</div>
-      <div id="iq-count-running" class="ion-metric-value text-ion-cyan">—</div>
+  <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+    <div class="stat">
+      <div class="stat-title">Running</div>
+      <div id="iq-count-running" class="stat-value text-primary">—</div>
     </div>
-    <div class="ion-metric">
-      <div class="ion-metric-label">Pending</div>
-      <div id="iq-count-pending" class="ion-metric-value iq-val-pending">—</div>
+    <div class="stat">
+      <div class="stat-title">Pending</div>
+      <div id="iq-count-pending" class="stat-value text-secondary">—</div>
     </div>
-    <div class="ion-metric">
-      <div class="ion-metric-label">Recent completed</div>
-      <div id="iq-count-completed" class="ion-metric-value iq-val-completed">—</div>
+    <div class="stat">
+      <div class="stat-title">Recent completed</div>
+      <div id="iq-count-completed" class="stat-value text-success">—</div>
     </div>
-    <div class="ion-metric">
-      <div class="ion-metric-label">Recent failed</div>
-      <div id="iq-count-failed" class="ion-metric-value iq-val-failed">—</div>
+    <div class="stat">
+      <div class="stat-title">Recent failed</div>
+      <div id="iq-count-failed" class="stat-value text-error">—</div>
     </div>
   </div>
 
   <!-- Running / pending jobs -->
-  <section class="mb-10">
-    <h2 class="text-[14px] font-semibold text-white mb-3">Running &amp; Pending</h2>
-    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
-      <table class="ion-table data-table w-full">
-        <thead>
-          <tr>
-            <th>Status</th>
-            <th>Started</th>
-            <th>Signature</th>
-            <th>Host</th>
-            <th>User</th>
-            <th>Alert ID</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="iq-running-tbody">
-          <tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>
-        </tbody>
-      </table>
+  <section class="card bg-base-200 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-sm">Running &amp; Pending</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-sm w-full">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Started</th>
+              <th>Signature</th>
+              <th>Host</th>
+              <th>User</th>
+              <th>Alert ID</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="iq-running-tbody">
+            <tr><td colspan="7" class="text-center text-base-content/50 text-xs py-8">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
   <!-- Recently completed -->
-  <section class="mb-10">
-    <h2 class="text-[14px] font-semibold text-white mb-3">Recently completed (last 20)</h2>
-    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
-      <table class="ion-table data-table w-full">
-        <thead>
-          <tr>
-            <th>Completed</th>
-            <th>Signature</th>
-            <th>Host</th>
-            <th>Verdict</th>
-            <th>Severity</th>
-            <th>Duration</th>
-            <th>Model</th>
-            <th>Summary</th>
-          </tr>
-        </thead>
-        <tbody id="iq-completed-tbody">
-          <tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>
-        </tbody>
-      </table>
+  <section class="card bg-base-200 shadow mb-6">
+    <div class="card-body">
+      <h2 class="card-title text-sm">Recently completed (last 20)</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-sm w-full">
+          <thead>
+            <tr>
+              <th>Completed</th>
+              <th>Signature</th>
+              <th>Host</th>
+              <th>Verdict</th>
+              <th>Severity</th>
+              <th>Duration</th>
+              <th>Model</th>
+              <th>Summary</th>
+            </tr>
+          </thead>
+          <tbody id="iq-completed-tbody">
+            <tr><td colspan="8" class="text-center text-base-content/50 text-xs py-8">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
   <!-- Recent failures -->
-  <section>
-    <h2 class="text-[14px] font-semibold text-white mb-3">Recent failures</h2>
-    <div class="rounded-[12px] border border-white/5 bg-ink-900/50 overflow-hidden">
-      <table class="ion-table data-table w-full">
-        <thead>
-          <tr>
-            <th>When</th>
-            <th>Signature</th>
-            <th>Alert ID</th>
-            <th>Summary / error</th>
-          </tr>
-        </thead>
-        <tbody id="iq-failed-tbody">
-          <tr><td colspan="4" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>
-        </tbody>
-      </table>
+  <section class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h2 class="card-title text-sm">Recent failures</h2>
+      <div class="overflow-x-auto">
+        <table class="table table-sm w-full">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Signature</th>
+              <th>Alert ID</th>
+              <th>Summary / error</th>
+            </tr>
+          </thead>
+          <tbody id="iq-failed-tbody">
+            <tr><td colspan="4" class="text-center text-base-content/50 text-xs py-8">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </section>
 
@@ -147,9 +155,8 @@
 </div>
 
 <style nonce="{{ csp_nonce }}">
-  .data-table tbody tr { border-top: 1px solid var(--border); }
-  .data-table tbody tr:hover { background: var(--bg-secondary); }
-  .data-table td { padding: 0.7rem 1rem; font-size: 12px; color: var(--text-primary); vertical-align: top; }
+  /* JS innerHTML emits .iq-pill / .iq-mono — cannot restyle those rows
+     without changing the script, which this rewrite must not touch. */
   .iq-pill {
     display: inline-block;
     padding: 2px 8px;
@@ -172,9 +179,6 @@
   .iq-pill-sev-high    { background: rgba(240,136,62,0.15);  color: var(--sev-high); }
   .iq-pill-sev-critical{ background: rgba(255,108,108,0.2);   color: var(--danger); }
   .iq-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11px; color: var(--text-secondary); }
-  .iq-val-pending   { color: var(--neon-purple); }
-  .iq-val-completed { color: var(--success); }
-  .iq-val-failed    { color: var(--danger); }
 </style>
 
 <script nonce="{{ csp_nonce }}">

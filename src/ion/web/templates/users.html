@@ -6,7 +6,7 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-  <div class="flex-1 min-w-0">
+  <div class="basis-full md:basis-auto md:flex-1">
     <div class="flex items-center gap-3 mb-4">
       <svg class="w-4 h-4 text-ion-cyan"><use href="#i-users"/></svg>
       <span class="label-tiny text-ion-cyan">Identity &amp; access</span>
@@ -14,75 +14,79 @@
     <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Users</h1>
     <p class="mt-3 max-w-2xl text-[15px] text-slate-400">User accounts, roles and sessions.</p>
   </div>
-  <button data-click-action="showCreateUserModal" class="inline-flex items-center gap-2 h-10 px-5 rounded-md bg-ion-cyan text-ink-950 hover:brightness-110 text-[13px] font-semibold transition shadow-[0_0_18px_-6px_rgba(109,228,255,0.9)]">
+  <button data-click-action="showCreateUserModal" class="btn btn-primary">
     <svg class="w-3.5 h-3.5"><use href="#i-plus"/></svg>
     New User
   </button>
 </section>
 
-<div class="ion-card">
-    <div class="card-header">
-        <h2 class="ion-card-title">Users</h2>
-        <div class="flex items-center gap-2 flex-wrap">
-            <label class="checkbox-label">
-                <input type="checkbox" id="include-inactive" data-change-action="loadUsers">
-                Show inactive users
+<div class="card bg-base-200 shadow">
+    <div class="card-body p-0">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+            <h2 class="card-title text-base">Users</h2>
+            <label class="label cursor-pointer justify-start gap-2 py-0 w-fit">
+                <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="include-inactive" data-change-action="loadUsers">
+                <span class="label-text">Show inactive users</span>
             </label>
         </div>
-    </div>
-    <div class="card-body">
-        <table class="ion-table" id="users-table">
-            <thead>
-                <tr>
-                    <th>Username</th>
-                    <th>Email</th>
-                    <th>Display Name</th>
-                    <th>Roles</th>
-                    <th>Elastic UID</th>
-                    <th>Keycloak Sub</th>
-                    <th>Status</th>
-                    <th>Last Login</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody id="users-tbody">
-                <tr><td colspan="9" class="loading">Loading users...</td></tr>
-            </tbody>
-        </table>
+        <div class="overflow-x-auto">
+            <table class="table table-sm" id="users-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Email</th>
+                        <th>Display Name</th>
+                        <th>Roles</th>
+                        <th>Elastic UID</th>
+                        <th>Keycloak Sub</th>
+                        <th>Status</th>
+                        <th>Last Login</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-tbody">
+                    <tr><td colspan="9"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading users...</div></td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <!-- Create User Modal -->
 <div class="modal" id="create-user-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Create New User</h3>
-            <button class="modal-close" data-click-action="closeModal" data-args='["create-user-modal"]'>&times;</button>
+    <div class="modal-box max-w-3xl">
+        <div class="flex items-center justify-between gap-4">
+            <h3 class="text-lg font-semibold">Create New User</h3>
+            <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["create-user-modal"]' aria-label="Close">&times;</button>
         </div>
-        <form id="create-user-form" data-submit-action="createUser" data-args='["$event"]'>
-            <div class="form-group">
-                <label for="new-username">Username</label>
-                <input class="ion-input" type="text" id="new-username" required pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, underscores, and hyphens only">
+        <form class="pt-4 flex flex-col gap-3" id="create-user-form" data-submit-action="createUser" data-args='["$event"]'>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Username</legend>
+                    <input class="input w-full" type="text" id="new-username" required pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, underscores, and hyphens only">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Email</legend>
+                    <input class="input w-full" type="email" id="new-email" required>
+                </fieldset>
             </div>
-            <div class="form-group">
-                <label for="new-email">Email</label>
-                <input class="ion-input" type="email" id="new-email" required>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Password</legend>
+                    <input class="input w-full" type="password" id="new-password" required minlength="8">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Display Name</legend>
+                    <input class="input w-full" type="text" id="new-display-name">
+                </fieldset>
             </div>
-            <div class="form-group">
-                <label for="new-password">Password</label>
-                <input class="ion-input" type="password" id="new-password" required minlength="8">
-            </div>
-            <div class="form-group">
-                <label for="new-display-name">Display Name</label>
-                <input class="ion-input" type="text" id="new-display-name">
-            </div>
-            <div class="form-group">
-                <label>Roles</label>
-                <div id="new-user-roles" class="checkbox-group"></div>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="ion-btn" data-click-action="closeModal" data-args='["create-user-modal"]'>Cancel</button>
-                <button type="submit" class="ion-btn ion-btn-primary">Create User</button>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Roles</legend>
+                <div id="new-user-roles"></div>
+            </fieldset>
+            <div class="modal-action">
+                <button type="button" class="btn btn-ghost" data-click-action="closeModal" data-args='["create-user-modal"]'>Cancel</button>
+                <button type="submit" class="btn btn-primary">Create User</button>
             </div>
         </form>
     </div>
@@ -90,55 +94,63 @@
 
 <!-- Edit User Modal -->
 <div class="modal" id="edit-user-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Edit User</h3>
-            <button class="modal-close" data-click-action="closeModal" data-args='["edit-user-modal"]'>&times;</button>
+    <div class="modal-box max-w-3xl">
+        <div class="flex items-center justify-between gap-4">
+            <h3 class="text-lg font-semibold">Edit User</h3>
+            <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["edit-user-modal"]' aria-label="Close">&times;</button>
         </div>
-        <form id="edit-user-form" data-submit-action="updateUser" data-args='["$event"]'>
+        <form class="pt-4 flex flex-col gap-3" id="edit-user-form" data-submit-action="updateUser" data-args='["$event"]'>
             <input type="hidden" id="edit-user-id">
-            <div class="form-group">
-                <label for="edit-username">Username</label>
-                <input class="ion-input" type="text" id="edit-username" required pattern="[a-zA-Z0-9_-]+">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Username</legend>
+                    <input class="input w-full" type="text" id="edit-username" required pattern="[a-zA-Z0-9_-]+">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Email</legend>
+                    <input class="input w-full" type="email" id="edit-email" required>
+                </fieldset>
             </div>
-            <div class="form-group">
-                <label for="edit-email">Email</label>
-                <input class="ion-input" type="email" id="edit-email" required>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Display Name</legend>
+                    <input class="input w-full" type="text" id="edit-display-name">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Status</legend>
+                    <label class="label cursor-pointer justify-start gap-2 w-fit py-0">
+                        <input type="checkbox" class="checkbox checkbox-primary" id="edit-is-active">
+                        Active
+                    </label>
+                </fieldset>
             </div>
-            <div class="form-group">
-                <label for="edit-display-name">Display Name</label>
-                <input class="ion-input" type="text" id="edit-display-name">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">GitLab Username</legend>
+                    <input class="input w-full" type="text" id="edit-gitlab-username" placeholder="GitLab username for issue filtering">
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Elastic Username</legend>
+                    <input class="input w-full" type="text" id="edit-elastic-username" placeholder="Kibana/ES username (if different from ION)">
+                </fieldset>
             </div>
-            <div class="form-group">
-                <label>Status</label>
-                <label class="checkbox-label">
-                    <input type="checkbox" id="edit-is-active">
-                    Active
-                </label>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Elastic UID</legend>
+                    <input class="input w-full _ion-s-383082bf69" type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana" readonly>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Keycloak Subject ID</legend>
+                    <input class="input w-full _ion-s-383082bf69" type="text" id="edit-keycloak-sub" placeholder="Auto-set on OIDC login" readonly>
+                </fieldset>
             </div>
-            <div class="form-group">
-                <label for="edit-gitlab-username">GitLab Username</label>
-                <input class="ion-input" type="text" id="edit-gitlab-username" placeholder="GitLab username for issue filtering">
-            </div>
-            <div class="form-group">
-                <label for="edit-elastic-username">Elastic Username</label>
-                <input class="ion-input" type="text" id="edit-elastic-username" placeholder="Kibana/ES username (if different from ION)">
-            </div>
-            <div class="form-group">
-                <label for="edit-elastic-uid">Elastic UID</label>
-                <input class="ion-input _ion-s-383082bf69" type="text" id="edit-elastic-uid" placeholder="Auto-resolved from Kibana" readonly>
-            </div>
-            <div class="form-group">
-                <label for="edit-keycloak-sub">Keycloak Subject ID</label>
-                <input class="ion-input _ion-s-383082bf69" type="text" id="edit-keycloak-sub" placeholder="Auto-set on OIDC login" readonly>
-            </div>
-            <div class="form-group">
-                <label>Roles</label>
-                <div id="edit-user-roles" class="checkbox-group"></div>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="ion-btn" data-click-action="closeModal" data-args='["edit-user-modal"]'>Cancel</button>
-                <button type="submit" class="ion-btn ion-btn-primary">Save Changes</button>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Roles</legend>
+                <div id="edit-user-roles"></div>
+            </fieldset>
+            <div class="modal-action">
+                <button type="button" class="btn btn-ghost" data-click-action="closeModal" data-args='["edit-user-modal"]'>Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
             </div>
         </form>
     </div>
@@ -146,27 +158,25 @@
 
 <!-- Reset Password Modal -->
 <div class="modal" id="reset-password-modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3>Reset Password</h3>
-            <button class="modal-close" data-click-action="closeModal" data-args='["reset-password-modal"]'>&times;</button>
+    <div class="modal-box">
+        <div class="flex items-center justify-between gap-4">
+            <h3 class="text-lg font-semibold">Reset Password</h3>
+            <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["reset-password-modal"]' aria-label="Close">&times;</button>
         </div>
-        <form id="reset-password-form" data-submit-action="resetPassword" data-args='["$event"]'>
+        <form class="pt-4 flex flex-col gap-3" id="reset-password-form" data-submit-action="resetPassword" data-args='["$event"]'>
             <input type="hidden" id="reset-user-id">
             <p>Resetting password for: <strong id="reset-username"></strong></p>
-            <div class="form-group">
-                <label for="reset-new-password">New Password</label>
-                <input class="ion-input" type="password" id="reset-new-password" required minlength="8">
-            </div>
-            <div class="form-group">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="reset-must-change" checked>
-                    Require password change on next login
-                </label>
-            </div>
-            <div class="modal-actions">
-                <button type="button" class="ion-btn" data-click-action="closeModal" data-args='["reset-password-modal"]'>Cancel</button>
-                <button type="submit" class="ion-btn ion-btn-primary">Reset Password</button>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">New Password</legend>
+                <input class="input w-full" type="password" id="reset-new-password" required minlength="8">
+            </fieldset>
+            <label class="label cursor-pointer justify-start gap-2 w-fit">
+                <input type="checkbox" class="checkbox checkbox-primary" id="reset-must-change" checked>
+                Require password change on next login
+            </label>
+            <div class="modal-action">
+                <button type="button" class="btn btn-ghost" data-click-action="closeModal" data-args='["reset-password-modal"]'>Cancel</button>
+                <button type="submit" class="btn btn-primary">Reset Password</button>
             </div>
         </form>
     </div>
@@ -178,6 +188,28 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+#create-user-modal.show,
+#edit-user-modal.show,
+#reset-password-modal.show {
+    display: grid;
+    place-items: center;
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+#create-user-modal.show > .modal-box,
+#edit-user-modal.show > .modal-box,
+#reset-password-modal.show > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-height: 90vh;
+}
+
+/* Role picker: per-role --role-color, hidden checkbox, :checked sibling glow.
+   No daisyUI selectable-card slot carries a CSS custom property this way. */
 .role-widgets { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
 .role-widget { display: block; cursor: pointer; }
 .role-widget-input { display: none; }
@@ -222,6 +254,12 @@
   color: var(--role-color);
 }
 .role-widget-perms { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+@media (max-width: 768px) {
+    #create-user-modal.show > .modal-box,
+    #edit-user-modal.show > .modal-box,
+    #reset-password-modal.show > .modal-box { max-height: 95vh; }
+}
 </style>
 <script nonce="{{ csp_nonce }}">
 let availableRoles = [];
@@ -277,7 +315,7 @@ function renderRoleCheckboxes() {
       const caps = permissionCapabilities(role.permissions || []);
       const permCount = (role.permissions || []).length;
       return `
-        <label class="role-widget" data-ion-data-ion-style="--role-color:${meta.color}">
+        <label class="role-widget" data-ion-style="--role-color:${meta.color}">
           <input type="checkbox" value="${role.name}" name="${containerId}" class="role-widget-input">
           <div class="role-widget-card">
             <div class="role-widget-header">
@@ -298,7 +336,7 @@ function renderRoleCheckboxes() {
 async function loadUsers() {
     const includeInactive = document.getElementById('include-inactive').checked;
     const tbody = document.getElementById('users-tbody');
-    tbody.innerHTML = '<tr><td colspan="9" class="loading">Loading users...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading users...</div></td></tr>';
 
     try {
         const response = await fetch(`/api/users?include_inactive=${includeInactive}`);
@@ -307,35 +345,37 @@ async function loadUsers() {
             return;
         }
         if (response.status === 403) {
-            tbody.innerHTML = '<tr><td colspan="9" class="error">Access denied. Admin privileges required.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9"><div class="alert alert-warning m-4">Access denied. Admin privileges required.</div></td></tr>';
             return;
         }
         const users = await response.json();
 
         if (users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="empty">No users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center opacity-50 py-8">No users found</td></tr>';
             return;
         }
 
         tbody.innerHTML = users.map(user => `
-            <tr class="${user.is_active ? '' : 'inactive-row'}">
+            <tr class="${user.is_active ? '' : 'opacity-50'}">
                 <td>${escapeHtml(user.username)}</td>
                 <td>${escapeHtml(user.email)}</td>
                 <td>${escapeHtml(user.display_name || '-')}</td>
-                <td>${user.roles.map(r => `<span class="role-badge role-${r}">${r}</span>`).join(' ')}</td>
+                <td>${user.roles.map(r => `<span class="badge badge-sm badge-ghost">${r}</span>`).join(' ')}</td>
                 <td class="_ion-s-dc02658502" data-ion-style="color:${user.elastic_uid ? 'var(--primary)' : 'var(--text-muted)'}" title="${escapeHtml(user.elastic_uid || '')}">${escapeHtml(user.elastic_uid || '-')}${user.elastic_username ? '<br><span class="_ion-s-5c71f29a29">' + escapeHtml(user.elastic_username) + '</span>' : ''}</td>
                 <td class="_ion-s-ebee7e459c" data-ion-style="color:${user.keycloak_sub ? 'var(--primary)' : 'var(--text-muted)'}" title="${escapeHtml(user.keycloak_sub || '')}">${escapeHtml(user.keycloak_sub || '-')}</td>
-                <td><span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td><span class="badge ${user.is_active ? 'badge-success' : 'badge-ghost'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
-                <td class="actions">
-                    <button class="ion-btn btn-sm" data-click-action="showEditUserModal" data-args='[${user.id}]'>Edit</button>
-                    <button class="ion-btn btn-sm" data-click-action="showResetPasswordModal" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Reset Password</button>
-                    <button class="ion-btn ion-btn-danger btn-sm" data-click-action="deleteUser" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Delete</button>
+                <td>
+                    <div class="flex flex-wrap gap-2">
+                    <button class="btn btn-ghost btn-sm" data-click-action="showEditUserModal" data-args='[${user.id}]'>Edit</button>
+                    <button class="btn btn-ghost btn-sm" data-click-action="showResetPasswordModal" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Reset Password</button>
+                    <button class="btn btn-error btn-sm" data-click-action="deleteUser" data-args='[${user.id}, "${escapeHtml(user.username)}"]'>Delete</button>
+                    </div>
                 </td>
             </tr>
         `).join('');
     } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="9" class="error">Error loading users</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9"><div class="alert alert-error m-4">Error loading users</div></td></tr>';
     }
 }
 

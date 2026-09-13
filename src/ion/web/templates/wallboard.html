@@ -1,258 +1,272 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wallboard · ION</title>
   <link rel="icon" type="image/png" href="/static/img/ion-favicon.png">
-  <link rel="stylesheet" href="/static/css/lucide.css?v=0.9.28">
-  <link rel="stylesheet" href="/static/css/style.css?v=0.9.80-lightmode">
-  <link rel="stylesheet" href="/static/css/design-system.css?v=0.9.72">
-  <link rel="stylesheet" href="/static/css/tailwind.css?v=0.9.80-lightmode">
+  <link rel="stylesheet" href="/static/css/ion.css?v={{ ion_version }}">
+  <link rel="stylesheet" href="/static/css/ion-migrated-styles.css?v={{ ion_version }}">
+  <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js"></script>
   <style nonce="{{ csp_nonce }}">
-    html, body { height: 100%; margin: 0; padding: 0; background: #0a0e17; overflow: hidden; }
-    /* v0.19.21: marquee CSS removed with the ticker strip. */
+    /* Standalone wall display has no 56px nav; .ion-tw-page subtracts that. */
+    .ion-tw-page { min-height: 100vh; height: 100%; }
+    /* Hide scrollbars on the wall display */
+    html, body { scrollbar-width: none; }
+    ::-webkit-scrollbar { display: none; }
     .wb-pulse-down { animation: wb-pulse 2s infinite; }
     @keyframes wb-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
-    .wb-grid-bg {
-      background:
-        radial-gradient(ellipse at top right, rgba(109,228,255,0.04) 0%, transparent 60%),
-        radial-gradient(ellipse at bottom left, rgba(167,139,250,0.04) 0%, transparent 60%),
-        #0a0e17;
-    }
-    /* Hide scrollbars on the wall display */
-    ::-webkit-scrollbar { display: none; }
-    /* v0.39.6: attention banner + panel-emphasis states (unattended wall) */
+    /* v0.39.6: attention banner + panel-emphasis states (unattended wall).
+       JS replaces #wb-attention.className and toggles wb-panel-* on the
+       cases card, so these cannot move onto daisyUI utility classes. */
     #wb-attention { transition: background-color .4s ease, border-color .4s ease; }
     .wb-att-dot { width: 12px; height: 12px; border-radius: 9999px; flex: none; }
-    .wb-att-ok       { background: rgba(16,185,129,0.10); border-color: rgba(16,185,129,0.30); }
-    .wb-att-warning  { background: rgba(251,191,36,0.13); border-color: rgba(251,191,36,0.45); }
-    .wb-att-critical { background: rgba(244,63,94,0.18);  border-color: rgba(244,63,94,0.65); animation: wb-att-flash 1.3s ease-in-out infinite; }
-    @keyframes wb-att-flash { 0%,100% { background: rgba(244,63,94,0.16); } 50% { background: rgba(244,63,94,0.36); } }
-    .wb-panel-warning  { border-color: rgba(251,191,36,0.50) !important; box-shadow: 0 0 0 1px rgba(251,191,36,0.25), 0 0 26px rgba(251,191,36,0.08); }
-    .wb-panel-critical { border-color: rgba(244,63,94,0.65) !important; box-shadow: 0 0 0 1px rgba(244,63,94,0.35), 0 0 30px rgba(244,63,94,0.12); }
+    .wb-att-ok       { background: color-mix(in oklab, var(--color-success) 10%, transparent); border-color: color-mix(in oklab, var(--color-success) 30%, transparent); }
+    .wb-att-warning  { background: color-mix(in oklab, var(--color-warning) 13%, transparent); border-color: color-mix(in oklab, var(--color-warning) 45%, transparent); }
+    .wb-att-critical { background: color-mix(in oklab, var(--color-error) 18%, transparent);  border-color: color-mix(in oklab, var(--color-error) 65%, transparent); animation: wb-att-flash 1.3s ease-in-out infinite; }
+    @keyframes wb-att-flash { 0%,100% { background: color-mix(in oklab, var(--color-error) 16%, transparent); } 50% { background: color-mix(in oklab, var(--color-error) 36%, transparent); } }
+    .wb-panel-warning  { border-color: color-mix(in oklab, var(--color-warning) 50%, transparent) !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-warning) 25%, transparent), 0 0 26px color-mix(in oklab, var(--color-warning) 8%, transparent); }
+    .wb-panel-critical { border-color: color-mix(in oklab, var(--color-error) 65%, transparent) !important; box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-error) 35%, transparent), 0 0 30px color-mix(in oklab, var(--color-error) 12%, transparent); }
   </style>
 </head>
-<body class="ion-tw font-sans text-slate-200 wb-grid-bg overflow-hidden">
+<body class="ion-tw ion-tw-page font-sans text-base-content overflow-hidden">
 
   <div class="h-screen flex flex-col px-5 py-4 gap-4">
 
     <!-- ═══════════════════ HEADER STRIP ═══════════════════ -->
-    <header class="flex items-center gap-6">
-      <div class="flex items-center gap-3">
-        <div class="h-10 w-10 rounded-[8px] bg-gradient-to-br from-ion-cyan to-ion-iris grid place-items-center">
-          <span class="font-mono text-[16px] font-bold text-ink-950">I</span>
+    <header class="flex flex-wrap items-center gap-6">
+      <div class="flex items-center gap-3 basis-full md:basis-auto md:flex-1">
+        <div class="h-10 w-10 rounded-[8px] bg-gradient-to-br from-primary to-secondary grid place-items-center">
+          <span class="font-mono text-[16px] font-bold text-primary-content">I</span>
         </div>
         <div>
-          <div class="font-sans font-semibold text-[20px] tracking-tight text-white leading-none">ION Wallboard</div>
-          <div class="label-tiny text-slate-500 mt-1">SOC Operations Snapshot</div>
+          <div class="font-sans font-semibold text-[20px] tracking-tight text-base-content leading-none">ION Wallboard</div>
+          <div class="label-tiny text-base-content/50 mt-1">SOC Operations Snapshot</div>
         </div>
       </div>
 
-      <div class="flex items-center gap-5 ml-auto">
+      <div class="flex items-center gap-5">
         <!-- Topology summary (replaces service-health dots — same data,
              read more clearly off the topology panel) -->
         <div id="wb-topology-summary" class="flex items-center gap-3">
-          <span class="label-tiny text-slate-500">Estate</span>
-          <span id="wb-top-up"   class="text-[12px] text-ion-lime  tabular-nums font-semibold">— up</span>
-          <span id="wb-top-down" class="text-[12px] text-ion-coral tabular-nums font-semibold">— down</span>
-          <span id="wb-top-off"  class="text-[12px] text-slate-500 tabular-nums">— off</span>
+          <span class="label-tiny text-base-content/50">Estate</span>
+          <span id="wb-top-up"   class="badge badge-success badge-soft badge-sm tabular-nums font-semibold">— up</span>
+          <span id="wb-top-down" class="badge badge-error badge-soft badge-sm tabular-nums font-semibold">— down</span>
+          <span id="wb-top-off"  class="badge badge-ghost badge-sm tabular-nums">— off</span>
         </div>
 
         <!-- Clock -->
-        <div class="text-right border-l border-white/10 pl-5">
-          <div id="wb-clock-time" class="font-mono font-bold text-[24px] text-white tabular-nums leading-none">--:--:--</div>
-          <div class="label-tiny text-slate-500 mt-1">Snapshot <span id="wb-cache-age" class="text-slate-400">—</span></div>
+        <div class="stat p-0 bg-transparent border-l border-base-300 pl-5">
+          <div id="wb-clock-time" class="stat-value font-mono text-[24px] tabular-nums leading-none">--:--:--</div>
+          <div class="stat-desc mt-1">Snapshot <span id="wb-cache-age">—</span></div>
         </div>
       </div>
     </header>
 
     <!-- ═══════════ ATTENTION BANNER — shouts when the estate needs attention ═══════════ -->
     <div id="wb-attention" class="wb-att-ok rounded-[12px] border px-6 py-3 flex items-center gap-4">
-      <span id="wb-att-dot" class="wb-att-dot bg-ion-lime"></span>
-      <span id="wb-att-headline" class="font-sans font-semibold text-[18px] tracking-tight text-white leading-none">Monitoring…</span>
-      <span id="wb-att-sub" class="label-tiny text-slate-400 ml-auto tabular-nums">—</span>
+      <span id="wb-att-dot" class="wb-att-dot bg-success"></span>
+      <span id="wb-att-headline" class="font-sans font-semibold text-[18px] tracking-tight text-base-content leading-none">Monitoring…</span>
+      <span id="wb-att-sub" class="label-tiny text-base-content/50 ml-auto tabular-nums">—</span>
     </div>
 
     <!-- ═══════════════════ 6-PANEL GRID ═══════════════════ -->
     <main class="flex-1 grid grid-cols-3 grid-rows-2 gap-4 min-h-0">
 
       <!-- ┌─── PANEL 1: ALERTS ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
-        <div class="flex items-baseline justify-between mb-3">
-          <span class="label-tiny text-slate-500">Alerts</span>
-          <span id="wb-alerts-stamp" class="label-tiny text-slate-600">last 24h</span>
-        </div>
+      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+        <div class="card-body p-6 flex flex-col min-h-0 h-full">
+          <div class="flex items-baseline justify-between">
+            <span class="label-tiny text-base-content/50">Alerts</span>
+            <span id="wb-alerts-stamp" class="label-tiny text-base-content/40">last 24h</span>
+          </div>
 
-        <div class="flex items-end justify-between gap-4 mb-2">
-          <div id="wb-alerts-24h" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-cyan">—</div>
-          <svg id="wb-alerts-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
-               class="w-[160px] h-[50px] text-ion-cyan shrink-0" aria-hidden="true">
-            <defs>
-              <linearGradient id="wb-spark-cyan" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
-                <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path id="wb-alerts-spark-fill" fill="url(#wb-spark-cyan)" d=""/>
-            <path id="wb-alerts-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
-          </svg>
-        </div>
-        <div id="wb-alerts-status" class="text-[13px] text-slate-400 mb-3">— open · — ack · — closed</div>
+          <div class="stat px-0 py-2">
+            <div class="stat-figure text-primary">
+              <svg id="wb-alerts-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
+                   class="w-[160px] h-[50px] text-primary shrink-0" aria-hidden="true">
+                <defs>
+                  <linearGradient id="wb-spark-cyan" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path id="wb-alerts-spark-fill" fill="url(#wb-spark-cyan)" d=""/>
+                <path id="wb-alerts-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
+              </svg>
+            </div>
+            <div id="wb-alerts-24h" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-primary">—</div>
+            <div id="wb-alerts-status" class="stat-desc">— open · — ack · — closed</div>
+          </div>
 
-        <!-- Verdict distribution bars -->
-        <div id="wb-alerts-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-white/5">
-          <!-- bars populated from snapshot -->
+          <!-- Verdict distribution bars -->
+          <div id="wb-alerts-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
+            <!-- bars populated from snapshot -->
+          </div>
         </div>
       </section>
 
       <!-- ┌─── PANEL 2: CASES ───┐ -->
-      <section id="wb-panel-cases" class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
-        <div class="flex items-baseline justify-between mb-3">
-          <span class="label-tiny text-slate-500">Cases</span>
-          <span id="wb-cases-stamp" class="label-tiny text-slate-600">open right now</span>
-        </div>
+      <section id="wb-panel-cases" class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+        <div class="card-body p-6 flex flex-col min-h-0 h-full">
+          <div class="flex items-baseline justify-between">
+            <span class="label-tiny text-base-content/50">Cases</span>
+            <span id="wb-cases-stamp" class="label-tiny text-base-content/40">open right now</span>
+          </div>
 
-        <div class="flex items-end justify-between gap-4 mb-2">
-          <div id="wb-cases-open" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-amber">—</div>
-          <svg id="wb-cases-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
-               class="w-[160px] h-[50px] text-ion-amber shrink-0" aria-hidden="true">
-            <defs>
-              <linearGradient id="wb-spark-amber" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
-                <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path id="wb-cases-spark-fill" fill="url(#wb-spark-amber)" d=""/>
-            <path id="wb-cases-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
-          </svg>
-        </div>
-        <div id="wb-cases-closures" class="text-[13px] text-slate-400 mb-3">— closures in last 24h</div>
+          <div class="stat px-0 py-2">
+            <div class="stat-figure text-warning">
+              <svg id="wb-cases-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
+                   class="w-[160px] h-[50px] text-warning shrink-0" aria-hidden="true">
+                <defs>
+                  <linearGradient id="wb-spark-amber" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path id="wb-cases-spark-fill" fill="url(#wb-spark-amber)" d=""/>
+                <path id="wb-cases-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
+              </svg>
+            </div>
+            <div id="wb-cases-open" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-warning">—</div>
+            <div id="wb-cases-closures" class="stat-desc">— closures in last 24h</div>
+          </div>
 
-        <!-- Severity bars -->
-        <div id="wb-cases-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-white/5">
-          <!-- bars -->
+          <!-- Severity bars -->
+          <div id="wb-cases-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
+            <!-- bars -->
+          </div>
         </div>
       </section>
 
       <!-- ┌─── PANEL 3: BOB (AI ANALYST) ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
-        <div class="flex items-baseline justify-between mb-3">
-          <span class="label-tiny text-slate-500 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
-            Bob — AI Analyst
-          </span>
-          <span id="wb-bob-stamp" class="label-tiny text-slate-600">last 7d</span>
-        </div>
-
-        <div class="flex items-end justify-between gap-4 mb-2">
-          <div id="wb-bob-investigations-24h" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-iris">—</div>
-          <svg id="wb-bob-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
-               class="w-[160px] h-[50px] text-ion-iris shrink-0" aria-hidden="true">
-            <defs>
-              <linearGradient id="wb-spark-iris" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
-                <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
-              </linearGradient>
-            </defs>
-            <path id="wb-bob-spark-fill" fill="url(#wb-spark-iris)" d=""/>
-            <path id="wb-bob-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
-          </svg>
-        </div>
-        <div id="wb-bob-total" class="text-[13px] text-slate-400 mb-3">— investigations · — feedback rows</div>
-
-        <div class="mt-auto pt-3 border-t border-white/5">
-          <div class="flex items-baseline justify-between mb-2">
-            <span class="label-tiny text-slate-500">Analyst-Bob agreement</span>
-            <span id="wb-bob-agreement-num" class="text-[12px] text-slate-300 tabular-nums">— / —</span>
+      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+        <div class="card-body p-6 flex flex-col min-h-0 h-full">
+          <div class="flex items-baseline justify-between">
+            <span class="label-tiny text-base-content/50 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
+              Bob — AI Analyst
+            </span>
+            <span id="wb-bob-stamp" class="label-tiny text-base-content/40">last 7d</span>
           </div>
-          <div class="h-1.5 w-full rounded-full bg-white/5 overflow-hidden">
-            <div id="wb-bob-agreement-fill" class="h-full rounded-full bg-gradient-to-r from-ion-iris to-ion-cyan transition-[width] duration-700 _ion-s-d2fba0f353"></div>
+
+          <div class="stat px-0 py-2">
+            <div class="stat-figure text-secondary">
+              <svg id="wb-bob-spark" viewBox="0 0 160 50" preserveAspectRatio="none"
+                   class="w-[160px] h-[50px] text-secondary shrink-0" aria-hidden="true">
+                <defs>
+                  <linearGradient id="wb-spark-iris" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stop-color="currentColor" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <path id="wb-bob-spark-fill" fill="url(#wb-spark-iris)" d=""/>
+                <path id="wb-bob-spark-line" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d=""/>
+              </svg>
+            </div>
+            <div id="wb-bob-investigations-24h" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-secondary">—</div>
+            <div id="wb-bob-total" class="stat-desc">— investigations · — feedback rows</div>
+          </div>
+
+          <div class="mt-auto pt-3 border-t border-base-300">
+            <div class="flex items-baseline justify-between mb-2">
+              <span class="label-tiny text-base-content/50">Analyst-Bob agreement</span>
+              <span id="wb-bob-agreement-num" class="text-[12px] text-base-content/70 tabular-nums">— / —</span>
+            </div>
+            <div class="h-1.5 w-full rounded-full bg-base-300 overflow-hidden">
+              <div id="wb-bob-agreement-fill" class="h-full rounded-full bg-gradient-to-r from-secondary to-primary transition-[width] duration-700 _ion-s-d2fba0f353"></div>
+            </div>
           </div>
         </div>
       </section>
 
       <!-- ┌─── PANEL 4: RULES (real rule posture) ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-6 flex flex-col min-h-0">
-        <div class="flex items-baseline justify-between mb-3">
-          <span class="label-tiny text-slate-500">Rules</span>
-          <span id="wb-rules-stamp" class="label-tiny text-slate-600">posture</span>
-        </div>
-
-        <div class="flex items-end justify-between gap-4 mb-2">
-          <div id="wb-rules-enabled" class="font-sans font-semibold tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-ion-lime">—</div>
-          <div class="text-right">
-            <div class="label-tiny text-slate-500">enabled rules</div>
-            <div id="wb-rules-of-total" class="text-[11px] text-slate-500 mt-1 tabular-nums">of — total</div>
+      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+        <div class="card-body p-6 flex flex-col min-h-0 h-full">
+          <div class="flex items-baseline justify-between">
+            <span class="label-tiny text-base-content/50">Rules</span>
+            <span id="wb-rules-stamp" class="label-tiny text-base-content/40">posture</span>
           </div>
-        </div>
-        <div id="wb-rules-coverage" class="text-[13px] text-slate-400 mb-3">
-          MITRE coverage <span class="text-ion-cyan tabular-nums font-semibold">—</span>
-        </div>
 
-        <!-- Severity distribution bars (critical / high / medium / low) -->
-        <div id="wb-rules-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-white/5">
-          <!-- bars populated from snapshot -->
+          <div class="stat px-0 py-2">
+            <div class="stat-figure text-right">
+              <div class="stat-title">enabled rules</div>
+              <div id="wb-rules-of-total" class="stat-desc mt-1 tabular-nums">of — total</div>
+            </div>
+            <div id="wb-rules-enabled" class="stat-value font-sans tabular-nums tracking-tight text-[44px] xl:text-[56px] leading-none text-success">—</div>
+            <div id="wb-rules-coverage" class="stat-desc">
+              MITRE coverage <span class="text-primary tabular-nums font-semibold">—</span>
+            </div>
+          </div>
+
+          <!-- Severity distribution bars (critical / high / medium / low) -->
+          <div id="wb-rules-bars" class="flex flex-col gap-2 mt-auto pt-3 border-t border-base-300">
+            <!-- bars populated from snapshot -->
+          </div>
         </div>
       </section>
 
       <!-- ┌─── PANEL 5: PLATFORM TOPOLOGY ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-5 flex flex-col min-h-0 relative overflow-hidden">
-        <div class="flex items-baseline justify-between mb-2">
-          <span class="label-tiny text-slate-500">Platform Topology</span>
-          <span class="label-tiny text-slate-600">live</span>
-        </div>
+      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 relative overflow-hidden">
+        <div class="card-body p-5 flex flex-col min-h-0 h-full">
+          <div class="flex items-baseline justify-between">
+            <span class="label-tiny text-base-content/50">Platform Topology</span>
+            <span class="badge badge-success badge-soft badge-sm">live</span>
+          </div>
 
-        <!-- The SVG fills the panel; coordinates are computed in JS so
-             the layout is identical regardless of font/scale. The viewBox
-             is large enough that node labels never overflow. -->
-        <div class="flex-1 grid place-items-center min-h-0">
-          <svg id="wb-topology" viewBox="0 0 460 280" preserveAspectRatio="xMidYMid meet"
-               class="w-full h-full" aria-hidden="true">
-            <defs>
-              <radialGradient id="wb-hub-glow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="rgb(109,228,255)" stop-opacity="0.55"/>
-                <stop offset="100%" stop-color="rgb(109,228,255)" stop-opacity="0"/>
-              </radialGradient>
-            </defs>
-            <g id="wb-topology-edges"><!-- edges drawn by JS --></g>
-            <g id="wb-topology-nodes"><!-- nodes drawn by JS --></g>
-          </svg>
-        </div>
+          <!-- The SVG fills the panel; coordinates are computed in JS so
+               the layout is identical regardless of font/scale. The viewBox
+               is large enough that node labels never overflow. -->
+          <div class="flex-1 grid place-items-center min-h-0">
+            <svg id="wb-topology" viewBox="0 0 460 280" preserveAspectRatio="xMidYMid meet"
+                 class="w-full h-full" aria-hidden="true">
+              <defs>
+                <radialGradient id="wb-hub-glow" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.55"/>
+                  <stop offset="100%" stop-color="var(--color-primary)" stop-opacity="0"/>
+                </radialGradient>
+              </defs>
+              <g id="wb-topology-edges"><!-- edges drawn by JS --></g>
+              <g id="wb-topology-nodes"><!-- nodes drawn by JS --></g>
+            </svg>
+          </div>
 
-        <div class="flex items-center gap-4 mt-1 pt-3 border-t border-white/5 text-[11px]">
-          <div class="flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-ion-lime"></span><span class="text-slate-400">up</span></div>
-          <div class="flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-ion-coral wb-pulse-down"></span><span class="text-slate-400">down</span></div>
-          <div class="flex items-center gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-slate-600"></span><span class="text-slate-400">not configured</span></div>
+          <div class="flex items-center gap-3 mt-1 pt-3 border-t border-base-300">
+            <span class="badge badge-success badge-soft badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-success"></span>up</span>
+            <span class="badge badge-error badge-soft badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-error wb-pulse-down"></span>down</span>
+            <span class="badge badge-ghost badge-sm gap-1.5"><span class="h-1.5 w-1.5 rounded-full bg-base-content/40"></span>not configured</span>
+          </div>
         </div>
       </section>
 
       <!-- ┌─── PANEL 6: THREAT LANDSCAPE (AI summary) ───┐ -->
-      <section class="rounded-[16px] border border-white/5 bg-ink-900/50 px-6 py-5 flex flex-col min-h-0">
-        <div class="flex items-baseline justify-between mb-2">
-          <span class="label-tiny text-slate-500 flex items-center gap-1.5">
-            <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
-            Threat Landscape
-          </span>
-          <span id="wb-tl-mode" class="label-tiny text-slate-600">—</span>
-        </div>
-
-        <div id="wb-tl-summary" class="flex-1 overflow-hidden text-[14px] leading-relaxed text-slate-200">
-          <span class="text-slate-600 italic">Awaiting first refresh…</span>
-        </div>
-
-        <div id="wb-tl-stats" class="grid grid-cols-3 gap-3 mt-auto pt-3 border-t border-white/5">
-          <div>
-            <div id="wb-tl-alerts-24h" class="font-sans font-semibold tabular-nums text-[20px] leading-none text-ion-cyan">—</div>
-            <div class="label-tiny text-slate-500 mt-1.5">alerts 24h</div>
+      <section class="card bg-base-200 shadow border border-base-300 flex flex-col min-h-0 overflow-hidden">
+        <div class="card-body p-5 flex flex-col min-h-0 h-full">
+          <div class="flex items-baseline justify-between">
+            <span class="label-tiny text-base-content/50 flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5"><use href="#i-sparkles"/></svg>
+              Threat Landscape
+            </span>
+            <span id="wb-tl-mode" class="badge badge-ghost badge-sm">—</span>
           </div>
-          <div>
-            <div id="wb-tl-tp-rate" class="font-sans font-semibold tabular-nums text-[20px] leading-none text-ion-coral">—</div>
-            <div class="label-tiny text-slate-500 mt-1.5">TP rate 7d</div>
+
+          <div id="wb-tl-summary" class="flex-1 overflow-hidden text-sm leading-relaxed text-base-content">
+            <span class="text-base-content/40 italic">Awaiting first refresh…</span>
           </div>
-          <div>
-            <div id="wb-tl-backlog" class="font-sans font-semibold tabular-nums text-[20px] leading-none text-ion-amber">—</div>
-            <div class="label-tiny text-slate-500 mt-1.5">open backlog</div>
+
+          <div id="wb-tl-stats" class="stats stats-horizontal w-full bg-transparent shadow-none mt-auto pt-3 border-t border-base-300">
+            <div class="stat px-0 py-2">
+              <div id="wb-tl-alerts-24h" class="stat-value text-xl text-primary tabular-nums">—</div>
+              <div class="stat-desc">alerts 24h</div>
+            </div>
+            <div class="stat px-0 py-2">
+              <div id="wb-tl-tp-rate" class="stat-value text-xl text-error tabular-nums">—</div>
+              <div class="stat-desc">TP rate 7d</div>
+            </div>
+            <div class="stat px-0 py-2">
+              <div id="wb-tl-backlog" class="stat-value text-xl text-warning tabular-nums">—</div>
+              <div class="stat-desc">open backlog</div>
+            </div>
           </div>
         </div>
       </section>

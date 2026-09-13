@@ -1,8 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Network Map · ION{% endblock %}
 {% block content %}
-<div class="ion-tw ion-tw-page grain text-slate-200 overflow-x-hidden">
-<div class="fixed inset-0 bg-grid pointer-events-none opacity-40 z-0"></div>
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10">
 {% set tabs = [
     {"label": "Topology", "href": "/integrations?tab=topology"},
@@ -15,16 +14,16 @@
 
   <!-- Header -->
   <section class="flex flex-wrap items-end justify-between gap-4 mb-10 rise d-1">
-    <div>
+    <div class="basis-full md:basis-auto md:flex-1">
       <div class="flex items-center gap-2 mb-2">
-        <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
-        <span class="label-tiny text-ion-cyan">Live CMDB</span>
+        <span class="h-1.5 w-1.5 rounded-full bg-primary pulse-cyan"></span>
+        <span class="label-tiny text-primary">Live CMDB</span>
       </div>
-      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-tight text-white tracking-[-0.02em]">Network Map</h1>
-      <p class="mt-1 text-[14px] text-slate-400">Asset inventory auto-populated from Elasticsearch host data.</p>
+      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] leading-tight tracking-[-0.02em]">Network Map</h1>
+      <p class="mt-1 text-sm text-base-content/60">Asset inventory auto-populated from Elasticsearch host data.</p>
     </div>
     <div class="flex items-center gap-3">
-      <button data-click-action="triggerSync" class="h-8 px-4 rounded-md bg-ion-cyan text-ink-950 text-[12px] font-semibold hover:brightness-110 transition flex items-center gap-1.5" id="sync-btn">
+      <button data-click-action="triggerSync" class="btn btn-primary btn-sm" id="sync-btn">
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
         Sync Now
       </button>
@@ -32,38 +31,38 @@
   </section>
 
   <!-- Stats row -->
-  <section class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 rise d-2">
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
-      <div class="label-tiny text-slate-500 mb-1">Total Assets</div>
-      <div id="stat-total" class="font-sans font-semibold text-[28px] text-white tabular-nums">—</div>
+  <section class="stats stats-vertical sm:stats-horizontal w-full bg-base-200 shadow mb-8 rise d-2">
+    <div class="stat">
+      <div class="stat-title">Total Assets</div>
+      <div id="stat-total" class="stat-value text-2xl">—</div>
     </div>
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
-      <div class="label-tiny text-slate-500 mb-1">Seen 24h</div>
-      <div id="stat-seen24" class="font-sans font-semibold text-[28px] text-ion-cyan tabular-nums">—</div>
+    <div class="stat">
+      <div class="stat-title">Seen 24h</div>
+      <div id="stat-seen24" class="stat-value text-2xl text-primary">—</div>
     </div>
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
-      <div class="label-tiny text-slate-500 mb-1">Unique IPs</div>
-      <div id="stat-ips" class="font-sans font-semibold text-[28px] text-ion-lime tabular-nums">—</div>
+    <div class="stat">
+      <div class="stat-title">Unique IPs</div>
+      <div id="stat-ips" class="stat-value text-2xl text-success">—</div>
     </div>
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 px-5 py-4">
-      <div class="label-tiny text-slate-500 mb-1">OS Families</div>
-      <div id="stat-os-count" class="font-sans font-semibold text-[28px] text-ion-iris tabular-nums">—</div>
+    <div class="stat">
+      <div class="stat-title">OS Families</div>
+      <div id="stat-os-count" class="stat-value text-2xl text-secondary">—</div>
     </div>
   </section>
 
   <!-- Filters -->
   <section class="flex flex-wrap items-center gap-3 mb-6 rise d-3">
     <input type="text" id="filter-search" placeholder="Search hostname or IP…"
-           class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200 placeholder:text-slate-500 w-64 focus:border-ion-cyan/50 focus:outline-none transition"
+           class="input input-sm w-64"
            data-input-action="debounceLoad">
-    <select id="filter-env" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+    <select id="filter-env" data-change-action="loadAssets" class="select select-sm w-auto">
       <option value="">All Environments</option>
       <option value="prod">Production</option>
       <option value="staging">Staging</option>
       <option value="dev">Development</option>
       <option value="unknown">Unknown</option>
     </select>
-    <select id="filter-crit" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+    <select id="filter-crit" data-change-action="loadAssets" class="select select-sm w-auto">
       <option value="">All Criticality</option>
       <option value="critical">Critical</option>
       <option value="high">High</option>
@@ -71,18 +70,19 @@
       <option value="low">Low</option>
       <option value="unknown">Unknown</option>
     </select>
-    <select id="filter-system" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+    <select id="filter-system" data-change-action="loadAssets" class="select select-sm w-auto">
       <option value="">All Systems</option>
     </select>
-    <select id="filter-seen" data-change-action="loadAssets" class="h-9 px-3 rounded-lg border border-white/10 bg-ink-900/60 text-[13px] text-slate-200">
+    <select id="filter-seen" data-change-action="loadAssets" class="select select-sm w-auto">
       <option value="">All Time</option>
       <option value="24h">Last 24h</option>
       <option value="7d">Last 7 days</option>
       <option value="30d">Last 30 days</option>
     </select>
-    <button data-click-action="clearFilters" class="h-9 px-3 rounded-lg border border-white/10 text-[12px] text-slate-400 hover:text-white transition">Clear</button>
-    <span id="results-count" class="text-[12px] text-slate-500 ml-auto"></span>
-    <div class="flex items-center gap-1 p-0.5 rounded-md bg-white/5 border border-white/5 ml-2">
+    <button data-click-action="clearFilters" class="btn btn-ghost btn-sm">Clear</button>
+    <span id="results-count" class="text-xs text-base-content/50 ml-auto"></span>
+    <!-- JS setView() rewrites these button classNames; keep the classes it assigns. -->
+    <div class="flex items-center gap-1 p-0.5 rounded-md bg-base-200 border border-base-300 ml-2">
       <button id="view-table-btn" data-click-action="setView" data-args='["table"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-white bg-white/10">Table</button>
       <button id="view-graph-btn" data-click-action="setView" data-args='["graph"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Graph</button>
       <button id="view-topology-btn" data-click-action="setView" data-args='["topology"]' class="px-2.5 py-1 rounded-[5px] text-[11px] font-medium text-slate-500 hover:text-slate-300">Topology</button>
@@ -90,64 +90,72 @@
   </section>
 
   <!-- Network graph visualization -->
-  <section id="graph-view" class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 mb-6 _ion-s-c8be1ccba6">
-    <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
-      <div class="flex items-center gap-3">
-        <span class="label-tiny text-slate-500">Network Diagram</span>
-        <span class="text-[11px] text-slate-500">Hierarchical view · subnets as switches · hosts as endpoints</span>
-      </div>
-      <div class="flex items-center gap-3 text-[10px]">
-        <span class="flex items-center gap-1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6de4ff" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6" y2="6.01"/><line x1="10" y1="6" x2="10" y2="6.01"/></svg> Switch/Subnet</span>
-        <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/><line x1="4" y1="9" x2="20" y2="9"/></svg> Server</span>
-        <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg> Workstation</span>
-        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#ff6c6c]"></span> Critical</span>
-        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#f8b33a]"></span> High</span>
+  <section id="graph-view" class="rise d-4 mb-6 _ion-s-c8be1ccba6">
+    <div class="card bg-base-200 shadow">
+      <div class="card-body p-0">
+        <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="label-tiny text-base-content/50">Network Diagram</span>
+            <span class="text-xs text-base-content/50">Hierarchical view · subnets as switches · hosts as endpoints</span>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 text-[10px] text-base-content/60">
+            <span class="flex items-center gap-1 text-primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6" y2="6.01"/><line x1="10" y1="6" x2="10" y2="6.01"/></svg> Switch/Subnet</span>
+            <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="1"/><line x1="4" y1="9" x2="20" y2="9"/></svg> Server</span>
+            <span class="flex items-center gap-1"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/></svg> Workstation</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-error"></span> Critical</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-warning"></span> High</span>
+          </div>
+        </div>
+        <div class="_ion-s-a0684079ae" id="network-graph"></div>
       </div>
     </div>
-    <div class="_ion-s-a0684079ae" id="network-graph"></div>
   </section>
 
   <!-- Topology view -->
   <section id="topology-view" class="rise d-4 mb-6 _ion-s-c8be1ccba6">
-    <div class="rounded-xl border border-white/5 bg-ink-900/50 p-4">
-      <div class="flex items-center justify-between mb-4">
-        <span class="label-tiny text-slate-500">Subnet Topology</span>
-        <span class="text-[11px] text-slate-500">Assets grouped by /24 subnet · colored by worst criticality</span>
-      </div>
-      <div id="topology-content" class="space-y-3">
-        <div class="text-slate-500 text-sm animate-pulse text-center py-12">Loading topology...</div>
+    <div class="card bg-base-200 shadow">
+      <div class="card-body">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <span class="label-tiny text-base-content/50">Subnet Topology</span>
+          <span class="text-xs text-base-content/50">Assets grouped by /24 subnet · colored by worst criticality</span>
+        </div>
+        <div id="topology-content" class="space-y-3">
+          <div class="alert alert-info justify-center">Loading topology...</div>
+        </div>
       </div>
     </div>
   </section>
 
   <!-- Asset table -->
-  <section id="table-view" class="rise d-4 rounded-xl border border-white/5 bg-ink-900/50 overflow-x-auto">
-    <table class="w-full text-[13px]">
-      <thead>
-        <tr class="border-b border-white/5 text-left">
-          <th class="px-4 py-3 label-tiny text-slate-500">Hostname</th>
-          <th class="px-4 py-3 label-tiny text-slate-500">Primary IP</th>
-          <th class="px-4 py-3 label-tiny text-slate-500">OS</th>
-          <th class="px-4 py-3 label-tiny text-slate-500">Environment</th>
-          <th class="px-4 py-3 label-tiny text-slate-500">Criticality</th>
-          <th class="px-4 py-3 label-tiny text-slate-500">Source Systems</th>
-          <th class="px-4 py-3 label-tiny text-slate-500">Last Seen</th>
-          <th class="px-4 py-3 label-tiny text-slate-500">Events</th>
-        </tr>
-      </thead>
-      <tbody id="assets-tbody">
-        <tr><td colspan="8" class="px-4 py-12 text-center text-slate-500">Loading assets…</td></tr>
-      </tbody>
-    </table>
-    <div id="pagination" class="flex items-center justify-between px-4 py-3 border-t border-white/5 text-[12px] text-slate-500"></div>
+  <section id="table-view" class="card bg-base-200 shadow rise d-4">
+    <div class="overflow-x-auto">
+      <table class="table table-sm w-full">
+        <thead>
+          <tr>
+            <th>Hostname</th>
+            <th>Primary IP</th>
+            <th>OS</th>
+            <th>Environment</th>
+            <th>Criticality</th>
+            <th>Source Systems</th>
+            <th>Last Seen</th>
+            <th>Events</th>
+          </tr>
+        </thead>
+        <tbody id="assets-tbody">
+          <tr><td colspan="8" class="text-center py-12 text-base-content/50">Loading assets…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="pagination" class="flex items-center justify-between px-4 py-3 border-t border-base-300 text-xs text-base-content/50"></div>
   </section>
 
   <!-- Detail drawer (hidden by default) -->
-  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-[480px] bg-ink-900 border-l border-white/10 shadow-2xl z-50 translate-x-full transition-transform duration-200 _ion-s-c8be1ccba6">
+  <div id="detail-drawer" class="fixed inset-y-0 right-0 w-[480px] bg-base-200 border-l border-base-300 shadow-2xl z-50 translate-x-full transition-transform duration-200 _ion-s-c8be1ccba6">
     <div class="h-full overflow-y-auto p-6">
       <div class="flex items-center justify-between mb-6">
-        <h2 id="drawer-hostname" class="font-sans font-semibold text-[20px] text-white"></h2>
-        <button data-click-action="closeDrawer" class="h-8 w-8 rounded-md hover:bg-white/5 grid place-items-center text-slate-400 hover:text-white">
+        <h2 id="drawer-hostname" class="font-sans font-semibold text-xl"></h2>
+        <button data-click-action="closeDrawer" class="btn btn-ghost btn-sm btn-square" aria-label="Close">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
         </button>
       </div>

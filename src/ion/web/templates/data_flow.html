@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}ION - Data Flow Visualization{% endblock %}
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {% set tabs = [
     {"label": "Topology", "href": "/integrations?tab=topology"},
@@ -12,54 +12,144 @@
 {% set active_label = "Data Flow" %}
 {% include "_nav_tabs.html" %}
 <style nonce="{{ csp_nonce }}">
-.df-page { max-width: 1400px; margin: 0 auto; }
+/* JS rewrites className on these controls (strips any daisyUI btn/join-item). */
+.df-toggle-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--color-base-300);
+    cursor: pointer;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition: background-color .2s, color .2s, border-color .2s;
+}
+.df-toggle-btn:first-child { border-radius: var(--radius-field, 0.25rem) 0 0 var(--radius-field, 0.25rem); }
+.df-toggle-btn:last-child { border-radius: 0 var(--radius-field, 0.25rem) var(--radius-field, 0.25rem) 0; }
+.df-toggle-btn:not(:first-child) { margin-left: -1px; }
+.df-toggle-btn.active-legacy {
+    background: var(--color-error);
+    color: var(--color-error-content);
+    border-color: var(--color-error);
+}
+.df-toggle-btn.active-modern {
+    background: var(--color-success);
+    color: var(--color-success-content);
+    border-color: var(--color-success);
+}
+.df-toggle-btn.active-compare {
+    background: var(--color-info);
+    color: var(--color-info-content);
+    border-color: var(--color-info);
+}
+.df-toggle-btn:hover:not(.active-legacy):not(.active-modern):not(.active-compare) {
+    color: var(--color-base-content);
+    background: var(--color-base-300);
+}
 
-/* Header */
-.df-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 16px; }
-.df-header-left { display: flex; flex-direction: column; gap: 4px; }
-.df-header-label { display: flex; align-items: center; gap: 6px; color: var(--primary); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; }
-.df-header h1 { font-size: 1.5rem; font-weight: 700; color: var(--text-bright); margin: 0; }
-.df-toggle-group { display: flex; align-items: center; gap: 2px; background: var(--bg-secondary); padding: 4px; border-radius: var(--radius-lg); border: 1px solid var(--border); }
-.df-toggle-btn { padding: 8px 16px; border-radius: 8px; font-size: 10px; font-weight: 900; text-transform: uppercase; border: none; cursor: pointer; background: transparent; color: var(--text-secondary); transition: all .2s; display: flex; align-items: center; gap: 6px; }
-.df-toggle-btn.active-legacy { background: var(--danger); color: var(--text-bright); box-shadow: 0 4px 12px rgba(239,68,68,.3); }
-.df-toggle-btn.active-modern { background: var(--success); color: var(--text-bright); box-shadow: 0 4px 12px rgba(16,185,129,.3); }
-.df-toggle-btn.active-compare { background: var(--info); color: var(--text-bright); box-shadow: 0 4px 12px rgba(14,165,233,.3); }
-.df-toggle-btn:hover:not(.active-legacy):not(.active-modern):not(.active-compare) { color: var(--text-primary); }
+/* JS rewrites className on pipeline nodes. Scale on the selected node is not a daisyUI state. */
+.df-node-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-box, 0.5rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-base-300);
+    cursor: pointer;
+    transition: all .2s;
+    background: var(--color-base-100);
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+.df-node-btn:hover { background: var(--color-base-300); }
+.df-node-btn.selected-legacy {
+    background: var(--color-error);
+    color: var(--color-error-content);
+    transform: scale(1.1);
+    border-color: var(--color-error);
+}
+.df-node-btn.selected-modern {
+    background: var(--color-success);
+    color: var(--color-success-content);
+    transform: scale(1.1);
+    border-color: var(--color-success);
+}
+.df-node-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    transition: color .2s;
+}
+.df-node-label.selected { color: var(--color-base-content); }
 
-/* Main grid */
-.df-grid { display: grid; grid-template-columns: 7fr 5fr; gap: 32px; }
-@media (max-width: 1024px) { .df-grid { grid-template-columns: 1fr; } }
-
-/* Pipeline track */
-.df-pipeline { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; position: relative; }
-.df-pipeline-track { display: flex; align-items: center; justify-content: space-between; position: relative; padding: 0 16px; }
-.df-pipeline-line { position: absolute; top: 50%; left: 0; width: 100%; height: 1px; background: var(--border); z-index: 0; }
-.df-node { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; }
-.df-node-btn { width: 48px; height: 48px; border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; border: none; cursor: pointer; transition: all .2s; background: var(--bg-card); color: var(--text-secondary); }
-.df-node-btn:hover { background: rgba(99,110,123,.3); }
-.df-node-btn.selected-legacy { background: var(--danger); color: var(--text-bright); transform: scale(1.1); box-shadow: 0 4px 16px rgba(239,68,68,.4); }
-.df-node-btn.selected-modern { background: var(--success); color: var(--text-bright); transform: scale(1.1); box-shadow: 0 4px 16px rgba(16,185,129,.4); }
-.df-node-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-secondary); transition: color .2s; }
-.df-node-label.selected { color: var(--text-bright); }
-
-/* Data content panel */
-.df-content { background: var(--bg-primary); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; min-height: 460px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
-.df-content-title { font-size: 12px; font-weight: 900; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
-.df-content-title i { color: var(--info); }
-
-/* Code/data block */
-.df-code-block { background: var(--bg-secondary); border-radius: var(--radius-lg); padding: 24px; border: 1px solid var(--border); }
-.df-code-block pre { font-family: monospace; font-size: 11px; color: var(--info); overflow-x: auto; white-space: pre; line-height: 1.6; margin: 0; }
-
-/* Notes panel */
-.df-notes { margin-top: 24px; padding: 16px; background: var(--bg-secondary); border-radius: var(--radius-lg); border: 1px solid var(--border); display: flex; gap: 16px; }
+/* JS innerHTML: #df-content-panel title / payload / notes. */
+.df-content-title {
+    font-size: 12px;
+    font-weight: 800;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.df-content-title i { color: var(--color-info); }
+.df-code-block {
+    background: var(--color-base-200);
+    border-radius: var(--radius-box, 0.5rem);
+    padding: 1.5rem;
+    border: 1px solid var(--color-base-300);
+}
+.df-code-block pre {
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--color-info);
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.6;
+    margin: 0;
+}
+.df-notes {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--color-base-200);
+    border-radius: var(--radius-box, 0.5rem);
+    border: 1px solid var(--color-base-300);
+    display: flex;
+    gap: 1rem;
+}
 .df-note-col { flex: 1; }
-.df-note-col + .df-note-col { border-left: 1px solid var(--border); padding-left: 16px; }
-.df-note-col h4 { font-size: 9px; font-weight: 900; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin: 0 0 4px; }
-.df-note-col p { font-size: 12px; color: var(--text-secondary); margin: 0; font-style: italic; }
-.df-note-col p.bright { color: var(--text-primary); font-style: normal; }
+.df-note-col + .df-note-col {
+    border-left: 1px solid var(--color-base-300);
+    padding-left: 1rem;
+}
+.df-note-col h4 {
+    font-size: 9px;
+    font-weight: 800;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 4px;
+}
+.df-note-col p {
+    font-size: 12px;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    margin: 0;
+    font-style: italic;
+}
+.df-note-col p.bright {
+    color: var(--color-base-content);
+    font-style: normal;
+}
 
-/* Windows Event Viewer mock */
+/* JS innerHTML: Windows Event Viewer replica — literal Windows chrome, not ION theme. */
 .df-winlog { border: 2px solid #555; border-radius: 3px; overflow: hidden; font-size: 12px; }
 .df-winlog-titlebar { background: #005a9e; color: #fff; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 12px; }
 .df-winlog-titlebar .dots { display: flex; gap: 3px; }
@@ -76,173 +166,219 @@
 .df-winlog-detail .hl-orange { color: #c2410c; font-weight: 700; }
 .df-winlog-section { font-weight: 700; margin: 8px 0 4px; padding-left: 0; }
 
-/* Kibana mock */
-.df-kibana { background: var(--bg-primary); border-radius: var(--radius-lg); border: 1px solid var(--border); overflow: hidden; }
-.df-kibana-header { background: var(--bg-secondary); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
-.df-kibana-header span { font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1.5px; font-style: italic; }
-.df-kibana-toggle { display: flex; background: var(--bg-primary); border-radius: 6px; padding: 2px; border: 1px solid var(--border); }
-.df-kibana-toggle button { padding: 4px 8px; font-size: 9px; font-weight: 700; text-transform: uppercase; border: none; border-radius: 4px; cursor: pointer; background: transparent; color: var(--text-secondary); }
-.df-kibana-toggle button.active { background: var(--info); color: var(--text-bright); }
+/* JS innerHTML: Elastic Security mock + table/JSON toggle. */
+.df-kibana {
+    background: var(--color-base-100);
+    border-radius: var(--radius-box, 0.5rem);
+    border: 1px solid var(--color-base-300);
+    overflow: hidden;
+}
+.df-kibana-header {
+    background: var(--color-base-200);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-base-300);
+}
+.df-kibana-header span {
+    font-size: 10px;
+    font-weight: 700;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-style: italic;
+}
+.df-kibana-toggle {
+    display: flex;
+    background: var(--color-base-100);
+    border-radius: var(--radius-field, 0.25rem);
+    padding: 2px;
+    border: 1px solid var(--color-base-300);
+}
+.df-kibana-toggle button {
+    padding: 4px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: none;
+    border-radius: var(--radius-field, 0.25rem);
+    cursor: pointer;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+}
+.df-kibana-toggle button.active {
+    background: var(--color-info);
+    color: var(--color-info-content);
+}
 .df-kibana-body { padding: 16px; }
-
-/* Kibana table */
 .df-kib-table { width: 100%; }
-.df-kib-table thead th { font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; text-align: left; padding: 8px 0; border-bottom: 1px solid var(--border); }
-.df-kib-table tbody td { font-size: 11px; padding: 10px 0; border-bottom: 1px solid rgba(99,110,123,.15); vertical-align: middle; }
-.df-kib-missing { color: var(--danger); font-weight: 900; display: flex; align-items: center; gap: 4px; }
-.df-kib-present { color: var(--success); font-weight: 700; }
-.df-kib-json { background: var(--bg-primary); padding: 16px; border-radius: 8px; font-family: monospace; font-size: 10px; color: var(--info); max-height: 200px; overflow-y: auto; white-space: pre; border: 1px solid var(--border); }
-.df-kib-alert { margin-top: 16px; padding: 10px; background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.2); border-radius: var(--radius); }
-.df-kib-alert p { font-size: 10px; color: var(--danger); margin: 0; line-height: 1.5; }
+.df-kib-table thead th {
+    font-size: 9px;
+    font-weight: 700;
+    color: color-mix(in oklab, var(--color-base-content) 55%, transparent);
+    text-transform: uppercase;
+    text-align: left;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-base-300);
+}
+.df-kib-table tbody td {
+    font-size: 11px;
+    padding: 10px 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+    vertical-align: middle;
+}
+.df-kib-missing {
+    color: var(--color-error);
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.df-kib-present { color: var(--color-success); font-weight: 700; }
+.df-kib-json {
+    background: var(--color-base-200);
+    padding: 16px;
+    border-radius: var(--radius-field, 0.25rem);
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--color-info);
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre;
+    border: 1px solid var(--color-base-300);
+}
+.df-kib-alert {
+    margin-top: 16px;
+    padding: 10px;
+    background: color-mix(in oklab, var(--color-error) 10%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-error) 25%, transparent);
+    border-radius: var(--radius-field, 0.25rem);
+}
+.df-kib-alert p { font-size: 10px; color: var(--color-error); margin: 0; line-height: 1.5; }
 
-/* Right sidebar - Forensic Completeness */
-.df-sidebar { display: flex; flex-direction: column; gap: 24px; }
-.df-forensic-card { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
-.df-forensic-card h3 { font-size: 11px; font-weight: 900; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1.5px; margin: 0 0 24px; display: flex; align-items: center; gap: 8px; }
-.df-forensic-card h3 i { color: var(--info); }
-.df-metric { margin-bottom: 20px; }
-.df-metric:last-child { margin-bottom: 0; }
-.df-metric-header { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 8px; }
+/* JS rewrites className on status labels and bar fills (also sets bar width via element.style). */
 .df-metric-status { font-weight: 700; }
-.df-metric-status.fail { color: var(--danger); }
-.df-metric-status.success { color: var(--success); }
-.df-metric-status.warn { color: var(--warning); }
-.df-metric-status.info { color: var(--info); }
-.df-bar { height: 4px; width: 100%; background: var(--border); border-radius: 4px; overflow: hidden; }
+.df-metric-status.fail { color: var(--color-error); }
+.df-metric-status.success { color: var(--color-success); }
+.df-metric-status.warn { color: var(--color-warning); }
+.df-metric-status.info { color: var(--color-info); }
 .df-bar-fill { height: 100%; border-radius: 4px; transition: width .8s ease; }
-.df-bar-fill.red { background: var(--danger); }
-.df-bar-fill.green { background: var(--success); }
-.df-bar-fill.orange { background: var(--warning); }
-.df-bar-fill.blue { background: var(--info); }
-
-/* Comparison view */
-.df-compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
-@media (max-width: 900px) { .df-compare-grid { grid-template-columns: 1fr; } }
-.df-compare-col h3 { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 16px; }
-.df-compare-col h3.legacy { color: var(--danger); }
-.df-compare-col h3.modern { color: var(--success); }
-.df-field-table { width: 100%; margin-top: 16px; }
-.df-field-table th { font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; text-align: left; padding: 8px 0; border-bottom: 1px solid var(--border); }
-.df-field-table th:last-child { text-align: right; }
-.df-field-table td { font-size: 10px; padding: 8px 0; border-bottom: 1px solid rgba(99,110,123,.1); font-family: monospace; }
-.df-field-table td:last-child { text-align: right; }
-.df-badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; font-family: sans-serif; }
-.df-badge.dropped { background: rgba(239,68,68,.12); color: var(--danger); }
-.df-badge.present { background: rgba(16,185,129,.12); color: var(--success); }
-.df-field-analysis { background: var(--bg-secondary); border: 1px solid var(--border); padding: 24px; border-radius: var(--radius-lg); margin-top: 16px; }
-.df-field-analysis h4 { font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
-
-/* Legend card */
-.df-legend { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
-.df-legend h3 { font-size: 11px; font-weight: 900; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 1.5px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
-.df-legend-items { display: flex; flex-direction: column; gap: 12px; }
-.df-legend-item { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
-.df-legend-item .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-.df-legend-item .dot.red { background: var(--danger); }
-.df-legend-item .dot.green { background: var(--success); }
-.df-legend-item .dot.blue { background: var(--info); }
-.df-legend-item .dot.orange { background: var(--warning); }
+.df-bar-fill.red { background: var(--color-error); }
+.df-bar-fill.green { background: var(--color-success); }
+.df-bar-fill.orange { background: var(--color-warning); }
+.df-bar-fill.blue { background: var(--color-info); }
 </style>
 
-<div class="df-page">
     <!-- Header -->
-    <div class="df-header">
-        <div class="df-header-left">
-            <div class="df-header-label">
-                <i class="icon-user-plus"></i> SOC Architecture Review: Privilege Escalation
+    <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+        <div class="basis-full md:basis-auto md:flex-1">
+            <div class="flex items-center gap-3 mb-4">
+                <i class="icon-user-plus text-primary"></i>
+                <span class="label-tiny text-primary">SOC Architecture Review: Privilege Escalation</span>
             </div>
-            <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em] mb-6">Group Membership Ingestion Flow</h1>
+            <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Group Membership Ingestion Flow</h1>
         </div>
-        <div class="df-toggle-group">
+        <div class="inline-flex bg-base-200 p-1 rounded-box border border-base-300">
             <button class="df-toggle-btn active-legacy" id="df-btn-legacy" data-click-action="dfSetFlow" data-args='["legacy"]'>Legacy</button>
             <button class="df-toggle-btn" id="df-btn-modern" data-click-action="dfSetFlow" data-args='["modern"]'>Modern</button>
             <button class="df-toggle-btn" id="df-btn-compare" data-click-action="dfToggleCompare">
                 <i class="icon-bar-chart-3"></i> Compare
             </button>
         </div>
-    </div>
+    </section>
 
     <!-- Main flow view -->
     <div id="df-flow-view">
-        <div class="df-grid">
+        <div class="grid grid-cols-1 lg:grid-cols-[7fr_5fr] gap-8">
             <div>
                 <!-- Pipeline -->
-                <div class="df-pipeline _ion-s-8d703344e0">
-                    <div class="df-pipeline-track">
-                        <div class="df-pipeline-line"></div>
-                        <div class="df-node" data-click-action="dfSelectNode" data-args='[0]'>
-                            <button class="df-node-btn selected-legacy" id="df-node-0"><i class="icon-server"></i></button>
-                            <span class="df-node-label selected" id="df-node-label-0">DC (Source)</span>
-                        </div>
-                        <div class="df-node" data-click-action="dfSelectNode" data-args='[1]'>
-                            <button class="df-node-btn" id="df-node-1"><i class="icon-shield-alert" id="df-node-icon-1"></i></button>
-                            <span class="df-node-label" id="df-node-label-1">Connector</span>
-                        </div>
-                        <div class="df-node" data-click-action="dfSelectNode" data-args='[2]'>
-                            <button class="df-node-btn" id="df-node-2"><i class="icon-settings" id="df-node-icon-2"></i></button>
-                            <span class="df-node-label" id="df-node-label-2">NiFi</span>
-                        </div>
-                        <div class="df-node" data-click-action="dfSelectNode" data-args='[3]'>
-                            <button class="df-node-btn" id="df-node-3"><i class="icon-layout" id="df-node-icon-3"></i></button>
-                            <span class="df-node-label" id="df-node-label-3">Elastic Security</span>
+                <div class="card bg-base-200 shadow mb-6 _ion-s-8d703344e0">
+                    <div class="card-body">
+                        <div class="relative flex items-center justify-between px-4">
+                            <div class="absolute top-1/2 left-0 w-full h-px bg-base-300 z-0"></div>
+                            <div class="relative z-10 flex flex-col items-center gap-2.5 cursor-pointer" data-click-action="dfSelectNode" data-args='[0]'>
+                                <button class="df-node-btn selected-legacy" id="df-node-0"><i class="icon-server"></i></button>
+                                <span class="df-node-label selected" id="df-node-label-0">DC (Source)</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center gap-2.5 cursor-pointer" data-click-action="dfSelectNode" data-args='[1]'>
+                                <button class="df-node-btn" id="df-node-1"><i class="icon-shield-alert" id="df-node-icon-1"></i></button>
+                                <span class="df-node-label" id="df-node-label-1">Connector</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center gap-2.5 cursor-pointer" data-click-action="dfSelectNode" data-args='[2]'>
+                                <button class="df-node-btn" id="df-node-2"><i class="icon-settings" id="df-node-icon-2"></i></button>
+                                <span class="df-node-label" id="df-node-label-2">NiFi</span>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center gap-2.5 cursor-pointer" data-click-action="dfSelectNode" data-args='[3]'>
+                                <button class="df-node-btn" id="df-node-3"><i class="icon-layout" id="df-node-icon-3"></i></button>
+                                <span class="df-node-label" id="df-node-label-3">Elastic Security</span>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Content -->
-                <div class="df-content" id="df-content-panel">
+                <div class="card bg-base-100 shadow min-h-[460px] p-6" id="df-content-panel">
                     <!-- Populated by JS -->
                 </div>
             </div>
 
             <!-- Sidebar -->
-            <div class="df-sidebar">
-                <div class="df-forensic-card">
-                    <h3><i class="icon-activity"></i> Forensic Completeness</h3>
-                    <div class="df-metric">
-                        <div class="df-metric-header">
-                            <span>Target User Resolution</span>
-                            <span class="df-metric-status fail" id="df-m1-status">FAILED</span>
+            <div class="flex flex-col gap-6">
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title text-xs uppercase tracking-widest">
+                            <i class="icon-activity text-info"></i> Forensic Completeness
+                        </h3>
+                        <div class="mb-5">
+                            <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
+                                <span>Target User Resolution</span>
+                                <span class="df-metric-status fail" id="df-m1-status">FAILED</span>
+                            </div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m1-bar"></div></div>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m1-bar"></div></div>
-                    </div>
-                    <div class="df-metric">
-                        <div class="df-metric-header">
-                            <span>Member SID Preservation</span>
-                            <span class="df-metric-status fail" id="df-m2-status">LOST</span>
+                        <div class="mb-5">
+                            <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
+                                <span>Member SID Preservation</span>
+                                <span class="df-metric-status fail" id="df-m2-status">LOST</span>
+                            </div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m2-bar"></div></div>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill red _ion-s-a8a5341de0" id="df-m2-bar"></div></div>
-                    </div>
-                    <div class="df-metric">
-                        <div class="df-metric-header">
-                            <span>NiFi Overhead</span>
-                            <span class="df-metric-status warn" id="df-m3-status">High</span>
+                        <div class="mb-5">
+                            <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
+                                <span>NiFi Overhead</span>
+                                <span class="df-metric-status warn" id="df-m3-status">High</span>
+                            </div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill orange _ion-s-3bc928abb5" id="df-m3-bar"></div></div>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill orange _ion-s-3bc928abb5" id="df-m3-bar"></div></div>
-                    </div>
-                    <div class="df-metric">
-                        <div class="df-metric-header">
-                            <span>Analyst Readiness</span>
-                            <span class="df-metric-status fail" id="df-m4-status">BLOCKED</span>
+                        <div>
+                            <div class="flex justify-between text-[10px] font-bold uppercase tracking-wide text-base-content/60 mb-2">
+                                <span>Analyst Readiness</span>
+                                <span class="df-metric-status fail" id="df-m4-status">BLOCKED</span>
+                            </div>
+                            <div class="h-1 w-full bg-base-300 rounded overflow-hidden"><div class="df-bar-fill red _ion-s-a659372d50" id="df-m4-bar"></div></div>
                         </div>
-                        <div class="df-bar"><div class="df-bar-fill red _ion-s-a659372d50" id="df-m4-bar"></div></div>
                     </div>
                 </div>
 
-                <div class="df-legend">
-                    <h3><i class="icon-info"></i> Understanding the Flow</h3>
-                    <div class="df-legend-items">
-                        <div class="df-legend-item">
-                            <span class="dot red"></span>
-                            <span><strong>Legacy (ArcSight/CEF):</strong> SmartConnector maps Event 4728 to CEF, stripping fields not in the standard schema. The target user identity is lost.</span>
-                        </div>
-                        <div class="df-legend-item">
-                            <span class="dot green"></span>
-                            <span><strong>Modern (Elastic Agent/ECS):</strong> Elastic Windows Integration preserves all XML attributes from the original event, mapping them to ECS fields automatically.</span>
-                        </div>
-                        <div class="df-legend-item">
-                            <span class="dot blue"></span>
-                            <span><strong>Impact:</strong> Without the target user, analysts cannot determine <em>who</em> was added to a privileged group without manually checking the DC.</span>
+                <div class="card bg-base-200 shadow">
+                    <div class="card-body">
+                        <h3 class="card-title text-xs uppercase tracking-widest">
+                            <i class="icon-info text-info"></i> Understanding the Flow
+                        </h3>
+                        <div class="flex flex-col gap-3">
+                            <div class="flex items-start gap-2.5 text-sm text-base-content/70 leading-snug">
+                                <span class="w-2 h-2 rounded-full bg-error mt-1 shrink-0"></span>
+                                <span><strong class="text-base-content">Legacy (ArcSight/CEF):</strong> SmartConnector maps Event 4728 to CEF, stripping fields not in the standard schema. The target user identity is lost.</span>
+                            </div>
+                            <div class="flex items-start gap-2.5 text-sm text-base-content/70 leading-snug">
+                                <span class="w-2 h-2 rounded-full bg-success mt-1 shrink-0"></span>
+                                <span><strong class="text-base-content">Modern (Elastic Agent/ECS):</strong> Elastic Windows Integration preserves all XML attributes from the original event, mapping them to ECS fields automatically.</span>
+                            </div>
+                            <div class="flex items-start gap-2.5 text-sm text-base-content/70 leading-snug">
+                                <span class="w-2 h-2 rounded-full bg-info mt-1 shrink-0"></span>
+                                <span><strong class="text-base-content">Impact:</strong> Without the target user, analysts cannot determine <em>who</em> was added to a privileged group without manually checking the DC.</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -252,42 +388,49 @@
 
     <!-- Comparison view -->
     <div class="_ion-s-f2892a2e8a" id="df-compare-view">
-        <div class="df-compare-grid">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <!-- Legacy column -->
-            <div class="df-compare-col">
-                <h3 class="legacy">Legacy End State (Missing Fields)</h3>
+            <div>
+                <h3 class="text-[11px] font-black uppercase tracking-widest mb-4 text-error">Legacy End State (Missing Fields)</h3>
                 <div id="df-compare-kibana-legacy"></div>
-                <div class="df-field-analysis">
-                    <h4><i class="icon-eye-off _ion-s-f75d63c1ee"></i> Field Analysis</h4>
-                    <table class="df-field-table">
-                        <thead><tr><th>Target Field</th><th>Status</th></tr></thead>
-                        <tbody>
-                            <tr><td class="_ion-s-a072892b2b">user.target.name</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
-                            <tr><td class="_ion-s-a072892b2b">winlog.event_data.MemberSid</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
-                            <tr><td class="_ion-s-a072892b2b">group.domain</td><td><span class="df-badge dropped">DROPPED</span></td></tr>
-                        </tbody>
-                    </table>
+                <div class="card bg-base-200 shadow mt-4">
+                    <div class="card-body">
+                        <h4 class="card-title text-sm"><i class="icon-eye-off _ion-s-f75d63c1ee"></i> Field Analysis</h4>
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead><tr><th>Target Field</th><th class="text-right">Status</th></tr></thead>
+                                <tbody>
+                                    <tr><td class="font-mono _ion-s-a072892b2b">user.target.name</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+                                    <tr><td class="font-mono _ion-s-a072892b2b">winlog.event_data.MemberSid</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+                                    <tr><td class="font-mono _ion-s-a072892b2b">group.domain</td><td class="text-right"><span class="badge badge-error badge-sm">DROPPED</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
             <!-- Modern column -->
-            <div class="df-compare-col">
-                <h3 class="modern">Modern End State (Full Visibility)</h3>
+            <div>
+                <h3 class="text-[11px] font-black uppercase tracking-widest mb-4 text-success">Modern End State (Full Visibility)</h3>
                 <div id="df-compare-kibana-modern"></div>
-                <div class="df-field-analysis">
-                    <h4><i class="icon-shield-check _ion-s-2ab631d078"></i> Field Analysis</h4>
-                    <table class="df-field-table">
-                        <thead><tr><th>Target Field</th><th>Status</th></tr></thead>
-                        <tbody>
-                            <tr><td class="_ion-s-e4aef55874">user.target.name</td><td><span class="df-badge present">PRESENT</span></td></tr>
-                            <tr><td class="_ion-s-e4aef55874">user.target.id (SID)</td><td><span class="df-badge present">PRESENT</span></td></tr>
-                            <tr><td class="_ion-s-e4aef55874">winlog.event_data.MemberName</td><td><span class="df-badge present">PRESENT</span></td></tr>
-                        </tbody>
-                    </table>
+                <div class="card bg-base-200 shadow mt-4">
+                    <div class="card-body">
+                        <h4 class="card-title text-sm"><i class="icon-shield-check _ion-s-2ab631d078"></i> Field Analysis</h4>
+                        <div class="overflow-x-auto">
+                            <table class="table table-sm">
+                                <thead><tr><th>Target Field</th><th class="text-right">Status</th></tr></thead>
+                                <tbody>
+                                    <tr><td class="font-mono _ion-s-e4aef55874">user.target.name</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+                                    <tr><td class="font-mono _ion-s-e4aef55874">user.target.id (SID)</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+                                    <tr><td class="font-mono _ion-s-e4aef55874">winlog.event_data.MemberName</td><td class="text-right"><span class="badge badge-success badge-sm">PRESENT</span></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
 <script nonce="{{ csp_nonce }}">
 (function(){

@@ -3,7 +3,7 @@
 {% block title %}Training Simulator - ION{% endblock %}
 
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 {% set tabs = [
     {"label": "ION Guide", "href": "/guide"},
@@ -15,19 +15,19 @@
 {% set active_label = "Training Sim" %}
 {% include "_nav_tabs.html" %}
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-amber"><use href="#i-target"/></svg>
     <span class="label-tiny text-ion-amber">Training simulator</span>
   </div>
-  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]">Training Sim</h1>
-  <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Hands-on alert triage scenarios.</p>
+  <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Training Sim</h1>
+  <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Hands-on alert triage scenarios.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-secondary _ion-s-6b99de8b69" data-click-action="simBack" id="sim-back-btn"><i class="icon-arrow-left"></i> Back to Scenarios</button>
+        <button class="btn btn-ghost _ion-s-6b99de8b69" data-click-action="simBack" id="sim-back-btn"><i class="icon-arrow-left"></i> Back to Scenarios</button>
     </div>
 </section>
-<div id="sim-content"><div class="sim-loading"><span class="sim-spinner"></span> Loading scenarios...</div></div>
+<div id="sim-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading scenarios...</div></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -35,145 +35,153 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-/* ── Simulator Core ─────────────────────── */
-.sim-loading{text-align:center;padding:60px;color:var(--text-secondary)}
-.sim-spinner{display:inline-block;width:20px;height:20px;border:3px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:sim-spin .8s linear infinite;margin-right:8px;vertical-align:middle}
-@keyframes sim-spin{to{transform:rotate(360deg)}}
+/* Scenario-card difficulty stripe + hover lift — no daisyUI equivalent. */
+.sim-scenario-card {
+    position: relative;
+    overflow: hidden;
+    transition: transform .2s, box-shadow .2s;
+}
+.sim-scenario-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+}
+.sim-scenario-card.beginner::before { background: var(--color-success); }
+.sim-scenario-card.intermediate::before { background: var(--color-warning); }
+.sim-scenario-card.advanced::before { background: var(--color-error); }
+.sim-scenario-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px color-mix(in oklab, var(--color-base-content) 12%, transparent);
+}
 
-/* Scenario selection */
-.sim-scenarios{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
-.sim-scenario-card{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden}
-.sim-scenario-card:hover{border-color:var(--primary);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.3)}
-.sim-scenario-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
-.sim-scenario-card.beginner::before{background:var(--mitre-covered)}
-.sim-scenario-card.intermediate::before{background:var(--sev-medium)}
-.sim-scenario-card.advanced::before{background:var(--sev-critical)}
-.sim-sc-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:6px}
-.sim-sc-desc{font-size:.82rem;color:var(--text-secondary);line-height:1.5;margin-bottom:12px}
-.sim-sc-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.sim-sc-badge{padding:3px 8px;border-radius:4px;font-size:.68rem;font-weight:700;text-transform:uppercase}
-.sim-sc-badge.beginner{background:var(--mitre-covered-dim);color:var(--mitre-covered)}
-.sim-sc-badge.intermediate{background:var(--sev-medium-dim);color:var(--sev-medium)}
-.sim-sc-badge.advanced{background:var(--sev-critical-dim);color:var(--sev-critical)}
-.sim-sc-info{font-size:.72rem;color:var(--text-muted)}
-.sim-sc-tag{padding:2px 6px;border-radius:3px;font-size:.65rem;background:var(--bg-card);border:1px solid var(--border);color:var(--text-secondary)}
+/* JS toggles .enriched on observable rows. */
+.sim-ob:hover { border-color: var(--color-primary); }
+.sim-ob.enriched { border-color: var(--color-success); }
 
-/* Active simulation layout */
-.sim-layout{display:grid;grid-template-columns:1fr 380px;gap:16px;min-height:500px}
-@media(max-width:1000px){.sim-layout{grid-template-columns:1fr}}
+/* JS toggles .show on enrichment results. */
+.sim-enrich-result { display: none; }
+.sim-enrich-result.show { display: block; }
 
-/* Left: Alert + Investigation panel */
-.sim-main{display:flex;flex-direction:column;gap:12px}
-.sim-panel{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
-.sim-panel-header{padding:10px 14px;background:var(--bg-card);font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-.sim-panel-header i{color:var(--primary)}
-.sim-panel-body{padding:14px}
+/* JS-computed bar width; 0.3s fill is not a compiled utility. */
+.sim-progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 4px;
+    transition: width .3s;
+}
 
-/* Alert mockup */
-.sim-alert-title{font-size:1rem;font-weight:700;color:var(--text-primary);margin-bottom:8px;display:flex;align-items:center;gap:8px}
-.sim-alert-meta{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;font-size:.78rem;color:var(--text-secondary)}
-.sim-alert-meta strong{color:var(--text-primary)}
-.sim-alert-message{padding:10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:.85rem;color:var(--text-primary);line-height:1.6;margin-bottom:12px}
-.sim-raw-data{font-family:'JetBrains Mono',monospace;font-size:.75rem;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);padding:10px;max-height:200px;overflow-y:auto;color:var(--text-secondary)}
-.sim-raw-key{color:var(--primary)}.sim-raw-val{color:var(--text-primary)}
+/* JS toggles .active / .completed / .locked on step cards. */
+.sim-step.active { border-color: var(--color-primary); }
+.sim-step.completed { border-color: var(--color-success); opacity: .85; }
+.sim-step.locked { opacity: .5; }
+.sim-step-num {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+    font-size: .72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.sim-step.active .sim-step-num {
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+}
+.sim-step.completed .sim-step-num {
+    background: var(--color-success);
+    color: var(--color-success-content);
+}
+.sim-step-body { display: none; }
+.sim-step.active .sim-step-body { display: block; }
 
-/* Observables panel */
-.sim-obs{display:flex;flex-direction:column;gap:6px}
-.sim-ob{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:all .15s}
-.sim-ob:hover{border-color:var(--primary)}
-.sim-ob.enriched{border-color:var(--mitre-covered)}
-.sim-ob-type{font-size:.65rem;font-weight:700;text-transform:uppercase;padding:2px 6px;border-radius:3px;background:var(--primary-dim);color:var(--primary);min-width:50px;text-align:center}
-.sim-ob-value{font-family:'JetBrains Mono',monospace;font-size:.82rem;color:var(--text-primary);flex:1}
-.sim-ob-context{font-size:.72rem;color:var(--text-muted)}
-.sim-ob-enrich-btn{font-size:.68rem;padding:3px 8px;background:var(--primary-dim);border:1px solid var(--primary);border-radius:4px;color:var(--primary);cursor:pointer;font-weight:700;white-space:nowrap}
-.sim-ob-enrich-btn:hover{background:var(--primary);color:var(--bg-deep)}
-.sim-ob-enriched-badge{font-size:.68rem;font-weight:700;color:var(--mitre-covered);white-space:nowrap}
+/* JS toggles .hidden via base.html simShowHints; bulb marker has no daisyUI slot.
+   hidden+flex utilities fight in the cascade, so display stays here. */
+.sim-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    font-size: .78rem;
+    color: var(--color-warning);
+}
+.sim-hint.hidden { display: none; }
+.sim-hint::before { content: '\1F4A1'; font-size: .85rem; }
 
-/* Enrichment result panel */
-.sim-enrich-result{padding:10px;background:var(--bg-primary);border:1px solid var(--mitre-covered);border-radius:var(--radius);margin-top:6px;font-size:.82rem;display:none}
-.sim-enrich-result.show{display:block}
-.sim-enrich-source{font-size:.68rem;color:var(--text-muted);margin-bottom:4px}
-.sim-enrich-verdict{font-weight:700;margin-top:4px;padding:4px 8px;border-radius:3px;display:inline-block;font-size:.78rem}
-.sim-enrich-verdict.high{background:var(--sev-critical-dim);color:var(--sev-critical)}
-.sim-enrich-verdict.medium{background:var(--sev-medium-dim);color:var(--sev-medium)}
-.sim-enrich-verdict.low{background:var(--mitre-covered-dim);color:var(--mitre-covered)}
+/* JS toggles .selected / .correct / .wrong on option rows — daisyUI has no selected slot. */
+.sim-option:hover { border-color: var(--color-primary); }
+.sim-option.selected {
+    border-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    color: var(--color-primary);
+}
+.sim-option.correct {
+    border-color: var(--color-success);
+    background: color-mix(in oklab, var(--color-success) 12%, transparent);
+    color: var(--color-success);
+}
+.sim-option.wrong {
+    border-color: var(--color-error);
+    background: color-mix(in oklab, var(--color-error) 12%, transparent);
+    color: var(--color-error);
+}
+.sim-option-radio,
+.sim-option-check {
+    width: 16px;
+    height: 16px;
+    border: 2px solid color-mix(in oklab, var(--color-base-content) 20%, transparent);
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.sim-option-radio { border-radius: 50%; }
+.sim-option-check { border-radius: 3px; font-size: .7rem; }
+.sim-option.selected .sim-option-radio { border-color: var(--color-primary); }
+.sim-option.selected .sim-option-radio::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--color-primary);
+}
+.sim-option.selected .sim-option-check {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+}
 
-/* Related alerts */
-.sim-related-alert{padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:.82rem}
-.sim-related-alert .sim-ra-title{font-weight:600;color:var(--text-primary)}
-.sim-related-alert .sim-ra-meta{font-size:.72rem;color:var(--text-muted);margin-top:2px}
+/* JS sets className to sim-feedback show correct|wrong|partial. */
+.sim-feedback { display: none; }
+.sim-feedback.show { display: flex; }
 
-/* Threat Intel panel */
-.sim-ti{padding:10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);font-size:.82rem}
-.sim-ti-ttps{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
-.sim-ti-ttp{padding:2px 6px;background:var(--primary-dim);border:1px solid rgba(0,212,255,.25);border-radius:3px;font-size:.68rem;font-family:'JetBrains Mono',monospace;color:var(--primary)}
-
-/* Right: Steps sidebar */
-.sim-sidebar{display:flex;flex-direction:column;gap:12px}
-.sim-progress{padding:14px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg)}
-.sim-progress-title{font-size:.78rem;font-weight:700;color:var(--text-secondary);text-transform:uppercase;margin-bottom:8px}
-.sim-progress-bar{height:8px;background:rgba(99,110,123,.2);border-radius:4px;overflow:hidden;margin-bottom:8px}
-.sim-progress-fill{height:100%;background:var(--primary);border-radius:4px;transition:width .3s}
-.sim-progress-text{font-size:.72rem;color:var(--text-muted)}
-
-/* Step cards */
-.sim-step{background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:all .2s}
-.sim-step.active{border-color:var(--primary)}
-.sim-step.completed{border-color:var(--mitre-covered);opacity:.85}
-.sim-step.locked{opacity:.5}
-.sim-step-header{padding:10px 14px;display:flex;align-items:center;gap:8px;cursor:pointer}
-.sim-step-num{width:24px;height:24px;border-radius:50%;background:var(--bg-card);color:var(--text-muted);font-size:.72rem;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.sim-step.active .sim-step-num{background:var(--primary);color:var(--bg-deep)}
-.sim-step.completed .sim-step-num{background:var(--mitre-covered);color:var(--bg-deep)}
-.sim-step-title{font-size:.82rem;font-weight:600;color:var(--text-primary);flex:1}
-.sim-step-body{padding:0 14px 14px;display:none}
-.sim-step.active .sim-step-body{display:block}
-
-.sim-instruction{font-size:.85rem;color:var(--text-secondary);line-height:1.6;margin-bottom:12px;padding:8px 10px;background:var(--bg-primary);border-left:3px solid var(--primary);border-radius:0 var(--radius) var(--radius) 0}
-.sim-hints{margin-bottom:12px}
-.sim-hint{font-size:.78rem;color:var(--sev-medium);padding:4px 0;display:flex;align-items:center;gap:6px}
-.sim-hint::before{content:'\1F4A1';font-size:.85rem}
-.sim-hint.hidden{display:none}
-.sim-show-hints{font-size:.72rem;color:var(--primary);cursor:pointer;text-decoration:underline;margin-bottom:8px}
-
-/* Questions */
-.sim-question{margin-bottom:16px}
-.sim-q-text{font-size:.88rem;font-weight:600;color:var(--text-primary);margin-bottom:8px}
-.sim-q-points{font-size:.68rem;color:var(--text-muted);margin-bottom:8px}
-.sim-option{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;background:var(--bg-primary);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:4px;cursor:pointer;transition:all .15s;font-size:.85rem;color:var(--text-secondary)}
-.sim-option:hover{border-color:var(--primary);color:var(--text-primary)}
-.sim-option.selected{border-color:var(--primary);background:var(--primary-dim);color:var(--primary)}
-.sim-option.correct{border-color:var(--mitre-covered);background:var(--mitre-covered-dim);color:var(--mitre-covered)}
-.sim-option.wrong{border-color:var(--sev-critical);background:var(--sev-critical-dim);color:var(--sev-critical)}
-.sim-option-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center}
-.sim-option.selected .sim-option-radio{border-color:var(--primary)}
-.sim-option.selected .sim-option-radio::after{content:'';width:8px;height:8px;border-radius:50%;background:var(--primary)}
-.sim-option-check{width:16px;height:16px;border-radius:3px;border:2px solid var(--border);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;font-size:.7rem}
-.sim-option.selected .sim-option-check{border-color:var(--primary);background:var(--primary);color:var(--bg-deep)}
-
-.sim-feedback{padding:10px;border-radius:var(--radius);font-size:.82rem;margin-top:8px;display:none}
-.sim-feedback.show{display:block}
-.sim-feedback.correct{background:var(--mitre-covered-dim);border:1px solid var(--mitre-covered);color:var(--mitre-covered)}
-.sim-feedback.wrong{background:var(--sev-critical-dim);border:1px solid var(--sev-critical);color:var(--sev-critical)}
-.sim-feedback.partial{background:var(--sev-medium-dim);border:1px solid var(--sev-medium);color:var(--sev-medium)}
-
-.sim-step-actions{display:flex;gap:8px;margin-top:12px}
-.sim-btn{padding:8px 16px;border-radius:var(--radius);font-size:.82rem;font-weight:700;cursor:pointer;border:none;transition:all .15s}
-.sim-btn-primary{background:var(--primary);color:var(--bg-deep)}.sim-btn-primary:hover{opacity:.85}
-.sim-btn-secondary{background:var(--bg-card);color:var(--text-primary);border:1px solid var(--border)}.sim-btn-secondary:hover{border-color:var(--primary)}
-
-/* Score screen */
-.sim-score{text-align:center;padding:40px 20px}
-.sim-score-ring{width:140px;height:140px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px}
-.sim-score-inner{width:100px;height:100px;border-radius:50%;background:var(--bg-secondary);display:flex;flex-direction:column;align-items:center;justify-content:center}
-.sim-score-grade{font-size:2.5rem;font-weight:700;font-family:'JetBrains Mono',monospace}
-.sim-score-pct{font-size:.82rem;color:var(--text-secondary)}
-.sim-score-title{font-size:1.2rem;font-weight:700;color:var(--text-primary);margin-bottom:4px}
-.sim-score-subtitle{font-size:.88rem;color:var(--text-secondary);margin-bottom:24px}
-.sim-score-breakdown{max-width:500px;margin:0 auto;text-align:left}
-.sim-score-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid rgba(99,110,123,.1);font-size:.85rem}
-.sim-score-row-q{flex:1;color:var(--text-primary)}
-.sim-score-row-pts{font-family:'JetBrains Mono',monospace;font-weight:700;min-width:60px;text-align:right}
+/* Conic-gradient score ring: daisyUI radial-progress needs a CSS custom
+   property set as a raw attribute, which CSP refuses. Geometry and inner
+   disc have no utility equivalent. */
+.sim-score-ring {
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 16px;
+}
+.sim-score-inner {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: var(--color-base-200);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
 </style>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/training-sim';
@@ -185,29 +193,42 @@ let currentStep = 0;
 let answers = {};
 let enrichedObs = new Set();
 
+function sevBadge(sev) {
+    const s = String(sev || '').toLowerCase();
+    const kind = s === 'critical' ? 'badge-error'
+        : s === 'high' ? 'badge-warning'
+        : s === 'medium' ? 'badge-warning'
+        : s === 'low' ? 'badge-success'
+        : 'badge-info';
+    return `<span class="badge badge-sm ${kind}">${esc(sev)}</span>`;
+}
+
 async function simInit() {
     try {
         const r = await fetch(API+'/scenarios');
         const d = await r.json();
         renderScenarioList(d.scenarios);
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="sim-loading _ion-s-5dd0211252">Failed to load scenarios</div>';
+        $('sim-content').innerHTML = '<div class="alert alert-error _ion-s-5dd0211252">Failed to load scenarios</div>';
     }
 }
 
 function renderScenarioList(scenarios) {
-    let html = '<div class="_ion-s-87c136dfd0"><p class="_ion-s-53cce34fa0">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
-    html += '<div class="sim-scenarios">';
+    let html = '<div class="alert alert-info mb-4 _ion-s-87c136dfd0"><p class="_ion-s-53cce34fa0">Choose a training scenario. Each simulation walks you through a realistic SOC investigation with mock data, requiring you to make decisions at each step.</p></div>';
+    html += '<div class="grid grid-cols-[repeat(auto-fill,minmax(320px,1fr))] gap-4">';
     for (const s of scenarios) {
-        html += `<div class="sim-scenario-card ${s.difficulty}" data-click-action="simStart" data-args='["${s.id}"]'>
-            <div class="sim-sc-title">${esc(s.title)}</div>
-            <div class="sim-sc-desc">${esc(s.description)}</div>
-            <div class="sim-sc-meta">
-                <span class="sim-sc-badge ${s.difficulty}">${esc(s.difficulty)}</span>
-                <span class="sim-sc-info">${s.estimated_minutes} min</span>
-                <span class="sim-sc-info">${s.total_steps} steps</span>
-                <span class="sim-sc-info">${s.total_points} pts</span>
-                ${s.tags.map(t=>'<span class="sim-sc-tag">'+esc(t)+'</span>').join('')}
+        const diffBadge = s.difficulty === 'beginner' ? 'badge-success' : s.difficulty === 'advanced' ? 'badge-error' : 'badge-warning';
+        html += `<div class="card bg-base-200 shadow cursor-pointer sim-scenario-card ${s.difficulty}" data-click-action="simStart" data-args='["${s.id}"]'>
+            <div class="card-body">
+            <h3 class="card-title text-base">${esc(s.title)}</h3>
+            <p class="text-sm opacity-70">${esc(s.description)}</p>
+            <div class="flex gap-2 flex-wrap items-center">
+                <span class="badge badge-sm ${diffBadge}">${esc(s.difficulty)}</span>
+                <span class="text-xs opacity-50">${s.estimated_minutes} min</span>
+                <span class="text-xs opacity-50">${s.total_steps} steps</span>
+                <span class="text-xs opacity-50">${s.total_points} pts</span>
+                ${s.tags.map(t=>'<span class="badge badge-ghost badge-sm">'+esc(t)+'</span>').join('')}
+            </div>
             </div>
         </div>`;
     }
@@ -217,7 +238,7 @@ function renderScenarioList(scenarios) {
 }
 
 async function simStart(scenarioId) {
-    $('sim-content').innerHTML = '<div class="sim-loading"><span class="sim-spinner"></span> Loading scenario...</div>';
+    $('sim-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading scenario...</div>';
     try {
         const r = await fetch(API+'/scenarios/'+scenarioId);
         currentScenario = await r.json();
@@ -227,7 +248,7 @@ async function simStart(scenarioId) {
         $('sim-back-btn').style.display = '';
         renderSimulation();
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="sim-loading _ion-s-5dd0211252">Failed to load scenario</div>';
+        $('sim-content').innerHTML = '<div class="alert alert-error _ion-s-5dd0211252">Failed to load scenario</div>';
     }
 }
 
@@ -239,17 +260,17 @@ function simBack() {
 function renderSimulation() {
     const s = currentScenario;
     const a = s.alert;
-    let html = '<div class="sim-layout">';
+    let html = '<div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_24rem] gap-4 min-h-[500px]">';
 
     // === LEFT: Main investigation area ===
-    html += '<div class="sim-main">';
+    html += '<div class="flex flex-col gap-3">';
 
     // Alert panel
-    html += `<div class="sim-panel">
-        <div class="sim-panel-header"><i class="icon-alert-triangle"></i> Alert Detail</div>
-        <div class="sim-panel-body">
-            <div class="sim-alert-title"><span class="sev-badge sev-${a.severity}">${esc(a.severity)}</span> ${esc(a.title)}</div>
-            <div class="sim-alert-meta">
+    html += `<div class="card bg-base-200 shadow">
+        <div class="card-body">
+            <h3 class="card-title text-sm"><i class="icon-alert-triangle text-primary"></i> Alert Detail</h3>
+            <div class="flex items-center gap-2 font-bold">${sevBadge(a.severity)} ${esc(a.title)}</div>
+            <div class="flex gap-3 flex-wrap text-sm opacity-70">
                 <span><strong>Rule:</strong> ${esc(a.rule_name)}</span>
                 <span><strong>Source:</strong> ${esc(a.source)}</span>
                 ${a.host ? '<span><strong>Host:</strong> '+esc(a.host)+'</span>' : ''}
@@ -257,20 +278,20 @@ function renderSimulation() {
                 <span><strong>Time:</strong> ${new Date(a.timestamp).toLocaleString()}</span>
             </div>
             ${a.mitre_technique_id ? `<div class="_ion-s-fdf33f2304"><span class="_ion-s-b1a8a836ea">${esc(a.mitre_technique_id)}</span> <span class="_ion-s-a975440d91">${esc(a.mitre_technique_name)} (${esc(a.mitre_tactic_name)})</span></div>` : ''}
-            <div class="sim-alert-message">${esc(a.message)}</div>
+            <div class="p-2.5 bg-base-100 border border-base-300 rounded text-sm leading-relaxed">${esc(a.message)}</div>
             <details><summary class="_ion-s-1c8066d23c">View Raw Data</summary>
-            <div class="sim-raw-data">${Object.entries(a.raw_data||{}).map(([k,v])=>`<div><span class="sim-raw-key">${esc(k)}</span>: <span class="sim-raw-val">${esc(String(v))}</span></div>`).join('')}</div>
+            <div class="font-mono text-xs bg-base-100 border border-base-300 rounded p-2.5 max-h-[200px] overflow-y-auto">${Object.entries(a.raw_data||{}).map(([k,v])=>`<div><span class="text-primary">${esc(k)}</span>: <span>${esc(String(v))}</span></div>`).join('')}</div>
             </details>
         </div>
     </div>`;
 
     // Related alerts (if any)
     if (s.related_alerts && s.related_alerts.length) {
-        html += '<div class="sim-panel"><div class="sim-panel-header"><i class="icon-link"></i> Related Alerts ('+s.related_alerts.length+')</div><div class="sim-panel-body">';
+        html += '<div class="card bg-base-200 shadow"><div class="card-body"><h3 class="card-title text-sm"><i class="icon-link text-primary"></i> Related Alerts ('+s.related_alerts.length+')</h3>';
         for (const ra of s.related_alerts) {
-            html += `<div class="sim-related-alert">
-                <div class="sim-ra-title"><span class="sev-badge sev-${ra.severity}">${esc(ra.severity)}</span> ${esc(ra.title)}</div>
-                <div class="sim-ra-meta">${esc(ra.rule_name)} | ${esc(ra.host||'')} | ${new Date(ra.timestamp).toLocaleTimeString()} | ${esc(ra.mitre_tactic_name||'')}</div>
+            html += `<div class="rounded-box bg-base-100 p-2.5 mb-1.5">
+                <div class="font-semibold">${sevBadge(ra.severity)} ${esc(ra.title)}</div>
+                <div class="text-xs opacity-50 mt-0.5">${esc(ra.rule_name)} | ${esc(ra.host||'')} | ${new Date(ra.timestamp).toLocaleTimeString()} | ${esc(ra.mitre_tactic_name||'')}</div>
                 <div class="_ion-s-a86ebff019">${esc(ra.message)}</div>
             </div>`;
         }
@@ -278,20 +299,20 @@ function renderSimulation() {
     }
 
     // Observables panel
-    html += '<div class="sim-panel"><div class="sim-panel-header"><i class="icon-search"></i> Observables</div><div class="sim-panel-body"><div class="sim-obs" id="sim-obs">';
+    html += '<div class="card bg-base-200 shadow"><div class="card-body"><h3 class="card-title text-sm"><i class="icon-search text-primary"></i> Observables</h3><div class="flex flex-col gap-1.5" id="sim-obs">';
     for (let i = 0; i < (s.observables||[]).length; i++) {
         const o = s.observables[i];
         const isEnriched = enrichedObs.has(o.value);
         html += `<div>
-            <div class="sim-ob ${isEnriched?'enriched':''}" id="sim-ob-${i}">
-                <span class="sim-ob-type">${esc(o.type)}</span>
+            <div class="sim-ob flex items-center gap-2 p-2 bg-base-100 border border-base-300 rounded cursor-pointer ${isEnriched?'enriched':''}" id="sim-ob-${i}">
+                <span class="badge badge-primary badge-sm">${esc(o.type)}</span>
                 <div class="_ion-s-97445a8d93">
-                    <div class="sim-ob-value">${esc(o.value)}</div>
-                    <div class="sim-ob-context">${esc(o.context)}</div>
+                    <div class="font-mono text-sm">${esc(o.value)}</div>
+                    <div class="text-xs opacity-50">${esc(o.context)}</div>
                 </div>
-                ${isEnriched ? '<span class="sim-ob-enriched-badge">ENRICHED</span>' : `<button class="sim-ob-enrich-btn" data-click-action="simEnrich" data-args='[${i}]'>Enrich</button>`}
+                ${isEnriched ? '<span class="badge badge-success badge-sm sim-ob-enriched-badge">ENRICHED</span>' : `<button class="btn btn-xs btn-primary sim-ob-enrich-btn" data-click-action="simEnrich" data-args='[${i}]'>Enrich</button>`}
             </div>
-            <div class="sim-enrich-result ${isEnriched?'show':''}" id="sim-enrich-${i}">
+            <div class="sim-enrich-result bg-base-100 border border-success rounded p-2.5 mt-1.5 text-sm ${isEnriched?'show':''}" id="sim-enrich-${i}">
                 ${isEnriched ? renderEnrichment(o.value, s) : ''}
             </div>
         </div>`;
@@ -301,12 +322,13 @@ function renderSimulation() {
     // Threat Intel panel (shown when relevant step reached)
     if (s.threat_intel && currentStep >= 2) {
         const ti = s.threat_intel;
-        html += `<div class="sim-panel"><div class="sim-panel-header"><i class="icon-eye"></i> Threat Intelligence</div><div class="sim-panel-body">
-            <div class="sim-ti">
+        html += `<div class="card bg-base-200 shadow"><div class="card-body">
+            <h3 class="card-title text-sm"><i class="icon-eye text-primary"></i> Threat Intelligence</h3>
+            <div class="p-2.5 bg-base-100 border border-base-300 rounded text-sm">
                 <div class="_ion-s-947b39942a">${esc(ti.actor)}</div>
                 <div class="_ion-s-a975440d91">Confidence: <strong>${ti.confidence}%</strong></div>
                 <div class="_ion-s-96628d4d70">${esc(ti.context)}</div>
-                <div class="sim-ti-ttps">${(ti.ttps||[]).map(t=>`<span class="sim-ti-ttp">${esc(t)}</span>`).join('')}</div>
+                <div class="flex gap-1 flex-wrap mt-1.5">${(ti.ttps||[]).map(t=>`<span class="badge badge-outline badge-sm font-mono">${esc(t)}</span>`).join('')}</div>
             </div>
         </div></div>`;
     }
@@ -314,34 +336,36 @@ function renderSimulation() {
     html += '</div>'; // end sim-main
 
     // === RIGHT: Steps sidebar ===
-    html += '<div class="sim-sidebar">';
+    html += '<div class="flex flex-col gap-3">';
 
     // Progress
     const totalSteps = s.steps.length;
     const completedSteps = Math.min(currentStep, totalSteps);
     const pct = Math.round(completedSteps / totalSteps * 100);
-    html += `<div class="sim-progress">
-        <div class="sim-progress-title">${esc(s.title)}</div>
-        <div class="sim-progress-bar"><div class="sim-progress-fill" data-ion-style="width:${pct}%"></div></div>
-        <div class="sim-progress-text">Step ${Math.min(currentStep+1, totalSteps)} of ${totalSteps} | ${pct}% complete</div>
+    html += `<div class="card bg-base-200 shadow">
+        <div class="card-body p-4">
+        <div class="text-xs font-bold uppercase opacity-70 mb-2">${esc(s.title)}</div>
+        <div class="h-2 rounded bg-base-300 overflow-hidden mb-2"><div class="sim-progress-fill" data-ion-style="width:${pct}%"></div></div>
+        <div class="text-xs opacity-50">Step ${Math.min(currentStep+1, totalSteps)} of ${totalSteps} | ${pct}% complete</div>
+        </div>
     </div>`;
 
     // Steps
     for (let i = 0; i < s.steps.length; i++) {
         const step = s.steps[i];
         const state = i < currentStep ? 'completed' : i === currentStep ? 'active' : 'locked';
-        html += `<div class="sim-step ${state}" id="sim-step-${i}">
-            <div class="sim-step-header" ${state !== 'locked' ? `data-click-action="simGoToStep" data-args='[${i}]'` : ''}>
+        html += `<div class="card bg-base-200 shadow sim-step ${state}" id="sim-step-${i}">
+            <div class="flex items-center gap-2 px-4 py-2.5 ${state !== 'locked' ? 'cursor-pointer' : ''}" ${state !== 'locked' ? `data-click-action="simGoToStep" data-args='[${i}]'` : ''}>
                 <div class="sim-step-num">${state === 'completed' ? '&#10003;' : i+1}</div>
-                <div class="sim-step-title">${esc(step.title)}</div>
+                <div class="text-sm font-semibold flex-1">${esc(step.title)}</div>
             </div>
-            <div class="sim-step-body">
-                <div class="sim-instruction">${esc(step.instruction)}</div>`;
+            <div class="sim-step-body px-4 pb-4">
+                <div class="text-sm leading-relaxed mb-3 py-2 px-2.5 bg-base-100 border-l-[3px] border-primary rounded-r">${esc(step.instruction)}</div>`;
 
         // Hints
         if (step.hints && step.hints.length) {
-            html += `<div class="sim-show-hints" data-click-action="simShowHints">Show hints (${step.hints.length})</div>`;
-            html += '<div class="sim-hints">';
+            html += `<div class="link link-hover text-xs text-primary cursor-pointer mb-2 sim-show-hints" data-click-action="simShowHints">Show hints (${step.hints.length})</div>`;
+            html += '<div class="mb-3">';
             for (const hint of step.hints) {
                 html += `<div class="sim-hint hidden">${esc(hint)}</div>`;
             }
@@ -355,8 +379,8 @@ function renderSimulation() {
 
         // Actions
         if (state === 'active') {
-            html += `<div class="sim-step-actions">
-                <button class="sim-btn sim-btn-primary" data-click-action="simSubmitStep" data-args='[${i}]'>Submit & Continue</button>
+            html += `<div class="flex gap-2 mt-3">
+                <button class="btn btn-primary btn-sm" data-click-action="simSubmitStep" data-args='[${i}]'>Submit & Continue</button>
             </div>`;
         }
 
@@ -366,7 +390,7 @@ function renderSimulation() {
     // Score button (shown when all steps completed)
     if (currentStep >= s.steps.length) {
         html += `<div class="_ion-s-766e488b93">
-            <button class="sim-btn sim-btn-primary _ion-s-3599ef6997" data-click-action="simScore">View Score</button>
+            <button class="btn btn-primary _ion-s-3599ef6997" data-click-action="simScore">View Score</button>
         </div>`;
     }
 
@@ -377,16 +401,16 @@ function renderSimulation() {
 
 function renderQuestion(q, stepIdx) {
     const answered = answers[q.id] !== undefined;
-    let html = `<div class="sim-question" id="sim-q-${q.id}">
-        <div class="sim-q-text">${esc(q.text)}</div>
-        <div class="sim-q-points">${q.points} points</div>`;
+    let html = `<div class="mb-4" id="sim-q-${q.id}">
+        <div class="font-semibold text-sm mb-2">${esc(q.text)}</div>
+        <div class="text-xs opacity-50 mb-2">${q.points} points</div>`;
 
     for (const opt of q.options) {
         const isSelected = q.type === 'multi_select'
             ? (answers[q.id] || []).includes(opt.id)
             : answers[q.id] === opt.id;
         const indicator = q.type === 'multi_select' ? 'sim-option-check' : 'sim-option-radio';
-        html += `<div class="sim-option ${isSelected?'selected':''}" data-click-action="simSelectOption" data-args='["${q.id}", "${opt.id}", "${q.type}"]'>
+        html += `<div class="sim-option flex items-start gap-2 p-2 bg-base-100 border border-base-300 rounded mb-1 cursor-pointer text-sm ${isSelected?'selected':''}" data-click-action="simSelectOption" data-args='["${q.id}", "${opt.id}", "${q.type}"]'>
             <div class="${indicator}">${isSelected && q.type==='multi_select' ? '&#10003;' : ''}</div>
             <span>${esc(opt.text)}</span>
         </div>`;
@@ -400,10 +424,10 @@ function renderQuestion(q, stepIdx) {
 function renderEnrichment(value, scenario) {
     const er = (scenario.enrichment_results || {})[value];
     if (!er) return '<div class="_ion-s-ebb3a47e42">No enrichment data available for this observable.</div>';
-    const levelCls = er.threat_level === 'high' ? 'high' : er.threat_level === 'medium' ? 'medium' : 'low';
-    return `<div class="sim-enrich-source">Source: ${esc(er.source)}</div>
+    const levelCls = er.threat_level === 'high' ? 'badge-error' : er.threat_level === 'medium' ? 'badge-warning' : 'badge-success';
+    return `<div class="text-xs opacity-50 mb-1">Source: ${esc(er.source)}</div>
         <div class="_ion-s-d9f8a31df1">${esc(er.details)}</div>
-        <div class="sim-enrich-verdict ${levelCls}">${esc(er.verdict)}</div>`;
+        <div class="badge ${levelCls} mt-1">${esc(er.verdict)}</div>`;
 }
 
 function simEnrich(idx) {
@@ -414,7 +438,7 @@ function simEnrich(idx) {
     el.classList.add('show');
     document.getElementById('sim-ob-'+idx).classList.add('enriched');
     const btn = document.querySelector(`#sim-ob-${idx} .sim-ob-enrich-btn`);
-    if (btn) btn.outerHTML = '<span class="sim-ob-enriched-badge">ENRICHED</span>';
+    if (btn) btn.outerHTML = '<span class="badge badge-success badge-sm sim-ob-enriched-badge">ENRICHED</span>';
 }
 
 function simSelectOption(qId, optId, type) {
@@ -486,10 +510,10 @@ function showFeedback(q) {
         const correct = q.options.find(o => o.correct);
         const chosen = q.options.find(o => o.id === answers[q.id]);
         if (chosen && chosen.correct) {
-            fb.className = 'sim-feedback show correct';
+            fb.className = 'sim-feedback alert alert-success mt-2 show correct';
             fb.textContent = chosen.feedback || 'Correct!';
         } else {
-            fb.className = 'sim-feedback show wrong';
+            fb.className = 'sim-feedback alert alert-error mt-2 show wrong';
             fb.textContent = (chosen ? chosen.feedback : 'No answer') || 'Incorrect.';
         }
     } else if (q.type === 'multi_select') {
@@ -497,13 +521,13 @@ function showFeedback(q) {
         const selected = new Set(answers[q.id] || []);
         const allCorrect = [...correctIds].every(id => selected.has(id)) && [...selected].every(id => correctIds.has(id));
         if (allCorrect) {
-            fb.className = 'sim-feedback show correct';
+            fb.className = 'sim-feedback alert alert-success mt-2 show correct';
             fb.textContent = q.feedback_correct || 'All correct!';
         } else if ([...selected].some(id => correctIds.has(id))) {
-            fb.className = 'sim-feedback show partial';
+            fb.className = 'sim-feedback alert alert-warning mt-2 show partial';
             fb.textContent = q.feedback_partial || 'Partially correct.';
         } else {
-            fb.className = 'sim-feedback show wrong';
+            fb.className = 'sim-feedback alert alert-error mt-2 show wrong';
             fb.textContent = 'Incorrect — review the options.';
         }
     }
@@ -529,7 +553,7 @@ function simGoToStep(idx) {
 }
 
 async function simScore() {
-    $('sim-content').innerHTML = '<div class="sim-loading"><span class="sim-spinner"></span> Calculating score...</div>';
+    $('sim-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Calculating score...</div>';
     try {
         const r = await fetch(API+'/score', {
             method: 'POST',
@@ -539,45 +563,47 @@ async function simScore() {
         const d = await r.json();
         renderScore(d);
     } catch(e) {
-        $('sim-content').innerHTML = '<div class="sim-loading _ion-s-5dd0211252">Failed to calculate score</div>';
+        $('sim-content').innerHTML = '<div class="alert alert-error _ion-s-5dd0211252">Failed to calculate score</div>';
     }
 }
 
 function renderScore(d) {
-    const color = d.percentage >= 90 ? 'var(--mitre-covered)' : d.percentage >= 75 ? 'var(--quality-good)' : d.percentage >= 60 ? 'var(--sev-medium)' : 'var(--sev-critical)';
+    const color = d.percentage >= 90 ? 'var(--color-success)' : d.percentage >= 75 ? 'var(--color-info)' : d.percentage >= 60 ? 'var(--color-warning)' : 'var(--color-error)';
 
-    let html = '<div class="sim-score">';
+    let html = '<div class="card bg-base-200 shadow mx-auto max-w-xl">';
+    html += '<div class="card-body items-center text-center">';
     html += `<div class="sim-score-ring" data-ion-style="background:conic-gradient(${color} ${d.percentage}%, rgba(99,110,123,.2) ${d.percentage}%)">
         <div class="sim-score-inner">
-            <div class="sim-score-grade" data-ion-style="color:${color}">${d.grade}</div>
-            <div class="sim-score-pct">${d.percentage}%</div>
+            <div class="sim-score-grade font-mono text-4xl font-bold" data-ion-style="color:${color}">${d.grade}</div>
+            <div class="text-sm opacity-70">${d.percentage}%</div>
         </div>
     </div>`;
-    html += `<div class="sim-score-title">${d.total_earned} / ${d.total_possible} Points</div>`;
-    html += `<div class="sim-score-subtitle">${
+    html += `<h2 class="card-title">${d.total_earned} / ${d.total_possible} Points</h2>`;
+    html += `<p class="opacity-70 mb-6">${
         d.percentage >= 90 ? 'Outstanding! You handled this scenario like a seasoned analyst.' :
         d.percentage >= 75 ? 'Great work! Solid investigation skills with room for minor improvement.' :
         d.percentage >= 60 ? 'Good effort. Review the feedback to strengthen your approach.' :
         'Keep practicing. Review each step\'s feedback to improve your triage skills.'
-    }</div>`;
+    }</p>`;
 
-    html += '<div class="sim-score-breakdown">';
+    html += '<div class="w-full overflow-x-auto text-left">';
+    html += '<table class="table table-sm">';
     for (const r of d.results) {
         const icon = r.correct ? '<span class="_ion-s-b00112b508">&#10003;</span>' : '<span class="_ion-s-5dd0211252">&#10007;</span>';
-        html += `<div class="sim-score-row">
-            <span>${icon}</span>
-            <span class="sim-score-row-q">${esc(r.feedback)}</span>
-            <span class="sim-score-row-pts" data-ion-style="color:${r.correct ? 'var(--mitre-covered)' : 'var(--sev-critical)'}">${r.earned}/${r.possible}</span>
-        </div>`;
+        html += `<tr>
+            <td>${icon}</td>
+            <td>${esc(r.feedback)}</td>
+            <td class="font-mono font-bold text-right" data-ion-style="color:${r.correct ? 'var(--color-success)' : 'var(--color-error)'}">${r.earned}/${r.possible}</td>
+        </tr>`;
     }
-    html += '</div>';
+    html += '</table></div>';
 
     html += `<div class="_ion-s-5367325448">
-        <button class="sim-btn sim-btn-primary" data-click-action="simStart" data-args='["${currentScenario.id}"]'>Retry Scenario</button>
-        <button class="sim-btn sim-btn-secondary" data-click-action="simBack">All Scenarios</button>
+        <button class="btn btn-primary" data-click-action="simStart" data-args='["${currentScenario.id}"]'>Retry Scenario</button>
+        <button class="btn btn-ghost" data-click-action="simBack">All Scenarios</button>
     </div>`;
 
-    html += '</div>';
+    html += '</div></div>';
     $('sim-content').innerHTML = html;
 }
 

@@ -6,7 +6,7 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
 <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-<div class="flex-1 min-w-0">
+<div class="basis-full md:basis-auto md:flex-1">
   <div class="flex items-center gap-3 mb-4">
     <svg class="w-4 h-4 text-ion-iris"><use href="#i-git-branch"/></svg>
     <span class="label-tiny text-ion-iris">Issue tracking</span>
@@ -15,46 +15,51 @@
   <p class="mt-3 max-w-2xl text-[15px] text-slate-400">Open issues, merge requests and assigned work.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <a class="ion-btn _ion-s-f2892a2e8a" href="/settings#gitlab" id="config-btn">Configure</a>
-        <button class="ion-btn ion-btn-primary _ion-s-f2892a2e8a" data-click-action="showCreateIssueModal" id="new-issue-btn">New Issue</button>
+        <a class="btn btn-ghost _ion-s-f2892a2e8a" href="/settings#gitlab" id="config-btn">Configure</a>
+        <button class="btn btn-primary _ion-s-f2892a2e8a" data-click-action="showCreateIssueModal" id="new-issue-btn">New Issue</button>
     </div>
 </section>
 
 <!-- Connection Status -->
-<div id="connection-status" class="connection-status">
+<div id="connection-status" role="alert" class="connection-status alert alert-info mb-4">
+    <span class="loading loading-spinner loading-sm"></span>
     <div class="status-checking">Checking GitLab connection...</div>
 </div>
 
 <!-- Not Configured State -->
-<div id="not-configured" class="empty-state _ion-s-f2892a2e8a">
-    <h2>GitLab Not Configured</h2>
-    <p>Connect to GitLab to create, track, and manage issues directly from ION.</p>
-    <a class="ion-btn ion-btn-primary" href="/settings#gitlab">Configure GitLab</a>
+<div id="not-configured" class="card bg-base-200 shadow _ion-s-f2892a2e8a">
+    <div class="card-body items-center text-center py-14">
+    <h2 class="card-title">GitLab Not Configured</h2>
+    <p class="text-base-content/60">Connect to GitLab to create, track, and manage issues directly from ION.</p>
+    <a class="btn btn-primary" href="/settings#gitlab">Configure GitLab</a>
+    </div>
 </div>
 
 <!-- Issues Section -->
-<div class="_ion-s-f2892a2e8a" id="issues-section">
+<div class="card bg-base-200 shadow _ion-s-f2892a2e8a" id="issues-section">
+    <div class="card-body">
     <!-- Toolbar -->
-    <div class="toolbar">
-        <input type="text" id="search-input" placeholder="Search issues..." class="ion-input gl-search">
-        <select id="scope-filter" class="ion-select gl-filter" data-change-action="loadIssues">
+    <div class="flex flex-wrap items-center gap-3">
+        <input type="text" id="search-input" placeholder="Search issues..." class="input input-sm flex-1 min-w-[12rem]">
+        <select id="scope-filter" class="select select-sm min-w-[9rem]" data-change-action="loadIssues">
             <option value="my">My Issues</option>
             <option value="all">All Issues</option>
         </select>
-        <select id="state-filter" class="ion-select gl-filter" data-change-action="loadIssues">
+        <select id="state-filter" class="select select-sm min-w-[9rem]" data-change-action="loadIssues">
             <option value="all">All States</option>
             <option value="opened">Open</option>
             <option value="closed">Closed</option>
         </select>
-        <select id="label-filter" class="ion-select gl-filter" data-change-action="loadIssues">
+        <select id="label-filter" class="select select-sm min-w-[9rem]" data-change-action="loadIssues">
             <option value="">All Labels</option>
         </select>
-        <button class="ion-btn" data-click-action="loadIssues">Refresh</button>
+        <button class="btn btn-ghost btn-sm" data-click-action="loadIssues">Refresh</button>
     </div>
 
     <!-- Issues List -->
-    <div id="issues-list" class="issues-list">
+    <div id="issues-list" class="mt-4">
         <p class="loading">Loading issues...</p>
+    </div>
     </div>
 </div>
 
@@ -68,49 +73,49 @@
 
 <!-- Create Issue Modal -->
 <div id="create-issue-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-large">
-        <div class="modal-header">
-            <h2>Create Issue</h2>
-            <button class="modal-close" data-click-action="closeCreateIssueModal">&times;</button>
+    <div class="modal-box w-11/12 max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold">Create Issue</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeCreateIssueModal" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="form-group">
-                <label for="issue-title">Title *</label>
-                <input type="text" id="issue-title" class="ion-input" placeholder="Issue title">
-            </div>
-            <div class="form-group">
-                <label for="issue-description">Description</label>
-                <textarea id="issue-description" class="ion-textarea" rows="8" placeholder="Markdown supported"></textarea>
-            </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="issue-labels">Labels</label>
-                    <select id="issue-labels" class="ion-select" multiple size="4">
+        <div class="pt-4 flex flex-col gap-4">
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Title *</legend>
+                <input type="text" id="issue-title" class="input w-full" placeholder="Issue title">
+            </fieldset>
+            <fieldset class="fieldset p-0">
+                <legend class="fieldset-legend">Description</legend>
+                <textarea id="issue-description" class="textarea w-full" rows="8" placeholder="Markdown supported"></textarea>
+            </fieldset>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Labels</legend>
+                    <select id="issue-labels" class="select w-full h-auto" multiple size="4">
                     </select>
-                    <small>Hold Ctrl/Cmd to select multiple</small>
-                </div>
-                <div class="form-group">
-                    <label for="issue-assignee">Assignee</label>
-                    <select id="issue-assignee" class="ion-select">
+                    <p class="label text-xs opacity-60">Hold Ctrl/Cmd to select multiple</p>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Assignee</legend>
+                    <select id="issue-assignee" class="select w-full">
                         <option value="">Unassigned</option>
                     </select>
-                </div>
+                </fieldset>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="issue-milestone">Milestone</label>
-                    <select id="issue-milestone" class="ion-select">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Milestone</legend>
+                    <select id="issue-milestone" class="select w-full">
                         <option value="">No Milestone</option>
                     </select>
-                </div>
-                <div class="form-group">
-                    <label for="issue-due-date">Due Date</label>
-                    <input type="date" id="issue-due-date" class="ion-input">
-                </div>
+                </fieldset>
+                <fieldset class="fieldset p-0">
+                    <legend class="fieldset-legend">Due Date</legend>
+                    <input type="date" id="issue-due-date" class="input w-full">
+                </fieldset>
             </div>
-            <div class="modal-actions">
-                <button class="ion-btn" data-click-action="closeCreateIssueModal">Cancel</button>
-                <button class="ion-btn ion-btn-primary" data-click-action="createIssue">Create Issue</button>
+            <div class="modal-action">
+                <button class="btn btn-ghost" data-click-action="closeCreateIssueModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="createIssue">Create Issue</button>
             </div>
         </div>
     </div>
@@ -118,51 +123,51 @@
 
 <!-- Issue Detail Modal -->
 <div id="issue-detail-modal" class="modal _ion-s-f2892a2e8a">
-    <div class="modal-content modal-xlarge">
-        <div class="modal-header">
-            <h2 id="issue-detail-title">Issue #</h2>
-            <button class="modal-close" data-click-action="closeIssueDetailModal">&times;</button>
+    <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between gap-4">
+            <h2 class="text-lg font-semibold" id="issue-detail-title">Issue #</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeIssueDetailModal" aria-label="Close">&times;</button>
         </div>
-        <div class="modal-body">
-            <div class="issue-detail-layout">
-                <div class="issue-main">
-                    <div class="issue-meta" id="issue-detail-meta"></div>
-                    <div class="issue-description" id="issue-detail-description"></div>
+        <div class="pt-4">
+            <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_16rem] gap-8">
+                <div class="min-w-0">
+                    <div class="flex flex-wrap gap-4 text-sm opacity-70 mb-6 pb-4 border-b border-base-300" id="issue-detail-meta"></div>
+                    <div class="p-4 bg-base-200 rounded-box min-h-[100px]" id="issue-detail-description"></div>
 
-                    <div class="issue-comments-section">
-                        <h3>Comments</h3>
-                        <div id="issue-comments-list" class="comments-list"></div>
+                    <div class="mt-8">
+                        <h3 class="text-base font-semibold mb-4">Comments</h3>
+                        <div id="issue-comments-list" class="mb-4"></div>
 
-                        <div class="add-comment">
-                            <textarea id="new-comment" class="ion-textarea" rows="3" placeholder="Add a comment..."></textarea>
-                            <button class="ion-btn ion-btn-primary" data-click-action="addComment">Add Comment</button>
+                        <div class="flex flex-col gap-2">
+                            <textarea id="new-comment" class="textarea w-full" rows="3" placeholder="Add a comment..."></textarea>
+                            <button class="btn btn-primary self-end" data-click-action="addComment">Add Comment</button>
                         </div>
                     </div>
                 </div>
-                <div class="issue-sidebar">
-                    <div class="sidebar-section">
-                        <h4>Status</h4>
+                <div class="lg:border-l lg:border-base-300 lg:pl-6">
+                    <div class="mb-6">
+                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Status</h4>
                         <span id="issue-detail-state" class="issue-state"></span>
-                        <button id="toggle-state-btn" class="ion-btn btn-sm" data-click-action="toggleIssueState"></button>
+                        <button id="toggle-state-btn" class="btn btn-sm mt-2" data-click-action="toggleIssueState"></button>
                     </div>
-                    <div class="sidebar-section">
-                        <h4>Labels</h4>
-                        <div id="issue-detail-labels" class="label-list"></div>
+                    <div class="mb-6">
+                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Labels</h4>
+                        <div id="issue-detail-labels" class="flex flex-wrap gap-1"></div>
                     </div>
-                    <div class="sidebar-section">
-                        <h4>Assignees</h4>
+                    <div class="mb-6">
+                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Assignees</h4>
                         <div id="issue-detail-assignees"></div>
                     </div>
-                    <div class="sidebar-section">
-                        <h4>Milestone</h4>
+                    <div class="mb-6">
+                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Milestone</h4>
                         <div id="issue-detail-milestone"></div>
                     </div>
-                    <div class="sidebar-section">
-                        <h4>Due Date</h4>
+                    <div class="mb-6">
+                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Due Date</h4>
                         <div id="issue-detail-due-date"></div>
                     </div>
-                    <div class="sidebar-section">
-                        <a id="issue-gitlab-link" href="#" target="_blank" class="ion-btn ion-btn-ghost">View in GitLab</a>
+                    <div class="mb-6">
+                        <a id="issue-gitlab-link" href="#" target="_blank" class="btn btn-ghost">View in GitLab</a>
                     </div>
                 </div>
             </div>
@@ -176,248 +181,152 @@
 
 {% block scripts %}
 <style nonce="{{ csp_nonce }}">
-.connection-status {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    border-radius: 4px;
-    background: var(--bg-secondary);
+/* JS opens these via CSSOM display:flex, not daisyUI .modal-open. Bridge. */
+#create-issue-modal[style*="flex"],
+#issue-detail-modal[style*="flex"] {
+    display: grid;
+    place-items: center;
+    align-items: center;
+    justify-content: center;
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
 }
+#create-issue-modal[style*="flex"] > .modal-box,
+#issue-detail-modal[style*="flex"] > .modal-box {
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+}
+#create-issue-modal[style*="flex"] > .modal-box { max-width: 700px; }
+#issue-detail-modal[style*="flex"] > .modal-box { max-width: 900px; }
 
+/* JS overwrites className to "connection-status connected|error". */
 .connection-status.connected {
-    background: color-mix(in srgb, var(--success) 15%, transparent);
-    border: 1px solid var(--success);
-    color: var(--success);
+    background: color-mix(in oklab, var(--color-success) 15%, transparent);
+    border: 1px solid var(--color-success);
+    color: var(--color-success);
 }
-
 .connection-status.error {
-    background: color-mix(in srgb, var(--danger) 15%, transparent);
-    border: 1px solid var(--danger);
-    color: var(--danger);
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+    border: 1px solid var(--color-error);
+    color: var(--color-error);
 }
 
-.status-checking {
-    color: var(--text-muted);
-}
-
-.empty-state {
+/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
+#issues-list .loading,
+#issue-comments-list .loading {
+    display: block;
+    aspect-ratio: auto;
+    width: auto;
+    height: auto;
+    background: none;
+    mask-image: none;
+    -webkit-mask-image: none;
     text-align: center;
-    padding: 4rem 2rem;
-    background: var(--bg-secondary);
-    border-radius: var(--radius-lg);
+    padding: 2rem;
+    opacity: 0.6;
 }
 
-.empty-state h2 {
-    margin-bottom: 1rem;
-}
-
-.empty-state p {
-    color: var(--text-muted);
-    margin-bottom: 2rem;
-}
-
-.issues-list {
-    margin-top: 1rem;
-}
-
+/* JS innerHTML: issue cards. Hover lift has no daisyUI card equivalent. */
 .issue-card {
-    background: var(--bg-secondary);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 1rem);
     padding: 1rem 1.5rem;
     margin-bottom: 0.75rem;
     cursor: pointer;
     transition: box-shadow 0.2s;
 }
-
 .issue-card:hover {
-    box-shadow: 0 2px 8px rgba(0,0,0,.15);
+    box-shadow: 0 2px 8px color-mix(in oklab, var(--color-base-content) 15%, transparent);
 }
-
 .issue-header {
     display: flex;
     align-items: flex-start;
     gap: 1rem;
 }
-
 .issue-id {
-    color: var(--text-muted);
+    opacity: 0.6;
     font-weight: 500;
 }
-
 .issue-title-text {
     flex: 1;
     font-weight: 500;
 }
 
+/* JS sets className to "issue-state opened|closed" — not badge-success. */
 .issue-state {
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
     font-size: 0.8rem;
     font-weight: 500;
 }
-
 .issue-state.opened {
-    background: var(--success);
-    color: white;
+    background: var(--color-success);
+    color: var(--color-success-content);
 }
-
 .issue-state.closed {
-    background: #6c757d;
-    color: white;
+    background: var(--color-neutral);
+    color: var(--color-neutral-content);
 }
 
+/* GitLab label colours come from the API via data-ion-style. */
 .issue-labels {
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
     margin-top: 0.5rem;
 }
-
 .issue-label {
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     font-size: 0.75rem;
     color: white;
 }
-
 .issue-footer {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-top: 0.75rem;
     font-size: 0.85rem;
-    color: var(--text-muted);
+    opacity: 0.6;
 }
 
-.modal-medium {
-    max-width: 500px;
-}
-
-.modal-large {
-    max-width: 700px;
-}
-
-.modal-xlarge {
-    max-width: 900px;
-}
-
-.form-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-}
-
-.issue-detail-layout {
-    display: grid;
-    grid-template-columns: 1fr 250px;
-    gap: 2rem;
-}
-
-.issue-main {
-    min-width: 0;
-}
-
-.issue-meta {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    font-size: 0.9rem;
-    color: var(--text-muted);
-    margin-bottom: 1.5rem;
-    padding-bottom: 1rem;
-    border-bottom: 1px solid var(--border);
-}
-
-.issue-description {
-    padding: 1rem;
-    background: var(--bg-secondary);
-    border-radius: 4px;
-    min-height: 100px;
-}
-
-.issue-comments-section {
-    margin-top: 2rem;
-}
-
-.issue-comments-section h3 {
-    margin-bottom: 1rem;
-}
-
-.comments-list {
-    margin-bottom: 1rem;
-}
-
+/* JS innerHTML: comment threads. */
 .comment-item {
-    background: var(--bg-secondary);
+    background: var(--color-base-200);
     padding: 1rem;
-    border-radius: 4px;
+    border-radius: var(--radius-box, 1rem);
     margin-bottom: 0.75rem;
 }
-
 .comment-header {
     display: flex;
     justify-content: space-between;
     margin-bottom: 0.5rem;
     font-size: 0.85rem;
 }
+.comment-author { font-weight: 500; }
+.comment-date { opacity: 0.6; }
+.comment-body { white-space: pre-wrap; }
 
-.comment-author {
-    font-weight: 500;
+/* Native multi-select: daisyUI .select is a single-line dropdown. */
+#issue-labels {
+    height: auto;
+    background-image: none;
+    padding-right: 0.75rem;
 }
 
-.comment-date {
-    color: var(--text-muted);
+.error-message {
+    color: var(--color-error);
+    padding: 1rem;
 }
-
-.comment-body {
-    white-space: pre-wrap;
+.empty-message {
+    opacity: 0.6;
+    padding: 1rem;
+    text-align: center;
 }
-
-.add-comment {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.add-comment .btn {
-    align-self: flex-end;
-}
-
-.issue-sidebar {
-    border-left: 1px solid var(--border);
-    padding-left: 1.5rem;
-}
-
-.sidebar-section {
-    margin-bottom: 1.5rem;
-}
-
-.sidebar-section h4 {
-    font-size: 0.85rem;
-    color: var(--text-muted);
-    margin-bottom: 0.5rem;
-    text-transform: uppercase;
-}
-
-.label-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-}
-
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.85rem;
-}
-
-.toolbar {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 1rem;
-}
-
-.gl-search { flex: 1; }
-.gl-filter { min-width: 150px; }
 </style>
 
 <script nonce="{{ csp_nonce }}">

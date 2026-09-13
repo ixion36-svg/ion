@@ -6,15 +6,18 @@
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
 <div class="relative z-10 mx-auto max-w-[920px] w-full px-4 sm:px-6 py-10 md:py-14">
 
-  <a id="ln-back" href="/courses" class="inline-flex items-center gap-1 text-[12px] text-slate-400 hover:text-white mb-4">← Back</a>
+  <a id="ln-back" href="/courses" class="btn btn-ghost btn-sm mb-4">← Back</a>
 
   <div id="ln-root">
-    <div class="text-slate-500 text-[13px] py-8 text-center">Loading…</div>
+    <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50">
+      <span class="loading loading-spinner loading-sm text-primary"></span> Loading…
+    </div>
   </div>
 </div>
 </div>
 
 <style nonce="{{ csp_nonce }}">
+/* marked.parse emits h2/code/pre/table/blockquote/mermaid with no classes we can attach. */
 .ln-content{font-size:0.95rem;line-height:1.65;color:var(--text-primary)}
 .ln-content h2{font-size:1.4rem;font-weight:700;margin-top:1.6rem;margin-bottom:0.6rem;color:var(--text-primary)}
 .ln-content h3{font-size:1.15rem;font-weight:700;margin-top:1.3rem;margin-bottom:0.5rem;color:var(--text-primary)}
@@ -33,31 +36,10 @@
 .ln-content img{max-width:100%;border-radius:0.4rem;margin:0.6rem 0}
 .ln-content .mermaid{background:var(--bg-deep);border-radius:0.4rem;padding:1rem;margin:0.85rem 0;border:1px solid var(--border)}
 
-.ln-q{padding:1rem 1.2rem;margin-top:0.85rem;background:var(--bg-secondary);border:1px solid var(--border);border-radius:0.45rem}
-.ln-q-stem{font-weight:600;color:var(--text-primary);font-size:0.95rem;margin-bottom:0.6rem;line-height:1.45}
-.ln-q-points{font-size:0.65rem;color:var(--text-muted);float:right;font-family:'JetBrains Mono',monospace}
+/* JS toggles .checked on .ln-opt; no daisyUI equivalent for the selected option row. */
 .ln-opt{display:flex;gap:0.5rem;align-items:flex-start;padding:0.5rem 0.65rem;border-radius:0.3rem;background:var(--bg-deep);margin-top:0.35rem;cursor:pointer;transition:background .12s,border-color .12s;border:1px solid transparent}
 .ln-opt:hover{background:var(--primary-dim)}
 .ln-opt.checked{background:var(--primary-dim);border-color:var(--primary)}
-.ln-opt input{margin-top:0.15rem;flex-shrink:0;accent-color:var(--primary)}
-.ln-opt-label{font-size:0.85rem;color:var(--text-primary)}
-.ln-shortans{width:100%;padding:0.5rem 0.7rem;background:var(--bg-deep);border:1px solid var(--border);border-radius:0.3rem;color:var(--text-primary);font-size:0.85rem;font-family:'JetBrains Mono',monospace}
-.ln-shortans:focus{outline:none;border-color:var(--primary)}
-
-.ln-result-correct{border-left:3px solid var(--success);padding-left:0.7rem;margin-top:0.4rem;color:var(--success);font-size:0.78rem;font-weight:600}
-.ln-result-wrong{border-left:3px solid var(--danger);padding-left:0.7rem;margin-top:0.4rem;color:var(--danger);font-size:0.78rem;font-weight:600}
-.ln-result-explain{font-size:0.8rem;color:var(--text-secondary);margin-top:0.35rem;font-style:italic;line-height:1.45}
-
-.ln-banner{padding:1rem 1.2rem;border-radius:0.45rem;margin:0.85rem 0;font-size:0.9rem}
-.ln-banner-pass{background:rgba(134,240,160,0.12);border:1px solid rgba(134,240,160,0.3);color:var(--success)}
-.ln-banner-fail{background:rgba(255,108,108,0.12);border:1px solid rgba(255,108,108,0.3);color:var(--danger)}
-
-.ln-actions{display:flex;gap:0.5rem;margin-top:1.25rem;flex-wrap:wrap}
-.ln-btn-primary{background:var(--primary);color:var(--bg-deep);border:none;border-radius:0.4rem;padding:0.65rem 1.4rem;font-size:0.85rem;font-weight:700;cursor:pointer;transition:filter .15s}
-.ln-btn-primary:hover{filter:brightness(1.1)}
-.ln-btn-primary:disabled{opacity:0.5;cursor:not-allowed}
-.ln-btn-secondary{background:transparent;color:var(--text-secondary);border:1px solid var(--border);border-radius:0.4rem;padding:0.65rem 1.4rem;font-size:0.85rem;font-weight:600;cursor:pointer}
-.ln-btn-secondary:hover{background:var(--bg-secondary)}
 </style>
 
 <script nonce="{{ csp_nonce }}">
@@ -90,7 +72,7 @@ async function loadLesson() {
     }
   } catch (e) {
     document.getElementById('ln-root').innerHTML =
-      '<div class="text-ion-coral py-8 text-center text-[13px]">Failed to load lesson: ' + escHtml(e.message) + '</div>';
+      '<div role="alert" class="alert alert-error"><span>Failed to load lesson: ' + escHtml(e.message) + '</span></div>';
   }
 }
 
@@ -108,22 +90,23 @@ function render() {
   const l = _lesson;
   const isQuizLike = (l.lesson_type === 'quiz' || l.lesson_type === 'lab');
   const labLink = (l.lesson_type === 'lab' && l.lab_target_url)
-    ? `<div class="ln-banner _ion-s-99d9b53847">
-         <strong>Hands-on lab.</strong> Open <a class="underline" href="${escHtml(l.lab_target_url)}" target="_blank">${escHtml(l.lab_target_url)}</a>
-         in another tab and complete the task before answering the verification questions.
+    ? `<div role="alert" class="alert alert-warning _ion-s-99d9b53847">
+         <span><strong>Hands-on lab.</strong> Open <a class="link" href="${escHtml(l.lab_target_url)}" target="_blank">${escHtml(l.lab_target_url)}</a>
+         in another tab and complete the task before answering the verification questions.</span>
        </div>` : '';
 
   const labFixturesSection = (l.lesson_type === 'lab')
-    ? `<div id="ln-lab-fixtures" class="ln-banner _ion-s-ba14db93df">
-         <div class="_ion-s-586dee8c5b">Lab environment</div>
+    ? `<div id="ln-lab-fixtures" class="card bg-base-200 shadow-sm mb-3 _ion-s-ba14db93df">
+         <div class="card-body">
+         <h2 class="card-title text-base _ion-s-586dee8c5b">Lab environment</h2>
          <div class="_ion-s-d110d4972e" id="ln-lab-status">
            Click <em>Launch lab</em> to seed practice alerts/cases into ION for this exercise.
          </div>
-         <div class="_ion-s-82ea167a73">
-           <button id="ln-lab-launch-btn" class="ln-btn-primary _ion-s-1b3ebf28b4" data-click-action="launchLab">
+         <div class="card-actions _ion-s-82ea167a73">
+           <button id="ln-lab-launch-btn" class="btn btn-primary btn-sm _ion-s-1b3ebf28b4" data-click-action="launchLab">
              Launch lab
            </button>
-           <button id="ln-lab-complete-btn" class="ln-btn-secondary _ion-s-1b3ebf28b4" data-click-action="completeLab">
+           <button id="ln-lab-complete-btn" class="btn btn-ghost btn-sm _ion-s-1b3ebf28b4" data-click-action="completeLab">
              Complete lab
            </button>
          </div>
@@ -133,39 +116,55 @@ function render() {
            <div class="_ion-s-eccba22010">Lab attempt history</div>
            <div id="ln-lab-history-list"></div>
          </div>
+         </div>
        </div>`
     : '';
 
   let questionsHtml = '';
   if (isQuizLike && (l.questions || []).length) {
-    questionsHtml = '<h2 class="_ion-s-6e58ee35af">Verification questions</h2>' +
+    questionsHtml = '<h2 class="text-lg font-bold _ion-s-6e58ee35af">Verification questions</h2>' +
       (l.questions || []).map(q => renderQuestion(q)).join('');
   }
 
   const completeBtn = (l.lesson_type === 'reading')
-    ? `<button class="ln-btn-primary" data-click-action="markComplete" ${l.user_status === 'completed' ? 'disabled' : ''}>
+    ? `<button class="btn btn-primary" data-click-action="markComplete" ${l.user_status === 'completed' ? 'disabled' : ''}>
          ${l.user_status === 'completed' ? '✓ Completed' : 'Mark complete →'}
        </button>`
-    : `<button id="ln-submit-btn" class="ln-btn-primary" data-click-action="submitQuiz">Submit answers</button>`;
+    : `<button id="ln-submit-btn" class="btn btn-primary" data-click-action="submitQuiz">Submit answers</button>`;
 
   const pdfLink = _courseSlug
-    ? `<a class="ln-btn-secondary _ion-s-c1224911b6" href="/api/courses/${_courseSlug}/lessons/${l.id}/export.pdf" download>Download PDF</a>`
+    ? `<a class="btn btn-ghost _ion-s-c1224911b6" href="/api/courses/${_courseSlug}/lessons/${l.id}/export.pdf" download>Download PDF</a>`
     : '';
 
+  const scoreStat = l.user_score != null
+    ? `<div class="stat py-3 px-4">
+         <div class="stat-title">Last score</div>
+         <div class="stat-value text-lg">${l.user_score}%</div>
+       </div>` : '';
+  const attemptsStat = l.user_attempts > 0
+    ? `<div class="stat py-3 px-4">
+         <div class="stat-title">Attempts</div>
+         <div class="stat-value text-lg">${l.user_attempts}</div>
+         <div class="stat-desc">${l.user_attempts !== 1 ? 'attempts' : 'attempt'}</div>
+       </div>` : '';
+
   document.getElementById('ln-root').innerHTML = `
-    <div class="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-2">${escHtml(l.lesson_type)}</div>
-    <h1 class="text-[26px] font-bold text-white tracking-tight mb-2">${escHtml(l.title)}</h1>
-    <div class="flex gap-3 text-[12px] text-slate-400 mb-5">
-      <span>~${l.duration_min}m</span>
-      ${l.user_score != null ? `<span>Last score: <strong>${l.user_score}%</strong></span>` : ''}
-      ${l.user_attempts > 0 ? `<span>${l.user_attempts} attempt${l.user_attempts !== 1 ? 's' : ''}</span>` : ''}
+    <div class="badge badge-ghost badge-sm uppercase tracking-wider mb-2">${escHtml(l.lesson_type)}</div>
+    <h1 class="text-2xl font-bold tracking-tight mb-2">${escHtml(l.title)}</h1>
+    <div class="stats stats-vertical sm:stats-horizontal bg-base-200 shadow-sm mb-5">
+      <div class="stat py-3 px-4">
+        <div class="stat-title">Duration</div>
+        <div class="stat-value text-lg">~${l.duration_min}m</div>
+      </div>
+      ${scoreStat}
+      ${attemptsStat}
     </div>
     ${labFixturesSection}
     ${labLink}
     <div id="ln-content" class="ln-content">${md(l.content_md || '')}</div>
     <div id="ln-questions">${questionsHtml}</div>
     <div id="ln-banner-slot"></div>
-    <div class="ln-actions">${completeBtn}${pdfLink}</div>
+    <div class="ln-actions flex flex-wrap gap-2 mt-5">${completeBtn}${pdfLink}</div>
   `;
 
   // Wire option clicks
@@ -194,22 +193,26 @@ function renderQuestion(q) {
   let body = '';
   if (q.kind === 'single' || q.kind === 'truefalse') {
     body = (q.options || []).map(opt =>
-      `<label class="ln-opt"><input type="radio" name="q${q.id}" data-qid="${q.id}" value="${escHtml(opt.value)}">
-        <span class="ln-opt-label">${md(opt.label || opt.value)}</span></label>`
+      `<label class="ln-opt"><input type="radio" class="radio radio-sm radio-primary mt-0.5 shrink-0" name="q${q.id}" data-qid="${q.id}" value="${escHtml(opt.value)}">
+        <span class="text-sm">${md(opt.label || opt.value)}</span></label>`
     ).join('');
   } else if (q.kind === 'multi') {
     body = (q.options || []).map(opt =>
-      `<label class="ln-opt"><input type="checkbox" data-qid="${q.id}" value="${escHtml(opt.value)}">
-        <span class="ln-opt-label">${md(opt.label || opt.value)}</span></label>`
+      `<label class="ln-opt"><input type="checkbox" class="checkbox checkbox-sm checkbox-primary mt-0.5 shrink-0" data-qid="${q.id}" value="${escHtml(opt.value)}">
+        <span class="text-sm">${md(opt.label || opt.value)}</span></label>`
     ).join('');
   } else if (q.kind === 'shortanswer') {
-    body = `<input type="text" class="ln-shortans" data-qid="${q.id}" placeholder="Your answer…">`;
+    body = `<input type="text" class="ln-shortans input input-bordered w-full font-mono text-sm" data-qid="${q.id}" placeholder="Your answer…">`;
   }
-  return `<div class="ln-q" id="ln-q-${q.id}">
-    <span class="ln-q-points">${q.points} pt${q.points !== 1 ? 's' : ''}</span>
-    <div class="ln-q-stem">${md(q.stem_md || '')}</div>
+  return `<div class="ln-q card bg-base-200 shadow-sm mt-3" id="ln-q-${q.id}">
+    <div class="card-body p-4">
+    <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+      <div class="basis-full md:basis-auto md:flex-1 font-semibold text-sm leading-snug">${md(q.stem_md || '')}</div>
+      <span class="badge badge-ghost badge-sm font-mono">${q.points} pt${q.points !== 1 ? 's' : ''}</span>
+    </div>
     ${body}
     <div id="ln-q-result-${q.id}"></div>
+    </div>
   </div>`;
 }
 
@@ -269,28 +272,28 @@ window.submitQuiz = submitQuiz;
 function renderResults(d) {
   // Banner
   const banner = d.passed
-    ? `<div class="ln-banner ln-banner-pass">✓ <strong>Passed</strong> — ${d.score_pct}% (need ${d.threshold}%). ${d.earned_points}/${d.total_points} points.</div>`
-    : `<div class="ln-banner ln-banner-fail">✗ <strong>Below threshold</strong> — ${d.score_pct}% (need ${d.threshold}%). Review the explanations and re-attempt.</div>`;
+    ? `<div role="alert" class="alert alert-success mt-3">✓ <strong>Passed</strong> — ${d.score_pct}% (need ${d.threshold}%). ${d.earned_points}/${d.total_points} points.</div>`
+    : `<div role="alert" class="alert alert-error mt-3">✗ <strong>Below threshold</strong> — ${d.score_pct}% (need ${d.threshold}%). Review the explanations and re-attempt.</div>`;
   document.getElementById('ln-banner-slot').innerHTML = banner;
 
   // Per-question feedback
   (d.results || []).forEach(res => {
     const slot = document.getElementById('ln-q-result-' + res.question_id);
     if (!slot) return;
-    const cls = res.is_correct ? 'ln-result-correct' : 'ln-result-wrong';
+    const cls = res.is_correct ? 'alert alert-success mt-2 py-2' : 'alert alert-error mt-2 py-2';
     const label = res.is_correct ? `✓ Correct — ${res.points_earned}/${res.points_max} pts` :
       `✗ Incorrect — ${res.points_earned}/${res.points_max} pts. Correct answer: ${escHtml(JSON.stringify(res.correct_answer))}`;
-    let html = `<div class="${cls}">${label}</div>`;
+    let html = `<div role="alert" class="${cls}">${label}</div>`;
     if (res.explanation_md) {
-      html += `<div class="ln-result-explain">${md(res.explanation_md)}</div>`;
+      html += `<div class="text-sm italic opacity-70 mt-1.5 leading-snug">${md(res.explanation_md)}</div>`;
     }
     slot.innerHTML = html;
   });
 
   // Replace submit button with retry / next
   document.querySelector('.ln-actions').innerHTML = `
-    <button class="ln-btn-secondary" data-click-action="loadLesson">Re-attempt</button>
-    <a class="ln-btn-primary" href="javascript:history.back()">Back to course →</a>
+    <button class="btn btn-ghost" data-click-action="loadLesson">Re-attempt</button>
+    <a class="btn btn-primary" href="javascript:history.back()">Back to course →</a>
   `;
 }
 
@@ -361,10 +364,11 @@ function _renderLabCriteria(d) {
             </div>`;
   }).join('');
   host.innerHTML =
-    '<div class="_ion-s-d1b1c0a49d">'
-    + '<div class="_ion-s-3965425ce7">Rubric</div>'
+    '<div class="card bg-base-300 shadow-sm _ion-s-d1b1c0a49d">'
+    + '<div class="card-title text-sm px-2 pt-2 _ion-s-3965425ce7">Rubric</div>'
+    + '<div class="card-body p-2">'
     + rows
-    + '</div>';
+    + '</div></div>';
 }
 
 async function _loadLabHistory() {
@@ -395,6 +399,9 @@ async function _loadLabHistory() {
       const label = status === 'completed' ? 'Pass'
         : status === 'failed' ? 'Fail'
         : 'In progress';
+      const statusBadge = status === 'completed' ? 'badge-success'
+        : status === 'failed' ? 'badge-error'
+        : 'badge-info';
       const score = (s.score === null || s.score === undefined) ? '—' : `${s.score}%`;
       const completedAt = s.completed_at ? new Date(s.completed_at).toLocaleString() : '(not completed)';
       const criteriaRows = (s.criteria || []).map(c => {
@@ -410,17 +417,19 @@ async function _loadLabHistory() {
         ? `<div class="_ion-s-ebfdcc23be" id="${cardId}-crit">${criteriaRows}</div>`
         : '';
       const toggle = criteriaRows
-        ? `<button class="_ion-s-d6d316dc26" data-click-action="toggleCardCriteria" data-args='[${JSON.stringify(cardId)}]'>Show breakdown ▾</button>`
+        ? `<button class="btn btn-ghost btn-xs _ion-s-d6d316dc26" data-click-action="toggleCardCriteria" data-args='[${JSON.stringify(cardId)}]'>Show breakdown ▾</button>`
         : '';
-      return `<div class="_ion-s-bdbf1f7451" id="${cardId}">
+      return `<div class="card bg-base-300 shadow-sm _ion-s-bdbf1f7451" id="${cardId}">
+                <div class="card-body p-3">
                 <div class="_ion-s-b93035ced5">
-                  <span class="_ion-s-7ee8d1002a" data-ion-style="color:${colour}">${label}</span>
+                  <span class="badge badge-sm ${statusBadge} _ion-s-7ee8d1002a" data-ion-style="color:${colour}">${label}</span>
                   <span class="_ion-s-37149aea5a">Attempt ${s.attempt_number}</span>
                   <span class="_ion-s-d997572aeb">${score}</span>
                 </div>
                 <div class="_ion-s-27fae56e60">${escHtml(completedAt)} · pass mark ${threshold}%</div>
                 ${toggle}
                 ${criteriaBlock}
+                </div>
               </div>`;
     }).join('');
   } catch (e) {
@@ -434,7 +443,7 @@ function _renderLabLinks(d) {
   const links = (d.observable_links || []).filter(Boolean);
   if (!links.length) return;
   el.innerHTML = 'Seeded: ' + links.map(l =>
-    `<a href="${escHtml(l)}" target="_blank" class="underline _ion-s-c51489969c">${escHtml(l)}</a>`
+    `<a href="${escHtml(l)}" target="_blank" class="link _ion-s-c51489969c">${escHtml(l)}</a>`
   ).join('');
 }
 
