@@ -1,13 +1,55 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.95.0 -->
-<!-- ion-doc:version=0.95.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.0 -->
+<!-- ion-doc:version=0.96.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-14 -->
 
 # Changelog
+
+## v0.96.0 — 2026-09-14
+
+**Multi-tenancy, phase 1: one ION can serve more than one client estate.**
+Off by default (`ION_MULTI_TENANT`), and off behaves exactly as before. Nothing
+is tenant-scoped yet except the Elasticsearch and Kibana a request talks to —
+ION's own cases, triage and notes are still shared, which is phase 2.
+
+- **A tenant names an estate.** Identity lives in a `tenants` row (slug, name);
+  the connection lives in `ION_TENANT_<SLUG>_*` variables, matching the
+  `ION_<NAME>_*` family every other integration uses. Credentials stay in `.env`
+  rather than becoming a new secret store in the database. Anything unset is
+  inherited from the process-wide config, so a tenant that only moves cluster
+  sets a URL and credentials and nothing else. Adding one needs a restart.
+- **Those credentials are the cluster service account ION connects as**, not an
+  analyst's. Access is decided by that account's Elastic role and the Kibana
+  space it can reach, so alert isolation holds in Elasticsearch rather than
+  depending on ION applying a filter.
+- **An estate toggle in the header.** Renders only when multi-tenancy is on and
+  the analyst has more than one estate: a tenant-bound analyst sees which estate
+  they are on with no control, and a single-estate deploy sees an unchanged
+  header. Switching is refused, not ignored, when the estate is not theirs.
+- **`users.tenant_id`** is nullable; NULL is platform-global, a support account
+  that can act across estates. Existing users are left NULL rather than
+  backfilled, which would have silently narrowed what they can see.
+- **Arkime and OpenCTI stay shared** across tenants by decision, not omission.
+
+**Fixes found while building it.**
+
+- **The Elasticsearch client was a single slot**, so two estates evicted each
+  other and rebuilt a connection pool on every alternating request. Now pooled
+  per (tenant, event loop). Keyed by tenant rather than credential fingerprint:
+  keying on the fingerprint made a rotated credential look like a new estate and
+  left the superseded client pooled instead of closed.
+- **`get_elasticsearch_service()` cached one instance for the process**, which
+  under multi-tenancy would freeze whichever estate constructed it first and
+  serve that to every later caller. It now caches only while serving one estate.
+
+**`.env.deploy` is 31% smaller.** Twenty-five lines of per-release history —
+newest entry 56 releases old — moved to where that record already lives, and the
+last `# vX.Y.Z:` annotations went with it. No setting was removed: all 303 are
+still there.
 
 ## v0.95.0 — 2026-09-14
 
