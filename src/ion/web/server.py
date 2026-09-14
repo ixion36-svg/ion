@@ -658,6 +658,36 @@ def _validate_startup_config():
     if os.environ.get("ION_DEBUG_MODE", "").lower() == "true":
         warnings.append("ION_DEBUG_MODE=true — /docs and /redoc are publicly accessible")
 
+    # TLS verification ships off for the internal integrations because
+    # air-gapped estates run self-signed certs. That trade is deliberate, but it
+    # must never be silent: with verification off, an on-path attacker can
+    # impersonate any of these — for OIDC that means forging the JWKS and
+    # minting tokens as any user. ION_CA_BUNDLE plus ION_<NAME>_VERIFY_SSL=true
+    # is the way back. Only enabled integrations are reported, so the warning
+    # stays about the estate actually running.
+    _cfg = _get_config()
+    _tls = (
+        ("OIDC", _cfg.oidc_enabled, _cfg.oidc_verify_ssl, "ION_OIDC_VERIFY_SSL"),
+        ("Elasticsearch", _cfg.elasticsearch_enabled, _cfg.elasticsearch_verify_ssl, "ION_ELASTICSEARCH_VERIFY_SSL"),
+        ("Kibana", _cfg.kibana_cases_enabled, _cfg.kibana_verify_ssl, "ION_KIBANA_VERIFY_SSL"),
+        ("Ollama", _cfg.ollama_enabled, _cfg.ollama_verify_ssl, "ION_OLLAMA_VERIFY_SSL"),
+        ("GitLab", _cfg.gitlab_enabled, _cfg.gitlab_verify_ssl, "ION_GITLAB_VERIFY_SSL"),
+        ("OpenCTI", _cfg.opencti_enabled, _cfg.opencti_verify_ssl, "ION_OPENCTI_VERIFY_SSL"),
+        ("Arkime", _cfg.arkime_enabled, _cfg.arkime_verify_ssl, "ION_ARKIME_VERIFY_SSL"),
+        ("TIDE", _cfg.tide_enabled, _cfg.tide_verify_ssl, "ION_TIDE_VERIFY_SSL"),
+        ("DFIR-IRIS", _cfg.dfir_iris_enabled, _cfg.dfir_iris_verify_ssl, "ION_DFIR_IRIS_VERIFY_SSL"),
+    )
+    _unverified = [(name, var) for name, on, verify, var in _tls if on and not verify]
+    if _unverified:
+        warnings.append(
+            "TLS certificate verification is OFF for: "
+            + ", ".join(name for name, _ in _unverified)
+            + " — this traffic is not certificate-verified and an on-path attacker "
+            "could impersonate these hosts. Set ION_CA_BUNDLE (for self-signed "
+            "estates) and turn verification on per integration: "
+            + ", ".join(f"{var}=true" for _, var in _unverified)
+        )
+
     # Log results
     for w in warnings:
         logger.warning("CONFIG: %s", w)

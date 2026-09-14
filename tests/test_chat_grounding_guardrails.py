@@ -116,9 +116,22 @@ def flag_on(monkeypatch):
     return cfg
 
 
+def test_the_check_is_on_by_default(monkeypatch):
+    """Graduated from opt-in 2026-09-14. Built from a clean env so the assertion
+    reflects the code default, not whatever this process happens to have set."""
+    import ion.core.config as config_mod
+
+    monkeypatch.delenv("ION_CHAT_GROUNDING_CHECK", raising=False)
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+    assert config_mod.get_config().chat_grounding_check is True
+
+
 @pytest.mark.anyio
-async def test_disabled_by_default_spends_no_tokens():
-    """A flag that is off must not reach Ollama at all."""
+async def test_turning_it_off_spends_no_tokens(monkeypatch):
+    """Off must not reach Ollama at all, not merely discard the result."""
+    from ion.core.config import get_config
+
+    monkeypatch.setattr(get_config(), "chat_grounding_check", False, raising=False)
     result = await verify_chat_answer(ANSWER, CONTEXT, ollama=_Unreachable())
     assert result == {"skipped": True, "grounded": None, "reason": "disabled"}
 
