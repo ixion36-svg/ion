@@ -1,9 +1,27 @@
-"""AI context service — RAG retrieval from KB, notes, and playbooks."""
+"""AI context service — RAG retrieval from KB, notes, and playbooks.
+
+Retrieval is hybrid: substring matching and vector search run independently and
+their rankings are fused. Neither alone is adequate for security content --
+substring matching cannot tell that "golden ticket" belongs with a Kerberos
+article, and embeddings blur exactly the identifiers analysts search by, so a
+query for CVE-2024-3094 ranks every other CVE alongside it. Fusing keeps the
+recall of one and the precision of the other.
+
+The vector half reads the KB-chunk and playbook embeddings that the background
+loops already maintain (``kb_embedding_service`` / ``playbook_embedding_service``,
+both on by default since v0.36.0). Analyst notes have no embedding table, so
+they stay substring-only.
+
+When embeddings are unavailable -- air-gapped, Ollama down, ION_EMBEDDING_ENABLED
+off -- the vector half yields nothing and retrieval degrades to exactly the
+substring behaviour that came before it.
+"""
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -17,6 +35,26 @@ logger = logging.getLogger(__name__)
 
 MAX_SNIPPET_CHARS = 800
 MAX_TOTAL_CONTEXT_CHARS = 3000
+
+# Reciprocal Rank Fusion constant, from the paper the method comes from and the
+# value Elasticsearch and OpenSearch ship. It flattens the head of each ranking
+# enough that neither retriever can monopolise the results.
+RRF_K = 60
+
+# Cosine similarity below this is noise rather than a weak match. Same floor
+# alert_prompt_service already applies to KB RAG: topic-level documentation
+# overlaps broadly by design, so the threshold is deliberately not tight.
+MIN_VECTOR_SIMILARITY = 0.65
+
+
+def _chat_vector_rag_enabled() -> bool:
+    """Semantic half of chat retrieval. On by default: the corpus is already
+    embedded, and with no embeddings the code path costs nothing anyway."""
+    return os.environ.get("ION_CHAT_VECTOR_RAG", "true").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
 
 STOP_WORDS = {
     "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
@@ -142,20 +180,40 @@ class AIContextService:
             return RAGContext()
 
         limit = min(max(preferences.max_context_snippets, 1), 5)
-        all_snippets: List[ContextSnippet] = []
 
+        # Two independently ordered rankings. Fusing them by rank means the
+        # keyword score (title hits worth 10, content hits 3) and the cosine
+        # similarity never have to be made comparable to each other.
+        ranked_lists: List[List[ContextSnippet]] = []
+
+        keyword_hits: List[ContextSnippet] = []
         if preferences.rag_knowledge_base:
-            all_snippets.extend(self._search_knowledge_base(keywords, limit))
-
+            keyword_hits.extend(self._search_knowledge_base(keywords, limit))
         if preferences.rag_user_notes:
-            all_snippets.extend(self._search_user_notes(keywords, user_id, limit))
-
+            keyword_hits.extend(self._search_user_notes(keywords, user_id, limit))
         if preferences.rag_playbooks:
-            all_snippets.extend(self._search_playbooks(keywords, limit))
+            keyword_hits.extend(self._search_playbooks(keywords, limit))
+        if keyword_hits:
+            keyword_hits.sort(key=lambda s: s.score, reverse=True)
+            ranked_lists.append(keyword_hits)
 
-        # Sort by score descending, take top N
-        all_snippets.sort(key=lambda s: s.score, reverse=True)
-        selected = all_snippets[:limit]
+        # Embed the whole question, not the extracted keywords -- discarding the
+        # stop words discards the phrasing the embedding exists to capture.
+        embedded = self._embed_query(query)
+        if embedded is not None:
+            vec, model_tag = embedded
+            vector_hits: List[ContextSnippet] = []
+            if preferences.rag_knowledge_base:
+                vector_hits.extend(self._vector_search_kb(vec, model_tag, limit))
+            if preferences.rag_playbooks:
+                vector_hits.extend(
+                    self._vector_search_playbooks(vec, model_tag, limit)
+                )
+            if vector_hits:
+                vector_hits.sort(key=lambda s: s.score, reverse=True)
+                ranked_lists.append(vector_hits)
+
+        selected = self._fuse(ranked_lists, limit)
 
         # Enforce total char budget
         final = []
@@ -295,6 +353,160 @@ class AIContextService:
         except Exception as e:
             logger.error("Playbook search failed: %s", e)
             return []
+
+    # ── Vector half ──────────────────────────────────────────────────────────
+
+    def _embed_query(self, query: str) -> Optional[Tuple[List[float], str]]:
+        """Embed the query, returning it with the model tag it was embedded under.
+
+        The tag travels with the vector because a stored vector is only
+        comparable to one produced by the same model and task-prefix regime, and
+        changing either re-embeds the corpus in the background -- so the table
+        holds both tags for as long as that takes.
+
+        Every unavailability -- flag off, embeddings disabled, Ollama
+        unreachable, model missing -- returns None rather than raising, so an
+        air-gapped deploy retrieves exactly what it did before.
+        """
+        if not _chat_vector_rag_enabled():
+            return None
+        try:
+            from ion.services.embedding_service import get_embedding_service
+
+            svc = get_embedding_service()
+            if not svc.is_enabled:
+                return None
+            vec = svc.embed(query, mode="query")
+            if vec is None:
+                return None
+            return vec, svc.model_tag
+        except Exception as exc:
+            logger.debug("chat vector RAG: no embedding (%s)", exc)
+            return None
+
+    def _vector_search_kb(
+        self, vec: List[float], model_tag: str, k: int
+    ) -> List[ContextSnippet]:
+        """Nearest KB chunks, deduped back to one snippet per document.
+
+        The stored chunk is the snippet: it is the passage that actually matched,
+        which is strictly better context than a window cut around a keyword.
+        """
+        try:
+            from ion.models.kb_document_embedding import KBChunkEmbedding
+
+            distance = KBChunkEmbedding.embedding.cosine_distance(vec)
+            rows = (
+                self.db.query(
+                    Document, KBChunkEmbedding.chunk_text, distance.label("distance")
+                )
+                .join(KBChunkEmbedding, KBChunkEmbedding.document_id == Document.id)
+                .filter(Document.status == "active")
+                .filter(KBChunkEmbedding.model_name == model_tag)
+                .order_by(distance.asc())
+                # Over-fetch: several of the best chunks often share a document.
+                .limit(max(1, int(k)) * 4)
+                .all()
+            )
+        except Exception as exc:
+            # No pgvector (SQLite dev/test), no table yet, or nothing embedded.
+            logger.debug("chat vector RAG: KB query unavailable (%s)", exc)
+            return []
+
+        out: List[ContextSnippet] = []
+        seen: set = set()
+        for doc, chunk_text, dist in rows:
+            similarity = 1.0 - float(dist)
+            if similarity < MIN_VECTOR_SIMILARITY:
+                break  # distance-ordered, so everything after is worse
+            if doc.id in seen:
+                continue
+            seen.add(doc.id)
+            out.append(
+                ContextSnippet(
+                    source_type="knowledge_base",
+                    source_id=doc.id,
+                    title=doc.name,
+                    snippet=(chunk_text or "")[:MAX_SNIPPET_CHARS],
+                    score=similarity,
+                )
+            )
+            if len(out) >= max(1, int(k)):
+                break
+        return out
+
+    def _vector_search_playbooks(
+        self, vec: List[float], model_tag: str, k: int
+    ) -> List[ContextSnippet]:
+        """Nearest playbooks. Embedded whole, so there is no chunk to return."""
+        try:
+            from ion.models.playbook_embedding import PlaybookEmbedding
+
+            distance = PlaybookEmbedding.embedding.cosine_distance(vec)
+            rows = (
+                self.db.query(Playbook, distance.label("distance"))
+                .join(PlaybookEmbedding, PlaybookEmbedding.playbook_id == Playbook.id)
+                .filter(Playbook.is_active.is_(True))
+                .filter(PlaybookEmbedding.model_name == model_tag)
+                .order_by(distance.asc())
+                .limit(max(1, int(k)))
+                .all()
+            )
+        except Exception as exc:
+            logger.debug("chat vector RAG: playbook query unavailable (%s)", exc)
+            return []
+
+        out: List[ContextSnippet] = []
+        for pb, dist in rows:
+            similarity = 1.0 - float(dist)
+            if similarity < MIN_VECTOR_SIMILARITY:
+                break
+            desc = pb.description or ""
+            snippet_text = desc[:MAX_SNIPPET_CHARS]
+            if len(desc) > MAX_SNIPPET_CHARS:
+                snippet_text += "..."
+            out.append(
+                ContextSnippet(
+                    source_type="playbook",
+                    source_id=pb.id,
+                    title=pb.name,
+                    snippet=snippet_text,
+                    score=similarity,
+                )
+            )
+        return out
+
+    @staticmethod
+    def _fuse(
+        ranked_lists: List[List[ContextSnippet]], limit: int
+    ) -> List[ContextSnippet]:
+        """Reciprocal Rank Fusion over the supplied rankings.
+
+        A document found by both retrievers accumulates both contributions and
+        outranks one found by either alone, which is the property we want: the
+        two disagree often, and agreement is the strongest signal available.
+        """
+        scores: Dict[Tuple[str, int], float] = {}
+        best: Dict[Tuple[str, int], Tuple[int, ContextSnippet]] = {}
+
+        for snippets in ranked_lists:
+            for rank, snippet in enumerate(snippets):
+                key = (snippet.source_type, snippet.source_id)
+                scores[key] = scores.get(key, 0.0) + 1.0 / (RRF_K + rank + 1)
+                # Keep the copy from whichever ranking placed it highest, so the
+                # snippet comes from the retriever that was most confident about
+                # it -- the matching chunk when vector search led, the window
+                # around the literal term when substring matching did.
+                if key not in best or rank < best[key][0]:
+                    best[key] = (rank, snippet)
+
+        ordered = sorted(scores.items(), key=lambda kv: kv[1], reverse=True)
+        out: List[ContextSnippet] = []
+        for key, score in ordered[:limit]:
+            snippet = best[key][1]
+            snippet.score = score
+            out.append(snippet)
+        return out
 
     @staticmethod
     def _extract_keywords(query: str) -> List[str]:
