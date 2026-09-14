@@ -228,6 +228,22 @@ def _set_sqlite_pragmas(dbapi_conn, connection_record):
     cursor.close()
 
 
+def _env_int(name: str, default: int) -> int:
+    """Positive int from the environment, or the default on anything unusable."""
+    raw = os.environ.get(name, "")
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("%s=%r is not an integer; using %d", name, raw, default)
+        return default
+    if value < 1:
+        logger.warning("%s=%d must be >= 1; using %d", name, value, default)
+        return default
+    return value
+
+
 def get_engine(db_path: Optional[Path] = None) -> Engine:
     """Get or create the database engine.
 
@@ -244,14 +260,20 @@ def get_engine(db_path: Optional[Path] = None) -> Engine:
             _engine = create_engine(
                 database_url,
                 echo=False,
-                # Steady-state pool of 25 connections + 50 burst overflow.
+                # Steady-state pool + burst overflow, PER WORKER. The ceiling
+                # that matters is ION_WORKERS x (pool_size + max_overflow),
+                # which must stay under Postgres max_connections or workers
+                # block waiting for a connection that cannot be granted.
+                # A pool much larger than the anyio threadpool (40 by default)
+                # cannot be used by sync handlers anyway -- that limiter, not
+                # the pool, is a worker's real concurrency ceiling.
                 # The pool_timeout is intentionally short (5s) so a request
                 # that can't get a connection fails *fast* with a clear error
-                # instead of stalling the worker for 30s. With the new TIDE
+                # instead of stalling the worker for 30s. With the TIDE
                 # budget cap (20s) and concurrency throttle (3 concurrent),
                 # the typical request should never wait this long anyway.
-                pool_size=25,
-                max_overflow=50,
+                pool_size=_env_int("ION_DB_POOL_SIZE", 25),
+                max_overflow=_env_int("ION_DB_MAX_OVERFLOW", 50),
                 pool_timeout=5,
                 pool_pre_ping=True,
                 pool_recycle=900,

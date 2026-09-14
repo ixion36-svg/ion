@@ -18,7 +18,13 @@ services:
     container_name: ion-postgres
     restart: unless-stopped
 
-    # Tuned for a 4 GB container on a 64 GB host (v0.9.86).
+    # Defaults below suit a 4 GB Postgres container. Every value is an env
+    # override, so a larger host is an .env change rather than a compose edit --
+    # see the "Postgres sizing" block in .env.deploy for a worked 64 GB profile.
+    # The three that actually matter on a big host are shared_buffers,
+    # effective_cache_size (a planner hint: too low and it picks seq scans over
+    # index scans) and max_connections, which must cover ION_WORKERS x the
+    # SQLAlchemy pool ceiling or workers block waiting for a connection.
     #
     # shared_buffers     1 GB   — 25% of container RAM, the standard rule
     # effective_cache_size 3 GB — tells the planner the OS cache is large;
@@ -33,19 +39,23 @@ services:
     command:
       - postgres
       - -c
-      - shared_buffers=1GB
+      - shared_buffers=${PG_SHARED_BUFFERS:-1GB}
       - -c
-      - effective_cache_size=3GB
+      - effective_cache_size=${PG_EFFECTIVE_CACHE_SIZE:-3GB}
       - -c
-      - work_mem=32MB
+      - work_mem=${PG_WORK_MEM:-32MB}
       - -c
-      - maintenance_work_mem=256MB
+      - maintenance_work_mem=${PG_MAINTENANCE_WORK_MEM:-256MB}
       - -c
-      - wal_buffers=16MB
+      - wal_buffers=${PG_WAL_BUFFERS:-16MB}
       - -c
-      - random_page_cost=1.1
+      - random_page_cost=${PG_RANDOM_PAGE_COST:-1.1}
       - -c
-      - max_connections=320
+      - effective_io_concurrency=${PG_EFFECTIVE_IO_CONCURRENCY:-200}
+      - -c
+      - max_parallel_workers_per_gather=${PG_PARALLEL_PER_GATHER:-2}
+      - -c
+      - max_connections=${PG_MAX_CONNECTIONS:-320}
       - -c
       - log_min_duration_statement=100
       - -c
@@ -56,7 +66,10 @@ services:
     environment:
       POSTGRES_DB: ion
       POSTGRES_USER: ion
-      POSTGRES_PASSWORD: ${ION_DB_PASSWORD:-ion2025}
+      # Fail hard rather than silently falling back to a well-known weak
+      # default. A deployment that forgets the variable must not come up
+      # with a password that is in the repository.
+      POSTGRES_PASSWORD: ${ION_DB_PASSWORD:?ION_DB_PASSWORD must be set -- refusing to start with no database password}
 
     volumes:
       - postgres-data:/var/lib/postgresql/data
