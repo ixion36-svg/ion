@@ -365,27 +365,48 @@ def test_no_served_stylesheet_contains_javascript_source():
         + "\n  ".join(offenders[:12]))
 
 
-def test_hidden_outranks_a_page_level_display_rule():
-    """`hidden` must beat a page's own `.overlay { display:flex }`.
+def test_a_page_never_forces_display_on_an_element_written_hidden():
+    """A page's own `.overlay { display:flex }` must not beat `hidden`.
 
-    Modal overlays are written `class="cases-modal-overlay hidden"` while the
-    page's own <style> block sets `.cases-modal-overlay { display:flex }`.
-    Both are specificity 0,1,0 and a page <style> comes after every <link>, so
-    the page rule wins and the modal renders open on load.
+    Overlays are written `class="cases-modal-overlay hidden"` while the page's
+    <style> block sets `.cases-modal-overlay { display:flex }`. Both are 0,1,0
+    and a page <style> comes after every <link>, so the page rule wins and the
+    modal renders open. 13 elements across 7 pages were permanently visible.
 
-    The v0.31.21 migration knew this: it emitted
-    `html body ._ion-s-c8be1ccba6 { display:none }` at 0,1,2, and that prefix
-    was the only reason those elements were hidden. Converting them to
-    Tailwind's `hidden` dropped it, leaving 13 elements across 7 pages
-    permanently visible -- both cases modals, the discover save-search dialog,
-    the training plan dialog, the alerts bulk-action toolbar, and the notepad
-    editor in base.html, which is every page.
+    The tempting fix is to give `hidden` more specificity, and it is wrong.
+    `hidden` is MEANT to be overridden by responsive variants: the navbar is
+    `<nav class="hidden md:flex">`, and a media query adds no specificity, so
+    an `html body .hidden` rule at 0,1,2 beats `md:flex` at 0,1,0 and the
+    navbar disappears at every width. That is exactly what happened when this
+    was first fixed the other way round.
+
+    So the condition belongs on the page rule: `.overlay:not(.hidden)`.
     """
-    built = BUILT.read_text(encoding="utf-8")
-    assert "html body .hidden{display:none}" in built.replace("\n", ""), (
-        "the specificity-restoring `html body .hidden` rule is gone; any page "
-        "that sets a display on its own overlay class will render it open"
-    )
+    offenders = []
+    style = re.compile(r"<style\b[^>]*>(.*?)</style>", re.S | re.I)
+    display = re.compile(r"(?<![-\w])display\s*:\s*([a-z-]+)")
+    for p in sorted(Path("src/ion/web/templates").rglob("*.html")):
+        text = p.read_text(encoding="utf-8", errors="replace")
+        # Classes this page writes on the same element as `hidden`.
+        with_hidden = set()
+        for m in re.finditer(r'class="([^"]*)"', text):
+            toks = m.group(1).split()
+            if "hidden" in toks:
+                with_hidden.update(t for t in toks if t != "hidden")
+        if not with_hidden:
+            continue
+        css = "\n".join(style.findall(text))
+        for m in re.finditer(r"(^|})\s*\.([A-Za-z][\w-]*)\s*\{([^{}]*)\}", css, re.M):
+            cls, body = m.group(2), m.group(3)
+            if cls not in with_hidden:
+                continue
+            d = display.search(body)
+            if d and d.group(1) != "none":
+                offenders.append(f"{p.name}: .{cls} -> display:{d.group(1)}")
+    assert not offenders, (
+        "page <style> rules force a display on an element that is also written "
+        "with `hidden`, so it renders visible. Split the declaration out as "
+        "`.cls:not(.hidden) { display: ... }`: " + "; ".join(offenders[:12]))
 
 
 def test_ion_modals_are_not_hidden_by_daisyuis_mechanism():

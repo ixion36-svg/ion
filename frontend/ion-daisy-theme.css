@@ -1924,41 +1924,7 @@
 }
 
 
-/* ============================================================
- * `hidden` has to outrank a page's own display rule.
- *
- * A modal overlay is written as
- *
- *     <div class="cases-modal-overlay hidden">
- *
- * and the page's own <style> block carries
- *
- *     .cases-modal-overlay { position:fixed; inset:0; display:flex; ... }
- *
- * Both selectors are specificity 0,1,0, and a page <style> block comes after
- * every <link>, so the page rule wins and the modal renders open on load.
- *
- * The v0.31.21 inline-style migration knew this. It emitted its hidden class
- * as `html body ._ion-s-c8be1ccba6 { display:none }` -- 0,1,2 -- and the
- * `html body` prefix was the only reason those elements were hidden at all.
- * Converting them to Tailwind's `hidden` dropped the prefix and with it the
- * specificity, which left 13 elements across 7 pages permanently visible:
- * both cases modals, the discover save-search dialog, the training plan
- * dialog, the alerts bulk-action toolbar and filter banner, and the notepad
- * editor in base.html, which is every page.
- *
- * Restoring the same 0,1,2 shape fixes all of them at once and needs no
- * !important. It is placed here, after the utilities import, purely for
- * legibility -- specificity is doing the work, not order.
- *
- * Anything that genuinely needs to override it can still do so at 0,2,0 or
- * higher, e.g. `.thing.is-open`. Nothing should: `hidden` means hidden, and
- * JS that shows these elements removes the class rather than out-specifying
- * it.
- * ============================================================ */
-html body .hidden {
-  display: none;
-}
+
 
 
 /* ============================================================
@@ -1996,4 +1962,45 @@ html body .hidden {
   opacity: 1;
   scale: 1;
   translate: none;
+}
+
+
+/* ============================================================
+ * `btn-secondary` is a ghost button in ION, not a purple one.
+ *
+ * ion-ui.css defined it as an alias of the ghost variant:
+ *
+ *     .ion-btn-ghost, .btn-secondary {
+ *       background: rgba(255,255,255,.05);
+ *       border: 1px solid var(--border);
+ *       color: var(--text-primary);
+ *     }
+ *
+ * Retiring ion-ui.css dropped the alias, and daisyUI's own definition took
+ * over. daisyUI builds the variant from two custom properties:
+ *
+ *     .btn-secondary { --btn-color: var(--color-secondary);
+ *                      --btn-fg: var(--color-secondary-content) }
+ *
+ * which in this theme is neon purple on near-black -- a solid lavender
+ * button, on 87 of them, mostly in forensics and alerts. Reported as looking
+ * naff, and it is: ION's secondary action is deliberately quiet.
+ *
+ * Overriding the two properties rather than background/color directly keeps
+ * daisyUI's hover, active, focus-visible and disabled states composing
+ * normally, since every one of them is derived from --btn-color.
+ *
+ * --color-secondary itself stays purple on purpose. It is what the alert tags
+ * use (purple text on a 14%-tinted purple ground, via .ion-c-purple), and
+ * that pairing reads well. The problem was only ever the solid fill.
+ * ============================================================ */
+.btn-secondary {
+  --btn-color: color-mix(in srgb, var(--color-base-content) 5%, transparent);
+  --btn-fg: var(--color-base-content);
+  --btn-border: var(--color-base-300);
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
 }

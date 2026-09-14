@@ -600,10 +600,11 @@
 }
 
 .custom-time-range {
-    display: flex;
     align-items: center;
     gap: 0.4rem;
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.custom-time-range:not(.hidden) { display: flex; }
 .custom-time-input {
     padding: 0.4rem 0.5rem;
     border: 1px solid var(--ion-border);
@@ -692,7 +693,6 @@
 
 /* Bulk Actions Toolbar — refreshed in v0.9.72 with elevated card pattern */
 .bulk-actions-toolbar {
-    display: flex;
     align-items: center;
     justify-content: space-between;
     background: var(--bg-secondary);
@@ -704,6 +704,8 @@
     gap: 16px;
     box-shadow: 0 8px 24px rgba(0, 212, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.2);
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.bulk-actions-toolbar:not(.hidden) { display: flex; }
 
 .bulk-actions-info {
     display: flex;
@@ -1482,12 +1484,13 @@
     border-radius: var(--radius);
     padding: 0.625rem 1rem;
     margin-bottom: 1rem;
-    display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 0.875rem;
     color: var(--primary);
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.active-filter-banner:not(.hidden) { display: flex; }
 
 /* Sortable columns */
 .sortable {
@@ -2006,12 +2009,13 @@ kbd {
 }
 
 .threat-indicator {
-    display: inline-block;
     width: 10px;
     height: 10px;
     border-radius: 50%;
     margin-left: 0.25rem;
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.threat-indicator:not(.hidden) { display: inline-block; }
 
 .threat-indicator.critical { background: var(--danger); animation: pulse-threat 1.5s infinite; }
 .threat-indicator.high { background: var(--neon-orange); }
@@ -2237,7 +2241,6 @@ kbd {
 
 /* Legend bar for MITRE heatmap */
 .mitre-heatmap-legend {
-    display: flex;
     gap: 1rem;
     align-items: center;
     flex-wrap: wrap;
@@ -2246,6 +2249,8 @@ kbd {
     font-size: 0.6875rem;
     color: var(--text-muted);
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.mitre-heatmap-legend:not(.hidden) { display: flex; }
 .mitre-legend-item {
     display: flex;
     align-items: center;
@@ -2971,10 +2976,11 @@ kbd {
 .pattern-dismiss-btn:hover { opacity: 1; color: var(--text); }
 .pattern-panel-body {
     padding: 0.75rem 1rem;
-    display: grid;
     grid-template-columns: 1fr;
     gap: 0.625rem;
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.pattern-panel-body:not(.hidden) { display: grid; }
 .pattern-cards-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));

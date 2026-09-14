@@ -562,7 +562,9 @@
     .np-empty{padding:3rem 1rem;text-align:center;color:#64748b;font-size:.8125rem}
 
     /* ── Editor ──────────────────────────────────── */
-    .np-editor{display:flex;flex-direction:column;flex:1;overflow:hidden}
+    .np-editor {flex-direction:column;flex:1;overflow:hidden}
+    /* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+    .np-editor:not(.hidden) { display: flex; }
     .np-editor-toolbar{display:flex;align-items:center;gap:6px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.05);flex-shrink:0}
     .np-save-status{flex:1;text-align:right;font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:600;color:#64748b}
     .np-title-input{width:100%;padding:14px;background:transparent;border:none;border-bottom:1px solid rgba(255,255,255,.05);color:#fff;font-family:'Geist',ui-sans-serif,system-ui,sans-serif;font-size:1.125rem;font-weight:600;letter-spacing:-.01em;flex-shrink:0}

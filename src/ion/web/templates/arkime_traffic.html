@@ -308,13 +308,14 @@
 .atf-overlay {
   position: absolute;
   inset: 0;
-  display: flex;
   align-items: center;
   justify-content: center;
   background: var(--color-base-200);
   border-radius: var(--radius-box);
   z-index: 5;
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.atf-overlay:not(.hidden) { display: flex; }
 .atf-overlay.hidden { display: none; }
 
 /* Chart/map heights have no compiled utility at these exact px values. */

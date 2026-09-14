@@ -1045,13 +1045,14 @@
 
 /* Typing Indicator */
 .ai-typing {
-    display: flex;
     align-items: center;
     gap: 5px;
     padding: 4px 14px;
     font-size: 0.78rem;
     color: var(--text-muted);
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.ai-typing:not(.hidden) { display: flex; }
 
 .ai-typing .dot {
     width: 5px;

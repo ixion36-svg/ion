@@ -109,7 +109,9 @@
 
 /* Unread indicator */
 .ti-unread td { border-left: 3px solid var(--accent); }
-.ti-badge { display: inline-block; min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 10px; background: var(--danger); color: #fff; font-size: .7rem; font-weight: 700; padding: 0 5px; margin-left: 6px; }
+.ti-badge {  min-width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 10px; background: var(--danger); color: #fff; font-size: .7rem; font-weight: 700; padding: 0 5px; margin-left: 6px; }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.ti-badge:not(.hidden) { display: inline-block; }
 
 /* Report cards — clickable */
 .ti-report-card { cursor: pointer; transition: border-color .15s; }

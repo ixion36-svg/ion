@@ -1344,10 +1344,11 @@
     inset: 0;
     background: rgba(0,0,0,0.5);
     z-index: 1100;
-    display: flex;
     align-items: center;
     justify-content: center;
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.cases-modal-overlay:not(.hidden) { display: flex; }
 
 .cases-modal {
     background: var(--bg-secondary);

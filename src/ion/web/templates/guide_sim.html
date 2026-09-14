@@ -102,13 +102,14 @@
 /* JS toggles .hidden via base.html simShowHints; bulb marker has no daisyUI slot.
    hidden+flex utilities fight in the cascade, so display stays here. */
 .sim-hint {
-    display: flex;
     align-items: center;
     gap: 6px;
     padding: 4px 0;
     font-size: .78rem;
     color: var(--color-warning);
 }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.sim-hint:not(.hidden) { display: flex; }
 .sim-hint.hidden { display: none; }
 .sim-hint::before { content: '\1F4A1'; font-size: .85rem; }
 

@@ -2228,7 +2228,9 @@
 .tp-btn-danger-sm { padding:0.35rem 0.6rem; color:var(--danger); border-color:transparent; }
 .tp-btn-danger-sm:hover { border-color:var(--danger); }
 
-.tp-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem; margin-bottom:1.5rem; }
+.tp-summary {  grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:0.75rem; margin-bottom:1.5rem; }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.tp-summary:not(.hidden) { display: grid; }
 .tp-summary-card { background:var(--bg-secondary); border:1px solid var(--ion-border); border-radius:var(--ion-radius-lg); padding:1rem; text-align:center; }
 .tp-summary-value { font-size:1.4rem; font-weight:700; color:var(--text-bright); }
 .tp-summary-label { font-size:0.7rem; color:var(--text-muted); text-transform:uppercase; margin-top:0.25rem; }
@@ -2278,7 +2280,9 @@
 .tp-empty-hero p { color:var(--text-secondary); margin-bottom:1.5rem; max-width:400px; margin-left:auto; margin-right:auto; }
 
 /* Training plan modal */
-.tp-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; display:flex; align-items:center; justify-content:center; }
+.tp-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000;  align-items:center; justify-content:center; }
+/* `display` is conditional: this element is also written with Tailwind's `hidden`, and an unconditional display here beats it. */
+.tp-modal-overlay:not(.hidden) { display: flex; }
 .tp-modal { background:var(--bg-primary); border:1px solid var(--ion-border); border-radius:var(--ion-radius-lg); padding:1.5rem; width:400px; max-width:90vw; }
 .tp-modal h3 { margin:0 0 1rem; color:var(--text-bright); }
 .tp-form-group { margin-bottom:1rem; }
