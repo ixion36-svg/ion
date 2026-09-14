@@ -64,6 +64,7 @@ class Config:
     alert_detail_v2: bool = True  # Serve the redesigned alert-detail panel (decision-first header + tabbed body + source badges). Set false to fall back to the previous render
     alert_field_pins: bool = True  # Let analysts pin alert fields to the Case-context panel (per-user, per-rule). Inert unless alert_detail_v2 is on
     bob_custom_templates: bool = True  # Let Bob generate custom per-rule investigation templates (human-reviewed) alongside the authored guide
+    multi_tenant: bool = False  # Serve several client estates from one instance (per-tenant Elasticsearch/Kibana). Off = one estate from the process-wide config, as before
     chat_grounding_check: bool = True  # After a chat answer streams, check its specifics against the retrieved context; advisory only, one extra LLM call per grounded answer
     csrf_enabled: bool = True  # Enforce CSRF token + Origin checks on cookie-authenticated state-changing requests. ON by default: a security control that ships disabled is not a control. Escape hatch for debugging only
     csrf_extra_origins: str = ""  # Comma-separated additional origins accepted by the CSRF Origin check, for deployments fronted by another hostname. The request's own Host and base_url are always accepted
@@ -328,6 +329,7 @@ class Config:
             alert_detail_v2=data.get("alert_detail_v2", True),
             alert_field_pins=data.get("alert_field_pins", True),
             bob_custom_templates=data.get("bob_custom_templates", True),
+            multi_tenant=data.get("multi_tenant", False),
             chat_grounding_check=data.get("chat_grounding_check", True),
             csrf_enabled=data.get("csrf_enabled", True),
             csrf_extra_origins=data.get("csrf_extra_origins", ""),
@@ -730,6 +732,8 @@ def get_config() -> Config:
             _config.alert_field_pins = _get_env_bool("ION_ALERT_FIELD_PINS", True)
         if os.environ.get("ION_BOB_CUSTOM_TEMPLATES"):
             _config.bob_custom_templates = _get_env_bool("ION_BOB_CUSTOM_TEMPLATES", True)
+        if os.environ.get("ION_MULTI_TENANT"):
+            _config.multi_tenant = _get_env_bool("ION_MULTI_TENANT")
         if os.environ.get("ION_CHAT_GROUNDING_CHECK"):
             _config.chat_grounding_check = _get_env_bool("ION_CHAT_GROUNDING_CHECK", True)
         if os.environ.get("ION_CSRF_ENABLED"):

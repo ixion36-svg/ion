@@ -224,6 +224,7 @@ from ion.models.social import (
 from ion.models.story import Story, StoryRun  # noqa: F401
 from ion.models.system_quirk import SystemQuirk, SystemQuirkStatus  # noqa: F401
 from ion.models.template import Collection, Tag, Template, Variable, template_tags
+from ion.models.tenant import Tenant  # noqa: F401
 from ion.models.threat_intel import ThreatIntelWatch
 
 # TI-report RAG — local OpenCTI report cache + chunk embeddings.
@@ -264,6 +265,7 @@ __all__ = [
     "WorkTaskType",
     "WorkLogEntry",
     "Template",
+    "Tenant",
     "Tag",
     "Variable",
     "Collection",

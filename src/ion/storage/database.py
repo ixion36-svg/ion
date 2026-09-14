@@ -515,6 +515,17 @@ def _run_migrations(engine: Engine) -> None:
         if "created_by_id" not in existing:
             _add_column_tolerant(engine, "documents", "created_by_id", "INTEGER")
 
+    # users.tenant_id — which client estate a user belongs to. Nullable, and
+    # left NULL on every existing row: NULL is platform-global, which is what a
+    # single-tenant deploy's users effectively are. Backfilling them to the
+    # default tenant would silently narrow what today's users can see.
+    # No FK in the ALTER: SQLite cannot add one, and the constraint is declared
+    # on the model so create_all builds it correctly on a fresh database.
+    if insp.has_table("users"):
+        existing = {col["name"] for col in insp.get_columns("users")}
+        if "tenant_id" not in existing:
+            _add_column_tolerant(engine, "users", "tenant_id", "INTEGER")
+
     # (route audit phase 8): DetectionProposal absorbs the retired
     # TuningProposal pipeline. Bob wrote tuning proposals unattended off a
     # false-positive verdict, but DetectionProposal had nowhere to put the

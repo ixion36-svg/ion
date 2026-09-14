@@ -69,6 +69,14 @@ class User(Base, TimestampMixin):
     elastic_uid: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     keycloak_sub: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
+    # The client estate this user belongs to. NULL is platform-global: a support
+    # or oversight account able to act across tenants. Nullable rather than
+    # NOT NULL DEFAULT because "belongs to no tenant" is a real, privileged
+    # state, not a row waiting to be backfilled.
+    tenant_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("tenants.id"), nullable=True, index=True
+    )
+
     # Relationships
     roles: Mapped[List["Role"]] = relationship(
         "Role", secondary=user_roles, back_populates="users"
