@@ -1,13 +1,63 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.94.0 -->
-<!-- ion-doc:version=0.94.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.95.0 -->
+<!-- ion-doc:version=0.95.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-14 -->
 
 # Changelog
+
+## v0.95.0 — 2026-09-14
+
+**Upgrading: four flags that shipped off now ship on.** No action needed, but
+the alert panel changes appearance and Bob's chat costs a second model call per
+grounded answer. Set any of `ION_ALERT_DETAIL_V2`, `ION_ALERT_FIELD_PINS`,
+`ION_BOB_CUSTOM_TEMPLATES`, `ION_CHAT_GROUNDING_CHECK` to `false` to opt out.
+
+**Bob's chat stopped guessing.**
+
+- **Retrieval fuses vector search with substring matching.** Chat RAG ran
+  `ILIKE '%keyword%'` over titles and bodies, so it could not tell that "golden
+  ticket" belongs with a Kerberos article, and the model filled the gap with
+  invented specifics. It now also searches the KB-chunk and playbook embeddings
+  the background loops already maintain, and fuses the two rankings by RRF, so a
+  document both retrievers find outranks one either finds alone. Swapping
+  wholesale to vectors was rejected: embeddings blur identifiers, so a query for
+  one CVE ranks every other CVE beside it. Nothing new is embedded and there is
+  no schema change. With embeddings unavailable — air-gapped, Ollama down, or
+  `ION_CHAT_VECTOR_RAG=false` — retrieval degrades to exactly its previous
+  behaviour and order.
+- **Chat samples at 0.3, not 0.7.** Every other AI surface in ION runs at
+  0.1–0.4, and both UI callers omit the field, so 0.7 was what analysts actually
+  got. A caller can still ask for more.
+- **The reference block states a grounding contract.** It previously asked only
+  for citations; retrieval returns near-misses often enough that a small model
+  read that as licence to invent matching specifics.
+- **An advisory grounding pass** (`ION_CHAT_GROUNDING_CHECK`) checks an answer's
+  specifics against what was actually retrieved and names what is not there. It
+  runs after the answer has streamed, so it annotates and never withholds; no
+  retrieved context, a short answer, or an unreachable model skips it silently.
+
+**Security fixes.**
+
+- **Exception text and GitLab assignee names reached `innerHTML` unescaped.**
+  Every sibling interpolation in those render paths already escaped; the catch
+  blocks did not, and `error.message` carries server-supplied detail. Code
+  scanning flagged 2 sites; the same defect was present at 18, plus an unflagged
+  one rendering remote-controlled GitLab usernames raw.
+- **Unverified TLS is announced at startup.** Nine integrations default to
+  `verify_ssl=false` for self-signed air-gapped endpoints, and that stays — but
+  the startup validator now names every *enabled* integration running
+  unverified, states what an on-path attacker could do, and gives the env var to
+  fix it. Previously only OIDC warned, and only once its config was requested.
+
+**Flag defaults audited.** All 63 booleans reviewed. Account lockout and PII
+anonymisation stay opt-in by decision, now with tests recording why. Env
+overrides for default-on flags carry their default, so an unrecognised value can
+no longer silently disable a feature. `.env.deploy` promises every flag is shown
+at its built-in default; four lines said otherwise and a test now enforces it.
 
 ## v0.94.0 — 2026-09-14
 
