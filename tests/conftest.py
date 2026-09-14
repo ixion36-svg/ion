@@ -1,7 +1,15 @@
 """Pytest configuration and fixtures."""
 
-import pytest
+import os
 from pathlib import Path
+
+import pytest
+
+# v0.94.0 makes a weak or unset ION_ADMIN_PASSWORD fatal in _validate_startup_config,
+# so any test booting the app through TestClient dies in startup instead of running.
+# Set a strong value rather than ION_DEV_MODE, so tests exercise the enforcing path.
+os.environ.setdefault("ION_ADMIN_PASSWORD", "Tst-C0nftest-N0t-A-Real-Pw-9f3a")
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 

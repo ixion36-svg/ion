@@ -64,6 +64,7 @@ class Config:
     alert_detail_v2: bool = False  # Serve the redesigned alert-detail panel (decision-first header + tabbed body + source badges); opt-in, falls back to the current render
     alert_field_pins: bool = False  # Let analysts pin alert fields to the Case-context panel (per-user, per-rule); opt-in, needs alert_detail_v2
     bob_custom_templates: bool = False  # Let Bob generate custom per-rule investigation templates (human-reviewed) alongside the authored guide; opt-in
+    chat_grounding_check: bool = False  # After a chat answer streams, check its specifics against the retrieved context; advisory only, one extra LLM call per grounded answer
     csrf_enabled: bool = True  # Enforce CSRF token + Origin checks on cookie-authenticated state-changing requests. ON by default: a security control that ships disabled is not a control. Escape hatch for debugging only
     csrf_extra_origins: str = ""  # Comma-separated additional origins accepted by the CSRF Origin check, for deployments fronted by another hostname. The request's own Host and base_url are always accepted
     authz_alert_window_minutes: int = 5  # Rolling window for the authz-failure threshold
@@ -327,6 +328,7 @@ class Config:
             alert_detail_v2=data.get("alert_detail_v2", False),
             alert_field_pins=data.get("alert_field_pins", False),
             bob_custom_templates=data.get("bob_custom_templates", False),
+            chat_grounding_check=data.get("chat_grounding_check", False),
             csrf_enabled=data.get("csrf_enabled", True),
             csrf_extra_origins=data.get("csrf_extra_origins", ""),
             authz_alert_window_minutes=data.get("authz_alert_window_minutes", 5),
@@ -728,6 +730,8 @@ def get_config() -> Config:
             _config.alert_field_pins = _get_env_bool("ION_ALERT_FIELD_PINS")
         if os.environ.get("ION_BOB_CUSTOM_TEMPLATES"):
             _config.bob_custom_templates = _get_env_bool("ION_BOB_CUSTOM_TEMPLATES")
+        if os.environ.get("ION_CHAT_GROUNDING_CHECK"):
+            _config.chat_grounding_check = _get_env_bool("ION_CHAT_GROUNDING_CHECK")
         if os.environ.get("ION_CSRF_ENABLED"):
             _config.csrf_enabled = _get_env_bool("ION_CSRF_ENABLED", True)
         _env_csrf_origins = os.environ.get("ION_CSRF_EXTRA_ORIGINS", "").strip()

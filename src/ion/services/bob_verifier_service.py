@@ -166,7 +166,7 @@ def build_verifier_user_prompt(
 # ── JSON parse ───────────────────────────────────────────────────────────────
 
 
-def _parse_verifier_json(content: str) -> Optional[Dict[str, Any]]:
+def parse_verifier_json(content: str) -> Optional[Dict[str, Any]]:
     """Parse the verifier's JSON reply, tolerating a stray code fence / prose."""
     if not content:
         return None
@@ -273,7 +273,7 @@ async def verify_analysis(
         logger.debug("verifier: LLM call failed — treating as no-op", exc_info=True)
         return _skipped("ollama-unavailable")
 
-    parsed = _parse_verifier_json((result or {}).get("content") or "")
+    parsed = parse_verifier_json((result or {}).get("content") or "")
     if parsed is None:
         logger.debug("verifier: unparseable JSON reply — treating as no-op")
         return _skipped("unparseable")

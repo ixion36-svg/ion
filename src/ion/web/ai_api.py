@@ -18,6 +18,7 @@ from ion.models.ai_preferences import AIResponseFeedback
 from ion.models.user import User
 from ion.services.ai_chat_service import AIChatService
 from ion.services.ai_context_service import AIContextService
+from ion.services.chat_grounding_service import verify_chat_answer
 from ion.services.ollama_service import (
     RECOMMENDED_MODELS,
     SYSTEM_PROMPTS,
@@ -46,10 +47,11 @@ class ChatRequest(BaseModel):
     messages: List[ChatMessage]
     model: Optional[str] = None
     context_type: str = Field(default="security", pattern="^(security|engineering|coding|general|analyst|default)$")
-    # Ceiling capped at 1.0: above that an 8B model degrades into incoherent /
-    # fabrication-prone output, which is the opposite of the expert answer the
-    # analyst wants. 0.7 default preserved.
-    temperature: float = Field(default=0.7, ge=0.0, le=1.0)
+    # Every other AI surface in ION samples at 0.1-0.4; chat sat at 0.7 and both
+    # UI callers omit the field, so that default was what analysts actually got.
+    # At 0.7 a 7-8B model fabricates IOCs and CVEs the reference context never
+    # mentioned. A caller that wants more entropy can still ask for it.
+    temperature: float = Field(default=0.3, ge=0.0, le=1.0)
     max_tokens: Optional[int] = Field(default=None, ge=1, le=4096)
     stream: bool = False
 
@@ -376,6 +378,7 @@ async def chat_stream(
     # --- RAG context injection ---
     enhanced_system_prompt = None
     citations_metadata = []
+    grounding_context = ""
 
     if not is_greeting:
         try:
@@ -416,11 +419,10 @@ async def chat_stream(
                             # RAG content (user notes / KB / playbooks) can
                             # carry adversary text pasted from alerts — scrub
                             # injection tokens before it enters the system prompt.
-                            layers.append(
-                                "\n" + sanitize_untrusted(
-                                    rag_context.to_prompt_block(), max_chars=0
-                                )
+                            grounding_context = sanitize_untrusted(
+                                rag_context.to_prompt_block(), max_chars=0
                             )
+                            layers.append("\n" + grounding_context)
                             enhanced_system_prompt = "\n".join(layers)
 
                 # Custom instructions even without RAG
@@ -498,12 +500,25 @@ async def chat_stream(
             if enhanced_system_prompt:
                 stream_kwargs["system_prompt"] = enhanced_system_prompt
 
+            answer_parts = []
             async for chunk in service.chat_stream(**stream_kwargs):
+                if isinstance(chunk, dict) and chunk.get("content"):
+                    answer_parts.append(chunk["content"])
                 yield f"data: {json.dumps(chunk)}\n\n"
 
             # Emit citations event before DONE if we have any
             if citations_metadata:
                 yield f"data: {json.dumps({'citations': citations_metadata})}\n\n"
+
+            # Advisory grounding pass. The answer is already with the analyst,
+            # so this can only annotate it — never withhold or rewrite it.
+            # No-ops unless ION_CHAT_GROUNDING_CHECK is on and RAG returned
+            # something to check the answer against.
+            grounding = await verify_chat_answer(
+                "".join(answer_parts), grounding_context, user_id=current_user.id
+            )
+            if not grounding.get("skipped"):
+                yield f"data: {json.dumps({'grounding': grounding})}\n\n"
 
             yield "data: [DONE]\n\n"
         except Exception as e:

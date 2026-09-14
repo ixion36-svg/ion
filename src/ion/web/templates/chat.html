@@ -1020,6 +1020,31 @@
     color: var(--text-secondary);
 }
 
+/* Grounding advisory */
+.ai-grounding {
+    margin-top: 6px;
+    padding: 6px 9px;
+    border-radius: 0 3px 3px 0;
+    font-size: 0.72rem;
+    line-height: 1.5;
+}
+
+.ai-grounding.ok {
+    border-left: 2px solid var(--success, #86f0a0);
+    background: rgba(134, 240, 160, 0.07);
+    color: var(--text-muted);
+}
+
+.ai-grounding.warn {
+    border-left: 2px solid var(--warning, #f8b33a);
+    background: rgba(248, 179, 58, 0.09);
+    color: var(--text-secondary);
+}
+
+.ai-grounding-head { display: block; font-weight: 600; }
+.ai-grounding ul { margin: 4px 0 4px 1.1rem; padding: 0; }
+.ai-grounding-foot { display: block; color: var(--text-muted); font-size: 0.68rem; }
+
 /* Feedback */
 .ai-feedback-row {
     display: flex;
@@ -1464,6 +1489,7 @@
     let uploadedFiles = [];
     let aiPreferences = {};
     let pendingCitations = null;
+    let pendingGrounding = null;
     let currentMode = 'chat';
     let docgenContent = '';
 
@@ -1698,6 +1724,7 @@
             const msgId = addMessage('assistant', '');
             const contentEl = document.getElementById(msgId);
             pendingCitations = null;
+            pendingGrounding = null;
 
             const reader = resp.body.getReader();
             const decoder = new TextDecoder();
@@ -1715,6 +1742,7 @@
                         const parsed = JSON.parse(data);
                         if (parsed.error) throw new Error(parsed.error);
                         if (parsed.citations) pendingCitations = parsed.citations;
+                        if (parsed.grounding) pendingGrounding = parsed.grounding;
                         if (parsed.content) {
                             fullResponse += parsed.content;
                             contentEl.innerHTML = formatMessage(fullResponse);
@@ -1735,6 +1763,9 @@
             if (wrapper) {
                 if (pendingCitations && pendingCitations.length > 0 && aiPreferences.show_citations !== false) {
                     wrapper.insertAdjacentHTML('beforeend', renderCitations(pendingCitations));
+                }
+                if (pendingGrounding) {
+                    wrapper.insertAdjacentHTML('beforeend', renderGrounding(pendingGrounding));
                 }
                 wrapper.insertAdjacentHTML('beforeend', renderFeedback(msgId));
             }
@@ -1795,6 +1826,20 @@
             `<span class="ai-citation-chip">${icons[c.type] || ''} ${escapeHtml(labels[c.type] || c.type)}: ${escapeHtml(c.title)}</span>`
         ).join('');
         return `<div class="ai-citations-bar"><span class="ai-citations-label">Sources:</span>${chips}</div>`;
+    }
+
+    function renderGrounding(g) {
+        if (!g || g.skipped) return '';
+        const claims = g.unsupported_claims || [];
+        if (g.grounded && !claims.length) {
+            return `<div class="ai-grounding ok">\u{2713} Every specific here appears in the cited sources.</div>`;
+        }
+        const items = claims.map(c => `<li>${escapeHtml(c)}</li>`).join('');
+        return `<div class="ai-grounding warn">
+            <span class="ai-grounding-head">\u{26A0} Not found in the cited sources</span>
+            ${items ? `<ul>${items}</ul>` : ''}
+            <span class="ai-grounding-foot">Advisory only \u{2014} verify before acting.</span>
+        </div>`;
     }
 
     function renderFeedback(msgId) {

@@ -72,7 +72,17 @@ class RAGContext:
             lines.append("")
 
         lines.append("--- END REFERENCE CONTEXT ---")
-        lines.append("Cite sources by type and title when using reference context.")
+        # Retrieval here is substring matching, so the block regularly contains
+        # near-misses. Without an explicit contract a small model treats whatever
+        # it retrieved as licence to invent matching specifics.
+        lines.append(
+            "Ground your answer in the reference context above and cite sources by "
+            "type and title. Mark anything you add from general knowledge as such. "
+            "Never present a specific -- an IOC, CVE, hostname, rule ID or quotation "
+            "-- as coming from the reference context unless it appears there "
+            "verbatim. If the context does not answer the question, say so plainly "
+            "rather than filling the gap."
+        )
         return "\n".join(lines)
 
     def to_citations_metadata(self) -> List[Dict[str, Any]]:

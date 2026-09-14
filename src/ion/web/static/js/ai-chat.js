@@ -357,6 +357,7 @@ async function streamAIResponse() {
     const contentDiv = messageDiv.querySelector('.ai-message-content');
 
     let fullContent = '';
+    let grounding = null;
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
@@ -378,6 +379,9 @@ async function streamAIResponse() {
                         if (parsed.error) {
                             throw new Error(parsed.error);
                         }
+                        if (parsed.grounding) {
+                            grounding = parsed.grounding;
+                        }
                         if (parsed.content) {
                             fullContent += parsed.content;
                             contentDiv.innerHTML = formatAIMessage(fullContent);
@@ -393,8 +397,26 @@ async function streamAIResponse() {
         aiStreaming = false;
     }
 
+    if (grounding && !grounding.skipped) {
+        contentDiv.insertAdjacentHTML('afterend', renderAIGrounding(grounding));
+        scrollAIMessages();
+    }
+
     // Add to messages array
     aiMessages.push({ role: 'assistant', content: fullContent });
+}
+
+function renderAIGrounding(g) {
+    const claims = g.unsupported_claims || [];
+    if (g.grounded && !claims.length) {
+        return '<div class="ai-grounding ok">✓ Every specific here appears in the cited sources.</div>';
+    }
+    const items = claims.map(c => `<li>${escapeHtml(c)}</li>`).join('');
+    return `<div class="ai-grounding warn">
+        <span class="ai-grounding-head">⚠ Not found in the cited sources</span>
+        ${items ? `<ul>${items}</ul>` : ''}
+        <span class="ai-grounding-foot">Advisory only — verify before acting.</span>
+    </div>`;
 }
 
 function addAIMessageToUI(role, content, streaming = false) {

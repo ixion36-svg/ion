@@ -198,6 +198,30 @@
     border-bottom-left-radius: 4px;
 }
 
+.ai-grounding {
+    margin-top: 0.4rem;
+    padding: 0.45rem 0.7rem;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+.ai-grounding.ok {
+    border-left: 2px solid var(--success, #86f0a0);
+    background: rgba(134, 240, 160, 0.07);
+    color: var(--text-muted);
+}
+
+.ai-grounding.warn {
+    border-left: 2px solid var(--warning, #f8b33a);
+    background: rgba(248, 179, 58, 0.09);
+    color: var(--text-secondary);
+}
+
+.ai-grounding-head { display: block; font-weight: 600; }
+.ai-grounding ul { margin: 0.25rem 0 0.25rem 1.1rem; padding: 0; }
+.ai-grounding-foot { display: block; color: var(--text-muted); font-size: 0.7rem; }
+
 .ai-message-error {
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.3);
