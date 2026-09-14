@@ -3598,6 +3598,7 @@ async function checkAIAvailability() {
             aiAvailable = data.available === true;
         }
     } catch (e) {
+        console.warn('checkAIAvailability failed; treating AI as unavailable:', e);
         aiAvailable = false;
     }
 }
@@ -5039,7 +5040,8 @@ async function loadCasePlaybookExecutions(caseId) {
             `;
         }).join('');
     } catch (error) {
-        container.innerHTML = `<span class="text-[0.8125rem] text-[var(--text-muted)]">Failed to load executions</span>`;
+        console.error('loadCasePlaybookExecutions failed:', error);
+        container.innerHTML = `<span class="text-[0.8125rem] text-[var(--text-muted)]">Failed to load executions: ${escapeHtml(String((error && error.message) || error))}</span>`;
     }
 }
 
@@ -5597,6 +5599,7 @@ async function aiSuggestPriority(alertId) {
             showNotification('AI could not determine priority');
         }
     } catch (e) {
+        console.error('aiSuggestPriority failed:', e);
         showNotification('AI priority suggestion failed');
     }
 }
@@ -5656,6 +5659,7 @@ async function aiExtractObservables(alertId) {
             showNotification('AI observables already present');
         }
     } catch (e) {
+        console.error('aiExtractObservables failed:', e);
         showNotification('AI observable extraction failed');
     }
 }
@@ -5727,6 +5731,7 @@ async function aiSuggestMitre(alertId) {
             showNotification('AI MITRE techniques already present');
         }
     } catch (e) {
+        console.error('aiSuggestMitre failed:', e);
         showNotification('AI MITRE suggestion failed');
     }
 }
@@ -5767,6 +5772,7 @@ async function aiGenerateCase(alertId) {
         if (hint) hint.textContent = 'Fields populated by AI - review and edit as needed';
         showNotification('AI generated case fields');
     } catch (e) {
+        console.error('aiGenerateCase failed:', e);
         if (hint) hint.textContent = 'AI generation failed';
         showNotification('AI case generation failed');
     }
@@ -6044,7 +6050,9 @@ async function togglePlaybookLibrary(alertId) {
         const data = await resp.json();
         renderPlaybookLibraryPanel(alertId, panel, data.playbooks || []);
     } catch (err) {
-        panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[#f44336]">Failed to load playbook library</div>';
+        console.error('togglePlaybookLibrary failed:', err);
+        panel.innerHTML = '<div class="p-2 text-[0.8125rem] text-[#f44336]">Failed to load playbook library: '
+            + escapeHtml(String((err && err.message) || err)) + '</div>';
     }
 }
 
@@ -6554,6 +6562,7 @@ function renderCommentsTab(alertId, comments) {
                 try {
                     rendered = DOMPurify.sanitize(marked.parse(raw));
                 } catch (e) {
+                    console.warn('renderCommentsTab: markdown render failed, falling back to plain text:', e);
                     rendered = escapeHtml(raw);
                 }
             } else {
@@ -9262,6 +9271,7 @@ function getSavedFilters() {
     try {
         return JSON.parse(localStorage.getItem(SAVED_FILTERS_KEY) || '[]');
     } catch (e) {
+        console.warn('getSavedFilters: ' + SAVED_FILTERS_KEY + ' is not valid JSON, ignoring saved views:', e);
         return [];
     }
 }
@@ -9559,6 +9569,7 @@ async function contextMenuAction(action, value) {
                     window.open('/kibana/app/security/alerts', '_blank');
                 }
             } catch (e) {
+                console.warn('contextMenuAction: Kibana deep link lookup failed, opening the default view:', e);
                 window.open('/kibana/app/security/alerts', '_blank');
             }
             break;
@@ -10267,6 +10278,7 @@ async function _acpLoadAssignees() {
         const data = await resp.json();
         _acpAssigneesCache = data.users || data || [];
     } catch (e) {
+        console.error('_acpLoadAssignees failed; assignee list will be empty:', e);
         _acpAssigneesCache = [];
     }
     return _acpAssigneesCache;
