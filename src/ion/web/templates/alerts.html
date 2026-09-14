@@ -6794,7 +6794,16 @@ async function renderCaseTab(caseId) {
             checkKFPMatchesForTab(c);
         }
     } catch (e) {
-        container.innerHTML = '<div class="empty-state">Failed to load case details</div>';
+        // Say WHICH case and WHY. The bare message here previously threw the
+        // exception away, which meant a failure the user could see was one
+        // nobody could diagnose: the request returns 200, so the server logs
+        // show nothing wrong, and the only evidence left was the words
+        // "Failed to load case details".
+        console.error('renderCaseTab(' + caseId + ') failed:', e);
+        container.innerHTML =
+            '<div class="empty-state">Failed to load case details'
+            + '<br><small>' + escapeHtml(String(e && e.message || e)) + '</small>'
+            + '</div>';
     }
 }
 
