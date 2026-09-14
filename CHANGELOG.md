@@ -1,13 +1,54 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.93.1 -->
-<!-- ion-doc:version=0.93.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.93.2 -->
+<!-- ion-doc:version=0.93.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-14 -->
 
 # Changelog
+
+## v0.93.2 — 2026-09-14
+
+**Three regressions from the v0.93.x styling work, all found by using the app.**
+
+- **The navbar disappeared.** The v0.93.1 overlay fix boosted Tailwind's
+  `hidden` to `html body .hidden` (specificity 0,1,2) so it would beat each
+  page's own `.overlay { display:flex }`. It also beat `md:flex` (0,1,0),
+  because a media query adds no specificity, and the navbar is
+  `<nav class="hidden md:flex">`. Six elements written with that idiom vanished
+  at every width. `hidden` is meant to be overridable by responsive variants,
+  so the condition now sits on the page rule instead:
+  `.overlay:not(.hidden) { display:flex }`, 15 rules across 9 pages. Only the
+  `display` declaration moves — gating the whole rule would also drop
+  `position:fixed`, which breaks modals opened by setting `el.style.display`.
+- **`btn-secondary` became a solid purple button.** `ion-ui.css` had defined it
+  as an alias of the ghost variant; retiring that sheet let daisyUI's own
+  definition take over, which is `--color-secondary` on
+  `--color-secondary-content` — neon purple on near-black, across 87 buttons.
+  Fixed by overriding those two custom properties rather than
+  `background`/`color`, so daisyUI's hover, active, focus-visible and disabled
+  states keep composing. `--color-secondary` stays purple: the alert tags use
+  it as text on a 14% tint and that pairing is correct.
+- **Case details failed to load.** `renderPanelContent` threw
+  `ReferenceError: sc is not defined`. The v0.31.21 migration had frozen a
+  runtime-built inline style into a CSS rule as literal text
+  (`background:' + sc.bg + '`), which is invalid CSS and silently discarded —
+  so the `sc` binding could disappear and nothing would complain. Restoring
+  those declarations to the markup in v0.93.1 turned the inert text into a live
+  expression, and the missing name took the whole panel down. `sc` is
+  `statusColors[st]`, which already existed and was used nowhere else. All 171
+  `data-ion-style` expressions were audited for the same fault; this was the
+  only one, and a test now checks every expression's identifiers against its
+  enclosing scope.
+
+**Two swallowed exceptions now report themselves.** `renderPanelContent` and
+`_renderAcpContent` both wrapped their render in a bare `try/catch` that
+replaced any error with "Failed to load case details". With the request
+returning 200, that left a visible failure with no server-side evidence and no
+client-side detail. Both now log the exception with the case id and show its
+message.
 
 ## v0.93.1 — 2026-09-14
 
