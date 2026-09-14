@@ -10247,7 +10247,10 @@ async function openCasePanel(caseId) {
         document.getElementById('acp-title').textContent = c.title || '';
         body.innerHTML = _renderAcpContent(c);
     } catch (e) {
-        body.innerHTML = '<p class="text-[#ef4444] text-center p-8">Failed to load case details</p>';
+        console.error('openCasePanel(' + caseId + ') failed:', e);
+        body.innerHTML =
+            '<p class="text-[#ef4444] text-center p-8">Failed to load case details'
+            + '<br><small>' + escapeHtml(String((e && e.message) || e)) + '</small></p>';
     }
 }
 

@@ -2813,7 +2813,15 @@ async function openCaseDetail(caseId) {
         // Timeline annotations
         loadAnnotations(c.id);
     } catch (e) {
-        body.innerHTML = '<p class="text-[#ef4444] text-center p-8">Failed to load case details</p>';
+        // Name the failure. Everything above runs inside one try, so a throw
+        // in any of renderPanelContent / applyConfidenceMeters /
+        // switchPanelTab / selectCaseAlert lands here indistinguishably --
+        // and the request itself returns 200, so the server log is clean and
+        // the only evidence was the words "Failed to load case details".
+        console.error('openCasePanel(' + caseId + ') failed:', e);
+        body.innerHTML =
+            '<p class="text-[#ef4444] text-center p-8">Failed to load case details'
+            + '<br><small>' + escapeHtml(String((e && e.message) || e)) + '</small></p>';
     }
 }
 
@@ -3484,6 +3492,14 @@ function renderPanelContent(c) {
                 ? a.rule_name
                 : String(alertId).substring(0, 24);
             const st = a.status || 'open';
+            // `sc` is what the badge's original inline style read from, before
+            // the v0.31.21 migration froze that style into a CSS rule. The
+            // rule kept the text `background:' + sc.bg + '`, which is invalid
+            // CSS and was silently discarded -- so the binding could go
+            // missing without anything noticing. Restoring the declaration to
+            // the markup made it live again, and the whole case panel threw
+            // ReferenceError until this came back.
+            const sc = statusColors[st] || statusColors.open;
             const sev = a.priority || c.severity || 'medium';
             const bits = [];
             if (a.process_name) bits.push(esc(a.process_name));
