@@ -363,15 +363,18 @@ async def create_webhook(
     except ValueError:
         source_type_enum = IntegrationType.CUSTOM
 
-    webhook = webhook_service.create_webhook(
-        name=data.name,
-        description=data.description,
-        source_type=source_type_enum,
-        secret=data.secret,
-        event_types=data.event_types,
-        created_by_id=current_user.id,
-        session=session,
-    )
+    try:
+        webhook = webhook_service.create_webhook(
+            name=data.name,
+            description=data.description,
+            source_type=source_type_enum,
+            secret=data.secret,
+            event_types=data.event_types,
+            created_by_id=current_user.id,
+            session=session,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     # Log the creation
     log_service = get_integration_log_service()

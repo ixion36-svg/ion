@@ -45,12 +45,16 @@ class Config:
     ssl_key: str = ""   # Path to PEM private key file
 
     # Security settings
-    cookie_secure: bool = False  # Set to True when using HTTPS in production
+    # Development deployment. Relaxes cookie_secure so the app works over
+    # plain HTTP, and downgrades the weak-admin-password startup error to a
+    # warning. NEVER set in production.
+    dev_mode: bool = False
+    cookie_secure: bool = True  # Secure flag on session cookies. dev_mode drops it unless ION_COOKIE_SECURE says otherwise
     debug_mode: bool = False  # Enable API docs and detailed errors (disable in production)
     account_lockout_enabled: bool = False  # Lock accounts after repeated failed logins
     ip_blocking_enabled: bool = False  # Auto-block IPs on attack detection (opt-in; needs ION_TRUSTED_PROXIES behind a proxy)
-    webhook_require_signature: bool = False  # Reject inbound webhooks with no HMAC secret configured (opt-in)
-    enforce_password_change: bool = False  # Block must_change_password users from APIs until they change it (opt-in)
+    webhook_require_signature: bool = True  # Reject inbound webhooks with no HMAC secret configured
+    enforce_password_change: bool = True  # Block must_change_password users from APIs until they change it
     password_min_length: int = 0  # Minimum password length on set/change; 0 = policy disabled (opt-in)
     security_scan_authenticated: bool = False  # Run payload-pattern WAF checks on authenticated traffic too (default off — analysts legitimately handle malicious content)
     authz_alert_enabled: bool = True  # Record 401/403 and alert on repeated unauthorized-access attempts
@@ -307,12 +311,13 @@ class Config:
             ssl_cert=data.get("ssl_cert", ""),
             ssl_key=data.get("ssl_key", ""),
             # Security settings
-            cookie_secure=data.get("cookie_secure", False),
+            dev_mode=data.get("dev_mode", False),
+            cookie_secure=data.get("cookie_secure", True),
             debug_mode=data.get("debug_mode", False),
             account_lockout_enabled=data.get("account_lockout_enabled", False),
             ip_blocking_enabled=data.get("ip_blocking_enabled", False),
-            webhook_require_signature=data.get("webhook_require_signature", False),
-            enforce_password_change=data.get("enforce_password_change", False),
+            webhook_require_signature=data.get("webhook_require_signature", True),
+            enforce_password_change=data.get("enforce_password_change", True),
             password_min_length=data.get("password_min_length", 0),
             security_scan_authenticated=data.get("security_scan_authenticated", False),
             authz_alert_enabled=data.get("authz_alert_enabled", True),
@@ -491,6 +496,7 @@ class Config:
                     "ssl_cert": self.ssl_cert,
                     "ssl_key": self.ssl_key,
                     # Security settings
+                    "dev_mode": self.dev_mode,
                     "cookie_secure": self.cookie_secure,
                     "debug_mode": self.debug_mode,
                     "account_lockout_enabled": self.account_lockout_enabled,
@@ -685,8 +691,14 @@ def get_config() -> Config:
             _config.ssl_cert = os.environ.get("ION_SSL_CERT", "")
         if os.environ.get("ION_SSL_KEY"):
             _config.ssl_key = os.environ.get("ION_SSL_KEY", "")
+        if os.environ.get("ION_DEV_MODE"):
+            _config.dev_mode = _get_env_bool("ION_DEV_MODE")
         if os.environ.get("ION_COOKIE_SECURE"):
             _config.cookie_secure = _get_env_bool("ION_COOKIE_SECURE")
+        elif _config.dev_mode:
+            # Plain-HTTP development: a Secure cookie is never sent back, so
+            # leaving the production default on would silently break login.
+            _config.cookie_secure = False
         if os.environ.get("ION_DEBUG_MODE"):
             _config.debug_mode = _get_env_bool("ION_DEBUG_MODE")
         if os.environ.get("ION_ACCOUNT_LOCKOUT_ENABLED"):

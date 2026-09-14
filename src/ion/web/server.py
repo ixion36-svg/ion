@@ -594,8 +594,18 @@ def _validate_startup_config():
         _min_len = int(_min_len_env) if _min_len_env else 0
     except ValueError:
         _min_len = 0
+    # Fatal outside dev: `admin` is the only local account, and an unset
+    # ION_ADMIN_PASSWORD falls through to the literal "changeme". Warning-only
+    # meant a deployment that never read the log shipped a known credential.
+    from ion.core.config import get_config as _get_config
+
+    _dev = _get_config().dev_mode
     if admin_pw.lower() in _COMMON_WEAK or admin_pw in ("changeme", "password", "admin"):
-        warnings.append("ION_ADMIN_PASSWORD is weak/common — set a strong unique value (admin is the only local account)")
+        _msg = "ION_ADMIN_PASSWORD is weak/common or unset — set a strong unique value (admin is the only local account)"
+        if _dev:
+            warnings.append(_msg + " [allowed: ION_DEV_MODE=true]")
+        else:
+            errors.append(_msg)
     elif _min_len:
         _pol_err = validate_password_policy(admin_pw, _min_len)
         if _pol_err:
@@ -626,8 +636,10 @@ def _validate_startup_config():
             warnings.append("ION_OPENCTI_ENABLED=true but ION_OPENCTI_URL is not set")
 
     # Security
-    if os.environ.get("ION_COOKIE_SECURE", "").lower() != "true":
-        warnings.append("ION_COOKIE_SECURE is not true — session cookies won't have Secure flag")
+    if not _get_config().cookie_secure:
+        warnings.append("cookie_secure is off — session cookies won't have the Secure flag (set ION_COOKIE_SECURE=true)")
+    if _dev:
+        warnings.append("ION_DEV_MODE=true — weak-credential and Secure-cookie enforcement are relaxed; never set this in production")
     if os.environ.get("ION_DEBUG_MODE", "").lower() == "true":
         warnings.append("ION_DEBUG_MODE=true — /docs and /redoc are publicly accessible")
 

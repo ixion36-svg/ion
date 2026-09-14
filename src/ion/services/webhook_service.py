@@ -63,6 +63,18 @@ class WebhookService:
         Returns:
             The created Webhook instance.
         """
+        # A secret-less webhook is refused at receive time while
+        # webhook_require_signature is on, so creating one produces a token
+        # that can never deliver. Fail here instead, where the operator can
+        # still act on it.
+        from ion.core.config import get_config
+
+        if get_config().webhook_require_signature and not secret:
+            raise ValueError(
+                "A webhook secret is required while ION_WEBHOOK_REQUIRE_SIGNATURE is on: "
+                "without one, every delivery to this webhook is rejected as unsigned."
+            )
+
         def _create(sess: Session) -> Webhook:
             webhook = Webhook(
                 name=name,
