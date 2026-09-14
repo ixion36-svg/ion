@@ -1,13 +1,44 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.93.0 -->
-<!-- ion-doc:version=0.93.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.93.1 -->
+<!-- ion-doc:version=0.93.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-14 -->
 
 # Changelog
+
+## v0.93.1 — 2026-09-14
+
+**Modal fixes.** Two faults from the v0.93.0 styling changeover, with opposite
+symptoms and different causes.
+
+- **Overlays rendered open on page load.** An overlay is written
+  `class="cases-modal-overlay hidden"` while the page's own `<style>` block
+  sets `.cases-modal-overlay { display:flex }`. Both selectors are specificity
+  0,1,0 and a page `<style>` comes after every `<link>`, so the page rule wins.
+  The v0.31.21 inline-style migration had emitted its hidden class as
+  `html body ._ion-s-c8be1ccba6 { display:none }` at 0,1,2 precisely to beat
+  that; converting those elements to Tailwind's `hidden` dropped the prefix and
+  the specificity with it. 13 elements across 7 pages were affected: both cases
+  modals, the discover save-search dialog, the training plan dialog and summary,
+  the alerts bulk-action toolbar, filter banner, MITRE legend, pattern panel and
+  custom time range, the chat typing indicator, a threat-intel badge, and the
+  notepad editor in `base.html`, which is every page.
+- **Opened modals were invisible.** daisyUI's `.modal` carries
+  `visibility:hidden` and `pointer-events:none` and reveals via `.modal-open`.
+  ION's modals are plain divs toggled by `.show` or by
+  `el.style.display = 'flex'`. ION's rule overrides `display`, but an unlayered
+  rule beats a layered one only for the properties it declares, and ION
+  declares nothing about visibility. So an opened modal was `display:flex`,
+  `visibility:hidden`, `pointer-events:none`, with its `.modal-box` at
+  `opacity:0`. Laid out, invisible, unclickable. Four pages had already patched
+  this one ID at a time; the bridge is now in the theme once, covering all 42
+  elements that carry `.modal`.
+
+Both are guarded by tests, including one asserting that nothing starts using
+daisyUI's own modal API, which is what makes the blanket bridge safe.
 
 ## v0.93.0 — 2026-09-14
 
