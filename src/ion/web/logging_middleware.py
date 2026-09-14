@@ -15,90 +15,135 @@ from ion.core.logging import (
 
 logger = get_structured_logger(__name__)
 
+# Above this, a request is logged as an error and shows up in alerting; above
+# the soft threshold it is a warning. Tighten once p99 drops below them.
+_SLOW_HARD_MS = 2000
+_SLOW_SOFT_MS = 500
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware that logs all HTTP requests in ECS format.
 
-    Features:
-    - Assigns unique request ID to each request
-    - Logs request start and completion
-    - Tracks request duration
-    - Captures client IP, user agent
-    - Integrates with distributed tracing (trace ID from headers)
+def _header(scope_headers: list[tuple[bytes, bytes]], name: bytes) -> str | None:
+    """First value for a header, or None. ASGI header names are lowercase bytes."""
+    for k, v in scope_headers:
+        if k == name:
+            return v.decode("latin-1")
+    return None
+
+
+def _trace_id(headers: list[tuple[bytes, bytes]], request_id: str) -> str:
+    """Caller-supplied trace id, else the W3C traceparent's trace-id, else our own.
+
+    Written as explicit branches on purpose. The single-expression form
+    `a or b if cond else None` parses as `(a or b) if cond else None`, which
+    dropped X-Trace-ID entirely whenever traceparent was absent -- the common
+    case -- so a caller's trace id never survived. See CLAUDE.md.
+    """
+    supplied = _header(headers, b"x-trace-id")
+    if supplied:
+        return supplied
+    traceparent = _header(headers, b"traceparent") or ""
+    parts = traceparent.split("-")
+    if len(parts) >= 2 and parts[1]:
+        return parts[1]
+    return request_id
+
+
+def _client_ip(headers: list[tuple[bytes, bytes]], client) -> str:
+    """Proxy headers win over the socket peer; the peer is the fallback, not a gate.
+
+    Same precedence trap as _trace_id: the previous single-expression form was
+    gated on `if request.client`, so behind a proxy that left no client in the
+    scope, X-Forwarded-For was discarded and the IP logged as "unknown".
+    """
+    forwarded = _header(headers, b"x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",")[0].strip()
+        if first:
+            return first
+    real_ip = _header(headers, b"x-real-ip")
+    if real_ip:
+        return real_ip
+    if client:
+        return client[0]
+    return "unknown"
+
+
+class RequestLoggingMiddleware:
+    """Logs all HTTP requests in ECS format.
+
+    Pure ASGI rather than BaseHTTPMiddleware: that base class builds a Request
+    object and runs the rest of the app in a separate task for every layer, and
+    measured on this stack it was the most expensive layer in the chain for what
+    is only timing and logging.
+
+    - Assigns a unique request ID to each request
+    - Tracks request duration and trips a slow-request tripwire
+    - Captures client IP (proxy-aware) and user agent
+    - Propagates a distributed trace ID from X-Trace-ID or W3C traceparent
     """
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Generate or extract request ID
-        request_id = request.headers.get("X-Request-ID") or generate_request_id()
+    def __init__(self, app):
+        self.app = app
 
-        # Extract trace ID for distributed tracing
-        trace_id = (
-            request.headers.get("X-Trace-ID") or
-            request.headers.get("traceparent", "").split("-")[1] if "-" in request.headers.get("traceparent", "") else None
-        ) or request_id
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-        # Get client IP (handle proxies)
-        client_ip = (
-            request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or
-            request.headers.get("X-Real-IP") or
-            request.client.host if request.client else "unknown"
-        )
+        headers = scope["headers"]
+        request_id = _header(headers, b"x-request-id") or generate_request_id()
 
-        # Set logging context for this request
         set_request_context(
             request_id=request_id,
-            client_ip=client_ip,
-            trace_id=trace_id,
+            client_ip=_client_ip(headers, scope.get("client")),
+            trace_id=_trace_id(headers, request_id),
         )
 
-        # Add request ID to response headers
         start_time = time.time()
+        status_code = 500
+        rid = request_id.encode("latin-1")
+
+        async def send_wrapper(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+                duration_ms = int((time.time() - start_time) * 1000)
+                extra = [
+                    (b"x-request-id", rid),
+                    (b"x-response-time", f"{duration_ms}ms".encode("latin-1")),
+                ]
+                message = {**message, "headers": [*message.get("headers", []), *extra]}
+            await send(message)
 
         try:
-            response = await call_next(request)
-
-            # Calculate duration
+            await self.app(scope, receive, send_wrapper)
             duration_ms = int((time.time() - start_time) * 1000)
+            method, path = scope["method"], scope["path"]
 
-            # Log the request
             logger.http_request(
-                method=request.method,
-                path=request.url.path,
-                status=response.status_code,
+                method=method,
+                path=path,
+                status=status_code,
                 duration_ms=duration_ms,
-                user_agent=request.headers.get("User-Agent"),
+                user_agent=_header(headers, b"user-agent"),
             )
 
-            # slow-request tripwire. Any request above the soft
-            # threshold gets a warning, anything above the hard threshold
-            # gets an error (visible in alerting). Thresholds are tuned to
-            # the current perf budget; tighten once p99 drops below them.
-            if duration_ms >= 2000:
+            if duration_ms >= _SLOW_HARD_MS:
                 logger.error(
-                    f"SLOW REQUEST (>2s): {request.method} {request.url.path} "
-                    f"{response.status_code} {duration_ms}ms",
+                    f"SLOW REQUEST (>2s): {method} {path} {status_code} {duration_ms}ms",
                 )
-            elif duration_ms >= 500:
+            elif duration_ms >= _SLOW_SOFT_MS:
                 logger.warning(
-                    f"Slow request (>500ms): {request.method} {request.url.path} "
-                    f"{response.status_code} {duration_ms}ms",
+                    f"Slow request (>500ms): {method} {path} {status_code} {duration_ms}ms",
                 )
-
-            # Add headers to response
-            response.headers["X-Request-ID"] = request_id
-            response.headers["X-Response-Time"] = f"{duration_ms}ms"
-
-            return response
 
         except Exception as e:
             duration_ms = int((time.time() - start_time) * 1000)
-
             logger.error(
-                f"Request failed: {request.method} {request.url.path}",
+                f"Request failed: {scope['method']} {scope['path']}",
                 error_type=type(e).__name__,
                 extra={
-                    "method": request.method,
-                    "path": request.url.path,
+                    "method": scope["method"],
+                    "path": scope["path"],
                     "duration_ms": duration_ms,
                 },
             )
@@ -109,19 +154,37 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
 
 class AuthLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware that adds authenticated user info to logging context.
+    """Middleware that logs authentication events.
 
-    Should be added AFTER authentication middleware.
+    This works with the auth system to log:
+    - Login attempts
+    - Failed authentications
+    - Session events
     """
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Check if user is set on request state (by auth middleware)
-        user = getattr(request.state, "user", None)
+        response = await call_next(request)
 
-        if user:
-            set_request_context(
-                user_id=user.id if hasattr(user, "id") else None,
-                username=user.username if hasattr(user, "username") else None,
+        # Log authentication failures
+        if response.status_code == 401:
+            logger.security_event(
+                event_type="authentication_failure",
+                severity="medium",
+                outcome="failure",
+                extra={
+                    "path": request.url.path,
+                    "method": request.method,
+                },
+            )
+        elif response.status_code == 403:
+            logger.security_event(
+                event_type="authorization_failure",
+                severity="medium",
+                outcome="failure",
+                extra={
+                    "path": request.url.path,
+                    "method": request.method,
+                },
             )
 
-        return await call_next(request)
+        return response

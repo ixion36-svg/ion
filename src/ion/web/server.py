@@ -30,7 +30,6 @@ import os
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy.orm import Session
-from starlette.middleware.base import BaseHTTPMiddleware
 
 import ion
 from ion.core.config import get_config, get_elasticsearch_config
@@ -200,91 +199,107 @@ from ion.web._csp_nonce import _csp_nonce_var, _CSPNonceProxy
 from ion.web._csrf_token import _CSRFTokenProxy
 from ion.web.csrf_middleware import CSRFMiddleware
 
+# Static response headers, pre-encoded once. ASGI carries headers as a list of
+# (bytes, bytes), so building them per request would re-encode the same values
+# on every response.
+_STATIC_SECURITY_HEADERS: list[tuple[bytes, bytes]] = [
+    (b"x-content-type-options", b"nosniff"),
+    (b"x-frame-options", b"DENY"),
+    (b"x-xss-protection", b"1; mode=block"),
+    (b"referrer-policy", b"strict-origin-when-cross-origin"),
+    (b"permissions-policy", b"geolocation=(), microphone=(), camera=(), payment=()"),
+    # Replace the default "Server: uvicorn" disclosure with a generic value —
+    # denies an external scanner a free server/version fingerprint.
+    (b"server", b"ION"),
+]
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Add security headers to all responses + seed the per-request CSP nonce."""
+_HSTS = (b"strict-transport-security", b"max-age=31536000; includeSubDomains")
 
-    async def dispatch(self, request: Request, call_next):
+# Everything in the CSP except the two nonce values, which change per request.
+_CSP_HEAD = b"default-src 'self'; script-src 'self' 'nonce-"
+_CSP_MID = b"'; script-src-attr 'none'; style-src 'self' 'nonce-"
+_CSP_TAIL = (
+    b"'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; "
+    b"connect-src 'self'; object-src 'none'; base-uri 'self'; "
+    b"form-action 'self'; frame-ancestors 'none'"
+)
+
+_OWNED = {h[0] for h in _STATIC_SECURITY_HEADERS} | {
+    _HSTS[0],
+    b"content-security-policy",
+}
+
+
+class SecurityHeadersMiddleware:
+    """Add security headers to all responses + seed the per-request CSP nonce.
+
+    Pure ASGI, not BaseHTTPMiddleware. BaseHTTPMiddleware builds a Request
+    object and runs the rest of the app in a separate task per layer; measured
+    on this stack that cost ~18% of throughput for what is only header-setting.
+    The pure-ASGI form measured ~3%.
+
+    Content-Security-Policy — CSP3 split-directive policy. Strict-nonce on
+    `<script>` and `<style>` element bodies (the main XSS injection surface).
+    `script-src-attr 'none'` was flipped on after the v0.31.4–v0.31.19 inline-
+    handler migration retired every `onclick=`/`onkeydown=`/etc attribute
+    (~1,150 handlers) in favour of `data-click-action` / `data-keydown-action`
+    plus the event-delegation helper at static/js/event-delegation.js, so a
+    stored-XSS payload cannot add an inline event handler.
+
+    `style-src-attr 'none'` was flipped on after tools/migrate_inline_styles.py
+    retired every inline `style=""` attribute. With strict `script-src-attr`,
+    strict `style-src-attr` and a strict nonce on inline `<script>`/`<style>`,
+    the only CSS that can apply to an ION page is same-origin stylesheets,
+    nonced `<style>` blocks, and programmatic CSSOM. Computed styles travel in
+    `data-ion-style` and are applied via setProperty by
+    static/js/ion-dynamic-styles.js; templates/emails/ and *_pdf.html are
+    exempt because they are not served under this policy. Held at zero by
+    tests/test_v080_csp_inline_styles.py.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         # 16 bytes of CSPRNG → base64-url-encoded (≈22 chars). Stored on
-        # request.state for direct access and on a ContextVar so the Jinja
-        # `{{ csp_nonce }}` global resolves to the right value without each
-        # route handler having to thread it through.
+        # scope["state"] so `request.state.csp_nonce` resolves, and on a
+        # ContextVar so the Jinja `{{ csp_nonce }}` global finds it without
+        # each route handler threading it through.
         nonce = _secrets.token_urlsafe(16)
-        request.state.csp_nonce = nonce
-        _token = _csp_nonce_var.set(nonce)
+        scope.setdefault("state", {})["csp_nonce"] = nonce
+        token = _csp_nonce_var.set(nonce)
+
+        # HSTS only over HTTPS, so a plain-HTTP development origin is not
+        # pinned to a scheme it cannot serve.
+        secure = scope.get("scheme") == "https" or any(
+            k == b"x-forwarded-proto" and v == b"https" for k, v in scope["headers"]
+        )
+        nonce_b = nonce.encode("ascii")
+        csp = _CSP_HEAD + nonce_b + _CSP_MID + nonce_b + _CSP_TAIL
+
+        async def send_with_headers(message):
+            if message["type"] == "http.response.start":
+                # Drop any value the app or server already set for a header we
+                # own, so this assigns rather than duplicates — matching what
+                # `response.headers[...] = ...` did.
+                headers = [
+                    (k, v) for k, v in message.get("headers", []) if k.lower() not in _OWNED
+                ]
+                headers.extend(_STATIC_SECURITY_HEADERS)
+                headers.append((b"content-security-policy", csp))
+                if secure:
+                    headers.append(_HSTS)
+                message = {**message, "headers": headers}
+            await send(message)
+
         try:
-            response = await call_next(request)
+            await self.app(scope, receive, send_with_headers)
         finally:
-            _csp_nonce_var.reset(_token)
-
-        # Prevent MIME type sniffing
-        response.headers["X-Content-Type-Options"] = "nosniff"
-
-        # Prevent clickjacking
-        response.headers["X-Frame-Options"] = "DENY"
-
-        # XSS protection (legacy, but still useful)
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-
-        # Referrer policy
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-
-        # HTTP Strict Transport Security (HSTS)
-        # Only set when request is HTTPS to avoid issues during development
-        if request.url.scheme == "https" or request.headers.get("X-Forwarded-Proto") == "https":
-            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-
-        # Content Security Policy — CSP3 split-directive policy.
-        # Strict-nonce on `<script>` and `<style>` element bodies (the main
-        # XSS injection surface). v0.31.20: `script-src-attr 'none'` flipped
-        # on after the v0.31.4–v0.31.19 inline-handler migration retired
-        # every `onclick=`/`onkeydown=`/etc attribute (~1,150 handlers) in
-        # favour of `data-click-action` / `data-keydown-action` + the
-        # event-delegation helper at static/js/event-delegation.js.
-        # Browsers now block any attempt to add an inline event handler
-        # (defence-in-depth against stored-XSS injection of a malicious
-        # `onerror=` etc).
-        # `style-src-attr 'none'` flipped on after
-        # tools/migrate_inline_styles.py retired every inline `style=""`
-        # attribute (1,820 instances → 993 unique hashed CSS classes in
-        # static/css/ion-migrated-styles.css, loaded via base.html). With
-        # strict `script-src-attr 'none'` AND strict
-        # `style-src-attr 'none'` AND strict nonce on inline
-        # `<script>` / `<style>`, the only CSS that can apply to
-        # an ION page is from same-origin stylesheets, nonced `<style>`
-        # blocks, and programmatic CSSOM (`el.style.setProperty(...)`).
-        #
-        # 22 inline `style=` attributes had survived that migration;
-        # swept to zero and held there by tests/test_v080_csp_inline_styles.py
-        # (templates/emails/ and *_pdf.html are exempt — not served under this
-        # policy). Computed styles use `data-ion-style`, applied via
-        # setProperty by static/js/ion-dynamic-styles.js.
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            f"script-src 'self' 'nonce-{nonce}'; "
-            "script-src-attr 'none'; "
-            f"style-src 'self' 'nonce-{nonce}'; "
-            "style-src-attr 'none'; "
-            "img-src 'self' data:; "
-            "font-src 'self'; "
-            "connect-src 'self'; "
-            "object-src 'none'; "
-            "base-uri 'self'; "
-            "form-action 'self'; "
-            "frame-ancestors 'none'"
-        )
-
-        # Permissions Policy (formerly Feature-Policy)
-        response.headers["Permissions-Policy"] = (
-            "geolocation=(), microphone=(), camera=(), payment=()"
-        )
-
-        # Replace the default "Server: uvicorn" disclosure with a generic value
-        #  — denies an external scanner a free server/version
-        # fingerprint. Purely cosmetic; no functional impact.
-        response.headers["Server"] = "ION"
-
-        return response
+            _csp_nonce_var.reset(token)
 
 
 # Add GZip compression — compresses all responses > 500 bytes.
