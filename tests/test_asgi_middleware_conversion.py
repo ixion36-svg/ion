@@ -1,15 +1,23 @@
-"""SecurityHeaders and RequestLogging are pure ASGI, not BaseHTTPMiddleware.
+"""ION's five middleware layers are pure ASGI, not BaseHTTPMiddleware.
 
 BaseHTTPMiddleware builds a Request object and runs the rest of the app in a
-separate task for every layer in the chain. Measured on this stack, the two
-layers converted here cost ~19% and ~19% of throughput respectively for work
-that is only header-setting and timing; the pure-ASGI form of SecurityHeaders
-measured ~4.5%.
+separate task for every layer in the chain, and ION stacks five of them. An
+interleaved A/B of the two implementations measured SecurityHeaders at 19.9% of
+throughput as BaseHTTPMiddleware against 5.8% as pure ASGI.
 
-The risk in that conversion is silent behaviour drift -- a header that stops
-being set, a header that starts being set twice because raw ASGI headers are a
-list rather than a mapping, or a ContextVar that no longer reaches the
-templates. These tests pin the observable behaviour, not the implementation.
+The risk is silent behaviour drift, and it differs per layer:
+
+- headers: one that stops being set, or starts being set twice because raw ASGI
+  headers are a list rather than a mapping
+- the CSP nonce ContextVar no longer reaching the templates, which would make
+  every nonced <script> in the page unrunnable
+- the request body, which SecurityMonitoring reads to scan for attack patterns.
+  BaseHTTPMiddleware replayed it to the route handler implicitly; in pure ASGI
+  that is done by hand, and getting it wrong means POST bodies arrive empty or
+  the request hangs on a drained receive.
+
+These tests pin observable behaviour rather than implementation, so the layers
+can be rewritten again without rewriting the tests.
 """
 
 import sys
@@ -169,3 +177,91 @@ def test_real_ip_is_the_second_choice():
 def test_peer_address_is_the_fallback():
     assert _client_ip([], ("10.0.0.9", 51234)) == "10.0.0.9"
     assert _client_ip([], None) == "unknown"
+
+
+# --------------------------------------------------------------------------
+# SecurityMonitoring reads the request body to scan it for attack patterns.
+# BaseHTTPMiddleware replayed the body to the route handler implicitly; in pure
+# ASGI that has to be done by hand, and getting it wrong means every POST body
+# arrives empty, or the request hangs forever waiting on a drained receive.
+# --------------------------------------------------------------------------
+
+def _echo_app():
+    from fastapi import FastAPI, Request
+
+    from ion.web.security_middleware import SecurityMonitoringMiddleware
+
+    app = FastAPI()
+
+    @app.post("/echo")
+    async def echo(request: Request):
+        raw = await request.body()
+        return {"len": len(raw), "body": raw.decode("utf-8", "replace")}
+
+    @app.get("/ping")
+    async def ping():
+        return {"ok": True}
+
+    app.add_middleware(SecurityMonitoringMiddleware)
+    return app
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param(b'{"note":"benign"}', id="small-json"),
+        pytest.param(b"", id="empty"),
+        pytest.param(b"x" * 200_000, id="200KB-chunked"),
+        pytest.param("café — naïve".encode(), id="utf8"),
+        pytest.param(b"' OR 1=1 --", id="attack-pattern"),
+    ],
+)
+async def test_request_body_reaches_the_handler_intact(payload):
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=_echo_app()), base_url="http://t"
+    ) as c:
+        r = await c.post("/echo", content=payload)
+    assert r.status_code == 200
+    assert r.json()["len"] == len(payload), "body was truncated or consumed"
+
+
+@pytest.mark.anyio
+async def test_a_get_is_not_delayed_by_body_buffering():
+    """Only POST/PUT/PATCH buffer; a GET must pass receive straight through."""
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=_echo_app()), base_url="http://t"
+    ) as c:
+        r = await c.get("/ping")
+    assert r.status_code == 200
+
+
+@pytest.mark.anyio
+async def test_the_whole_stack_still_serves_a_post():
+    """End to end through all five converted layers, not one in isolation."""
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+    ) as c:
+        r = await c.post("/api/auth/login", json={"username": "nobody", "password": "wrong"})
+    # 401 proves the JSON body was parsed by the handler, not swallowed.
+    assert r.status_code == 401
+    assert "detail" in r.json()
+
+
+def test_no_middleware_is_left_on_basehttpmiddleware():
+    from starlette.middleware.base import BaseHTTPMiddleware
+
+    from ion.web.csrf_middleware import CSRFMiddleware
+    from ion.web.security_middleware import (
+        RateLimitSecurityMiddleware,
+        SecurityMonitoringMiddleware,
+    )
+
+    for mw in (
+        SecurityHeadersMiddleware,
+        RequestLoggingMiddleware,
+        CSRFMiddleware,
+        SecurityMonitoringMiddleware,
+        RateLimitSecurityMiddleware,
+    ):
+        assert not issubclass(mw, BaseHTTPMiddleware), f"{mw.__name__} regressed"

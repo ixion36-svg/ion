@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import logging
 
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -80,10 +79,24 @@ def _request_scheme(request: Request) -> str:
     return request.url.scheme
 
 
-class CSRFMiddleware(BaseHTTPMiddleware):
-    """Reject cross-site state-changing requests; publish the token for templates."""
+class CSRFMiddleware:
+    """Reject cross-site state-changing requests; publish the token for templates.
 
-    async def dispatch(self, request: Request, call_next):
+    Pure ASGI. A Request is still built, because the checks below read cookies
+    and headers, but building one object is not what BaseHTTPMiddleware costs --
+    that is the extra task per layer and the response streamed back through an
+    anyio pair. The checks themselves are unchanged.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope, receive)
         session_token = request.cookies.get(SESSION_COOKIE_NAME) or ""
 
         # Publish on every request, including GETs, so the page being rendered
@@ -92,8 +105,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         try:
             rejection = self._check(request, session_token)
             if rejection is not None:
-                return rejection
-            return await call_next(request)
+                # A Starlette Response is itself an ASGI app.
+                await rejection(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
         finally:
             _csrf_token_var.reset(ctx_token)
 

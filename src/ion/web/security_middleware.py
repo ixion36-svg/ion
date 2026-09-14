@@ -1,10 +1,8 @@
 """Security monitoring middleware for FastAPI."""
 
-from typing import Callable
 
-from fastapi import Request, Response
+from fastapi import Request
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from ion.core.client_ip import get_client_ip
 from ion.core.client_ip import is_trusted_proxy as _is_trusted_proxy
@@ -37,7 +35,7 @@ logger = get_structured_logger(__name__)
 # the auth layer, audit logging, and the login rate-limiter.
 
 
-class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
+class SecurityMonitoringMiddleware:
     """Middleware for detecting and logging security threats.
 
     Features:
@@ -72,7 +70,7 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
     )
 
     def __init__(self, app, enabled: bool = True):
-        super().__init__(app)
+        self.app = app
         self.enabled = enabled
         # IP auto-blocking is opt-in (ION_IP_BLOCKING_ENABLED, default off).
         # Attack detections are ALWAYS logged; blocking only acts when this is
@@ -144,9 +142,47 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
         except Exception:
             return None
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        await self._handle(Request(scope, receive), scope, receive, send)
+
+    @staticmethod
+    async def _buffer_body(receive):
+        """Drain the request body, returning (bytes, replay_receive).
+
+        BaseHTTPMiddleware did this implicitly. In pure ASGI a body read here
+        would leave nothing for the route handler, so the raw messages are kept
+        and handed back in order.
+        """
+        messages = []
+        while True:
+            message = await receive()
+            messages.append(message)
+            if message["type"] == "http.disconnect":
+                break
+            if not message.get("more_body", False):
+                break
+        body = b"".join(
+            m.get("body", b"") for m in messages if m["type"] == "http.request"
+        )
+        pending = iter(messages)
+
+        async def replay():
+            try:
+                return next(pending)
+            except StopIteration:
+                # The app asked for more than arrived; anything further is a
+                # disconnect, never a hang.
+                return {"type": "http.disconnect"}
+
+        return body, replay
+
+    async def _handle(self, request: Request, scope, receive, send) -> None:
         if not self.enabled or not self.session_factory:
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # CRITICAL: trust check uses the actual TCP peer, NOT the result of
         # get_client_ip() — the latter can be derived from X-Forwarded-For
@@ -157,8 +193,10 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
 
         # Skip all security checks for trusted IPs (localhost)
         if self._is_trusted_ip(peer_ip):
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
+        downstream_receive = receive
         session = self.session_factory()
         try:
             security_service = SecurityDetectionService(session)
@@ -179,10 +217,11 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
                     outcome="blocked",
                     details={"ip": client_ip, "path": request.url.path},
                 )
-                return JSONResponse(
+                await JSONResponse(
                     status_code=403,
                     content={"detail": "Access denied"},
-                )
+                )(scope, receive, send)
+                return
 
             # Attack detection runs on non-excluded paths. (Excluded paths still
             # get post-response authz auditing below.)
@@ -191,7 +230,7 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
                 body = None
                 if request.method in ("POST", "PUT", "PATCH"):
                     try:
-                        body_bytes = await request.body()
+                        body_bytes, downstream_receive = await self._buffer_body(receive)
                         body = body_bytes.decode("utf-8", errors="ignore")[:10000]  # Limit size
                     except Exception:
                         pass
@@ -269,15 +308,23 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
                         )
                         session.commit()
 
-            # Continue with request
-            response = await call_next(request)
+            # Continue with request, capturing the status the authz audit needs.
+            status = 0
+
+            async def capture_status(message):
+                nonlocal status
+                if message["type"] == "http.response.start":
+                    status = message["status"]
+                await send(message)
+
+            await self.app(scope, downstream_receive, capture_status)
 
             # Authorization-failure auditing: record 401/403 and escalate a burst
             # from one actor (IDOR / privilege probing, unauthenticated scanning)
             # into a HIGH event. Runs on the response so it needs no route hooks.
             if (
                 self.authz_alert_enabled
-                and response.status_code in (401, 403)
+                and status in (401, 403)
                 and not self._is_authz_skip(request.url.path)
             ):
                 try:
@@ -292,7 +339,7 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
                     )
                     _ev, escalated = security_service.record_authorization_failure(
                         authz_ctx,
-                        response.status_code,
+                        status,
                         threshold=self.authz_threshold,
                         window_minutes=self.authz_window_minutes,
                     )
@@ -304,29 +351,35 @@ class SecurityMonitoringMiddleware(BaseHTTPMiddleware):
                             details={
                                 "ip": client_ip,
                                 "path": request.url.path,
-                                "status": response.status_code,
+                                "status": status,
                                 "actor": authz_ctx.username or authz_ctx.user_id or client_ip,
                             },
                         )
                 except Exception as e:
                     logger.error(f"Authz-failure auditing error: {e}")
 
-            return response
-
         except Exception as e:
             logger.error(f"Security middleware error: {e}", exc_info=True)
-            # Don't block requests on middleware errors
-            return await call_next(request)
+            # Never block a request because monitoring failed. downstream_receive
+            # is whatever the body buffer left behind, so a request whose body
+            # was already drained still reaches the handler intact.
+            await self.app(scope, downstream_receive, send)
 
         finally:
             session.close()
 
 
-class RateLimitSecurityMiddleware(BaseHTTPMiddleware):
-    """Middleware that records rate limit violations as security events."""
+class RateLimitSecurityMiddleware:
+    """Records rate limit violations as security events.
+
+    Pure ASGI. It only needs the response status, never the request body, so
+    there is nothing to buffer -- the status is read off http.response.start.
+    The DB write happens only on a 429, which is rare, so the synchronous
+    commit is not on the hot path.
+    """
 
     def __init__(self, app):
-        super().__init__(app)
+        self.app = app
 
         try:
             config = get_config()
@@ -336,26 +389,36 @@ class RateLimitSecurityMiddleware(BaseHTTPMiddleware):
             self.engine = None
             self.session_factory = None
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        response = await call_next(request)
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
 
-        # Check if rate limited (429 status)
-        if response.status_code == 429 and self.session_factory:
-            session = self.session_factory()
-            try:
-                security_service = SecurityDetectionService(session)
-                client_ip = get_client_ip(request)
+        status = 0
 
-                security_service.record_rate_limit_exceeded(
-                    source_ip=client_ip,
-                    request_path=request.url.path,
-                    user_agent=request.headers.get("User-Agent"),
-                )
-                session.commit()
+        async def capture_status(message):
+            nonlocal status
+            if message["type"] == "http.response.start":
+                status = message["status"]
+            await send(message)
 
-            except Exception as e:
-                logger.error(f"Error recording rate limit event: {e}")
-            finally:
-                session.close()
+        await self.app(scope, receive, capture_status)
 
-        return response
+        if status != 429 or not self.session_factory:
+            return
+
+        # Recorded after the response has gone out rather than before it, so a
+        # throttled caller is not made to wait on a database write.
+        request = Request(scope, receive)
+        session = self.session_factory()
+        try:
+            SecurityDetectionService(session).record_rate_limit_exceeded(
+                source_ip=get_client_ip(request),
+                request_path=request.url.path,
+                user_agent=request.headers.get("User-Agent"),
+            )
+            session.commit()
+        except Exception as e:
+            logger.error(f"Error recording rate limit event: {e}")
+        finally:
+            session.close()

@@ -32,7 +32,11 @@ dependencies = [
     # upper-cap (requires starlette>=0.46.0 only) allowing starlette 1.0.1+
     # to be installed, closing PYSEC-2026-161 (Host-header URL reconstruction).
     "fastapi>=0.136.1,<0.136.3",
-    "uvicorn>=0.27.0",
+    # [standard] pulls uvloop and httptools. Without them uvicorn runs the
+    # pure-Python h11 parser on the stock asyncio loop -- uvloop is 2-4x on
+    # async I/O and httptools is a C parser. Both are platform-gated, so a
+    # Windows dev box simply skips uvloop.
+    "uvicorn[standard]>=0.27.0",
     "python-multipart>=0.0.27",  # CVE-2026-40347/42561: multipart DoS
     "passlib[bcrypt]>=1.7.4",
     "bcrypt>=4.0.0,<4.1",
