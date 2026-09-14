@@ -376,7 +376,7 @@ async function checkConnection() {
         }
     } catch (error) {
         statusDiv.className = 'connection-status error';
-        statusDiv.innerHTML = `<strong>Error:</strong> ${error.message}`;
+        statusDiv.innerHTML = `<strong>Error:</strong> ${escapeHtml(error.message)}`;
     }
 }
 
@@ -422,12 +422,12 @@ async function loadIssues() {
                 ` : ''}
                 <div class="issue-footer">
                     <span>Created by ${escapeHtml(issue.author)} on ${formatDate(issue.created_at)}</span>
-                    ${issue.assignees.length > 0 ? `<span>Assigned to: ${issue.assignees.join(', ')}</span>` : ''}
+                    ${issue.assignees.length > 0 ? `<span>Assigned to: ${issue.assignees.map(escapeHtml).join(', ')}</span>` : ''}
                 </div>
             </div>
         `).join('');
     } catch (error) {
-        listDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+        listDiv.innerHTML = `<p class="error-message">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -648,7 +648,7 @@ async function loadComments(iid) {
             </div>
         `).join('');
     } catch (error) {
-        listDiv.innerHTML = `<p class="error-message">Error: ${error.message}</p>`;
+        listDiv.innerHTML = `<p class="error-message">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 

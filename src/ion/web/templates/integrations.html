@@ -1605,7 +1605,7 @@ async function loadIntegrationStatus() {
         }).join('');
 
     } catch (error) {
-        container.innerHTML = `<p class="loading">Error: ${error.message}</p>`;
+        container.innerHTML = `<p class="loading">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -1717,7 +1717,7 @@ async function loadServerMetrics() {
             </div>
         `;
     } catch (error) {
-        container.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        container.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -1783,8 +1783,8 @@ async function loadElasticsearchMetrics() {
             `;
         }
     } catch (error) {
-        clusterContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
-        ingestContainer.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        clusterContainer.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
+        ingestContainer.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -1817,7 +1817,7 @@ async function loadDataFlowMetrics() {
             </div>
         `;
     } catch (error) {
-        container.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        container.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -1891,7 +1891,7 @@ async function loadServerLogsMetrics() {
             </div>
         `;
     } catch (error) {
-        container.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+        container.innerHTML = `<p class="error">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -1929,7 +1929,7 @@ async function loadWebhooks() {
         `).join('');
 
     } catch (error) {
-        container.innerHTML = `<p class="loading">Error: ${error.message}</p>`;
+        container.innerHTML = `<p class="loading">Error: ${escapeHtml(error.message)}</p>`;
     }
 }
 
@@ -2086,7 +2086,7 @@ async function showWebhookLogs(webhookId) {
         `).join('');
 
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="loading">Error: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="loading">Error: ${escapeHtml(error.message)}</td></tr>`;
     }
 }
 
@@ -2122,7 +2122,7 @@ async function loadIntegrationLogs() {
         `).join('');
 
     } catch (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="loading">Error: ${error.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="loading">Error: ${escapeHtml(error.message)}</td></tr>`;
     }
 }
 
