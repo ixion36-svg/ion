@@ -410,12 +410,12 @@
 
 
 
-/* Global Reset */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-}
+/* No global `* { margin:0; padding:0 }` here. It was unlayered, and an
+   unlayered declaration beats a layered one, so it stripped the padding off
+   every daisyUI component -- 1,932 elements carrying .btn, .input, .badge,
+   .card-body and friends with no padding utility of their own. Tailwind's
+   preflight does the same reset inside @layer base, which daisyUI's later
+   layer can override. Re-adding this rule silently un-pads the app. */
 
 html {
     overflow-x: hidden;
@@ -1298,8 +1298,6 @@ select option {
 
 
 
-.text-success { color: var(--neon-green); }
-.text-warning { color: var(--neon-yellow); }
 .text-danger { color: var(--neon-red); }
 
 /* =============================================================================
