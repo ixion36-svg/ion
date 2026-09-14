@@ -7,9 +7,15 @@
  *     -o ./src/ion/web/static/css/ion.css \
  *     --minify
  *
- * Parallel to tailwind.input.css, which still drives the current
- * static/css/tailwind.css. Both exist during the rewrite; tailwind.input.css
- * retires when the last page moves over.
+ * The binary is gitignored, so a clone has none and its version is not
+ * self-evident. frontend/TAILWIND_VERSION pins it and
+ * tests/test_tailwind_build_pin.py fails if the shipped ion.css was built by
+ * anything else: a minor-version bump silently rewrites the utility layer.
+ *
+ * tailwind.input.css no longer builds anything -- static/css/tailwind.css is
+ * retired and base.html links only ion.css. It stays on disk because
+ * tests/test_ui_rewrite_theme_parity.py reads it as the reference for the
+ * light-mode fixes ported below; deleting it removes that guard.
  *
  * ORDER MATTERS:
  *   1. Tailwind theme + preflight + utilities

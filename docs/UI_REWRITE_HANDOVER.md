@@ -9,8 +9,8 @@
 
 # UI Rewrite Handover
 
-Branch: `feat/ui-rewrite-foundation`, 76 commits ahead of `main`, fast-forwardable.
-Released as v0.93.2. **Not merged to main.**
+Released as v0.93.2 and merged: `main` and `feat/ui-rewrite-foundation` both
+point at the release commit.
 
 Read the "Traps" section before touching any stylesheet. Most of the bugs in
 this project were invisible — no error, no failing test, no log line — and
@@ -44,8 +44,12 @@ the `style.css` `<link>`.
                            -o ./src/ion/web/static/css/ion.css --minify
 ```
 
-No Node. The standalone binary is committed. **Import order in
-`tailwind-daisy.input.css` is load-bearing** — see Traps.
+No Node. The binary is **gitignored**, so a clone has none: the version is
+pinned in `frontend/TAILWIND_VERSION` and `tests/test_tailwind_build_pin.py`
+fails if the shipped `ion.css` was built by anything else. Building with a
+different minor rewrites most of the utility layer while looking like an
+ordinary diff. **Import order in `tailwind-daisy.input.css` is load-bearing**
+— see Traps.
 
 | input | what it is |
 |---|---|
@@ -98,12 +102,22 @@ expressions against their enclosing scope.
 compiles class names out of the changelog, the docs and the migration tools'
 own data files.
 
-**7. Utility names that collide with ION's tokens.**
-ION has `--bg-secondary` (a dark surface) and `--text-primary` (light grey).
-Tailwind's `bg-secondary` and `text-primary` mean *the secondary/primary
-colour*. `bg-[var(--bg-secondary)]` is the correct form when you want the
-token. Note `text-primary`'s 244 current uses are all icons and accent labels
-and are correct as written.
+**7. daisyUI's colour utilities do not exist in this build.**
+daisyUI is imported as plain CSS, not as a Tailwind plugin, so its palette is
+never registered with `@theme` and Tailwind generates none of it: `bg-primary`,
+`bg-secondary`, `bg-base-100` and `text-secondary` compile to nothing. Its
+*component* classes (`btn-primary`, `card`, `modal`) do work, as do ION's own
+`@theme` colours (`bg-ink-900`, `text-ion-cyan`). The `.text-primary` used
+244 times is ION's own rule in `ion-daisy-theme.css`, not a utility. When you
+want an ION token, the explicit form is `bg-[var(--bg-secondary)]`.
+
+**8. The Tailwind binary is gitignored, and a minor bump rewrites the sheet.**
+v4.2.2 emits `calc(var(--spacing) * 0)` where v4.3.3 emits `0`, adds
+`.start`/`.end`, and ships a different preflight font stack — roughly a hundred
+rule changes that read as ordinary codegen drift in a diff. The pin lives in
+`frontend/TAILWIND_VERSION`, guarded by `tests/test_tailwind_build_pin.py`.
+A correct build reproduces the shipped `ion.css` byte for byte, modulo the
+CRLF the checkout adds to the banner.
 
 ---
 
@@ -149,39 +163,41 @@ time-dependent and flake on `main` too.
 
 ## What to do next
 
-**1. Merge to main.** It fast-forwards cleanly. Force-push is disabled there,
-so a bad merge sticks — this is the only reason it has not been done.
+**1. The shadowed component rules in `frontend/ion-legacy.css` — 28 of them,
+across 12 class names.** Counted by intersecting every selector in the file
+against the class names daisyUI defines. The file is 157 rule blocks, 16 of
+which are the accent themes that stay by design.
 
-```bash
-git checkout main && git merge --ff-only feat/ui-rewrite-foundation && git push origin main
-```
-
-**2. The ~110 shadowed component rules in `frontend/ion-legacy.css`.**
-This is a design decision, not a refactor, and it was measured rather than
-guessed. Building `ion.css` without them and diffing computed styles gives:
-
-| rule | effect of removing it |
-|---|---|
-| `.card`, `.card-header`, `.card-body`, `.text-success`, `.text-warning`, `.badge` | **nothing** — already inert, safe to delete |
-| `.alert`, `.stat-value`, `.toast`, `.tabs`, `.footer`, `.divider`, `.card-title` | real visual change — daisyUI's `.alert` has no left accent bar, its `.stat-value` loses tabular-nums |
-| `.modal` | **never remove** — a closed modal becomes `display:grid` and every dialog renders open |
+| class | rules | effect of removing it |
+|---|---|---|
+| `.toast` | 6 | real visual change |
+| `.card-title` | 4 | real visual change |
+| `.modal` | 4 | **never remove** — a closed modal becomes `display:grid` and every dialog renders open |
+| `.stat-value` | 3 | loses `tabular-nums` |
+| `.alert`, `.alert-warning`, `.alert-success` | 6 | daisyUI's `.alert` has no left accent bar |
+| `.footer`, `.tabs`, `.divider` | 3 | real visual change |
+| `.text-success`, `.text-warning` | 2 | **live, and the sole definition in the build** — no Tailwind utility of that name is emitted, so removing them flattens success/warning colour on 49 files |
 
 So the choice is: rename ION's to `ion-*` and keep the current look, or adopt
-daisyUI's components and accept the restyle. Start with the six inert rules
-either way; they are free.
+daisyUI's components and accept the restyle. Verify each against a computed-style
+diff before deleting — an earlier revision of this table listed `.card`,
+`.card-header`, `.card-body`, `.text-success`, `.text-warning` and `.badge` as
+free deletions. `.card` and `.badge` were already gone, `.card-header` survived
+only as a dead descendant selector fused to a live `.card-title`, and the two
+`.text-*` rules were live.
 
-**3. Page weight.** Per page this is heavier than before: 90.6KB gzipped
+**2. Page weight.** Per page this is heavier than before: 90.6KB gzipped
 against 64.6KB, for three fewer requests. `ion.css` is 591KB decoded, most of
 it daisyUI. Component-level tree-shaking would help but needs a usage scan
 worth trusting — a component can be applied by a script no scanner follows.
 The responsive-variant trim was safe because a breakpoint prefix is always
 static markup.
 
-**4. The remaining page-scoped sheets.** `alerts-queue.css`,
+**3. The remaining page-scoped sheets.** `alerts-queue.css`,
 `alert-detail.css`, `ion-workspace.css`, `ai-chat.css`. All live, no dead
 rules left in any of them.
 
-**5. Bare `catch` blocks that swallow exceptions.** Two were fixed. There are
+**4. Bare `catch` blocks that swallow exceptions.** Two were fixed. There are
 more in `alerts.html`, and they will hide the next bug exactly as these did.
 
 ---

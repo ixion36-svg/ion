@@ -691,9 +691,6 @@ body::before {
     color: var(--primary);
 }
 
-.card-body {
-    margin-bottom: 1rem;
-}
 
 
 
@@ -1679,8 +1676,6 @@ select option {
 
 
 
-.card-header h2,
-.card-header h3,
 .card-title {
     font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
     font-size: 1.125rem;
@@ -1689,7 +1684,6 @@ select option {
     margin: 0;
     letter-spacing: -0.01em;
 }
-.card-body { margin-bottom: 0; }
 
 
 
@@ -2039,8 +2033,6 @@ h1, h2, h3, h4, h5, h6 {
 
 
 
-[data-mode="light"] .card-header h2,
-[data-mode="light"] .card-header h3,
 [data-mode="light"] .card-title,
 [data-mode="light"] .panel-header h2,
 [data-mode="light"] .panel-header h3 {
