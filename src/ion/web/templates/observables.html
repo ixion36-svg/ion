@@ -1255,7 +1255,7 @@ function showToast(message, type = 'info') {
     }
 
     const toast = document.createElement('div');
-    toast.className = `toast toast-${type}`;
+    toast.className = `ion-toast toast-${type}`;
     toast.style.cssText = `
         background: ${type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : '#3b82f6'};
         color: white;

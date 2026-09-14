@@ -74,7 +74,7 @@ function formatDate(isoString) {
 function showToast(message, type = 'info') {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
+    toast.className = `ion-toast ${type}`;
     toast.textContent = message;
     container.appendChild(toast);
 

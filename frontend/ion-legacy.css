@@ -620,7 +620,7 @@ body::before {
    Footer
    ============================================================================= */
 
-.footer {
+.ion-footer {
     text-align: center;
     padding: 1.25rem;
     color: var(--text-muted);
@@ -680,16 +680,6 @@ body::before {
 
 
 
-.card-title {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--text-bright);
-    text-decoration: none;
-}
-
-.card-title:hover {
-    color: var(--primary);
-}
 
 
 
@@ -985,7 +975,7 @@ body::before {
     z-index: 2000;
 }
 
-.toast {
+.ion-toast {
     background: var(--bg-card);
     color: var(--text-primary);
     padding: 1rem 1.5rem;
@@ -996,17 +986,17 @@ body::before {
     animation: slideIn 0.3s ease;
 }
 
-.toast.success {
+.ion-toast.success {
     border-left-color: var(--neon-green);
     box-shadow: var(--shadow-card), 0 0 15px rgba(16, 185, 129, 0.3);
 }
 
-.toast.error {
+.ion-toast.error {
     border-left-color: var(--neon-red);
     box-shadow: var(--shadow-card), 0 0 15px rgba(239, 68, 68, 0.3);
 }
 
-.toast.warning {
+.ion-toast.warning {
     border-left-color: var(--neon-yellow);
 }
 
@@ -1674,14 +1664,6 @@ select option {
 
 
 
-.card-title {
-    font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: #fff;
-    margin: 0;
-    letter-spacing: -0.01em;
-}
 
 
 
@@ -1777,7 +1759,7 @@ select option {
 .list-item:hover {
     background: rgba(255, 255, 255, 0.03);
 }
-hr, .divider {
+hr {
     border: 0;
     border-top: 1px solid rgba(255, 255, 255, 0.06);
     margin: 1.5rem 0;
@@ -1977,7 +1959,7 @@ h1, h2, h3, h4, h5, h6 {
 
 
 /* ── Toasts ───────────────────────────────────────────────────────────── */
-.toast {
+.ion-toast {
     background: rgba(10, 12, 18, 0.95);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
@@ -2031,7 +2013,6 @@ h1, h2, h3, h4, h5, h6 {
 
 
 
-[data-mode="light"] .card-title,
 [data-mode="light"] .panel-header h2,
 [data-mode="light"] .panel-header h3 {
   color: var(--text-bright) !important;
@@ -2098,7 +2079,7 @@ h1, h2, h3, h4, h5, h6 {
 
 
 /* Toasts */
-[data-mode="light"] .toast {
+[data-mode="light"] .ion-toast {
   background: var(--bg-card) !important;
   border-color: var(--ion-border) !important;
   color: var(--text-primary) !important;
