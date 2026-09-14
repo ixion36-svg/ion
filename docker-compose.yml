@@ -7,13 +7,12 @@ services:
   # PostgreSQL - Primary Database
   # ======================================================================
   postgres:
-    # v0.10.4: switched from postgres:16-alpine to pgvector/pgvector — same
-    # PG major as before (data-compatible), preinstalled pgvector extension
-    # for case-similarity embeddings. Debian-based, ~50 MB larger than alpine.
-    # v0.10.9: major version parameterised via PG_VERSION so deployments on
-    # pg15/pg17/pg18 can pin via .env without hand-editing compose on every
-    # pull. MUST match the major version of your existing postgres volume —
-    # mixing majors fails to start (pg15 can't read pg16 data files, etc.).
+    # pgvector/pgvector rather than plain postgres: case-similarity embeddings
+    # need the pgvector extension preinstalled. Debian-based, ~50 MB larger
+    # than alpine.
+    #
+    # PG_VERSION MUST match the major version of the existing postgres volume.
+    # Mixing majors fails to start -- pg15 cannot read pg16 data files.
     image: pgvector/pgvector:${PG_VERSION:-pg16}
     container_name: ion-postgres
     restart: unless-stopped
@@ -93,8 +92,9 @@ services:
     security_opt:
       - no-new-privileges:true
 
-    # Sized for ~50 concurrent SOC users on the v0.9.65 load-test profile.
-    # Override per-deployment via .env: ION_DB_CPUS, ION_DB_MEMORY.
+    # Defaults suit ~50 concurrent SOC users on a small host. Override via
+    # .env: ION_DB_CPUS, ION_DB_MEMORY -- see the Postgres sizing block in
+    # .env.deploy for a worked larger-host profile.
     deploy:
       resources:
         limits:
@@ -140,18 +140,21 @@ services:
       - .env
 
     environment:
-      # PostgreSQL connection
-      - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD:-ion2025}@postgres:5432/ion
+      # PostgreSQL connection. Same credential as POSTGRES_PASSWORD, which
+      # refuses to start unset -- so no fallback here either.
+      - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD}@postgres:5432/ion
       # Ollama LLM — defaults to the compose Ollama container when the
       # `ai` profile is enabled. Override in .env to point at a remote
       # Ollama host (e.g. ION_OLLAMA_URL=http://gpu-box:11434).
       - ION_OLLAMA_URL=${ION_OLLAMA_URL:-http://ollama:11434}
-      # uvicorn workers — 4 sized for ION's 50-user max ceiling.
-      # Background tasks (Kibana sync, Analytics Engine, TIDE sync,
-      # Network Mapper, CyAB reminders) run on ONE worker via pg
-      # advisory lock leader election (v0.9.71+).
       # Base URL for OIDC redirect URIs — must match Keycloak Valid Redirect URIs
       - ION_BASE_URL=${ION_BASE_URL:-https://ion.guardedglass.internal}
+      # uvicorn workers. Background tasks (Kibana sync, Analytics Engine, TIDE
+      # sync, Network Mapper, CyAB reminders) run on ONE worker, elected by a
+      # pg advisory lock -- raising this adds contenders for that election, it
+      # does not run the loops more than once. Each worker carries its own
+      # SQLAlchemy pool, so ION_WORKERS x (ION_DB_POOL_SIZE +
+      # ION_DB_MAX_OVERFLOW) must stay under the database's max_connections.
       - ION_WORKERS=${ION_WORKERS:-4}
       # CA bundle — set ION_CA_BUNDLE in .env when using the cert mount above
       - ION_CA_BUNDLE=${ION_CA_BUNDLE:-}
@@ -166,8 +169,6 @@ services:
       - /tmp
 
     # Health check — used by seeder to know when ION is ready.
-    #
-    # v0.79.2: start_period 15s -> 90s, timeout 5s -> 10s.
     #
     # Boot is not a 15-second job. The startup event runs migrations and ~12
     # advisory-locked seeders (permissions, playbooks, SOC templates, knowledge
@@ -189,15 +190,17 @@ services:
       start_period: 90s
       retries: 5
 
-    # Resource limits — sized for ~50 concurrent SOC users (v0.9.65 load-test
-    # design ceiling). 4 uvicorn workers × ~1GB steady with headroom for PCAP
-    # parsing spikes, SQLAlchemy pools, and the 3 background sync loops
-    # (TIDE / Kibana / Analytics Engine). 6 CPUs = 4 workers + 2 for background
-    # tasks running in parallel with request handling.
+    # Resource limits — the defaults suit ~50 concurrent SOC users: 4 uvicorn
+    # workers x ~1GB steady, with headroom for PCAP parsing spikes, SQLAlchemy
+    # pools, and the background sync loops (TIDE / Kibana / Analytics Engine).
+    # 6 CPUs = 4 workers + 2 for background tasks running alongside request
+    # handling.
     #
-    # Override per-deployment via .env: ION_CPUS, ION_MEMORY. On a 64 GB host
-    # leave these at the defaults; on a 16 GB dev box drop ION_MEMORY=2G and
-    # ION_WORKERS=2 (via docker-compose.override.yml).
+    # These are caps, not reservations, so ION_CPUS + ION_DB_CPUS may exceed
+    # the host's core count deliberately -- the two peak at different times.
+    # Override via .env: ION_CPUS, ION_MEMORY. A worked profile for a larger
+    # host is in .env.deploy; on a 16 GB dev box drop ION_MEMORY=2G and
+    # ION_WORKERS=2.
     deploy:
       resources:
         limits:
@@ -239,8 +242,8 @@ services:
       # Concurrency settings - adjust based on available RAM
       # Each parallel slot needs ~2-4GB additional RAM
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-4}
-      # v0.10.7: raised default from 1→2 so Bob's chat model AND
-      # nomic-embed-text both stay resident — every investigation hits
+      # 2 so Bob's chat model AND nomic-embed-text both stay resident —
+      # every investigation hits
       # /api/embed then /api/chat back-to-back, and MAX_LOADED_MODELS=1
       # forced a model swap (+~5-15s load latency) per call. At 2,
       # qwen2.5:3b (~2GB) + nomic-embed-text (~274MB) = ~2.3GB resident,
@@ -249,7 +252,7 @@ services:
       # budget for both simultaneously.
       - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-2}
       # Keep model in memory longer to reduce reload times.
-      # v0.19.5: -1 means "never unload" — eliminates cold-start tax on
+      # -1 means "never unload" — eliminates the cold-start tax on
       # the investigation queue (intermittent alerts can sit longer than
       # 30m between runs and re-pay the model-load on every wake).
       - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:--1}
@@ -259,7 +262,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '4'
+          cpus: '${OLLAMA_CPUS:-4}'
           memory: ${OLLAMA_MEMORY:-8G}
         reservations:
           cpus: '1'
@@ -296,11 +299,11 @@ services:
       - .env
     environment:
       - ION_SEED_URL=http://ion:8000
-      # v0.49.3: the DB-direct seeds (seed_courses, seed_lab_fixtures) run in
-      # THIS container — without the URL they silently fell back to a
-      # throwaway SQLite inside the container and the courses/labs never
-      # reached Postgres.
-      - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD:-ion2025}@postgres:5432/ion
+      # The DB-direct seeds (seed_courses, seed_lab_fixtures) run in THIS
+      # container. Without the URL they fall back to a throwaway SQLite inside
+      # the container and the courses and labs never reach Postgres -- silently,
+      # with the seeder reporting success.
+      - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD}@postgres:5432/ion
     networks:
       - ion-net
     depends_on:
