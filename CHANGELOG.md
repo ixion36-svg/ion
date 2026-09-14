@@ -1,13 +1,77 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.93.2 -->
-<!-- ion-doc:version=0.93.2 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.94.0 -->
+<!-- ion-doc:version=0.94.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-14 -->
 
 # Changelog
+
+## v0.94.0 — 2026-09-14
+
+**Upgrading: this release can refuse to start, deliberately.** Three controls
+that shipped off now ship on, and two of them abort boot rather than warn.
+Set `ION_DB_PASSWORD` and a strong `ION_ADMIN_PASSWORD` before deploying, or
+set `ION_DEV_MODE=true` for a development box.
+
+- **A weak or unset `ION_ADMIN_PASSWORD` blocks startup.** `admin` is the only
+  local account and an unset value fell through to the literal `changeme`, so
+  warning-only meant a deployment that never read its logs shipped a known
+  credential. `ION_DEV_MODE=true` downgrades it to a warning and says so in the
+  log.
+- **`ION_DB_PASSWORD` is mandatory.** `POSTGRES_PASSWORD` and the connection
+  string in both the `ion` and `seeder` services defaulted to a password
+  published in this repository. Neither falls back now.
+- **Inbound webhooks require a signature** (`ION_WEBHOOK_REQUIRE_SIGNATURE`).
+  This is the only change that stops something already working: an existing
+  webhook with no secret will be rejected at delivery, and creating one is
+  refused up front rather than handing out a token that can never work.
+- **Session cookies set `Secure`** and the password-change gate is enforced.
+  `ION_DEV_MODE` drops the cookie flag, because a Secure cookie is never
+  returned over plain HTTP and login would break.
+
+**Security fixes.**
+
+- **Webhook management was reachable with `alert:read`.** `require_integration_access`
+  permits `integration:read` OR `alert:read` and guarded webhook create, update,
+  delete and token regeneration, with no compensating check in any handler. Six
+  of the nine seeded roles hold `alert:read` without `integration:manage`, so a
+  plain analyst could rotate webhook credentials. The four mutations now require
+  `integration:manage`; the reads deliberately keep the permissive dependency.
+- **The dead SIEM exporter is deleted** (465 lines). `SIEMExporter.export_to_webhook`
+  posted an unvalidated URL, but nothing imported the module — the SIEM export
+  actually served is a different class that makes no outbound request at all. An
+  unreachable HTTP sink with no URL validation is what gets wired up later
+  without one.
+- **Eleven swallowed exceptions in `alerts.html` now report themselves**, six of
+  them behind a failure the analyst can see. Fixing them surfaced two live
+  defects of the `a or b if cond else None` precedence class: `X-Trace-ID` was
+  discarded whenever `traceparent` was absent — the common case, so distributed
+  trace correlation never worked — and `X-Forwarded-For` was dropped when the
+  scope carried no client.
+
+**Performance.** All five middleware layers move from `BaseHTTPMiddleware` to
+pure ASGI, and 159 route handlers that held a synchronous session while declared
+`async def` become `def`, so FastAPI runs them in the threadpool instead of
+blocking the worker's event loop. An interleaved A/B measured one layer at 19.9%
+of throughput as `BaseHTTPMiddleware` against 5.8% as pure ASGI. `uvicorn[standard]`
+brings uvloop and httptools, which the dependency had never pulled.
+
+**Deployment.** Postgres tuning, the SQLAlchemy pool and the anyio threadpool are
+env-tunable rather than hardcoded, and `.env.deploy` carries an active profile
+for a 12-core / 64 GB host. Every setting the application reads — 241 variables,
+including all 62 feature flags — is now listed in that file at its built-in
+default; previously 43 of the flags existed only in `config.py`.
+
+**UI.** The Tailwind build is pinned (`frontend/TAILWIND_VERSION`) and guarded by
+a test, after a rebuild with the wrong binary silently rewrote most of the
+utility layer. An unlayered `* { margin:0; padding:0 }` reset was stripping the
+padding from every daisyUI component — 1,932 elements carrying `.btn`, `.input`,
+`.badge`, `.card-body` and friends were rendering flush. Toasts were each pinned
+to the same fixed coordinates and stacked on top of one another; only the last
+was ever legible.
 
 ## v0.93.2 — 2026-09-14
 
