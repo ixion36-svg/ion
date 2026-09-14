@@ -15,17 +15,24 @@ from ion.auth.dependencies import (
     get_client_ip,
     get_current_user,
     get_db_session,
+    require_permission,
 )
 from ion.models.user import User
 
 
 def require_integration_access(user: User = Depends(get_current_user)) -> User:
-    """Allow access if user has integration:read OR alert:read.
+    """Allow READ access if user has integration:read OR alert:read.
 
     SOC leads and analysts need to see ES cluster health + integration logs
     on the integrations page even if they don't have the engineering-tier
     integration:manage permission. alert:read is a reasonable minimum —
     if you can see alerts, you can see the infrastructure that feeds them.
+
+    Read only. Anything that creates, modifies, deletes or rotates a
+    credential takes require_permission("integration:manage") instead:
+    six of the nine seeded roles hold alert:read without integration:manage,
+    so this dependency on a mutation hands webhook management to every
+    analyst.
     """
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -346,7 +353,7 @@ async def list_webhooks(
 async def create_webhook(
     data: WebhookCreate,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_integration_access),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Create a new webhook."""
     webhook_service = get_webhook_service()
@@ -401,7 +408,7 @@ async def update_webhook(
     webhook_id: int,
     data: WebhookUpdate,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_integration_access),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Update a webhook."""
     webhook_service = get_webhook_service()
@@ -426,7 +433,7 @@ async def update_webhook(
 async def delete_webhook(
     webhook_id: int,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_integration_access),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Delete a webhook."""
     webhook_service = get_webhook_service()
@@ -442,7 +449,7 @@ async def regenerate_webhook_token(
     request: Request,
     webhook_id: int,
     session: Session = Depends(get_db_session),
-    current_user: User = Depends(require_integration_access),
+    current_user: User = Depends(require_permission("integration:manage")),
 ):
     """Regenerate the token for a webhook."""
     webhook_service = get_webhook_service()
