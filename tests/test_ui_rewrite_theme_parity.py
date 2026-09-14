@@ -363,3 +363,62 @@ def test_no_served_stylesheet_contains_javascript_source():
         "dropped by the browser and the styling silently does not apply. Move "
         "the dynamic declarations to a data-ion-style attribute:\n  "
         + "\n  ".join(offenders[:12]))
+
+
+def test_hidden_outranks_a_page_level_display_rule():
+    """`hidden` must beat a page's own `.overlay { display:flex }`.
+
+    Modal overlays are written `class="cases-modal-overlay hidden"` while the
+    page's own <style> block sets `.cases-modal-overlay { display:flex }`.
+    Both are specificity 0,1,0 and a page <style> comes after every <link>, so
+    the page rule wins and the modal renders open on load.
+
+    The v0.31.21 migration knew this: it emitted
+    `html body ._ion-s-c8be1ccba6 { display:none }` at 0,1,2, and that prefix
+    was the only reason those elements were hidden. Converting them to
+    Tailwind's `hidden` dropped it, leaving 13 elements across 7 pages
+    permanently visible -- both cases modals, the discover save-search dialog,
+    the training plan dialog, the alerts bulk-action toolbar, and the notepad
+    editor in base.html, which is every page.
+    """
+    built = BUILT.read_text(encoding="utf-8")
+    assert "html body .hidden{display:none}" in built.replace("\n", ""), (
+        "the specificity-restoring `html body .hidden` rule is gone; any page "
+        "that sets a display on its own overlay class will render it open"
+    )
+
+
+def test_ion_modals_are_not_hidden_by_daisyuis_mechanism():
+    """ION toggles modals with `display`; daisyUI hides them another way.
+
+    daisyUI's `.modal` carries `visibility:hidden` and `pointer-events:none`
+    and reveals via `.modal-open`. ION's rule overrides `display` only, and an
+    unlayered rule beats a layered one solely for properties it declares -- so
+    an opened ION modal was `display:flex` and entirely invisible, with its
+    `.modal-box` at `opacity:0`. Every modal in the app was affected.
+
+    Guards the bridge, and the assumption behind it: that nothing uses
+    daisyUI's own modal API.
+    """
+    theme = THEME.read_text(encoding="utf-8")
+    block = re.search(r"\.modal\s*\{([^}]*)\}", theme)
+    assert block, "the .modal bridge is missing from the theme"
+    body = block.group(1)
+    assert "visibility" in body and "pointer-events" in body, (
+        "the .modal bridge no longer resets visibility/pointer-events; opened "
+        "modals will lay out but render invisible"
+    )
+
+    src = []
+    for d in (Path("src/ion/web/templates"), Path("src/ion/web/static/js")):
+        for p in d.rglob("*"):
+            if p.suffix.lower() in (".html", ".js"):
+                src.append(p.read_text(encoding="utf-8", errors="replace"))
+    joined = "\n".join(src)
+    # Comments mentioning modal-open are explanations of this very bridge.
+    code = re.sub(r"<!--.*?-->|/\*.*?\*/", "", joined, flags=re.S)
+    for api in ("<dialog", "modal-toggle", ".showModal("):
+        assert api not in code, (
+            f"{api} is now used, so daisyUI's modal mechanism is live and the "
+            "blanket .modal bridge in the theme may force it open"
+        )

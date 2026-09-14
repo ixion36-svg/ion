@@ -1922,3 +1922,78 @@
   color: #ffffff !important;
   border-color: var(--primary) !important;
 }
+
+
+/* ============================================================
+ * `hidden` has to outrank a page's own display rule.
+ *
+ * A modal overlay is written as
+ *
+ *     <div class="cases-modal-overlay hidden">
+ *
+ * and the page's own <style> block carries
+ *
+ *     .cases-modal-overlay { position:fixed; inset:0; display:flex; ... }
+ *
+ * Both selectors are specificity 0,1,0, and a page <style> block comes after
+ * every <link>, so the page rule wins and the modal renders open on load.
+ *
+ * The v0.31.21 inline-style migration knew this. It emitted its hidden class
+ * as `html body ._ion-s-c8be1ccba6 { display:none }` -- 0,1,2 -- and the
+ * `html body` prefix was the only reason those elements were hidden at all.
+ * Converting them to Tailwind's `hidden` dropped the prefix and with it the
+ * specificity, which left 13 elements across 7 pages permanently visible:
+ * both cases modals, the discover save-search dialog, the training plan
+ * dialog, the alerts bulk-action toolbar and filter banner, and the notepad
+ * editor in base.html, which is every page.
+ *
+ * Restoring the same 0,1,2 shape fixes all of them at once and needs no
+ * !important. It is placed here, after the utilities import, purely for
+ * legibility -- specificity is doing the work, not order.
+ *
+ * Anything that genuinely needs to override it can still do so at 0,2,0 or
+ * higher, e.g. `.thing.is-open`. Nothing should: `hidden` means hidden, and
+ * JS that shows these elements removes the class rather than out-specifying
+ * it.
+ * ============================================================ */
+html body .hidden {
+  display: none;
+}
+
+
+/* ============================================================
+ * ION modals are controlled by `display`. daisyUI's are not.
+ *
+ * daisyUI hides a modal with `visibility:hidden`, `pointer-events:none` and
+ * an `opacity:0; scale:.95` transition on `.modal-box`, and reveals it by
+ * adding `.modal-open` (or via `<dialog open>`). ION predates that entirely:
+ * every modal in the app is a plain div toggled either by `.show` or by a
+ * direct `el.style.display = 'flex'`.
+ *
+ * Those two mechanisms do not compose. ION's rule overrides `display`, so the
+ * overlay lays out -- but it declares nothing about visibility or pointer
+ * events, and an unlayered rule only beats a layered one for the properties
+ * it actually declares. The result is a modal that is `display:flex` and
+ * completely invisible, with `.modal-box` at `opacity:0` inside it. Clicking
+ * an alert did nothing visible; so did every other modal in the app.
+ *
+ * Four pages had already hit this and bridged it one ID at a time
+ * (canaries, detection_health, daily_work, bob_eval, each with the comment
+ * "JS toggles .show, not daisyUI .modal-open"). This is that same bridge,
+ * once, for all of them.
+ *
+ * Safe as a blanket rule because nothing in ION uses daisyUI's modal API:
+ * no <dialog>, no .modal-open, no .modal-toggle anywhere in templates or JS.
+ * A closed ION modal is `display:none`, which takes it out of rendering no
+ * matter what visibility says, so forcing visibility here cannot reveal one.
+ * ============================================================ */
+.modal {
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.modal .modal-box {
+  opacity: 1;
+  scale: 1;
+  translate: none;
+}
