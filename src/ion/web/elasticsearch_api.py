@@ -395,7 +395,7 @@ async def get_alert_process_tree(
     return build_process_tree(raw)
 
 @router.get("/elasticsearch/alerts/systems")
-async def get_alert_systems(
+def get_alert_systems(
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ):

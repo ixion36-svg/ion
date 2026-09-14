@@ -212,7 +212,7 @@ def _fp_to_response(fp: FalsePositiveSignature) -> FPSignatureResponse:
 # =========================================================================
 
 @router.get("/api/investigations")
-async def list_investigations_endpoint(
+def list_investigations_endpoint(
     verdict: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     alert_signature: Optional[str] = Query(None),
@@ -243,7 +243,7 @@ async def list_investigations_endpoint(
 
 
 @router.get("/api/investigations/{inv_id}")
-async def get_investigation_endpoint(
+def get_investigation_endpoint(
     inv_id: int,
     db: Session = Depends(get_db_session),
     user: User = Depends(require_permission("alert:read")),
@@ -260,7 +260,7 @@ async def get_investigation_endpoint(
 # =========================================================================
 
 @router.get("/api/iocs")
-async def list_iocs_endpoint(
+def list_iocs_endpoint(
     ioc_type: Optional[str] = Query(None),
     is_known_bad: Optional[bool] = Query(None),
     limit: int = Query(100, ge=1, le=500),
@@ -285,7 +285,7 @@ async def list_iocs_endpoint(
 
 
 @router.get("/api/iocs/{ioc_type}/{value:path}")
-async def get_ioc_endpoint(
+def get_ioc_endpoint(
     ioc_type: str,
     value: str,
     db: Session = Depends(get_db_session),
@@ -303,7 +303,7 @@ async def get_ioc_endpoint(
 # =========================================================================
 
 @router.get("/api/fps")
-async def list_fps_endpoint(
+def list_fps_endpoint(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_db_session),
@@ -320,7 +320,7 @@ async def list_fps_endpoint(
 
 
 @router.post("/api/fps", status_code=201)
-async def create_fp_endpoint(
+def create_fp_endpoint(
     data: FPSignatureCreate,
     db: Session = Depends(get_db_session),
     user: User = Depends(require_permission("alert:read")),
@@ -351,7 +351,7 @@ async def create_fp_endpoint(
 
 
 @router.delete("/api/fps/{fp_id}")
-async def delete_fp_endpoint(
+def delete_fp_endpoint(
     fp_id: int,
     db: Session = Depends(get_db_session),
     user: User = Depends(require_permission("alert:read")),
@@ -364,7 +364,7 @@ async def delete_fp_endpoint(
 
 
 @router.patch("/api/fps/{fp_id}/toggle")
-async def toggle_fp_endpoint(
+def toggle_fp_endpoint(
     fp_id: int,
     db: Session = Depends(get_db_session),
     user: User = Depends(require_permission("alert:read")),

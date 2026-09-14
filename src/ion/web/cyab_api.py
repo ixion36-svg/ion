@@ -298,7 +298,7 @@ async def list_icons():
 
 
 @router.get("/systems", dependencies=[Depends(require_permission("alert:read"))])
-async def list_systems(
+def list_systems(
     session: Session = Depends(get_db_session),
 ):
     systems = session.execute(
@@ -308,7 +308,7 @@ async def list_systems(
 
 
 @router.get("/dashboard", dependencies=[Depends(require_permission("alert:read"))])
-async def dashboard_metrics(
+def dashboard_metrics(
     session: Session = Depends(get_db_session),
 ):
     # signoffs_this_week — count CyabSnapshot rows in the last 7 days.
@@ -383,7 +383,7 @@ async def dashboard_metrics(
 
 
 @router.get("/due-reviews", dependencies=[Depends(require_permission("alert:read"))])
-async def due_reviews(session: Session = Depends(get_db_session)):
+def due_reviews(session: Session = Depends(get_db_session)):
     today = date.today()
     cutoff = today + timedelta(days=30)
     systems = session.execute(
@@ -400,7 +400,7 @@ async def due_reviews(session: Session = Depends(get_db_session)):
 
 
 @router.post("/systems", dependencies=[Depends(require_permission("alert:read"))])
-async def create_system(
+def create_system(
     req: SystemCreateRequest,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -434,7 +434,7 @@ async def create_system(
 
 
 @router.get("/systems/{system_id}", dependencies=[Depends(require_permission("alert:read"))])
-async def get_system(system_id: int, session: Session = Depends(get_db_session)):
+def get_system(system_id: int, session: Session = Depends(get_db_session)):
     sys = session.get(CyabSystem, system_id)
     if not sys:
         raise HTTPException(status_code=404, detail="CyAB system not found")
@@ -442,7 +442,7 @@ async def get_system(system_id: int, session: Session = Depends(get_db_session))
 
 
 @router.get("/systems/{system_id}/data-health", dependencies=[Depends(require_permission("alert:read"))])
-async def get_data_health(system_id: int, session: Session = Depends(get_db_session)):
+def get_data_health(system_id: int, session: Session = Depends(get_db_session)):
     """Aggregate Data Health signals for a system."""
     from ion.services import cyab_data_health_service as dh
     return {
@@ -533,7 +533,7 @@ async def get_system_alert_rollup(
 
 
 @router.put("/systems/{system_id}", dependencies=[Depends(require_permission("alert:read"))])
-async def update_system(
+def update_system(
     system_id: int, req: SystemUpdateRequest,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -569,7 +569,7 @@ async def update_system(
 
 
 @router.delete("/systems/{system_id}", dependencies=[Depends(require_permission("case:close"))])
-async def delete_system(system_id: int, session: Session = Depends(get_db_session)):
+def delete_system(system_id: int, session: Session = Depends(get_db_session)):
     sys = session.get(CyabSystem, system_id)
     if not sys:
         raise HTTPException(status_code=404, detail="CyAB system not found")
@@ -586,7 +586,7 @@ async def delete_system(system_id: int, session: Session = Depends(get_db_sessio
 
 
 @router.post("/systems/{system_id}/mark-reviewed", dependencies=[Depends(require_permission("alert:read"))])
-async def mark_reviewed(
+def mark_reviewed(
     system_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -607,7 +607,7 @@ async def mark_reviewed(
 # ---------------------------------------------------------------------------
 
 @router.get("/systems/{system_id}/sources", dependencies=[Depends(require_permission("alert:read"))])
-async def list_data_sources(system_id: int, session: Session = Depends(get_db_session)):
+def list_data_sources(system_id: int, session: Session = Depends(get_db_session)):
     sys = session.get(CyabSystem, system_id)
     if not sys:
         raise HTTPException(status_code=404, detail="CyAB system not found")
@@ -615,7 +615,7 @@ async def list_data_sources(system_id: int, session: Session = Depends(get_db_se
 
 
 @router.post("/systems/{system_id}/sources", dependencies=[Depends(require_permission("alert:read"))])
-async def create_data_source(
+def create_data_source(
     system_id: int, req: DataSourceRequest,
     session: Session = Depends(get_db_session),
 ):
@@ -658,7 +658,7 @@ async def create_data_source(
 
 
 @router.get("/sources/{source_id}", dependencies=[Depends(require_permission("alert:read"))])
-async def get_data_source(source_id: int, session: Session = Depends(get_db_session)):
+def get_data_source(source_id: int, session: Session = Depends(get_db_session)):
     ds = session.get(CyabDataSource, source_id)
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
@@ -666,7 +666,7 @@ async def get_data_source(source_id: int, session: Session = Depends(get_db_sess
 
 
 @router.put("/sources/{source_id}", dependencies=[Depends(require_permission("alert:read"))])
-async def update_data_source(
+def update_data_source(
     source_id: int, req: DataSourceUpdateRequest,
     session: Session = Depends(get_db_session),
 ):
@@ -705,7 +705,7 @@ async def update_data_source(
 
 
 @router.delete("/sources/{source_id}", dependencies=[Depends(require_permission("case:close"))])
-async def delete_data_source(source_id: int, session: Session = Depends(get_db_session)):
+def delete_data_source(source_id: int, session: Session = Depends(get_db_session)):
     ds = session.get(CyabDataSource, source_id)
     if not ds:
         raise HTTPException(status_code=404, detail="Data source not found")
@@ -735,7 +735,7 @@ async def delete_data_source(source_id: int, session: Session = Depends(get_db_s
 # ---------------------------------------------------------------------------
 
 @router.get("/systems/{system_id}/history", dependencies=[Depends(require_permission("alert:read"))])
-async def get_system_history(system_id: int, session: Session = Depends(get_db_session)):
+def get_system_history(system_id: int, session: Session = Depends(get_db_session)):
     sys = session.get(CyabSystem, system_id)
     if not sys:
         raise HTTPException(status_code=404, detail="CyAB system not found")
@@ -4275,7 +4275,7 @@ def _render_scoping_pack_pdf_html(scores: dict, answers: dict) -> str:
 _WID_RE = re.compile(r"\A[0-9a-fA-F]{32}\Z")
 
 @router.post("/systems/bulk")
-async def cyab_systems_bulk(
+def cyab_systems_bulk(
     payload: dict,
     user: User = Depends(require_page_permission("alert:read")),
     session: Session = Depends(get_db_session),
@@ -4390,7 +4390,7 @@ def _cyab_wizard_redirect(wid: str, step: int) -> RedirectResponse:
         )
     return RedirectResponse(url="/cyab/onboard", status_code=303)
 @router.post("/onboard/{wid}/step/1", response_class=HTMLResponse)
-async def cyab_onboard_step_1(
+def cyab_onboard_step_1(
     wid: str,
     request: Request,
     name: str = Form(...),
@@ -4483,7 +4483,7 @@ async def cyab_onboard_step_2(
         )
     return _cyab_wizard_redirect(wid, 3)
 @router.post("/onboard/{wid}/step/3", response_class=HTMLResponse)
-async def cyab_onboard_step_3(
+def cyab_onboard_step_3(
     wid: str,
     request: Request,
     name: str = Form(...),

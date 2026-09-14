@@ -66,7 +66,7 @@ def _serialize_post(post: SocialPost, current_user_id: int) -> dict:
 
 
 @router.get("/")
-async def list_posts(
+def list_posts(
     category: Optional[str] = None,
     limit: int = 50,
     offset: int = 0,
@@ -88,7 +88,7 @@ async def list_posts(
 
 
 @router.post("/")
-async def create_post(
+def create_post(
     data: PostCreate,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(_get_db_session),
@@ -112,7 +112,7 @@ async def create_post(
 
 
 @router.get("/{post_id}")
-async def get_post(
+def get_post(
     post_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(_get_db_session),
@@ -146,7 +146,7 @@ async def get_post(
 
 
 @router.put("/{post_id}")
-async def update_post(
+def update_post(
     post_id: int,
     data: PostUpdate,
     current_user: User = Depends(get_current_user),
@@ -175,7 +175,7 @@ async def update_post(
 
 
 @router.delete("/{post_id}")
-async def delete_post(
+def delete_post(
     post_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(_get_db_session),
@@ -195,7 +195,7 @@ async def delete_post(
 
 
 @router.post("/{post_id}/pin")
-async def toggle_pin(
+def toggle_pin(
     post_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(_get_db_session),
@@ -215,7 +215,7 @@ async def toggle_pin(
 
 
 @router.post("/{post_id}/comments")
-async def add_comment(
+def add_comment(
     post_id: int,
     data: CommentCreate,
     current_user: User = Depends(get_current_user),
@@ -240,7 +240,7 @@ async def add_comment(
 
 
 @router.delete("/{post_id}/comments/{comment_id}")
-async def delete_comment(
+def delete_comment(
     post_id: int,
     comment_id: int,
     current_user: User = Depends(get_current_user),
@@ -266,7 +266,7 @@ async def delete_comment(
 
 
 @router.post("/{post_id}/reactions")
-async def toggle_reaction(
+def toggle_reaction(
     post_id: int,
     data: ReactionToggle,
     current_user: User = Depends(get_current_user),

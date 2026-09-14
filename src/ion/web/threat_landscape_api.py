@@ -270,7 +270,7 @@ async def get_ioc_feed(
 
 
 @router.post("/ioc-feed/track")
-async def track_ioc(
+def track_ioc(
     data: dict,
     user: User = Depends(require_permission("observable:read")),
     session: Session = Depends(get_db_session),

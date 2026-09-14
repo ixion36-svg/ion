@@ -324,7 +324,7 @@ async def get_config_schema(
 # =============================================================================
 
 @router.get("/webhooks", response_model=List[WebhookResponse])
-async def list_webhooks(
+def list_webhooks(
     source_type: Optional[str] = Query(None, description="Filter by source type"),
     is_active: Optional[bool] = Query(None, description="Filter by active status"),
     session: Session = Depends(get_db_session),
@@ -350,7 +350,7 @@ async def list_webhooks(
 
 
 @router.post("/webhooks", response_model=WebhookResponse)
-async def create_webhook(
+def create_webhook(
     data: WebhookCreate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("integration:manage")),
@@ -391,7 +391,7 @@ async def create_webhook(
 
 
 @router.get("/webhooks/{webhook_id}", response_model=WebhookResponse)
-async def get_webhook(
+def get_webhook(
     webhook_id: int,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_integration_access),
@@ -407,7 +407,7 @@ async def get_webhook(
 
 
 @router.put("/webhooks/{webhook_id}", response_model=WebhookResponse)
-async def update_webhook(
+def update_webhook(
     webhook_id: int,
     data: WebhookUpdate,
     session: Session = Depends(get_db_session),
@@ -433,7 +433,7 @@ async def update_webhook(
 
 
 @router.delete("/webhooks/{webhook_id}")
-async def delete_webhook(
+def delete_webhook(
     webhook_id: int,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("integration:manage")),
@@ -448,7 +448,7 @@ async def delete_webhook(
 
 
 @router.post("/webhooks/{webhook_id}/regenerate-token")
-async def regenerate_webhook_token(
+def regenerate_webhook_token(
     request: Request,
     webhook_id: int,
     session: Session = Depends(get_db_session),
@@ -534,7 +534,7 @@ async def receive_webhook(
 
 
 @router.get("/webhooks/{webhook_id}/logs", response_model=List[WebhookLogResponse])
-async def get_webhook_logs(
+def get_webhook_logs(
     webhook_id: int,
     status: Optional[str] = Query(None, description="Filter by status"),
     limit: int = Query(50, ge=1, le=500),
@@ -584,7 +584,7 @@ async def get_webhook_logs(
 # =============================================================================
 
 @router.get("/logs", response_model=List[IntegrationLogResponse])
-async def get_integration_logs(
+def get_integration_logs(
     integration_type: Optional[str] = Query(None, description="Filter by integration type"),
     level: Optional[str] = Query(None, description="Filter by log level"),
     action: Optional[str] = Query(None, description="Filter by action"),
@@ -641,7 +641,7 @@ async def get_integration_logs(
 
 
 @router.get("/logs/stats")
-async def get_log_stats(
+def get_log_stats(
     hours: int = Query(24, ge=1, le=168, description="Time window in hours"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_integration_access),
@@ -652,7 +652,7 @@ async def get_log_stats(
 
 
 @router.get("/health-history")
-async def get_health_history(
+def get_health_history(
     integration_type: Optional[str] = Query(None, description="Filter by integration type"),
     hours: int = Query(24, ge=1, le=168, description="Time window in hours"),
     limit: int = Query(100, ge=1, le=500),

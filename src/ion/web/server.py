@@ -692,6 +692,22 @@ async def _startup_event():
     except Exception:
         pass
 
+    # anyio's threadpool limiter, which is what FastAPI runs every `def` route
+    # handler in. The default is 40 per worker, and most of ION's handlers are
+    # sync -- so this, not the SQLAlchemy pool, is a worker's real ceiling on
+    # concurrent database work. Keep it at or below the pool
+    # (ION_DB_POOL_SIZE + ION_DB_MAX_OVERFLOW) or threads queue for a
+    # connection that does not exist.
+    try:
+        import anyio.to_thread
+
+        _limit = int(os.environ.get("ION_THREADPOOL_SIZE", "0"))
+        if _limit > 0:
+            anyio.to_thread.current_default_thread_limiter().total_tokens = _limit
+            logger.info("Thread limiter set to %d (ION_THREADPOOL_SIZE)", _limit)
+    except Exception as exc:  # a bad value must not stop the app booting
+        logger.warning("Could not set ION_THREADPOOL_SIZE: %s", exc)
+
     _validate_startup_config()
     config = get_config()
     if not config.db_path.exists():
@@ -1604,7 +1620,7 @@ async def cyab_overview_page(
     # Reuse the existing /api/cyab/dashboard endpoint internally rather
     # than duplicating the math. Call the function directly to avoid
     # the HTTP round-trip.
-    kpis = await dashboard_metrics(session=session)
+    kpis = dashboard_metrics(session=session)
 
     # In-progress = 5 most-recently-updated systems
     in_progress = session.execute(
@@ -1640,7 +1656,7 @@ async def cyab_overview_page(
 
 
 @app.get("/cyab/systems", response_class=HTMLResponse)
-async def cyab_systems_list_page(
+def cyab_systems_list_page(
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
     session: Session = Depends(get_db_session),
@@ -1669,7 +1685,7 @@ async def cyab_systems_list_page(
 
 
 @app.get("/cyab/systems/_table", response_class=HTMLResponse)
-async def cyab_systems_table_partial(
+def cyab_systems_table_partial(
     request: Request,
     q: str = "",
     pillar: str = "",
@@ -1736,7 +1752,7 @@ async def cyab_systems_table_partial(
 
 
 @app.get("/cyab/systems/{system_id}", response_class=HTMLResponse)
-async def cyab_system_detail_page(
+def cyab_system_detail_page(
     system_id: int,
     request: Request,
     user: User = Depends(require_page_permission("alert:read")),
@@ -1773,7 +1789,7 @@ _CYAB_TABS = {
 
 
 @app.get("/cyab/systems/{system_id}/tab/{tab_name}", response_class=HTMLResponse)
-async def cyab_system_tab(
+def cyab_system_tab(
     system_id: int,
     tab_name: str,
     request: Request,
@@ -1994,7 +2010,7 @@ async def cyab_audit_page(
 
 
 @app.get("/cyab/onboard", response_class=HTMLResponse)
-async def cyab_onboard_page(
+def cyab_onboard_page(
     request: Request,
     wid: str | None = None,
     step: int = 1,

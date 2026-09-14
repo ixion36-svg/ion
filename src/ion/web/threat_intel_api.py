@@ -204,7 +204,7 @@ async def get_campaign_detail(
 # ---- Watch Management ----
 
 @router.get("/watches")
-async def list_watches(
+def list_watches(
     entity_type: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -221,7 +221,7 @@ async def list_watches(
 
 
 @router.post("/watches")
-async def add_watch(
+def add_watch(
     data: AddWatchRequest,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:enrich")),
@@ -246,7 +246,7 @@ async def add_watch(
 
 
 @router.delete("/watches/{watch_id}")
-async def remove_watch(
+def remove_watch(
     watch_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:enrich")),
@@ -262,7 +262,7 @@ async def remove_watch(
 # ---- Match Alerts ----
 
 @router.get("/matches")
-async def list_matches(
+def list_matches(
     unread_only: bool = Query(False),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -279,7 +279,7 @@ async def list_matches(
 
 
 @router.post("/matches/{match_id}/read")
-async def mark_match_read(
+def mark_match_read(
     match_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
@@ -295,7 +295,7 @@ async def mark_match_read(
 # ---- Overview ----
 
 @router.get("/overview")
-async def get_overview(
+def get_overview(
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
 ):

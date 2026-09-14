@@ -96,7 +96,7 @@ async def get_index_breakdown(
 
 
 @router.get("/tide-systems")
-async def get_tide_systems(
+def get_tide_systems(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):

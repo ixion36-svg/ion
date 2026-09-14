@@ -1332,7 +1332,7 @@ async def add_case_note(
     }
 
 @router.get("/elasticsearch/alerts/cases/{case_id}/similar")
-async def get_similar_cases(
+def get_similar_cases(
     case_id: int,
     limit: int = 5,
     min_similarity: float = 0.5,
@@ -1384,7 +1384,7 @@ async def get_similar_cases(
     return {"similar": items, "count": len(items)}
 
 @router.get("/elasticsearch/alerts/cases/{case_id}/timeline")
-async def get_case_timeline(
+def get_case_timeline(
     case_id: int,
     current_user: User = Depends(require_permission("case:read")),
     session: Session = Depends(get_db_session),
@@ -1614,7 +1614,7 @@ async def get_case_attack_path(
     return await build_attack_path(session, case_id)
 
 @router.get("/elasticsearch/alerts/cases/{case_id}/similar-observables")
-async def get_case_similar_observables(
+def get_case_similar_observables(
     case_id: int,
     current_user: User = Depends(require_permission("case:read")),
     session: Session = Depends(get_db_session),
@@ -2193,7 +2193,7 @@ async def update_case(
     }
 
 @router.get("/elasticsearch/alerts/cases/{case_id}/pdf")
-async def export_case_pdf(
+def export_case_pdf(
     case_id: int,
     current_user: User = Depends(require_permission("case:read")),
     session: Session = Depends(get_db_session),
@@ -2585,7 +2585,7 @@ async def close_case_as_known_fp(
 # ===========================================================================
 
 @router.get("/elasticsearch/alerts/cases/{case_id}/playbook-executions")
-async def get_case_playbook_executions(
+def get_case_playbook_executions(
     case_id: int,
     current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
@@ -2641,7 +2641,7 @@ async def get_case_playbook_executions(
     return {"executions": results, "total": len(results)}
 
 @router.post("/elasticsearch/alerts/cases/{case_id}/playbook/{playbook_id}/start")
-async def start_playbook_from_case(
+def start_playbook_from_case(
     case_id: int,
     playbook_id: int,
     current_user: User = Depends(require_permission("playbook:execute")),

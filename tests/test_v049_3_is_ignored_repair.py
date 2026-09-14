@@ -136,7 +136,6 @@ class TestSharedObservablesExcludesIgnored:
     tautological source-string scan)."""
 
     def test_endpoint_excludes_ignored_observable(self, full_session):
-        import asyncio
 
         from ion.models.alert_triage import AlertCase, AlertCaseStatus
         from ion.models.observable import (
@@ -167,9 +166,9 @@ class TestSharedObservablesExcludesIgnored:
                                      entity_id=cid, context="test"))
         s.commit()
 
-        out = asyncio.run(get_case_similar_observables(
+        out = get_case_similar_observables(
             case_id=case_a.id, current_user=None, session=s
-        ))
+        )
         values = {e["observable"]["value"] for e in out["shared"]}
         assert "evil.example" in values
         assert "203.0.113.9" not in values, (

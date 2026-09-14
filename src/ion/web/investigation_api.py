@@ -301,7 +301,7 @@ class CancelResponse(BaseModel):
 
 
 @router.get("/api/investigate/loop/status", response_model=LoopStatusResponse)
-async def get_loop_status(
+def get_loop_status(
     user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
 ) -> LoopStatusResponse:
@@ -317,7 +317,7 @@ async def get_loop_status(
 
 
 @router.post("/api/investigate/loop/pause", response_model=LoopStatusResponse)
-async def pause_loop(
+def pause_loop(
     user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ) -> LoopStatusResponse:
@@ -343,7 +343,7 @@ async def pause_loop(
 
 
 @router.post("/api/investigate/loop/resume", response_model=LoopStatusResponse)
-async def resume_loop(
+def resume_loop(
     user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ) -> LoopStatusResponse:
@@ -358,7 +358,7 @@ async def resume_loop(
     "/api/investigate/jobs/cancel-pending",
     response_model=CancelResponse,
 )
-async def cancel_all_pending(
+def cancel_all_pending(
     user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),
 ) -> CancelResponse:
@@ -388,7 +388,7 @@ async def cancel_all_pending(
     "/api/investigate/jobs/{inv_id}/cancel",
     response_model=CancelResponse,
 )
-async def cancel_one(
+def cancel_one(
     inv_id: int,
     user: User = Depends(require_permission("alert:triage")),
     session: Session = Depends(get_db_session),

@@ -154,7 +154,7 @@ class AlertRuleCreate(BaseModel):
 
 
 @router.get("/events", response_model=List[SecurityEventResponse])
-async def get_security_events(
+def get_security_events(
     hours: int = Query(24, ge=1, le=168, description="Time period in hours"),
     severity: Optional[str] = Query(None, description="Filter by severity"),
     event_type: Optional[str] = Query(None, description="Filter by event type"),
@@ -186,7 +186,7 @@ async def get_security_events(
 
 
 @router.get("/events/{event_id}", response_model=SecurityEventResponse)
-async def get_security_event(
+def get_security_event(
     event_id: int,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("security:read")),
@@ -204,7 +204,7 @@ async def get_security_event(
 
 
 @router.patch("/events/{event_id}/status")
-async def update_event_status(
+def update_event_status(
     event_id: int,
     request: UpdateEventStatusRequest,
     session: Session = Depends(get_db_session),
@@ -238,7 +238,7 @@ async def update_event_status(
 
 
 @router.get("/statistics", response_model=SecurityStatisticsResponse)
-async def get_security_statistics(
+def get_security_statistics(
     hours: int = Query(24, ge=1, le=168, description="Time period in hours"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("security:read")),
@@ -250,7 +250,7 @@ async def get_security_statistics(
 
 
 @router.get("/timeline", response_model=List[TimelineDataPoint])
-async def get_security_timeline(
+def get_security_timeline(
     hours: int = Query(24, ge=1, le=168, description="Time period in hours"),
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("security:read")),
@@ -262,7 +262,7 @@ async def get_security_timeline(
 
 
 @router.get("/blocked-ips", response_model=List[BlockedIPResponse])
-async def get_blocked_ips(
+def get_blocked_ips(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("security:read")),
 ):
@@ -284,7 +284,7 @@ async def get_blocked_ips(
 
 
 @router.post("/blocked-ips")
-async def block_ip(
+def block_ip(
     request: BlockIPRequest,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("security:manage")),
@@ -319,7 +319,7 @@ async def block_ip(
 
 
 @router.delete("/blocked-ips/{ip_address}")
-async def unblock_ip(
+def unblock_ip(
     ip_address: str,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("security:manage")),
@@ -345,7 +345,7 @@ async def unblock_ip(
 
 
 @router.get("/export/siem", response_model=SIEMExportResponse)
-async def export_to_siem(
+def export_to_siem(
     format: str = Query("json", description="Export format: json or syslog"),
     limit: int = Query(1000, ge=1, le=10000, description="Maximum events to export"),
     mark_exported: bool = Query(True, description="Mark events as exported"),
@@ -382,7 +382,7 @@ async def export_to_siem(
 
 
 @router.get("/export/download")
-async def download_events(
+def download_events(
     hours: int = Query(24, ge=1, le=720, description="Time period in hours"),
     format: str = Query("json", description="Export format: json or csv"),
     session: Session = Depends(get_db_session),
@@ -448,7 +448,7 @@ async def download_events(
 
 
 @router.get("/threat-summary")
-async def get_threat_summary(
+def get_threat_summary(
     session: Session = Depends(get_db_session),
     current_user: User = Depends(require_permission("security:read")),
 ):

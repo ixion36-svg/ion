@@ -23,7 +23,7 @@ class AnalyticsJobUpdate(BaseModel):
 
 
 @router.get("/jobs")
-async def list_analytics_jobs(
+def list_analytics_jobs(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
@@ -50,7 +50,7 @@ async def list_analytics_jobs(
 
 
 @router.get("/jobs/{job_type}")
-async def get_analytics_job(
+def get_analytics_job(
     job_type: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -76,7 +76,7 @@ async def get_analytics_job(
 
 
 @router.post("/jobs/{job_type}/run")
-async def run_analytics_job(
+def run_analytics_job(
     job_type: str,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -91,7 +91,7 @@ async def run_analytics_job(
 
 
 @router.patch("/jobs/{job_type}")
-async def update_analytics_job(
+def update_analytics_job(
     job_type: str,
     data: AnalyticsJobUpdate,
     current_user: User = Depends(get_current_user),
@@ -117,7 +117,7 @@ async def update_analytics_job(
 
 
 @router.get("/snapshots/{job_type}")
-async def get_analytics_snapshots(
+def get_analytics_snapshots(
     job_type: str,
     days: int = 7,
     current_user: User = Depends(get_current_user),
@@ -144,7 +144,7 @@ async def get_analytics_snapshots(
 
 
 @router.get("/dashboard")
-async def get_analytics_dashboard(
+def get_analytics_dashboard(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):

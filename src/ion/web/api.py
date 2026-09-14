@@ -262,7 +262,7 @@ def get_services(session: Session = Depends(get_db_session)) -> Services:
 
 @router.post("/auth/login")
 @limiter.limit("10/minute")
-async def login(
+def login(
     request: Request,
     login_request: LoginRequest,
     response: Response,
@@ -371,7 +371,7 @@ class FocusModeRequest(BaseModel):
 
 
 @router.post("/auth/focus-mode")
-async def set_focus_mode(
+def set_focus_mode(
     body: FocusModeRequest,
     session_token: Optional[str] = Depends(get_session_token),
     session: Session = Depends(get_db_session),
@@ -421,7 +421,7 @@ class ProfileUpdate(BaseModel):
 
 
 @router.put("/auth/profile")
-async def update_own_profile(
+def update_own_profile(
     data: ProfileUpdate,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -468,7 +468,7 @@ async def update_own_profile(
 
 
 @router.post("/auth/profile/resolve-elastic")
-async def resolve_elastic_uid(
+def resolve_elastic_uid(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
@@ -894,7 +894,7 @@ async def list_users(
 
 
 @router.post("/users", dependencies=[Depends(require_permission("user:create"))])
-async def create_user(
+def create_user(
     user_create: UserCreate,
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -932,7 +932,7 @@ async def create_user(
 
 
 @router.get("/users/{user_id}", dependencies=[Depends(require_permission("user:read"))])
-async def get_user(
+def get_user(
     user_id: int,
     session: Session = Depends(get_db_session),
 ):
@@ -963,7 +963,7 @@ async def get_user(
 
 
 @router.put("/users/{user_id}", dependencies=[Depends(require_permission("user:update"))])
-async def update_user(
+def update_user(
     user_id: int,
     user_update: UserUpdate,
     request: Request,
@@ -1027,7 +1027,7 @@ async def update_user(
 
 
 @router.delete("/users/{user_id}", dependencies=[Depends(require_permission("user:delete"))])
-async def delete_user(
+def delete_user(
     user_id: int,
     request: Request,
     current_user: User = Depends(get_current_user),
@@ -1062,7 +1062,7 @@ async def delete_user(
 
 
 @router.put("/users/{user_id}/roles", dependencies=[Depends(require_permission("user:update"))])
-async def update_user_roles(
+def update_user_roles(
     user_id: int,
     roles_update: UserRolesUpdate,
     request: Request,
@@ -1094,7 +1094,7 @@ async def update_user_roles(
 
 
 @router.post("/users/{user_id}/reset-password", dependencies=[Depends(require_permission("user:update"))])
-async def reset_user_password(
+def reset_user_password(
     user_id: int,
     password_reset: PasswordReset,
     request: Request,
@@ -1131,7 +1131,7 @@ async def reset_user_password(
 # =============================================================================
 
 @router.get("/roles", dependencies=[Depends(require_permission("user:read"))])
-async def list_roles(
+def list_roles(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
@@ -1179,7 +1179,7 @@ def _parse_audit_details(raw: Optional[str]):
 
 
 @router.get("/audit-logs", dependencies=[Depends(require_permission("system:audit_view"))])
-async def list_audit_logs(
+def list_audit_logs(
     limit: int = 100,
     offset: int = 0,
     user_id: Optional[int] = None,
@@ -3096,7 +3096,7 @@ class KFPMatchRequest(BaseModel):
 
 
 @router.get("/known-false-positives")
-async def list_known_false_positives(
+def list_known_false_positives(
     active_only: bool = True,
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
@@ -3167,7 +3167,7 @@ async def create_known_false_positive(
 
 
 @router.get("/known-false-positives/{kfp_id}")
-async def get_known_false_positive(
+def get_known_false_positive(
     kfp_id: int,
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
@@ -3251,7 +3251,7 @@ async def delete_known_false_positive(
 
 
 @router.post("/known-false-positives/match")
-async def match_known_false_positives(
+def match_known_false_positives(
     data: KFPMatchRequest,
     current_user: User = Depends(require_permission("alert:read")),
     session: Session = Depends(get_db_session),
@@ -4110,7 +4110,7 @@ def _populate_triage_observables(triage, host=None, user=None, raw_data=None) ->
 
 
 @router.post("/elasticsearch/alerts/{alert_id}/triage/auto-populate-observables")
-async def auto_populate_observables(
+def auto_populate_observables(
     alert_id: str,
     data: AutoPopulateRequest,
     current_user: User = Depends(require_permission("alert:triage")),
@@ -4130,7 +4130,7 @@ async def auto_populate_observables(
 
 
 @router.post("/elasticsearch/alerts/{alert_id}/comments")
-async def add_alert_comment(
+def add_alert_comment(
     alert_id: str,
     data: CommentCreate,
     current_user: User = Depends(require_permission("alert:triage")),
@@ -4391,7 +4391,7 @@ class SavedSearchUpdate(BaseModel):
 
 
 @router.get("/saved-searches")
-async def list_saved_searches(
+def list_saved_searches(
     search_type: Optional[str] = None,
     favorites_only: bool = False,
     current_user: User = Depends(get_current_user),
@@ -4412,7 +4412,7 @@ async def list_saved_searches(
 
 
 @router.post("/saved-searches")
-async def create_saved_search(
+def create_saved_search(
     data: SavedSearchCreate,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -4442,7 +4442,7 @@ async def create_saved_search(
 
 
 @router.get("/saved-searches/{search_id}")
-async def get_saved_search(
+def get_saved_search(
     search_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -4462,7 +4462,7 @@ async def get_saved_search(
 
 
 @router.put("/saved-searches/{search_id}")
-async def update_saved_search(
+def update_saved_search(
     search_id: int,
     data: SavedSearchUpdate,
     current_user: User = Depends(get_current_user),
@@ -4495,7 +4495,7 @@ async def update_saved_search(
 
 
 @router.delete("/saved-searches/{search_id}")
-async def delete_saved_search(
+def delete_saved_search(
     search_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -4597,7 +4597,7 @@ async def execute_saved_search(
 
 
 @router.post("/saved-searches/{search_id}/favorite")
-async def toggle_saved_search_favorite(
+def toggle_saved_search_favorite(
     search_id: int,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
@@ -4668,7 +4668,7 @@ class ExecutionCompleteRequest(BaseModel):
 
 
 @router.get("/playbooks")
-async def list_playbooks(
+def list_playbooks(
     active_only: bool = False,
     current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
@@ -4684,7 +4684,7 @@ async def list_playbooks(
 
 
 @router.post("/playbooks")
-async def create_playbook(
+def create_playbook(
     data: PlaybookCreate,
     current_user: User = Depends(require_permission("playbook:create")),
     session: Session = Depends(get_db_session),
@@ -4737,7 +4737,7 @@ async def create_playbook(
 
 
 @router.get("/playbooks/{playbook_id}")
-async def get_playbook(
+def get_playbook(
     playbook_id: int,
     current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
@@ -4753,7 +4753,7 @@ async def get_playbook(
 
 
 @router.put("/playbooks/{playbook_id}")
-async def update_playbook(
+def update_playbook(
     playbook_id: int,
     data: PlaybookUpdate,
     current_user: User = Depends(require_permission("playbook:update")),
@@ -4807,7 +4807,7 @@ async def update_playbook(
 
 
 @router.delete("/playbooks/{playbook_id}")
-async def delete_playbook(
+def delete_playbook(
     playbook_id: int,
     current_user: User = Depends(require_permission("playbook:delete")),
     session: Session = Depends(get_db_session),
@@ -4978,7 +4978,7 @@ async def get_suggested_playbooks(
 
 
 @router.post("/elasticsearch/alerts/{alert_id}/playbook/{playbook_id}/start")
-async def start_playbook_execution(
+def start_playbook_execution(
     alert_id: str,
     playbook_id: int,
     current_user: User = Depends(require_permission("playbook:execute")),
@@ -5029,7 +5029,7 @@ async def start_playbook_execution(
 
 
 @router.get("/playbook-executions/summary")
-async def playbook_executions_summary(
+def playbook_executions_summary(
     current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
 ):
@@ -5047,7 +5047,7 @@ async def playbook_executions_summary(
 
 
 @router.get("/playbook-executions/{execution_id}")
-async def get_playbook_execution(
+def get_playbook_execution(
     execution_id: int,
     current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
@@ -5063,7 +5063,7 @@ async def get_playbook_execution(
 
 
 @router.get("/elasticsearch/alerts/{alert_id}/playbook-executions")
-async def get_alert_playbook_executions(
+def get_alert_playbook_executions(
     alert_id: str,
     current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
@@ -5079,7 +5079,7 @@ async def get_alert_playbook_executions(
 
 
 @router.put("/playbook-executions/{execution_id}/steps/{step_id}")
-async def update_step_status(
+def update_step_status(
     execution_id: int,
     step_id: int,
     data: StepStatusUpdate,
@@ -5125,7 +5125,7 @@ async def update_step_status(
 
 
 @router.post("/playbook-executions/{execution_id}/complete")
-async def complete_playbook_execution(
+def complete_playbook_execution(
     execution_id: int,
     data: ExecutionCompleteRequest = ExecutionCompleteRequest(),
     current_user: User = Depends(require_permission("playbook:execute")),
@@ -5183,7 +5183,7 @@ async def complete_playbook_execution(
 
 
 @router.post("/playbook-executions/{execution_id}/regenerate-report")
-async def regenerate_playbook_report(
+def regenerate_playbook_report(
     execution_id: int,
     current_user: User = Depends(require_permission("playbook:execute")),
     session: Session = Depends(get_db_session),
@@ -5215,7 +5215,7 @@ async def regenerate_playbook_report(
 
 
 @router.post("/playbook-executions/{execution_id}/fail")
-async def fail_playbook_execution(
+def fail_playbook_execution(
     execution_id: int,
     reason: Optional[str] = None,
     current_user: User = Depends(require_permission("playbook:execute")),
@@ -5246,7 +5246,7 @@ async def fail_playbook_execution(
 
 
 @router.get("/playbook-executions")
-async def list_playbook_executions(
+def list_playbook_executions(
     status: Optional[str] = None,
     limit: int = 50,
     current_user: User = Depends(require_permission("playbook:execute")),
@@ -5360,7 +5360,7 @@ async def get_host_patterns(
 # ============================================================
 
 @router.get("/analyst/knowledge-base")
-async def get_analyst_knowledge_base(
+def get_analyst_knowledge_base(
     include_articles: bool = True,
     recent: int = 0,
     current_user: User = Depends(require_permission("document:read")),
@@ -5472,7 +5472,7 @@ async def get_analyst_knowledge_base(
 
 
 @router.get("/analyst/knowledge-base/search")
-async def search_analyst_knowledge_base(
+def search_analyst_knowledge_base(
     q: str = "",
     collection_id: Optional[int] = None,
     limit: int = 25,

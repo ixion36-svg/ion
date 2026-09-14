@@ -216,7 +216,7 @@ def _observable_to_detail(obs: Observable, session: Session) -> ObservableDetail
 # =============================================================================
 
 @router.get("/observables")
-async def search_observables(
+def search_observables(
     query: Optional[str] = Query(None, description="Search term"),
     type: Optional[str] = Query(None, description="Filter by type"),
     threat_level: Optional[str] = Query(None, description="Filter by threat level"),
@@ -265,7 +265,7 @@ async def search_observables(
 
 
 @router.get("/observables/stats")
-async def get_observable_stats(
+def get_observable_stats(
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
 ) -> StatsResponse:
@@ -276,7 +276,7 @@ async def get_observable_stats(
 
 
 @router.get("/observables/top")
-async def get_top_observables(
+def get_top_observables(
     type: Optional[str] = Query(None, description="Filter by type"),
     limit: int = Query(10, ge=1, le=50),
     session: Session = Depends(get_db_session),
@@ -291,7 +291,7 @@ async def get_top_observables(
 
 
 @router.get("/observables/graph")
-async def get_relationship_graph(
+def get_relationship_graph(
     observable_id: Optional[int] = Query(None, description="Center node ID"),
     limit: int = Query(100, ge=10, le=500),
     min_co_occurrence: int = Query(2, ge=1, le=100),
@@ -309,7 +309,7 @@ async def get_relationship_graph(
 
 
 @router.get("/observables/patterns")
-async def detect_patterns(
+def detect_patterns(
     time_window_minutes: int = Query(60, ge=5, le=1440),
     min_occurrences: int = Query(3, ge=2, le=100),
     limit: int = Query(20, ge=1, le=100),
@@ -327,7 +327,7 @@ async def detect_patterns(
 
 
 @router.get("/observables/clusters")
-async def get_time_clusters(
+def get_time_clusters(
     hours: int = Query(24, ge=1, le=168),
     interval_minutes: int = Query(30, ge=5, le=360),
     session: Session = Depends(get_db_session),
@@ -364,7 +364,7 @@ class WatchlistAlertResponse(BaseModel):
 
 
 @router.get("/observables/watchlist")
-async def get_watchlist(
+def get_watchlist(
     limit: int = Query(100, ge=1, le=500),
     offset: int = Query(0, ge=0),
     session: Session = Depends(get_db_session),
@@ -382,7 +382,7 @@ async def get_watchlist(
 
 
 @router.get("/observables/watchlist/alerts")
-async def get_watchlist_alerts(
+def get_watchlist_alerts(
     is_read: Optional[bool] = None,
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
@@ -440,7 +440,7 @@ class STIXImportRequest(BaseModel):
 
 
 @router.post("/observables/import/csv")
-async def import_from_csv(
+def import_from_csv(
     data: CSVImportRequest,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:create")),
@@ -458,7 +458,7 @@ async def import_from_csv(
 
 
 @router.post("/observables/import/stix")
-async def import_from_stix(
+def import_from_stix(
     data: STIXImportRequest,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:create")),
@@ -474,7 +474,7 @@ async def import_from_stix(
 
 
 @router.get("/observables/export/csv")
-async def export_to_csv(
+def export_to_csv(
     types: Optional[str] = Query(None, description="Comma-separated types to export"),
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
@@ -511,7 +511,7 @@ class RetentionPolicyRequest(BaseModel):
 
 
 @router.post("/observables/retention/preview")
-async def preview_retention_policy(
+def preview_retention_policy(
     data: RetentionPolicyRequest,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:update")),
@@ -528,7 +528,7 @@ async def preview_retention_policy(
 
 
 @router.post("/observables/retention/apply")
-async def apply_retention_policy(
+def apply_retention_policy(
     data: RetentionPolicyRequest,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:delete")),
@@ -551,7 +551,7 @@ async def apply_retention_policy(
 
 
 @router.post("/observables/enrich/scheduled")
-async def run_scheduled_enrichment(
+def run_scheduled_enrichment(
     max_age_hours: int = Query(168, ge=1, le=720),
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_db_session),
@@ -572,7 +572,7 @@ async def run_scheduled_enrichment(
 # =============================================================================
 
 @router.get("/observables/{observable_id}")
-async def get_observable(
+def get_observable(
     observable_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
@@ -586,7 +586,7 @@ async def get_observable(
 
 
 @router.put("/observables/{observable_id}")
-async def update_observable(
+def update_observable(
     observable_id: int,
     data: ObservableUpdate,
     session: Session = Depends(get_db_session),
@@ -628,7 +628,7 @@ async def update_observable(
 
 
 @router.delete("/observables/{observable_id}")
-async def delete_observable(
+def delete_observable(
     observable_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:delete")),
@@ -646,7 +646,7 @@ async def delete_observable(
 # =============================================================================
 
 @router.get("/observables/{observable_id}/alerts")
-async def get_observable_alerts(
+def get_observable_alerts(
     observable_id: int,
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_db_session),
@@ -676,7 +676,7 @@ async def get_observable_alerts(
 
 
 @router.get("/observables/{observable_id}/cases")
-async def get_observable_cases(
+def get_observable_cases(
     observable_id: int,
     limit: int = Query(50, ge=1, le=200),
     session: Session = Depends(get_db_session),
@@ -706,7 +706,7 @@ async def get_observable_cases(
 
 
 @router.get("/observables/{observable_id}/co-occurring")
-async def get_co_occurring_observables(
+def get_co_occurring_observables(
     observable_id: int,
     limit: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_db_session),
@@ -775,7 +775,7 @@ async def enrich_observable(
 
 
 @router.get("/observables/{observable_id}/enrichment")
-async def get_observable_enrichment(
+def get_observable_enrichment(
     observable_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
@@ -807,7 +807,7 @@ async def get_observable_enrichment(
 
 
 @router.get("/observables/{observable_id}/enrichment/history")
-async def get_enrichment_history(
+def get_enrichment_history(
     observable_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
@@ -861,7 +861,7 @@ async def enrich_batch(
 
 
 @router.post("/observables/search/bulk")
-async def bulk_search(
+def bulk_search(
     data: ObservableSearchRequest,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:read")),
@@ -876,7 +876,7 @@ async def bulk_search(
 
 
 @router.post("/observables/migrate")
-async def migrate_observables(
+def migrate_observables(
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:create")),
 ) -> MigrationResponse:
@@ -945,7 +945,7 @@ def _audit_new_observable_links(
 
 
 @router.post("/observables/extract-from-alert/{alert_triage_id}")
-async def extract_from_alert(
+def extract_from_alert(
     alert_triage_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:create")),
@@ -966,7 +966,7 @@ async def extract_from_alert(
 
 
 @router.post("/observables/extract-from-case/{case_id}")
-async def extract_from_case(
+def extract_from_case(
     case_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:create")),
@@ -991,7 +991,7 @@ async def extract_from_case(
 # =============================================================================
 
 @router.post("/observables/watchlist/{observable_id}")
-async def add_to_watchlist(
+def add_to_watchlist(
     observable_id: int,
     data: WatchlistAddRequest,
     session: Session = Depends(get_db_session),
@@ -1015,7 +1015,7 @@ async def add_to_watchlist(
 
 
 @router.delete("/observables/watchlist/{observable_id}")
-async def remove_from_watchlist(
+def remove_from_watchlist(
     observable_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:update")),
@@ -1034,7 +1034,7 @@ async def remove_from_watchlist(
 
 
 @router.post("/observables/watchlist/alerts/{alert_id}/read")
-async def mark_watchlist_alert_read(
+def mark_watchlist_alert_read(
     alert_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:update")),
@@ -1054,7 +1054,7 @@ async def mark_watchlist_alert_read(
 # =============================================================================
 
 @router.get("/observables/{observable_id}/timeline")
-async def get_observable_timeline(
+def get_observable_timeline(
     observable_id: int,
     limit: int = Query(100, ge=1, le=500),
     session: Session = Depends(get_db_session),
@@ -1077,7 +1077,7 @@ async def get_observable_timeline(
 
 
 @router.get("/observables/{observable_id}/heatmap")
-async def get_observable_heatmap(
+def get_observable_heatmap(
     observable_id: int,
     days: int = Query(30, ge=1, le=365),
     session: Session = Depends(get_db_session),
@@ -1104,7 +1104,7 @@ async def get_observable_heatmap(
 # =============================================================================
 
 @router.post("/observables/{observable_id}/auto-enrich/enable")
-async def enable_auto_enrich(
+def enable_auto_enrich(
     observable_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:update")),
@@ -1120,7 +1120,7 @@ async def enable_auto_enrich(
 
 
 @router.post("/observables/{observable_id}/auto-enrich/disable")
-async def disable_auto_enrich(
+def disable_auto_enrich(
     observable_id: int,
     session: Session = Depends(get_db_session),
     user: User = Depends(require_permission("observable:update")),
