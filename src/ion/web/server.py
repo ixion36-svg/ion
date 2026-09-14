@@ -112,6 +112,7 @@ from ion.web.skills_api import router as skills_router
 from ion.web.soc_health_api import router as soc_health_router
 from ion.web.social_api import router as social_router
 from ion.web.story_api import router as story_router
+from ion.web.tenant_api import router as tenant_router
 
 # threat_hunt_api removed; see /threat-hunting handler note below.
 from ion.web.threat_intel_api import router as threat_intel_router
@@ -418,6 +419,7 @@ app.include_router(mcp_router)    # /api/mcp — MCP Streamable HTTP (router has
 app.include_router(security_router, prefix="/api/security")
 app.include_router(integration_router, prefix="/api/integrations")
 app.include_router(admin_router, prefix="/api/admin")
+app.include_router(tenant_router, prefix="/api")  # /api/tenants — estate switcher
 app.include_router(skill_publisher_router, prefix="/api/admin")
 app.include_router(observable_router, prefix="/api")
 app.include_router(ai_router)
@@ -761,6 +763,7 @@ async def _startup_event():
         LOCK_SEED_KNOWLEDGE_BASE,
         LOCK_SEED_PERMISSIONS,
         LOCK_SEED_SOC_TEMPLATES,
+        LOCK_SEED_TENANTS,
         LOCK_SKILLS_DAILY_SNAPSHOT,
         LOCK_TIDE_BG_SYNC,
         get_engine,
@@ -796,6 +799,21 @@ async def _startup_event():
         finally:
             session.close()
     run_locked(engine, LOCK_SEED_PERMISSIONS, "seed_auth", _seed_auth)
+
+    # ---------------------------------------------------------------
+    # Seed the default tenant
+    # ---------------------------------------------------------------
+    # Always present, even single-estate: it is the row pre-existing data is
+    # attributed to, and it sets no ION_TENANT_* variables so it inherits the
+    # process-wide Elasticsearch and Kibana exactly as before.
+    def _seed_default_tenant():
+        from ion.services.tenant_service import ensure_default_tenant
+        session = factory()
+        try:
+            ensure_default_tenant(session)
+        finally:
+            session.close()
+    run_locked(engine, LOCK_SEED_TENANTS, "seed_default_tenant", _seed_default_tenant)
 
     # ---------------------------------------------------------------
     # Seed default pattern-based playbooks

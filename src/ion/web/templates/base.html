@@ -79,6 +79,7 @@
          setInterval polling fallback. Loaded early so page scripts can call
          it from their DOMContentLoaded handlers. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/live-updates.js?v={{ ion_version }}"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/tenant-switcher.js?v={{ ion_version }}"></script>
     <!-- page-specific data-click-action wrappers needed to retire
          the last few multi-statement inline handlers. Living here in base.html
          so every page has them in scope. Kept tiny so the global namespace
@@ -335,6 +336,10 @@
           <button class="md:hidden h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" id="tw-mobile-toggle" aria-label="Menu">
             <svg class="w-4 h-4 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
+
+          <!-- Estate switcher: hidden unless multi-tenancy is on and this
+               analyst has more than one estate. -->
+          <div id="tenant-switcher" class="hidden items-center gap-1.5 mr-1"></div>
 
           <button id="notepad-toggle-btn" data-click-action="toggleNotepad" class="h-8 w-8 grid place-items-center rounded-md hover:bg-white/5 transition" title="Notepad (Ctrl+Shift+N)">
             <i class="icon-notebook-pen text-slate-400"></i>

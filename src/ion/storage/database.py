@@ -129,6 +129,7 @@ LOCK_PLAYBOOK_EMBEDDING_BG  = 1027  # v0.51.0  — playbook-embedding background
 LOCK_TI_REPORT_BG           = 1028  # v0.53.0  — TI-report cache sync + chunk-embedding loop
 LOCK_SEED_KEV_CATALOG       = 1029  # v0.79.1  — seed the bundled CISA KEV snapshot
 LOCK_ARKIME_RETENTION_BG    = 1030  # v0.86.0  — PCAP-retention awareness / analysis rescue
+LOCK_SEED_TENANTS           = 1031  # seed the default tenant row
 
 
 @contextmanager

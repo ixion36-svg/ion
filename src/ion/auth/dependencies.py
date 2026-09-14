@@ -14,6 +14,12 @@ from ion.storage.database import get_db_session  # noqa: F401  (re-exported; rou
 
 logger = logging.getLogger(__name__)
 
+# Which estate the analyst is looking at. Caller-controlled and validated on
+# every request by resolve_tenant_for_user, so tampering gains nothing: a
+# tenant-bound user is refused and keeps their own, and a platform user could
+# have selected that tenant anyway. Not HttpOnly — the header toggle reads it.
+TENANT_COOKIE = "ion_tenant"
+
 # Cookie name for session token
 SESSION_COOKIE_NAME = "ion_session"
 
@@ -101,7 +107,44 @@ def get_current_user(
         user_id=getattr(user, "id", None),
         email=getattr(user, "email", None),
     )
+
+    _bind_tenant(request, user, auth_service)
     return user
+
+
+def _bind_tenant(request: Request, user: User, auth_service: AuthService) -> None:
+    """Install the tenant this request acts for.
+
+    Bound here because every authenticated route already depends on
+    get_current_user, and the alternative — a middleware — runs before the user
+    is known. No reset is needed: each request is handled in its own task, and a
+    task takes a copy of the context when it is created, so a ContextVar set
+    here cannot reach another request.
+
+    Never raises. A failure to resolve leaves the tenant unset, which every
+    scoped query must read as "no rows" — so a broken lookup hides data rather
+    than exposing another estate's.
+    """
+    try:
+        from ion.services.tenant_service import (
+            multi_tenant_enabled,
+            resolve_tenant_for_user,
+            tenant_connection,
+        )
+
+        if not multi_tenant_enabled():
+            return
+
+        from ion.core.tenant_context import set_tenant_connection, set_tenant_id
+
+        # Caller-controlled, and validated by the resolver: a tenant-bound user
+        # asking for another estate is refused and keeps their own.
+        requested = request.cookies.get(TENANT_COOKIE) or request.headers.get("X-ION-Tenant")
+        tenant = resolve_tenant_for_user(auth_service.db_session, user, requested)
+        set_tenant_id(tenant.id if tenant else None)
+        set_tenant_connection(tenant_connection(tenant))
+    except Exception:  # noqa: BLE001 — tenancy must never break authentication
+        logger.warning("tenant binding failed; request proceeds with no tenant", exc_info=True)
 
 
 def get_current_user_optional(
