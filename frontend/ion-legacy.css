@@ -26,10 +26,12 @@
  *     ties against this file, exactly as it did when it was inside ion.css and
  *     style.css was a separate earlier <link>.
  *
- * The remaining content is two kinds. Roughly 110 component rules for the
- * daisyUI-shadowed names above, which need a markup migration rather than a
- * move: daisyUI's .alert has no left accent bar and its .card no ION border,
- * so deleting these changes how pages look. And the eight accent themes --
+ * The remaining content is two kinds. Fourteen component rules that override
+ * daisyUI on purpose -- .alert, .stat-value, .tabs and .modal -- where
+ * daisyUI's own version is a different design, not an equivalent: it fills
+ * .alert solid instead of tinting it, drops tabular-nums from .stat-value, and
+ * renders a closed .modal open. See docs/UI_REWRITE_HANDOVER.md before
+ * touching any of them. And the eight accent themes --
  * [data-theme="cyan"|purple|green|orange|pink|red|blue|gold] -- which stay by
  * design: they are the SOURCE the daisyUI theme derives from, via
  * --color-primary: var(--primary).
