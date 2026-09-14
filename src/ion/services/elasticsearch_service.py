@@ -8,6 +8,7 @@ import hashlib
 import logging
 import os
 import threading
+from collections import OrderedDict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -28,15 +29,89 @@ logger = logging.getLogger(__name__)
 # the persistent request loop raised "RuntimeError: Event loop is closed" when
 # one loop tried to use/close connections owned by another. We therefore track
 # the binding loop and recreate the client whenever the running loop differs.
-_es_client: Optional[httpx.AsyncClient] = None
-_es_client_creds: Optional[str] = None  # fingerprint of (headers, auth) used at creation
-_es_client_loop: Optional[asyncio.AbstractEventLoop] = None  # loop the client is bound to
-# guards every read-check-create-assign of the slot above. Without it
-# a background thread's asyncio.run() cycle could rebind the global between a
-# web-loop caller's creation and its `return`, handing that caller a client
-# bound to a throwaway loop — the exact "Event loop is closed" crash the
-# loop-binding fix was meant to close.
+#
+# A pool rather than one slot, because a slot holds exactly one estate: with
+# several tenants the clients evict each other, so alternating requests dispose
+# and rebuild a connection pool per call.
+#
+# Keyed by tenant, NOT by credential fingerprint, even though credentials differ
+# per tenant. Keying on the fingerprint would make a rotated credential look
+# like a new tenant: the superseded client would stay pooled instead of being
+# closed, and on the long-lived web loop nothing would ever prune it. The
+# fingerprint is kept on the entry instead, so a rotation still displaces and
+# closes its predecessor exactly as it did before there was a pool.
+#
+# guards every read-check-create-assign below. Without it a background thread's
+# asyncio.run() cycle could rebind an entry between a web-loop caller's creation
+# and its `return`, handing that caller a client bound to a throwaway loop — the
+# exact "Event loop is closed" crash the loop-binding fix was meant to close.
 _es_client_lock = threading.Lock()
+
+# (tenant id, id(loop)) -> entry. id() alone is not a safe key: CPython reuses
+# the address of a collected object, so a fresh loop can land on a dead one's id
+# and be handed its client. Each entry therefore carries the loop itself and is
+# only reused when that object *is* the running loop. Holding the reference also
+# keeps the dead loop alive, so its id cannot be reassigned while the entry
+# exists, and pruning disposes it.
+_ES_POOL_MAX = 16
+
+
+def _tenant_key() -> int:
+    """Which estate this client belongs to. 0 when no tenant is bound."""
+    try:
+        from ion.core.tenant_context import current_tenant_id
+
+        return current_tenant_id() or 0
+    except Exception:  # pragma: no cover - context must never break a request
+        return 0
+
+
+class _PooledClient:
+    __slots__ = ("client", "loop", "fp")
+
+    def __init__(self, client, loop, fp):
+        self.client = client
+        self.loop = loop
+        self.fp = fp
+
+
+_es_pool: "OrderedDict[tuple, _PooledClient]" = OrderedDict()
+
+
+def _prune_pool(current_loop) -> list:
+    """Drop entries whose loop has finished. Caller holds the lock.
+
+    asyncio.run() leaves a closed loop behind every cycle, so without this the
+    pool grows one dead entry per background iteration and leaks its sockets.
+
+    Returns the removed clients, and the caller must hold that list until it has
+    created any replacement: dropping the last reference here frees the object,
+    and CPython hands the same address to the next allocation, so a caller
+    comparing client identity would see the replacement as the client it just
+    displaced.
+    """
+    removed = []
+    for key, entry in list(_es_pool.items()):
+        if entry.client.is_closed or (
+            entry.loop is not None and entry.loop.is_closed()
+        ):
+            _es_pool.pop(key, None)
+            _dispose_client(entry.client, entry.loop, current_loop)
+            removed.append(entry.client)
+    return removed
+
+
+def _evict_oldest(current_loop) -> None:
+    """Bound the pool. Caller holds the lock.
+
+    Reaching the cap means more live (tenant, loop) pairs than expected, so the
+    least recently used entry goes rather than letting the pool grow without
+    limit. Its next caller simply rebuilds it.
+    """
+    while len(_es_pool) > _ES_POOL_MAX:
+        _, entry = _es_pool.popitem(last=False)
+        logger.debug("ES client pool at capacity — evicting an idle client")
+        _dispose_client(entry.client, entry.loop, current_loop)
 
 
 def _creds_fingerprint(headers: Dict, auth: Optional[tuple]) -> str:
@@ -81,51 +156,71 @@ def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
     queries via asyncio.run() on throwaway loops; reusing a client bound to a
     now-dead loop would fail.
 
+    Several tenants' clients coexist, one entry per (tenant, loop). Within an
+    entry a credential change still displaces and closes its predecessor, so a
+    rotation does not leave a client behind.
+
     Thread-safe: the whole check-create-assign runs under _es_client_lock and
-    callers receive a local reference, never a re-read of the mutable global.
+    callers receive a local reference, never a re-read of the mutable pool.
     """
-    global _es_client, _es_client_creds, _es_client_loop
     fp = _creds_fingerprint(headers, auth)
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
-        loop = None  # sync context (e.g. unit tests) — single shared slot
+        loop = None  # sync context (e.g. unit tests) — one entry per tenant
+    key = (_tenant_key(), id(loop))
+
     with _es_client_lock:
-        client = _es_client
+        # Held until this call returns — see _prune_pool on address reuse.
+        _displaced = _prune_pool(loop)
+        entry = _es_pool.get(key)
+        # `entry.loop is loop` is the guard against a recycled id() handing back
+        # a client bound to a loop that has since died.
         if (
-            client is None
-            or client.is_closed
-            or fp != _es_client_creds
-            or loop is not _es_client_loop
+            entry is not None
+            and not entry.client.is_closed
+            and entry.loop is loop
+            and entry.fp == fp
         ):
-            _dispose_client(client, _es_client_loop, loop)
-            client = httpx.AsyncClient(
-                headers=headers,
-                auth=auth,
-                verify=verify_ssl,
-                timeout=timeout,
-                limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-            )
-            # test/debug bookkeeping: which loop this client belongs to
-            client._ion_bound_loop = loop  # type: ignore[attr-defined]
-            _es_client = client
-            _es_client_creds = fp
-            _es_client_loop = loop
+            _es_pool.move_to_end(key)
+            return entry.client
+
+        if entry is not None:
+            _es_pool.pop(key, None)
+            _dispose_client(entry.client, entry.loop, loop)
+            _displaced.append(entry.client)
+
+        client = httpx.AsyncClient(
+            headers=headers,
+            auth=auth,
+            verify=verify_ssl,
+            timeout=timeout,
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+        # test/debug bookkeeping: which loop this client belongs to
+        client._ion_bound_loop = loop  # type: ignore[attr-defined]
+        _es_pool[key] = _PooledClient(client, loop, fp)
+        _evict_oldest(loop)
         return client
 
 
-def _close_es_client() -> None:
-    """Close the shared ES client (call on config change)."""
-    global _es_client, _es_client_creds, _es_client_loop
+def _close_es_client(fingerprint: Optional[str] = None) -> None:
+    """Close pooled ES clients (call on config change).
+
+    Without a fingerprint every client closes, which is what a global config
+    change means. With one, only that estate's clients do — so re-pointing a
+    single tenant does not drop every other tenant's live connections.
+    """
     try:
         current = asyncio.get_running_loop()
     except RuntimeError:
         current = None
     with _es_client_lock:
-        _dispose_client(_es_client, _es_client_loop, current)
-        _es_client = None
-        _es_client_creds = None
-        _es_client_loop = None
+        for key, entry in list(_es_pool.items()):
+            if fingerprint is not None and entry.fp != fingerprint:
+                continue
+            _es_pool.pop(key, None)
+            _dispose_client(entry.client, entry.loop, current)
 
 
 def _redact_url(url: str) -> str:

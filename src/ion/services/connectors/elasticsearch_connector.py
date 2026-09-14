@@ -14,8 +14,26 @@ _elasticsearch_service: Optional[ElasticsearchService] = None
 
 
 def get_elasticsearch_service() -> ElasticsearchService:
-    """Get the global Elasticsearch service instance."""
+    """Get the Elasticsearch service instance for the current context.
+
+    Cached only while ION serves one estate. With multi-tenancy on, a cache here
+    freezes whichever tenant happened to construct it first and then hands that
+    estate to every later caller — a cross-tenant read, from roughly a dozen
+    call sites that look identical to the tenant-aware ones.
+
+    Constructing per call is cheap: __init__ reads a config dict and does string
+    work. The expensive resource is the httpx connection pool, which lives in
+    elasticsearch_service and is pooled per (credentials, event loop) regardless.
+    """
     global _elasticsearch_service
+    try:
+        from ion.core.tenant_context import current_tenant_connection
+
+        if current_tenant_connection() is not None:
+            return ElasticsearchService()
+    except Exception:  # pragma: no cover - context must never break the connector
+        pass
+
     if _elasticsearch_service is None:
         _elasticsearch_service = ElasticsearchService()
     return _elasticsearch_service

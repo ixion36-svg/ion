@@ -1173,13 +1173,38 @@ def get_arkime_config() -> dict:
     }
 
 
-def get_elasticsearch_config() -> dict:
-    """Get Elasticsearch configuration from the global config.
+def _overlay_tenant(base: dict, section: str) -> dict:
+    """Apply the active tenant's connection settings over the process-wide ones.
 
-    Returns a dictionary with Elasticsearch configuration.
+    This is the single place tenancy reaches Elasticsearch and Kibana: every
+    caller builds its client from these two functions, so overlaying here makes
+    ~30 construction sites tenant-aware without touching any of them.
+
+    Only keys the tenant actually set are overlaid — a tenant row that leaves a
+    field blank inherits rather than blanking a working connection. With no
+    tenant bound the base is returned untouched, which is every single-estate
+    deploy.
     """
+    try:
+        from ion.core.tenant_context import current_tenant_connection
+
+        conn = current_tenant_connection()
+    except Exception:  # pragma: no cover - context must never break config
+        return base
+    if not conn:
+        return base
+    overlay = conn.get(section) or {}
+    if not overlay:
+        return base
+    merged = dict(base)
+    merged.update({k: v for k, v in overlay.items() if v is not None})
+    return merged
+
+
+def get_elasticsearch_config() -> dict:
+    """Get Elasticsearch configuration for the active tenant, or the process-wide one."""
     config = get_config()
-    return {
+    return _overlay_tenant({
         "enabled": config.elasticsearch_enabled,
         "url": config.elasticsearch_url,
         "api_key": config.elasticsearch_api_key,
@@ -1192,7 +1217,7 @@ def get_elasticsearch_config() -> dict:
         "user_index": config.elasticsearch_user_index,
         "user_field": config.elasticsearch_user_field,
         "assignment_field": config.elasticsearch_assignment_field,
-    }
+    }, "es")
 
 
 def get_kibana_config() -> dict:
@@ -1201,10 +1226,14 @@ def get_kibana_config() -> dict:
     Returns a dictionary with Kibana configuration.
     """
     config = get_config()
-    # Fall back to Elasticsearch credentials if Kibana-specific ones not set
-    username = config.kibana_username or config.elasticsearch_username
-    password = config.kibana_password or config.elasticsearch_password
-    return {
+    # Fall back to Elasticsearch credentials if Kibana-specific ones not set.
+    # Resolved from the *tenant's* Elasticsearch where one is bound: falling back
+    # to the process-wide credentials would point one tenant's Kibana client at
+    # another estate's login.
+    es = get_elasticsearch_config()
+    username = config.kibana_username or es.get("username", "")
+    password = config.kibana_password or es.get("password", "")
+    return _overlay_tenant({
         "enabled": config.kibana_cases_enabled,
         "url": config.kibana_url,
         "username": username,
@@ -1212,7 +1241,7 @@ def get_kibana_config() -> dict:
         "space_id": config.kibana_space_id,
         "case_owner": config.kibana_case_owner,
         "verify_ssl": config.kibana_verify_ssl,
-    }
+    }, "kibana")
 
 
 def get_dfir_iris_config() -> dict:

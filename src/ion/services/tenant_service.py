@@ -19,12 +19,18 @@ table and against the caller's own right to cross tenants before it is trusted.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from ion.core.tenant_context import set_tenant_id
+from ion.core.tenant_context import (
+    reset_tenant_connection,
+    reset_tenant_id,
+    set_tenant_connection,
+    set_tenant_id,
+)
 from ion.models.tenant import TENANT_SLUG_PATTERN, Tenant
 
 logger = logging.getLogger(__name__)
@@ -165,12 +171,84 @@ def resolve_tenant_for_user(
     return get_default_tenant(db)
 
 
-def bind_request_tenant(db: Session, user, requested: Optional[str] = None):
-    """Resolve and install the active tenant. Returns (tenant, reset_token).
+# ION_TENANT_<SLUG>_<SUFFIX> -> the key the ES/Kibana config dicts use.
+_ES_ENV_KEYS = {
+    "ES_URL": "url",
+    "ES_USERNAME": "username",
+    "ES_PASSWORD": "password",
+    "ES_API_KEY": "api_key",
+    "ES_ALERT_INDEX": "alert_index",
+    "ES_CASE_INDEX": "case_index",
+    "ES_VERIFY_SSL": "verify_ssl",
+}
+_KIBANA_ENV_KEYS = {
+    "KIBANA_URL": "url",
+    "KIBANA_USERNAME": "username",
+    "KIBANA_PASSWORD": "password",
+    "KIBANA_SPACE": "space_id",
+    "KIBANA_VERIFY_SSL": "verify_ssl",
+}
+_BOOL_KEYS = {"verify_ssl"}
 
-    Callers must reset the token when the request ends; ``tenant_scope`` is the
+
+def _read_env_section(prefix: str, mapping: dict) -> dict:
+    """Collect one tenant's settings from the environment.
+
+    Unset and empty variables are omitted rather than returned blank, so a
+    tenant that specifies only a URL inherits the rest from the process config
+    instead of blanking a working connection with empty strings.
+    """
+    out: dict = {}
+    for suffix, key in mapping.items():
+        raw = os.environ.get(f"{prefix}_{suffix}", "").strip()
+        if not raw:
+            continue
+        out[key] = raw.lower() in ("true", "1", "yes") if key in _BOOL_KEYS else raw
+    return out
+
+
+def tenant_connection(tenant: Optional[Tenant]) -> Optional[dict]:
+    """The ES/Kibana overlay for a tenant, or None to use the process config.
+
+    Read from ``ION_TENANT_<SLUG>_*``. Resolved once when the tenant is bound
+    and carried in the request context, because ``ElasticsearchService()`` is
+    constructed at ~30 call sites and reads its config on each construction.
+
+    A tenant with no variables set returns None and therefore inherits the
+    process-wide estate, which is what makes the default tenant a no-op.
+    """
+    if tenant is None or not multi_tenant_enabled():
+        return None
+    prefix = tenant.env_prefix
+    es = _read_env_section(prefix, _ES_ENV_KEYS)
+    kibana = _read_env_section(prefix, _KIBANA_ENV_KEYS)
+    if not es and not kibana:
+        return None
+    return {"es": es, "kibana": kibana}
+
+
+def tenant_env_vars(tenant: Tenant) -> List[str]:
+    """Every variable name this tenant reads. For docs and admin diagnostics."""
+    prefix = tenant.env_prefix
+    return [f"{prefix}_{s}" for s in (*_ES_ENV_KEYS, *_KIBANA_ENV_KEYS)]
+
+
+def bind_request_tenant(db: Session, user, requested: Optional[str] = None):
+    """Resolve and install the active tenant. Returns (tenant, reset_tokens).
+
+    Callers must reset the tokens when the request ends; ``tenant_scope`` is the
     better choice anywhere a ``with`` block fits.
     """
     tenant = resolve_tenant_for_user(db, user, requested)
-    token = set_tenant_id(tenant.id if tenant else None)
-    return tenant, token
+    tokens = (
+        set_tenant_id(tenant.id if tenant else None),
+        set_tenant_connection(tenant_connection(tenant)),
+    )
+    return tenant, tokens
+
+
+def unbind_request_tenant(tokens) -> None:
+    """Restore whatever was active before :func:`bind_request_tenant`."""
+    id_token, conn_token = tokens
+    reset_tenant_connection(conn_token)
+    reset_tenant_id(id_token)

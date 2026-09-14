@@ -48,8 +48,8 @@ def db():
 @pytest.fixture
 def estates(db):
     default = ts.ensure_default_tenant(db)
-    acme = Tenant(slug="acme", name="Acme", es_url="https://es-acme:9200")
-    beta = Tenant(slug="beta", name="Beta", es_url="https://es-beta:9200")
+    acme = Tenant(slug="acme", name="Acme")
+    beta = Tenant(slug="beta", name="Beta")
     gone = Tenant(slug="gone", name="Gone", is_active=False)
     db.add_all([acme, beta, gone])
     db.commit()
@@ -166,35 +166,74 @@ def test_the_default_tenant_is_created_once(db):
     assert db.query(Tenant).filter(Tenant.slug == "default").count() == 1
 
 
-def test_the_default_tenant_inherits_the_process_config(db):
-    """Blank connection fields are what make enabling this a no-op on an
-    existing single-estate deploy."""
+def test_the_default_tenant_inherits_the_process_config(db, monkeypatch):
+    """No ION_TENANT_DEFAULT_* variables means no overlay, which is what makes
+    enabling this a no-op on an existing single-estate deploy."""
+    monkeypatch.setenv("ION_MULTI_TENANT", "true")
+    import ion.core.config as config_mod
+
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
     d = ts.ensure_default_tenant(db)
-    assert d.es_config() == {"verify_ssl": False}
-    assert d.kibana_config() == {}
+    assert ts.tenant_connection(d) is None
 
 
-def test_a_half_filled_tenant_does_not_blank_a_working_connection(db):
-    """Empty strings must be omitted, not passed through as overrides."""
-    t = Tenant(slug="partial", name="Partial", es_url="https://es:9200", es_username="")
-    assert t.es_config() == {"url": "https://es:9200", "verify_ssl": False}
-    assert "username" not in t.es_config()
+def test_connection_settings_come_from_the_environment(db, monkeypatch):
+    """Identity in the table, connection in .env — so credentials stay where
+    every other ION credential lives rather than becoming a database secret."""
+    monkeypatch.setenv("ION_MULTI_TENANT", "true")
+    import ion.core.config as config_mod
+
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+    monkeypatch.setenv("ION_TENANT_ACME_ES_URL", "https://es-acme:9200")
+    monkeypatch.setenv("ION_TENANT_ACME_KIBANA_SPACE", "acme")
+
+    t = Tenant(slug="acme", name="Acme")
+    conn = ts.tenant_connection(t)
+    assert conn["es"]["url"] == "https://es-acme:9200"
+    assert conn["kibana"]["space_id"] == "acme"
 
 
-def test_a_fully_configured_tenant_reports_its_own_estate(db):
-    t = Tenant(
-        slug="acme",
-        name="Acme",
-        es_url="https://es-acme:9200",
-        es_username="u",
-        es_password="p",
-        es_alert_index=".alerts-acme-*",
-        kibana_url="https://kb-acme:5601",
-        kibana_space_id="acme",
-    )
-    assert t.es_config()["url"] == "https://es-acme:9200"
-    assert t.es_config()["alert_index"] == ".alerts-acme-*"
-    assert t.kibana_config()["space_id"] == "acme"
+def test_unset_variables_are_omitted_not_blanked(db, monkeypatch):
+    """A tenant setting only a URL must inherit the rest, not blank it."""
+    monkeypatch.setenv("ION_MULTI_TENANT", "true")
+    import ion.core.config as config_mod
+
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+    monkeypatch.setenv("ION_TENANT_ACME_ES_URL", "https://es-acme:9200")
+    monkeypatch.setenv("ION_TENANT_ACME_ES_USERNAME", "   ")
+
+    conn = ts.tenant_connection(Tenant(slug="acme", name="Acme"))
+    assert conn["es"] == {"url": "https://es-acme:9200"}
+    assert "username" not in conn["es"]
+
+
+def test_no_connection_leaks_while_multi_tenancy_is_off(db, monkeypatch):
+    """Stray variables must not reroute a single-estate deploy."""
+    monkeypatch.delenv("ION_MULTI_TENANT", raising=False)
+    import ion.core.config as config_mod
+
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+    monkeypatch.setenv("ION_TENANT_ACME_ES_URL", "https://es-acme:9200")
+    assert ts.tenant_connection(Tenant(slug="acme", name="Acme")) is None
+
+
+@pytest.mark.parametrize(
+    "slug,prefix",
+    [("acme", "ION_TENANT_ACME"), ("acme-uk", "ION_TENANT_ACME_UK"), ("a1", "ION_TENANT_A1")],
+)
+def test_env_prefix_derivation(slug, prefix):
+    assert Tenant(slug=slug, name="x").env_prefix == prefix
+
+
+def test_verify_ssl_is_parsed_as_a_boolean(db, monkeypatch):
+    monkeypatch.setenv("ION_MULTI_TENANT", "true")
+    import ion.core.config as config_mod
+
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+    monkeypatch.setenv("ION_TENANT_ACME_ES_URL", "https://es-acme:9200")
+    monkeypatch.setenv("ION_TENANT_ACME_ES_VERIFY_SSL", "true")
+    conn = ts.tenant_connection(Tenant(slug="acme", name="Acme"))
+    assert conn["es"]["verify_ssl"] is True
 
 
 # --------------------------------------------------------------------------
@@ -231,22 +270,22 @@ def test_set_and_reset_round_trip():
     assert current_tenant_id() is None
 
 
-def test_bind_request_tenant_installs_and_returns_a_token(db, estates):
-    tenant, token = ts.bind_request_tenant(db, user(estates.acme.id))
+def test_bind_request_tenant_installs_and_unbinds(db, estates):
+    tenant, tokens = ts.bind_request_tenant(db, user(estates.acme.id))
     try:
         assert tenant.slug == "acme"
         assert current_tenant_id() == estates.acme.id
     finally:
-        reset_tenant_id(token)
+        ts.unbind_request_tenant(tokens)
     assert current_tenant_id() is None
 
 
 def test_binding_an_unresolvable_tenant_installs_none(db, estates):
-    _, token = ts.bind_request_tenant(db, user(), "does-not-exist")
+    _, tokens = ts.bind_request_tenant(db, user(), "does-not-exist")
     try:
         assert current_tenant_id() is None
     finally:
-        reset_tenant_id(token)
+        ts.unbind_request_tenant(tokens)
 
 
 # --------------------------------------------------------------------------

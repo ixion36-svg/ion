@@ -1,26 +1,30 @@
-"""Tenants — one client estate, with its own Elasticsearch and Kibana.
+"""Tenants — the identity of one client estate.
 
 ION has always talked to exactly one Elastic: ``elasticsearch_alert_index`` and
-``kibana_space_id`` are process-global config and the ES client is a module
-global. A tenant moves that connection into a row, so one ION instance can serve
-several client estates, each with its own cluster, credentials and index.
+``kibana_space_id`` are process-global config. A tenant names an estate so one
+instance can serve several, each with its own cluster, index and Kibana space.
 
-**Arkime and OpenCTI are deliberately NOT here.** They stay shared across all
-tenants — PCAP retrieval and threat intelligence are estate-wide services, not
-per-client ones. Adding connection columns for them would imply an isolation
-this design does not provide.
+**Identity here, connection in the environment.** The row carries only what has
+to be stable — an id the ``tenant_id`` columns can reference, and a slug that
+appears in audit records — while the Elasticsearch and Kibana connection comes
+from ``ION_TENANT_<SLUG>_*`` environment variables, matching the
+``ION_<NAME>_*`` family every other ION integration already uses. Credentials
+then stay in ``.env`` with every other credential instead of becoming a new
+secret store in the database, and an air-gapped estate configures a tenant the
+same way it configures everything else. The cost is that adding a tenant needs a
+restart, which is how these deployments change anyway.
+
+**Arkime and OpenCTI are deliberately not per-tenant.** They stay shared — PCAP
+retrieval and threat intelligence are estate-wide services, not per-client ones.
+Giving them a per-tenant connection would imply an isolation this design does
+not provide.
 
 Alerts themselves live in Elasticsearch, so tenant isolation for them is a
 matter of which cluster ION queries. ION's own rows — triage, cases, notes —
-carry a ``tenant_id`` instead; see the Phase 2 columns.
+carry a ``tenant_id`` instead.
 
 ``users.tenant_id`` is nullable and NULL means platform-global: a support or
 oversight account that can act across tenants. Every other user is bound to one.
-
-Credentials here are written by an admin and read by the ES client factory. They
-are stored the same way the existing single-tenant config stores them, which is
-in the clear — a tenant row is not a new secret-handling posture, it is the
-existing one made per-client. Treat the table as sensitive at rest accordingly.
 """
 
 from typing import Optional
@@ -60,50 +64,14 @@ class Tenant(Base, TimestampMixin):
         Boolean, nullable=False, default=False, server_default="0"
     )
 
-    # --- Elasticsearch (per tenant: separate cluster per client) ---
-    es_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    es_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    es_password: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    es_api_key: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    es_alert_index: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    es_verify_ssl: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="0"
-    )
-
-    # --- Kibana (cases + spaces) ---
-    kibana_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    kibana_username: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    kibana_password: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
-    kibana_space_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<Tenant {self.slug!r} active={self.is_active}>"
 
-    def es_config(self) -> dict:
-        """Connection dict for the ES client factory.
+    @property
+    def env_prefix(self) -> str:
+        """Environment-variable prefix for this tenant's connection settings.
 
-        Only keys with a value are returned, so a tenant that leaves a field
-        blank inherits the process-wide setting rather than overriding it with
-        an empty string — which is what a half-filled tenant row would otherwise
-        do to a working connection.
+        ``acme-uk`` -> ``ION_TENANT_ACME_UK``, so the family reads
+        ``ION_TENANT_ACME_UK_ES_URL``, ``..._KIBANA_SPACE`` and so on.
         """
-        candidate = {
-            "url": self.es_url,
-            "username": self.es_username,
-            "password": self.es_password,
-            "api_key": self.es_api_key,
-            "alert_index": self.es_alert_index,
-        }
-        out = {k: v for k, v in candidate.items() if v}
-        out["verify_ssl"] = bool(self.es_verify_ssl)
-        return out
-
-    def kibana_config(self) -> dict:
-        """Connection dict for the Kibana cases client. Same inherit-on-blank rule."""
-        candidate = {
-            "url": self.kibana_url,
-            "username": self.kibana_username,
-            "password": self.kibana_password,
-            "space_id": self.kibana_space_id,
-        }
-        return {k: v for k, v in candidate.items() if v}
+        return "ION_TENANT_" + self.slug.upper().replace("-", "_")
