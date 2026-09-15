@@ -10073,7 +10073,7 @@ async function loadBulkAssignOptions() {
 
         // Fallback: ION internal users
         assignmentUsersSource = 'ion';
-        const resp = await fetch('/api/chat/users');
+        const resp = await fetch('/api/users/assignable');
         if (!resp.ok) return;
         const data = await resp.json();
 
