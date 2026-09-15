@@ -25,12 +25,6 @@ from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
-from ion.core.tenant_context import (
-    reset_tenant_connection,
-    reset_tenant_id,
-    set_tenant_connection,
-    set_tenant_id,
-)
 from ion.models.tenant import TENANT_SLUG_PATTERN, Tenant
 
 logger = logging.getLogger(__name__)
@@ -275,28 +269,3 @@ def tenant_connection(tenant: Optional[Tenant]) -> Optional[dict]:
     return {"es": es, "kibana": kibana}
 
 
-def tenant_env_vars(tenant: Tenant) -> List[str]:
-    """Every variable name this tenant reads. For docs and admin diagnostics."""
-    prefix = tenant.env_prefix
-    return [f"{prefix}_{s}" for s in (*_ES_ENV_KEYS, *_KIBANA_ENV_KEYS)]
-
-
-def bind_request_tenant(db: Session, user, requested: Optional[str] = None):
-    """Resolve and install the active tenant. Returns (tenant, reset_tokens).
-
-    Callers must reset the tokens when the request ends; ``tenant_scope`` is the
-    better choice anywhere a ``with`` block fits.
-    """
-    tenant = resolve_tenant_for_user(db, user, requested)
-    tokens = (
-        set_tenant_id(tenant.id if tenant else None),
-        set_tenant_connection(tenant_connection(tenant)),
-    )
-    return tenant, tokens
-
-
-def unbind_request_tenant(tokens) -> None:
-    """Restore whatever was active before :func:`bind_request_tenant`."""
-    id_token, conn_token = tokens
-    reset_tenant_connection(conn_token)
-    reset_tenant_id(id_token)

@@ -89,6 +89,7 @@ def get_tenant_state(
 @router.post("/switch", response_model=TenantState)
 def switch_tenant(
     payload: SwitchRequest,
+    request: Request,
     response: Response,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db_session),
@@ -117,7 +118,7 @@ def switch_tenant(
         max_age=_COOKIE_MAX_AGE,
         httponly=False,  # the header toggle reads it to render the active estate
         samesite="strict",
-        secure=_cookie_secure(),
+        secure=_cookie_secure(request),
         path="/",
     )
     logger.info("tenant: user %s switched to %s", current_user.id, chosen.slug)
@@ -130,15 +131,19 @@ def switch_tenant(
     )
 
 
-def _cookie_secure() -> bool:
+def _cookie_secure(request: Request) -> bool:
     """Match the session cookie's Secure flag rather than hard-coding it.
 
-    A Secure cookie is never returned over plain HTTP, so pinning it on would
-    break the switcher on a development box exactly as it would break login.
+    Secure when configured OR when the request is HTTPS (direct scheme or
+    ``X-Forwarded-Proto`` behind a TLS terminator) — the same rule as the
+    session cookie in api.py, so the tenant cookie is not the one cookie left
+    without Secure on an HTTPS deployment that never set ION_COOKIE_SECURE. A
+    Secure cookie is never returned over plain HTTP, so a dev box still works.
     """
     try:
         from ion.core.config import get_config
 
-        return bool(get_config().cookie_secure)
+        scheme = request.headers.get("X-Forwarded-Proto", request.url.scheme)
+        return bool(get_config().cookie_secure) or scheme == "https"
     except Exception:  # pragma: no cover
         return True

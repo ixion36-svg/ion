@@ -283,24 +283,6 @@ def test_set_and_reset_round_trip():
     assert current_tenant_id() is None
 
 
-def test_bind_request_tenant_installs_and_unbinds(db, estates):
-    tenant, tokens = ts.bind_request_tenant(db, user(estates.acme.id))
-    try:
-        assert tenant.slug == "acme"
-        assert current_tenant_id() == estates.acme.id
-    finally:
-        ts.unbind_request_tenant(tokens)
-    assert current_tenant_id() is None
-
-
-def test_binding_an_unresolvable_tenant_installs_none(db, estates):
-    _, tokens = ts.bind_request_tenant(db, user(), "does-not-exist")
-    try:
-        assert current_tenant_id() is None
-    finally:
-        ts.unbind_request_tenant(tokens)
-
-
 # --------------------------------------------------------------------------
 # Off by default, and off means unchanged.
 # --------------------------------------------------------------------------
