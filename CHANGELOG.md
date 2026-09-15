@@ -1,13 +1,28 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.2 -->
-<!-- ion-doc:version=0.96.2 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.3 -->
+<!-- ion-doc:version=0.96.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-15 -->
 
 # Changelog
+
+## v0.96.3 — 2026-09-15
+
+**Verdict Review no longer probes a disabled endpoint.** With SOAR response
+actions off (the default), the Verdict Review page fetched
+`/api/response/actions` on load and logged a console 404 — that endpoint
+deliberately 404s when the feature is disabled. The page now reads a
+server-rendered flag and skips the request entirely when the feature is off (the
+`!r.ok` guard stays as a safety net). Cosmetic only; no behaviour change when
+response actions are enabled.
+
+- Also in-tree (docs): a PROD upgrade runbook for v0.79.5 → v0.96.3
+  (`docs/UPGRADE_v0.79.5_to_v0.96.3.md`) — the boot-gate/env prerequisites,
+  backup, deploy, verify, and rollback steps for the jump from the version PROD
+  currently runs.
 
 ## v0.96.2 — 2026-09-15
 
