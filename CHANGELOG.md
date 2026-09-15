@@ -1,13 +1,49 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.3 -->
-<!-- ion-doc:version=0.96.3 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.97.0 -->
+<!-- ion-doc:version=0.97.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-15 -->
 
 # Changelog
+
+## v0.97.0 — 2026-09-15
+
+**Detection Engineering module — licensing packaging (Phase 4), shipped
+dormant.** The DE module (Metrics / Proposals / Quirks / Bob-loop) can now be
+gated behind an offline, vendor-signed licence, but enforcement ships **off** —
+with `ION_DE_LICENSE_ENFORCED` unset the module behaves exactly as before
+(mounted, RBAC-gated, no licence). Turned on later, DE is available only when
+the operator flag is set **and** a validly-signed licence entitles it; otherwise
+it goes dark (routes 404, nav hidden).
+
+- Licence is an Ed25519-signed JWT verified against a public key baked into the
+  image (`ion.licensing`); no network/phone-home. Expiry is informational, not
+  fail-closed. Vendor-side signer: `tools/mint_de_licence.py` (not shipped in
+  the app).
+- **Content packs:** `GET/POST /api/de/content-pack/{export,import}` move a
+  curated baseline of system quirks + detection proposals between air-gapped
+  deployments. Imports route through the existing raise/create paths, so quirks
+  land **pending** (separation-of-duties intact, no imported verifier),
+  proposals land **draft** (no imported decision), wildcard scopes are rejected,
+  and re-import dedups. Export/import controls on the DE Workbench.
+
+**PCAP case notes now carry the evidence, not just the verdict.** Auto-analysis
+notes previously showed findings and a verdict but omitted the supporting
+detail. They now include each finding's *why*, an **IKE / IPsec (ISAKMP)**
+section (initiator↔responder, exchange, status, and auth-failure error
+notifications), and a **credentials-observed** section (protocol + username +
+endpoints; the captured secret is never written to the note). DNS/TLS/HTTP
+signals were already shown.
+
+**Multi-tenancy review-backlog hardening.** Removed dead phase-2 scaffolding
+that had no production callers (`bind_request_tenant`/`unbind_request_tenant`,
+`tenant_env_vars`); the tenant-switch cookie now gets the `Secure` flag on HTTPS
+(direct or via `X-Forwarded-Proto`), matching the session cookie instead of
+being the one cookie left without it. The separate cross-tenant ("all estates")
+ContextVar is kept by design.
 
 ## v0.96.3 — 2026-09-15
 
