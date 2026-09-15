@@ -1,13 +1,37 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.1 -->
-<!-- ion-doc:version=0.96.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.2 -->
+<!-- ion-doc:version=0.96.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-15 -->
 
 # Changelog
+
+## v0.96.2 — 2026-09-15
+
+**Case closes now reach Kibana immediately, on every path.** A case closed in
+ION only pushed its status to the linked Kibana case on the manual PATCH path.
+Every other close/transition set ION's status (and often posted a note) but
+left the Kibana case status alone, so it stayed `open` until the periodic
+reconciler next ran — up to a full loop interval later, and not at all if the
+Kibana circuit breaker was open or a reverse-sync race intervened. Reproduced
+end to end against live Elasticsearch + Kibana: a KFP auto-close left the
+Kibana case open with only the note attached, closing ~40s later via the loop.
+
+- **New shared helper** `push_case_status_to_kibana(session, case)` mirrors a
+  case's current status onto its linked Kibana case — the one push every close
+  path now routes through, with the reconciler kept as a backstop.
+- **Paths fixed to push status inline:** the KFP auto-close at case creation;
+  the dedicated *close as known FP* endpoint (previously synced only to
+  Elasticsearch, never Kibana); bulk alert-close parent-case auto-close; the
+  alert-close endpoint's parent-case cascade (previously mirrored the note but
+  not the status); and Bob's auto-investigation OPEN→acknowledged transition.
+- Forensics cases are a separate model with no Kibana link and are unaffected.
+- The alerts bulk-assign picker's ION fallback pointed at a removed endpoint
+  (`/api/chat/users`) and 404'd; it now uses `/api/users/assignable`, so the
+  fallback populates for every analyst instead of logging a console error.
 
 ## v0.96.1 — 2026-09-15
 
