@@ -15,7 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -51,6 +52,36 @@ def de_campaigns(
     from ion.services.de_metrics_service import get_noise_campaigns
 
     return get_noise_campaigns(session, days=days)
+
+
+# ── Phase 4 — content-pack export / import ───────────────────────────────────
+
+
+@router.get("/content-pack/export", dependencies=[Depends(require_permission("de:read"))])
+def de_content_pack_export(session: Session = Depends(get_db_session)):
+    """Download a portable content pack (quirks + proposals, content only)."""
+    from ion.services.de_content_pack_service import export_pack
+
+    pack = export_pack(session)
+    return JSONResponse(
+        content=pack,
+        headers={"Content-Disposition": 'attachment; filename="ion-de-content-pack.json"'},
+    )
+
+
+@router.post("/content-pack/import", dependencies=[Depends(require_permission("de:propose"))])
+def de_content_pack_import(
+    pack: dict = Body(..., description="A DE content pack produced by the export endpoint"),
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Import a content pack. Quirks land pending (SoD intact), proposals land draft."""
+    from ion.services.de_content_pack_service import import_pack
+
+    try:
+        return import_pack(session, pack, current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 # ── Phase 1 — detection proposals ────────────────────────────────────────────

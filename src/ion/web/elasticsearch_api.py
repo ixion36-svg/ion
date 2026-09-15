@@ -293,8 +293,10 @@ async def get_es_alerts(
         # Additive-only and best-effort — a quirk NEVER hides an alert, and a
         # failure here must not break the alerts view.
         try:
-            from ion.services.de_quirk_service import annotate_alerts
-            annotate_alerts(session, out_alerts)
+            from ion.licensing.gating import de_module_available
+            if de_module_available():  # quirks are a DE-module feature
+                from ion.services.de_quirk_service import annotate_alerts
+                annotate_alerts(session, out_alerts)
         except Exception:
             logger.debug("quirk annotation skipped", exc_info=True)
 

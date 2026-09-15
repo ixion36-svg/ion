@@ -168,6 +168,13 @@ class Config:
     tide_space: str = "default"  # Kibana space where TIDE rules live (e.g., default, production)
     tide_client_id: str = ""  # TIDE 4.x tenant (client) id. Leave blank for single-tenant API keys.
 
+    # Detection Engineering optional module (licensed). Enforcement ships
+    # dormant: while de_license_enforced is False the module behaves as it did
+    # before licensing (mounted, RBAC-gated, no licence). See ion.licensing.
+    de_license_enforced: bool = False  # master switch — gate DE behind a licence
+    de_module_enabled: bool = False    # operator intent to run DE (needs a licence when enforced)
+    de_license: str = ""               # ION_DE_LICENSE — inline signed token or path to a licence file
+
     # Generic job scheduler
     scheduler_enabled: bool = True
     scheduler_interval_s: int = 30
@@ -413,6 +420,9 @@ class Config:
             tide_verify_ssl=data.get("tide_verify_ssl", False),
             tide_space=data.get("tide_space", "default"),
             tide_client_id=data.get("tide_client_id", ""),
+            de_license_enforced=data.get("de_license_enforced", False),
+            de_module_enabled=data.get("de_module_enabled", False),
+            de_license=data.get("de_license", ""),
             # Generic scheduler
             scheduler_enabled=data.get("scheduler_enabled", True),
             scheduler_interval_s=data.get("scheduler_interval_s", 30),
@@ -580,6 +590,9 @@ class Config:
                     "tide_verify_ssl": self.tide_verify_ssl,
                     "tide_space": self.tide_space,
                     "tide_client_id": self.tide_client_id,
+                    "de_license_enforced": self.de_license_enforced,
+                    "de_module_enabled": self.de_module_enabled,
+                    "de_license": self.de_license,
                     # Generic scheduler
                     "scheduler_enabled": self.scheduler_enabled,
                     "scheduler_interval_s": self.scheduler_interval_s,
@@ -916,6 +929,14 @@ def get_config() -> Config:
             _config.tide_space = os.environ.get("ION_TIDE_SPACE", "default")
         if os.environ.get("ION_TIDE_CLIENT_ID"):
             _config.tide_client_id = os.environ.get("ION_TIDE_CLIENT_ID", "")
+
+        # Detection Engineering module licensing
+        if os.environ.get("ION_DE_LICENSE_ENFORCED"):
+            _config.de_license_enforced = _get_env_bool("ION_DE_LICENSE_ENFORCED", False)
+        if os.environ.get("ION_DE_MODULE_ENABLED"):
+            _config.de_module_enabled = _get_env_bool("ION_DE_MODULE_ENABLED", False)
+        if os.environ.get("ION_DE_LICENSE"):
+            _config.de_license = os.environ.get("ION_DE_LICENSE", "")
 
         # Generic scheduler env overrides
         if os.environ.get("ION_SCHEDULER_ENABLED"):

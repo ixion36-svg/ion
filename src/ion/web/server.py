@@ -35,6 +35,7 @@ import ion
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.config import get_config as get_app_config
 from ion.core.logging import get_logger, setup_logging
+from ion.licensing.gating import de_module_available, de_module_status, require_de_module
 from ion.storage.database import get_db_session, init_db
 from ion.web.admin_api import router as admin_router
 from ion.web.ai_api import router as ai_router
@@ -399,6 +400,10 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 templates.env.bytecode_cache = _J2Cache(str(_bytecode_cache_dir))
 templates.env.auto_reload = _debug_mode  # Only reload in debug
 templates.env.globals["ion_version"] = ion.__version__
+# DE module availability for nav gating; read in base.html as
+# `{% if de_module_available() %}`. Callable (not a value) so a runtime licence
+# state change is picked up without a template reload.
+templates.env.globals["de_module_available"] = de_module_available
 # CSP nonce as a global proxy. Templates read it as `{{ csp_nonce }}`
 # (no parens) inside `<script nonce="...">` and `<style nonce="...">` tags.
 # The proxy reads the per-request value from `_csp_nonce_var`; outside a
@@ -455,7 +460,7 @@ app.include_router(soc_health_router, prefix="/api")
 # Detection Health (per-rule IR→detection feedback analytics)
 app.include_router(detection_health_router, prefix="/api")
 # Detection Engineering module — Phase 0 (read-only noise campaigns + DE metrics)
-app.include_router(de_router, prefix="/api")
+app.include_router(de_router, prefix="/api", dependencies=[Depends(require_de_module)])
 app.include_router(attack_story_router, prefix="/api")
 app.include_router(case_similarity_router, prefix="/api")
 app.include_router(case_lifecycle_router, prefix="/api")  # /api/elasticsearch/alerts/cases/* (split from api.py, #14 inc.3)
@@ -701,6 +706,26 @@ def _validate_startup_config():
         raise SystemExit(1)
 
     logger.info("Configuration validated: %d warning(s), 0 errors", len(warnings))
+
+    # DE module licensing posture (enforcement ships dormant).
+    try:
+        _de = de_module_status()
+        if not _de["enforced"]:
+            logger.info("DE module: available (licence enforcement OFF — dormant)")
+        elif _de["available"]:
+            logger.info(
+                "DE module: available (licensed to %s%s)",
+                _de["customer_id"] or "?",
+                " — LICENCE EXPIRED" if _de["expired"] else "",
+            )
+        else:
+            logger.warning(
+                "DE module: DARK — enforcement ON but %s",
+                "flag off (ION_DE_MODULE_ENABLED)" if not _de["flag_enabled"]
+                else "no valid licence entitles it",
+            )
+    except Exception as _exc:  # pragma: no cover — never block startup on this
+        logger.debug("DE module status unavailable: %s", _exc)
 
 
 async def _startup_event():
@@ -2347,7 +2372,7 @@ async def detection_health_page(request: Request, user: User = Depends(require_p
 
 
 @app.get("/de", response_class=HTMLResponse)
-async def de_workbench_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+async def de_workbench_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
     """Render the DE Workbench — the detection team's working surface
     (tuning-request queue + campaigns + proposals + quirks in one place)."""
     return templates.TemplateResponse(request=request, name="de_workbench.html")
@@ -2367,7 +2392,7 @@ async def verdict_review_page(request: Request, user: User = Depends(require_pag
 
 
 @app.get("/de-metrics", response_class=HTMLResponse)
-async def de_metrics_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+async def de_metrics_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
     """Render the Detection-Engineering Metrics page (Phase 0 — noise campaigns)."""
     return templates.TemplateResponse(
         request=request, name="de_metrics.html",
@@ -2376,19 +2401,19 @@ async def de_metrics_page(request: Request, user: User = Depends(require_page_pe
 
 
 @app.get("/de-proposals", response_class=HTMLResponse)
-async def de_proposals_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+async def de_proposals_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
     """Render the Detection Proposals page (Phase 1 — draft/review/decide)."""
     return templates.TemplateResponse(request=request, name="de_proposals.html")
 
 
 @app.get("/de-quirks", response_class=HTMLResponse)
-async def de_quirks_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+async def de_quirks_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
     """Render the System Quirks register page (Phase 2 — raise/verify/revert)."""
     return templates.TemplateResponse(request=request, name="de_quirks.html")
 
 
 @app.get("/de-bob", response_class=HTMLResponse)
-async def de_bob_page(request: Request, user: User = Depends(require_page_permission("de:read"))):
+async def de_bob_page(request: Request, user: User = Depends(require_page_permission("de:read")), _gate: None = Depends(require_de_module)):
     """Render the Bob improvement loop page (Phase 3 — scorecard + tuning proposals)."""
     return templates.TemplateResponse(request=request, name="de_bob.html")
 

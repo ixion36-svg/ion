@@ -48,6 +48,22 @@
     </div>
   </div>
 
+  <!-- Content pack (Phase 4) -->
+  <div class="card bg-base-200 shadow mb-6 rise d-2">
+    <div class="card-body">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <h2 class="card-title">Content pack</h2>
+        <span class="text-xs opacity-60">portable quirks + proposals · imports land pending/draft (verify before effect)</span>
+      </div>
+      <div class="flex items-center gap-3 flex-wrap mt-2">
+        <a href="/api/de/content-pack/export" class="btn btn-sm btn-primary">Export pack</a>
+        <input type="file" id="cp-file" accept="application/json,.json" class="file-input file-input-sm file-input-bordered max-w-xs">
+        <button type="button" id="cp-import" class="btn btn-sm">Import pack</button>
+        <span id="cp-result" class="text-xs opacity-70"></span>
+      </div>
+    </div>
+  </div>
+
   <!-- Tuning Requests queue -->
   <div class="card bg-base-200 shadow mb-6 rise d-3">
     <div class="card-body">
@@ -367,6 +383,37 @@
       var btn = e.target.closest('.camp-draft');
       if (btn) draftProposal(btn.getAttribute('data-rule'), null);
     });
+    var cpImport = document.getElementById('cp-import');
+    if (cpImport) {
+      cpImport.addEventListener('click', function () {
+        var out = document.getElementById('cp-result');
+        var f = (document.getElementById('cp-file').files || [])[0];
+        if (!f) { out.textContent = 'Choose a .json pack first.'; return; }
+        out.textContent = 'Importing…';
+        var reader = new FileReader();
+        reader.onload = function () {
+          var pack;
+          try { pack = JSON.parse(reader.result); }
+          catch (e) { out.textContent = 'Not valid JSON.'; return; }
+          fetch('/api/de/content-pack/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pack)
+          }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+              var d = res.d || {};
+              if (!res.ok) { out.textContent = 'Import failed: ' + (d.detail || 'error'); return; }
+              out.textContent = 'Imported: quirks +' + d.quirks_created + ' (skip ' + d.quirks_skipped
+                + '), proposals +' + d.proposals_created + ' (skip ' + d.proposals_skipped + ')'
+                + (d.errors && d.errors.length ? ' · ' + d.errors.length + ' error(s)' : '');
+              loadProposals();
+              loadQuirks();
+            })
+            .catch(function (e) { out.textContent = 'Import failed: ' + e.message; });
+        };
+        reader.readAsText(f);
+      });
+    }
     loadRequests();
     loadMetrics();
     loadProposals();
