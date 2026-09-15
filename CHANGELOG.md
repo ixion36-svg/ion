@@ -1,13 +1,41 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.0 -->
-<!-- ion-doc:version=0.96.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.96.1 -->
+<!-- ion-doc:version=0.96.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-14 -->
+<!-- ion-doc:date=2026-09-15 -->
 
 # Changelog
+
+## v0.96.1 — 2026-09-15
+
+**Review-fix patch on multi-tenancy phase 1.** Ten findings from a post-release
+code review, three of them load-bearing:
+
+- **Tenant binding now actually reaches the request.** It was set inside a sync
+  dependency, which FastAPI runs in a copied context — the values were discarded
+  before the route ran, so every request read the default estate regardless of
+  the switcher. Binding now happens in the request's own context, and the
+  resolution still runs in the threadpool.
+- **Unresolved tenants fail closed.** A user bound to a deactivated estate, or a
+  resolution error, is refused (403/503) instead of silently reading the default
+  estate's cluster — which also means a tenancy fault can now abort a request,
+  by design.
+- **Platform-global requires the admin role**, not just `users.tenant_id IS
+  NULL`: every pre-existing user is NULL, so enabling the flag would otherwise
+  have handed each of them every client estate. NULL non-admins stay on the
+  default estate; `.env.deploy` documents how to bind users.
+- **Kibana Cases and the engineering-analytics ES service are tenant-routed.**
+  Both cached a first-caller config for the process lifetime, the same frozen-
+  singleton shape v0.96.0 fixed for the ES connector.
+- **Credential overlay fixes.** A tenant's basic auth no longer loses to the
+  inherited process `api_key`; the kibana←ES credential fallback stays inside
+  the tenant rather than preferring the process-wide Kibana pair; an
+  unrecognized `..._VERIFY_SSL` value now inherits instead of parsing as false.
+- Module docstrings no longer describe phase-2 enforcement (RLS, `tenant_id`
+  columns, tenant-scoped background loops) in the present tense.
 
 ## v0.96.0 — 2026-09-14
 
