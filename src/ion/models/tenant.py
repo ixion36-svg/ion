@@ -21,10 +21,12 @@ not provide.
 
 Alerts themselves live in Elasticsearch, so tenant isolation for them is a
 matter of which cluster ION queries. ION's own rows — triage, cases, notes —
-carry a ``tenant_id`` instead.
+are not yet tenant-scoped: phase 2 adds ``tenant_id`` columns to them.
 
-``users.tenant_id`` is nullable and NULL means platform-global: a support or
-oversight account that can act across tenants. Every other user is bound to one.
+``users.tenant_id`` is nullable. NULL plus the admin role means
+platform-global — a support or oversight account that can act across tenants;
+NULL without it (every pre-tenancy user) stays on the default estate until an
+admin binds them.
 """
 
 from typing import Optional

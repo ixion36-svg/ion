@@ -517,9 +517,10 @@ def _run_migrations(engine: Engine) -> None:
             _add_column_tolerant(engine, "documents", "created_by_id", "INTEGER")
 
     # users.tenant_id — which client estate a user belongs to. Nullable, and
-    # left NULL on every existing row: NULL is platform-global, which is what a
-    # single-tenant deploy's users effectively are. Backfilling them to the
-    # default tenant would silently narrow what today's users can see.
+    # left NULL on every existing row: NULL non-admins resolve to the default
+    # estate (platform-global additionally requires the admin role — see
+    # tenant_service._platform_global), so the un-backfilled rows cannot reach
+    # a new tenant's estate.
     # No FK in the ALTER: SQLite cannot add one, and the constraint is declared
     # on the model so create_all builds it correctly on a fresh database.
     if insp.has_table("users"):

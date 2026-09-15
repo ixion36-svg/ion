@@ -13,21 +13,16 @@ from ion.auth.dependencies import get_current_user
 from ion.core.config import get_elasticsearch_config
 from ion.core.safe_errors import safe_error
 from ion.models.user import User
-from ion.services.elasticsearch_service import ElasticsearchError, ElasticsearchService
+from ion.services.connectors.elasticsearch_connector import get_elasticsearch_service
+from ion.services.elasticsearch_service import ElasticsearchError
 from ion.services.tide_sync_service import get_snapshot
 from ion.web.api import get_db_session
 
 router = APIRouter(tags=["engineering-analytics"])
 
-# Cache service instance
-_es_service: Optional[ElasticsearchService] = None
-
-
-def _get_es_service() -> ElasticsearchService:
-    global _es_service
-    if _es_service is None:
-        _es_service = ElasticsearchService()
-    return _es_service
+# Tenant-aware: a module-level cache here would freeze the first requester's
+# estate, exactly what the connector's getter exists to avoid.
+_get_es_service = get_elasticsearch_service
 
 
 @router.get("/systems")

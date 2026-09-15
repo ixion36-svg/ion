@@ -66,8 +66,8 @@ class Config:
     bob_custom_templates: bool = True  # Let Bob generate custom per-rule investigation templates (human-reviewed) alongside the authored guide
     multi_tenant: bool = False  # Serve several client estates from one instance (per-tenant Elasticsearch/Kibana). Off = one estate from the process-wide config, as before
     chat_grounding_check: bool = True  # After a chat answer streams, check its specifics against the retrieved context; advisory only, one extra LLM call per grounded answer
-    csrf_enabled: bool = True  # Enforce CSRF token + Origin checks on cookie-authenticated state-changing requests. ON by default: a security control that ships disabled is not a control. Escape hatch for debugging only
-    csrf_extra_origins: str = ""  # Comma-separated additional origins accepted by the CSRF Origin check, for deployments fronted by another hostname. The request's own Host and base_url are always accepted
+    csrf_enabled: bool = True  # Enforce CSRF token + Origin checks on cookie-authenticated state-changing requests. ON by default; escape hatch for debugging only
+    csrf_extra_origins: str = ""  # Comma-separated additional origins accepted by the CSRF Origin check (deploys fronted by another hostname). Own Host and base_url always accepted
     authz_alert_window_minutes: int = 5  # Rolling window for the authz-failure threshold
 
     # GitLab integration
@@ -1198,6 +1198,15 @@ def _overlay_tenant(base: dict, section: str) -> dict:
         return base
     merged = dict(base)
     merged.update({k: v for k, v in overlay.items() if v is not None})
+    # A tenant that sets basic-auth credentials must not inherit the process
+    # api_key: the ES client prefers api_key over basic auth, so the inherited
+    # key would be sent to the tenant's cluster and its own account never used.
+    if (
+        "api_key" in merged
+        and "api_key" not in overlay
+        and ("username" in overlay or "password" in overlay)
+    ):
+        merged["api_key"] = ""
     return merged
 
 
@@ -1227,12 +1236,23 @@ def get_kibana_config() -> dict:
     """
     config = get_config()
     # Fall back to Elasticsearch credentials if Kibana-specific ones not set.
-    # Resolved from the *tenant's* Elasticsearch where one is bound: falling back
-    # to the process-wide credentials would point one tenant's Kibana client at
-    # another estate's login.
+    # With a tenant bound, both fallback steps stay inside that tenant: its own
+    # Kibana creds, else its (overlaid) ES creds — never the process-wide
+    # Kibana pair, which is another estate's login.
     es = get_elasticsearch_config()
-    username = config.kibana_username or es.get("username", "")
-    password = config.kibana_password or es.get("password", "")
+    try:
+        from ion.core.tenant_context import current_tenant_connection
+
+        conn = current_tenant_connection()
+    except Exception:  # pragma: no cover - context must never break config
+        conn = None
+    if conn:
+        tenant_kibana = conn.get("kibana") or {}
+        username = tenant_kibana.get("username") or es.get("username", "")
+        password = tenant_kibana.get("password") or es.get("password", "")
+    else:
+        username = config.kibana_username or es.get("username", "")
+        password = config.kibana_password or es.get("password", "")
     return _overlay_tenant({
         "enabled": config.kibana_cases_enabled,
         "url": config.kibana_url,

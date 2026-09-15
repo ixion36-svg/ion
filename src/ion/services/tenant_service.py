@@ -122,6 +122,23 @@ def get_tenant_by_slug(db: Session, slug: str) -> Optional[Tenant]:
     )
 
 
+def _platform_global(user) -> bool:
+    """Whether this user may act across every estate.
+
+    ``tenant_id IS NULL`` alone must not grant that: every user that predates
+    multi-tenancy is NULL, so an upgrade that enables the flag would otherwise
+    hand each of them every client estate. Platform-global therefore also
+    requires the admin role; a NULL non-admin stays on the default estate until
+    an admin binds them.
+    """
+    if getattr(user, "tenant_id", None) is not None:
+        return False
+    try:
+        return bool(user.is_admin)
+    except Exception:  # noqa: BLE001 — a user object without roles is not global
+        return False
+
+
 def accessible_tenants(db: Session, user) -> List[Tenant]:
     """Tenants this user may act for.
 
@@ -133,6 +150,9 @@ def accessible_tenants(db: Session, user) -> List[Tenant]:
     if bound is not None:
         tenant = get_tenant(db, bound)
         return [tenant] if tenant else []
+    if not _platform_global(user):
+        default = get_default_tenant(db)
+        return [default] if default else []
     return list_tenants(db, active_only=True)
 
 
@@ -157,6 +177,19 @@ def resolve_tenant_for_user(
                 requested,
             )
         return tenant
+
+    if not _platform_global(user):
+        # NULL tenant_id without the admin role: a pre-tenancy analyst. They
+        # get the default estate only; anything else needs an admin to set
+        # users.tenant_id.
+        default = get_default_tenant(db)
+        if requested and default and requested not in (default.slug, str(default.id)):
+            logger.warning(
+                "tenant: user %s is not platform-global and requested %r — refused",
+                getattr(user, "id", "?"),
+                requested,
+            )
+        return default
 
     # Platform user: honour an explicit selection, else the default.
     if requested:
@@ -203,7 +236,22 @@ def _read_env_section(prefix: str, mapping: dict) -> dict:
         raw = os.environ.get(f"{prefix}_{suffix}", "").strip()
         if not raw:
             continue
-        out[key] = raw.lower() in ("true", "1", "yes") if key in _BOOL_KEYS else raw
+        if key in _BOOL_KEYS:
+            lowered = raw.lower()
+            if lowered in ("true", "1", "yes"):
+                out[key] = True
+            elif lowered in ("false", "0", "no"):
+                out[key] = False
+            else:
+                # An unrecognized value inherits rather than parsing as False:
+                # the only bool key is verify_ssl, where False silently
+                # disables TLS verification for this tenant's cluster.
+                logger.warning(
+                    "tenant: %s_%s=%r is not a boolean; inheriting the process value",
+                    prefix, suffix, raw,
+                )
+            continue
+        out[key] = raw
     return out
 
 

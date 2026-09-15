@@ -6,14 +6,17 @@ as request handlers, so passing a tenant explicitly everywhere would be a
 change to nearly every signature and would still miss the paths that forget.
 
 Reading this does **not** make a query safe. It supplies the value a query
-filters on; nothing here enforces that the filter was written. Enforcement is
-Postgres row-level security, which fails closed when a filter is missing.
+filters on; nothing here enforces that the filter was written. In this phase
+nothing filters ION's own Postgres rows by tenant at all: isolation applies
+only to which Elasticsearch/Kibana a request talks to, via the connection
+overlay below. Phase 2 adds ``tenant_id`` columns and Postgres row-level
+security so that a missing filter fails closed.
 
-Background loops have no request and therefore no ambient tenant. They must set
-one per iteration with :func:`tenant_scope` — a loop that leaves the context
-unset gets ``None``, which every scoped query must treat as "no rows", never as
-"all rows". That asymmetry is the whole safety property: forgetting to set a
-tenant hides data, it does not leak it.
+Background loops have no request and therefore no ambient tenant, and in this
+phase none sets one: every loop talks to the process-wide (default) estate, so
+secondary tenants get no background processing yet. :func:`tenant_scope` exists
+for the phase-2 loop wiring — a loop that leaves the context unset gets
+``None``, which the ES/Kibana overlay resolves to the default estate.
 """
 
 from __future__ import annotations

@@ -4,6 +4,7 @@ import logging
 from typing import Callable, List, Optional
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from ion.auth.service import AuthService
@@ -61,7 +62,7 @@ def get_session_token(
     return None
 
 
-def get_current_user(
+async def get_current_user(
     request: Request,
     session_token: Optional[str] = Depends(get_session_token),
     auth_service: AuthService = Depends(get_auth_service),
@@ -71,7 +72,29 @@ def get_current_user(
     Raises HTTPException 401 if not authenticated. When
     ION_ENFORCE_PASSWORD_CHANGE is on, also raises 403 for a user flagged
     must_change_password on any endpoint outside the password-change allowlist.
+
+    Async on purpose: the blocking work runs in the threadpool, but the tenant
+    ContextVars must be set HERE, in the request's own context. A sync
+    dependency runs in a copied context, so a ContextVar set inside it is
+    discarded before the route runs.
     """
+    user, binding = await run_in_threadpool(
+        _authenticate, request, session_token, auth_service
+    )
+    if binding is not None:
+        from ion.core.tenant_context import set_tenant_connection, set_tenant_id
+
+        set_tenant_id(binding[0])
+        set_tenant_connection(binding[1])
+    return user
+
+
+def _authenticate(
+    request: Request,
+    session_token: Optional[str],
+    auth_service: AuthService,
+) -> tuple:
+    """Blocking half of get_current_user: session validation + tenant resolve."""
     if not session_token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -108,43 +131,63 @@ def get_current_user(
         email=getattr(user, "email", None),
     )
 
-    _bind_tenant(request, user, auth_service)
-    return user
+    return user, _resolve_tenant_binding(request, user, auth_service)
+
+
+def _resolve_tenant_binding(
+    request: Request, user: User, auth_service: AuthService
+) -> Optional[tuple]:
+    """The (tenant_id, connection) this request acts for; None when tenancy is off.
+
+    Fails closed. The ES/Kibana overlay treats "no tenant bound" as the
+    process-wide (default) estate, so proceeding unbound after a failed resolve
+    would show a tenant's user another estate's data: a bound user whose tenant
+    cannot be resolved (deactivated, or the lookup errored) is refused instead.
+    """
+    from ion.services.tenant_service import (
+        multi_tenant_enabled,
+        resolve_tenant_for_user,
+        tenant_connection,
+    )
+
+    if not multi_tenant_enabled():
+        return None
+
+    # Caller-controlled, and validated by the resolver: a tenant-bound user
+    # asking for another estate is refused and keeps their own.
+    requested = request.cookies.get(TENANT_COOKIE) or request.headers.get("X-ION-Tenant")
+    try:
+        tenant = resolve_tenant_for_user(auth_service.db_session, user, requested)
+    except HTTPException:
+        raise
+    except Exception:  # noqa: BLE001
+        logger.warning("tenant resolution failed; refusing the request", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Tenant resolution failed",
+        )
+    if tenant is None and getattr(user, "tenant_id", None) is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your estate is not available",
+        )
+    return (tenant.id if tenant else None, tenant_connection(tenant))
 
 
 def _bind_tenant(request: Request, user: User, auth_service: AuthService) -> None:
-    """Install the tenant this request acts for.
+    """Resolve and install the tenant, in the caller's own context.
 
-    Bound here because every authenticated route already depends on
-    get_current_user, and the alternative — a middleware — runs before the user
-    is known. No reset is needed: each request is handled in its own task, and a
-    task takes a copy of the context when it is created, so a ContextVar set
-    here cannot reach another request.
-
-    Never raises. A failure to resolve leaves the tenant unset, which every
-    scoped query must read as "no rows" — so a broken lookup hides data rather
-    than exposing another estate's.
+    Correct only where the caller's context IS the request's (tests, in-context
+    helpers). get_current_user does not use this: it resolves in the threadpool
+    and sets the variables in its async body, because a threadpool dependency
+    runs in a copied context whose ContextVar writes are discarded.
     """
-    try:
-        from ion.services.tenant_service import (
-            multi_tenant_enabled,
-            resolve_tenant_for_user,
-            tenant_connection,
-        )
-
-        if not multi_tenant_enabled():
-            return
-
+    binding = _resolve_tenant_binding(request, user, auth_service)
+    if binding is not None:
         from ion.core.tenant_context import set_tenant_connection, set_tenant_id
 
-        # Caller-controlled, and validated by the resolver: a tenant-bound user
-        # asking for another estate is refused and keeps their own.
-        requested = request.cookies.get(TENANT_COOKIE) or request.headers.get("X-ION-Tenant")
-        tenant = resolve_tenant_for_user(auth_service.db_session, user, requested)
-        set_tenant_id(tenant.id if tenant else None)
-        set_tenant_connection(tenant_connection(tenant))
-    except Exception:  # noqa: BLE001 — tenancy must never break authentication
-        logger.warning("tenant binding failed; request proceeds with no tenant", exc_info=True)
+        set_tenant_id(binding[0])
+        set_tenant_connection(binding[1])
 
 
 def get_current_user_optional(

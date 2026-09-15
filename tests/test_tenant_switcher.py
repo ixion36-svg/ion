@@ -46,9 +46,12 @@ def estates(db):
     default = ts.ensure_default_tenant(db)
     legacy = Tenant(slug="legacy", name="Legacy estate")
     migrated = Tenant(slug="migrated", name="Migrated estate")
-    db.add_all([legacy, migrated])
+    gone = Tenant(slug="gone", name="Gone", is_active=False)
+    db.add_all([legacy, migrated, gone])
     db.commit()
-    return types.SimpleNamespace(default=default, legacy=legacy, migrated=migrated)
+    return types.SimpleNamespace(
+        default=default, legacy=legacy, migrated=migrated, gone=gone
+    )
 
 
 @pytest.fixture
@@ -70,8 +73,10 @@ def fake_auth(db):
     return types.SimpleNamespace(db_session=db)
 
 
-def user(tenant_id=None, uid=1):
-    return types.SimpleNamespace(id=uid, tenant_id=tenant_id)
+def user(tenant_id=None, uid=1, is_admin=True):
+    """Platform-global now requires NULL tenant_id AND the admin role, so the
+    default stand-in is an admin; pass is_admin=False for a pre-tenancy analyst."""
+    return types.SimpleNamespace(id=uid, tenant_id=tenant_id, is_admin=is_admin)
 
 
 # --------------------------------------------------------------------------
@@ -122,8 +127,10 @@ def test_an_unknown_cookie_binds_nothing_rather_than_everything(db, estates, mul
         assert current_tenant_id() is None
 
 
-def test_binding_never_breaks_authentication(db, estates, multi_tenant):
-    """A tenancy failure must not 500 a login. The request proceeds unbound."""
+def test_binding_failure_refuses_rather_than_serving_the_default(db, estates, multi_tenant):
+    """An unbound context reads as the default estate's ES, so a resolution
+    failure must refuse the request instead of falling open to another estate."""
+    from fastapi import HTTPException
 
     class Exploding:
         @property
@@ -131,7 +138,20 @@ def test_binding_never_breaks_authentication(db, estates, multi_tenant):
             raise RuntimeError("database is gone")
 
     with tenant_scope(None):
-        _bind_tenant(fake_request(cookie="legacy"), user(), Exploding())  # must not raise
+        with pytest.raises(HTTPException) as exc:
+            _bind_tenant(fake_request(cookie="legacy"), user(), Exploding())
+        assert exc.value.status_code == 503
+        assert current_tenant_id() is None
+
+
+def test_a_bound_user_with_a_dead_estate_is_refused(db, estates, multi_tenant):
+    """Deactivating a tenant must cut its users off, not show them the default."""
+    from fastapi import HTTPException
+
+    with tenant_scope(None):
+        with pytest.raises(HTTPException) as exc:
+            _bind_tenant(fake_request(), user(tenant_id=estates.gone.id), fake_auth(db))
+        assert exc.value.status_code == 403
         assert current_tenant_id() is None
 
 

@@ -56,9 +56,13 @@ def estates(db):
     return types.SimpleNamespace(default=default, acme=acme, beta=beta, gone=gone)
 
 
-def user(tenant_id=None, uid=1):
-    """A stand-in for User — resolution reads only .id and .tenant_id."""
-    return types.SimpleNamespace(id=uid, tenant_id=tenant_id)
+def user(tenant_id=None, uid=1, is_admin=True):
+    """A stand-in for User — resolution reads .id, .tenant_id and .is_admin.
+
+    Platform-global requires NULL tenant_id AND the admin role, so the default
+    stand-in is an admin; pass is_admin=False for a pre-tenancy analyst.
+    """
+    return types.SimpleNamespace(id=uid, tenant_id=tenant_id, is_admin=is_admin)
 
 
 # --------------------------------------------------------------------------
@@ -75,6 +79,15 @@ def test_no_ambient_tenant_by_default():
 def test_an_unmatched_selection_resolves_to_nothing(db, estates):
     """Not to the default, and not to 'all' — a bad selection shows no data."""
     assert ts.resolve_tenant_for_user(db, user(), "does-not-exist") is None
+
+
+def test_a_null_non_admin_is_not_platform_global(db, estates):
+    """Every pre-tenancy user is NULL, so NULL alone must not grant every
+    estate: without the admin role they stay on the default, whatever they ask."""
+    analyst = user(is_admin=False)
+    assert [t.slug for t in ts.accessible_tenants(db, analyst)] == ["default"]
+    resolved = ts.resolve_tenant_for_user(db, analyst, "acme")
+    assert resolved is not None and resolved.slug == "default"
 
 
 def test_an_inactive_tenant_is_not_resolvable(db, estates):

@@ -726,7 +726,21 @@ _kibana_service: Optional[KibanaCasesService] = None
 
 
 def get_kibana_cases_service() -> KibanaCasesService:
-    """Get the singleton Kibana Cases service instance."""
+    """Get the Kibana Cases service for the current context.
+
+    Cached only while ION serves one estate: __init__ snapshots the
+    tenant-overlaid get_kibana_config(), so a singleton built under one tenant
+    would write every later caller's cases into that tenant's Kibana. Same
+    rule as the Elasticsearch connector's service getter.
+    """
+    try:
+        from ion.core.tenant_context import current_tenant_connection
+
+        if current_tenant_connection() is not None:
+            return KibanaCasesService()
+    except Exception:  # pragma: no cover - context must never break the service
+        pass
+
     global _kibana_service
     if _kibana_service is None:
         _kibana_service = KibanaCasesService()
