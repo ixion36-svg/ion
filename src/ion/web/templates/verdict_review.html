@@ -55,13 +55,18 @@
     user: ['disable_account', 'reset_password'], username: ['disable_account', 'reset_password'],
     host: ['quarantine_host'], hostname: ['quarantine_host'], email: ['block_sender']
   };
+  // Server-rendered: response actions are opt-in and /api/response/actions
+  // deliberately 404s when off. Gate the probe so a disabled deploy makes no
+  // failing request (no console 404) rather than fetching and swallowing it.
+  const RESPONSE_ACTIONS_ENABLED = {{ response_actions_enabled|tojson }};
   let responseByType = null;  // null = not yet fetched; {} = disabled/empty
   async function loadCatalog() {
     if (responseByType !== null) return;
     responseByType = {};
+    if (!RESPONSE_ACTIONS_ENABLED) return;  // feature off → no probe
     try {
       const r = await fetch('/api/response/actions');
-      if (!r.ok) return;  // 404 = response actions disabled → no containment UI
+      if (!r.ok) return;  // safety net if it flips off between render and fetch
       const acts = (await r.json()).actions || [];
       const m = {}; acts.forEach(function (a) { m[a.action_type] = a; });
       responseByType = m;

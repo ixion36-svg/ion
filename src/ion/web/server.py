@@ -2356,8 +2356,13 @@ async def de_workbench_page(request: Request, user: User = Depends(require_page_
 @app.get("/verdict-review", response_class=HTMLResponse)
 async def verdict_review_page(request: Request, user: User = Depends(require_page_permission("verdict:review"))):
     """Review Bob's suggested per-alert verdicts (the human-in-the-loop queue)."""
+    from ion.core.config import get_config
     return templates.TemplateResponse(
-        request=request, name="verdict_review.html", context={"current_user": user},
+        request=request, name="verdict_review.html",
+        context={
+            "current_user": user,
+            "response_actions_enabled": get_config().response_actions_enabled,
+        },
     )
 
 
