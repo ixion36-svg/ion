@@ -340,6 +340,37 @@ def _render_pcap_markdown(
         parts.append(_top_list(pcap_result.http_requests, "host"))
         parts.append("")
 
+    # IKE / IPsec (ISAKMP) negotiation evidence — who negotiated with whom,
+    # whether it established, and any error notifications (an IKE auth failure
+    # surfaces here as an error), so a VPN-related verdict shows its working.
+    isakmp = getattr(pcap_result, "isakmp_sessions", None) or []
+    if isakmp:
+        parts.append("**IKE / IPsec (ISAKMP) sessions:**")
+        for s in isakmp[:6]:
+            errs = s.get("errors") or []
+            err_str = f" · errors: {', '.join(str(e) for e in errs)}" if errs else ""
+            rex = f" · {s.get('retransmits')} retransmit(s)" if s.get("retransmits") else ""
+            exch = ", ".join(str(e) for e in (s.get("exchanges") or [])) or "?"
+            parts.append(
+                f"- `{s.get('initiator', '?')}` → `{s.get('responder', '?')}` "
+                f"IKEv{s.get('ike_version', '?')} — **{s.get('status', '?')}** "
+                f"({exch}){rex}{err_str}"
+            )
+        parts.append("")
+
+    # Cleartext / weak-auth credentials seen in the traffic — strong evidence for
+    # a verdict, but the secret itself is never written into the note (a case
+    # note is not the place to store a captured password/hash).
+    creds = getattr(pcap_result, "credential_captures", None) or []
+    if creds:
+        parts.append("**Credentials observed (values redacted):**")
+        for c in creds[:8]:
+            parts.append(
+                f"- **{c.get('protocol', '?')}** — user `{c.get('username', '?')}` · "
+                f"`{c.get('src_ip', '?')}` → `{c.get('dst_ip', '?')}`"
+            )
+        parts.append("")
+
     # enhanced analyzers — TLS certs, OS fingerprints, RITA beacons
     tls_certs = getattr(pcap_result, "tls_certificates", None) or []
     if tls_certs:
@@ -381,11 +412,16 @@ def _render_pcap_markdown(
             if isinstance(f, dict):
                 sev = f.get("severity", "info")
                 msg = f.get("title") or f.get("message") or f.get("detail") or str(f)
+                detail = f.get("detail") or ""
                 mitre = f.get("mitre") or []
                 mitre_str = f"  _[{', '.join(mitre)}]_" if mitre else ""
             else:
-                sev, msg, mitre_str = "info", str(f), ""
+                sev, msg, detail, mitre_str = "info", str(f), "", ""
             parts.append(f"- **{sev}**: {msg}{mitre_str}")
+            # The 'why' behind the finding — the analyzer's supporting detail,
+            # shown unless it just repeats the title used above.
+            if detail.strip() and detail.strip() != str(msg).strip():
+                parts.append(f"    - _{detail}_")
         parts.append("")
 
     # OpenCTI enrichment of the extracted observables. Only passed in when
