@@ -119,6 +119,7 @@ def bulk_close_alerts(
             errors.append(f"{es_id}: {safe_error(exc, 'bulk_ops')}")
 
     # Close parent cases whose triage entries are now all closed
+    closed_cases = []
     for case_id in cases_to_check:
         try:
             case = session.get(AlertCase, case_id)
@@ -142,6 +143,7 @@ def bulk_close_alerts(
                 case.closure_reason = closure_reason
                 case.closed_by_id = analyst_id
                 case.closed_at = datetime.now(timezone.utc)
+                closed_cases.append(case)
                 logger.info("Auto-closed case %s (all alerts closed)", case.case_number)
 
         except Exception as exc:
@@ -149,6 +151,13 @@ def bulk_close_alerts(
             errors.append(f"case-{case_id}: {safe_error(exc, 'bulk_ops')}")
 
     session.commit()
+
+    # Mirror each auto-close onto its linked Kibana case (best-effort; the
+    # periodic reconciler is the backstop for any that fail here).
+    if closed_cases:
+        from ion.services.kibana_sync_helpers import push_case_status_to_kibana
+        for case in closed_cases:
+            push_case_status_to_kibana(session, case)
     logger.info(
         "bulk_close_alerts: processed=%d skipped=%d errors=%d",
         processed, skipped, len(errors),

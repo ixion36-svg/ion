@@ -28,6 +28,7 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import logging
 import os
@@ -1603,6 +1604,8 @@ class InvestigationService:
             factory = get_session_factory()
             db = factory()
             triage_moved_to_ack = False
+            case_moved_to_ack = False
+            case_number_for_sync: Optional[str] = None
             # Bob's case comment is mirrored to Kibana AFTER this session closes
             # (same shape as pcap_analysis_service). Capture what the sync needs
             # while the session is still open — the ORM objects are unusable once
@@ -1721,6 +1724,8 @@ class InvestigationService:
                 # downgrade from CLOSED — analyst has the final say).
                 if case.status == AlertCaseStatus.OPEN:
                     case.status = AlertCaseStatus.ACKNOWLEDGED
+                    case_moved_to_ack = True
+                    case_number_for_sync = case.case_number
 
                 db.commit()
             except Exception as exc:
@@ -1748,6 +1753,27 @@ class InvestigationService:
                     )
                 except Exception as exc:  # sync_note_to_kibana already swallows
                     logger.warning("Bob case-comment Kibana sync failed: %s", exc)
+
+            # Mirror the case OPEN->ACKNOWLEDGED transition onto Kibana, same
+            # shape as the note sync above (off the event loop; re-fetches the
+            # Kibana version itself, so no session is needed). Without it the
+            # Kibana case stays "open" while ION shows "acknowledged".
+            if case_moved_to_ack and kibana_case_id and case_number_for_sync:
+                try:
+                    from ion.services.kibana_sync_helpers import sync_case_update_to_kibana
+
+                    loop = asyncio.get_running_loop()
+                    await loop.run_in_executor(
+                        None,
+                        functools.partial(
+                            sync_case_update_to_kibana,
+                            kibana_case_id=kibana_case_id,
+                            case_number=case_number_for_sync,
+                            status="acknowledged",
+                        ),
+                    )
+                except Exception as exc:  # sync_case_update_to_kibana already swallows
+                    logger.warning("Bob case-status Kibana sync failed: %s", exc)
 
             # Push ES alert status transition (acknowledged) — helps Kibana
             # Security UI reflect that this alert is no longer untouched.

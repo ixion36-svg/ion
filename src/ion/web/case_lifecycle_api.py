@@ -37,6 +37,7 @@ from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.kibana_cases_service import get_kibana_cases_service
 from ion.services.kibana_sync_helpers import (
     get_kibana_case_url,
+    push_case_status_to_kibana,
     sync_case_update_to_kibana,
     sync_new_case_to_kibana,
     sync_note_to_kibana,
@@ -1243,6 +1244,10 @@ async def create_case(
 
             if new_case.kibana_case_id:
                 sync_note_to_kibana(new_case.kibana_case_id, current_user.username, auto_note.content)
+                # Mirror the close to Kibana here, as every close path must —
+                # otherwise the Kibana case stays open with only the note and
+                # waits on the periodic reconciler.
+                push_case_status_to_kibana(session, new_case)
 
             auto_closed = True
             auto_closed_kfp = fp
@@ -2564,6 +2569,8 @@ async def close_case_as_known_fp(
     session.commit()
     session.refresh(case)
     await _sync_case_to_es(case, session)
+    # Mirror the close to the linked Kibana case, as every close path must.
+    push_case_status_to_kibana(session, case)
 
     return {
         "id": case.id,

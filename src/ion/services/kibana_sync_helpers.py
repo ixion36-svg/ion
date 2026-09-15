@@ -182,6 +182,40 @@ def sync_case_update_to_kibana(
         return None, None
 
 
+def push_case_status_to_kibana(session, case) -> bool:
+    """Mirror a case's current ION status onto its linked Kibana case.
+
+    The single close/transition→Kibana push every case-status writer must call,
+    so the Kibana case status follows ION's without waiting for the periodic
+    reconciler (which is best-effort: skipped when the Kibana breaker is open,
+    races the reverse sync, and only retries next cycle). No-op when the case is
+    not linked to Kibana. Best-effort and never raises — a Kibana failure must
+    not break the ION-side close, and the reconciler remains the backstop.
+
+    Returns True when Kibana was updated.
+    """
+    kibana_case_id = getattr(case, "kibana_case_id", None)
+    if not kibana_case_id:
+        return False
+    status = case.status.value if hasattr(case.status, "value") else case.status
+    try:
+        new_version, _ = sync_case_update_to_kibana(
+            kibana_case_id=kibana_case_id,
+            case_number=case.case_number,
+            status=status,
+        )
+    except Exception as e:  # noqa: BLE001 — the reconciler is the backstop
+        logger.warning("push_case_status_to_kibana failed for case %s: %s",
+                       getattr(case, "case_number", "?"), e)
+        return False
+    if new_version:
+        case.kibana_case_version = new_version
+        if session is not None:
+            session.commit()
+        return True
+    return False
+
+
 def get_kibana_case_url(kibana_case_id: Optional[str]) -> Optional[str]:
     """Get the Kibana URL for a case. Returns None if not available."""
     if not kibana_case_id:

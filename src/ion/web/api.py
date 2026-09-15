@@ -3991,6 +3991,12 @@ async def close_alert(
 
     session.commit()
 
+    # Mirror the parent-case close onto its linked Kibana case (case_closed
+    # implies case is bound). Note-only sync above left Kibana showing "open".
+    if case_closed:
+        from ion.services.kibana_sync_helpers import push_case_status_to_kibana
+        push_case_status_to_kibana(session, case)
+
     # Sync workflow_status to Elasticsearch for closed alerts
     try:
         from ion.services.elasticsearch_service import ElasticsearchService
