@@ -1576,13 +1576,11 @@ def get_case_similar_observables(
         .all()
     )
 
-    shared_out: List[dict] = []
+    # Links stay capped per observable (a widely-seen IOC can carry thousands),
+    # but the cases they point at are fetched once for the whole page.
+    links_by_obs: dict = {}
     for obs in case_observables:
-        # Find other cases linking the same observable. The Observable row
-        # is unique per (type, normalized_value), so other-case-link rows
-        # pointing at this same observable.id give us the answer directly
-        # — no need to fan out via normalized_value.
-        sightings_links = (
+        links_by_obs[obs.id] = (
             session.query(ObservableLink)
             .filter(ObservableLink.observable_id == obs.id)
             .filter(ObservableLink.link_type == ObservableLinkType.CASE)
@@ -1591,16 +1589,27 @@ def get_case_similar_observables(
             .limit(25)
             .all()
         )
+    all_other_case_ids = {
+        l.entity_id for links in links_by_obs.values() for l in links
+    }
+    case_by_id = {
+        c.id: c
+        for c in (
+            session.query(AlertCase)
+            .filter(AlertCase.id.in_(all_other_case_ids))
+            .all()
+            if all_other_case_ids else []
+        )
+    }
+
+    shared_out: List[dict] = []
+    for obs in case_observables:
+        # The Observable row is unique per (type, normalized_value), so
+        # other-case-link rows on this observable.id answer directly — no
+        # need to fan out via normalized_value.
+        sightings_links = links_by_obs.get(obs.id) or []
         if not sightings_links:
             continue
-        # Pull the matched cases in one round-trip.
-        other_case_ids = list({l.entity_id for l in sightings_links})
-        other_cases = (
-            session.query(AlertCase)
-            .filter(AlertCase.id.in_(other_case_ids))
-            .all()
-        )
-        case_by_id = {c.id: c for c in other_cases}
         sightings_payload = []
         for link in sightings_links:
             c = case_by_id.get(link.entity_id)
@@ -2177,12 +2186,21 @@ def export_case_pdf(
         html += f'<h2>Closure Notes</h2><p>{_esc(case.closure_notes)}</p>'
 
     if notes:
+        from ion.models.user import User as UserModel
+
+        note_user_ids = {n.user_id for n in notes if n.user_id}
+        note_users = {
+            u.id: u
+            for u in (
+                session.query(UserModel).filter(UserModel.id.in_(note_user_ids)).all()
+                if note_user_ids else []
+            )
+        }
         html += '<h2>Investigation Notes</h2>'
         for n in notes:
             user_name = ""
             if n.user_id:
-                from ion.models.user import User as UserModel
-                note_user = session.query(UserModel).get(n.user_id)
+                note_user = note_users.get(n.user_id)
                 user_name = _esc((note_user.display_name or note_user.username) if note_user else "System")
             html += '<div class="note">'
             html += f'<div class="note-meta">{user_name} — {n.created_at.strftime("%d %b %Y %H:%M") if n.created_at else ""}</div>'

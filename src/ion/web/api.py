@@ -33,7 +33,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ion.core.client_ip import get_client_ip as _trusted_client_ip
 from ion.core.config import (
@@ -2602,6 +2602,21 @@ async def get_team_metrics(
         ).group_by(AlertCase.assigned_to_id).all()
         closed_by_assignee = dict(closed_by_assignee_rows)
 
+        recent_closures_q = session.query(AlertCase).filter(
+            AlertCase.closed_at.isnot(None)
+        ).order_by(AlertCase.closed_at.desc()).limit(10).all()
+
+        # One lookup for both loops below — each used to query User per row.
+        user_ids = {uid for uid, _ in assignee_rows if uid is not None}
+        user_ids.update(c.closed_by_id for c in recent_closures_q if c.closed_by_id)
+        users_by_id = {
+            u.id: u
+            for u in (
+                session.query(User).filter(User.id.in_(user_ids)).all()
+                if user_ids else []
+            )
+        }
+
         cases_by_assignee = []
         for user_id, open_count in assignee_rows:
             if user_id is None:
@@ -2612,7 +2627,7 @@ async def get_team_metrics(
                     "closed_7d": closed_by_assignee.get(None, 0),
                 })
             else:
-                user = session.query(User).filter_by(id=user_id).first()
+                user = users_by_id.get(user_id)
                 cases_by_assignee.append({
                     "username": user.username if user else "Unknown",
                     "display_name": user.display_name if user else "Unknown",
@@ -2620,13 +2635,9 @@ async def get_team_metrics(
                     "closed_7d": closed_by_assignee.get(user_id, 0),
                 })
 
-        recent_closures_q = session.query(AlertCase).filter(
-            AlertCase.closed_at.isnot(None)
-        ).order_by(AlertCase.closed_at.desc()).limit(10).all()
-
         recent_closures = []
         for c in recent_closures_q:
-            closed_by_user = session.query(User).filter_by(id=c.closed_by_id).first() if c.closed_by_id else None
+            closed_by_user = users_by_id.get(c.closed_by_id) if c.closed_by_id else None
             recent_closures.append({
                 "id": c.id,
                 "case_number": c.case_number,
@@ -3465,12 +3476,20 @@ async def bulk_update_triage(
         # Collision-free number from the DB-assigned id (was max(id)+1 — raced).
         assign_case_number(session, new_case)
 
+    # One prefetch instead of a SELECT (and a flush) per selected alert.
+    existing = {
+        t.es_alert_id: t
+        for t in session.query(AlertTriage)
+        .filter(AlertTriage.es_alert_id.in_(data.alert_ids))
+        .all()
+    }
+
     for alert_id in data.alert_ids:
-        triage = session.query(AlertTriage).filter_by(es_alert_id=alert_id).first()
+        triage = existing.get(alert_id)
         if not triage:
             triage = AlertTriage(es_alert_id=alert_id)
             session.add(triage)
-            session.flush()
+            existing[alert_id] = triage
 
         if data.status is not None:
             triage.status = data.status
@@ -5411,19 +5430,37 @@ def get_analyst_knowledge_base(
         "collections": []
     }
 
-    # For each collection, get its documents
+    # One query for every child collection rather than one per collection:
+    # documents (with their tags eager-loaded) when articles are wanted,
+    # otherwise a single grouped count.
+    docs_by_collection: dict = {}
+    counts_by_collection: dict = {}
+    if child_ids_for_recent:
+        if include_articles:
+            all_docs = (
+                session.query(Document)
+                .options(selectinload(Document.tags))
+                .filter(Document.collection_id.in_(child_ids_for_recent))
+                .order_by(Document.name)
+                .all()
+            )
+            for doc in all_docs:
+                docs_by_collection.setdefault(doc.collection_id, []).append(doc)
+        else:
+            counts_by_collection = dict(
+                session.query(Document.collection_id, func.count(Document.id))
+                .filter(Document.collection_id.in_(child_ids_for_recent))
+                .group_by(Document.collection_id)
+                .all()
+            )
+
     for collection in child_collections:
         if include_articles:
-            docs = session.query(Document).filter_by(
-                collection_id=collection.id
-            ).order_by(Document.name).all()
+            docs = docs_by_collection.get(collection.id, [])
             article_count = len(docs)
         else:
-            # Count in SQL rather than loading ~600 rows to call len() on them.
             docs = []
-            article_count = session.query(func.count(Document.id)).filter(
-                Document.collection_id == collection.id
-            ).scalar() or 0
+            article_count = counts_by_collection.get(collection.id, 0)
 
         collection_data = {
             "id": collection.id,
@@ -5532,9 +5569,16 @@ def search_analyst_knowledge_base(
             )
         )
 
-    docs = session.query(Document).filter(
-        *filters
-    ).order_by(Document.name).limit(max(1, min(limit, 100))).all()
+    # The result rows read doc.tags and doc.collection — eager-load both so
+    # a full page of hits is one query, not two per hit.
+    docs = (
+        session.query(Document)
+        .options(selectinload(Document.tags), joinedload(Document.collection))
+        .filter(*filters)
+        .order_by(Document.name)
+        .limit(max(1, min(limit, 100)))
+        .all()
+    )
 
     def _snippet(doc) -> Optional[str]:
         """A window of body text around the first match.

@@ -1454,30 +1454,42 @@ class ObservableService:
                 observable_sets[key]["times"].append(alert_times.get(alert_id))
 
         # Filter to patterns with enough occurrences
+        qualifying = [
+            (obs_set, data)
+            for obs_set, data in observable_sets.items()
+            if len(data["alerts"]) >= min_occurrences
+        ]
+        # Every qualifying pattern is resolved from one fetch rather than a
+        # query per pattern; the sets overlap heavily.
+        wanted = {oid for obs_set, _ in qualifying for oid in obs_set}
+        obs_by_id = {
+            o.id: o
+            for o in (
+                self.session.query(Observable)
+                .filter(Observable.id.in_(wanted))
+                .all()
+                if wanted else []
+            )
+        }
+
         results = []
-        for obs_set, data in observable_sets.items():
-            if len(data["alerts"]) >= min_occurrences:
-                # Get observable details
-                observables = (
-                    self.session.query(Observable)
-                    .filter(Observable.id.in_(obs_set))
-                    .all()
-                )
-                results.append({
-                    "observables": [
-                        {
-                            "id": o.id,
-                            "type": o.type.value,
-                            "value": o.value,
-                            "threat_level": o.threat_level.value,
-                        }
-                        for o in observables
-                    ],
-                    "occurrence_count": len(data["alerts"]),
-                    "alert_ids": data["alerts"][:10],  # Limit for response size
-                    "first_seen": min(data["times"]).isoformat() if data["times"] else None,
-                    "last_seen": max(data["times"]).isoformat() if data["times"] else None,
-                })
+        for obs_set, data in qualifying:
+            observables = [obs_by_id[oid] for oid in obs_set if oid in obs_by_id]
+            results.append({
+                "observables": [
+                    {
+                        "id": o.id,
+                        "type": o.type.value,
+                        "value": o.value,
+                        "threat_level": o.threat_level.value,
+                    }
+                    for o in observables
+                ],
+                "occurrence_count": len(data["alerts"]),
+                "alert_ids": data["alerts"][:10],  # Limit for response size
+                "first_seen": min(data["times"]).isoformat() if data["times"] else None,
+                "last_seen": max(data["times"]).isoformat() if data["times"] else None,
+            })
 
         # Sort by occurrence count
         results.sort(key=lambda x: x["occurrence_count"], reverse=True)

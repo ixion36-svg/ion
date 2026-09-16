@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ion.auth.dependencies import (
     get_current_user,
@@ -2277,10 +2277,12 @@ def bulk_apply_settings(
 
     updated = 0
     touched_systems: set[int] = set()
-    for ds_id in req.ds_ids:
-        ds = session.get(CyabDataSource, ds_id)
-        if not ds:
-            continue
+    rows = (
+        session.query(CyabDataSource)
+        .filter(CyabDataSource.id.in_(req.ds_ids))
+        .all()
+    )
+    for ds in rows:
         for k, v in fields.items():
             setattr(ds, k, v)
         touched_systems.add(ds.system_id)
@@ -3257,7 +3259,9 @@ def _build_audit_feed(
     # 1. System creates + archives. CyabSystem in this codebase has
     # created_at + created_by (user FK); archived_at is optional and
     # not yet on the model — getattr keeps this forward-compatible.
-    sys_q = select(CyabSystem)
+    # Eager-load the author relationships each loop reads — lazy access
+    # below would otherwise issue one SELECT per row.
+    sys_q = select(CyabSystem).options(selectinload(CyabSystem.creator))
     if system_id:
         sys_q = sys_q.where(CyabSystem.id == system_id)
     for sys_row in session.execute(sys_q).scalars().all():
@@ -3291,7 +3295,7 @@ def _build_audit_feed(
     # phrasing, otherwise emit as ``snapshot``. CyabSnapshot has no
     # ``kind`` or ``signed_by`` column in this codebase; getattr keeps
     # the code forward-compatible if either gets added later.
-    snap_q = select(CyabSnapshot)
+    snap_q = select(CyabSnapshot).options(selectinload(CyabSnapshot.system))
     if system_id:
         snap_q = snap_q.where(CyabSnapshot.system_id == system_id)
     for snap in session.execute(snap_q).scalars().all():
@@ -3319,7 +3323,9 @@ def _build_audit_feed(
 
     # 3. Checklist updates. The model exposes the user FK as
     # ``updated_by_id`` and the relationship as ``updated_by``.
-    ck_q = select(CyabDocChecklistItem)
+    ck_q = select(CyabDocChecklistItem).options(
+        selectinload(CyabDocChecklistItem.updated_by)
+    )
     if system_id:
         ck_q = ck_q.where(CyabDocChecklistItem.system_id == system_id)
     for item in session.execute(ck_q).scalars().all():

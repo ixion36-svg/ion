@@ -728,6 +728,10 @@ def _write_bob_outputs(
 
     # 4) Observables for high-confidence IOCs ------------------------------
     iocs = parsed.get("iocs") or []
+    # Normalise first so the existing rows come back in one query rather than
+    # one per IOC. Newly created rows join the map so a repeated IOC in the
+    # same response still updates a single observable.
+    pending: list = []
     for ioc in iocs:
         if not isinstance(ioc, dict):
             continue
@@ -748,14 +752,19 @@ def _write_bob_outputs(
             normalized = Observable.normalize_value(obs_type, raw_value)
         except Exception:
             normalized = raw_value.lower()
-        existing = (
+        pending.append((ioc, obs_type, raw_value, normalized))
+
+    by_key = {}
+    if pending:
+        for row in (
             db.query(Observable)
-            .filter(
-                Observable.type == obs_type,
-                Observable.normalized_value == normalized,
-            )
-            .one_or_none()
-        )
+            .filter(Observable.normalized_value.in_({p[3] for p in pending}))
+            .all()
+        ):
+            by_key[(row.type, row.normalized_value)] = row
+
+    for ioc, obs_type, raw_value, normalized in pending:
+        existing = by_key.get((obs_type, normalized))
         if existing is not None:
             existing.sighting_count = (existing.sighting_count or 0) + 1
             existing.last_seen = datetime.now(timezone.utc)
@@ -772,6 +781,7 @@ def _write_bob_outputs(
             notes=ioc.get("note") or None,
         )
         db.add(obs)
+        by_key[(obs_type, normalized)] = obs
 
 
 # ---------------------------------------------------------------------------
