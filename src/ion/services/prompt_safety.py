@@ -20,6 +20,7 @@ faithful sibling of that logic. Keep the two in sync when either changes.
 from __future__ import annotations
 
 import re
+from typing import Tuple
 
 INPUT_DATA_OPEN = "<input_data>"
 INPUT_DATA_CLOSE = "</input_data>"
@@ -59,6 +60,31 @@ _CHATML_ROLE_TOKEN = re.compile(
 _INPUT_DATA_BREAKOUT = re.compile(r"</\s*input_data\s*>", re.IGNORECASE)
 
 
+def sanitize_untrusted_counted(
+    value: object, max_chars: int = _DEFAULT_MAX_CHARS
+) -> Tuple[str, int]:
+    """:func:`sanitize_untrusted`, plus how many lines were dropped.
+
+    Callers that log the drop count for telemetry use this; everything else
+    wants the plain string form. One implementation so the keyword list and
+    the role-token strip cannot drift between them.
+    """
+    if value is None:
+        return "", 0
+    s = str(value)
+    if max_chars and len(s) > max_chars:
+        s = s[:max_chars] + "…(truncated)"
+    s = _CHATML_ROLE_TOKEN.sub("[role-token-removed]", s)
+    s = _INPUT_DATA_BREAKOUT.sub("[input-data-tag-removed]", s)
+    kept, dropped = [], 0
+    for ln in s.split("\n"):
+        if _INJECTION_KEYWORDS.search(ln):
+            dropped += 1
+        else:
+            kept.append(ln)
+    return "\n".join(kept), dropped
+
+
 def sanitize_untrusted(value: object, max_chars: int = _DEFAULT_MAX_CHARS) -> str:
     """Scrub a single value before it is spliced into an LLM prompt.
 
@@ -66,15 +92,7 @@ def sanitize_untrusted(value: object, max_chars: int = _DEFAULT_MAX_CHARS) -> st
     ChatML role tokens and any ``</input_data>`` breakout, and drops whole lines
     that carry explicit override keywords. Returns the cleaned string.
     """
-    if value is None:
-        return ""
-    s = str(value)
-    if max_chars and len(s) > max_chars:
-        s = s[:max_chars] + "…(truncated)"
-    s = _CHATML_ROLE_TOKEN.sub("[role-token-removed]", s)
-    s = _INPUT_DATA_BREAKOUT.sub("[input-data-tag-removed]", s)
-    cleaned = [ln for ln in s.split("\n") if not _INJECTION_KEYWORDS.search(ln)]
-    return "\n".join(cleaned)
+    return sanitize_untrusted_counted(value, max_chars)[0]
 
 
 def wrap_untrusted(body: str) -> str:

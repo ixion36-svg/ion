@@ -2949,12 +2949,23 @@ def _create_kfp_document(session: Session, kfp, username: str) -> int | None:
             session.add(collection)
             session.flush()
 
-        # Get all KFPs in this category to rebuild the full document
-        all_kfps = session.query(KnownFalsePositive).all()
-        category_kfps = [
-            k for k in all_kfps
-            if _classify_rule_category(k.match_rules) == category
+        # Rebuilding the document needs every KFP in this category. The
+        # classifier is keyword matching over match_rules, so it cannot run in
+        # SQL — but only (id, match_rules) is needed to decide, and with 11
+        # categories hydrating the whole table would discard most of it.
+        candidates = session.query(
+            KnownFalsePositive.id, KnownFalsePositive.match_rules
+        ).all()
+        category_ids = [
+            kid for kid, rules in candidates
+            if _classify_rule_category(rules) == category
         ]
+        category_kfps = (
+            session.query(KnownFalsePositive)
+            .filter(KnownFalsePositive.id.in_(category_ids))
+            .all()
+            if category_ids else []
+        )
 
         content = _build_kfp_registry_content(category, category_kfps)
         input_data = json.dumps({

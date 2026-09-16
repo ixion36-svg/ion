@@ -3262,6 +3262,27 @@ def _build_audit_feed(
 
     events: list = []
 
+    # since/until are pushed into each source query below as well as applied in
+    # Python: the three tables carry the whole history, and an audit view asking
+    # for one week should not read all of it. The columns are NOT NULL, so the
+    # `or` fallbacks further down never change which row a bound selects. The
+    # Python pass stays because the change-log source is not pushed down.
+    def _bound(value):
+        try:
+            return datetime.fromisoformat(value) if value else None
+        except Exception:
+            return None
+
+    since_dt = _bound(since)
+    until_dt = _bound(until)
+
+    def _window(query, column):
+        if since_dt is not None:
+            query = query.where(column >= since_dt)
+        if until_dt is not None:
+            query = query.where(column <= until_dt)
+        return query
+
     # 1. System creates + archives. CyabSystem in this codebase has
     # created_at + created_by (user FK); archived_at is optional and
     # not yet on the model — getattr keeps this forward-compatible.
@@ -3270,6 +3291,7 @@ def _build_audit_feed(
     sys_q = select(CyabSystem).options(selectinload(CyabSystem.creator))
     if system_id:
         sys_q = sys_q.where(CyabSystem.id == system_id)
+    sys_q = _window(sys_q, CyabSystem.created_at)
     for sys_row in session.execute(sys_q).scalars().all():
         if sys_row.created_at:
             who = "system"
@@ -3304,6 +3326,7 @@ def _build_audit_feed(
     snap_q = select(CyabSnapshot).options(selectinload(CyabSnapshot.system))
     if system_id:
         snap_q = snap_q.where(CyabSnapshot.system_id == system_id)
+    snap_q = _window(snap_q, CyabSnapshot.created_at)
     for snap in session.execute(snap_q).scalars().all():
         kind = getattr(snap, "kind", None)
         notes_lower = (snap.notes or "").lower()
@@ -3334,6 +3357,7 @@ def _build_audit_feed(
     )
     if system_id:
         ck_q = ck_q.where(CyabDocChecklistItem.system_id == system_id)
+    ck_q = _window(ck_q, CyabDocChecklistItem.updated_at)
     for item in session.execute(ck_q).scalars().all():
         ts = getattr(item, "updated_at", None) or getattr(item, "created_at", None)
         if not ts:

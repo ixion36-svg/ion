@@ -40,6 +40,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from ion.core import apm
 from ion.models.investigation import Investigation
+from ion.services.prompt_safety import sanitize_untrusted_counted
 from ion.storage import investigation_memory_repository as inv_repo
 from ion.storage.database import (
     get_engine,
@@ -839,71 +840,17 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-_INJECTION_KEYWORDS = re.compile(
-    r"\b(?:OUTPUT\s+CONTRACT|"
-    r"IGNORE\s+(?:ALL\s+)?PREVIOUS\s+INSTRUCTIONS|"
-    r"DISREGARD\s+(?:THE\s+)?ABOVE|"
-    r"NEW\s+INSTRUCTIONS\s*:|"
-    r"FROM\s+NOW\s+ON,?\s+(?:RESPOND|REPLY)|"
-    r"OVERRIDE\s+(?:OUTPUT|VERDICT|CONTRACT))",
-    re.IGNORECASE,
-)
-_CHATML_ROLE_TOKEN = re.compile(
-    r"<\|(?:im_start|im_end|eot_id|endoftext|start_header_id|end_header_id|"
-    r"system|user|assistant)\|>",
-    re.IGNORECASE,
-)
-_INPUT_DATA_BREAKOUT = re.compile(r"</\s*input_data\s*>", re.IGNORECASE)
+# Cap for a single alert field. The scrubbing itself lives in prompt_safety.
 _VALUE_MAX_CHARS = 1024
 
 
 def _sanitize_alert_value(value: Any) -> Tuple[str, int]:
-    """v0.19.19: scrub a field value before splicing into the LLM prompt.
+    """Scrub a field value before it is spliced into the LLM prompt.
 
-    Belt-and-braces defense layered on top of the ``<input_data>``
-    wrapper + system-prompt instruction. Conservative — only touches
-    patterns that have no legitimate place in alert metadata, so real
-    command lines and rule names with normal markdown characters
-    (``#``, ``*``, ``_``, ``\\``) flow through unchanged.
-
-    Specifically:
-
-    - Coerce to ``str`` and truncate to ``_VALUE_MAX_CHARS`` (1024).
-      A normal alert field is well under this; long values are
-      typically encoded payloads where the first kB carries enough
-      signal for the analyst.
-    - Strip the literal closing wrapper tag ``</input_data>`` —
-      otherwise an attacker who learns the wrapper name can break
-      out of the data block.
-    - Strip ChatML role tokens (``<|im_start|>``, ``<|eot_id|>``,
-      etc) which can prematurely terminate the model's attention.
-    - Drop whole lines that contain explicit override keywords
-      (``OUTPUT CONTRACT``, ``IGNORE PREVIOUS INSTRUCTIONS``,
-      ``NEW INSTRUCTIONS:``, ``OVERRIDE VERDICT``, …). Real alerts
-      do not contain these phrases; if they do, the lines are not
-      analyst-useful anyway.
-
-    Returns ``(sanitised_value, dropped_line_count)``. Caller logs
-    the count for telemetry — first iteration of this defense is
-    intentionally conservative, and the operational signal will
-    drive any tightening.
+    Thin alias over the shared sanitiser so the injection-keyword list lives
+    in exactly one place; the count feeds prompt telemetry.
     """
-    if value is None:
-        return "", 0
-    s = str(value)
-    if len(s) > _VALUE_MAX_CHARS:
-        s = s[:_VALUE_MAX_CHARS] + "…(truncated by sanitiser)"
-    s = _CHATML_ROLE_TOKEN.sub("[role-token-removed]", s)
-    s = _INPUT_DATA_BREAKOUT.sub("[input-data-tag-removed]", s)
-
-    dropped = 0
-    cleaned: List[str] = []
-    for line in s.split("\n"):
-        if _INJECTION_KEYWORDS.search(line):
-            dropped += 1
-            continue
-        cleaned.append(line)
-    return "\n".join(cleaned), dropped
+    return sanitize_untrusted_counted(value, _VALUE_MAX_CHARS)
 
 
 def _build_memory_ctx(memory, alert: dict) -> str:
