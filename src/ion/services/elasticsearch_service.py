@@ -1792,7 +1792,10 @@ class ElasticsearchService:
             try:
                 return await self._get_alert_stats_esql(hours)
             except Exception as e:  # noqa: BLE001 — any ES|QL failure → DSL
-                logger.warning("ES|QL alert-stats failed; falling back to DSL: %s", e)
+                logger.warning(
+                    "ES|QL alert-stats failed; falling back to DSL: %s",
+                    safe_error(e, "elasticsearch.alert_stats_esql"),
+                )
 
         query = {
             "size": 0,

@@ -73,6 +73,20 @@ def fake_auth(db):
     return types.SimpleNamespace(db_session=db)
 
 
+def _http_request(scheme="http", forwarded_proto=None):
+    """Minimal stand-in for the Request the tenant routes read.
+
+    Only the scheme and X-Forwarded-Proto matter: _cookie_secure derives the
+    Secure flag from them so a TLS-terminated deployment gets it without
+    ION_COOKIE_SECURE being set.
+    """
+    headers = {"X-Forwarded-Proto": forwarded_proto} if forwarded_proto else {}
+    return types.SimpleNamespace(
+        headers=headers,
+        url=types.SimpleNamespace(scheme=scheme),
+    )
+
+
 def user(tenant_id=None, uid=1, is_admin=True):
     """Platform-global now requires NULL tenant_id AND the admin role, so the
     default stand-in is an admin; pass is_admin=False for a pre-tenancy analyst."""
@@ -170,6 +184,7 @@ def test_switching_to_an_unavailable_estate_is_refused(db, estates, multi_tenant
     with pytest.raises(HTTPException) as exc:
         switch_tenant(
             SwitchRequest(slug="migrated"),
+            _http_request(),
             types.SimpleNamespace(set_cookie=lambda *a, **k: None),
             current_user=bound,
             db=db,
@@ -187,6 +202,7 @@ def test_switching_is_404_when_multi_tenancy_is_off(db, estates, monkeypatch):
     with pytest.raises(HTTPException) as exc:
         switch_tenant(
             SwitchRequest(slug="legacy"),
+            _http_request(),
             types.SimpleNamespace(set_cookie=lambda *a, **k: None),
             current_user=user(),
             db=db,
@@ -204,6 +220,7 @@ def test_a_successful_switch_sets_the_cookie(db, estates, multi_tenant):
 
     state = switch_tenant(
         SwitchRequest(slug="migrated"),
+        _http_request(),
         types.SimpleNamespace(set_cookie=set_cookie),
         current_user=user(),
         db=db,
@@ -221,9 +238,15 @@ def test_the_cookie_secure_flag_follows_the_session_cookie(db, estates, multi_te
     from ion.web.tenant_api import _cookie_secure
 
     monkeypatch.setattr(config_mod.get_config(), "cookie_secure", False, raising=False)
-    assert _cookie_secure() is False
+    assert _cookie_secure(_http_request()) is False
     monkeypatch.setattr(config_mod.get_config(), "cookie_secure", True, raising=False)
-    assert _cookie_secure() is True
+    assert _cookie_secure(_http_request()) is True
+
+    # v0.97.0: Secure also follows the scheme, so a TLS-terminated request
+    # gets it even when the flag is off.
+    monkeypatch.setattr(config_mod.get_config(), "cookie_secure", False, raising=False)
+    assert _cookie_secure(_http_request(scheme="https")) is True
+    assert _cookie_secure(_http_request(forwarded_proto="https")) is True
 
 
 # --------------------------------------------------------------------------

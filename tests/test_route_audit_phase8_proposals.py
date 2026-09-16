@@ -134,10 +134,14 @@ def test_pending_legacy_rows_are_carried_over_and_backfill_is_idempotent():
     )).fetchall()
     assert len(carried) == 1, "only the PENDING legacy row should carry over"
     assert carried[0][0] == 1
-    assert carried[0][1] == "bob"
+    # Read back over raw SQL, so these are the stored values. ION's
+    # SQLEnum(native_enum=False) columns store the enum NAME, not the value —
+    # see tests/test_v032_sqlenum_name_storage.py for the contract, and the
+    # repair migration that rewrites any legacy value-form row to the name.
+    assert carried[0][1] == DetectionProposalSource.BOB.name
     assert carried[0][2] == "alert-9"
     assert carried[0][3] == "Noisy Rule"
-    assert carried[0][4] == "draft"
+    assert carried[0][4] == DetectionProposalStatus.DRAFT.name
 
     # running again must not duplicate it
     _run_migrations(engine)

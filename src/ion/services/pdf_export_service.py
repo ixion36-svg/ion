@@ -309,7 +309,17 @@ def generate_pdf(
         ) from exc
 
     full_html = _build_pdf_html(html_content, title, metadata)
-    return HTML(string=full_html, url_fetcher=_block_external_url_fetcher).write_pdf()
+    # Newer WeasyPrint reads `_fail_on_errors` off the fetcher it is handed, and
+    # a plain function has none. False keeps the documented behaviour: a blocked
+    # external URL is skipped and the page still renders. Read through the module
+    # attribute so a test that swaps the fetcher gets the same treatment.
+    fetcher = _block_external_url_fetcher
+    if not hasattr(fetcher, "_fail_on_errors"):
+        try:
+            fetcher._fail_on_errors = False
+        except AttributeError:  # pragma: no cover - exotic callables
+            pass
+    return HTML(string=full_html, url_fetcher=fetcher).write_pdf()
 
 
 def render_lesson_pdf(lesson, course) -> bytes:

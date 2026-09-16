@@ -53,18 +53,29 @@ def api_src() -> str:
     return API.read_text(encoding="utf-8")
 
 
+def _fn_source(api_src: str, name: str) -> str:
+    """Slice one handler out of api.py.
+
+    Accepts `def` as well as `async def`: these KB handlers use a sync
+    SQLAlchemy session, and pinning the keyword made the whole module error
+    at fixture setup once they stopped being coroutines.
+    """
+    for prefix in ("async def ", "def "):
+        at = api_src.find(prefix + name)
+        if at != -1:
+            rest = api_src[at:]
+            return rest[:rest.index(chr(10) + "@router.")]
+    raise AssertionError(name + " not found in api.py")
+
+
 @pytest.fixture(scope="module")
 def search_fn(api_src: str) -> str:
-    start = api_src.index("async def search_analyst_knowledge_base")
-    rest = api_src[start:]
-    return rest[:rest.index("\n@router.")]
+    return _fn_source(api_src, "search_analyst_knowledge_base")
 
 
 @pytest.fixture(scope="module")
 def browse_fn(api_src: str) -> str:
-    start = api_src.index("async def get_analyst_knowledge_base")
-    rest = api_src[start:]
-    return rest[:rest.index("\n@router.")]
+    return _fn_source(api_src, "get_analyst_knowledge_base")
 
 
 # ── 1. the click-through works ───────────────────────────────────────────

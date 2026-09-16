@@ -5,6 +5,8 @@ until an operator sets ION_ENFORCE_PASSWORD_CHANGE / ION_PASSWORD_MIN_LENGTH).
 In ION's deployment `admin` is the only local account; everyone else is OIDC.
 """
 
+import asyncio
+
 import pytest
 from fastapi import HTTPException
 
@@ -62,9 +64,12 @@ def test_policy_accepts_strong_password():
     assert validate_password_policy("Tr0ub4dour&3xtraLong", 12) is None
 
 
-def test_password_flags_default_off():
+def test_password_flags_defaults():
+    """v0.94.0 enforces the password-change gate by default (CHANGELOG:
+    "the password-change gate is enforced"). password_min_length stays 0 so a
+    deployment opts into a length policy explicitly."""
     c = Config()
-    assert c.enforce_password_change is False
+    assert c.enforce_password_change is True
     assert c.password_min_length == 0
 
 
@@ -74,33 +79,33 @@ def test_password_flags_default_off():
 def test_f4_blocks_must_change_user_when_enabled(monkeypatch):
     monkeypatch.setattr(get_config(), "enforce_password_change", True)
     with pytest.raises(HTTPException) as ei:
-        deps.get_current_user(
+        asyncio.run(deps.get_current_user(
             request=_Req("/api/elasticsearch/alerts"),
             session_token="t",
             auth_service=_FakeAuth(_must_change_user()),
-        )
+        ))
     assert ei.value.status_code == 403
 
 
 def test_f4_allows_change_password_endpoint(monkeypatch):
     monkeypatch.setattr(get_config(), "enforce_password_change", True)
     user = _must_change_user()
-    got = deps.get_current_user(
+    got = asyncio.run(deps.get_current_user(
         request=_Req("/api/auth/change-password"),
         session_token="t",
         auth_service=_FakeAuth(user),
-    )
+    ))
     assert got is user
 
 
 def test_f4_noop_when_disabled(monkeypatch):
     monkeypatch.setattr(get_config(), "enforce_password_change", False)
     user = _must_change_user()
-    got = deps.get_current_user(
+    got = asyncio.run(deps.get_current_user(
         request=_Req("/api/elasticsearch/alerts"),
         session_token="t",
         auth_service=_FakeAuth(user),
-    )
+    ))
     assert got is user  # flag is advisory when enforcement is off
 
 

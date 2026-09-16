@@ -13,6 +13,7 @@ de:approve (Bob-tuning apply) — those stay reserved for human reviewers.
 import hashlib
 import json
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import pytest
 
@@ -76,12 +77,25 @@ def test_metis_role_excludes_verify_and_approve(session):
 
 
 def test_metis_interactive_login_is_refused(session):
+    """Refused, and refused *indistinguishably* from a bad password.
+
+    v0.88.0 made login responses uniform to remove a username/account-state
+    enumeration oracle: "the specific reason is retained in the audit log, not
+    returned to the caller". So the caller must see the generic message, and a
+    reason the operator can act on must still be logged.
+    """
     svc = _seeded(session)
-    user, token, err = svc.login("metis", "whatever-password")
+    with patch.object(svc, "_log_failed_login") as logged:
+        user, token, err = svc.login("metis", "whatever-password")
 
     assert user is None
     assert token is None
-    assert err == "This account cannot be used for interactive login"
+    assert err == svc._GENERIC_LOGIN_ERROR
+    # the caller cannot tell this apart from a wrong password
+    assert "service" not in err.lower() and "interactive" not in err.lower()
+    # but the operator can, from the audit log
+    assert logged.called
+    assert "Service account" in logged.call_args[0][2]
 
 
 def test_mint_token_is_accepted_by_validate_session_and_maps_to_metis(session):

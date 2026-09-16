@@ -20,6 +20,7 @@ from jinja2 import FileSystemBytecodeCache
 
 import ion
 from ion.core.config import get_config
+from ion.licensing.gating import de_module_available
 from ion.web._csp_nonce import _CSPNonceProxy
 from ion.web._csrf_token import _CSRFTokenProxy
 
@@ -44,6 +45,11 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
         pass
     templates.env.auto_reload = bool(getattr(get_config(), "debug_mode", False))
     templates.env.globals["ion_version"] = ion.__version__
+    # base.html gates the DE nav on `{% if de_module_available() %}`, so every
+    # env needs it or any page extending base.html raises UndefinedError.
+    # Callable, not a value, so a runtime licence change is picked up without
+    # a template reload.
+    templates.env.globals["de_module_available"] = de_module_available
     templates.env.globals["csp_nonce"] = _CSPNonceProxy()
     templates.env.globals["csrf_token"] = _CSRFTokenProxy()
     return templates

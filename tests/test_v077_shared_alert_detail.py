@@ -89,9 +89,37 @@ def test_component_loads_after_app_js(base):
 
 
 def test_one_sections_list_drives_both_layouts(module_js):
-    ids = re.findall(r"\{\s*id:\s*'(\w+)'", module_js)
+    """The canonical SECTIONS array is the only section list.
+
+    Asserting on every `id:` literal in the file was too literal: the v2
+    layout legitimately derives extra entries (Comments relabelled to Notes,
+    a v2-only Guide tab). What must hold is that the canonical list is intact
+    and that both layouts read it through _visibleSections() rather than
+    declaring a second list.
+    """
+    canonical = re.search(r"var SECTIONS = \[(.*?)\];", module_js, re.S)
+    assert canonical, "canonical SECTIONS array not found"
+    ids = re.findall(r"\{\s*id:\s*'(\w+)'", canonical.group(1))
     assert ids == ["related", "timeline", "comments", "case", "sequence",
                    "autoinvestigate", "fields", "rawdata"]
+
+    # Every layout builder derives from the canonical list rather than
+    # declaring its own; slice each body by index so the check does not
+    # depend on a multi-line regex.
+    for fn in ("_sectionsHtml", "_sectionsHtmlV2"):
+        marker = "function " + fn + "(alert) {"
+        at = module_js.find(marker)
+        assert at != -1, fn + " not found"
+        # bound the slice at the next top-level function so the check
+        # cannot be satisfied by the neighbouring builder
+        nxt = module_js.find(chr(10) + "  function ", at + len(marker))
+        body = module_js[at:nxt if nxt != -1 else len(module_js)]
+        assert "var SECTIONS = _visibleSections()" in body, (
+            fn + " must assign SECTIONS from the canonical list"
+        )
+        assert "var SECTIONS = [" not in body, (
+            fn + " must not declare a second section list"
+        )
 
 
 # ── the duplication must not come back ───────────────────────────────────

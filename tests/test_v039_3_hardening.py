@@ -75,10 +75,14 @@ def test_auth_layer_get_client_ip_is_the_shared_one():
 # ---------------------------------------------------------------------------
 # Config — opt-in defaults (the "disabled by default" contract)
 # ---------------------------------------------------------------------------
-def test_new_security_flags_default_off():
+def test_new_security_flags_defaults():
+    """v0.94.0 flipped webhook signing ON by default — see CHANGELOG. That was
+    deliberate ("the only change that stops something already working"), so the
+    contract this pins is the current one: IP blocking stays opt-in, webhook
+    signature verification is mandatory unless an operator turns it off."""
     c = Config()
     assert c.ip_blocking_enabled is False
-    assert c.webhook_require_signature is False
+    assert c.webhook_require_signature is True
 
 
 def test_flags_are_settable_fields():

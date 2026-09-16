@@ -7,7 +7,6 @@ from pathlib import Path
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 
 from ion.auth.dependencies import require_page_auth, require_page_permission
 from ion.models.user import User
@@ -35,7 +34,7 @@ import ion
 from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.config import get_config as get_app_config
 from ion.core.logging import get_logger, setup_logging
-from ion.licensing.gating import de_module_available, de_module_status, require_de_module
+from ion.licensing.gating import de_module_status, require_de_module
 from ion.storage.database import get_db_session, init_db
 from ion.web.admin_api import router as admin_router
 from ion.web.ai_api import router as ai_router
@@ -113,6 +112,7 @@ from ion.web.skills_api import router as skills_router
 from ion.web.soc_health_api import router as soc_health_router
 from ion.web.social_api import router as social_router
 from ion.web.story_api import router as story_router
+from ion.web.templating import make_templates
 from ion.web.tenant_api import router as tenant_router
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
@@ -190,8 +190,7 @@ app = FastAPI(
 # instances can register the same proxy without circular imports.
 import secrets as _secrets
 
-from ion.web._csp_nonce import _csp_nonce_var, _CSPNonceProxy
-from ion.web._csrf_token import _CSRFTokenProxy
+from ion.web._csp_nonce import _csp_nonce_var
 from ion.web.csrf_middleware import CSRFMiddleware
 
 # Static response headers, pre-encoded once. ASGI carries headers as a list of
@@ -384,29 +383,11 @@ class CachedStaticFiles(_StaticFiles):
 
 app.mount("/static", CachedStaticFiles(directory=BASE_DIR / "static"), name="static")
 
-# Setup templates with bytecode cache (compiled once, not per-request)
-from jinja2 import FileSystemBytecodeCache as _J2Cache
-
-_bytecode_cache_dir = Path("/tmp/ion-jinja2-cache")
-_bytecode_cache_dir.mkdir(exist_ok=True)
-templates = Jinja2Templates(directory=BASE_DIR / "templates")
-templates.env.bytecode_cache = _J2Cache(str(_bytecode_cache_dir))
-templates.env.auto_reload = _debug_mode  # Only reload in debug
-templates.env.globals["ion_version"] = ion.__version__
-# DE module availability for nav gating; read in base.html as
-# `{% if de_module_available() %}`. Callable (not a value) so a runtime licence
-# state change is picked up without a template reload.
-templates.env.globals["de_module_available"] = de_module_available
-# CSP nonce as a global proxy. Templates read it as `{{ csp_nonce }}`
-# (no parens) inside `<script nonce="...">` and `<style nonce="...">` tags.
-# The proxy reads the per-request value from `_csp_nonce_var`; outside a
-# request (e.g. CLI template rendering, if any) it resolves to "" which
-# produces a benign empty attribute.
-templates.env.globals["csp_nonce"] = _CSPNonceProxy()
-# CSRF token as a global proxy, same mechanism as csp_nonce above. Templates
-# read it as `{{ csrf_token }}`; it is falsy for anonymous requests so
-# base.html can skip the meta tag entirely.
-templates.env.globals["csrf_token"] = _CSRFTokenProxy()
+# One template configuration for the whole app. server.py used to hand-roll a
+# duplicate of this, which is how de_module_available ended up registered here
+# only — every router that built its own env raised UndefinedError on any page
+# extending base.html.
+templates = make_templates(BASE_DIR / "templates")
 
 # Include API routes
 app.include_router(api_router, prefix="/api")
