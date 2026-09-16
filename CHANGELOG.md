@@ -1,13 +1,43 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.97.0 -->
-<!-- ion-doc:version=0.97.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.98.0 -->
+<!-- ion-doc:version=0.98.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-15 -->
+<!-- ion-doc:date=2026-09-16 -->
 
 # Changelog
+
+## v0.98.0 — 2026-09-16
+
+**Flow Topology phase 2: the graph now shows threat and hands you the packets.**
+
+- **Threat edge overlay** — an edge inherits the worst observable-ledger threat
+  of its two endpoints, so a suspicious conversation stands out even when the
+  busy node itself does not. Threat-linked edges render red; the edge detail
+  panel shows level / malicious / IOC.
+- **Per-edge PCAP deep-link** — the Arkime session sample now carries each
+  pair's representative `community_id` (largest flow, charset-gated before it
+  can reach an Arkime expression), and the edge detail panel gains a
+  "Flow PCAP →" link straight to that flow in Arkime. Works in both the
+  `/api/connections` and sample-fallback graph modes.
+- **Rendered on Cytoscape** (already vendored, previously unused) — gradient
+  nodes, curved width-scaled edges, a red glow on threat nodes, `cose` layout,
+  and an ops-console backdrop. vis-network stays vendored for the other
+  Infrastructure views. Cytoscape's single injected stylesheet
+  (`position: relative` on its container) is allowed by a **pinned sha256 hash**
+  in `style-src` — the CSP keeps its strict nonce policy with no
+  `unsafe-inline`; bumping the vendored cytoscape build means regenerating that
+  hash.
+
+**GitLab tuning-request mirroring verified end-to-end** (the PROD-verify owed
+since v0.87.0). New lightweight `test-gitlab/mock_gitlab.py` (GitLab CE is not
+viable on the dev box) implements exactly the REST v4 surface ION calls;
+verified live: raising a request creates the issue (title, `ion` /
+`tuning-request` / reason labels, evidence markdown) and stores its iid/url on
+the row; closing the request comments on and closes the issue. Pinned in CI by
+`tests/test_v098_gitlab_mirror.py`, including mirror-failure-never-blocks.
 
 ## v0.97.0 — 2026-09-15
 
