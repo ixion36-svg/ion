@@ -94,27 +94,32 @@ class TestLoadTriageDataReplacement:
 
 
 # ---------------------------------------------------------------------------
-# Fix 2: build_case_description produces richer format than ad-hoc builder
+# Fix 2: build_case_description renders the lean structured markdown
 # ---------------------------------------------------------------------------
 
 class TestBuildCaseDescription:
     """Ensure the shared description builder produces the structured markdown."""
 
-    def test_includes_observables_section(self):
+    def test_observables_are_accepted_but_not_rendered(self):
+        # Observables post as a separate case Note (post_enrichment_note) so the
+        # description stays lean; the kwarg stays in the signature for callers.
         desc = build_case_description(
             description="Brute force detected",
             observables=[{"type": "ip", "value": "10.0.0.1"}],
         )
-        assert "**Observables:**" in desc
-        assert "10.0.0.1" in desc
+        assert "**Observables:**" not in desc
+        assert "10.0.0.1" not in desc
+        assert "Brute force detected" in desc
 
-    def test_includes_linked_alert_ids(self):
+    def test_alert_ids_are_accepted_but_not_rendered(self):
+        # Alerts show as first-class links on the case, not as an id dump.
         desc = build_case_description(
             description="Case",
             alert_ids=["abc-123", "def-456"],
         )
-        assert "**Linked Alert IDs (2):**" in desc
-        assert "`abc-123`" in desc
+        assert "Linked Alert IDs" not in desc
+        assert "abc-123" not in desc
+        assert "Case" in desc
 
     def test_includes_all_structured_fields(self):
         desc = build_case_description(
@@ -127,9 +132,11 @@ class TestBuildCaseDescription:
             alert_ids=["a1"],
         )
         for expected in ("**Affected Hosts:**", "**Affected Users:**",
-                         "**Triggered Rules:**", "**Evidence Summary:**",
-                         "**Observables:**", "**Linked Alert IDs"):
+                         "**Triggered Rules:**", "**Evidence Summary:**"):
             assert expected in desc, f"Missing section: {expected}"
+        # The two deliberately-unrendered inputs stay out.
+        for absent in ("**Observables:**", "evil.com", "Linked Alert IDs"):
+            assert absent not in desc, f"Should not render: {absent}"
 
     def test_empty_inputs_return_non_empty_placeholder(self):
         # an empty description is NOT valid for Kibana >= 8.19 (400:
@@ -425,6 +432,10 @@ class TestExportRetryLogic:
 
         call_kwargs = mock_kb.create_case.call_args
         description = call_kwargs.kwargs.get("description") or call_kwargs[1].get("description", "")
-        # build_case_description adds Observables and Linked Alert IDs sections
-        assert "**Observables:**" in description
-        assert "**Linked Alert IDs" in description
+        # Export goes through build_case_description: its structured sections are
+        # present, and the observable/alert-id dumps it deliberately drops are not.
+        assert "**Affected Hosts:**" in description
+        assert "**Evidence Summary:**" in description
+        assert "**Observables:**" not in description
+        assert "1.2.3.4" not in description
+        assert "Linked Alert IDs" not in description
