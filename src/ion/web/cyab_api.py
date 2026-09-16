@@ -18,6 +18,7 @@ from ion.auth.dependencies import (
     require_page_permission,
     require_permission,
 )
+from ion.core.concurrency import map_bounded
 from ion.core.config import get_elasticsearch_config
 from ion.core.safe_errors import safe_error
 from ion.models.cyab import (
@@ -1666,14 +1667,19 @@ async def tide_de_actor_readiness(search: str = "", first: int = 15):
 
     actors = actors_result.get("actors", [])
 
-    # 3. For each actor, fetch TTPs and compute readiness
+    # 3. For each actor, fetch TTPs and compute readiness. The detail fetches
+    # are independent — serially this was one OpenCTI round-trip per actor.
+    async def _actor_ttps(actor):
+        detail = await opencti.get_entity_detail(
+            actor["id"], actor.get("entity_type", "threat_actor")
+        )
+        return detail.get("ttps", [])
+
+    details = await map_bounded(actors, _actor_ttps) if actors else []
+
     readiness_list = []
-    for actor in actors:
-        try:
-            entity_type = actor.get("entity_type", "threat_actor")
-            detail = await opencti.get_entity_detail(actor["id"], entity_type)
-            ttps = detail.get("ttps", [])
-        except Exception:
+    for actor, ttps in zip(actors, details):
+        if isinstance(ttps, BaseException) or not isinstance(ttps, list):
             ttps = []
 
         # Map TTPs to TIDE coverage

@@ -17,6 +17,7 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from ion.core.circuit_breaker import es_breaker
+from ion.core.concurrency import map_bounded
 from ion.core.config import get_config, get_elasticsearch_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
 
@@ -2743,23 +2744,26 @@ class ElasticsearchService:
     ) -> list:
         """Fallback: list indices via _resolve/index (lower privilege)."""
         result = await self._request("GET", f"/_resolve/index/{pattern}")
+        names = [
+            idx.get("name", "")
+            for idx in result.get("indices", [])
+            if include_system or not idx.get("name", "").startswith(".")
+        ]
+
+        # One count per index is unavoidable on this lower-privilege path, but
+        # a cluster with hundreds of indices should not pay for them in series.
+        async def _count(index_name: str) -> int:
+            res = await self._request("GET", f"/{index_name}/_count")
+            return res.get("count", 0)
+
+        counts = await map_bounded(names, _count) if names else []
         indices = []
-        for idx in result.get("indices", []):
-            index_name = idx.get("name", "")
-            if not include_system and index_name.startswith("."):
-                continue
-            # Try to get doc count via a count query per index
-            doc_count = 0
-            try:
-                count_result = await self._request("GET", f"/{index_name}/_count")
-                doc_count = count_result.get("count", 0)
-            except ElasticsearchError:
-                pass
+        for index_name, doc_count in zip(names, counts):
             indices.append({
                 "name": index_name,
                 "health": None,
                 "status": "open",
-                "doc_count": doc_count,
+                "doc_count": 0 if isinstance(doc_count, BaseException) else doc_count,
                 "size": None,
             })
         return indices
@@ -3167,14 +3171,23 @@ class ElasticsearchService:
         found_count = 0
         not_found_count = 0
 
-        for ioc in ioc_values[:100]:  # Limit to 100 IOCs
-            result = await self.ioc_hunt(
+        batch = ioc_values[:100]  # Limit to 100 IOCs
+
+        async def _hunt(ioc: str):
+            return await self.ioc_hunt(
                 ioc_value=ioc.strip(),
                 index_pattern=index_pattern,
                 time_from=time_from,
                 time_to=time_to,
                 size=10  # Limit per IOC for bulk search
             )
+
+        # The hunts are independent; serially this was up to 100 round-trips of
+        # latency in series. Bounded so a large batch cannot flood the cluster.
+        for ioc, result in zip(batch, await map_bounded(batch, _hunt)):
+            if isinstance(result, BaseException):
+                logger.warning("IOC hunt failed for %s: %s", ioc, result)
+                result = {}
 
             ioc_result = {
                 "ioc_value": ioc,

@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
 from ion.auth.dependencies import require_permission
+from ion.core.concurrency import map_bounded
 from ion.core.config import get_elasticsearch_config
 from ion.core.safe_errors import safe_error
 from ion.models.alert_triage import (
@@ -2303,37 +2304,53 @@ async def escalate_case_to_dfir_iris(
 
         # 2. Push observables as IOCs
         iocs_pushed = 0
-        if case.observables:
-            for obs in case.observables:
-                obs_type = obs.get("type", "")
-                obs_value = obs.get("value", "")
-                if not obs_value:
-                    continue
-                try:
-                    iris_ioc_type_id = iris_service.map_ioc_type(obs_type)
-                    await iris_service.add_ioc(
-                        case_id=iris_case_id,
-                        value=obs_value,
-                        ioc_type_id=iris_ioc_type_id,
-                        description=f"Auto-imported from ION {case.case_number} ({obs_type})",
-                        tags=["ion", obs_type],
-                    )
-                    iocs_pushed += 1
-                except Exception as ioc_err:
-                    _case_es_logger.warning("Failed to push IOC %s to IRIS: %s", obs_value, ioc_err)
-
-        # 3. Push case notes
-        notes_pushed = 0
-        for note in case.notes:
-            try:
-                await iris_service.add_note(
+        ioc_targets = [
+            (o.get("type", ""), o.get("value", ""))
+            for o in (case.observables or [])
+            if o.get("value")
+        ]
+        if ioc_targets:
+            async def _push_ioc(target):
+                obs_type, obs_value = target
+                await iris_service.add_ioc(
                     case_id=iris_case_id,
-                    title=f"Note by {note.user.username if note.user else 'Unknown'} ({note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at else 'N/A'})",
-                    content=note.content,
+                    value=obs_value,
+                    ioc_type_id=iris_service.map_ioc_type(obs_type),
+                    description=f"Auto-imported from ION {case.case_number} ({obs_type})",
+                    tags=["ion", obs_type],
                 )
-                notes_pushed += 1
-            except Exception as note_err:
-                _case_es_logger.warning("Failed to push note to IRIS: %s", note_err)
+
+            for (_t, obs_value), outcome in zip(
+                ioc_targets, await map_bounded(ioc_targets, _push_ioc)
+            ):
+                if isinstance(outcome, BaseException):
+                    _case_es_logger.warning("Failed to push IOC %s to IRIS: %s", obs_value, outcome)
+                else:
+                    iocs_pushed += 1
+
+        # 3. Push case notes. Titles are built up front: note.user is a lazy
+        # relationship and the fan-out below must not touch the session.
+        notes_pushed = 0
+        note_payloads = [
+            (
+                f"Note by {note.user.username if note.user else 'Unknown'}"
+                f" ({note.created_at.strftime('%Y-%m-%d %H:%M') if note.created_at else 'N/A'})",
+                note.content,
+            )
+            for note in case.notes
+        ]
+        if note_payloads:
+            async def _push_note(payload):
+                title, content = payload
+                await iris_service.add_note(
+                    case_id=iris_case_id, title=title, content=content
+                )
+
+            for outcome in await map_bounded(note_payloads, _push_note):
+                if isinstance(outcome, BaseException):
+                    _case_es_logger.warning("Failed to push note to IRIS: %s", outcome)
+                else:
+                    notes_pushed += 1
 
         # 4. Add timeline events for each alert in the case
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -2343,48 +2360,52 @@ async def escalate_case_to_dfir_iris(
                 es_service = get_elasticsearch_service()
                 es_alerts = await es_service.get_alerts_by_ids(case.source_alert_ids)
 
-                for alert in es_alerts:
-                    try:
-                        event_content_parts = []
-                        if alert.message:
-                            event_content_parts.append(alert.message)
-                        if alert.host:
-                            event_content_parts.append(f"**Host:** {alert.host}")
-                        if alert.user:
-                            event_content_parts.append(f"**User:** {alert.user}")
-                        if alert.severity:
-                            event_content_parts.append(f"**Severity:** {alert.severity}")
-                        if alert.mitre_technique_id:
-                            technique = alert.mitre_technique_id
-                            if alert.mitre_technique_name:
-                                technique += f" ({alert.mitre_technique_name})"
-                            event_content_parts.append(f"**MITRE:** {technique}")
-                        if alert.mitre_tactic_name:
-                            event_content_parts.append(f"**Tactic:** {alert.mitre_tactic_name}")
+                async def _push_alert_event(alert):
+                    event_content_parts = []
+                    if alert.message:
+                        event_content_parts.append(alert.message)
+                    if alert.host:
+                        event_content_parts.append(f"**Host:** {alert.host}")
+                    if alert.user:
+                        event_content_parts.append(f"**User:** {alert.user}")
+                    if alert.severity:
+                        event_content_parts.append(f"**Severity:** {alert.severity}")
+                    if alert.mitre_technique_id:
+                        technique = alert.mitre_technique_id
+                        if alert.mitre_technique_name:
+                            technique += f" ({alert.mitre_technique_name})"
+                        event_content_parts.append(f"**MITRE:** {technique}")
+                    if alert.mitre_tactic_name:
+                        event_content_parts.append(f"**Tactic:** {alert.mitre_tactic_name}")
 
-                        event_tags = ["ion", "alert"]
-                        if alert.severity:
-                            event_tags.append(alert.severity)
-                        if alert.mitre_technique_id:
-                            event_tags.append(alert.mitre_technique_id)
+                    event_tags = ["ion", "alert"]
+                    if alert.severity:
+                        event_tags.append(alert.severity)
+                    if alert.mitre_technique_id:
+                        event_tags.append(alert.mitre_technique_id)
 
-                        category_id = iris_service.map_tactic_to_category(
-                            alert.mitre_tactic_name or ""
-                        )
-                        await iris_service.add_event(
-                            case_id=iris_case_id,
-                            title=f"[{alert.severity.upper()}] {alert.rule_name or alert.title}",
-                            date=alert.timestamp.isoformat() if alert.timestamp else now_iso,
-                            content="\n".join(event_content_parts),
-                            source=f"ION ({alert.source})",
-                            tags=event_tags,
-                            category_id=category_id,
-                        )
-                        events_pushed += 1
-                    except Exception as evt_err:
+                    category_id = iris_service.map_tactic_to_category(
+                        alert.mitre_tactic_name or ""
+                    )
+                    await iris_service.add_event(
+                        case_id=iris_case_id,
+                        title=f"[{alert.severity.upper()}] {alert.rule_name or alert.title}",
+                        date=alert.timestamp.isoformat() if alert.timestamp else now_iso,
+                        content="\n".join(event_content_parts),
+                        source=f"ION ({alert.source})",
+                        tags=event_tags,
+                        category_id=category_id,
+                    )
+
+                for alert, outcome in zip(
+                    es_alerts, await map_bounded(es_alerts, _push_alert_event)
+                ):
+                    if isinstance(outcome, BaseException):
                         _case_es_logger.warning(
-                            "Failed to push alert %s as timeline event: %s", alert.id, evt_err
+                            "Failed to push alert %s as timeline event: %s", alert.id, outcome
                         )
+                    else:
+                        events_pushed += 1
             except Exception as es_err:
                 _case_es_logger.warning("Failed to fetch alerts from ES for timeline: %s", es_err)
 
