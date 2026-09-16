@@ -130,7 +130,7 @@ the Similar-Cases sidebar all quietly return nothing.
 |---|---|
 | `fubsxploitapps/ion:<VERSION>` | Application (private repo — `docker login` required to pull) |
 | `pgvector/pgvector:<PG_VERSION>` | Postgres **with pgvector** (not plain postgres) |
-| `ollama/ollama:latest` | LLM host |
+| `ollama/ollama:${OLLAMA_VERSION}` | LLM host (pinned in `.env.deploy`) |
 | Chat model (default `hf.co/fdtn-ai/Foundation-Sec-1.1-8B-Instruct-Q4_K_M-GGUF`) | Bob's reasoning |
 | `nomic-embed-text` model | Embeddings — **new in v0.10.4, silently required by case-similarity + KB RAG** |
 | `docker-compose.yml` | Config (pinned to matching ION + PG versions) |

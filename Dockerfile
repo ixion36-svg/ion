@@ -3,6 +3,12 @@
 # Part of Guarded Glass Security Toolkit
 # Multi-stage build for smaller final image
 
+# Global scope so the syft stage below can interpolate it: `COPY --from` does
+# NOT expand variables, so the version has to reach the image reference via
+# a named FROM stage instead.
+ARG SYFT_VERSION=1.44.0
+FROM anchore/syft:v${SYFT_VERSION} AS syft
+
 # ============================================================================
 # Stage 1: Build stage - install dependencies
 # ============================================================================
@@ -49,8 +55,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # removes a build-time GitHub dependency, which suits the air-gapped ethos.
 # The syft binary is a static Go executable, so it runs as-is in the
 # python:3.14-slim builder. Pin the tag to keep SBOM tooling reproducible.
-ARG SYFT_VERSION=1.44.0
-COPY --from=anchore/syft:v1.44.0 /syft /usr/local/bin/syft
+COPY --from=syft /syft /usr/local/bin/syft
 RUN syft /opt/venv -o spdx-json=/build/sbom.spdx.json && \
     rm -f /usr/local/bin/syft
 

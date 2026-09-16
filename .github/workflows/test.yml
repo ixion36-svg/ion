@@ -6,12 +6,16 @@
 # Principles 6 and 7.
 #
 # Jobs:
-#   - test : pytest on Python 3.11 against the full tests/ suite. SQLite
-#            in-process, no DB service needed.
+#   - test : pytest against the full tests/ suite on both the declared
+#            floor (3.11) and the version the shipped image runs (3.14).
+#            SQLite in-process, no DB service needed.
 #   - lint : ruff check on src/ (config in pyproject.toml [tool.ruff]).
 #   - sec  : bandit -r src/ with the skip set documented in this file's
 #            comment for `bandit-skip`. Treats high-severity findings as
 #            fatal; medium and below as warnings.
+#   - image: builds the Dockerfile. Does not push — it exists so a broken
+#            build surfaces on the commit that broke it rather than at
+#            release, when the tag is already cut.
 #   - sca  : pip-audit (v0.25.0) — scans the project's pinned dependency
 #            graph for known CVEs via the OSV database. Fails the build
 #            only on HIGH-severity (and above) findings; MEDIUM/LOW are
@@ -37,16 +41,23 @@ permissions:
 
 jobs:
   test:
-    name: pytest
+    name: pytest (py${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the floor declared by requires-python; 3.14 is what the
+        # shipped image actually runs (Dockerfile: python:3.14-slim). Testing
+        # only the floor left the runtime version unverified.
+        python-version: ["3.11", "3.14"]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "${{ matrix.python-version }}"
           cache: pip
 
       - name: Install dependencies
@@ -173,3 +184,33 @@ jobs:
           pip-audit \
             --vulnerability-service pypi \
             --skip-editable
+
+
+  image:
+    name: docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build only — no registry credentials are needed and none are used.
+      # ION ships from a private org repo, pushed deliberately at release.
+      - name: Build the runtime image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ion:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The SBOM is a release artefact (SDLC SS8); a build that silently stops
+      # producing it would otherwise ship an image without one.
+      - name: Check the SBOM was generated
+        run: |
+          docker run --rm --entrypoint sh ion:ci -c 'test -s /app/sbom.spdx.json'
+          echo "SBOM present"

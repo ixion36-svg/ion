@@ -223,7 +223,7 @@ services:
   # Ollama - Local LLM Service (opt-in via: docker compose --profile ai up)
   # ======================================================================
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:${OLLAMA_VERSION:-0.32.6}
     container_name: ion-ollama
     restart: unless-stopped
     profiles:
