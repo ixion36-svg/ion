@@ -26,6 +26,7 @@ from ion.services.embedding_service import (
 )
 from ion.services.prompt_safety import sanitize_untrusted
 from ion.storage.alert_prompt_repository import AlertPromptRepository
+from ion.storage.alert_prompt_repository import _loads as _load_list
 
 logger = logging.getLogger(__name__)
 
@@ -84,9 +85,11 @@ def _playbook_rag_enabled() -> bool:
 
 
 def _ti_report_rag_enabled() -> bool:
-    return os.environ.get("ION_TI_REPORT_RAG_ENABLED", "true").lower() in (
-        "true", "1", "yes",
-    )
+    # Imported here rather than at module scope: ti_report_service pulls in the
+    # embedding stack, which this module is itself part of.
+    from ion.services.ti_report_service import ti_report_rag_enabled
+
+    return ti_report_rag_enabled()
 
 
 def _alert_text_for_embedding(alert: dict) -> str:
@@ -4059,15 +4062,6 @@ no commentary outside the JSON. The object MUST conform to this schema:
 """
 
 
-def _load_list(raw: Optional[str]) -> list:
-    """Decode a JSON list column defensively — returns [] on None/invalid."""
-    if not raw:
-        return []
-    try:
-        val = json.loads(raw)
-        return val if isinstance(val, list) else []
-    except Exception:
-        return []
 
 
 # ---------------------------------------------------------------------------

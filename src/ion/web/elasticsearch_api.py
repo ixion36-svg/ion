@@ -642,7 +642,7 @@ async def discover_search(
             fields=request.fields,
         )
 
-        if "error" in result and result["error"]:
+        if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
 
         return result
@@ -679,7 +679,7 @@ async def discover_histogram(
             interval=request.interval,
         )
 
-        if "error" in result and result["error"]:
+        if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
 
         return result
@@ -716,7 +716,7 @@ async def list_indices(
             include_stats=include_stats,
         )
 
-        if "error" in result and result["error"]:
+        if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
 
         return result
@@ -744,7 +744,7 @@ async def get_index_mappings(
     try:
         result = await service.get_index_mappings(index_pattern=index_pattern)
 
-        if "error" in result and result["error"]:
+        if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
 
         return result
@@ -779,7 +779,7 @@ async def get_field_stats(
             time_to=request.time_to,
         )
 
-        if "error" in result and result["error"]:
+        if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
 
         return result
@@ -816,7 +816,7 @@ async def ioc_hunt(
             size=request.size,
         )
 
-        if "error" in result and result["error"]:
+        if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
 
         return result
@@ -850,7 +850,7 @@ async def ioc_hunt_bulk(
             time_to=request.time_to,
         )
 
-        if "error" in result and result["error"]:
+        if result.get("error"):
             raise HTTPException(status_code=500, detail=result["error"])
 
         return result

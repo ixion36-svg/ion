@@ -4,7 +4,6 @@
 class IonError(Exception):
     """Base exception for ION errors."""
 
-    pass
 
 
 class TemplateNotFoundError(IonError):

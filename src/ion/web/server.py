@@ -114,15 +114,8 @@ from ion.web.soc_health_api import router as soc_health_router
 from ion.web.social_api import router as social_router
 from ion.web.story_api import router as story_router
 from ion.web.tenant_api import router as tenant_router
-
-# threat_hunt_api removed; see /threat-hunting handler note below.
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
-
-# ticker service + API removed (was crashing every tick on an
-# enum-case mismatch; the auto-flagging design also conflicted with
-# investigation queue ownership). Model + table kept dormant for any
-# future redesign — see _backlog_v0_27.md.
 from ion.web.training_sim_api import router as training_sim_router
 from ion.web.translator_api import router as translator_router
 from ion.web.triage_suggestion_api import router as triage_suggestion_router
@@ -493,7 +486,6 @@ app.include_router(compliance_router, prefix="/api")
 app.include_router(comm_template_router, prefix="/api")
 app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
-# threat_hunt_router removed alongside the half-built page.
 app.include_router(cyber_range_router, prefix="/api")
 app.include_router(enrichment_router, prefix="/api/enrichment")
 app.include_router(alert_prompt_router, prefix="")
@@ -509,7 +501,6 @@ app.include_router(bug_report_router, prefix="")
 app.include_router(change_request_router, prefix="")
 # AI document analysis — large-PDF map-reduce via the internal LLM (toggle-gated).
 app.include_router(large_doc_router, prefix="")
-# ticker_router removed alongside the service.
 app.include_router(investigation_memory_router)
 app.include_router(scheduler_router, prefix="")
 app.include_router(investigation_router, prefix="")
@@ -543,7 +534,8 @@ app.include_router(metrics_router)
 # Aliasing (same endpoint, two paths) rather than redirecting: a 3xx that must
 # preserve method + body across POST/PATCH/DELETE is fragile, and docs/API.md is
 # a PUBLIC integration contract. Both paths therefore behave identically, byte
-# for byte, and the ~89 in-repo call sites can migrate at leisure. The legacy
+# for byte. In-repo callers have all moved to the canonical paths; the aliases
+# exist only for external integrators and can be dropped at a major. The legacy
 # paths stay out of the OpenAPI schema's duplicate listing via the alias being
 # the one marked deprecated.
 # ---------------------------------------------------------------------------
@@ -1170,16 +1162,6 @@ async def _startup_event():
                hold_until_close=True)
 
     # ---------------------------------------------------------------
-    # Ticker background producer — REMOVED v0.26.1.
-    # The loop crashed every tick on an enum-case mismatch
-    # (AlertTriageStatus stored as the enum NAME 'OPEN', queried for
-    # 'open') AND its auto-flagging design conflicted with the
-    # investigation-queue ownership model. Model + table kept dormant
-    # for any future redesign. See _backlog_v0_27.md for the design
-    # rethink notes.
-    # ---------------------------------------------------------------
-
-    # ---------------------------------------------------------------
     # Case-embedding background producer — embeds cases via Ollama for
     # similarity search. Honours ION_EMBEDDING_ENABLED / _INTERVAL_S.
     # Silently no-ops when Ollama isn't reachable.
@@ -1245,17 +1227,25 @@ async def _startup_event():
 
     # Version compatibility checks for connectors that declare supported ranges
     try:
+        import asyncio as _asyncio
+
         from ion.services.connectors import get_connector_registry
         from ion.services.connectors.version_compat import check_version_compatibility
 
         registry = get_connector_registry()
-        for connector in registry.get_all():
-            if connector.SUPPORTED_VERSIONS is None:
-                continue
-            if not connector.is_configured:
-                continue
+        probed = [
+            c for c in registry.get_all()
+            if c.SUPPORTED_VERSIONS is not None and c.is_configured
+        ]
+        # Probe concurrently: serially, boot waits the SUM of every unreachable
+        # integration's connect timeout before the app is ready.
+        results = await _asyncio.gather(
+            *(c.test_connection() for c in probed), return_exceptions=True
+        )
+        for connector, result in zip(probed, results):
             try:
-                result = await connector.test_connection()
+                if isinstance(result, BaseException):
+                    raise result
                 detected = result.get(connector.VERSION_KEY)
                 if detected:
                     compat = check_version_compatibility(detected, connector.SUPPORTED_VERSIONS)
@@ -2436,11 +2426,6 @@ async def cyber_range_page(request: Request, user: User = Depends(require_page_a
     return templates.TemplateResponse(request=request, name="cyber_range.html")
 
 
-# /attack-stories page removed; content folded into the
-# /threat-intel "Attack Stories" tab. The /api/attack-stories endpoint
-# still exists — the unified page calls it.
-
-
 @app.get("/attack-stories")
 async def attack_stories_redirect():
     from fastapi.responses import RedirectResponse
@@ -2451,14 +2436,6 @@ async def attack_stories_redirect():
 async def executive_report_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
     """Render the Executive Report page."""
     return templates.TemplateResponse(request=request, name="executive_report.html")
-
-
-# /threat-hunting page + threat_hunt_api router + ThreatHunt
-# model + threat_hunts table removed. The half-built CRUD shell never
-# integrated with /discover (where hunt queries actually run) or /cases
-# (where findings get recorded), so it was deleted rather than fleshed
-# out. Real hunting workflow: write the query in /discover, record the
-# verdict in the case the query produced.
 
 
 

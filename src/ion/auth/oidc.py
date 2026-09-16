@@ -51,7 +51,6 @@ class OIDCTokenData:
 class OIDCValidationError(Exception):
     """Raised when OIDC token validation fails."""
 
-    pass
 
 
 class OIDCValidator:

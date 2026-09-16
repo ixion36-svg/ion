@@ -58,7 +58,6 @@ class BaseConnector(ABC):
     @abstractmethod
     def is_configured(self) -> bool:
         """Check if the connector has all required configuration."""
-        pass
 
     @property
     def is_enabled(self) -> bool:
@@ -79,7 +78,6 @@ class BaseConnector(ABC):
         Returns:
             True if configuration was applied successfully.
         """
-        pass
 
     @abstractmethod
     async def test_connection(self) -> Dict[str, Any]:
@@ -88,7 +86,6 @@ class BaseConnector(ABC):
         Returns:
             Dictionary with connection status and details.
         """
-        pass
 
     async def healthcheck(self) -> HealthCheckResult:
         """Perform a health check with timing.

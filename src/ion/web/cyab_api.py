@@ -43,6 +43,9 @@ from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
 
+# Sort priority, worst first. Callers pass their own default for unknown values.
+_SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
 router = APIRouter()
 
 # Fully-configured Jinja env (bytecode cache + ion_version + csp_nonce) from the
@@ -676,7 +679,7 @@ def update_data_source(
 
     data = req.model_dump(exclude_none=True)
     # Normalise namespace to lowercase (ES enforces lowercase).
-    if "data_namespace" in data and data["data_namespace"]:
+    if data.get("data_namespace"):
         data["data_namespace"] = data["data_namespace"].strip().lower()
     for f in ["name", "data_source_type", "icon", "sal_tier", "uptime_target",
               "max_latency", "retention", "p1_sla", "field_mapping_score",
@@ -998,7 +1001,7 @@ async def tide_system_alerts(system_id: str, namespace: str = "", hours: int = 1
 
     # Sort: firing by count desc, silent by severity
     firing_rules.sort(key=lambda r: r["alert_count"], reverse=True)
-    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3, "informational": 4}
+    sev_order = {**_SEV_ORDER, "informational": 4}
     silent_rules.sort(key=lambda r: sev_order.get((r.get("severity") or "low").lower(), 5))
 
     # Overall stats
@@ -1893,8 +1896,7 @@ async def tide_de_kill_chain_alerts(hours: int = 24):
                 })
 
     # Sort by severity then pct_complete
-    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    progressions.sort(key=lambda p: (sev_order.get(p["severity"], 9), -p["pct_complete"]))
+    progressions.sort(key=lambda p: (_SEV_ORDER.get(p["severity"], 9), -p["pct_complete"]))
 
     return {
         "enabled": True,
@@ -2071,8 +2073,7 @@ async def tide_de_execution(hours: int = 168):
                 "tide_quality": rule.get("quality_score"),
                 "mitre_ids": rule.get("mitre_ids") or [],
             })
-    sev_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    silent_rules.sort(key=lambda r: sev_order.get((r.get("tide_severity") or "low").lower(), 5))
+    silent_rules.sort(key=lambda r: _SEV_ORDER.get((r.get("tide_severity") or "low").lower(), 5))
 
     # 6. Global stats
     total_severity = {sb["key"]: sb["doc_count"] for sb in aggs.get("total_by_severity", {}).get("buckets", [])}
@@ -3393,14 +3394,6 @@ def _build_audit_feed(
     return {"events": events[:limit], "total": len(events)}
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-#  Migrated from cyab_studio_api (dropped in v0.20.0).
-#
-#  All routes formerly under /api/cyab/studio/* now live here under
-#  /api/cyab/*.  Templates and tests were updated to match; the old
-#  /api/cyab/studio router mount and cyab_studio_api.py have been removed.
-# ═══════════════════════════════════════════════════════════════════════════
-
 import html as _html_mod
 import logging as _logging
 import re as _re
@@ -3409,6 +3402,7 @@ from typing import Any, Dict
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
 from ion.services import cyab_doc_checklist_service as _doc_svc
 from ion.services.cyab_subprofile_service import (
+    _row_to_full_dict,
     get_subprofile_full,
     get_use_case,
     list_pillars,
@@ -3519,20 +3513,6 @@ def get_subprofile(sub_id: str, session: Session = Depends(get_db_session)):
         raise HTTPException(status_code=404, detail="Unknown sub-profile")
     return full
 
-
-def _row_to_full_dict(row: CyabSubProfile) -> Dict[str, Any]:
-    return {
-        "id": row.id,
-        "pillar_id": row.pillar_id,
-        "label": row.label,
-        "icon": row.icon,
-        "description": row.description,
-        "ecs_anchors": json.loads(row.ecs_anchors or "[]"),
-        "expected_feeds": json.loads(row.expected_feeds or "[]"),
-        "catalogue": json.loads(row.catalogue_json or "{}"),
-        "catalogue_version": row.catalogue_version,
-        "is_custom": row.is_custom,
-    }
 
 
 @router.post(

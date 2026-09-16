@@ -3033,6 +3033,13 @@ def _detect_dga(dns_counter: collections.Counter) -> list[Finding]:
 # Payload / UA / credential detections
 # ---------------------------------------------------------------------------
 
+# Ordering only. SEVERITY_WEIGHTS below scores severity; this ranks it.
+_SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+
+# Content types that indicate a file transfer rather than a text response.
+_FILE_CONTENT_TYPES = ("application/", "image/", "audio/", "video/", "font/", "model/")
+
+
 def _detect_payload_signatures(payload_sigs: list) -> list[Finding]:
     """Generate findings from payload signature matches."""
     findings = []
@@ -3045,7 +3052,7 @@ def _detect_payload_signatures(payload_sigs: list) -> list[Finding]:
         sig_groups.setdefault(sig["sig"], []).append(sig)
 
     for sig_name, hits in sig_groups.items():
-        worst_sev = max(hits, key=lambda h: {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(h["severity"], 0))
+        worst_sev = max(hits, key=lambda h: _SEVERITY_RANK.get(h["severity"], 0))
         severity = worst_sev["severity"]
         examples = "; ".join(h["detail"] for h in hits[:5])
         count = len(hits)
@@ -3081,7 +3088,7 @@ def _detect_suspicious_uas(suspicious_uas: list) -> list[Finding]:
         ua_groups.setdefault(ua["reason"], []).append(ua)
 
     for reason, hits in ua_groups.items():
-        worst = max(hits, key=lambda h: {"critical": 4, "high": 3, "medium": 2, "low": 1}.get(h["severity"], 0))
+        worst = max(hits, key=lambda h: _SEVERITY_RANK.get(h["severity"], 0))
         examples = "; ".join(f"{h['src']}->{h['dst']} UA=\"{h['ua'][:60]}\"" for h in hits[:3])
         findings.append(Finding(
             category="Suspicious User-Agent",
@@ -3965,11 +3972,7 @@ def _extract_http_files(streams: dict) -> list[dict]:
                         pass
 
             # Only care about non-text content types that indicate file transfers
-            interesting_types = (
-                "application/", "image/", "audio/", "video/",
-                "font/", "model/",
-            )
-            if content_type and any(content_type.startswith(t) for t in interesting_types):
+            if content_type and content_type.startswith(_FILE_CONTENT_TYPES):
                 body = data[body_start:body_start + min(content_length, 5 * 1024 * 1024)] if content_length else b""
                 # MD5 is used as a content fingerprint for body dedup, not for security.
                 md5 = hashlib.md5(body, usedforsecurity=False).hexdigest() if body else ""

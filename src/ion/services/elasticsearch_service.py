@@ -1765,8 +1765,13 @@ class ElasticsearchService:
                 f"| WHERE @timestamp >= NOW() - {int(hours)} hours "
                 f"| STATS count = COUNT(*) BY {field}"
             )
-        sev = self._esql_rows(await self.query_esql(_by("kibana.alert.severity")))
-        sts = self._esql_rows(await self.query_esql(_by("kibana.alert.status")))
+        # Independent aggregations — one round-trip of latency, not two.
+        sev_raw, sts_raw = await asyncio.gather(
+            self.query_esql(_by("kibana.alert.severity")),
+            self.query_esql(_by("kibana.alert.status")),
+        )
+        sev = self._esql_rows(sev_raw)
+        sts = self._esql_rows(sts_raw)
         by_severity = {(r.get("kibana.alert.severity") or "unknown"): r.get("count", 0) for r in sev}
         by_status = {(r.get("kibana.alert.status") or "unknown"): r.get("count", 0) for r in sts}
         return {

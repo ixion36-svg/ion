@@ -245,7 +245,6 @@ def get_request_queue() -> RequestQueue:
 
 class OllamaError(Exception):
     """Ollama service error."""
-    pass
 
 
 class ModelSize(str, Enum):

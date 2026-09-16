@@ -1952,14 +1952,6 @@ async def upload_document(
     }
 
 
-class DocumentCreateRequest(BaseModel):
-    name: str
-    content: str
-    output_format: str = "markdown"
-    tags: Optional[List[str]] = None
-    collection_id: Optional[int] = None
-
-
 @router.put("/documents/{document_id}/tags", dependencies=[Depends(require_permission("document:update"))])
 async def update_document_tags(
     document_id: int,
@@ -3267,10 +3259,6 @@ def match_known_false_positives(
     return {"matches": matches}
 
 
-
-
-class BatchTriageRequest(BaseModel):
-    alert_ids: List[str]
 
 
 class BatchTriageRequestWithStatus(BaseModel):

@@ -135,7 +135,7 @@ def delete_folder(
         raise HTTPException(status_code=404, detail="Folder not found")
     repo.delete_folder(folder)
     session.commit()
-    return None
+    return
 
 
 # =============================================================================
@@ -285,4 +285,4 @@ def delete_note(
         raise HTTPException(status_code=404, detail="Note not found")
     repo.delete(note)
     session.commit()
-    return None
+    return

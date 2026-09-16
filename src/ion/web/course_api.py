@@ -946,7 +946,7 @@ def delete_course(
         raise HTTPException(status_code=404, detail="Course not found")
     session.delete(course)
     session.commit()
-    return None
+    return
 
 
 @router.post("/api/courses/{course_id}/modules", status_code=201)
@@ -997,7 +997,7 @@ def delete_module(
         raise HTTPException(status_code=404, detail="Module not found")
     session.delete(m)
     session.commit()
-    return None
+    return
 
 
 @router.post("/api/modules/{module_id}/lessons", status_code=201)
@@ -1053,7 +1053,7 @@ def delete_lesson(
         raise HTTPException(status_code=404, detail="Lesson not found")
     session.delete(l)
     session.commit()
-    return None
+    return
 
 
 @router.post("/api/lessons/{lesson_id}/questions", status_code=201)
@@ -1118,7 +1118,7 @@ def delete_question(
         raise HTTPException(status_code=404, detail="Question not found")
     session.delete(q)
     session.commit()
-    return None
+    return
 
 
 # ── JSON import / export ───────────────────────────────────────
