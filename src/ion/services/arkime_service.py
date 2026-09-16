@@ -1342,6 +1342,9 @@ class ArkimeService:
 
     _CONVO_SAMPLE = 1000  # sessions fetched for edge enrichment / graph fallback
     _PROTO_NAME_RE = re.compile(r"[a-z0-9._-]{1,32}")
+    # Community ID: version prefix + base64 hash, e.g. "1:LQU9qZlK+B5F3KDmev6m=".
+    # Gated because it is interpolated into an Arkime expression for the deep-link.
+    _COMMUNITY_ID_RE = re.compile(r"[0-9]:[A-Za-z0-9+/=]{8,96}")
 
     @classmethod
     def _clean_endpoint_ip(cls, value: Any) -> str:
@@ -1423,6 +1426,7 @@ class ArkimeService:
                     "protocol": enr["protocol"] if enr else "",
                     "port": enr["port"] if enr else None,
                     "throughput_bps": enr["throughput_bps"] if enr else None,
+                    "community_id": enr.get("community_id") if enr else None,
                 })
             edges, method = merged, "connections"
         else:
@@ -1525,7 +1529,7 @@ class ArkimeService:
             "startTime": str(start_ts),
             "stopTime": str(stop_ts),
             "order": "totBytes:desc",
-            "fields": "srcIp,dstIp,totBytes,packets,ipProtocol,dstPort,firstPacket,lastPacket",
+            "fields": "srcIp,dstIp,totBytes,packets,ipProtocol,dstPort,firstPacket,lastPacket,communityId",
         }
         if expression:
             params["expression"] = expression
@@ -1577,10 +1581,19 @@ class ArkimeService:
             entry = pairs.setdefault((src, dst), {
                 "bytes": 0, "sessions": 0, "packets": 0,
                 "protocols": {}, "ports": {}, "first": None, "last": None,
+                "community_id": None, "_rep_bytes": -1,
             })
             entry["bytes"] += b
             entry["sessions"] += 1
             entry["packets"] += pk
+            # Keep the community_id of the pair's largest flow as a representative
+            # for a per-edge PCAP deep-link. Charset-gated: it is interpolated
+            # into an Arkime expression downstream.
+            if b > entry["_rep_bytes"]:
+                cid = str(s.get("communityId") or "").strip()
+                if cid and self._COMMUNITY_ID_RE.fullmatch(cid):
+                    entry["_rep_bytes"] = b
+                    entry["community_id"] = cid
             if proto:
                 entry["protocols"][proto] = entry["protocols"].get(proto, 0) + b
             if port is not None:
@@ -1614,6 +1627,7 @@ class ArkimeService:
                 "protocol": max(protocols, key=protocols.get) if protocols else "",
                 "port": max(ports, key=ports.get) if ports else None,
                 "throughput_bps": round(st["bytes"] / span, 1) if span > 0 else None,
+                "community_id": st.get("community_id"),
             })
         return edges
 

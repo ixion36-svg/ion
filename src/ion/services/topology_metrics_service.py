@@ -42,6 +42,25 @@ UNAVAILABLE_METRICS = [
 # Threat levels that mark a node as malicious in the graph. LOW/MEDIUM still
 # surface as context in the detail panel without turning the node red.
 _MALICIOUS_LEVELS = {"high", "critical"}
+_LEVEL_RANK = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+
+
+def _edge_threat(
+    src_t: Optional[Dict[str, Any]], dst_t: Optional[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """An edge inherits the worst threat of its two endpoints, so a suspicious
+    conversation stands out even when the busy node itself does not. None when
+    neither endpoint is in the observable ledger."""
+    present = [t for t in (src_t, dst_t) if t]
+    if not present:
+        return None
+    level = max((t.get("level") or "" for t in present),
+                key=lambda lv: _LEVEL_RANK.get(lv, 0))
+    return {
+        "malicious": any(t.get("malicious") for t in present),
+        "level": level,
+        "is_ioc": any(t.get("is_ioc") for t in present),
+    }
 
 
 def _subnet_of(ip: str) -> str:
@@ -150,15 +169,24 @@ async def build_topology(
     ]
     # Endpoint IPs are ipaddress-validated upstream (_clean_endpoint_ip), so
     # bare interpolation into the expression is safe — IP terms are unquoted.
-    edges = [
-        {
+    edges = []
+    for e in convo["edges"]:
+        edge = {
             **e,
             "arkime_url": arkime_sessions_link(
                 f"ip.src == {e['src']} && ip.dst == {e['dst']}"
             ),
         }
-        for e in convo["edges"]
-    ]
+        et = _edge_threat(threats.get(e["src"]), threats.get(e["dst"]))
+        if et:
+            edge["threat"] = et
+        # Per-edge PCAP deep-link to the representative flow. community_id was
+        # charset-gated at capture (_COMMUNITY_ID_RE), so it cannot break the
+        # quoted Arkime term.
+        cid = e.get("community_id")
+        if cid:
+            edge["arkime_pcap_url"] = arkime_sessions_link(f'communityId == "{cid}"')
+        edges.append(edge)
 
     port_bytes: Dict[int, int] = {}
     for e in convo["edges"]:

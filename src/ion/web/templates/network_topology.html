@@ -93,6 +93,18 @@
   color: var(--color-base-content);
   font-family: var(--font-mono, ui-monospace, monospace);
 }
+/* Ops-console backdrop: dark base + a faint blue glow + a subtle grid, so the
+   graph reads as a surface rather than floating on flat grey. vis draws on a
+   transparent canvas, so this shows through behind the nodes. */
+#nt-canvas {
+  background-color: #0b0f14;
+  background-image:
+    radial-gradient(1000px circle at 50% 28%, rgba(88, 166, 255, 0.12), transparent 55%),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+  border: 1px solid var(--color-base-300);
+}
 .nt-legend {
   display: inline-flex;
   align-items: center;
@@ -238,7 +250,7 @@
   letter-spacing: .5px;
 }
 </style>
-<script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/cytoscape.min.js"></script>
 <script nonce="{{ csp_nonce }}">
 const NT_API = '/api/arkime/traffic/topology';
 let ntNetwork = null;
@@ -253,6 +265,46 @@ const NT_COLORS = {
   threat:   '#f85149',
   asset:    '#3fb950',
 };
+
+// Log-scaled sizes so a byte range spanning orders of magnitude stays legible.
+function ntNodeSize(bytes){ const b = Math.max(Number(bytes) || 0, 1); return Math.max(22, Math.min(92, 16 + Math.log10(b) * 9)); }
+function ntEdgeWidth(bytes){ const b = Math.max(Number(bytes) || 0, 1); return Math.max(1.5, Math.min(12, Math.log10(b) * 1.6)); }
+
+// Cytoscape stylesheet — gradient spheres, category colours, a red glow on
+// threat-linked nodes, curved width-scaled edges. Node/edge label text comes
+// from packet capture; Cytoscape renders labels as plain text (not HTML), so
+// this is not an injection sink (the detail panel does its own escaping).
+const NT_CY_STYLE = [
+  { selector: 'node', style: {
+      'width': 'data(size)', 'height': 'data(size)',
+      'label': 'data(label)', 'text-wrap': 'wrap',
+      'color': '#e6edf3', 'font-family': 'JetBrains Mono, monospace', 'font-size': 11,
+      'text-outline-width': 3, 'text-outline-color': '#0b0f14',
+      'text-valign': 'bottom', 'text-margin-y': 5,
+      'border-width': 2, 'border-color': '#30363d',
+      'background-fill': 'radial-gradient', 'background-gradient-stop-positions': '0 100',
+  }},
+  { selector: 'node[kind="subnet"]', style: { 'shape': 'round-hexagon' } },
+  { selector: 'node[kind="host"]',   style: { 'shape': 'ellipse' } },
+  { selector: 'node[cat="subnet"]',   style: { 'background-gradient-stop-colors': '#a5d6ff #388bfd' } },
+  { selector: 'node[cat="internal"]', style: { 'background-gradient-stop-colors': '#79c0ff #1f6feb' } },
+  { selector: 'node[cat="external"]', style: { 'background-gradient-stop-colors': '#f0c674 #bb8009' } },
+  { selector: 'node[cat="asset"]',    style: { 'background-gradient-stop-colors': '#56d364 #238636' } },
+  { selector: 'node[cat="threat"]',   style: {
+      'background-gradient-stop-colors': '#ff9492 #da3633', 'border-color': '#ff7b72',
+      'underlay-color': '#f85149', 'underlay-opacity': 0.35, 'underlay-padding': 12 } },
+  { selector: 'edge', style: {
+      'width': 'data(width)', 'curve-style': 'bezier', 'opacity': 0.8,
+      'line-color': '#484f58', 'target-arrow-color': '#484f58',
+      'target-arrow-shape': 'triangle', 'arrow-scale': 0.85,
+      'label': 'data(label)', 'font-size': 9, 'color': '#8b949e',
+      'text-outline-width': 3, 'text-outline-color': '#0b0f14', 'text-rotation': 'autorotate',
+  }},
+  { selector: 'edge[ecls="threat"]', style: {
+      'line-color': '#ff7b72', 'target-arrow-color': '#ff7b72', 'opacity': 1 } },
+  { selector: 'node:selected', style: { 'border-width': 4, 'border-color': '#58a6ff' } },
+  { selector: 'edge:selected', style: { 'width': 4, 'line-color': '#58a6ff', 'target-arrow-color': '#58a6ff', 'opacity': 1 } },
+];
 
 function ntEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 
@@ -349,6 +401,7 @@ function ntBuildGraph(){
     }
   });
 
+  const NT_LVL = { low: 1, medium: 2, high: 3, critical: 4 };
   const edgeMap = new Map();
   rawEdges.forEach(e => {
     const a = keyFor(e.src), b = keyFor(e.dst);
@@ -359,64 +412,40 @@ function ntBuildGraph(){
     agg.bytes += e.bytes; agg.sessions += e.sessions;
     if (e.protocol) agg.protos[e.protocol] = (agg.protos[e.protocol] || 0) + e.bytes;
     if (e.bytes > agg.sample.bytes) agg.sample = e;
+    // Aggregate the worst endpoint-threat seen on any flow in this pair.
+    if (e.threat && (!agg.threat || (NT_LVL[e.threat.level] || 0) > (NT_LVL[agg.threat.level] || 0))) agg.threat = e.threat;
   });
 
-  const visNodes = [];
+  const elements = [];
   nodes.forEach((v, k) => {
     if (v.kind === 'host') {
       const n = v.host;
-      const cat = ntNodeCategory(n);
       const label = n.asset && n.asset.hostname ? `${n.asset.hostname}\n${n.ip}` : n.ip;
-      visNodes.push({
-        id: k, label, value: Math.max(n.bytes, 1), shape: 'dot',
-        color: { background: NT_COLORS[cat], border: cat === 'threat' ? '#ff7b72' : '#30363d' },
-        font: { color: '#c9d1d9', size: 11, face: 'JetBrains Mono, monospace' },
-        title: ntTooltip([
-          n.ip,
-          n.asset ? `asset: ${n.asset.hostname} (${n.asset.criticality})` : null,
-          n.threat ? `threat: ${n.threat.level} · ${n.threat.case_count} case(s)` : null,
-          `${ntFmtBytes(n.bytes)} · ${n.sessions} sessions`,
-        ]),
-      });
+      elements.push({ group: 'nodes', data: {
+        id: k, label, kind: 'host', cat: ntNodeCategory(n), size: ntNodeSize(n.bytes),
+      }});
     } else {
-      const hostsLbl = `${v.hosts} host${v.hosts === 1 ? '' : 's'}`;
-      visNodes.push({
-        id: k, label: `${v.subnet}\n${hostsLbl}`, value: Math.max(v.bytes, 1), shape: 'hexagon',
-        color: { background: v.threat ? NT_COLORS.threat : NT_COLORS.subnet, border: '#30363d' },
-        font: { color: '#c9d1d9', size: 11, face: 'JetBrains Mono, monospace' },
-        title: ntTooltip([
-          v.subnet,
-          `${hostsLbl} · ${v.assets} known asset${v.assets === 1 ? '' : 's'}`,
-          `${ntFmtBytes(v.bytes)} · ${v.sessions} sessions`,
-          'Click, then "Drill into subnet" to expand',
-        ]),
-      });
+      elements.push({ group: 'nodes', data: {
+        id: k, kind: 'subnet', cat: v.threat ? 'threat' : 'subnet', size: ntNodeSize(v.bytes),
+        label: `${v.subnet}\n${v.hosts} host${v.hosts === 1 ? '' : 's'}`,
+      }});
     }
   });
 
-  const visEdges = [];
-  let i = 0;
+  let ei = 0;
   edgeMap.forEach(agg => {
     const protos = Object.keys(agg.protos);
     const dominant = protos.length ? protos.reduce((a, b) => agg.protos[a] >= agg.protos[b] ? a : b) : '';
     const port = agg.sample.port;
     const label = dominant ? (port != null ? `${dominant}:${port}` : dominant) : '';
-    visEdges.push({
-      id: 'e' + (i++), from: agg.from, to: agg.to,
-      value: Math.max(agg.bytes, 1), label,
-      color: { color: '#484f58', highlight: '#58a6ff' },
-      font: { color: '#8b949e', size: 9, align: 'middle' },
-      arrows: { to: { enabled: true, scaleFactor: 0.4 } },
-      smooth: { type: 'continuous' },
-      title: ntTooltip([
-        `${agg.from.slice(2)} → ${agg.to.slice(2)}`,
-        `${ntFmtBytes(agg.bytes)} · ${agg.sessions} sessions`,
-        agg.sample.throughput_bps != null ? `~${ntFmtRate(agg.sample.throughput_bps)} (busiest pair)` : null,
-      ]),
-      _agg: agg,
-    });
+    elements.push({ group: 'edges', data: {
+      id: 'e' + (ei++), source: agg.from, target: agg.to, label,
+      width: ntEdgeWidth(agg.bytes),
+      ecls: (agg.threat && agg.threat.malicious) ? 'threat' : 'normal',
+      agg,
+    }});
   });
-  return { visNodes, visEdges };
+  return elements;
 }
 
 function ntRender(){
@@ -440,32 +469,25 @@ function ntRender(){
     <span class="nt-legend">${legend}</span>
   `;
 
-  const { visNodes, visEdges } = ntBuildGraph();
+  const elements = ntBuildGraph();
   const container = document.getElementById('nt-canvas');
   container.innerHTML = '';
-  const options = {
-    physics: {
-      forceAtlas2Based: { gravitationalConstant: -70, springLength: 110 },
-      solver: 'forceAtlas2Based',
-      stabilization: { iterations: 220 },
-    },
-    interaction: { hover: true, tooltipDelay: 150 },
-    nodes: { scaling: { min: 8, max: 42 }, borderWidth: 2, borderWidthSelected: 3 },
-    edges: { scaling: { min: 1, max: 8 } },
-  };
   if (ntNetwork) { ntNetwork.destroy(); ntNetwork = null; }
-  ntNetwork = new vis.Network(container, {
-    nodes: new vis.DataSet(visNodes),
-    edges: new vis.DataSet(visEdges),
-  }, options);
-  ntNetwork.on('selectNode', p => ntShowNode(p.nodes[0]));
-  ntNetwork.on('selectEdge', p => {
-    if (ntNetwork.getSelectedNodes().length) return;
-    const edge = visEdges.find(e => e.id === p.edges[0]);
-    if (edge) ntShowEdge(edge);
+  ntNetwork = cytoscape({
+    container,
+    elements,
+    style: NT_CY_STYLE,
+    minZoom: 0.2, maxZoom: 3, wheelSensitivity: 0.3,
+    layout: {
+      name: 'cose', animate: false, padding: 40, randomize: true,
+      idealEdgeLength: 130, nodeRepulsion: 9000, nodeOverlap: 24,
+      gravity: 0.3, componentSpacing: 120, numIter: 1200,
+    },
   });
-  ntNetwork.on('deselectNode', ntClearDetail);
-  ntNetwork.on('deselectEdge', () => { if (!ntNetwork.getSelectedNodes().length) ntClearDetail(); });
+  // Tap a node/edge for details; tap the empty canvas to clear.
+  ntNetwork.on('tap', 'node', evt => ntShowNode(evt.target.id()));
+  ntNetwork.on('tap', 'edge', evt => ntShowEdge({ _agg: evt.target.data('agg') }));
+  ntNetwork.on('tap', evt => { if (evt.target === ntNetwork) ntClearDetail(); });
 }
 
 function ntShowNode(id){
@@ -504,10 +526,16 @@ function ntShowEdge(edge){
     s.protocol ? `Dominant: <b>${ntEsc(s.protocol)}${s.port != null ? ':' + s.port : ''}</b>` : 'Protocol detail needs the session sample',
     s.throughput_bps != null ? `Busiest pair throughput: <b>${ntEsc(ntFmtRate(s.throughput_bps))}</b>` : null,
     s.packets ? `<b>${s.packets}</b> packets (sampled)` : null,
+    agg.threat ? `Threat: <b>${ntEsc(agg.threat.level)}</b>${agg.threat.malicious ? ' · <b>malicious endpoint</b>' : ''}${agg.threat.is_ioc ? ' · IOC' : ''}` : null,
   ].filter(Boolean).map(r => `<div>${r}</div>`).join('');
   let link = '';
   if (s.arkime_url && /^https?:\/\//.test(s.arkime_url)) {
     link = `<a class="nt-link" href="${ntEsc(s.arkime_url)}" target="_blank" rel="noopener noreferrer">Open in Arkime →</a>`;
+  }
+  // Per-edge PCAP: deep-link to the representative flow (its community_id), where
+  // the analyst can pull the capture. href gated ^https?:// and escaped.
+  if (s.arkime_pcap_url && /^https?:\/\//.test(s.arkime_pcap_url)) {
+    link += ` <a class="nt-link" href="${ntEsc(s.arkime_pcap_url)}" target="_blank" rel="noopener noreferrer">Flow PCAP →</a>`;
   }
   det.innerHTML = `<h3>${ntEsc(agg.from.slice(2))} → ${ntEsc(agg.to.slice(2))}</h3><div class="nt-detail-meta">${rows}</div>${link}`;
 }

@@ -171,6 +171,7 @@ for _src, _dst, _port, _proto, _bytes, _pkts, _dur, _cnt in FLOW_PAIRS:
         FLOW_SESSIONS.append({
             "id": f"flow-{_fn}",
             "node": MOCK_NODE,
+            "communityId": f"1:MockFlow{_fn:04d}Base64Pad=",
             "srcIp": _src,
             "dstIp": _dst,
             "dstPort": _port,
