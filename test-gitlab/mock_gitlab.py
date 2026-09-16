@@ -30,10 +30,6 @@ def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def _issue(iid: int) -> Dict[str, Any]:
-    return _ISSUES[iid]
-
-
 @app.get("/api/v4/projects/{project}")
 async def get_project(project: str):
     # test_connection() just needs a 200 with an object.
@@ -64,12 +60,12 @@ async def create_issue(project: str, body: Dict[str, Any]):
 
 @app.get("/api/v4/projects/{project}/issues/{iid}")
 async def get_issue(project: str, iid: int):
-    return _issue(iid)
+    return _ISSUES[iid]
 
 
 @app.put("/api/v4/projects/{project}/issues/{iid}")
 async def update_issue(project: str, iid: int, body: Dict[str, Any]):
-    issue = _issue(iid)
+    issue = _ISSUES[iid]
     if body.get("state_event") == "close":
         issue["state"] = "closed"
         issue["closed_at"] = _now()

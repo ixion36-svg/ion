@@ -29,6 +29,7 @@ from ion.models.observable import (
 from ion.services.arkime_service import (
     ArkimeService,
     arkime_sessions_link,
+    escape_arkime_quoted,
     get_arkime_service,
 )
 
@@ -54,11 +55,14 @@ def _edge_threat(
     present = [t for t in (src_t, dst_t) if t]
     if not present:
         return None
-    level = max((t.get("level") or "" for t in present),
-                key=lambda lv: _LEVEL_RANK.get(lv, 0))
+    worst = max(present, key=lambda t: _LEVEL_RANK.get(t.get("level") or "", 0))
+    level = worst.get("level") or ""
     return {
         "malicious": any(t.get("malicious") for t in present),
         "level": level,
+        # Rank travels with the edge so the browser can fold several flows into
+        # one rendered pair without repeating this table in JS.
+        "rank": _LEVEL_RANK.get(level, 0),
         "is_ioc": any(t.get("is_ioc") for t in present),
     }
 
@@ -170,6 +174,7 @@ async def build_topology(
     # Endpoint IPs are ipaddress-validated upstream (_clean_endpoint_ip), so
     # bare interpolation into the expression is safe — IP terms are unquoted.
     edges = []
+    port_bytes: Dict[int, int] = {}
     for e in convo["edges"]:
         edge = {
             **e,
@@ -177,19 +182,16 @@ async def build_topology(
                 f"ip.src == {e['src']} && ip.dst == {e['dst']}"
             ),
         }
-        et = _edge_threat(threats.get(e["src"]), threats.get(e["dst"]))
-        if et:
-            edge["threat"] = et
-        # Per-edge PCAP deep-link to the representative flow. community_id was
-        # charset-gated at capture (_COMMUNITY_ID_RE), so it cannot break the
-        # quoted Arkime term.
+        src_t, dst_t = threats.get(e["src"]), threats.get(e["dst"])
+        if src_t or dst_t:
+            edge["threat"] = _edge_threat(src_t, dst_t)
+        # Per-edge PCAP deep-link to the representative flow.
         cid = e.get("community_id")
         if cid:
-            edge["arkime_pcap_url"] = arkime_sessions_link(f'communityId == "{cid}"')
+            edge["arkime_pcap_url"] = arkime_sessions_link(
+                f'communityId == "{escape_arkime_quoted(cid)}"'
+            )
         edges.append(edge)
-
-    port_bytes: Dict[int, int] = {}
-    for e in convo["edges"]:
         if e.get("port") is not None:
             port_bytes[e["port"]] = port_bytes.get(e["port"], 0) + int(e.get("bytes") or 0)
     port_distribution = sorted(

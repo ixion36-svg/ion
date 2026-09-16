@@ -52,6 +52,8 @@ def test_edge_threat_picks_worst_endpoint_level():
     et = tm._edge_threat({"level": "low", "malicious": False},
                          {"level": "high", "malicious": True})
     assert et["level"] == "high" and et["malicious"] is True
+    # rank travels with the edge so the browser need not carry its own table
+    assert et["rank"] == tm._LEVEL_RANK["high"]
 
 
 def test_edge_threat_none_without_ledgered_endpoints():

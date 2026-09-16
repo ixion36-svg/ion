@@ -25,11 +25,11 @@
 - **Rendered on Cytoscape** (already vendored, previously unused) — gradient
   nodes, curved width-scaled edges, a red glow on threat nodes, `cose` layout,
   and an ops-console backdrop. vis-network stays vendored for the other
-  Infrastructure views. Cytoscape's single injected stylesheet
-  (`position: relative` on its container) is allowed by a **pinned sha256 hash**
-  in `style-src` — the CSP keeps its strict nonce policy with no
-  `unsafe-inline`; bumping the vendored cytoscape build means regenerating that
-  hash.
+  Infrastructure views. Cytoscape would inject a nonce-less stylesheet
+  (`position: relative` on its container), which the strict `style-src` refuses;
+  the page pre-declares that rule in its own nonce'd block under the id
+  Cytoscape looks for, so the injection never happens and **the CSP is
+  unchanged** — no hash, no `unsafe-inline`.
 
 **GitLab tuning-request mirroring verified end-to-end** (the PROD-verify owed
 since v0.87.0). New lightweight `test-gitlab/mock_gitlab.py` (GitLab CE is not

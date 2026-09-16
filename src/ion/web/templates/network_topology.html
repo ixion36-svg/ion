@@ -75,7 +75,11 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
+<style nonce="{{ csp_nonce }}" id="__________cytoscape_stylesheet">
+/* Cytoscape injects this exact rule as a nonce-less <style> unless an element
+   with that id already exists, which would violate our strict style-src. Owning
+   the id suppresses the injection — keep both the id and the rule. */
+.__________cytoscape_container { position: relative; }
 /* JS toggles .active on .nt-seg-btn, not daisyUI .btn-active. Bridge the two. */
 #nt-range-tabs .nt-seg-btn.active {
   background-color: var(--color-primary);
@@ -94,8 +98,8 @@
   font-family: var(--font-mono, ui-monospace, monospace);
 }
 /* Ops-console backdrop: dark base + a faint blue glow + a subtle grid, so the
-   graph reads as a surface rather than floating on flat grey. vis draws on a
-   transparent canvas, so this shows through behind the nodes. */
+   graph reads as a surface rather than floating on flat grey. Cytoscape draws on
+   a transparent canvas, so this shows through behind the nodes. */
 #nt-canvas {
   background-color: #0b0f14;
   background-image:
@@ -253,18 +257,23 @@
 <script nonce="{{ csp_nonce }}" src="/static/js/cytoscape.min.js"></script>
 <script nonce="{{ csp_nonce }}">
 const NT_API = '/api/arkime/traffic/topology';
-let ntNetwork = null;
+let ntCy = null;
 let ntData = null;
 let ntRange = '24h';
 const ntExpanded = new Set();
 
-const NT_COLORS = {
-  subnet:   '#79c0ff',
-  internal: '#58a6ff',
-  external: '#d29922',
-  threat:   '#f85149',
-  asset:    '#3fb950',
+// One palette per category: [inner, outer] radial-gradient stops. The legend
+// swatch uses the outer stop, so the key always names a colour the graph draws.
+const NT_CATS = {
+  subnet:   ['#a5d6ff', '#388bfd'],
+  internal: ['#79c0ff', '#1f6feb'],
+  external: ['#f0c674', '#bb8009'],
+  threat:   ['#ff9492', '#da3633'],
+  asset:    ['#56d364', '#238636'],
 };
+const NT_COLORS = Object.fromEntries(
+  Object.entries(NT_CATS).map(([cat, stops]) => [cat, stops[1]])
+);
 
 // Log-scaled sizes so a byte range spanning orders of magnitude stays legible.
 function ntNodeSize(bytes){ const b = Math.max(Number(bytes) || 0, 1); return Math.max(22, Math.min(92, 16 + Math.log10(b) * 9)); }
@@ -286,12 +295,12 @@ const NT_CY_STYLE = [
   }},
   { selector: 'node[kind="subnet"]', style: { 'shape': 'round-hexagon' } },
   { selector: 'node[kind="host"]',   style: { 'shape': 'ellipse' } },
-  { selector: 'node[cat="subnet"]',   style: { 'background-gradient-stop-colors': '#a5d6ff #388bfd' } },
-  { selector: 'node[cat="internal"]', style: { 'background-gradient-stop-colors': '#79c0ff #1f6feb' } },
-  { selector: 'node[cat="external"]', style: { 'background-gradient-stop-colors': '#f0c674 #bb8009' } },
-  { selector: 'node[cat="asset"]',    style: { 'background-gradient-stop-colors': '#56d364 #238636' } },
-  { selector: 'node[cat="threat"]',   style: {
-      'background-gradient-stop-colors': '#ff9492 #da3633', 'border-color': '#ff7b72',
+  ...Object.entries(NT_CATS).map(([cat, stops]) => ({
+    selector: `node[cat="${cat}"]`,
+    style: { 'background-gradient-stop-colors': stops.join(' ') },
+  })),
+  { selector: 'node[cat="threat"]', style: {
+      'border-color': '#ff7b72',
       'underlay-color': '#f85149', 'underlay-opacity': 0.35, 'underlay-padding': 12 } },
   { selector: 'edge', style: {
       'width': 'data(width)', 'curve-style': 'bezier', 'opacity': 0.8,
@@ -360,26 +369,12 @@ function ntNodeCategory(n){
   return n.private ? 'internal' : 'external';
 }
 
-// Tooltips are built as DOM elements with textContent — node/edge strings
-// originate from packet capture and must never hit innerHTML.
-function ntTooltip(lines){
-  const el = document.createElement('div');
-  lines.filter(Boolean).forEach(t => {
-    const row = document.createElement('div');
-    row.textContent = t;
-    el.appendChild(row);
-  });
-  return el;
-}
-
 function ntBuildGraph(){
   const grouped = document.getElementById('nt-group').checked;
   const hosts = ntData.nodes || [];
   const rawEdges = ntData.edges || [];
   const subnetOf = {};
   hosts.forEach(n => { subnetOf[n.ip] = n.subnet || ''; });
-  const byIp = {};
-  hosts.forEach(n => { byIp[n.ip] = n; });
 
   const keyFor = ip => {
     const sn = subnetOf[ip];
@@ -401,7 +396,6 @@ function ntBuildGraph(){
     }
   });
 
-  const NT_LVL = { low: 1, medium: 2, high: 3, critical: 4 };
   const edgeMap = new Map();
   rawEdges.forEach(e => {
     const a = keyFor(e.src), b = keyFor(e.dst);
@@ -413,7 +407,7 @@ function ntBuildGraph(){
     if (e.protocol) agg.protos[e.protocol] = (agg.protos[e.protocol] || 0) + e.bytes;
     if (e.bytes > agg.sample.bytes) agg.sample = e;
     // Aggregate the worst endpoint-threat seen on any flow in this pair.
-    if (e.threat && (!agg.threat || (NT_LVL[e.threat.level] || 0) > (NT_LVL[agg.threat.level] || 0))) agg.threat = e.threat;
+    if (e.threat && (!agg.threat || e.threat.rank > agg.threat.rank)) agg.threat = e.threat;
   });
 
   const elements = [];
@@ -441,7 +435,7 @@ function ntBuildGraph(){
     elements.push({ group: 'edges', data: {
       id: 'e' + (ei++), source: agg.from, target: agg.to, label,
       width: ntEdgeWidth(agg.bytes),
-      ecls: (agg.threat && agg.threat.malicious) ? 'threat' : 'normal',
+      ecls: (agg.threat && agg.threat.malicious) ? 'threat' : '',
       agg,
     }});
   });
@@ -471,9 +465,9 @@ function ntRender(){
 
   const elements = ntBuildGraph();
   const container = document.getElementById('nt-canvas');
+  if (ntCy) { ntCy.destroy(); ntCy = null; }
   container.innerHTML = '';
-  if (ntNetwork) { ntNetwork.destroy(); ntNetwork = null; }
-  ntNetwork = cytoscape({
+  ntCy = cytoscape({
     container,
     elements,
     style: NT_CY_STYLE,
@@ -485,9 +479,9 @@ function ntRender(){
     },
   });
   // Tap a node/edge for details; tap the empty canvas to clear.
-  ntNetwork.on('tap', 'node', evt => ntShowNode(evt.target.id()));
-  ntNetwork.on('tap', 'edge', evt => ntShowEdge({ _agg: evt.target.data('agg') }));
-  ntNetwork.on('tap', evt => { if (evt.target === ntNetwork) ntClearDetail(); });
+  ntCy.on('tap', 'node', evt => ntShowNode(evt.target.id()));
+  ntCy.on('tap', 'edge', evt => ntShowEdge(evt.target.data('agg')));
+  ntCy.on('tap', evt => { if (evt.target === ntCy) ntClearDetail(); });
 }
 
 function ntShowNode(id){
@@ -516,10 +510,9 @@ function ntShowNode(id){
   det.innerHTML = `<h3>${ntEsc(ip)}</h3><div class="nt-detail-meta">${rows}</div>${links}`;
 }
 
-function ntShowEdge(edge){
+function ntShowEdge(agg){
   const det = document.getElementById('nt-detail');
   det.classList.remove('empty');
-  const agg = edge._agg;
   const s = agg.sample;
   const rows = [
     `<b>${ntEsc(ntFmtBytes(agg.bytes))}</b> · <b>${agg.sessions}</b> sessions`,

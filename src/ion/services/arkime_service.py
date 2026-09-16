@@ -1343,7 +1343,8 @@ class ArkimeService:
     _CONVO_SAMPLE = 1000  # sessions fetched for edge enrichment / graph fallback
     _PROTO_NAME_RE = re.compile(r"[a-z0-9._-]{1,32}")
     # Community ID: version prefix + base64 hash, e.g. "1:LQU9qZlK+B5F3KDmev6m=".
-    # Gated because it is interpolated into an Arkime expression for the deep-link.
+    # A quality filter, not a security control — expression safety comes from
+    # escape_arkime_quoted at the interpolation site.
     _COMMUNITY_ID_RE = re.compile(r"[0-9]:[A-Za-z0-9+/=]{8,96}")
 
     @classmethod
@@ -1426,7 +1427,7 @@ class ArkimeService:
                     "protocol": enr["protocol"] if enr else "",
                     "port": enr["port"] if enr else None,
                     "throughput_bps": enr["throughput_bps"] if enr else None,
-                    "community_id": enr.get("community_id") if enr else None,
+                    "community_id": enr["community_id"] if enr else None,
                 })
             edges, method = merged, "connections"
         else:
@@ -1587,8 +1588,7 @@ class ArkimeService:
             entry["sessions"] += 1
             entry["packets"] += pk
             # Keep the community_id of the pair's largest flow as a representative
-            # for a per-edge PCAP deep-link. Charset-gated: it is interpolated
-            # into an Arkime expression downstream.
+            # for a per-edge PCAP deep-link.
             if b > entry["_rep_bytes"]:
                 cid = str(s.get("communityId") or "").strip()
                 if cid and self._COMMUNITY_ID_RE.fullmatch(cid):

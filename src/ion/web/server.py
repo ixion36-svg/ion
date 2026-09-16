@@ -221,14 +221,7 @@ _HSTS = (b"strict-transport-security", b"max-age=31536000; includeSubDomains")
 _CSP_HEAD = b"default-src 'self'; script-src 'self' 'nonce-"
 _CSP_MID = b"'; script-src-attr 'none'; style-src 'self' 'nonce-"
 _CSP_TAIL = (
-    # cytoscape.min.js (Flow Topology graph) injects one stylesheet,
-    # `.__________cytoscape_container { position: relative; }`, with no nonce.
-    # Allow exactly that rule by hash so the strict style-src stays free of
-    # 'unsafe-inline'. Coupling: the hash is over the vendored cytoscape build's
-    # exact bytes — bump cytoscape.min.js and this must be regenerated, or the
-    # Flow Topology page logs a CSP violation (the graph still draws on canvas).
-    b"' 'sha256-pgvDUBa4IjFA2yuSJ2cqcyxmNYJMborsd0ORcRv9vw8='"
-    b"; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; "
+    b"'; style-src-attr 'none'; img-src 'self' data:; font-src 'self'; "
     b"connect-src 'self'; object-src 'none'; base-uri 'self'; "
     b"form-action 'self'; frame-ancestors 'none'"
 )
