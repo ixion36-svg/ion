@@ -416,13 +416,9 @@ def _run_migrations(engine: Engine) -> None:
             "observables": "JSON",
             "dfir_iris_case_id": "INTEGER",
         }
-        with engine.begin() as conn:
-            for col_name, col_type in new_columns.items():
-                if col_name not in existing:
-                    conn.execute(
-                        text(f"ALTER TABLE alert_cases ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: alert_cases.%s", col_name)
+        for col_name, col_type in new_columns.items():
+            if col_name not in existing:
+                _add_column_tolerant(engine, "alert_cases", col_name, col_type)
 
     # AlertCase closure fields
     if insp.has_table("alert_cases"):
@@ -434,68 +430,32 @@ def _run_migrations(engine: Engine) -> None:
             "closed_at": dt_type,
         }.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE alert_cases ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: alert_cases.%s", col_name)
+                _add_column_tolerant(engine, "alert_cases", col_name, col_type)
 
     # Migrations for alert_triage table
     if insp.has_table("alert_triage"):
         existing = {col["name"] for col in insp.get_columns("alert_triage")}
         if "analyst_notes" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE alert_triage ADD COLUMN analyst_notes TEXT")
-                )
-                logger.info("Migrated: alert_triage.analyst_notes")
+            _add_column_tolerant(engine, "alert_triage", "analyst_notes", "TEXT")
         if "observables" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE alert_triage ADD COLUMN observables JSON")
-                )
-                logger.info("Migrated: alert_triage.observables")
+            _add_column_tolerant(engine, "alert_triage", "observables", "JSON")
         if "mitre_techniques" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE alert_triage ADD COLUMN mitre_techniques JSON")
-                )
-                logger.info("Migrated: alert_triage.mitre_techniques")
+            _add_column_tolerant(engine, "alert_triage", "mitre_techniques", "JSON")
         # Bob's suggested verdict hint on triage rows
         if "suggested_verdict" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE alert_triage ADD COLUMN suggested_verdict VARCHAR(50)")
-                )
-                logger.info("Migrated: alert_triage.suggested_verdict")
+            _add_column_tolerant(engine, "alert_triage", "suggested_verdict", "VARCHAR(50)")
         if "suggested_verdict_confidence" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE alert_triage ADD COLUMN suggested_verdict_confidence VARCHAR(20)")
-                )
-                logger.info("Migrated: alert_triage.suggested_verdict_confidence")
+            _add_column_tolerant(engine, "alert_triage", "suggested_verdict_confidence", "VARCHAR(20)")
         # rule_name denormalized for case detail rendering
         if "rule_name" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE alert_triage ADD COLUMN rule_name VARCHAR(500)")
-                )
-                logger.info("Migrated: alert_triage.rule_name")
+            _add_column_tolerant(engine, "alert_triage", "rule_name", "VARCHAR(500)")
 
     # users.is_service_account for Bob + other service users
     if insp.has_table("users"):
         existing = {col["name"] for col in insp.get_columns("users")}
         if "is_service_account" not in existing:
-            with engine.begin() as conn:
-                # NOT NULL with default 0 — existing rows all become human users
-                conn.execute(
-                    text(
-                        "ALTER TABLE users ADD COLUMN is_service_account BOOLEAN NOT NULL DEFAULT 0"
-                        if not _is_postgres(engine)
-                        else "ALTER TABLE users ADD COLUMN is_service_account BOOLEAN NOT NULL DEFAULT FALSE"
-                    )
-                )
-                logger.info("Migrated: users.is_service_account")
+            # NOT NULL with default 0 — existing rows all become human users
+            _add_column_tolerant(engine, "users", "is_service_account", "BOOLEAN NOT NULL DEFAULT FALSE")
 
     # planned_date (CAB date-only field) on an existing
     # change_requests table. create_all only creates missing tables, not
@@ -729,56 +689,34 @@ def _run_migrations(engine: Engine) -> None:
         }
         for col_name in ("mitre_techniques_json", "mitre_tactics_json"):
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(
-                            f"ALTER TABLE alert_prompt_templates ADD COLUMN {col_name} TEXT"
-                        )
-                    )
-                    logger.info(
-                        "Migrated: alert_prompt_templates.%s", col_name
-                    )
+                _add_column_tolerant(engine, "alert_prompt_templates", col_name, "TEXT")
 
     # Migrations for playbook_executions table
     if insp.has_table("playbook_executions"):
         existing = {col["name"] for col in insp.get_columns("playbook_executions")}
         if "case_id" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE playbook_executions ADD COLUMN case_id INTEGER REFERENCES alert_cases(id)")
-                )
-                logger.info("Migrated: playbook_executions.case_id")
-        for col, sql in [
-            ("outcome", "ALTER TABLE playbook_executions ADD COLUMN outcome VARCHAR(50)"),
-            ("outcome_notes", "ALTER TABLE playbook_executions ADD COLUMN outcome_notes TEXT"),
-            ("report_document_id", "ALTER TABLE playbook_executions ADD COLUMN report_document_id INTEGER REFERENCES documents(id)"),
+            _add_column_tolerant(engine, "playbook_executions", "case_id", "INTEGER REFERENCES alert_cases(id)")
+        for col, col_def in [
+            ("outcome", "VARCHAR(50)"),
+            ("outcome_notes", "TEXT"),
+            ("report_document_id", "INTEGER REFERENCES documents(id)"),
         ]:
             if col not in existing:
-                with engine.begin() as conn:
-                    conn.execute(text(sql))
-                    logger.info("Migrated: playbook_executions.%s", col)
+                _add_column_tolerant(engine, "playbook_executions", col, col_def)
 
     # Migrations for templates table
     if insp.has_table("templates"):
         existing = {col["name"] for col in insp.get_columns("templates")}
         if "document_type" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE templates ADD COLUMN document_type VARCHAR(50)"))
-                logger.info("Migrated: templates.document_type")
+            _add_column_tolerant(engine, "templates", "document_type", "VARCHAR(50)")
         if "sections_json" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE templates ADD COLUMN sections_json TEXT"))
-                logger.info("Migrated: templates.sections_json")
+            _add_column_tolerant(engine, "templates", "sections_json", "TEXT")
 
     # Migration for analyst_notes.folder_id
     if insp.has_table("analyst_notes"):
         existing = {col["name"] for col in insp.get_columns("analyst_notes")}
         if "folder_id" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE analyst_notes ADD COLUMN folder_id INTEGER REFERENCES note_folders(id)")
-                )
-                logger.info("Migrated: analyst_notes.folder_id")
+            _add_column_tolerant(engine, "analyst_notes", "folder_id", "INTEGER REFERENCES note_folders(id)")
 
     # Migrations for users table — account lockout columns + employment type
     if insp.has_table("users"):
@@ -789,11 +727,7 @@ def _run_migrations(engine: Engine) -> None:
             "employment_type": "VARCHAR(20) DEFAULT 'cs'",
         }.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: users.%s", col_name)
+                _add_column_tolerant(engine, "users", col_name, col_type)
 
     # Migrations for forensic_cases table — lock + report + playbook columns
     if insp.has_table("forensic_cases"):
@@ -806,11 +740,7 @@ def _run_migrations(engine: Engine) -> None:
             "playbook_id": "INTEGER REFERENCES forensic_playbooks(id)",
         }.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE forensic_cases ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: forensic_cases.%s", col_name)
+                _add_column_tolerant(engine, "forensic_cases", col_name, col_type)
 
     # ForensicCase Workbench tables (pins + tamper-evident ledger).
     # Base.metadata.create_all() (called in init_db) creates these tables on
@@ -854,9 +784,7 @@ def _run_migrations(engine: Engine) -> None:
     if insp.has_table("forensic_playbook_steps"):
         existing = {col["name"] for col in insp.get_columns("forensic_playbook_steps")}
         if "fields_json" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE forensic_playbook_steps ADD COLUMN fields_json TEXT"))
-                logger.info("Migrated: forensic_playbook_steps.fields_json")
+            _add_column_tolerant(engine, "forensic_playbook_steps", "fields_json", "TEXT")
 
     # Migrations for forensic_case_steps — structured fields
     if insp.has_table("forensic_case_steps"):
@@ -871,48 +799,26 @@ def _run_migrations(engine: Engine) -> None:
     if insp.has_table("user_sessions"):
         existing = {col["name"] for col in insp.get_columns("user_sessions")}
         if "active_role_id" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE user_sessions ADD COLUMN active_role_id INTEGER REFERENCES roles(id)")
-                )
-                logger.info("Migrated: user_sessions.active_role_id")
+            _add_column_tolerant(engine, "user_sessions", "active_role_id", "INTEGER REFERENCES roles(id)")
 
     # Migration for users.gitlab_username, elastic_uid (v0.9.13+)
     if insp.has_table("users"):
         existing = {col["name"] for col in insp.get_columns("users")}
         if "gitlab_username" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN gitlab_username VARCHAR(255)")
-                )
-                logger.info("Migrated: users.gitlab_username")
+            _add_column_tolerant(engine, "users", "gitlab_username", "VARCHAR(255)")
         if "elastic_uid" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN elastic_uid VARCHAR(255)")
-                )
-                logger.info("Migrated: users.elastic_uid")
+            _add_column_tolerant(engine, "users", "elastic_uid", "VARCHAR(255)")
         # elastic_username and keycloak_sub for identity mapping
         if "elastic_username" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN elastic_username VARCHAR(255)")
-                )
-                logger.info("Migrated: users.elastic_username")
+            _add_column_tolerant(engine, "users", "elastic_username", "VARCHAR(255)")
         if "keycloak_sub" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE users ADD COLUMN keycloak_sub VARCHAR(255)")
-                )
-                logger.info("Migrated: users.keycloak_sub")
+            _add_column_tolerant(engine, "users", "keycloak_sub", "VARCHAR(255)")
 
     # Variables: add options column
     if insp.has_table("variables"):
         existing = {col["name"] for col in insp.get_columns("variables")}
         if "options" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE variables ADD COLUMN options TEXT"))
-                logger.info("Migrated: variables.options")
+            _add_column_tolerant(engine, "variables", "options", "TEXT")
 
     # CyAB: add icon and tags columns to cyab_systems
     if insp.has_table("cyab_systems"):
@@ -964,26 +870,18 @@ def _run_migrations(engine: Engine) -> None:
     if insp.has_table("cyab_data_sources"):
         existing = {col["name"] for col in insp.get_columns("cyab_data_sources")}
         if "tide_system_id" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN tide_system_id VARCHAR(64)"))
-                logger.info("Migrated: cyab_data_sources.tide_system_id")
+            _add_column_tolerant(engine, "cyab_data_sources", "tide_system_id", "VARCHAR(64)")
         if "data_namespace" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN data_namespace VARCHAR(128)"))
-                logger.info("Migrated: cyab_data_sources.data_namespace")
+            _add_column_tolerant(engine, "cyab_data_sources", "data_namespace", "VARCHAR(128)")
         # Onboarding Studio sub-profile tag.
         if "subprofile_id" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE cyab_data_sources ADD COLUMN subprofile_id VARCHAR(64)"))
-                logger.info("Migrated: cyab_data_sources.subprofile_id")
+            _add_column_tolerant(engine, "cyab_data_sources", "subprofile_id", "VARCHAR(64)")
 
     # Onboarding Pack containment_authority field on cyab_systems.
     if insp.has_table("cyab_systems"):
         existing = {col["name"] for col in insp.get_columns("cyab_systems")}
         if "containment_authority" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE cyab_systems ADD COLUMN containment_authority TEXT"))
-                logger.info("Migrated: cyab_systems.containment_authority")
+            _add_column_tolerant(engine, "cyab_systems", "containment_authority", "TEXT")
 
     # Performance indexes on hot tables (alert_cases, alert_triage).
     # create_all() creates indexes for new tables but NOT for tables that
@@ -1064,14 +962,11 @@ def _run_migrations(engine: Engine) -> None:
             "review_cadence_days": "INTEGER",
             "review_notes": "TEXT",
         }
+        for col_name, col_type in sa_cols.items():
+            if col_name not in existing:
+                _add_column_tolerant(engine, "service_accounts", col_name, col_type)
+        # Backfill default cadence so existing rows aren't NULL
         with engine.begin() as conn:
-            for col_name, col_type in sa_cols.items():
-                if col_name not in existing:
-                    conn.execute(
-                        text(f"ALTER TABLE service_accounts ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: service_accounts.%s", col_name)
-            # Backfill default cadence so existing rows aren't NULL
             conn.execute(
                 text("UPDATE service_accounts SET review_cadence_days = 90 WHERE review_cadence_days IS NULL")
             )
@@ -1131,11 +1026,7 @@ def _run_migrations(engine: Engine) -> None:
     if insp.has_table("post_incident_reviews"):
         existing = {col["name"] for col in insp.get_columns("post_incident_reviews")}
         if "linked_controls" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE post_incident_reviews ADD COLUMN linked_controls JSON")
-                )
-                logger.info("Migrated: post_incident_reviews.linked_controls")
+            _add_column_tolerant(engine, "post_incident_reviews", "linked_controls", "JSON")
 
     # Observable gains TheHive-style IOC handling — TLP/PAP
     # classification, is_ioc flag, and ignore_similarity escape hatch for
@@ -1176,11 +1067,7 @@ def _run_migrations(engine: Engine) -> None:
         }
         for col_name, col_type in new_cols.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE cyab_systems ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: cyab_systems.%s", col_name)
+                _add_column_tolerant(engine, "cyab_systems", col_name, col_type)
 
     # Investigation gains prompt snapshot + raw response + key
     # observations so AIFeedback rows are debuggable (see what Bob saw, not
@@ -1195,11 +1082,7 @@ def _run_migrations(engine: Engine) -> None:
         }
         for col_name, col_type in new_cols.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE investigations ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: investigations.%s", col_name)
+                _add_column_tolerant(engine, "investigations", col_name, col_type)
 
     # lab_fixtures + lab_session_fixtures for replayable labs.
     # lab_fixtures holds the template rows (what to seed for a lesson).
@@ -1267,11 +1150,7 @@ def _run_migrations(engine: Engine) -> None:
             "escalation_attempted": f"BOOLEAN NOT NULL DEFAULT {_bool_default}",
         }.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE investigations ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: investigations.%s", col_name)
+                _add_column_tolerant(engine, "investigations", col_name, col_type)
 
     if insp.has_table("alert_triage"):
         existing = {col["name"] for col in insp.get_columns("alert_triage")}
@@ -1280,50 +1159,22 @@ def _run_migrations(engine: Engine) -> None:
             "bob_escalation_badge": "VARCHAR(30)",
         }.items():
             if col_name not in existing:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(f"ALTER TABLE alert_triage ADD COLUMN {col_name} {col_type}")
-                    )
-                    logger.info("Migrated: alert_triage.%s", col_name)
+                _add_column_tolerant(engine, "alert_triage", col_name, col_type)
 
     if insp.has_table("ai_feedback"):
         existing = {col["name"] for col in insp.get_columns("ai_feedback")}
         if "bob_confidence_int" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE ai_feedback ADD COLUMN bob_confidence_int INTEGER")
-                )
-                logger.info("Migrated: ai_feedback.bob_confidence_int")
+            _add_column_tolerant(engine, "ai_feedback", "bob_confidence_int", "INTEGER")
         if "auto_escalated" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "ALTER TABLE ai_feedback ADD COLUMN auto_escalated BOOLEAN NOT NULL DEFAULT FALSE"
-                        if _is_postgres(engine)
-                        else "ALTER TABLE ai_feedback ADD COLUMN auto_escalated BOOLEAN NOT NULL DEFAULT 0"
-                    )
-                )
-                logger.info("Migrated: ai_feedback.auto_escalated")
+            _add_column_tolerant(engine, "ai_feedback", "auto_escalated", "BOOLEAN NOT NULL DEFAULT FALSE")
         # escalation deep-pass telemetry.
         if "escalation_attempted" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text(
-                        "ALTER TABLE ai_feedback ADD COLUMN escalation_attempted BOOLEAN NOT NULL DEFAULT FALSE"
-                        if _is_postgres(engine)
-                        else "ALTER TABLE ai_feedback ADD COLUMN escalation_attempted BOOLEAN NOT NULL DEFAULT 0"
-                    )
-                )
-                logger.info("Migrated: ai_feedback.escalation_attempted")
+            _add_column_tolerant(engine, "ai_feedback", "escalation_attempted", "BOOLEAN NOT NULL DEFAULT FALSE")
 
     if insp.has_table("alert_prompt_templates"):
         existing = {col["name"] for col in insp.get_columns("alert_prompt_templates")}
         if "confidence_threshold_override" not in existing:
-            with engine.begin() as conn:
-                conn.execute(
-                    text("ALTER TABLE alert_prompt_templates ADD COLUMN confidence_threshold_override INTEGER")
-                )
-                logger.info("Migrated: alert_prompt_templates.confidence_threshold_override")
+            _add_column_tolerant(engine, "alert_prompt_templates", "confidence_threshold_override", "INTEGER")
 
     # Bob Prompt Evaluation Harness — eval run + sample tables.
     # Base.metadata.create_all creates these on fresh deployments. The blocks

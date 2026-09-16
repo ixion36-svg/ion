@@ -1272,10 +1272,65 @@ async def index(request: Request, user: User = Depends(require_page_auth)):
     return templates.TemplateResponse(request=request, name="dashboard_v2.html")
 
 
-@app.get("/templates", response_class=HTMLResponse)
-async def templates_page(request: Request, user: User = Depends(require_page_permission("template:read"))):
-    """Render the templates page."""
-    return templates.TemplateResponse(request=request, name="templates.html")
+# Static pages: path, template, required permission. Each one only renders its
+# template behind a page guard, so they register from one table rather than as
+# 36 identical handlers. Safe to register together: no dynamic route matches
+# any of these paths, so their position among the other routes cannot matter.
+_PAGES: list[tuple[str, str, str]] = [
+    ("/templates",              "templates.html",                  "template:read"),
+    ("/arkime-traffic",         "arkime_traffic.html",             "alert:read"),
+    ("/documents",              "documents.html",                  "document:read"),
+    ("/users",                  "users.html",                      "user:read"),
+    ("/audit-logs",             "audit_logs.html",                 "system:audit_view"),
+    ("/security",               "security_dashboard.html",         "security:read"),
+    ("/observables",            "observables.html",                "observable:read"),
+    ("/threat-intel",           "threat_intel.html",               "observable:read"),
+    ("/tools",                  "tools.html",                      "alert:read"),
+    ("/discover",               "discover.html",                   "alert:read"),
+    ("/analyst",                "analyst.html",                    "alert:read"),
+    ("/integrations",           "integrations.html",               "alert:read"),
+    ("/settings",               "settings.html",                   "system:settings"),
+    ("/playbooks",              "playbooks.html",                  "playbook:read"),
+    ("/chat",                   "chat.html",                       "ai:chat"),
+    ("/training",               "training.html",                   "alert:read"),
+    ("/daily-work",             "daily_work.html",                 "alert:read"),
+    ("/pcap",                   "pcap.html",                       "alert:read"),
+    ("/data-flow",              "data_flow.html",                  "alert:read"),
+    ("/forensics",              "forensics.html",                  "forensic:read"),
+    ("/analytics",              "analytics.html",                  "alert:read"),
+    ("/detection-engineering",  "detection_engineering.html",      "alert:read"),
+    ("/canaries",               "canaries.html",                   "alert:read"),
+    ("/log-sources",            "log_sources.html",                "alert:read"),
+    ("/briefing",               "briefing.html",                   "alert:read"),
+    ("/knowledge-graph",        "knowledge_graph.html",            "alert:read"),
+    ("/compliance",             "compliance.html",                 "alert:read"),
+    ("/maturity",               "maturity.html",                   "alert:read"),
+    ("/shift-handover",         "shift_handover.html",             "alert:read"),
+    ("/daily-standup",          "daily_standup.html",              "alert:read"),
+    ("/daily-standup/slides",   "daily_standup_slides.html",       "alert:read"),
+    ("/entity-timeline",        "entity_timeline.html",            "alert:read"),
+    ("/soc-health",             "soc_health.html",                 "alert:read"),
+    ("/executive-report",       "executive_report.html",           "alert:read"),
+    ("/service-accounts",       "service_accounts.html",           "alert:read"),
+    ("/architecture",           "architecture.html",               "security:read"),
+]
+
+
+def _register_pages() -> None:
+    for _path, _template, _permission in _PAGES:
+        def _page(
+            request: Request,
+            user: User = Depends(require_page_permission(_permission)),
+            _name: str = _template,
+        ):
+            return templates.TemplateResponse(request=request, name=_name)
+
+        _page.__name__ = "page_" + (_path.strip("/").replace("/", "_").replace("-", "_") or "root")
+        app.get(_path, response_class=HTMLResponse)(_page)
+
+
+_register_pages()
+
 
 
 @app.get("/scheduler", response_class=HTMLResponse)
@@ -1284,10 +1339,6 @@ async def scheduler_page(request: Request, user: User = Depends(require_page_aut
     return templates.TemplateResponse(request=request, name="scheduler.html")
 
 
-@app.get("/arkime-traffic", response_class=HTMLResponse)
-async def arkime_traffic_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Arkime traffic analytics page."""
-    return templates.TemplateResponse(request=request, name="arkime_traffic.html")
 
 
 @app.get("/templates/new", response_class=HTMLResponse)
@@ -1320,10 +1371,6 @@ async def versions_page(request: Request, template_id: int, user: User = Depends
     return templates.TemplateResponse(request=request, name="versions.html", context={"template_id": template_id})
 
 
-@app.get("/documents", response_class=HTMLResponse)
-async def documents_page(request: Request, user: User = Depends(require_page_permission("document:read"))):
-    """Render the documents page."""
-    return templates.TemplateResponse(request=request, name="documents.html")
 
 
 
@@ -1426,22 +1473,10 @@ async def profile_page(request: Request, user: User = Depends(require_page_auth)
     return templates.TemplateResponse(request=request, name="profile.html")
 
 
-@app.get("/users", response_class=HTMLResponse)
-async def users_page(request: Request, user: User = Depends(require_page_permission("user:read"))):
-    """Render the user management page (admin only)."""
-    return templates.TemplateResponse(request=request, name="users.html")
 
 
-@app.get("/audit-logs", response_class=HTMLResponse)
-async def audit_logs_page(request: Request, user: User = Depends(require_page_permission("system:audit_view"))):
-    """Render the audit logs page (admin only)."""
-    return templates.TemplateResponse(request=request, name="audit_logs.html")
 
 
-@app.get("/security", response_class=HTMLResponse)
-async def security_dashboard_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
-    """Render the security dashboard page."""
-    return templates.TemplateResponse(request=request, name="security_dashboard.html")
 
 
 @app.get("/alerts", response_class=HTMLResponse)
@@ -1551,16 +1586,8 @@ async def case_deeplink(
         s.close()
 
 
-@app.get("/observables", response_class=HTMLResponse)
-async def observables_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
-    """Render the observables tracking page."""
-    return templates.TemplateResponse(request=request, name="observables.html")
 
 
-@app.get("/threat-intel", response_class=HTMLResponse)
-async def threat_intel_page(request: Request, user: User = Depends(require_page_permission("observable:read"))):
-    """Render the threat intel page."""
-    return templates.TemplateResponse(request=request, name="threat_intel.html")
 
 
 @app.get("/threat-intel/actors/{entity_id}", response_class=HTMLResponse)
@@ -1638,10 +1665,6 @@ async def investigations_redirect():
     return RedirectResponse(url="/investigation-memory", status_code=302)
 
 
-@app.get("/tools", response_class=HTMLResponse)
-async def tools_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the document tools page."""
-    return templates.TemplateResponse(request=request, name="tools.html")
 
 
 @app.get("/cyab/scoping", response_class=HTMLResponse)
@@ -2149,52 +2172,20 @@ def cyab_onboard_page(
     )
 
 
-@app.get("/discover", response_class=HTMLResponse)
-async def discover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the discover and hunt page for analysts."""
-    return templates.TemplateResponse(request=request, name="discover.html")
 
 
-@app.get("/analyst", response_class=HTMLResponse)
-async def analyst_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the unified analyst workspace page."""
-    return templates.TemplateResponse(request=request, name="analyst.html")
 
 
-@app.get("/integrations", response_class=HTMLResponse)
-async def integrations_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the integrations management page (read-only for analysts, full access for engineers)."""
-    return templates.TemplateResponse(request=request, name="integrations.html")
 
 
-@app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request, user: User = Depends(require_page_permission("system:settings"))):
-    """Render the system settings page."""
-    return templates.TemplateResponse(request=request, name="settings.html")
 
 
-@app.get("/playbooks", response_class=HTMLResponse)
-async def playbooks_page(request: Request, user: User = Depends(require_page_permission("playbook:read"))):
-    """Render the playbooks management page."""
-    return templates.TemplateResponse(request=request, name="playbooks.html")
 
 
-@app.get("/chat", response_class=HTMLResponse)
-async def chat_page(request: Request, user: User = Depends(require_page_permission("ai:chat"))):
-    """Render the AI chat page."""
-    return templates.TemplateResponse(request=request, name="chat.html")
 
 
-@app.get("/training", response_class=HTMLResponse)
-async def training_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the training pathways page."""
-    return templates.TemplateResponse(request=request, name="training.html")
 
 
-@app.get("/daily-work", response_class=HTMLResponse)
-async def daily_work_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the daily-work tracking page (My Day / Team Day)."""
-    return templates.TemplateResponse(request=request, name="daily_work.html")
 
 
 @app.get("/notes", response_class=HTMLResponse)
@@ -2203,34 +2194,13 @@ async def notes_page(request: Request, user: User = Depends(require_page_auth)):
     return templates.TemplateResponse(request=request, name="notes.html")
 
 
-@app.get("/pcap", response_class=HTMLResponse)
-async def pcap_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the PCAP analyzer page."""
-    return templates.TemplateResponse(request=request, name="pcap.html")
-
-
-@app.get("/data-flow", response_class=HTMLResponse)
-async def data_flow_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Data Flow visualization page (legacy / modern / compare).
-
-    Recovered from v0.9.61 in v0.9.70 — the page + route + integration
-    metrics endpoint were lost when v0.9.61's working tree was never
-    committed back to git after the docker push.
-    """
-    return templates.TemplateResponse(request=request, name="data_flow.html")
 
 
 
-@app.get("/forensics", response_class=HTMLResponse)
-async def forensics_page(request: Request, user: User = Depends(require_page_permission("forensic:read"))):
-    """Render the forensic investigations page."""
-    return templates.TemplateResponse(request=request, name="forensics.html")
 
 
-@app.get("/analytics", response_class=HTMLResponse)
-async def analytics_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Analytics Engine dashboard."""
-    return templates.TemplateResponse(request=request, name="analytics.html")
+
+
 
 
 @app.get("/social", response_class=HTMLResponse)
@@ -2253,82 +2223,31 @@ async def engineering_analytics_redirect():
     return RedirectResponse(url="/analytics?tab=systems", status_code=302)
 
 
-@app.get("/detection-engineering", response_class=HTMLResponse)
-async def detection_engineering_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Detection Engineering page (TIDE-powered)."""
-    return templates.TemplateResponse(request=request, name="detection_engineering.html")
-
-
-@app.get("/canaries", response_class=HTMLResponse)
-async def canaries_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Canary / Deception Tracker page."""
-    return templates.TemplateResponse(request=request, name="canaries.html")
-
-
-@app.get("/log-sources", response_class=HTMLResponse)
-async def log_sources_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Log Source Health Monitor page."""
-    return templates.TemplateResponse(request=request, name="log_sources.html")
-
-
-@app.get("/briefing", response_class=HTMLResponse)
-async def briefing_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Morning Threat Briefing page."""
-    return templates.TemplateResponse(request=request, name="briefing.html")
-
-
-@app.get("/knowledge-graph", response_class=HTMLResponse)
-async def knowledge_graph_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Knowledge Graph page."""
-    return templates.TemplateResponse(request=request, name="knowledge_graph.html")
-
-
-@app.get("/compliance", response_class=HTMLResponse)
-async def compliance_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the multi-framework Compliance Posture page."""
-    return templates.TemplateResponse(request=request, name="compliance.html")
-
-
-@app.get("/maturity", response_class=HTMLResponse)
-async def maturity_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the SOC Maturity Assessment page."""
-    return templates.TemplateResponse(request=request, name="maturity.html")
 
 
 
 
 
-@app.get("/shift-handover", response_class=HTMLResponse)
-async def shift_handover_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Shift Handover Report page."""
-    return templates.TemplateResponse(request=request, name="shift_handover.html")
-
-
-@app.get("/daily-standup", response_class=HTMLResponse)
-async def daily_standup_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Daily SOC Standup / Duty Check page."""
-    return templates.TemplateResponse(request=request, name="daily_standup.html")
-
-
-@app.get("/daily-standup/slides", response_class=HTMLResponse)
-async def daily_standup_slides_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """v0.19.9: presentation-mode slide deck of the daily standup.
-
-    Pulls the same /api/daily-standup/checks payload as the live page
-    and renders one panel per slide. Keyboard-navigable (← / → / Esc /
-    F for fullscreen). Shareable URL — useful for screen-sharing the
-    standup without overwhelming participants with the full data table
-    view.
-    """
-    return templates.TemplateResponse(request=request, name="daily_standup_slides.html")
 
 
 
 
-@app.get("/entity-timeline", response_class=HTMLResponse)
-async def entity_timeline_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Entity Timeline page."""
-    return templates.TemplateResponse(request=request, name="entity_timeline.html")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.get("/analyst-efficiency")
@@ -2346,10 +2265,6 @@ async def analyst_efficiency_redirect():
     return RedirectResponse(url="/executive-report", status_code=302)
 
 
-@app.get("/soc-health", response_class=HTMLResponse)
-async def soc_health_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the SOC Health Scorecard page."""
-    return templates.TemplateResponse(request=request, name="soc_health.html")
 
 
 @app.get("/detection-health", response_class=HTMLResponse)
@@ -2432,17 +2347,9 @@ async def attack_stories_redirect():
     return RedirectResponse(url="/threat-intel", status_code=302)
 
 
-@app.get("/executive-report", response_class=HTMLResponse)
-async def executive_report_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Executive Report page."""
-    return templates.TemplateResponse(request=request, name="executive_report.html")
 
 
 
-@app.get("/service-accounts", response_class=HTMLResponse)
-async def service_accounts_page(request: Request, user: User = Depends(require_page_permission("alert:read"))):
-    """Render the Service Account Tracker page."""
-    return templates.TemplateResponse(request=request, name="service_accounts.html")
 
 
 @app.get("/topology")
@@ -2467,10 +2374,6 @@ async def topology_redirect():
     return RedirectResponse(url="/integrations?tab=topology", status_code=302)
 
 
-@app.get("/architecture", response_class=HTMLResponse)
-async def architecture_page(request: Request, user: User = Depends(require_page_permission("security:read"))):
-    """Render the system architecture flow diagram page."""
-    return templates.TemplateResponse(request=request, name="architecture.html")
 
 
 @app.get("/network-map", response_class=HTMLResponse)
