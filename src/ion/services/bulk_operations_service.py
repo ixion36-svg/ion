@@ -13,6 +13,7 @@ from ion.models.alert_triage import (
     AlertTriage,
     AlertTriageStatus,
 )
+from ion.services.ai_feedback_service import record_close_feedback_safe
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,9 @@ def bulk_close_alerts(
                 case.closure_reason = closure_reason
                 case.closed_by_id = analyst_id
                 case.closed_at = datetime.now(timezone.utc)
+                record_close_feedback_safe(
+                    session, case, closure_reason, analyst_id,
+                )
                 closed_cases.append(case)
                 logger.info("Auto-closed case %s (all alerts closed)", case.case_number)
 

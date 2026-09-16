@@ -44,6 +44,7 @@ from ion.core.config import (
     get_ssl_verify,
 )
 from ion.core.safe_errors import safe_error
+from ion.services.ai_feedback_service import record_close_feedback_safe
 from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.kibana_cases_service import get_kibana_cases_service
 from ion.services.kibana_sync_helpers import (
@@ -3954,6 +3955,10 @@ async def close_alert(
                 case.closure_notes = data.notes or f"Closed via alert closure ({label})"
                 case.closed_by_id = current_user.id
                 case.closed_at = datetime.utcnow()
+                record_close_feedback_safe(
+                    session, case, case.closure_reason,
+                    current_user.id, case.closure_notes,
+                )
                 case_closed = True
 
                 # Close all other linked alerts in the same case

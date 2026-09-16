@@ -18,6 +18,34 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
+def record_close_feedback_safe(
+    session: Session,
+    case,
+    human_verdict: Optional[str],
+    human_closed_by_id: Optional[int],
+    delta_reason: Optional[str] = None,
+) -> int:
+    """Ledger side of a case close, for every path that closes a case.
+
+    CLAUDE.md pins AIFeedback as a dual-write on fire-time AND case-close, but
+    only the manual PATCH path ever wrote the close half. Route every close
+    through here, the way push_case_status_to_kibana owns the Kibana half.
+    Never raises: a ledger failure must not fail the close.
+    """
+    if not case or not human_verdict:
+        return 0
+    try:
+        return record_case_close_feedback(
+            case=case,
+            human_verdict=human_verdict,
+            human_closed_by_id=human_closed_by_id,
+            delta_reason=delta_reason,
+            session=session,
+        )
+    except Exception as exc:
+        logger.debug("AIFeedback close capture skipped: %s", exc)
+        return 0
+
 def record_case_close_feedback(
     *,
     case,  # AlertCase

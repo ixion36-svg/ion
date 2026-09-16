@@ -34,6 +34,9 @@ from ion.models.alert_triage import (
 )
 from ion.models.playbook import PlaybookExecution
 from ion.models.user import User
+from ion.services.ai_feedback_service import (
+    record_close_feedback_safe as _record_close_feedback,
+)
 from ion.services.dfir_iris_service import get_dfir_iris_service
 from ion.services.kibana_cases_service import get_kibana_cases_service
 from ion.services.kibana_sync_helpers import (
@@ -1137,6 +1140,10 @@ async def create_case(
             new_case.closure_reason = "false_positive"
             new_case.closed_by_id = current_user.id
             new_case.closed_at = datetime.utcnow()
+            _record_close_feedback(
+                session, new_case, "false_positive", current_user.id,
+                f"Auto-closed on known-FP match: {fp.get('title') or ''}".strip(),
+            )
 
             # Set all linked triage entries to CLOSED
             for triage_entry in new_case.triage_entries:
@@ -2507,6 +2514,10 @@ async def close_case_as_known_fp(
     case.closure_notes = f"Matched known FP: {kfp.title}\n\n{kfp.description}"
     case.closed_by_id = current_user.id
     case.closed_at = datetime.utcnow()
+    _record_close_feedback(
+        session, case, CaseClosureReason.FALSE_POSITIVE.value,
+        current_user.id, case.closure_notes,
+    )
 
     # Set all linked AlertTriage entries to closed
     updated_alerts = 0

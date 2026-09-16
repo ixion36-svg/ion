@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import desc, func, or_
 from sqlalchemy.orm import Session, selectinload
 
+from ion.core.concurrency import map_bounded
 from ion.core.safe_errors import safe_error
 from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.observable import (
@@ -29,6 +30,10 @@ from ion.services.observable_extractor import ENRICHABLE_CONTRACT_TYPES
 from ion.services.opencti_service import OpenCTIError, get_opencti_service
 
 logger = logging.getLogger(__name__)
+
+# OpenCTI is typically a single air-gapped node; keep the enrichment fan-out
+# modest even though the calls are independent.
+_ENRICH_FANOUT = 5
 
 # Map context types (from observable_extractor) and legacy names to ObservableType enum.
 # The context string is preserved on ObservableLink.context so the role (source vs
@@ -1057,120 +1062,143 @@ class ObservableService:
         Returns:
             List of enrichment records (may be shorter than input if errors)
         """
+        if source != "opencti":
+            logger.warning("Unknown enrichment source: %s", source)
+            return []
+
+        # Fetch concurrently, persist serially: the OpenCTI calls are
+        # independent, but _persist_opencti_result writes through self.session
+        # and a Session must not be driven from several tasks at once.
+        observables = [o for o in (self.get_by_id(i) for i in observable_ids) if o]
+        if not observables:
+            return []
+
+        fetched = await map_bounded(
+            observables, self._fetch_opencti_result, limit=_ENRICH_FANOUT
+        )
+
         results = []
-        for obs_id in observable_ids:
-            enrichment = await self.enrich(obs_id, source)
+        for observable, result in zip(observables, fetched):
+            if isinstance(result, BaseException):
+                logger.error(
+                    "OpenCTI enrichment failed for %s: %s", observable.value, result
+                )
+                continue
+            enrichment = self._persist_opencti_result(observable, result)
             if enrichment:
                 results.append(enrichment)
         return results
+
+    async def _fetch_opencti_result(self, observable: Observable):
+        """Network half of OpenCTI enrichment. Touches no session state, so a
+        batch can run these concurrently; the DB half must stay serial."""
+        service = get_opencti_service()
+        if not service.is_configured:
+            logger.warning("OpenCTI not configured, skipping enrichment")
+            return None
+        try:
+            return await service.enrich_observable(
+                self._to_opencti_type(observable.type), observable.value
+            )
+        except OpenCTIError as e:
+            logger.error("OpenCTI enrichment failed: %s", e)
+            return None
+
+    def _persist_opencti_result(
+        self, observable: Observable, result
+    ) -> Optional[ObservableEnrichment]:
+        """DB half. Never call concurrently — it writes through self.session."""
+        # Handle case where OpenCTI returns None or invalid response
+        if not result or not isinstance(result, dict):
+            logger.warning("OpenCTI returned no/invalid result for observable %s: %s", observable.value, type(result))
+            return None
+
+        try:
+            # Calculate score and malicious flag
+            is_malicious = bool(
+                result.get("found", False) and (
+                    result.get("indicators") or result.get("threat_actors")
+                )
+            )
+            score = None
+            obs_data = result.get("observable") or {}
+            if isinstance(obs_data, dict) and obs_data.get("score") is not None:
+                score = obs_data["score"]
+            elif result.get("indicators"):
+                # Average score from indicators
+                scores = [
+                    i.get("score")
+                    for i in result.get("indicators", [])
+                    if isinstance(i, dict) and i.get("score") is not None
+                ]
+                if scores:
+                    score = sum(scores) // len(scores)
+
+            # Extract and clean data for JSON storage
+            labels_data = [l.get("value") for l in result.get("labels", []) if isinstance(l, dict) and l.get("value")]
+            threat_actors_data = [
+                {"name": ta.get("name"), "id": ta.get("id")}
+                for ta in result.get("threat_actors", [])
+                if isinstance(ta, dict) and ta.get("name")
+            ]
+            indicators_data = [
+                {
+                    "name": i.get("name"),
+                    "id": i.get("id"),
+                    "pattern": i.get("pattern"),
+                }
+                for i in result.get("indicators", [])
+                if isinstance(i, dict) and (i.get("name") or i.get("id"))
+            ]
+            reports_data = [
+                {"name": r.get("name"), "id": r.get("id")}
+                for r in result.get("reports", [])
+                if isinstance(r, dict) and r.get("name")
+            ]
+        except (AttributeError, TypeError, KeyError) as e:
+            logger.error("Error processing OpenCTI result for %s: %s", observable.value, e)
+            return None
+
+        # Create enrichment record with no_autoflush to prevent premature flush
+        with self.session.no_autoflush:
+            enrichment = ObservableEnrichment(
+                observable_id=observable.id,
+                source="opencti",
+                enriched_at=datetime.utcnow(),
+                raw_response=result,
+                is_malicious=is_malicious,
+                score=score,
+                labels=labels_data if labels_data else None,
+                threat_actors=threat_actors_data if threat_actors_data else None,
+                indicators=indicators_data if indicators_data else None,
+                reports=reports_data if reports_data else None,
+            )
+            self.session.add(enrichment)
+            self.session.flush()
+
+            # Update observable threat level based on enrichment
+            self._update_threat_level(observable, enrichment)
+
+            # Check enrichment against watched threat actors
+            if threat_actors_data:
+                try:
+                    from ion.services.threat_intel_service import ThreatIntelService
+                    ti_service = ThreatIntelService(self.session)
+                    ti_service.check_enrichment_for_watched_actors(enrichment, observable)
+                except Exception as e:
+                    logger.warning("Threat intel watch check failed: %s", e)
+
+        return enrichment
+
 
     async def _enrich_from_opencti(
         self,
         observable: Observable,
     ) -> Optional[ObservableEnrichment]:
-        """Enrich observable using OpenCTI.
-
-        Args:
-            observable: Observable to enrich
-
-        Returns:
-            Enrichment record or None if failed
-        """
-        service = get_opencti_service()
-        if not service.is_configured:
-            logger.warning("OpenCTI not configured, skipping enrichment")
-            return None
-
-        # Map our type to OpenCTI type
-        opencti_type = self._to_opencti_type(observable.type)
-
-        try:
-            result = await service.enrich_observable(opencti_type, observable.value)
-        except OpenCTIError as e:
-            logger.error("OpenCTI enrichment failed: %s", e)
-            return None
-
-        # Handle case where OpenCTI returns None or invalid response
-        if not result or not isinstance(result, dict):
-            logger.warning("OpenCTI returned no/invalid result for observable %s: %s", observable.value, type(result))
-            return None
-
-        try:
-            # Calculate score and malicious flag
-            is_malicious = bool(
-                result.get("found", False) and (
-                    result.get("indicators") or result.get("threat_actors")
-                )
-            )
-            score = None
-            obs_data = result.get("observable") or {}
-            if isinstance(obs_data, dict) and obs_data.get("score") is not None:
-                score = obs_data["score"]
-            elif result.get("indicators"):
-                # Average score from indicators
-                scores = [
-                    i.get("score")
-                    for i in result.get("indicators", [])
-                    if isinstance(i, dict) and i.get("score") is not None
-                ]
-                if scores:
-                    score = sum(scores) // len(scores)
-
-            # Extract and clean data for JSON storage
-            labels_data = [l.get("value") for l in result.get("labels", []) if isinstance(l, dict) and l.get("value")]
-            threat_actors_data = [
-                {"name": ta.get("name"), "id": ta.get("id")}
-                for ta in result.get("threat_actors", [])
-                if isinstance(ta, dict) and ta.get("name")
-            ]
-            indicators_data = [
-                {
-                    "name": i.get("name"),
-                    "id": i.get("id"),
-                    "pattern": i.get("pattern"),
-                }
-                for i in result.get("indicators", [])
-                if isinstance(i, dict) and (i.get("name") or i.get("id"))
-            ]
-            reports_data = [
-                {"name": r.get("name"), "id": r.get("id")}
-                for r in result.get("reports", [])
-                if isinstance(r, dict) and r.get("name")
-            ]
-        except (AttributeError, TypeError, KeyError) as e:
-            logger.error("Error processing OpenCTI result for %s: %s", observable.value, e)
-            return None
-
-        # Create enrichment record with no_autoflush to prevent premature flush
-        with self.session.no_autoflush:
-            enrichment = ObservableEnrichment(
-                observable_id=observable.id,
-                source="opencti",
-                enriched_at=datetime.utcnow(),
-                raw_response=result,
-                is_malicious=is_malicious,
-                score=score,
-                labels=labels_data if labels_data else None,
-                threat_actors=threat_actors_data if threat_actors_data else None,
-                indicators=indicators_data if indicators_data else None,
-                reports=reports_data if reports_data else None,
-            )
-            self.session.add(enrichment)
-            self.session.flush()
-
-            # Update observable threat level based on enrichment
-            self._update_threat_level(observable, enrichment)
-
-            # Check enrichment against watched threat actors
-            if threat_actors_data:
-                try:
-                    from ion.services.threat_intel_service import ThreatIntelService
-                    ti_service = ThreatIntelService(self.session)
-                    ti_service.check_enrichment_for_watched_actors(enrichment, observable)
-                except Exception as e:
-                    logger.warning("Threat intel watch check failed: %s", e)
-
-        return enrichment
+        """Enrich observable using OpenCTI (fetch, then persist)."""
+        return self._persist_opencti_result(
+            observable, await self._fetch_opencti_result(observable)
+        )
 
     def get_enrichment_history(
         self,
