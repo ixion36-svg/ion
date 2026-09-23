@@ -316,8 +316,13 @@ async def chat(
         except Exception:
             pass  # PII service unavailable — proceed without
 
+        # The personas carry only the grounding rule; the full conduct block is
+        # conversational and has to be applied here too, not just on the stream.
         result = await service.chat(
             messages=messages,
+            system_prompt=finalize_system_prompt(
+                SYSTEM_PROMPTS.get(payload.context_type, SYSTEM_PROMPTS.get("default", ""))
+            ),
             context_type=payload.context_type,
             temperature=payload.temperature,
             max_tokens=payload.max_tokens,

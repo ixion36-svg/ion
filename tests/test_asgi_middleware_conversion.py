@@ -125,7 +125,28 @@ async def test_hsts_present_when_the_proxy_says_https(client):
 async def test_request_id_is_generated_and_returned(client):
     r = await client.get("/login")
     assert r.headers.get("x-request-id")
-    assert r.headers.get("x-response-time", "").endswith("ms")
+
+
+@pytest.mark.anyio
+async def test_response_time_is_withheld_outside_dev(client):
+    """Server-side timing is an enumeration oracle on the sign-in route: a real
+    account runs bcrypt and an absent one returns early. Developers keep the
+    header; a deployment does not."""
+    r = await client.get("/login")
+    assert r.headers.get("x-response-time") is None
+
+
+def test_response_time_follows_the_dev_flag(monkeypatch):
+    import ion.core.config as _config
+    from ion.web.logging_middleware import RequestLoggingMiddleware as _M
+
+    class _Cfg:
+        def __init__(self, dev, debug):
+            self.dev_mode, self.debug_mode = dev, debug
+
+    for dev, debug, expected in ((False, False, False), (True, False, True), (False, True, True)):
+        monkeypatch.setattr(_config, "get_config", lambda d=dev, g=debug: _Cfg(d, g))
+        assert _M(app)._expose_timing is expected, (dev, debug)
 
 
 @pytest.mark.anyio

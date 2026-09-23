@@ -19,6 +19,8 @@ import pytest
 from pydantic import ValidationError
 
 from ion.services.ollama_service import (
+    CONDUCT_RULES,
+    GROUNDING_RULE,
     SYSTEM_PROMPTS,
     finalize_system_prompt,
 )
@@ -132,18 +134,36 @@ def test_vendored_dompurify_is_not_a_known_vulnerable_release():
 
 
 @pytest.mark.parametrize("persona", sorted(SYSTEM_PROMPTS))
-def test_every_persona_carries_the_conduct_rules_exactly_once(persona):
+def test_every_persona_states_it_cannot_see_runtime_state(persona):
+    """The cheap half of the rules. Fabricated runtime state harms the automated
+    paths too -- an invented alert count in a triage note misdirects an
+    investigation -- so every persona carries it."""
     prompt = SYSTEM_PROMPTS[persona]
     assert prompt, persona
-    assert prompt.count("Non-negotiable conduct rules") == 1
+    assert prompt.count(GROUNDING_RULE) == 1
+    assert "no access to ion's live system state" in prompt.lower()
 
 
 @pytest.mark.parametrize("persona", sorted(SYSTEM_PROMPTS))
-def test_conduct_rules_cover_all_three_findings(persona):
-    prompt = SYSTEM_PROMPTS[persona].lower()
+def test_personas_do_not_carry_the_full_conduct_block(persona):
+    """It costs ~360 tokens of a 3800-token retrieval budget. The jailbreak
+    surface is a human in chat; the automated prompts have a fixed JSON output
+    contract and fence their inputs, so they pay for it and gain nothing."""
+    assert CONDUCT_RULES not in SYSTEM_PROMPTS[persona]
+
+
+@pytest.mark.parametrize("persona", sorted(SYSTEM_PROMPTS))
+def test_the_chat_prompt_covers_all_three_findings(persona):
+    prompt = finalize_system_prompt(SYSTEM_PROMPTS[persona]).lower()
     assert "no access to ion's live system state" in prompt   # 7: fabricated telemetry
     assert "reverse shell" in prompt                           # 8: weaponised artifacts
     assert "discriminatory" in prompt                          # 9: conduct
+
+
+def test_both_chat_entry_points_apply_the_conduct_rules():
+    """Streaming and non-streaming both reach a model; only one used to."""
+    code = _strip_hash_comments((SRC / "web" / "ai_api.py").read_text(encoding="utf-8"))
+    assert code.count("finalize_system_prompt(") >= 2
 
 
 def test_conduct_rules_survive_layering_and_stay_last():

@@ -98,15 +98,23 @@ def test_kb_dropped_when_budget_tight():
     assert "Output Contract" in prompt
 
 
-def test_skills_dropped_before_exemplars():
-    """Skills (priority 3) are dropped before exemplars (priority 2) when
-    the budget runs tight after KB (priority 1).
 
-    Budget is tightened to 2400 tokens so the layout is:
-      fixed (~1898 tokens) + KB (~210 tokens) + exemplars (~225 tokens)
-      = ~2333 tokens — fits.
-      + skills (1000 tokens) = ~3333 — does NOT fit under 2400 budget.
-    Skills must be dropped; KB and exemplars must survive.
+def _fixed_tokens() -> int:
+    """Tokens the prompt spends before any RAG layer: base persona + contract."""
+    import ion.services.alert_prompt_service as _aps
+    from ion.services.ollama_service import SYSTEM_PROMPTS
+
+    return _aps._estimate_tokens(SYSTEM_PROMPTS.get("security", "")) + _aps._estimate_tokens(
+        _aps._OUTPUT_CONTRACT
+    )
+
+
+def test_skills_dropped_before_exemplars():
+    """Skills (priority 3) are dropped before exemplars (priority 2) when the
+    budget runs tight after KB (priority 1).
+
+    The budget is derived from the base prompt in force plus room for KB and
+    exemplars and not skills, so it tracks prompt changes instead of rotting.
     """
     import ion.services.alert_prompt_service as _aps
 
@@ -141,11 +149,11 @@ def test_skills_dropped_before_exemplars():
             return_value=large_skill_block,
             create=True,
         ),
-        # budget=2600: fixed ~2071 → remaining ~529
-        # KB ~132 tokens fits → remaining ~397
-        # Exemplars ~261 tokens fits → remaining ~136
-        # Skills ~1000 tokens does NOT fit → dropped
-        patch.object(_aps, "_SYSTEM_PROMPT_TOKEN_BUDGET", 2600),
+        # Derived, not hard-coded: this budget must leave room for KB (~132)
+        # and exemplars (~261) but not skills (~1000). A fixed number silently
+        # rots whenever the base prompt changes size -- it had 34 tokens of
+        # slack and a 59-token prompt addition broke it.
+        patch.object(_aps, "_SYSTEM_PROMPT_TOKEN_BUDGET", _fixed_tokens() + 132 + 261 + 30),
     ):
         prompt = svc.render_system_prompt(None, TINY_ALERT)
 
