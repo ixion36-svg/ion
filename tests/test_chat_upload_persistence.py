@@ -16,16 +16,31 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from ion.models.ai_chat import AIChatUpload
 from ion.models.base import Base
 from ion.models.user import User
 from ion.services import chat_upload_service as svc
 
 
-@pytest.fixture
-def factory(tmp_path):
-    engine = create_engine(f"sqlite:///{tmp_path}/uploads.db")
+@pytest.fixture(scope="module")
+def _engine(tmp_path_factory):
+    """Built once: create_all raises ION's whole schema and costs ~5s a go."""
+    path = tmp_path_factory.mktemp("uploads") / "uploads.db"
+    engine = create_engine(f"sqlite:///{path}")
     Base.metadata.create_all(engine)
-    return sessionmaker(bind=engine)
+    return engine
+
+
+@pytest.fixture
+def factory(_engine):
+    """Fresh rows per test; the schema is shared."""
+    maker = sessionmaker(bind=_engine)
+    s = maker()
+    s.query(AIChatUpload).delete()
+    s.query(User).delete()
+    s.commit()
+    s.close()
+    return maker
 
 
 @pytest.fixture
@@ -144,8 +159,6 @@ def test_long_files_are_truncated_for_the_prompt(factory, user_id):
 
 def test_indicators_are_stored_as_json_not_a_python_repr(factory, user_id):
     """Read back by anything other than this service, the column must parse."""
-    from ion.models.ai_chat import AIChatUpload
-
     s = factory()
     svc.store_upload(
         s, user_id, name="f.log", content="x", size_bytes=1, indicators=["webshell", "obfuscation"]
