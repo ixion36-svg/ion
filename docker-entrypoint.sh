@@ -190,4 +190,5 @@ exec python -m uvicorn ion.web.server:app \
     --timeout-keep-alive 30 \
     --limit-concurrency 200 \
     --limit-max-requests 10000 \
+    --no-server-header \
     "$@"

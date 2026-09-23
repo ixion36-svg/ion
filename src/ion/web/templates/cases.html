@@ -3553,7 +3553,7 @@ function renderPanelContent(c) {
             let rendered;
             if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
                 try {
-                    rendered = DOMPurify.sanitize(marked.parse(raw));
+                    rendered = safeHtml(marked.parse(raw));
                 } catch (e) {
                     rendered = esc(raw);
                 }

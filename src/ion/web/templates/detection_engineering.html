@@ -305,7 +305,9 @@ async function apiFetch(path) {
     return r.json();
 }
 function $(id){ return document.getElementById(id); }
-function esc(s){ return DOMPurify.sanitize(String(s||'')); }
+// Values here are names, severities and error strings -- escape them, never
+// filter them: DOMPurify.sanitize() would pass benign markup straight through.
+function esc(s){ return escapeHtml(s); }
 function pct(a,b){ return b ? Math.round(a/b*100) : 0; }
 function sevClass(s){ return (s||'').toLowerCase(); }
 

@@ -1,13 +1,42 @@
 // ION Web UI JavaScript
 
+// DOMPurify's defaults allow `id` and `name`, which are a DOM-clobbering
+// primitive: an attacker-set id becomes a global that shadows a real one.
+// Stored cross-user content (social posts, case notes) reaches these sinks.
+const ION_SANITIZE_CONFIG = { FORBID_ATTR: ['id', 'name'] };
+
+// An absolute http(s) link in stored content points off-platform. Marking it
+// untrusted and severing the opener stops reverse-tabnabbing; relative links
+// are ION's own and keep their in-tab behaviour.
+if (typeof DOMPurify !== 'undefined' && DOMPurify.addHook) {
+    DOMPurify.addHook('afterSanitizeAttributes', function (node) {
+        if (node.tagName !== 'A' || !node.hasAttribute('href')) return;
+        if (!/^https?:\/\//i.test(node.getAttribute('href'))) return;
+        node.setAttribute('target', '_blank');
+        node.setAttribute('rel', 'noopener noreferrer nofollow');
+    });
+}
+
+/**
+ * Sanitize HTML for insertion into the DOM. Fails CLOSED — without DOMPurify
+ * the caller gets escaped text, never raw markup.
+ */
+function safeHtml(raw) {
+    if (raw == null) return '';
+    if (typeof DOMPurify === 'undefined') return escapeHtml(raw);
+    return DOMPurify.sanitize(String(raw), ION_SANITIZE_CONFIG);
+}
+
 /**
  * Render markdown to sanitized HTML. All user-controlled markdown
  * MUST go through this function — never use marked.parse() directly.
  */
 function safeMarkdown(content) {
     if (!content) return '';
-    const raw = (typeof marked !== 'undefined') ? marked.parse(content) : content;
-    return (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(raw) : raw;
+    if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+        return escapeHtml(content);
+    }
+    return safeHtml(marked.parse(content));
 }
 
 // API helper

@@ -83,6 +83,14 @@ class RequestLoggingMiddleware:
 
     def __init__(self, app):
         self.app = app
+        # Server-side timing is an enumeration oracle: login runs bcrypt for a
+        # real account and short-circuits for an absent one, a ~200ms gap that
+        # this header reports free of network jitter -- defeating the uniform
+        # login response. Developers keep it; deployments do not.
+        from ion.core.config import get_config
+
+        _cfg = get_config()
+        self._expose_timing = bool(_cfg.dev_mode or _cfg.debug_mode)
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
@@ -107,10 +115,11 @@ class RequestLoggingMiddleware:
             if message["type"] == "http.response.start":
                 status_code = message["status"]
                 duration_ms = int((time.time() - start_time) * 1000)
-                extra = [
-                    (b"x-request-id", rid),
-                    (b"x-response-time", f"{duration_ms}ms".encode("latin-1")),
-                ]
+                extra = [(b"x-request-id", rid)]
+                if self._expose_timing:
+                    extra.append(
+                        (b"x-response-time", f"{duration_ms}ms".encode("latin-1"))
+                    )
                 message = {**message, "headers": [*message.get("headers", []), *extra]}
             await send(message)
 

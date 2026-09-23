@@ -2395,6 +2395,8 @@ def main():
         "host": host,
         "port": port,
         "reload": args.reload,
+        # The uvicorn version banner names the server to any caller.
+        "server_header": False,
     }
 
     if ssl_cert and ssl_key:

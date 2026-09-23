@@ -90,6 +90,7 @@ def web(
         host=host,
         port=port,
         reload=reload,
+        server_header=False,
     )
 
 

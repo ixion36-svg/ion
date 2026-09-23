@@ -274,6 +274,23 @@ def get_current_user_hybrid(
     )
 
 
+# A 403 body naming the permission hands the caller ION's permission taxonomy,
+# which is a map for targeting. The caller learns only that access was refused;
+# the specific permission goes to the log, matching the uniform login contract.
+_PERMISSION_DENIED_DETAIL = "Permission denied"
+
+
+def _permission_denied(user: object, required: object) -> HTTPException:
+    logger.warning(
+        "Permission denied for user %s: %s required",
+        getattr(user, "username", "<unknown>"), required,
+    )
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=_PERMISSION_DENIED_DETAIL,
+    )
+
+
 def require_permission(permission_name: str) -> Callable:
     """Dependency factory that requires a specific permission.
 
@@ -284,10 +301,7 @@ def require_permission(permission_name: str) -> Callable:
     """
     def dependency(user: User = Depends(get_current_user)) -> User:
         if not user.has_permission(permission_name):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {permission_name} required",
-            )
+            raise _permission_denied(user, permission_name)
         return user
     return dependency
 
@@ -302,10 +316,7 @@ def require_any_permission(permission_names: List[str]) -> Callable:
     """
     def dependency(user: User = Depends(get_current_user)) -> User:
         if not user.has_any_permission(permission_names):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: one of {permission_names} required",
-            )
+            raise _permission_denied(user, permission_names)
         return user
     return dependency
 
@@ -369,10 +380,7 @@ def require_page_permission(permission_name: str) -> Callable:
             )
 
         if not user.has_permission(permission_name):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {permission_name} required",
-            )
+            raise _permission_denied(user, permission_name)
         return user
     return dependency
 
@@ -410,16 +418,10 @@ class PermissionChecker:
                 if not user.has_permission(p)
             ]
             if missing:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Permission denied: missing {missing}",
-                )
+                raise _permission_denied(user, missing)
         else:
             if not user.has_any_permission(self.required_permissions):
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Permission denied: one of {self.required_permissions} required",
-                )
+                raise _permission_denied(user, self.required_permissions)
         return user
 
 

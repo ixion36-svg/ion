@@ -22,7 +22,7 @@ const SLUG = {{ slug | tojson }};
 function escHtml(s) { if (s == null) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
 function md(s) {
   if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') return escHtml(s);
-  return DOMPurify.sanitize(marked.parse(s || ''));
+  return safeHtml(marked.parse(s || ''));
 }
 
 async function loadCourse() {
