@@ -1,13 +1,48 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.98.0 -->
-<!-- ion-doc:version=0.98.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.0 -->
+<!-- ion-doc:version=0.99.0 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-16 -->
+<!-- ion-doc:date=2026-09-23 -->
 
 # Changelog
+
+## v0.99.0 — 2026-09-23
+
+**A quality pass over the whole codebase, one real ledger defect closed, and a
+test pipeline that actually tests what ships.**
+
+- **AI feedback was not being scored on four of five close paths.** The
+  AIFeedback ledger is a dual-write: once when Bob offers a verdict, once when
+  a human closes the case. Only the manual close endpoint wrote the second
+  half. The known-false-positive auto-close, close-as-known-FP, the
+  alert-close parent cascade and the bulk-close cascade all left a case closed
+  with no close-side row, so Bob's verdict was never measured against the human
+  outcome. All five paths now route through one helper that cannot fail the
+  close. Historical gaps are not backfilled — accuracy figures before this
+  release under-count.
+- **`/soc-roles` returned 500.** The page gates its Detection Engineering nav
+  on a Jinja global that was registered on one template instance while the page
+  built its own. Registered at the factory, so every template gets it.
+- **Faster where it was slowest.** Nine N+1 query sites now batch; escalating a
+  case to DFIR-IRIS issued roughly 160 sequential HTTP POSTs in a single
+  request and now fans out with bounded concurrency; the audit feed filters in
+  SQL rather than in Python; observable enrichment fetches concurrently and
+  writes serially. Concurrency is capped, not unbounded — a single-node
+  OpenCTI or IRIS never sees a connection storm.
+- **Less code to get wrong.** A repo-wide simplification sweep removed dead
+  code and duplicate helpers, collapsed 36 identical page handlers into a
+  table, and routed 38 raw `ADD COLUMN` migrations through the tolerant helper
+  that was already handling the other 22. The v0.98.0 CSP hash workaround is
+  gone; the strict policy is unchanged.
+- **CI now tests the runtime that ships.** The suite ran only on Python 3.11
+  while the image ships 3.14, so the shipped interpreter was never exercised —
+  it is now a matrix over both. A build job compiles the Dockerfile and
+  asserts the SBOM is still produced; nothing had ever built the image before
+  release. The Ollama image is pinned instead of tracking `latest`, which an
+  air-gapped deploy cannot re-pull identically.
 
 ## v0.98.0 — 2026-09-16
 
