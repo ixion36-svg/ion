@@ -1,13 +1,41 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.2 -->
-<!-- ion-doc:version=0.99.2 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.3 -->
+<!-- ion-doc:version=0.99.3 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-23 -->
 
 # Changelog
+
+## v0.99.3 — 2026-09-23
+
+**Files attached to the AI chat no longer go missing.**
+
+ION runs several uvicorn worker processes. Uploaded files were held in the
+memory of whichever worker happened to serve the upload, so the next request —
+listing the files, or the chat message that referred to them — often landed on
+a different worker that had never seen it. The upload reported success and the
+assistant then behaved as though no file had been attached.
+
+A browser keeps its connection open, which pins it to one worker and hides the
+problem, so it surfaced only after an idle period or on one of the browser's
+other parallel connections. That made it look like the assistant ignoring an
+attachment rather than a fault. Measured on a four-worker deployment before the
+fix, ten of twenty reads could not see a file that had just uploaded; after,
+twenty of twenty can.
+
+Uploads are now held in the database, so every worker sees the same set and
+they survive a restart. Nothing is written to a filesystem — the stored text is
+the same text that reaches the model, and it is removed when the file is
+deleted. The per-user limit of ten files is unchanged, as are the content
+checks added in v0.99.1: the hash and any matched indicators are stored with
+the file and still label it for the assistant.
+
+Also corrected: the deployment template described a default of four workers.
+The entrypoint falls back to one when the setting is absent, and the template
+itself sets eight.
 
 ## v0.99.2 — 2026-09-23
 

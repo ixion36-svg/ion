@@ -52,3 +52,39 @@ class AIChatMessage(Base):
 
     # Relationships
     session = relationship("AIChatSession", back_populates="messages")
+
+
+class AIChatUpload(Base):
+    """A file an analyst attached to the AI chat.
+
+    Held in the database rather than process memory: ION runs several uvicorn
+    workers, and a dict on the module would only ever be visible to the worker
+    that served the upload -- the next request round-robins elsewhere and the
+    file appears to vanish. Nothing is written to a filesystem; ``content`` is
+    the decoded text that reaches the model.
+    """
+
+    __tablename__ = "ai_chat_uploads"
+    __table_args__ = (
+        Index("ix_ai_chat_uploads_user_uploaded", "user_id", "uploaded_at"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    # The short public handle the UI and the model prompt refer to.
+    file_id = Column(String(32), nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    name = Column(String(255), nullable=False)
+    size_bytes = Column(Integer, nullable=False, default=0)
+    line_count = Column(Integer, nullable=False, default=0)
+    content = Column(Text, nullable=False)
+
+    # Provenance from ion.services.upload_scan, carried so the audit trail and
+    # the hostile-data label survive a restart.
+    sha256 = Column(String(64), nullable=True)
+    indicators = Column(Text, nullable=True)  # JSON list; never compared in SQL
+
+    uploaded_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    user = relationship("User")
+

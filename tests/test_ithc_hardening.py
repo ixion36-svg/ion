@@ -294,9 +294,13 @@ def test_the_scanner_never_blocks_an_upload():
 
 
 def test_flagged_uploads_are_audited_and_labelled_for_the_model():
-    code = _strip_hash_comments((SRC / "web" / "ai_api.py").read_text(encoding="utf-8"))
-    assert "upload_content_indicator" in code
-    assert "hostile data" in code
+    api = _strip_hash_comments((SRC / "web" / "ai_api.py").read_text(encoding="utf-8"))
+    assert "upload_content_indicator" in api, "the audit record is written at upload"
+    # The label travels with the stored row, so it lives with the store.
+    store = _strip_hash_comments(
+        (SRC / "services" / "chat_upload_service.py").read_text(encoding="utf-8")
+    )
+    assert "hostile data" in store
 
 
 def test_no_live_signature_sits_contiguously_in_these_sources():
