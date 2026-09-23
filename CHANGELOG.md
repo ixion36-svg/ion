@@ -1,13 +1,62 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.0 -->
-<!-- ion-doc:version=0.99.0 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.1 -->
+<!-- ion-doc:version=0.99.1 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-23 -->
 
 # Changelog
+
+## v0.99.1 — 2026-09-23
+
+**ITHC remediation: sanitiser hardening, header hygiene, and guardrails for the
+assistant.** Findings raised against v0.88 by an external IT Health Check, each
+re-verified against a running container before and after the fix.
+
+- **The HTML sanitiser failed open.** If DOMPurify did not load, user-supplied
+  markdown was returned unsanitised into the DOM across sixteen call sites. It
+  now escapes instead. Every sanitiser call shares one policy: `id` and `name`
+  are stripped (DOMPurify allows them by default, and an attacker-controlled
+  `id` can shadow a page variable), and an off-platform link is marked
+  `rel="noopener noreferrer nofollow"` and opened in a new tab. **DOMPurify is
+  updated 3.2.4 → 3.4.15**, which closes six advisories affecting 3.2.4.
+- **A malformed request disclosed the server.** Such a request never reaches
+  the application, so the header middleware never ran and the underlying server
+  answered with its own banner — the only path on which it leaked. All entry
+  points now suppress it.
+- **Response timing is no longer published.** A timing header was returned on
+  every response, including sign-in, where an existing account takes materially
+  longer than an absent one. That measurement undid the uniform sign-in
+  response introduced at v0.88 to prevent account enumeration; it is now
+  limited to development mode. **The underlying timing difference is
+  unchanged** and remains observable to a determined attacker.
+- **Authorisation errors no longer name the permission** they wanted. The
+  caller is told only that access was refused; the specific permission goes to
+  the audit log, matching the sign-in contract.
+- **The assistant has conduct rules.** Its prompts previously described what it
+  could do and constrained nothing. It now refuses attempts to change its role
+  ("developer mode" and similar), states plainly that it cannot see ION's
+  runtime state rather than inventing values, refuses ready-to-run offensive
+  tooling whatever the stated reason, and will not produce discriminatory
+  content. Analysing samples, explaining techniques and writing detection
+  content are unaffected — that is the product's job. A per-user "custom
+  instructions" preference is **removed**: it appended text after those rules
+  and could override them.
+- **Uploaded files are inspected and recorded.** Every upload is hashed, and
+  recognisable offensive patterns are named, written to the audit log, and
+  passed to the model marked as hostile data. Uploads are **not** blocked: an
+  analyst handling a live sample is normal here.
+- **Chat requests are bounded** — message count, per-message and total size,
+  sampling temperature and reply length. The model can no longer be chosen by
+  the caller.
+
+Two reported items do not stand. The assistant's apparent disclosure of
+internal platform data was **fabrication, not disclosure**: it has no access to
+any runtime state, and the values reported match nothing in the product. The
+defect is real, and for a security tool arguably worse, but nothing leaked.
+Quill 2.0.3 was reported as outdated; it is the current release.
 
 ## v0.99.0 — 2026-09-23
 
