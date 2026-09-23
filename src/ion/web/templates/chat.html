@@ -123,9 +123,6 @@
                             <option value="1">1</option><option value="2">2</option><option value="3" selected>3</option><option value="4">4</option><option value="5">5</option>
                         </select>
                     </div>
-                    <div class="h-px bg-base-300 my-2"></div>
-                    <textarea id="pref-custom-instructions" maxlength="500" placeholder="Custom instructions for the AI..." data-change-action="saveAIPreferences" data-input-action="updateCharCount"></textarea>
-                    <div class="text-[0.65rem] text-base-content/50 text-right" id="ai-char-count">0/500</div>
                 </div>
             </div>
 
@@ -662,22 +659,6 @@
     margin: 8px 0;
 }
 
-#pref-custom-instructions {
-    width: 100%;
-    min-height: 50px;
-    padding: 6px 8px;
-    background: var(--bg-secondary);
-    color: var(--text-primary);
-    border: 1px solid var(--ion-border);
-    border-radius: 4px;
-    font-family: inherit;
-    font-size: 0.78rem;
-    resize: vertical;
-    line-height: 1.4;
-}
-
-#pref-custom-instructions:focus { outline: none; border-color: var(--primary); }
-.ai-char-count { font-size: 0.65rem; color: var(--text-muted); text-align: right; }
 
 /* Quick Prompts */
 .ai-quick-list {
@@ -2142,7 +2123,6 @@
         if (el('pref-rag-playbooks')) el('pref-rag-playbooks').checked = !!aiPreferences.rag_playbooks;
         if (el('pref-show-citations')) el('pref-show-citations').checked = aiPreferences.show_citations !== false;
         if (el('pref-max-refs')) el('pref-max-refs').value = String(aiPreferences.max_context_snippets || 3);
-        if (el('pref-custom-instructions')) { el('pref-custom-instructions').value = aiPreferences.custom_instructions || ''; updateCharCount(); }
     }
 
     window.saveAIPreferences = async function() {
@@ -2152,7 +2132,6 @@
             rag_playbooks: document.getElementById('pref-rag-playbooks')?.checked || false,
             show_citations: document.getElementById('pref-show-citations')?.checked ?? true,
             max_context_snippets: parseInt(document.getElementById('pref-max-refs')?.value || '3', 10),
-            custom_instructions: document.getElementById('pref-custom-instructions')?.value || '',
         };
         try {
             const resp = await fetch('/api/ai/preferences', {
@@ -2161,12 +2140,6 @@
             });
             if (resp.ok) { aiPreferences = await resp.json(); showToast('Preferences saved', 'success'); }
         } catch (e) { console.error(e); }
-    };
-
-    window.updateCharCount = function() {
-        const ta = document.getElementById('pref-custom-instructions');
-        const ct = document.getElementById('ai-char-count');
-        if (ta && ct) ct.textContent = ta.value.length + '/500';
     };
 
     window.toggleSettingsPanel = function() {

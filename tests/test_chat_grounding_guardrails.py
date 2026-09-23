@@ -39,12 +39,12 @@ def test_chat_temperature_default_is_low():
 
 
 def test_a_caller_can_still_ask_for_more_entropy():
-    assert ChatRequest(messages=[], temperature=0.9).temperature == 0.9
+    assert ChatRequest(messages=[{"role": "user", "content": "hi"}], temperature=0.9).temperature == 0.9
 
 
 def test_the_ceiling_still_holds():
     with pytest.raises(Exception):
-        ChatRequest(messages=[], temperature=1.5)
+        ChatRequest(messages=[{"role": "user", "content": "hi"}], temperature=1.5)
 
 
 # --------------------------------------------------------------------------
