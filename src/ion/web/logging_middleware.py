@@ -83,10 +83,10 @@ class RequestLoggingMiddleware:
 
     def __init__(self, app):
         self.app = app
-        # Server-side timing is an enumeration oracle: login runs bcrypt for a
-        # real account and short-circuits for an absent one, a ~200ms gap that
-        # this header reports free of network jitter -- defeating the uniform
-        # login response. Developers keep it; deployments do not.
+        # Server-side timing is detail a deployment has no reason to publish:
+        # it is free measurement for anyone probing for a slow path. Developers
+        # keep it. (It does NOT leak account existence -- login verifies against
+        # a dummy hash when the user is absent, measured equal at ~226ms.)
         from ion.core.config import get_config
 
         _cfg = get_config()

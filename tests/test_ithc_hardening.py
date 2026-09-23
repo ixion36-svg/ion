@@ -306,3 +306,43 @@ def test_no_live_signature_sits_contiguously_in_these_sources():
         assert _EICAR_SIGNATURE not in raw, path.name
         assert PHP_WEBSHELL not in raw, path.name
         assert BASH_REVSHELL not in raw, path.name
+
+
+# --- Not a finding: login timing was measured, and it is equal ------------
+
+
+def test_absent_account_still_pays_the_hash_cost():
+    """A ~200ms 'timing oracle' was reported during this work and was wrong: the
+    sample was polluted by the 10/minute rate limiter returning 429s in ~2ms.
+    Measured properly the two paths are equal, because login verifies against
+    _DUMMY_HASH when the user is absent. This pins the defence, not the timing."""
+    import inspect
+
+    from ion.auth.service import AuthService
+
+    src = inspect.getsource(AuthService.login)
+    # The absent-account branch must hash before it returns. Anchor on the
+    # first return so a future edit cannot move the verify below it.
+    before_first_return = src.split("return None, None")[0]
+    assert "_DUMMY_HASH" in before_first_return, "absent-account path must still hash"
+
+
+def test_the_dummy_hash_costs_the_same_as_a_real_one():
+    import time
+
+    from ion.auth.password import password_hasher
+    from ion.auth.service import AuthService
+
+    real = password_hasher.hash("a-real-password")
+
+    def cost(h):
+        t0 = time.perf_counter()
+        password_hasher.verify("attempted", h)
+        return time.perf_counter() - t0
+
+    dummy_ms = min(cost(AuthService._DUMMY_HASH) for _ in range(3)) * 1000
+    real_ms = min(cost(real) for _ in range(3)) * 1000
+    # Same bcrypt cost factor, so the floor times track closely. Generous bound:
+    # this catches a dummy hash at a different work factor, not scheduler noise.
+    assert abs(dummy_ms - real_ms) < max(50.0, 0.25 * real_ms), (dummy_ms, real_ms)
+

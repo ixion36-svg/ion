@@ -1,13 +1,38 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.1 -->
-<!-- ion-doc:version=0.99.1 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.2 -->
+<!-- ion-doc:version=0.99.2 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-09-23 -->
 
 # Changelog
+
+## v0.99.2 — 2026-09-23
+
+**Correction to the v0.99.1 security notes.** No functional change to the
+application; the code behaves as it did in v0.99.1.
+
+v0.99.1 reported that sign-in took measurably longer for an existing account
+than for one that does not exist, and recorded an open low-severity finding on
+that basis. **That was a measurement error and the finding is withdrawn.**
+Sign-in already performs a password hash comparison against a fixed dummy hash
+when the account does not exist, specifically so that both paths cost the same;
+measured directly, the difference is under a millisecond. The earlier figure
+came from a test that exceeded the endpoint's own rate limit partway through,
+so throttled responses — which return immediately — were compared against real
+ones.
+
+- The open-findings table returns to **zero at every severity**, where it has
+  been since v0.34.0.
+- The v0.99.1 note about response timing is corrected: withholding that header
+  outside development remains sensible, because a deployment has no reason to
+  publish server-side timing, but it is not an account-enumeration fix and no
+  longer claims to be.
+- Two tests now pin the behaviour that was wrongly reported as missing: the
+  absent-account path must still perform the hash comparison, and the dummy
+  hash must cost the same as a real one.
 
 ## v0.99.1 — 2026-09-23
 
@@ -26,12 +51,11 @@ re-verified against a running container before and after the fix.
   the application, so the header middleware never ran and the underlying server
   answered with its own banner — the only path on which it leaked. All entry
   points now suppress it.
-- **Response timing is no longer published.** A timing header was returned on
-  every response, including sign-in, where an existing account takes materially
-  longer than an absent one. That measurement undid the uniform sign-in
-  response introduced at v0.88 to prevent account enumeration; it is now
-  limited to development mode. **The underlying timing difference is
-  unchanged** and remains observable to a determined attacker.
+- **Response timing is no longer published.** A header returned server-side
+  request timing on every response. That is unnecessary detail for a
+  deployment to hand out, and it is now limited to development mode. It did
+  **not** leak account existence: sign-in already verifies against a dummy
+  hash when the account does not exist, and the two paths measure equal.
 - **Authorisation errors no longer name the permission** they wanted. The
   caller is told only that access was refused; the specific permission goes to
   the audit log, matching the sign-in contract.

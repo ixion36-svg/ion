@@ -129,9 +129,9 @@ async def test_request_id_is_generated_and_returned(client):
 
 @pytest.mark.anyio
 async def test_response_time_is_withheld_outside_dev(client):
-    """Server-side timing is an enumeration oracle on the sign-in route: a real
-    account runs bcrypt and an absent one returns early. Developers keep the
-    header; a deployment does not."""
+    """A deployment has no reason to publish server-side timing; developers do.
+    Not an account-enumeration fix: login already verifies against a dummy hash
+    when the user is absent, so both paths cost the same bcrypt work."""
     r = await client.get("/login")
     assert r.headers.get("x-response-time") is None
 
