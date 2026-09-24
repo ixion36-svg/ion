@@ -2,6 +2,40 @@
 {% block title %}ORBAT - ION{% endblock %}
 
 {% block content %}
+<style nonce="{{ csp_nonce }}">
+/* Org-chart connectors. The tree is nested ul/li; each li draws the two
+   halves of the line above itself, and each child ul draws the drop from its
+   parent. Only-children keep just the vertical stub. */
+.wf-tree { --wf-line: color-mix(in srgb, currentColor 22%, transparent); }
+.wf-tree ul {
+    display: flex; align-items: flex-start; justify-content: center;
+    padding: 26px 0 0; margin: 0; position: relative;
+}
+.wf-tree li {
+    list-style: none; position: relative;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 26px 10px 0;
+}
+.wf-tree li::before, .wf-tree li::after {
+    content: ''; position: absolute; top: 0; right: 50%;
+    border-top: 2px solid var(--wf-line); width: 50%; height: 26px;
+}
+.wf-tree li::after { right: auto; left: 50%; border-left: 2px solid var(--wf-line); }
+.wf-tree li:only-child::before, .wf-tree li:only-child::after { display: none; }
+.wf-tree li:first-child::before, .wf-tree li:last-child::after { border: 0 none; }
+.wf-tree li:last-child::before {
+    border-right: 2px solid var(--wf-line); border-radius: 0 8px 0 0;
+}
+.wf-tree li:first-child::after { border-radius: 8px 0 0 0; }
+.wf-tree ul ul::before {
+    content: ''; position: absolute; top: 0; left: 50%;
+    border-left: 2px solid var(--wf-line); width: 0; height: 26px;
+}
+/* Roots: no connectors above the top card. */
+.wf-tree > ul { padding-top: 0; }
+.wf-tree > ul > li { padding-top: 0; }
+.wf-tree > ul > li::before, .wf-tree > ul > li::after { display: none; }
+</style>
 <div class="p-6 max-w-[1400px] mx-auto">
 
   <div class="flex items-end gap-4 mb-5">
@@ -18,8 +52,15 @@
   <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
 
     <div class="flex flex-col gap-4">
-      <div id="wf-tree" class="flex flex-col gap-3">
-        <div class="text-sm text-base-content/50">Loading&hellip;</div>
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <div class="text-[0.7rem] uppercase tracking-wider text-base-content/50 mb-2">Structure</div>
+          <div class="overflow-x-auto pb-2">
+            <div id="wf-tree" class="wf-tree min-w-fit mx-auto">
+              <div class="text-sm text-base-content/50">Loading&hellip;</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {% if can_manage %}
@@ -92,7 +133,7 @@
 
   function postRow(post) {
     const row = document.createElement('div');
-    row.className = 'flex items-center gap-2 py-1.5 px-3 rounded-lg border ' +
+    row.className = 'flex items-center gap-1.5 py-1 px-2 rounded-lg border text-left flex-wrap ' +
       (post.state === 'gapped'
         ? 'border-dashed border-error/60 bg-error/5'
         : post.state === 'filling'
@@ -177,28 +218,30 @@
     return row;
   }
 
-  function unitCard(unit, depth) {
+  function unitNode(unit) {
     const card = document.createElement('div');
-    card.className = 'card bg-base-200 border border-base-300' + (depth ? ' ml-6' : '');
-    const body = document.createElement('div');
-    body.className = 'card-body p-4';
-    card.appendChild(body);
+    card.className = 'w-[250px] rounded-xl border border-base-300 bg-base-100 shadow-sm overflow-hidden';
 
     const head = document.createElement('div');
-    head.className = 'flex items-center gap-2 mb-1';
-    const h = document.createElement('h3');
-    h.className = 'text-sm font-semibold uppercase tracking-wider';
+    head.className = 'flex items-center gap-2 px-3 py-2 bg-base-300/40 border-b border-base-300';
+    const h = document.createElement('span');
+    h.className = 'text-xs font-semibold uppercase tracking-wider grow truncate';
     h.textContent = unit.name;
     head.appendChild(h);
-    const grow = document.createElement('span');
-    grow.className = 'grow';
-    head.appendChild(grow);
+
+    const gapped = unit.posts.filter(function (p) { return p.state === 'gapped'; }).length;
+    if (gapped) {
+      const g = document.createElement('span');
+      g.className = 'badge badge-xs badge-error';
+      g.textContent = gapped + ' gap' + (gapped === 1 ? '' : 's');
+      head.appendChild(g);
+    }
     if (CAN_MANAGE) {
       const del = document.createElement('button');
       del.type = 'button';
-      del.className = 'btn btn-xs btn-ghost text-base-content/40';
+      del.className = 'btn btn-xs btn-ghost text-base-content/40 px-1';
       del.setAttribute('aria-label', 'Remove unit ' + unit.name);
-      del.textContent = 'remove';
+      del.textContent = '\u2715';
       del.addEventListener('click', function () {
         if (!window.confirm('Remove ' + unit.name + ' and everything under it?')) { return; }
         api('DELETE', '/api/workforce/org/units/' + unit.id)
@@ -206,26 +249,32 @@
       });
       head.appendChild(del);
     }
-    body.appendChild(head);
+    card.appendChild(head);
 
     const posts = document.createElement('div');
-    posts.className = 'flex flex-col gap-1.5';
+    posts.className = 'flex flex-col gap-1.5 p-2';
+    if (!unit.posts.length) {
+      const none = document.createElement('div');
+      none.className = 'text-xs text-base-content/40 px-1 py-0.5';
+      none.textContent = 'No established posts';
+      posts.appendChild(none);
+    }
     unit.posts.forEach(function (p) { posts.appendChild(postRow(p)); });
-    body.appendChild(posts);
+    card.appendChild(posts);
 
     if (CAN_MANAGE) {
       const add = document.createElement('div');
-      add.className = 'flex items-center gap-2 mt-2';
+      add.className = 'flex items-center gap-1 px-2 pb-2';
       const t = document.createElement('input');
       t.type = 'text';
-      t.className = 'input input-xs input-bordered';
-      t.placeholder = 'New post title';
+      t.className = 'input input-xs input-bordered w-24 grow';
+      t.placeholder = 'New post';
       add.appendChild(t);
       const sel = document.createElement('select');
-      sel.className = 'select select-xs select-bordered';
+      sel.className = 'select select-xs select-bordered max-w-[90px]';
       const o0 = document.createElement('option');
       o0.value = '';
-      o0.textContent = 'any role profile';
+      o0.textContent = 'any role';
       sel.appendChild(o0);
       profiles.forEach(function (p) {
         const o = document.createElement('option');
@@ -237,7 +286,8 @@
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn btn-xs';
-      b.textContent = 'Add post';
+      b.textContent = '+';
+      b.setAttribute('aria-label', 'Add post to ' + unit.name);
       b.addEventListener('click', function () {
         if (!t.value.trim()) { return; }
         api('POST', '/api/workforce/org/posts', {
@@ -246,17 +296,20 @@
         }).then(refresh).catch(function (e) { alert(e.message); });
       });
       add.appendChild(b);
-      body.appendChild(add);
+      card.appendChild(add);
     }
+    return card;
+  }
 
-    const wrap = document.createElement('div');
-    wrap.appendChild(card);
-    unit.children.forEach(function (c) {
-      const childEl = unitCard(c, depth + 1);
-      childEl.classList.add('mt-3');
-      wrap.appendChild(childEl);
-    });
-    return wrap;
+  function branch(unit) {
+    const li = document.createElement('li');
+    li.appendChild(unitNode(unit));
+    if (unit.children.length) {
+      const ul = document.createElement('ul');
+      unit.children.forEach(function (c) { ul.appendChild(branch(c)); });
+      li.appendChild(ul);
+    }
+    return li;
   }
 
   function renderTree(data) {
@@ -274,16 +327,15 @@
 
     if (!data.units.length) {
       const empty = document.createElement('div');
-      empty.className = 'card bg-base-200 border border-base-300';
-      const b = document.createElement('div');
-      b.className = 'card-body p-5 text-sm text-base-content/70';
-      b.textContent = CAN_MANAGE
+      empty.className = 'text-sm text-base-content/70 py-4';
+      empty.textContent = CAN_MANAGE
         ? 'No structure yet. Add a top-level unit below (e.g. SOC), then teams and posts under it. An unfilled post shows as a gap.'
         : 'No structure defined yet.';
-      empty.appendChild(b);
       host.appendChild(empty);
     } else {
-      data.units.forEach(function (u) { host.appendChild(unitCard(u, 0)); });
+      const ul = document.createElement('ul');
+      data.units.forEach(function (u) { ul.appendChild(branch(u)); });
+      host.appendChild(ul);
     }
 
     const gaps = document.getElementById('wf-gap-summary');

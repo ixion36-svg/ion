@@ -1452,6 +1452,7 @@
        inset:0 below 900px, so a width override means nothing now. */
 }
 
+
 /* ── Attention Banner ───────────────────────────────────── */
 .attn-banner {
     border: 1px solid var(--warning);
@@ -2197,6 +2198,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% if initial_case_id %}<script nonce="{{ csp_nonce }}">window.__initialCaseId = {{ initial_case_id }};</script>{% endif %}
 <script nonce="{{ csp_nonce }}">
 // =============================================================================
 // Cases Board — State
@@ -2754,13 +2756,24 @@ function cancelClosure() {
 // Case Detail Panel
 // =============================================================================
 async function openCaseDetail(caseId) {
+    // The case view lives at its own URL. Outside page mode this function is
+    // reached from list cards, attention rows, SLA rows and related-case
+    // links -- all of them navigate; only /cases/{id} renders in place.
+    const panelEl = document.getElementById('case-panel');
+    if (!panelEl.classList.contains('page-mode')) {
+        window.location.assign('/cases/' + caseId);
+        return;
+    }
+    if (window.history && String(window.__initialCaseId) !== String(caseId)) {
+        window.history.replaceState(null, '', '/cases/' + caseId);
+        window.__initialCaseId = caseId;
+    }
     const panel = document.getElementById('case-panel');
     const overlay = document.getElementById('case-panel-overlay');
     const body = document.getElementById('case-panel-body');
 
     // Show panel with loading
     panel.classList.add('open');
-    overlay.classList.add('open');
     body.innerHTML = '<p class="text-[var(--text-secondary)] text-center p-8">Loading...</p>';
 
     try {
@@ -4282,6 +4295,7 @@ async function requestResponseAction(actionId, target, caseId) {
 
 function switchPanelTab(tabName) {
     _currentPanelTab = tabName;
+    if (applyPageModeLayout()) return;
     document.querySelectorAll('.cpanel-tab-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.tab === tabName);
     });
@@ -4302,8 +4316,51 @@ function switchPanelTab(tabName) {
     }
 }
 
+// Page mode re-homes the rendered sections into the A+D hybrid: alerts
+// workspace centre-left, overview + actions on a sticky rail, everything
+// else as board cards. Idempotent; a full re-render wipes the wrappers and
+// this rebuilds them. Loaders find their targets by id, so moved nodes
+// keep filling.
+function applyPageModeLayout() {
+    const panel = document.getElementById('case-panel');
+    if (!panel.classList.contains('page-mode')) return false;
+    const body = document.getElementById('case-panel-body');
+    body.classList.remove('workspace-mode');
+    body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => sec.classList.remove('tab-hidden'));
+    if (!body.querySelector('.pm-grid')) {
+        const grid = document.createElement('div');
+        grid.className = 'pm-grid';
+        const main = document.createElement('div');
+        main.className = 'pm-main';
+        const rail = document.createElement('div');
+        rail.className = 'pm-rail';
+        const board = document.createElement('div');
+        board.className = 'pm-board';
+        body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => {
+            const t = sec.dataset.tab;
+            if (t === 'alerts') main.appendChild(sec);
+            else if (t === 'overview' || t === 'actions') rail.appendChild(sec);
+            else board.appendChild(sec);
+        });
+        grid.appendChild(main);
+        grid.appendChild(rail);
+        body.appendChild(grid);
+        body.appendChild(board);
+    }
+    // the attack path lays edges out from getBoundingClientRect, which is all
+    // zeroes until the section is actually visible.
+    if (typeof _apgState !== 'undefined' && _apgState.redraw) {
+        requestAnimationFrame(_apgState.redraw);
+    }
+    return true;
+}
+
 function closeCasePanel() {
     const panel = document.getElementById('case-panel');
+    if (panel.classList.contains('page-mode')) {
+        window.location.assign('/cases');
+        return;
+    }
     panel.classList.remove('open');
     document.getElementById('case-panel-overlay').classList.remove('open');
     // clear the tracked case id so a subsequent updateCaseStatus
@@ -4869,6 +4926,9 @@ function renderRow2Stats() {
 function computeAttentionAlerts() {
     const banner = document.getElementById('attn-banner');
     if (!banner || attentionDismissed) return;
+    // The banner force-shows itself with style.display='flex', which would
+    // resurrect it over the hidden list chrome on /cases/{id}.
+    if (document.getElementById('case-panel').classList.contains('page-mode')) return;
 
     const now = Date.now();
     const alerts = [];
@@ -5573,13 +5633,33 @@ document.addEventListener('DOMContentLoaded', async function() {
     // centered modal that used to live on /alerts.
     const params = new URLSearchParams(window.location.search);
     const selected = params.get('selected');
-    if (selected) {
+    if (selected && !window.__initialCaseId) {
         const match = allCases.find(c => c.case_number === selected)
             || allCases.find(c => String(c.id) === selected);
         if (match) {
-            openCaseDetail(match.id);
+            openCaseDetail(match.id);   // navigates to /cases/{id}
         }
     }
 });
+
+// /cases/{id} — render the panel as the page. The list chrome around it is
+// hidden, the panel joins the document flow, and the overlay never mounts.
+if (window.__initialCaseId) {
+    document.addEventListener('DOMContentLoaded', () => {
+        const panel = document.getElementById('case-panel');
+        panel.classList.add('page-mode', 'open');
+        // style.display, not the .hidden utility: page chrome like
+        // .ion-page-header carries its own display:flex that outranks the
+        // utility class in the cascade. The dialogs stay untouched -- the
+        // closure modal must still open from page mode.
+        for (const sibling of panel.parentElement.children) {
+            if (sibling === panel) { continue; }
+            if (sibling.id === 'create-case-overlay' || sibling.id === 'closure-modal-overlay') { continue; }
+            if (sibling.tagName === 'STYLE' || sibling.tagName === 'SCRIPT') { continue; }
+            sibling.style.display = 'none';
+        }
+        openCaseDetail(window.__initialCaseId);
+    });
+}
 </script>
 {% endblock %}

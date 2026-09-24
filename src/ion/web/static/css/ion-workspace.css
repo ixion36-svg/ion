@@ -306,3 +306,53 @@
     pointer-events: none;
     transition: opacity 0.2s;
 }
+
+/* Page mode — /cases/{id}. The same panel, sitting in the document flow:
+   long content scrolls with the page, so the body must NOT own a scrollbar
+   here. The alerts workspace still scrolls its own columns, which requires
+   a bounded height it no longer inherits from a fixed-inset parent. */
+.ion-ws-panel.page-mode,
+.case-panel.page-mode {
+    position: static;
+    inset: auto;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+    min-height: calc(100vh - 160px);
+}
+.case-panel.page-mode .case-panel-body { overflow: visible; }
+.case-panel.page-mode .cpanel-workspace { height: calc(100vh - 260px); min-height: 480px; }
+
+/* Page-mode layout: command rail + ops board. The alerts workspace is the
+   working core; case meta and response actions ride a sticky right rail; the
+   remaining sections sit below as always-visible cards instead of tabs. */
+.case-panel.page-mode .cpanel-tab-nav { display: none; }
+.case-panel.page-mode .pm-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 14px;
+    align-items: start;
+}
+.case-panel.page-mode .pm-main { min-width: 0; }
+.case-panel.page-mode .pm-rail {
+    position: sticky; top: 14px;
+    display: flex; flex-direction: column; gap: 14px;
+    max-height: calc(100vh - 28px); overflow-y: auto;
+}
+.case-panel.page-mode .pm-board {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px; margin-top: 14px;
+}
+.case-panel.page-mode .pm-board > [data-tab="attackpath"] { grid-column: 1 / -1; }
+.case-panel.page-mode .pm-rail > .cpanel-section,
+.case-panel.page-mode .pm-board > .cpanel-section {
+    margin-bottom: 0;
+    border: 1px solid var(--ion-border);
+    border-radius: 12px;
+    padding: 0.9rem 1rem;
+}
+@media (max-width: 1150px) {
+    .case-panel.page-mode .pm-grid { grid-template-columns: 1fr; }
+    .case-panel.page-mode .pm-rail { position: static; max-height: none; overflow: visible; }
+    .case-panel.page-mode .pm-board { grid-template-columns: 1fr; }
+}

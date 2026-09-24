@@ -1542,16 +1542,17 @@ async def cases_page(request: Request, user: User = Depends(require_page_permiss
     )
 
 
-@app.get("/cases/{row_id:int}")
-async def case_deeplink(
+@app.get("/cases/{row_id:int}", response_class=HTMLResponse)
+async def case_page(
+    request: Request,
     row_id: int,
     user: User = Depends(require_page_permission("case:read")),
 ):
-    """Deep-link to a single case by AlertCase row PK.
+    """A single case as its own page.
 
-    v0.30.0 companion to `alert_deeplink` — see that function's
-    docstring for the rationale. We look up the case, resolve its
-    `case_number`, and redirect to `/cases?selected=<case_number>`.
+    The same template and case-panel component as /cases, rendered in page
+    mode: static in the document flow, so long content scrolls with the page
+    instead of fighting a fixed inset overlay.
     """
     from sqlalchemy.orm import Session
 
@@ -1561,13 +1562,20 @@ async def case_deeplink(
     s: Session = next(get_session())
     try:
         case = s.query(AlertCase).filter(AlertCase.id == row_id).one_or_none()
-        if case is None:
-            return RedirectResponse(url="/cases", status_code=303)
-        return RedirectResponse(
-            url=f"/cases?selected={case.case_number}", status_code=303
-        )
     finally:
         s.close()
+    if case is None:
+        return RedirectResponse(url="/cases", status_code=303)
+    return templates.TemplateResponse(
+        request=request,
+        name="cases.html",
+        context={
+            "alert_detail_v2": get_config().alert_detail_v2,
+            "alert_field_pins": get_config().alert_field_pins,
+            "bob_custom_templates": get_config().bob_custom_templates,
+            "initial_case_id": case.id,
+        },
+    )
 
 
 
