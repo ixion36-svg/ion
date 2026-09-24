@@ -1176,6 +1176,31 @@ def _run_migrations(engine: Engine) -> None:
         if "confidence_threshold_override" not in existing:
             _add_column_tolerant(engine, "alert_prompt_templates", "confidence_threshold_override", "INTEGER")
 
+    # Workforce lifecycle. create_all raises the tables on a fresh database but
+    # never adds a column to one that already exists.
+    if insp.has_table("role_profiles"):
+        existing = {col["name"] for col in insp.get_columns("role_profiles")}
+        if "grants_role_id" not in existing:
+            _add_column_tolerant(
+                engine, "role_profiles", "grants_role_id",
+                "INTEGER REFERENCES roles(id) ON DELETE SET NULL")
+
+    if insp.has_table("user_journeys"):
+        existing = {col["name"] for col in insp.get_columns("user_journeys")}
+        if "grace_until" not in existing:
+            ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+            _add_column_tolerant(engine, "user_journeys", "grace_until", ts_type)
+
+    if insp.has_table("journey_requirements"):
+        existing = {col["name"] for col in insp.get_columns("journey_requirements")}
+        ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+        for col_name, col_type in {
+            "completed_on": "DATE",
+            "submitted_at": ts_type,
+        }.items():
+            if col_name not in existing:
+                _add_column_tolerant(engine, "journey_requirements", col_name, col_type)
+
     # Bob Prompt Evaluation Harness — eval run + sample tables.
     # Base.metadata.create_all creates these on fresh deployments. The blocks
     # below add them idempotently on upgrades and ensure indexes exist.

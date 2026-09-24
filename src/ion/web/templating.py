@@ -28,6 +28,10 @@ _TEMPLATES_DIR = Path(__file__).parent / "templates"
 _BYTECODE_CACHE_DIR = Path("/tmp/ion-jinja2-cache")
 
 
+def _workforce_available() -> bool:
+    return bool(getattr(get_config(), "workforce_enabled", False))
+
+
 def make_templates(directory: Path | None = None) -> Jinja2Templates:
     """Return a Jinja2Templates env configured identically across the app.
 
@@ -50,6 +54,9 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
     # Callable, not a value, so a runtime licence change is picked up without
     # a template reload.
     templates.env.globals["de_module_available"] = de_module_available
+    # Same contract for the workforce nav entry: callable, so the flag is
+    # read per render and the entry vanishes the moment the module is off.
+    templates.env.globals["workforce_available"] = _workforce_available
     templates.env.globals["csp_nonce"] = _CSPNonceProxy()
     templates.env.globals["csrf_token"] = _CSRFTokenProxy()
     return templates

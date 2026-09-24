@@ -124,6 +124,8 @@ from ion.web.vulnerability_api import router as vulnerability_router
 from ion.web.wallboard_api import router as wallboard_router
 from ion.web.webhook_api import router as webhook_router
 from ion.web.workbench_api import router as workbench_router
+from ion.web.workforce_api import require_workforce_module
+from ion.web.workforce_api import router as workforce_router
 from ion.web.worklog_api import router as worklog_router
 
 es_config = get_elasticsearch_config()
@@ -435,6 +437,7 @@ app.include_router(soc_health_router, prefix="/api")
 app.include_router(detection_health_router, prefix="/api")
 # Detection Engineering module — Phase 0 (read-only noise campaigns + DE metrics)
 app.include_router(de_router, prefix="/api", dependencies=[Depends(require_de_module)])
+app.include_router(workforce_router, prefix="/api")  # /api/workforce/* — 404s when ION_WORKFORCE_ENABLED is off
 app.include_router(attack_story_router, prefix="/api")
 app.include_router(case_similarity_router, prefix="/api")
 app.include_router(case_lifecycle_router, prefix="/api")  # /api/elasticsearch/alerts/cases/* (split from api.py, #14 inc.3)
@@ -2274,6 +2277,44 @@ async def verdict_review_page(request: Request, user: User = Depends(require_pag
             "current_user": user,
             "response_actions_enabled": get_config().response_actions_enabled,
         },
+    )
+
+
+@app.get("/workforce", response_class=HTMLResponse)
+async def workforce_page(request: Request, user: User = Depends(require_page_permission("workforce:read")), _gate: None = Depends(require_workforce_module)):
+    """A person's own journey: the gate, then role readiness."""
+    return templates.TemplateResponse(
+        request=request, name="workforce_journey.html",
+        context={"current_user": user},
+    )
+
+
+@app.get("/workforce/profiles", response_class=HTMLResponse)
+async def workforce_profiles_page(request: Request, user: User = Depends(require_page_permission("workforce:manage")), _gate: None = Depends(require_workforce_module)):
+    """Role profile builder — the schema a SOC edits for itself."""
+    return templates.TemplateResponse(
+        request=request, name="workforce_profiles.html",
+        context={"current_user": user},
+    )
+
+
+@app.get("/workforce/people", response_class=HTMLResponse)
+async def workforce_people_page(request: Request, user: User = Depends(require_page_permission("workforce:verify")), _gate: None = Depends(require_workforce_module)):
+    """The lead's roster and verification queue."""
+    return templates.TemplateResponse(
+        request=request, name="workforce_people.html",
+        context={"current_user": user,
+                 "can_manage": user.has_permission("workforce:manage")},
+    )
+
+
+@app.get("/workforce/orbat", response_class=HTMLResponse)
+async def workforce_orbat_page(request: Request, user: User = Depends(require_page_permission("workforce:read")), _gate: None = Depends(require_workforce_module)):
+    """Who holds which role, primary and cover, and where cover is thin."""
+    return templates.TemplateResponse(
+        request=request, name="workforce_orbat.html",
+        context={"current_user": user,
+                 "can_manage": user.has_permission("workforce:manage")},
     )
 
 

@@ -1,0 +1,370 @@
+{% extends "base.html" %}
+{% block title %}Workforce people - ION{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-[1400px] mx-auto">
+
+  <div class="flex items-end gap-4 mb-5">
+    <div>
+      <div class="text-[0.7rem] uppercase tracking-widest text-base-content/50 mb-1">Workforce / People</div>
+      <h1 class="text-2xl font-semibold">Journeys &amp; verification</h1>
+    </div>
+    <div class="grow"></div>
+    <a href="/workforce/profiles" class="btn btn-sm btn-ghost">Role profiles</a>
+    <a href="/workforce/orbat" class="btn btn-sm btn-ghost">ORBAT</a>
+  </div>
+
+  <div class="card bg-base-200 border border-base-300 mb-5">
+    <div class="card-body p-5">
+      <div class="flex items-center gap-3">
+        <h2 class="card-title text-base">Awaiting verification</h2>
+        <span id="wf-q-count" class="badge badge-warning badge-sm hidden"></span>
+      </div>
+      <ul id="wf-queue" class="flex flex-col mt-1">
+        <li class="text-sm text-base-content/50 py-2">Loading&hellip;</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card bg-base-200 border border-base-300">
+    <div class="card-body p-5">
+      <h2 class="card-title text-base">Everyone</h2>
+      <div class="overflow-x-auto mt-2">
+        <table class="table table-sm">
+          <thead>
+            <tr class="text-[0.65rem] uppercase tracking-wider text-base-content/50">
+              <th>Person</th><th>Journeys</th><th>ION roles held</th>
+              <th>Wants to move to</th><th>Access</th>
+            </tr>
+          </thead>
+          <tbody id="wf-people-rows">
+            <tr><td colspan="5" class="text-sm text-base-content/50">Loading&hellip;</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card bg-base-200 border border-base-300 mt-5">
+    <div class="card-body p-5">
+      <h2 class="card-title text-base">Offboarding</h2>
+      <div class="flex items-end gap-2 flex-wrap mb-2">
+        <div>
+          <label class="label text-xs py-0" for="wf-leaver-user">Person</label>
+          <select id="wf-leaver-user" class="select select-sm select-bordered min-w-[180px]"></select>
+        </div>
+        <div>
+          <label class="label text-xs py-0" for="wf-leaver-date">Last working day</label>
+          <input id="wf-leaver-date" type="date" class="input input-sm input-bordered">
+        </div>
+        <div class="grow max-w-xs">
+          <label class="label text-xs py-0" for="wf-leaver-reason">Reason</label>
+          <input id="wf-leaver-reason" type="text" class="input input-sm input-bordered w-full" placeholder="resignation, transfer...">
+        </div>
+        <button id="wf-leaver-start" type="button" class="btn btn-sm btn-warning">Start offboarding</button>
+      </div>
+      <p class="text-xs text-base-content/50 mb-1">Access is revoked at 17:00 on the last working day whether or not the checklist is finished &mdash; outstanding items are chased, never a reason to leave an account enabled.</p>
+      <div id="wf-leavers" class="flex flex-col gap-3 mt-2"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  'use strict';
+
+  const STAGE_BADGE = {
+    operational: 'badge-success', role_training: 'badge-info',
+    pre_access: 'badge-warning', suspended: 'badge-error', withdrawn: 'badge-error'
+  };
+
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      credentials: 'include',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (e) {
+          throw new Error(e.detail || ('HTTP ' + r.status));
+        });
+      }
+      return r.json();
+    });
+  }
+
+  function loadQueue() {
+    return api('GET', '/api/workforce/verification-queue').then(function (data) {
+      const list = document.getElementById('wf-queue');
+      const count = document.getElementById('wf-q-count');
+      list.textContent = '';
+      if (data.count) {
+        count.textContent = String(data.count);
+        count.classList.remove('hidden');
+      } else {
+        count.classList.add('hidden');
+        const li = document.createElement('li');
+        li.className = 'text-sm text-base-content/50 py-2';
+        li.textContent = 'Nothing waiting. Submissions land here the moment someone marks an item complete.';
+        list.appendChild(li);
+        return;
+      }
+      data.items.forEach(function (i) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-3 py-2 border-t border-base-300/60 flex-wrap';
+
+        const who = document.createElement('span');
+        who.className = 'text-sm font-medium';
+        who.textContent = i.user;
+        li.appendChild(who);
+
+        const what = document.createElement('span');
+        what.className = 'text-sm grow truncate';
+        what.textContent = i.name + ' (' + i.role + ')';
+        li.appendChild(what);
+
+        const meta = document.createElement('span');
+        meta.className = 'text-xs text-base-content/50 font-mono';
+        meta.textContent = [
+          i.completed_on ? 'done ' + i.completed_on : null,
+          i.evidence_ref ? 'ref ' + i.evidence_ref : null
+        ].filter(Boolean).join(' · ');
+        li.appendChild(meta);
+
+        const kind = document.createElement('span');
+        kind.className = 'badge badge-xs ' + (i.phase === 'gate' ? 'badge-warning' : 'badge-ghost');
+        kind.textContent = i.phase === 'gate' ? 'GATE' : i.kind;
+        li.appendChild(kind);
+
+        const verify = document.createElement('button');
+        verify.type = 'button';
+        verify.className = 'btn btn-xs btn-primary';
+        verify.textContent = 'Verify';
+        verify.addEventListener('click', function () {
+          verify.disabled = true;
+          api('POST', '/api/workforce/requirements/' + i.id + '/verify',
+              { evidence_ref: i.evidence_ref || '' })
+            .then(refresh)
+            .catch(function (e) { verify.disabled = false; alert(e.message); });
+        });
+        li.appendChild(verify);
+
+        const back = document.createElement('button');
+        back.type = 'button';
+        back.className = 'btn btn-xs btn-ghost';
+        back.setAttribute('aria-label', 'Send back ' + i.name);
+        back.textContent = 'Send back';
+        back.addEventListener('click', function () {
+          api('POST', '/api/workforce/requirements/' + i.id + '/withdraw')
+            .then(refresh)
+            .catch(function (e) { alert(e.message); });
+        });
+        li.appendChild(back);
+
+        list.appendChild(li);
+      });
+    });
+  }
+
+  function chip(text, cls) {
+    const s = document.createElement('span');
+    s.className = 'badge badge-xs ' + (cls || 'badge-ghost');
+    s.textContent = text;
+    return s;
+  }
+
+  function renderPeople(data) {
+      const tbody = document.getElementById('wf-people-rows');
+      tbody.textContent = '';
+      data.people.forEach(function (p) {
+        const tr = document.createElement('tr');
+
+        const name = document.createElement('td');
+        const n = document.createElement('div');
+        n.className = 'text-sm font-medium';
+        n.textContent = p.name;
+        name.appendChild(n);
+        const u = document.createElement('div');
+        u.className = 'text-xs text-base-content/50';
+        u.textContent = p.username;
+        name.appendChild(u);
+        tr.appendChild(name);
+
+        const jt = document.createElement('td');
+        jt.className = 'align-top';
+        if (!p.journeys.length) {
+          const s = document.createElement('span');
+          s.className = 'text-xs text-base-content/40';
+          s.textContent = '—';
+          jt.appendChild(s);
+        }
+        p.journeys.forEach(function (j) {
+          const row = document.createElement('div');
+          row.className = 'flex items-center gap-2 py-0.5 flex-wrap';
+          row.appendChild(chip(j.is_cover ? 'COV' : 'PRI',
+            j.is_cover ? 'badge-secondary' : 'badge-primary'));
+          const r = document.createElement('span');
+          r.className = 'text-sm';
+          r.textContent = j.role;
+          row.appendChild(r);
+          row.appendChild(chip(j.stage.replace(/_/g, ' '),
+            STAGE_BADGE[j.stage] || 'badge-ghost'));
+          const prog = document.createElement('span');
+          prog.className = 'text-xs text-base-content/50 font-mono';
+          prog.textContent = 'gate ' + j.gate_done + '/' + j.gate_total +
+            ' · role ' + j.readiness_done + '/' + j.readiness_total;
+          row.appendChild(prog);
+          if (j.awaiting_verification) {
+            row.appendChild(chip(j.awaiting_verification + ' to verify', 'badge-warning'));
+          }
+          jt.appendChild(row);
+        });
+        tr.appendChild(jt);
+
+        const roles = document.createElement('td');
+        roles.className = 'align-top';
+        const wrap = document.createElement('div');
+        wrap.className = 'flex gap-1 flex-wrap max-w-[220px]';
+        p.ion_roles.forEach(function (r) { wrap.appendChild(chip(r)); });
+        roles.appendChild(wrap);
+        tr.appendChild(roles);
+
+        const target = document.createElement('td');
+        target.className = 'text-sm align-top';
+        target.textContent = p.target_role || '—';
+        tr.appendChild(target);
+
+        const access = document.createElement('td');
+        access.className = 'align-top';
+        if (p.has_access === null) {
+          access.appendChild(chip('n/a'));
+        } else {
+          access.appendChild(chip(p.has_access ? 'granted' : 'blocked',
+            p.has_access ? 'badge-success' : 'badge-error'));
+        }
+        tr.appendChild(access);
+
+        tbody.appendChild(tr);
+      });
+  }
+
+  function loadLeavers() {
+    return api('GET', '/api/workforce/leavers').then(function (data) {
+      const host = document.getElementById('wf-leavers');
+      host.textContent = '';
+      if (!data.leavers.length) {
+        const d = document.createElement('div');
+        d.className = 'text-sm text-base-content/50';
+        d.textContent = 'Nobody is offboarding.';
+        host.appendChild(d);
+        return;
+      }
+      data.leavers.forEach(function (l) {
+        const card = document.createElement('div');
+        card.className = 'rounded-lg border p-3 ' +
+          (l.revoked_at ? 'border-base-300 bg-base-100 opacity-60' : 'border-warning/50 bg-warning/5');
+
+        const head = document.createElement('div');
+        head.className = 'flex items-center gap-3 flex-wrap';
+        const n = document.createElement('span');
+        n.className = 'text-sm font-medium';
+        n.textContent = l.name;
+        head.appendChild(n);
+        const d = document.createElement('span');
+        d.className = 'text-xs text-base-content/60';
+        d.textContent = 'last day ' + l.last_working_day + (l.reason ? ' \u00b7 ' + l.reason : '');
+        head.appendChild(d);
+        const grow = document.createElement('span');
+        grow.className = 'grow';
+        head.appendChild(grow);
+        if (l.revoked_at) {
+          const b = document.createElement('span');
+          b.className = 'badge badge-xs badge-ghost';
+          b.textContent = 'revoked ' + l.revoked_at.slice(0, 10);
+          head.appendChild(b);
+        } else {
+          const rev = document.createElement('button');
+          rev.type = 'button';
+          rev.className = 'btn btn-xs btn-error';
+          rev.textContent = 'Revoke now';
+          rev.addEventListener('click', function () {
+            if (!window.confirm('Close every journey for ' + l.name + ' and take back granted roles?')) { return; }
+            api('POST', '/api/workforce/leavers/' + l.id + '/revoke')
+              .then(refresh).catch(function (e) { alert(e.message); });
+          });
+          head.appendChild(rev);
+        }
+        card.appendChild(head);
+
+        const list = document.createElement('div');
+        list.className = 'mt-2 flex flex-col gap-1';
+        (l.checklist || []).forEach(function (item, idx) {
+          const row = document.createElement('label');
+          row.className = 'flex items-center gap-2 text-sm cursor-pointer';
+          const cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.className = 'checkbox checkbox-xs';
+          cb.checked = !!item.done;
+          cb.addEventListener('change', function () {
+            api('PUT', '/api/workforce/leavers/' + l.id + '/checklist',
+                { index: idx, done: cb.checked })
+              .catch(function (e) { cb.checked = !cb.checked; alert(e.message); });
+          });
+          row.appendChild(cb);
+          const t = document.createElement('span');
+          t.className = item.done ? 'line-through text-base-content/50' : '';
+          t.textContent = item.name;
+          row.appendChild(t);
+          const o = document.createElement('span');
+          o.className = 'text-xs text-base-content/40';
+          o.textContent = item.owner;
+          row.appendChild(o);
+          list.appendChild(row);
+        });
+        card.appendChild(list);
+        host.appendChild(card);
+      });
+    }).catch(function () { /* panel is supplementary */ });
+  }
+
+  function fillLeaverSelect(peopleData) {
+    const sel = document.getElementById('wf-leaver-user');
+    sel.textContent = '';
+    peopleData.people.forEach(function (p) {
+      const o = document.createElement('option');
+      o.value = String(p.user_id);
+      o.textContent = p.name;
+      sel.appendChild(o);
+    });
+  }
+
+  document.getElementById('wf-leaver-start').addEventListener('click', function () {
+    const uid = document.getElementById('wf-leaver-user').value;
+    const day = document.getElementById('wf-leaver-date').value;
+    if (!uid || !day) { alert('Pick a person and their last working day.'); return; }
+    api('POST', '/api/workforce/leavers', {
+      user_id: parseInt(uid, 10), last_working_day: day,
+      reason: document.getElementById('wf-leaver-reason').value.trim()
+    }).then(refresh).catch(function (e) { alert(e.message); });
+  });
+
+  function refresh() {
+    return Promise.all([
+      loadQueue(),
+      api('GET', '/api/workforce/people').then(function (data) {
+        renderPeople(data);
+        fillLeaverSelect(data);
+      }),
+      loadLeavers()
+    ]).catch(function (e) {
+      document.getElementById('wf-queue').textContent = 'Could not load: ' + e.message;
+    });
+  }
+
+  refresh();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+{% block title %}My onboarding - ION{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-[1100px] mx-auto">
+
+  <div class="flex items-end gap-4 mb-5">
+    <div>
+      <div class="text-[0.7rem] uppercase tracking-widest text-base-content/50 mb-1">Workforce / Onboarding</div>
+      <h1 class="text-2xl font-semibold">My onboarding</h1>
+    </div>
+    <div class="grow"></div>
+    <a href="/workforce/orbat" class="btn btn-sm btn-ghost">ORBAT</a>
+  </div>
+
+  <div id="wf-journey-tabs" class="hidden mb-4 flex gap-2"></div>
+  <div id="wf-suspended" class="hidden alert alert-error mb-4 text-sm"></div>
+
+  <div id="wf-wizard" class="hidden">
+    <ol id="wf-stepper" class="flex items-center gap-0 mb-6"></ol>
+    <div id="wf-step-body"></div>
+  </div>
+
+  <div id="wf-empty" class="hidden card bg-base-200 border border-base-300">
+    <div class="card-body">
+      <h2 class="card-title text-base">No role assigned yet</h2>
+      <p class="text-sm text-base-content/70">Once a lead assigns you a role profile, your onboarding starts here. Access to the system is granted when every mandatory item has been verified.</p>
+    </div>
+  </div>
+
+  <div id="wf-loading" class="text-sm text-base-content/50">Loading&hellip;</div>
+</div>
+
+<template id="wf-req-row">
+  <li class="py-3 border-t border-base-300/60">
+    <div class="flex items-center gap-3 flex-wrap">
+      <span data-f="dot" class="w-2.5 h-2.5 rounded-full shrink-0"></span>
+      <div class="grow min-w-0">
+        <div class="text-sm font-medium" data-f="name"></div>
+        <div class="text-xs text-base-content/50" data-f="meta"></div>
+      </div>
+      <span class="badge badge-xs badge-ghost shrink-0" data-f="kind"></span>
+      <span class="text-xs font-medium shrink-0" data-f="status"></span>
+    </div>
+    <div class="hidden mt-2 ml-5 flex items-end gap-2 flex-wrap" data-f="form">
+      <div>
+        <label class="label text-xs py-0" data-f="datelabel">Date completed</label>
+        <input type="date" class="input input-xs input-bordered" data-f="date">
+      </div>
+      <div class="grow max-w-xs">
+        <label class="label text-xs py-0">Evidence / reference</label>
+        <input type="text" class="input input-xs input-bordered w-full"
+               placeholder="cert number, ticket, document" data-f="evidence">
+      </div>
+      <button type="button" class="btn btn-xs btn-primary" data-f="submit">Mark complete</button>
+    </div>
+    <div class="hidden mt-2 ml-5 flex items-center gap-3" data-f="pendingbar">
+      <span class="text-xs text-warning" data-f="pendingtext"></span>
+      <button type="button" class="btn btn-xs btn-ghost" data-f="withdraw">Withdraw</button>
+    </div>
+  </li>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  'use strict';
+
+  const STEPS = ['Your role', 'Access gate', 'Access', 'Role readiness', 'Operational'];
+  let journeys = [];
+  let hasAccess = false;
+  let active = 0;        // which journey
+  let step = null;       // which wizard step is open (null = derive)
+
+  function money(n) { return '£' + Number(n || 0).toLocaleString(); }
+
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      credentials: 'include',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (e) {
+          throw new Error(e.detail || ('HTTP ' + r.status));
+        });
+      }
+      return r.json();
+    });
+  }
+
+  function load(keepStep) {
+    return api('GET', '/api/workforce/journeys/me').then(function (data) {
+      journeys = data.journeys;
+      hasAccess = data.has_access;
+      document.getElementById('wf-loading').classList.add('hidden');
+      if (!journeys.length) {
+        document.getElementById('wf-empty').classList.remove('hidden');
+        return;
+      }
+      if (active >= journeys.length) { active = 0; }
+      if (!keepStep) { step = null; }
+      render();
+    }).catch(function (e) {
+      document.getElementById('wf-loading').textContent = 'Could not load: ' + e.message;
+    });
+  }
+
+  // The step the journey has actually reached; nothing beyond it is clickable.
+  function reached(j) {
+    if (j.stage === 'operational') { return 4; }
+    if (j.gate_cleared) { return 3; }
+    return 1;
+  }
+
+  function render() {
+    const j = journeys[active];
+    renderTabs();
+    renderSuspended(j);
+    const max = reached(j);
+    if (step === null || step > max) { step = max === 1 && !anyTouched(j) ? 0 : max; }
+    renderStepper(j, max);
+    renderBody(j);
+    document.getElementById('wf-wizard').classList.remove('hidden');
+  }
+
+  function anyTouched(j) {
+    return j.requirements.some(function (r) { return r.status !== 'pending'; });
+  }
+
+  function renderTabs() {
+    const host = document.getElementById('wf-journey-tabs');
+    host.textContent = '';
+    if (journeys.length < 2) { host.classList.add('hidden'); return; }
+    host.classList.remove('hidden');
+    journeys.forEach(function (j, i) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-sm ' + (i === active ? 'btn-primary' : 'btn-ghost');
+      b.textContent = j.role + (j.is_cover ? ' (cover)' : '');
+      b.addEventListener('click', function () { active = i; step = null; render(); });
+      host.appendChild(b);
+    });
+  }
+
+  function renderSuspended(j) {
+    const el = document.getElementById('wf-suspended');
+    if (j.stage !== 'suspended') { el.classList.add('hidden'); return; }
+    const lapsed = j.requirements.filter(function (r) { return r.status === 'expired'; })
+      .map(function (r) { return r.name; }).join(', ');
+    el.textContent = 'Suspended - a mandatory item has lapsed (' + lapsed +
+      '). Renew it and it will be re-verified; access is withdrawn when the grace period ends.';
+    el.classList.remove('hidden');
+  }
+
+  function renderStepper(j, max) {
+    const ol = document.getElementById('wf-stepper');
+    ol.textContent = '';
+    STEPS.forEach(function (label, i) {
+      const li = document.createElement('li');
+      li.className = 'flex items-center' + (i < STEPS.length - 1 ? ' grow' : '');
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      const done = i < max, current = i === step, open = i <= max;
+      btn.className = 'flex items-center gap-2 px-1 ' + (open ? '' : 'opacity-40 cursor-not-allowed');
+
+      const dot = document.createElement('span');
+      dot.className = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 ' +
+        (done ? 'bg-success text-success-content'
+          : current ? 'bg-primary text-primary-content'
+          : 'bg-base-300 text-base-content/60');
+      dot.textContent = done ? '✓' : String(i + 1);
+      btn.appendChild(dot);
+
+      const t = document.createElement('span');
+      t.className = 'text-xs whitespace-nowrap ' + (current ? 'font-semibold' : 'text-base-content/60');
+      t.textContent = label;
+      btn.appendChild(t);
+
+      if (open) {
+        btn.addEventListener('click', function () { step = i; render(); });
+      }
+      li.appendChild(btn);
+
+      if (i < STEPS.length - 1) {
+        const bar = document.createElement('span');
+        bar.className = 'grow h-0.5 mx-2 ' + (i < max ? 'bg-success' : 'bg-base-300');
+        li.appendChild(bar);
+      }
+      ol.appendChild(li);
+    });
+  }
+
+  function card() {
+    const c = document.createElement('div');
+    c.className = 'card bg-base-200 border border-base-300';
+    const b = document.createElement('div');
+    b.className = 'card-body p-5';
+    c.appendChild(b);
+    return [c, b];
+  }
+
+  function heading(body, title, sub) {
+    const h = document.createElement('h2');
+    h.className = 'card-title text-base';
+    h.textContent = title;
+    body.appendChild(h);
+    if (sub) {
+      const p = document.createElement('p');
+      p.className = 'text-sm text-base-content/70';
+      p.textContent = sub;
+      body.appendChild(p);
+    }
+  }
+
+  function nextButton(body, label, enabled, hint) {
+    const row = document.createElement('div');
+    row.className = 'mt-4 flex items-center gap-3';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn btn-sm btn-primary';
+    b.disabled = !enabled;
+    b.textContent = label;
+    b.addEventListener('click', function () { step += 1; render(); });
+    row.appendChild(b);
+    if (!enabled && hint) {
+      const s = document.createElement('span');
+      s.className = 'text-xs text-base-content/50';
+      s.textContent = hint;
+      row.appendChild(s);
+    }
+    body.appendChild(row);
+  }
+
+  function requirementList(body, j, phase) {
+    const ul = document.createElement('ul');
+    ul.className = 'flex flex-col mt-2';
+    j.requirements.filter(function (r) { return r.phase === phase; }).forEach(function (r) {
+      ul.appendChild(reqRow(r));
+    });
+    body.appendChild(ul);
+  }
+
+  function reqRow(r) {
+    const node = document.getElementById('wf-req-row').content.cloneNode(true);
+    const f = function (n) { return node.querySelector('[data-f="' + n + '"]'); };
+
+    f('name').textContent = r.name;
+    f('kind').textContent = r.kind;
+
+    const meta = [];
+    if (r.expires_on) { meta.push('expires ' + r.expires_on); }
+    if (r.notes) { meta.push(r.notes); }
+    f('meta').textContent = meta.join(' · ');
+
+    const styles = {
+      verified: ['bg-success', 'text-success', 'Verified'],
+      waived: ['bg-success', 'text-success', 'Waived'],
+      submitted: ['bg-warning', 'text-warning', 'Awaiting verification'],
+      expired: ['bg-error', 'text-error', 'Lapsed - renew and resubmit'],
+      pending: ['bg-base-content/30', 'text-base-content/60', 'To do']
+    };
+    const st = styles[r.status] || styles.pending;
+    f('dot').classList.add(st[0]);
+    f('status').classList.add(st[1]);
+    f('status').textContent = st[2];
+
+    if (r.status === 'pending' || r.status === 'expired') {
+      f('form').classList.remove('hidden');
+      f('date').value = new Date().toISOString().slice(0, 10);
+      if (r.evidence_ref) { f('evidence').value = r.evidence_ref; }
+      f('submit').addEventListener('click', function () {
+        f('submit').disabled = true;
+        api('POST', '/api/workforce/requirements/' + r.id + '/submit', {
+          completed_on: f('date').value || null,
+          evidence_ref: f('evidence').value.trim()
+        }).then(function () { return load(true); })
+          .catch(function (e) { f('submit').disabled = false; alert(e.message); });
+      });
+    } else if (r.status === 'submitted') {
+      f('pendingbar').classList.remove('hidden');
+      f('pendingtext').textContent = 'Submitted ' +
+        (r.completed_on ? '(completed ' + r.completed_on + ') ' : '') +
+        '- your lead has been asked to verify it.';
+      f('withdraw').addEventListener('click', function () {
+        api('POST', '/api/workforce/requirements/' + r.id + '/withdraw')
+          .then(function () { return load(true); })
+          .catch(function (e) { alert(e.message); });
+      });
+    }
+    return node;
+  }
+
+  function renderBody(j) {
+    const host = document.getElementById('wf-step-body');
+    host.textContent = '';
+    const pair = card();
+    const body = pair[1];
+    host.appendChild(pair[0]);
+
+    const gate = j.requirements.filter(function (r) { return r.phase === 'gate'; });
+    const ready = j.requirements.filter(function (r) { return r.phase === 'readiness'; });
+
+    if (step === 0) {
+      heading(body, j.role + ' · v' + j.version + (j.is_cover ? ' · cover role' : ''),
+        'Before you can use the system, ' + gate.length + ' mandatory item' + (gate.length === 1 ? '' : 's') +
+        ' must be verified by a lead. Role training (' + ready.length + ' item' + (ready.length === 1 ? '' : 's') +
+        ') unlocks after that. Target: day ' + j.days_elapsed + ' of ' + j.target_days + '.');
+      const cost = document.createElement('p');
+      cost.className = 'text-xs text-base-content/50 mt-1';
+      cost.textContent = 'Training committed: ' + money(j.committed) + ' · spent so far: ' + money(j.spend);
+      body.appendChild(cost);
+      nextButton(body, 'Start the access gate', true);
+
+    } else if (step === 1) {
+      heading(body, 'Access gate · ' + j.gate_done + ' of ' + j.gate_total + ' verified',
+        'For each item, set the date you completed it and add a reference. ' +
+        'Your lead is notified and verifies it - nothing here is self-service access.');
+      requirementList(body, j, 'gate');
+      nextButton(body, 'Continue', j.gate_cleared,
+        'Locked until every item above is verified.');
+
+    } else if (step === 2) {
+      heading(body, hasAccess ? 'System access granted' : 'Access pending',
+        hasAccess
+          ? 'Every mandatory item is verified. The permissions of your role are now active - no new login needed.'
+          : 'The gate is cleared on this role, but access is person-level and another of your roles is holding it.');
+      const badge = document.createElement('div');
+      badge.className = 'mt-2 badge ' + (hasAccess ? 'badge-success' : 'badge-warning');
+      badge.textContent = hasAccess ? 'ACTIVE' : 'HELD';
+      body.appendChild(badge);
+      nextButton(body, 'On to role readiness', true);
+
+    } else if (step === 3) {
+      heading(body, 'Role readiness · ' + j.readiness_done + ' of ' + j.readiness_total + ' complete',
+        'The training and certifications this role requires. Courses complete from your enrolment; certs need your date and reference, then verification.');
+      requirementList(body, j, 'readiness');
+      const cost = document.createElement('p');
+      cost.className = 'text-xs text-base-content/50 mt-3';
+      cost.textContent = 'Spent ' + money(j.spend) + ' · committed ' + money(j.committed);
+      body.appendChild(cost);
+      nextButton(body, 'Finish', j.stage === 'operational',
+        'Completes automatically once everything above is verified.');
+
+    } else {
+      heading(body, 'Operational',
+        'Onboarding for ' + j.role + ' is complete. Expiry dates are tracked from here - you and your lead are reminded at 90, 60, 30 and 7 days.');
+      const p = document.createElement('div');
+      p.className = 'mt-2 badge badge-success';
+      p.textContent = j.is_cover ? 'COVER · READY' : 'OPERATIONAL';
+      body.appendChild(p);
+    }
+  }
+
+  load(false);
+})();
+</script>
+{% endblock %}

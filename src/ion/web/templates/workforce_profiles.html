@@ -1,0 +1,312 @@
+{% extends "base.html" %}
+{% block title %}Role profiles - ION{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-[1400px] mx-auto">
+
+  <div class="flex items-end gap-4 mb-5">
+    <div>
+      <div class="text-[0.7rem] uppercase tracking-widest text-base-content/50 mb-1">Workforce / Role profiles</div>
+      <h1 class="text-2xl font-semibold">The schema</h1>
+    </div>
+    <div class="grow"></div>
+    <a href="/workforce/orbat" class="btn btn-sm btn-ghost">ORBAT</a>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
+
+    <div class="flex flex-col gap-4">
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <h2 class="card-title text-sm">Profiles</h2>
+          <ul id="wf-profile-list" class="flex flex-col gap-1 mt-1">
+            <li class="text-sm text-base-content/50">Loading&hellip;</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <h2 class="card-title text-sm">New profile</h2>
+          <label class="label text-xs" for="wf-new-name">Role name</label>
+          <input id="wf-new-name" type="text" class="input input-sm input-bordered w-full" placeholder="L1 SOC Analyst">
+          <label class="label text-xs mt-2" for="wf-new-nice">NICE work role (optional)</label>
+          <input id="wf-new-nice" type="text" class="input input-sm input-bordered w-full" placeholder="Defensive Cybersecurity">
+          <button id="wf-create" type="button" class="btn btn-sm btn-primary mt-3">Create</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-col gap-4">
+      <div id="wf-version-banner" class="hidden alert alert-info text-sm"></div>
+
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-5">
+          <div class="flex items-center gap-3">
+            <h2 id="wf-draft-title" class="card-title text-base">Select a profile</h2>
+            <div class="grow"></div>
+            <button id="wf-publish" type="button" class="btn btn-sm btn-primary hidden">Publish</button>
+          </div>
+
+          <div id="wf-editor" class="hidden mt-3">
+            <div class="mb-4 flex items-end gap-2 flex-wrap">
+              <div>
+                <label class="label text-xs py-0" for="wf-grants">Grants ION role once the gate is verified</label>
+                <select id="wf-grants" class="select select-sm select-bordered min-w-[220px]">
+                  <option value="">(none - journey tracking only)</option>
+                </select>
+              </div>
+              <span id="wf-grants-note" class="text-xs text-base-content/50 pb-2">Held back until every mandatory item is verified; removed again if one lapses.</span>
+            </div>
+            <div class="text-[0.7rem] uppercase tracking-wider text-base-content/50 mb-2">Requirements</div>
+            <ul id="wf-req-list" class="flex flex-col"></ul>
+
+            <div class="mt-4 pt-4 border-t border-base-300">
+              <div class="text-[0.7rem] uppercase tracking-wider text-base-content/50 mb-2">Add a requirement</div>
+              <div class="grid grid-cols-2 md:grid-cols-6 gap-2 items-end">
+                <div class="col-span-2">
+                  <label class="label text-xs" for="wf-r-name">Name</label>
+                  <input id="wf-r-name" type="text" class="input input-sm input-bordered w-full">
+                </div>
+                <div>
+                  <label class="label text-xs" for="wf-r-phase">Phase</label>
+                  <select id="wf-r-phase" class="select select-sm select-bordered w-full">
+                    <option value="gate">Gate</option>
+                    <option value="readiness">Readiness</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="label text-xs" for="wf-r-kind">Kind</label>
+                  <select id="wf-r-kind" class="select select-sm select-bordered w-full">
+                    <option value="document">Document</option>
+                    <option value="vetting">Vetting</option>
+                    <option value="access">Access</option>
+                    <option value="course">Course</option>
+                    <option value="cert">Certification</option>
+                    <option value="signoff">Sign-off</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="label text-xs" for="wf-r-validity">Valid (months)</label>
+                  <input id="wf-r-validity" type="number" min="1" max="120" class="input input-sm input-bordered w-full">
+                </div>
+                <div>
+                  <label class="label text-xs" for="wf-r-cost">Cost</label>
+                  <input id="wf-r-cost" type="number" min="0" step="1" value="0" class="input input-sm input-bordered w-full">
+                </div>
+              </div>
+              <button id="wf-add-req" type="button" class="btn btn-sm mt-3">Add requirement</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  let currentVersionId = null;
+
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      credentials: 'include',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (e) {
+          throw new Error(e.detail || ('HTTP ' + r.status));
+        });
+      }
+      return r.status === 204 ? null : r.json();
+    });
+  }
+
+  function toast(message, ok) {
+    const banner = document.getElementById('wf-version-banner');
+    banner.className = 'alert text-sm ' + (ok ? 'alert-success' : 'alert-error');
+    banner.textContent = message;
+  }
+
+  function loadProfiles() {
+    return api('GET', '/api/workforce/profiles').then(function (data) {
+      const list = document.getElementById('wf-profile-list');
+      list.textContent = '';
+      if (!data.profiles.length) {
+        const li = document.createElement('li');
+        li.className = 'text-sm text-base-content/50';
+        li.textContent = 'None yet.';
+        list.appendChild(li);
+        return;
+      }
+      data.profiles.forEach(function (p) {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-sm btn-ghost w-full justify-start';
+        btn.textContent = p.name;
+        const tag = document.createElement('span');
+        tag.className = 'badge badge-xs ml-auto ' + (p.published_version ? 'badge-success' : 'badge-ghost');
+        tag.textContent = p.published_version ? ('v' + p.published_version) : 'draft';
+        btn.appendChild(tag);
+        btn.addEventListener('click', function () { openDraft(p.id); });
+        li.appendChild(btn);
+        list.appendChild(li);
+      });
+    });
+  }
+
+  function openDraft(profileId) {
+    api('GET', '/api/workforce/profiles/' + profileId + '/draft').then(function (d) {
+      currentVersionId = d.version_id;
+      document.getElementById('wf-draft-title').textContent = d.profile.name + ' — v' + d.version + ' draft';
+      document.getElementById('wf-editor').classList.remove('hidden');
+      document.getElementById('wf-publish').classList.remove('hidden');
+
+      const banner = document.getElementById('wf-version-banner');
+      banner.classList.remove('hidden', 'alert-success', 'alert-error');
+      banner.classList.add('alert-info');
+      banner.textContent = d.live_version
+        ? ('v' + d.live_version + ' is live for ' + d.people_on_live +
+           ' people. Publishing applies to new assignments only — existing journeys keep the version they started on.')
+        : 'Nothing published yet. The first published version is what can be assigned.';
+
+      renderRequirements(d.requirements);
+      renderGrants(d.profile);
+    }).catch(function (e) { toast(e.message, false); });
+  }
+
+  let ionRoles = null;
+  function renderGrants(profile) {
+    const sel = document.getElementById('wf-grants');
+    const fill = function () {
+      while (sel.options.length > 1) { sel.remove(1); }
+      ionRoles.forEach(function (r) {
+        const o = document.createElement('option');
+        o.value = String(r.id);
+        o.textContent = r.name + ' (' + r.permissions + ' perms)';
+        sel.appendChild(o);
+      });
+      sel.value = profile.grants_role_id ? String(profile.grants_role_id) : '';
+      sel.onchange = function () {
+        api('PUT', '/api/workforce/profiles/' + profile.id + '/grants', {
+          role_id: sel.value ? parseInt(sel.value, 10) : null
+        }).then(function () {
+          toast(sel.value ? 'The gate now controls the permissions of that role.' : 'No ION role granted.', true);
+        }).catch(function (e) { toast(e.message, false); });
+      };
+    };
+    if (ionRoles) { fill(); return; }
+    api('GET', '/api/workforce/ion-roles').then(function (d) {
+      ionRoles = d.roles;
+      fill();
+    }).catch(function (e) { toast(e.message, false); });
+  }
+
+  function renderRequirements(reqs) {
+    const list = document.getElementById('wf-req-list');
+    list.textContent = '';
+    if (!reqs.length) {
+      const li = document.createElement('li');
+      li.className = 'text-sm text-base-content/50 py-2';
+      li.textContent = 'No requirements yet.';
+      list.appendChild(li);
+      return;
+    }
+    reqs.forEach(function (r) {
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-3 py-2 border-t border-base-300/60';
+
+      const phase = document.createElement('span');
+      phase.className = 'badge badge-xs shrink-0 ' + (r.phase === 'gate' ? 'badge-warning' : 'badge-success');
+      phase.textContent = r.phase === 'gate' ? 'GATE' : 'ROLE';
+      li.appendChild(phase);
+
+      const kind = document.createElement('span');
+      kind.className = 'badge badge-xs badge-ghost shrink-0';
+      kind.textContent = r.kind;
+      li.appendChild(kind);
+
+      const name = document.createElement('span');
+      name.className = 'grow text-sm truncate';
+      name.textContent = r.name;
+      li.appendChild(name);
+
+      const meta = document.createElement('span');
+      meta.className = 'text-xs text-base-content/50 shrink-0 font-mono';
+      meta.textContent = [
+        r.validity_months ? ('renew ' + r.validity_months + 'm') : 'no expiry',
+        r.cost ? ('£' + r.cost) : null
+      ].filter(Boolean).join(' · ');
+      li.appendChild(meta);
+
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn btn-xs btn-ghost shrink-0';
+      del.setAttribute('aria-label', 'Remove ' + r.name);
+      del.textContent = '✕';
+      del.addEventListener('click', function () {
+        api('DELETE', '/api/workforce/requirements/' + r.id)
+          .then(function () { openDraftAgain(); })
+          .catch(function (e) { toast(e.message, false); });
+      });
+      li.appendChild(del);
+      list.appendChild(li);
+    });
+  }
+
+  let lastProfileId = null;
+  function openDraftAgain() { if (lastProfileId) { openDraft(lastProfileId); } }
+  const origOpen = openDraft;
+  openDraft = function (id) { lastProfileId = id; origOpen(id); };
+
+  document.getElementById('wf-create').addEventListener('click', function () {
+    const name = document.getElementById('wf-new-name').value.trim();
+    if (!name) { toast('A role needs a name.', false); return; }
+    api('POST', '/api/workforce/profiles', {
+      name: name,
+      nice_work_role: document.getElementById('wf-new-nice').value.trim()
+    }).then(function (p) {
+      document.getElementById('wf-new-name').value = '';
+      document.getElementById('wf-new-nice').value = '';
+      return loadProfiles().then(function () { openDraft(p.id); });
+    }).catch(function (e) { toast(e.message, false); });
+  });
+
+  document.getElementById('wf-add-req').addEventListener('click', function () {
+    if (!currentVersionId) { return; }
+    const name = document.getElementById('wf-r-name').value.trim();
+    if (!name) { toast('The requirement needs a name.', false); return; }
+    const validity = document.getElementById('wf-r-validity').value;
+    api('POST', '/api/workforce/versions/' + currentVersionId + '/requirements', {
+      name: name,
+      phase: document.getElementById('wf-r-phase').value,
+      kind: document.getElementById('wf-r-kind').value,
+      validity_months: validity ? parseInt(validity, 10) : null,
+      cost: parseFloat(document.getElementById('wf-r-cost').value || '0')
+    }).then(function () {
+      document.getElementById('wf-r-name').value = '';
+      document.getElementById('wf-r-validity').value = '';
+      document.getElementById('wf-r-cost').value = '0';
+      openDraftAgain();
+    }).catch(function (e) { toast(e.message, false); });
+  });
+
+  document.getElementById('wf-publish').addEventListener('click', function () {
+    if (!currentVersionId) { return; }
+    api('POST', '/api/workforce/versions/' + currentVersionId + '/publish')
+      .then(function (v) {
+        toast('Published v' + v.version + '. Existing journeys are untouched.', true);
+        return loadProfiles().then(openDraftAgain);
+      })
+      .catch(function (e) { toast(e.message, false); });
+  });
+
+  loadProfiles().catch(function (e) { toast(e.message, false); });
+})();
+</script>
+{% endblock %}

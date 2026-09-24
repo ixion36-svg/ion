@@ -299,6 +299,23 @@ log_sources
   +-- expected_interval, volume_stats
 ```
 
+### Workforce Lifecycle Tables (module, `ION_WORKFORCE_ENABLED`, off by default)
+
+```
+role_profiles ──1:N──> role_profile_versions ──1:N──> profile_requirements
+user_journeys ──1:N──> journey_requirements   (copies, the audit record)
+org_units (self-referencing tree) ──1:N──> org_posts (filled by a journey)
+leaver_records                                (offboarding + revocation)
+```
+
+The one cross-cutting behaviour to know: a `role_profile` may name an ION
+role (`grants_role_id`). `workforce_service.sync_granted_roles` adds that
+role to a user only while their journey's mandatory gate is verified, and
+removes it on lapse (after a grace window) or offboarding — i.e. this module
+**writes to `user_roles`**, with an `audit_logs` row per grant/revoke.
+Verified certs and training costs are written to the pre-existing
+`team_certifications` / `training_plan_items`, not tracked in parallel.
+
 ### Migrations
 
 ION uses an internal migration system in `storage/database.py:_run_migrations()`. Migrations run automatically on startup under a PostgreSQL advisory lock (`LOCK_RUN_MIGRATIONS = 1001`) to prevent races when multiple workers start simultaneously.

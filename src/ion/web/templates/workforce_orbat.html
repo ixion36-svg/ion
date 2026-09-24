@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+{% block title %}ORBAT - ION{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-[1400px] mx-auto">
+
+  <div class="flex items-end gap-4 mb-5">
+    <div>
+      <div class="text-[0.7rem] uppercase tracking-widest text-base-content/50 mb-1">Workforce / Structure</div>
+      <h1 class="text-2xl font-semibold">Order of battle</h1>
+    </div>
+    <div id="wf-gap-summary" class="hidden badge badge-error badge-sm"></div>
+    <div class="grow"></div>
+    <a href="/workforce" class="btn btn-sm btn-ghost">My onboarding</a>
+    {% if can_manage %}<a href="/workforce/people" class="btn btn-sm btn-ghost">People</a>{% endif %}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5">
+
+    <div class="flex flex-col gap-4">
+      <div id="wf-tree" class="flex flex-col gap-3">
+        <div class="text-sm text-base-content/50">Loading&hellip;</div>
+      </div>
+
+      {% if can_manage %}
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <h2 class="card-title text-sm">Add a unit</h2>
+          <div class="flex items-end gap-2 flex-wrap">
+            <div>
+              <label class="label text-xs py-0" for="wf-unit-name">Name</label>
+              <input id="wf-unit-name" type="text" class="input input-sm input-bordered" placeholder="Triage">
+            </div>
+            <div>
+              <label class="label text-xs py-0" for="wf-unit-parent">Parent</label>
+              <select id="wf-unit-parent" class="select select-sm select-bordered">
+                <option value="">(top level)</option>
+              </select>
+            </div>
+            <button id="wf-unit-add" type="button" class="btn btn-sm btn-primary">Add unit</button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="flex flex-col gap-4">
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <h2 class="card-title text-sm">Cover by role</h2>
+          <div id="wf-cover" class="flex flex-col gap-3 mt-1"></div>
+          <p id="wf-cover-note" class="text-xs text-base-content/50 mt-2"></p>
+        </div>
+      </div>
+
+      <div class="card bg-base-200 border border-base-300">
+        <div class="card-body p-4">
+          <h2 class="card-title text-sm">Expiring soon</h2>
+          <ul id="wf-expiring" class="flex flex-col mt-1"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script nonce="{{ csp_nonce }}">
+(function () {
+  'use strict';
+
+  const CAN_MANAGE = {{ 'true' if can_manage else 'false' }};
+  let profiles = [];      // for the add-post select
+  let seatable = [];      // journeys that can fill posts
+  let seated = {};        // journey_id -> true
+
+  function api(method, url, body) {
+    return fetch(url, {
+      method: method,
+      credentials: 'include',
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (r) {
+      if (!r.ok) {
+        return r.json().catch(function () { return {}; }).then(function (e) {
+          throw new Error(e.detail || ('HTTP ' + r.status));
+        });
+      }
+      return r.json();
+    });
+  }
+
+  function postRow(post) {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 py-1.5 px-3 rounded-lg border ' +
+      (post.state === 'gapped'
+        ? 'border-dashed border-error/60 bg-error/5'
+        : post.state === 'filling'
+          ? 'border-warning/50 bg-warning/5'
+          : 'border-base-300 bg-base-100');
+
+    const title = document.createElement('span');
+    title.className = 'text-sm font-medium shrink-0';
+    title.textContent = post.title;
+    row.appendChild(title);
+
+    if (post.occupant) {
+      const who = document.createElement('span');
+      who.className = 'text-sm text-base-content/70 truncate';
+      who.textContent = post.occupant.name;
+      row.appendChild(who);
+      if (post.occupant.is_cover) {
+        const c = document.createElement('span');
+        c.className = 'badge badge-xs badge-secondary';
+        c.textContent = 'COV';
+        row.appendChild(c);
+      }
+    }
+    const grow = document.createElement('span');
+    grow.className = 'grow';
+    row.appendChild(grow);
+
+    const state = document.createElement('span');
+    state.className = 'badge badge-xs ' +
+      (post.state === 'gapped' ? 'badge-error'
+        : post.state === 'filling' ? 'badge-warning' : 'badge-success');
+    state.textContent = post.state === 'gapped' ? 'GAPPED'
+      : post.state === 'filling' ? 'IN TRAINING' : 'FILLED';
+    row.appendChild(state);
+
+    if (CAN_MANAGE) {
+      if (post.state === 'gapped') {
+        const sel = document.createElement('select');
+        sel.className = 'select select-xs select-bordered max-w-[180px]';
+        const opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = 'Seat someone…';
+        sel.appendChild(opt0);
+        seatable.forEach(function (s) {
+          if (seated[s.journey_id]) { return; }
+          if (post.profile_id && s.profile_id !== post.profile_id) { return; }
+          const o = document.createElement('option');
+          o.value = String(s.journey_id);
+          o.textContent = s.name + ' · ' + s.role + (s.is_cover ? ' (cover)' : '');
+          sel.appendChild(o);
+        });
+        sel.addEventListener('change', function () {
+          if (!sel.value) { return; }
+          api('PUT', '/api/workforce/org/posts/' + post.id + '/fill',
+              { journey_id: parseInt(sel.value, 10) })
+            .then(refresh).catch(function (e) { alert(e.message); });
+        });
+        row.appendChild(sel);
+      } else {
+        const un = document.createElement('button');
+        un.type = 'button';
+        un.className = 'btn btn-xs btn-ghost';
+        un.setAttribute('aria-label', 'Unseat ' + post.title);
+        un.textContent = 'Unseat';
+        un.addEventListener('click', function () {
+          api('PUT', '/api/workforce/org/posts/' + post.id + '/fill', { journey_id: null })
+            .then(refresh).catch(function (e) { alert(e.message); });
+        });
+        row.appendChild(un);
+      }
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn btn-xs btn-ghost text-base-content/40';
+      del.setAttribute('aria-label', 'Remove post ' + post.title);
+      del.textContent = '✕';
+      del.addEventListener('click', function () {
+        api('DELETE', '/api/workforce/org/posts/' + post.id)
+          .then(refresh).catch(function (e) { alert(e.message); });
+      });
+      row.appendChild(del);
+    }
+    return row;
+  }
+
+  function unitCard(unit, depth) {
+    const card = document.createElement('div');
+    card.className = 'card bg-base-200 border border-base-300' + (depth ? ' ml-6' : '');
+    const body = document.createElement('div');
+    body.className = 'card-body p-4';
+    card.appendChild(body);
+
+    const head = document.createElement('div');
+    head.className = 'flex items-center gap-2 mb-1';
+    const h = document.createElement('h3');
+    h.className = 'text-sm font-semibold uppercase tracking-wider';
+    h.textContent = unit.name;
+    head.appendChild(h);
+    const grow = document.createElement('span');
+    grow.className = 'grow';
+    head.appendChild(grow);
+    if (CAN_MANAGE) {
+      const del = document.createElement('button');
+      del.type = 'button';
+      del.className = 'btn btn-xs btn-ghost text-base-content/40';
+      del.setAttribute('aria-label', 'Remove unit ' + unit.name);
+      del.textContent = 'remove';
+      del.addEventListener('click', function () {
+        if (!window.confirm('Remove ' + unit.name + ' and everything under it?')) { return; }
+        api('DELETE', '/api/workforce/org/units/' + unit.id)
+          .then(refresh).catch(function (e) { alert(e.message); });
+      });
+      head.appendChild(del);
+    }
+    body.appendChild(head);
+
+    const posts = document.createElement('div');
+    posts.className = 'flex flex-col gap-1.5';
+    unit.posts.forEach(function (p) { posts.appendChild(postRow(p)); });
+    body.appendChild(posts);
+
+    if (CAN_MANAGE) {
+      const add = document.createElement('div');
+      add.className = 'flex items-center gap-2 mt-2';
+      const t = document.createElement('input');
+      t.type = 'text';
+      t.className = 'input input-xs input-bordered';
+      t.placeholder = 'New post title';
+      add.appendChild(t);
+      const sel = document.createElement('select');
+      sel.className = 'select select-xs select-bordered';
+      const o0 = document.createElement('option');
+      o0.value = '';
+      o0.textContent = 'any role profile';
+      sel.appendChild(o0);
+      profiles.forEach(function (p) {
+        const o = document.createElement('option');
+        o.value = String(p.id);
+        o.textContent = p.name;
+        sel.appendChild(o);
+      });
+      add.appendChild(sel);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-xs';
+      b.textContent = 'Add post';
+      b.addEventListener('click', function () {
+        if (!t.value.trim()) { return; }
+        api('POST', '/api/workforce/org/posts', {
+          unit_id: unit.id, title: t.value.trim(),
+          profile_id: sel.value ? parseInt(sel.value, 10) : null
+        }).then(refresh).catch(function (e) { alert(e.message); });
+      });
+      add.appendChild(b);
+      body.appendChild(add);
+    }
+
+    const wrap = document.createElement('div');
+    wrap.appendChild(card);
+    unit.children.forEach(function (c) {
+      const childEl = unitCard(c, depth + 1);
+      childEl.classList.add('mt-3');
+      wrap.appendChild(childEl);
+    });
+    return wrap;
+  }
+
+  function renderTree(data) {
+    const host = document.getElementById('wf-tree');
+    host.textContent = '';
+    seated = {};
+    (function walk(units) {
+      units.forEach(function (u) {
+        u.posts.forEach(function (p) {
+          if (p.occupant) { seated[p.occupant.journey_id] = true; }
+        });
+        walk(u.children);
+      });
+    })(data.units);
+
+    if (!data.units.length) {
+      const empty = document.createElement('div');
+      empty.className = 'card bg-base-200 border border-base-300';
+      const b = document.createElement('div');
+      b.className = 'card-body p-5 text-sm text-base-content/70';
+      b.textContent = CAN_MANAGE
+        ? 'No structure yet. Add a top-level unit below (e.g. SOC), then teams and posts under it. An unfilled post shows as a gap.'
+        : 'No structure defined yet.';
+      empty.appendChild(b);
+      host.appendChild(empty);
+    } else {
+      data.units.forEach(function (u) { host.appendChild(unitCard(u, 0)); });
+    }
+
+    const gaps = document.getElementById('wf-gap-summary');
+    if (data.gaps > 0) {
+      gaps.textContent = data.gaps + ' gapped post' + (data.gaps === 1 ? '' : 's');
+      gaps.classList.remove('hidden');
+    } else {
+      gaps.classList.add('hidden');
+    }
+
+    const parentSel = document.getElementById('wf-unit-parent');
+    if (parentSel) {
+      while (parentSel.options.length > 1) { parentSel.remove(1); }
+      (function opts(units, prefix) {
+        units.forEach(function (u) {
+          const o = document.createElement('option');
+          o.value = String(u.id);
+          o.textContent = prefix + u.name;
+          parentSel.appendChild(o);
+          opts(u.children, prefix + u.name + ' / ');
+        });
+      })(data.units, '');
+    }
+  }
+
+  function loadSeatable() {
+    return api('GET', '/api/workforce/people').then(function (data) {
+      seatable = [];
+      data.people.forEach(function (p) {
+        p.journeys.forEach(function (j) {
+          seatable.push({
+            journey_id: j.id, name: p.name, role: j.role,
+            is_cover: j.is_cover, stage: j.stage, profile_id: j.profile_id
+          });
+        });
+      });
+    }).catch(function () { seatable = []; });
+  }
+
+  function loadSide() {
+    api('GET', '/api/workforce/orbat').then(function (data) {
+      const cover = document.getElementById('wf-cover');
+      cover.textContent = '';
+      Object.keys(data.cover).forEach(function (role) {
+        const c = data.cover[role];
+        if (!c.primary && !c.cover && !c.in_training && !c.blocked) { return; }
+        const wrap = document.createElement('div');
+        const top = document.createElement('div');
+        top.className = 'flex items-baseline gap-2 text-sm';
+        const n = document.createElement('span');
+        n.className = 'grow truncate';
+        n.textContent = role;
+        top.appendChild(n);
+        const fig = document.createElement('span');
+        fig.className = 'font-mono text-xs ' +
+          (c.weighted ? 'text-base-content/60' : 'text-warning');
+        fig.textContent = c.primary + 'p + ' + c.cover + 'c = ' + c.weighted;
+        top.appendChild(fig);
+        wrap.appendChild(top);
+        if (c.in_training || c.blocked) {
+          const sub = document.createElement('div');
+          sub.className = 'text-xs text-base-content/50';
+          const bits = [];
+          if (c.in_training) { bits.push(c.in_training + ' in training'); }
+          if (c.blocked) { bits.push(c.blocked + ' suspended or withdrawn'); }
+          sub.textContent = bits.join(' · ');
+          wrap.appendChild(sub);
+        }
+        cover.appendChild(wrap);
+      });
+      document.getElementById('wf-cover-note').textContent =
+        'A cover holder counts ' + data.cover_weight + ' against a primary, so depth cannot disguise a thin rota.';
+    }).catch(function () { /* supplementary */ });
+
+    api('GET', '/api/workforce/expiring?within_days=90').then(function (data) {
+      const list = document.getElementById('wf-expiring');
+      list.textContent = '';
+      if (!data.items.length) {
+        const li = document.createElement('li');
+        li.className = 'text-sm text-base-content/50';
+        li.textContent = 'Nothing due in the next 90 days.';
+        list.appendChild(li);
+        return;
+      }
+      data.items.slice(0, 12).forEach(function (i) {
+        const li = document.createElement('li');
+        li.className = 'flex items-center gap-2 py-1.5 border-t border-base-300/60';
+        const n = document.createElement('span');
+        n.className = 'grow text-xs truncate';
+        n.textContent = i.requirement;
+        li.appendChild(n);
+        const p = document.createElement('span');
+        p.className = 'badge badge-xs ' + (i.phase === 'gate' ? 'badge-error' : 'badge-warning');
+        p.textContent = i.phase === 'gate' ? 'GATE' : 'ROLE';
+        li.appendChild(p);
+        const d = document.createElement('span');
+        d.className = 'text-xs font-mono ' + (i.days_left < 0 ? 'text-error' : 'text-base-content/60');
+        d.textContent = i.days_left < 0 ? 'lapsed' : (i.days_left + 'd');
+        li.appendChild(d);
+        list.appendChild(li);
+      });
+    }).catch(function () { /* supplementary */ });
+  }
+
+  function refresh() {
+    const chain = CAN_MANAGE
+      ? Promise.all([
+          loadSeatable(),
+          api('GET', '/api/workforce/profiles').then(function (d) { profiles = d.profiles; })
+        ])
+      : loadSeatable();
+    return Promise.resolve(chain)
+      .then(function () { return api('GET', '/api/workforce/org'); })
+      .then(renderTree)
+      .catch(function (e) {
+        document.getElementById('wf-tree').textContent = 'Could not load: ' + e.message;
+      });
+  }
+
+  const addUnit = document.getElementById('wf-unit-add');
+  if (addUnit) {
+    addUnit.addEventListener('click', function () {
+      const name = document.getElementById('wf-unit-name');
+      const parent = document.getElementById('wf-unit-parent');
+      if (!name.value.trim()) { return; }
+      api('POST', '/api/workforce/org/units', {
+        name: name.value.trim(),
+        parent_id: parent.value ? parseInt(parent.value, 10) : null
+      }).then(function () { name.value = ''; return refresh(); })
+        .catch(function (e) { alert(e.message); });
+    });
+  }
+
+  refresh();
+  loadSide();
+})();
+</script>
+{% endblock %}

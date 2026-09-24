@@ -172,6 +172,11 @@ class Config:
     # dormant: while de_license_enforced is False the module behaves as it did
     # before licensing (mounted, RBAC-gated, no licence). See ion.licensing.
     de_license_enforced: bool = False  # master switch — gate DE behind a licence
+    # ION_WORKFORCE_ENABLED — onboarding/offboarding lifecycle. Off by default.
+    workforce_enabled: bool = False
+    # How long a granted ION role outlives a lapsed mandatory item. The journey
+    # suspends at once and the lead is told; 0 revokes the permissions with it.
+    workforce_lapse_grace_days: int = 7
     de_module_enabled: bool = False    # operator intent to run DE (needs a licence when enforced)
     de_license: str = ""               # ION_DE_LICENSE — inline signed token or path to a licence file
 
@@ -421,6 +426,7 @@ class Config:
             tide_space=data.get("tide_space", "default"),
             tide_client_id=data.get("tide_client_id", ""),
             de_license_enforced=data.get("de_license_enforced", False),
+            workforce_enabled=data.get("workforce_enabled", False),
             de_module_enabled=data.get("de_module_enabled", False),
             de_license=data.get("de_license", ""),
             # Generic scheduler
@@ -933,6 +939,15 @@ def get_config() -> Config:
         # Detection Engineering module licensing
         if os.environ.get("ION_DE_LICENSE_ENFORCED"):
             _config.de_license_enforced = _get_env_bool("ION_DE_LICENSE_ENFORCED", False)
+        if os.environ.get("ION_WORKFORCE_ENABLED"):
+            _config.workforce_enabled = _get_env_bool("ION_WORKFORCE_ENABLED", False)
+        if os.environ.get("ION_WORKFORCE_LAPSE_GRACE_DAYS"):
+            try:
+                _config.workforce_lapse_grace_days = int(
+                    os.environ["ION_WORKFORCE_LAPSE_GRACE_DAYS"])
+            except ValueError:
+                logger.warning("ION_WORKFORCE_LAPSE_GRACE_DAYS is not a number; keeping %s",
+                               _config.workforce_lapse_grace_days)
         if os.environ.get("ION_DE_MODULE_ENABLED"):
             _config.de_module_enabled = _get_env_bool("ION_DE_MODULE_ENABLED", False)
         if os.environ.get("ION_DE_LICENSE"):

@@ -253,6 +253,16 @@ from ion.models.version import TemplateVersion
 from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeverity, VulnStatus
 
 # daily-work tracking — manual work-log entries + admin task taxonomy.
+from ion.models.workforce import (  # noqa: F401
+    JourneyRequirement,
+    LeaverRecord,
+    OrgPost,
+    OrgUnit,
+    ProfileRequirement,
+    RoleProfile,
+    RoleProfileVersion,
+    UserJourney,
+)
 from ion.models.worklog import (  # noqa: F401
     DEFAULT_TASK_TYPES,
     WorkLogEntry,

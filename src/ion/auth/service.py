@@ -582,6 +582,10 @@ class AuthService:
             ("forensic:manage_playbooks", "forensic", "manage_playbooks", "Manage forensic playbooks"),
             # Other permissions
             ("ai:chat", "ai", "chat", "Use AI chat"),
+            # Workforce lifecycle (onboarding, cover roles, currency, offboarding)
+            ("workforce:read", "workforce", "read", "View role profiles, journeys and the ORBAT"),
+            ("workforce:verify", "workforce", "verify", "Verify onboarding requirements"),
+            ("workforce:manage", "workforce", "manage", "Define role profiles, assign roles and offboard"),
             # Detection Engineering module (Phase 0 — read-only noise campaigns + DE metrics)
             ("de:read", "de", "read", "View detection-engineering metrics"),
             # Detection Engineering module (Phase 1 — draft/edit/decide detection proposals)
@@ -673,6 +677,7 @@ class AuthService:
                     "playbook:read", "playbook:execute", "playbook:create", "playbook:update",
                     "forensic:read", "forensic:create", "forensic:update",
                     "security:read", "de:read", "de:propose", "de:verify", "de:approve",
+                    "workforce:read",
                     "response:approve",
                     "ai:chat",
                     "template:read", "template:create", "template:update",
