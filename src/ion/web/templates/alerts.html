@@ -9510,24 +9510,49 @@ async function contextMenuAction(action, value) {
     if (!contextMenuAlertId) return;
     const alertId = contextMenuAlertId;
 
+    // File-manager semantics: right-clicking a row INSIDE the current
+    // multi-selection acts on the whole selection; a row outside it acts on
+    // that row alone. Acting only on the clicked row silently dropped the
+    // other selected alerts -- they never joined the case and never left
+    // 'open', while the one clicked row tracked the case status.
+    const targets = (selectedAlertIds.size > 1 && selectedAlertIds.has(alertId))
+        ? [...selectedAlertIds]
+        : [alertId];
+
     switch (action) {
         case 'open':
             showAlertDetail(alertId);
             break;
 
         case 'assign-me':
-            await quickAssignToMe(alertId);
+            if (targets.length > 1) {
+                await assignManyToMe(targets);
+            } else {
+                await quickAssignToMe(alertId);
+            }
             break;
 
         case 'status':
-            await quickStatusChange(alertId, value);
+            if (targets.length > 1) {
+                await bulkTriageUpdate(targets, { status: value },
+                    targets.length + ' alerts set to ' + value);
+            } else {
+                await quickStatusChange(alertId, value);
+            }
             break;
 
         case 'priority':
-            await quickPriorityChange(alertId, value);
+            if (targets.length > 1) {
+                await bulkTriageUpdate(targets, { priority: value },
+                    targets.length + ' alerts set to ' + value + ' priority');
+            } else {
+                await quickPriorityChange(alertId, value);
+            }
             break;
 
         case 'close-as':
+            // The closure modal is per-alert (reason + notes for ONE alert);
+            // a multi-selection goes through the bulk toolbar instead.
             showAlertClosureModal(alertId, value);
             break;
 
@@ -9536,9 +9561,12 @@ async function contextMenuAction(action, value) {
             break;
 
         case 'add-to-case':
-            // Select this alert and open add to case dialog
-            selectedAlertIds.clear();
-            selectedAlertIds.add(alertId);
+            // Keep a selection that includes the clicked row -- clearing it
+            // here attached exactly one of N selected alerts to the case.
+            if (!selectedAlertIds.has(alertId)) {
+                selectedAlertIds.clear();
+                selectedAlertIds.add(alertId);
+            }
             updateBulkActionsUI();
             addToExistingCase();
             break;
@@ -9573,6 +9601,51 @@ async function contextMenuAction(action, value) {
                 window.open('/kibana/app/security/alerts', '_blank');
             }
             break;
+    }
+}
+
+async function bulkTriageUpdate(alertIds, fields, successMessage) {
+    try {
+        const resp = await fetch('/api/elasticsearch/alerts-triage/bulk-update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(Object.assign({ alert_ids: alertIds }, fields))
+        });
+        if (!resp.ok) throw new Error('Bulk update failed');
+        showNotification(successMessage, 'success');
+        await loadTriageBatch();
+        renderAlerts();
+    } catch (err) {
+        console.error('Bulk update error:', err);
+        showNotification('Failed to update selected alerts', 'error');
+    }
+}
+
+async function assignManyToMe(alertIds) {
+    // The ES-backed assignment variant needs assigned_to_name, which the
+    // bulk endpoint does not carry -- reuse the per-alert PUT for both modes.
+    const payload = {};
+    if (assignmentUsersSource === 'elasticsearch') {
+        payload.assigned_to_name = currentUserData?.display_name || currentUserData?.username || '';
+    } else {
+        payload.assigned_to_id = currentUserData?.id || null;
+    }
+    try {
+        const results = await Promise.all(alertIds.map(id =>
+            fetch(`/api/elasticsearch/alerts/${encodeURIComponent(id)}/triage`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            })
+        ));
+        const failed = results.filter(r => !r.ok).length;
+        if (failed) throw new Error(failed + ' assignments failed');
+        showNotification(alertIds.length + ' alerts assigned to you', 'success');
+        await loadTriageBatch();
+        renderAlerts();
+    } catch (err) {
+        console.error('Bulk assign error:', err);
+        showNotification('Failed to assign selected alerts', 'error');
     }
 }
 
