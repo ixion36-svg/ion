@@ -1,13 +1,52 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.3 -->
-<!-- ion-doc:version=0.99.3 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.4 -->
+<!-- ion-doc:version=0.99.4 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-23 -->
+<!-- ion-doc:date=2026-09-28 -->
 
 # Changelog
+
+## v0.99.4 — 2026-09-28
+
+**Workforce lifecycle: onboarding that actually gates access, plus a dedicated case page.**
+
+**Workforce module** (`ION_WORKFORCE_ENABLED`, off by default — every route and
+page 404s until an operator opts in). A SOC defines role profiles with a
+mandatory access gate (clearances, signed policies, account provisioning) and
+role-readiness training; assigning a profile copies its requirements onto the
+person's journey as the audit record, so a later edit to the role can never
+change what someone was required to hold. The gate holds real permissions: a
+profile may name an ION role, conferred only while every mandatory item is
+verified, kept through a configurable grace window when one lapses, and
+removed on offboarding. The joiner's only write is submitting an item with a
+date and evidence — verification is a lead's act, from a queue that names who
+is waiting on what. An ORBAT renders the SOC as an org chart of units and
+established posts, where an unfilled post is a first-class gap. Verified
+certifications land in the existing certification records and training costs
+in the existing training plans, so the /training forecasts keep working.
+Every grant, revoke, verify and revocation writes an audit row.
+
+**Cases open at their own URL.** `/cases/{id}` renders the case as a full
+page — the alerts workspace as the working core, case metadata and response
+actions on a sticky rail, and timeline, attack path, observables and notes as
+always-visible cards. Long cases scroll like a document, which retires a
+standing annoyance where the pop-out overlay could trap content below the
+fold with no scrollbar. All former overlay entry points navigate to the URL.
+
+**Right-clicking a multi-selection now acts on the whole selection.** Add to
+Case attached only the row under the cursor — the other selected alerts never
+joined the case, which is why changing the case status appeared to move one
+alert and leave the rest open. Status and Priority had the same single-row
+behaviour. All three now target every selected alert; Close-as stays
+single-alert because its modal captures a closure reason for one.
+
+**SQLAlchemy pinned below 2.1.** 2.1 resolves plain `postgresql://` URLs
+through the psycopg3 dialect; ION ships psycopg2, so a fresh dependency
+resolve boot-looped before serving a byte. Caught on a dev rebuild after a
+cache wipe — CI installs fresh every run and would have hit the same wall.
 
 ## v0.99.3 — 2026-09-23
 
