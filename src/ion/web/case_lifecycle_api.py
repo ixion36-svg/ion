@@ -755,6 +755,34 @@ def _should_investigate_new_case(
     return bool(auto_investigate_enabled) and not auto_closed and bool(source_alert_ids)
 
 
+def _rule_name_from_raw(rd) -> Optional[str]:
+    """The rule name wherever this alert's generation put it.
+
+    Kibana >=8 writes kibana.alert.rule.name (flat or nested), the old
+    signals index wrote signal.rule.name, watcher/custom indices write
+    rule.name -- an alert missing from this list renders as its document
+    id in the case rail, which is the symptom to keep out.
+    """
+    if not isinstance(rd, dict):
+        return None
+    src = rd.get("_source") if isinstance(rd.get("_source"), dict) else rd
+
+    def _dig(d, path):
+        cur = d
+        for part in path.split("."):
+            if not isinstance(cur, dict):
+                return None
+            cur = cur.get(part)
+        return cur if isinstance(cur, str) and cur else None
+
+    for container in (src, rd):
+        for path in ("kibana.alert.rule.name", "signal.rule.name", "rule.name"):
+            hit = container.get(path) if isinstance(container.get(path), str) and container.get(path) else _dig(container, path)
+            if hit:
+                return hit
+    return None
+
+
 @router.post("/elasticsearch/alerts/cases")
 async def create_case(
     data: CaseCreate,
@@ -791,12 +819,7 @@ async def create_case(
         if data.alert_contexts:
             for ctx in data.alert_contexts:
                 rd = ctx.raw_data or {}
-                rule_name_by_alert[ctx.alert_id] = (
-                    (rd.get("rule") or {}).get("name")
-                    or rd.get("kibana.alert.rule.name")
-                    or (rd.get("_source", {}).get("rule") or {}).get("name")
-                    if isinstance(rd, dict) else None
-                )
+                rule_name_by_alert[ctx.alert_id] = _rule_name_from_raw(rd)
 
         # Prefetch every triage row (and every prior case they point at) in
         # two queries. The previous per-alert query-and-flush loop was

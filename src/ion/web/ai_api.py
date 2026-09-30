@@ -10,6 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user
 from ion.core.logging import get_structured_logger
@@ -34,6 +35,7 @@ from ion.services.prompt_safety import (
 )
 from ion.services.upload_scan import scan_text, sha256_of
 from ion.storage.database import get_session
+from ion.web.api import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -582,10 +584,81 @@ async def pull_model(
     )
 
 
+def _alert_history_context(session, alert_data: dict) -> str:
+    """First-party history for the rule and host this alert names.
+
+    Everything here comes back from ION's own tables, but case titles are
+    analyst/adversary-influenced text, so the whole block is fenced with the
+    alert rather than presented as trusted instruction.
+    """
+    from ion.models.alert_triage import AlertCase, AlertTriage, KnownFalsePositive
+
+    rule = alert_data.get("rule_name")
+    host = alert_data.get("host")
+    lines = []
+
+    if rule and isinstance(rule, str):
+        rows = (
+            session.query(AlertTriage)
+            .filter(AlertTriage.rule_name == rule)
+            .order_by(AlertTriage.id.desc())
+            .limit(200)
+            .all()
+        )
+        if rows:
+            by_status: dict = {}
+            case_ids = set()
+            for t in rows:
+                key = t.status.value if hasattr(t.status, "value") else str(t.status)
+                by_status[key] = by_status.get(key, 0) + 1
+                if t.case_id:
+                    case_ids.add(t.case_id)
+            lines.append(f"Rule history (last {len(rows)} alerts from this rule): "
+                         + ", ".join(f"{k}={v}" for k, v in sorted(by_status.items())))
+            if case_ids:
+                cases = (
+                    session.query(AlertCase)
+                    .filter(AlertCase.id.in_(list(case_ids)))
+                    .order_by(AlertCase.id.desc())
+                    .limit(5)
+                    .all()
+                )
+                for c in cases:
+                    status = c.status.value if hasattr(c.status, "value") else str(c.status)
+                    outcome = f", closed as {c.closure_reason}" if c.closure_reason else ""
+                    lines.append(f"Prior case {c.case_number} [{status}{outcome}]: {c.title}")
+
+        kfps = (
+            session.query(KnownFalsePositive)
+            .filter(KnownFalsePositive.is_active.is_(True))
+            .limit(200)
+            .all()
+        )
+        matches = [k for k in kfps if k.match_rules and rule in k.match_rules]
+        for k in matches[:3]:
+            lines.append(f"Known false-positive pattern on this rule: {k.title}")
+
+    if host and isinstance(host, str):
+        recent = (
+            session.query(AlertCase)
+            .order_by(AlertCase.id.desc())
+            .limit(100)
+            .all()
+        )
+        host_cases = [c for c in recent
+                      if c.affected_hosts and host in c.affected_hosts][:3]
+        for c in host_cases:
+            status = c.status.value if hasattr(c.status, "value") else str(c.status)
+            lines.append(f"Host {host} appears in case {c.case_number} [{status}]: {c.title}")
+
+    return "\n".join(lines)
+
+
 @router.post("/analyze/alert")
 async def analyze_alert(
     alert_data: dict,
     current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
 ):
     """Analyze an alert using AI."""
     service = get_ollama_service()
@@ -603,19 +676,40 @@ async def analyze_alert(
     except Exception:
         pass
 
+    # First-party history (rule outcomes, known-FP patterns, host's prior
+    # cases). Case titles inside are analyst/adversary text, so it is fenced
+    # with the alert, never presented as instruction.
+    history = ""
+    try:
+        history = _alert_history_context(session, alert_data)
+    except Exception:
+        logger.debug("alert history context unavailable", exc_info=True)
+
     # Build analysis prompt. The alert is attacker-influenced content — fence it
     # in the trust boundary and scrub injection tokens before it hits the model.
     alert_json = sanitize_untrusted(
-        json.dumps(alert_data, indent=2, default=str), max_chars=6000
+        json.dumps(alert_data, indent=2, default=str), max_chars=9000
     )
+    history_block = ""
+    if history:
+        history_block = (
+            "\n\nPrior context from this SOC's own records "
+            "(same trust boundary as the alert):\n"
+            + wrap_untrusted(sanitize_untrusted(history, max_chars=2500))
+        )
     prompt = f"""Analyze this security alert and provide:
 1. A brief summary of what happened
 2. Potential impact and severity assessment
 3. Recommended investigation steps
 4. Possible MITRE ATT&CK techniques involved
 
+Weigh the rule's description and investigation guide (in the alert data) and
+the SOC's prior outcomes for this rule and host when judging severity — a rule
+whose alerts were repeatedly closed as false positives deserves scepticism,
+and a host already in an open case deserves urgency.
+
 Alert Data:
-{wrap_untrusted(alert_json)}
+{wrap_untrusted(alert_json)}{history_block}
 
 {UNTRUSTED_DIRECTIVE}"""
 

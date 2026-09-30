@@ -2763,6 +2763,10 @@ class BulkTriageUpdate(BaseModel):
     add_to_new_case: Optional[bool] = False
     new_case_title: Optional[str] = None
     new_case_severity: Optional[str] = None
+    # alert_id -> rule name, from the page's already-parsed alert list. Without
+    # it a triage row created here has no name and the case rail shows the
+    # document id.
+    rule_names: Optional[Dict[str, str]] = None
 
 
 class AutoPopulateRequest(BaseModel):
@@ -3496,12 +3500,16 @@ async def bulk_update_triage(
         .all()
     }
 
+    names = data.rule_names or {}
     for alert_id in data.alert_ids:
         triage = existing.get(alert_id)
         if not triage:
-            triage = AlertTriage(es_alert_id=alert_id)
+            triage = AlertTriage(es_alert_id=alert_id,
+                                 rule_name=names.get(alert_id))
             session.add(triage)
             existing[alert_id] = triage
+        elif not triage.rule_name and names.get(alert_id):
+            triage.rule_name = names[alert_id]
 
         if data.status is not None:
             triage.status = data.status
