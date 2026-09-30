@@ -720,3 +720,45 @@
 .iad2-gstatus.rejected { color: var(--danger); border-color: rgba(255,108,108,.3); background: rgba(255,108,108,.07); }
 .iad2-gok { border-color: rgba(134,240,160,.5); color: var(--success); background: rgba(134,240,160,.08); cursor: pointer; }
 .iad2-gno { border-color: rgba(255,108,108,.5); color: var(--danger); background: rgba(255,108,108,.08); cursor: pointer; }
+
+/* A rule's investigation guide can run to pages. It scrolls inside its own
+   box, because an unbounded guide pushes every section after it off screen. */
+#iad2-guide-content {
+    max-height: 48vh;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+/* Stacked layout, boxed: one section chrome everywhere (the TIDE lesson).
+   Folding is per analyst and per section; raw data starts folded. */
+.iad-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.5fr) minmax(240px, 1fr);
+    gap: 14px;
+    align-items: start;
+}
+.iad-col-main, .iad-col-side { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+@media (max-width: 1100px) {
+    .iad-cols { grid-template-columns: 1fr; }
+}
+
+.iad-boxed {
+    margin-bottom: 0;
+    border: 1px solid var(--ion-border);
+    border-radius: 12px;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+.iad-sec-head {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 11px;
+    background: rgba(255, 255, 255, 0.025);
+    border-bottom: 1px solid var(--ion-border);
+    cursor: pointer; user-select: none;
+}
+.iad-sec-head .iad-section-title { margin: 0; flex: 1; }
+.iad-fold-chev { color: var(--text-secondary); font-size: 9px; transition: transform 0.12s; }
+.iad-folded .iad-fold-chev { transform: rotate(-90deg); }
+.iad-folded .iad-sec-body { display: none; }
+.iad-sec-body { padding: 10px 12px; }
+

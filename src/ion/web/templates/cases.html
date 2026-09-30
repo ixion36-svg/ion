@@ -271,17 +271,6 @@
 /* v0.39.1 — CSP: these rules replace JS-injected inline style="" attributes,
    which the strict CSP (style-src-attr 'none') blocks ("Refused to apply
    inline style"). Keep in sync with the class names in the JS render helpers. */
-.bob-analysis-body {
-    white-space: pre-wrap;
-    font-size: 0.85rem;
-    line-height: 1.5;
-    color: #cbd5e1;
-    padding: 0.75rem;
-    background: rgba(0, 0, 0, 0.2);
-    border-left: 3px solid #6de4ff;
-    border-radius: 4px;
-}
-/* Auto-Investigate report (case panel) */
 .autoinv-report-wrap { padding: 0.5rem 0; }
 .autoinv-report { font-size: 0.85rem; }
 .autoinv-head { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.6rem; }
@@ -308,8 +297,6 @@
 .autoinv-tag { display: inline-block; font-family: 'Consolas','Monaco',monospace; font-size: 0.72rem; background: rgba(0,0,0,.25); border: 1px solid #334155; border-radius: 4px; padding: 0.1rem 0.35rem; margin: 0 0.2rem 0.2rem 0; }
 .autoinv-sources { margin-top: 0.85rem; font-size: 0.72rem; color: #9ca3af; border-top: 1px solid #334155; padding-top: 0.5rem; }
 .autoinv-empty { color: #9ca3af; font-size: 0.8125rem; padding: 0.4rem 0; }
-.bob-action-btn { font-size: 0.75rem; padding: 0.35rem 0.75rem; }
-.bob-action-btn-ghost { background: none; }
 .cpanel-note-translate {
     margin-left: auto;
     font-size: 0.65rem;
@@ -2899,6 +2886,7 @@ function selectCaseAlert(alertId, idx, caseId) {
         sections: ['related', 'timeline', 'comments', 'sequence', 'autoinvestigate', 'fields', 'rawdata'],
         triageBar: false,
         aiAvailable: true,
+        discussEnabled: false,
         arkimeEnabled: !!window.__ionArkimeEnabled,
         detailV2: document.querySelector('[data-alert-detail-v2]')?.dataset.alertDetailV2 === '1',
         fieldPins: document.querySelector('[data-alert-field-pins]')?.dataset.alertFieldPins === '1',
@@ -3635,36 +3623,6 @@ function renderPanelContent(c) {
         + '</div>'
         + '</div>';
 
-    // On-demand Bob analysis panel (rendered into when analyst clicks
-    // "Get Bob's Analysis"). Empty until then.
-    html += '<div id="bob-analysis-panel-' + c.id + '" class="cpanel-section hidden" data-tab="notes">'
-        +   '<div class="cpanel-section-title flex items-center gap-2">'
-        +     '<i class="icon-sparkles"></i> Bob\'s analysis'
-        +     '<span class="ml-[auto] text-[0.7rem] text-[#94a3b8] font-normal" id="bob-analysis-meta-' + c.id + '"></span>'
-        +   '</div>'
-        +   '<div id="bob-analysis-body-' + c.id + '" class="bob-analysis-body">'
-        +   '</div>'
-        +   '<div class="flex gap-2 mt-2 flex-wrap">'
-        +     '<button class="btn bob-action-btn" data-click-action="saveBobAnalysisAsNote" data-args=\'[' + c.id + ']\'>Save as note</button>'
-        +     '<button class="btn bob-action-btn" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\'>Re-run</button>'
-        +     '<button class="btn bob-action-btn bob-action-btn-ghost" data-click-action="hideBobAnalysis" data-args=\'[' + c.id + ']\'>Dismiss</button>'
-        +   '</div>'
-        + '</div>';
-
-    // Auto-Investigate panel (cited multi-source verdict). Empty/hidden
-    // until the analyst clicks "Auto-Investigate".
-    html += '<div id="autoinv-panel-' + c.id + '" class="cpanel-section hidden" data-tab="notes">'
-        +   '<div class="cpanel-section-title flex items-center gap-2">'
-        +     '<i class="icon-search"></i> Bob Auto-Investigate'
-        +   '</div>'
-        +   '<div id="autoinv-body-' + c.id + '" class="autoinv-report-wrap"></div>'
-        +   '<div class="flex gap-2 mt-2 flex-wrap">'
-        +     '<button class="btn bob-action-btn" data-click-action="saveAutoInvestigateAsNote" data-args=\'[' + c.id + ']\'>Save as note</button>'
-        +     '<button class="btn bob-action-btn" data-click-action="runCaseAutoInvestigate" data-args=\'[' + c.id + ']\'>Re-run</button>'
-        +     '<button class="btn bob-action-btn bob-action-btn-ghost" data-click-action="hideAutoInvestigate" data-args=\'[' + c.id + ']\'>Dismiss</button>'
-        +   '</div>'
-        + '</div>';
-
     // Action buttons
     html += '<div class="cpanel-actions">';
     if (c.dfir_iris_case_id) {
@@ -3675,12 +3633,6 @@ function renderPanelContent(c) {
     if (c.kibana_url) {
         html += '<a class="btn" href="' + esc(c.kibana_url) + '" target="_blank" rel="noopener">View in Kibana</a>';
     }
-    html += '<button class="btn btn-primary" data-click-action="getBobAnalysis" data-args=\'[' + c.id + ']\' '
-        +       'title="Generate Bob\'s analysis based on investigations, observables, raw alert, and similar cases">'
-        +       'Get Bob\'s analysis</button>';
-    html += '<button class="btn btn-primary" data-click-action="runCaseAutoInvestigate" data-args=\'[' + c.id + ']\' '
-        +       'title="Bob gathers evidence (related alerts, enrichment, similar closed cases) and returns a cited verdict + recommended playbook">'
-        +       '&#128269; Auto-Investigate</button>';
     html += '<button class="btn" data-click-action="toggleCasePlaybookBrowser" data-args=\'[' + c.id + ']\'>Start Playbook</button>';
     html += '<a class="btn" href="/api/cases/' + c.id + '/pdf" target="_blank" rel="noopener" title="Export case as PDF">Export PDF</a>';
     html += '</div>';
@@ -4316,37 +4268,307 @@ function switchPanelTab(tabName) {
     }
 }
 
-// Page mode re-homes the rendered sections into the A+D hybrid: alerts
-// workspace centre-left, overview + actions on a sticky rail, everything
-// else as board cards. Idempotent; a full re-render wipes the wrappers and
-// this rebuilds them. Loaders find their targets by id, so moved nodes
-// keep filling.
+// ── Page-mode window arrangement (after TIDE v6) ────────────────────────
+// Every .cpanel-section is a movable, foldable, hideable unit in three
+// columns. ONE arrangement is remembered for all cases
+// (ion-case-window-layout-v1); sections a case does not have keep their
+// saved place, so arranging a small case never forgets a fuller one.
+const PM_LAYOUT_KEY = 'ion-case-window-layout-v1';
+const PM_COL_WIDTHS = { left: 'minmax(230px,1fr)', centre: 'minmax(0,1.7fr)', right: 'minmax(220px,0.9fr)' };
+const PM_TAB_COL = { alerts: 'centre', timeline: 'centre', attackpath: 'centre',
+                     observables: 'left', overview: 'right', actions: 'right', notes: 'right' };
+const PM_SLUG_COL = { 'similar-cases': 'left', 'workbench': 'left',
+                      'observable-sightings': 'left' };
+const PM_PRESETS = {
+    triage: null,   // the defaults above
+    dossier: function (key, tab) {
+        return (tab === 'overview' || tab === 'actions' || tab === 'notes') ? 'right' : 'centre';
+    },
+    review: function (key, tab) {
+        if (tab === 'timeline' || key === 'similar-cases' || tab === 'observables') return 'left';
+        if (tab === 'overview' || tab === 'actions') return 'right';
+        return 'centre';
+    }
+};
+
+function pmReadLayout() {
+    try { return JSON.parse(localStorage.getItem(PM_LAYOUT_KEY) || 'null'); }
+    catch (_) { return null; }
+}
+function pmWriteLayout(v) {
+    try { localStorage.setItem(PM_LAYOUT_KEY, JSON.stringify(v)); } catch (_) { /* blocked */ }
+}
+
+function pmKeyFor(sec, seen) {
+    const t = sec.querySelector('.cpanel-section-title');
+    let base = (t ? t.textContent : (sec.dataset.tab || 'section'))
+        .replace(/\(.*?\)/g, '').replace(/[0-9]+/g, '')
+        .trim().toLowerCase().replace(/[^a-z]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!base) base = sec.dataset.tab || 'section';
+    if (seen[base] != null) { seen[base] += 1; base = base + '-' + seen[base]; }
+    else { seen[base] = 1; }
+    return base;
+}
+
+function pmDefaultCol(key, tab) {
+    return PM_SLUG_COL[key] || PM_TAB_COL[tab] || 'centre';
+}
+
+function pmSections(body) {
+    return [...body.querySelectorAll('.pm-col > .cpanel-section[data-section]')];
+}
+
+function pmCurrentLayout(body) {
+    const cols = {}, hidden = [], collapsed = [];
+    body.querySelectorAll('.pm-col').forEach(col => {
+        cols[col.dataset.col] = [...col.querySelectorAll(':scope > .cpanel-section')].map(sec => {
+            const k = sec.dataset.section;
+            if (sec.hidden) hidden.push(k);
+            if (sec.classList.contains('pm-collapsed')) collapsed.push(k);
+            return k;
+        });
+    });
+    return { cols, hidden, collapsed };
+}
+
+// TIDE's merge: keys absent from THIS case keep their saved place and flags.
+function pmSaveLayout(body) {
+    const now = pmCurrentLayout(body);
+    const saved = pmReadLayout();
+    const present = {};
+    Object.values(now.cols).forEach(list => list.forEach(k => { present[k] = true; }));
+    if (saved && saved.cols) {
+        Object.keys(saved.cols).forEach(c => {
+            const list = now.cols[c] || (now.cols[c] = []);
+            (saved.cols[c] || []).forEach((k, i) => {
+                if (present[k] || list.includes(k)) return;
+                const after = i > 0 ? list.indexOf(saved.cols[c][i - 1]) : -1;
+                list.splice(after !== -1 ? after + 1 : Math.min(i, list.length), 0, k);
+            });
+        });
+        (saved.hidden || []).forEach(k => { if (!present[k] && !now.hidden.includes(k)) now.hidden.push(k); });
+        (saved.collapsed || []).forEach(k => { if (!present[k] && !now.collapsed.includes(k)) now.collapsed.push(k); });
+    }
+    pmWriteLayout(now);
+}
+
+function pmFitCols(body) {
+    const widths = [];
+    body.querySelectorAll('.pm-col').forEach(col => {
+        const any = [...col.children].some(el =>
+            el.classList.contains('cpanel-section') && !el.hidden);
+        col.classList.toggle('pm-col--empty', !any && !_pmDragging);
+        if (any || _pmDragging) widths.push(PM_COL_WIDTHS[col.dataset.col]);
+    });
+    body.querySelector('.pm-cols').style.setProperty('--pm-cols', widths.join(' ') || '1fr');
+}
+
+function pmArrange(body, layout) {
+    const byKey = {};
+    pmSections(body).forEach(sec => { byKey[sec.dataset.section] = sec; });
+    body.querySelectorAll('.pm-col').forEach(col => {
+        ((layout.cols || {})[col.dataset.col] || []).forEach(k => {
+            if (byKey[k]) { col.appendChild(byKey[k]); delete byKey[k]; }
+        });
+    });
+    const hidden = layout.hidden || [], collapsed = layout.collapsed || [];
+    pmSections(body).forEach(sec => {
+        sec.hidden = hidden.includes(sec.dataset.section);
+        sec.classList.toggle('pm-collapsed', collapsed.includes(sec.dataset.section));
+    });
+    pmFitCols(body);
+}
+
+function pmApplyPreset(body, name) {
+    const fn = PM_PRESETS[name];
+    pmSections(body).forEach(sec => {
+        const col = fn ? fn(sec.dataset.section, sec.dataset.tab)
+                       : pmDefaultCol(sec.dataset.section, sec.dataset.tab);
+        body.querySelector('.pm-col[data-col="' + col + '"]').appendChild(sec);
+        sec.hidden = false;
+        sec.classList.remove('pm-collapsed');
+    });
+    pmFitCols(body);
+    pmSaveLayout(body);
+}
+
+let _pmDragging = null;
+const _pmMarker = (() => { const m = document.createElement('div'); m.className = 'pm-drop-marker'; return m; })();
+
+function pmWireDrag(body) {
+    body.addEventListener('dragstart', e => {
+        const h = e.target.closest && e.target.closest('.pm-handle');
+        if (!h) return;
+        _pmDragging = h.closest('.cpanel-section');
+        _pmDragging.classList.add('pm-dragging');
+        body.querySelectorAll('.pm-col').forEach(c => c.classList.add('pm-col--drop'));
+        pmFitCols(body);
+        e.dataTransfer.effectAllowed = 'move';
+        try { e.dataTransfer.setDragImage(_pmDragging, 20, 14); } catch (_) { /* optional */ }
+    });
+    body.addEventListener('dragover', e => {
+        if (!_pmDragging) return;
+        const col = e.target.closest && e.target.closest('.pm-col');
+        if (!col) return;
+        e.preventDefault();
+        const after = [...col.querySelectorAll(':scope > .cpanel-section:not(.pm-dragging)')]
+            .find(sec => e.clientY < sec.getBoundingClientRect().top + sec.offsetHeight / 2);
+        if (after) col.insertBefore(_pmMarker, after); else col.appendChild(_pmMarker);
+    });
+    body.addEventListener('drop', e => {
+        if (!_pmDragging) return;
+        e.preventDefault();
+        if (_pmMarker.parentElement) _pmMarker.parentElement.insertBefore(_pmDragging, _pmMarker);
+    });
+    body.addEventListener('dragend', () => {
+        if (!_pmDragging) return;
+        _pmDragging.classList.remove('pm-dragging');
+        _pmDragging = null;
+        _pmMarker.remove();
+        body.querySelectorAll('.pm-col').forEach(c => c.classList.remove('pm-col--drop'));
+        pmFitCols(body);
+        pmSaveLayout(body);
+    });
+}
+
+function pmInjectHeaderTools(body) {
+    const header = document.querySelector('.case-panel-header');
+    if (!header || header.querySelector('.pm-tools')) return;
+    const tools = document.createElement('span');
+    tools.className = 'pm-tools';
+
+    // prev / next case, from the already-loaded list order
+    const mkNav = (label, delta, title) => {
+        const b = document.createElement('button');
+        b.className = 'pm-tool-btn';
+        b.textContent = label;
+        b.title = title;
+        b.addEventListener('click', () => {
+            const cur = String(window.__initialCaseId);
+            const ids = (allCases || []).map(c => String(c.id));
+            const i = ids.indexOf(cur);
+            if (i === -1 || !ids.length) return;
+            const next = ids[(i + delta + ids.length) % ids.length];
+            if (next && next !== cur) window.location.assign('/cases/' + next);
+        });
+        return b;
+    };
+    tools.appendChild(mkNav('\u2190', -1, 'Previous case'));
+    tools.appendChild(mkNav('\u2192', 1, 'Next case'));
+
+    const btn = document.createElement('button');
+    btn.className = 'pm-tool-btn';
+    btn.textContent = 'Sections \u25BE';
+    const menu = document.createElement('div');
+    menu.className = 'pm-menu';
+
+    function rebuild() {
+        menu.textContent = '';
+        const presets = document.createElement('div');
+        presets.className = 'pm-preset-row';
+        [['triage', 'Triage'], ['dossier', 'Dossier'], ['review', 'Review']].forEach(([k, label]) => {
+            const pb = document.createElement('button');
+            pb.className = 'pm-tool-btn';
+            pb.textContent = label;
+            pb.addEventListener('click', () => { pmApplyPreset(body, k); rebuild(); });
+            presets.appendChild(pb);
+        });
+        menu.appendChild(presets);
+        menu.appendChild(document.createElement('hr'));
+        pmSections(body).forEach(sec => {
+            const label = document.createElement('label');
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.checked = !sec.hidden;
+            box.addEventListener('change', () => {
+                sec.hidden = !box.checked;
+                pmFitCols(body);
+                pmSaveLayout(body);
+            });
+            label.appendChild(box);
+            const t = sec.querySelector('.cpanel-section-title');
+            label.appendChild(document.createTextNode(
+                (t ? t.textContent : sec.dataset.section).replace(/\s+/g, ' ').trim()));
+            menu.appendChild(label);
+        });
+        menu.appendChild(document.createElement('hr'));
+        const reset = document.createElement('button');
+        reset.className = 'pm-reset';
+        reset.textContent = 'Reset arrangement';
+        reset.addEventListener('click', () => {
+            try { localStorage.removeItem(PM_LAYOUT_KEY); } catch (_) { /* blocked */ }
+            pmApplyPreset(body, 'triage');
+            menu.classList.remove('pm-open');
+        });
+        menu.appendChild(reset);
+    }
+    btn.addEventListener('click', e => { e.stopPropagation(); rebuild(); menu.classList.toggle('pm-open'); });
+    document.addEventListener('click', e => { if (!menu.contains(e.target)) menu.classList.remove('pm-open'); });
+
+    tools.appendChild(btn);
+    tools.appendChild(menu);
+    const close = header.querySelector('.case-panel-close');
+    header.insertBefore(tools, close);
+}
+
 function applyPageModeLayout() {
     const panel = document.getElementById('case-panel');
     if (!panel.classList.contains('page-mode')) return false;
     const body = document.getElementById('case-panel-body');
     body.classList.remove('workspace-mode');
     body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => sec.classList.remove('tab-hidden'));
-    if (!body.querySelector('.pm-grid')) {
+
+    if (!body.querySelector('.pm-cols')) {
         const grid = document.createElement('div');
-        grid.className = 'pm-grid';
-        const main = document.createElement('div');
-        main.className = 'pm-main';
-        const rail = document.createElement('div');
-        rail.className = 'pm-rail';
-        const board = document.createElement('div');
-        board.className = 'pm-board';
-        body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => {
-            const t = sec.dataset.tab;
-            if (t === 'alerts') main.appendChild(sec);
-            else if (t === 'overview' || t === 'actions') rail.appendChild(sec);
-            else board.appendChild(sec);
+        grid.className = 'pm-cols';
+        ['left', 'centre', 'right'].forEach(c => {
+            const col = document.createElement('div');
+            col.className = 'pm-col';
+            col.dataset.col = c;
+            grid.appendChild(col);
         });
-        grid.appendChild(main);
-        grid.appendChild(rail);
+
+        const seen = {};
+        body.querySelectorAll('.cpanel-section[data-tab]').forEach(sec => {
+            const key = pmKeyFor(sec, seen);
+            sec.dataset.section = key;
+            // chrome: handle + fold on the existing title row
+            const title = sec.querySelector('.cpanel-section-title');
+            const head = document.createElement('div');
+            head.className = 'pm-sec-head';
+            const handle = document.createElement('button');
+            handle.className = 'pm-handle';
+            handle.textContent = '\u2261';
+            handle.title = 'Drag to move this section';
+            handle.draggable = true;
+            head.appendChild(handle);
+            if (title) head.appendChild(title);
+            const fold = document.createElement('span');
+            fold.className = 'pm-fold';
+            fold.textContent = '\u25BC';
+            head.appendChild(fold);
+            const bodyWrap = document.createElement('div');
+            bodyWrap.className = 'pm-sec-body';
+            while (sec.firstChild) bodyWrap.appendChild(sec.firstChild);
+            sec.appendChild(head);
+            sec.appendChild(bodyWrap);
+            head.addEventListener('click', e => {
+                if (e.target.closest('button:not(.pm-handle), a, select, input')) return;
+                if (e.target === handle) return;
+                sec.classList.toggle('pm-collapsed');
+                pmSaveLayout(body);
+            });
+            grid.querySelector('.pm-col[data-col="' + pmDefaultCol(key, sec.dataset.tab) + '"]')
+                .appendChild(sec);
+        });
+
         body.appendChild(grid);
-        body.appendChild(board);
+        pmWireDrag(body);
+        const saved = pmReadLayout();
+        if (saved && saved.cols) pmArrange(body, saved); else pmFitCols(body);
+        pmInjectHeaderTools(body);
     }
+
     // the attack path lays edges out from getBoundingClientRect, which is all
     // zeroes until the section is actually visible.
     if (typeof _apgState !== 'undefined' && _apgState.redraw) {
@@ -4478,234 +4700,6 @@ async function addPanelNote(caseId) {
     } catch (e) {
         showToast('Failed to add note: ' + e.message, 'error');
     }
-}
-
-// =============================================================================
-// On-demand Bob case analysis (replaces v0.22.x auto-comment)
-// =============================================================================
-// `_bobAnalysisCache` keeps the most recent generation per case so "Save as
-// note" can post the exact text the analyst saw without re-running the LLM.
-const _bobAnalysisCache = {};
-
-async function getBobAnalysis(caseId) {
-    const panel = document.getElementById('bob-analysis-panel-' + caseId);
-    const body = document.getElementById('bob-analysis-body-' + caseId);
-    const meta = document.getElementById('bob-analysis-meta-' + caseId);
-    // Explicit 'block' (not '') — the panel carries the migrated _ion-s-c8be1ccba6
-    // (display:none) class whose selector specificity beats a cleared inline style,
-    // so clearing it left the panel hidden and the analysis appeared to never load.
-    if (panel) panel.style.display = 'block';
-    if (body) body.textContent = 'Generating analysis… (this can take 15–60s)';
-    if (meta) meta.textContent = '';
-    try {
-        const resp = await fetch(
-            '/api/cases/' + caseId + '/bob-analysis',
-            { method: 'POST', headers: { 'Content-Type': 'application/json' } }
-        );
-        const data = await resp.json();
-        if (!resp.ok) {
-            throw new Error(data.detail || ('HTTP ' + resp.status));
-        }
-        _bobAnalysisCache[caseId] = data.analysis;
-        if (body) body.textContent = data.analysis;
-        if (meta) {
-            const s = data.sources || {};
-            meta.textContent =
-                'model: ' + (data.model || 'unknown') +
-                ' · alerts: ' + (s.alerts_count || 0) +
-                ' · investigations: ' + (s.investigations_count || 0) +
-                ' · observables: ' + (s.observables_count || 0) +
-                ' · similar: ' + (s.similar_cases_count || 0);
-        }
-        showToast("Bob's analysis ready", 'success');
-    } catch (e) {
-        if (body) body.textContent = 'Failed: ' + e.message;
-        showToast("Bob analysis failed: " + e.message, 'error');
-    }
-}
-
-async function saveBobAnalysisAsNote(caseId) {
-    const text = _bobAnalysisCache[caseId];
-    if (!text) {
-        showToast("No analysis to save — run 'Get Bob's analysis' first.", 'warning');
-        return;
-    }
-    if (!confirm("Save this Bob analysis as a note on the case?")) return;
-    try {
-        const resp = await fetch(
-            '/api/cases/' + caseId + '/notes',
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: text }),
-            }
-        );
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        showToast('Saved as note', 'success');
-        delete _bobAnalysisCache[caseId];
-        openCaseDetail(caseId);
-    } catch (e) {
-        showToast("Save failed: " + e.message, 'error');
-    }
-}
-
-function hideBobAnalysis(caseId) {
-    const panel = document.getElementById('bob-analysis-panel-' + caseId);
-    if (panel) panel.style.display = 'none';
-}
-
-// =============================================================================
-// Bob Auto-Investigate — cited multi-source verdict for a case.
-// Citations validated server-side; rendered CSP-safe (esc only).
-// =============================================================================
-const _autoinvCache = {};
-const _AUTOINV_VERDICT_CLASS = {
-    true_positive: 'autoinv-v-tp', false_positive: 'autoinv-v-fp',
-    benign_true_positive: 'autoinv-v-btp', inconclusive: 'autoinv-v-inc',
-};
-
-function _autoinvRefBadges(refs) {
-    if (!refs || !refs.length) return '';
-    return ' ' + refs.map(r => '<span class="autoinv-ref">' + esc(String(r)) + '</span>').join(' ');
-}
-
-function renderAutoInvestigateReport(data) {
-    const rep = data.report || {};
-    const ev = data.evidence || [];
-    const counts = data.counts || {};
-    const verdict = String(rep.verdict || 'inconclusive');
-    const vClass = _AUTOINV_VERDICT_CLASS[verdict] || 'autoinv-v-inc';
-    let h = '<div class="autoinv-report">';
-    h += '<div class="autoinv-head">'
-       + '<span class="autoinv-verdict ' + vClass + '">' + esc(verdict.replace(/_/g, ' ')) + '</span>'
-       + '<span class="autoinv-meta">confidence: <strong>' + esc(String(rep.confidence_level || '?')) + '</strong></span>'
-       + '<span class="autoinv-meta">severity: <strong>' + esc(String(rep.severity || '?')) + '</strong></span>'
-       + '</div>';
-    const val = rep.validation || {};
-    if (val.verdict_downgraded || val.dropped_citations || val.invalid_playbook) {
-        const notes = [];
-        if (val.verdict_downgraded) notes.push('verdict downgraded to inconclusive (no cited evidence supported a decisive verdict)');
-        if (val.dropped_citations) notes.push(val.dropped_citations + ' invalid citation(s) dropped');
-        if (val.dropped_findings) notes.push(val.dropped_findings + ' unsupported finding(s) dropped');
-        if (val.invalid_playbook) notes.push('a recommended playbook id was not in the catalogue and was discarded');
-        h += '<div class="autoinv-validation">&#9888; ' + esc(notes.join('; ')) + '</div>';
-    }
-    if (rep.summary) h += '<div class="autoinv-summary">' + esc(String(rep.summary)) + '</div>';
-    if (rep.analyst_explanation) h += '<div class="autoinv-explain">' + esc(String(rep.analyst_explanation)) + '</div>';
-    if ((rep.findings || []).length) {
-        h += '<div class="autoinv-section-title">Findings</div><ul class="autoinv-findings">';
-        for (const f of rep.findings) h += '<li>' + esc(String(f.claim || '')) + _autoinvRefBadges(f.evidence_refs) + '</li>';
-        h += '</ul>';
-    }
-    if ((rep.key_observations || []).length) {
-        h += '<div class="autoinv-section-title">Key observations</div><table class="autoinv-obs"><tbody>';
-        for (const o of rep.key_observations) {
-            h += '<tr><td class="autoinv-obs-k">' + esc(String(o.field || '')) + '</td>'
-               + '<td>' + esc(String(o.value || '')) + ' <span class="autoinv-sig">' + esc(String(o.significance || '')) + '</span>'
-               + _autoinvRefBadges(o.evidence_refs) + '</td></tr>';
-        }
-        h += '</tbody></table>';
-    }
-    if (rep.recommended_playbook && rep.recommended_playbook.name) {
-        const pb = rep.recommended_playbook;
-        h += '<div class="autoinv-section-title">Recommended playbook</div>'
-           + '<div class="autoinv-playbook"><strong>' + esc(String(pb.name)) + '</strong>'
-           + (pb.rationale ? ' — ' + esc(String(pb.rationale)) : '') + '</div>';
-    }
-    if ((rep.recommended_actions || []).length) {
-        h += '<div class="autoinv-section-title">Recommended actions</div><ul class="autoinv-findings">';
-        for (const a of rep.recommended_actions) {
-            const txt = (typeof a === 'string') ? a : (a.action || '');
-            const pri = (typeof a === 'object' && a.priority) ? (esc(String(a.priority)) + ' · ') : '';
-            h += '<li>' + pri + esc(String(txt)) + '</li>';
-        }
-        h += '</ul>';
-    }
-    const mi = rep.mitre || {};
-    const tech = (mi.techniques || []).concat(mi.tactics || []);
-    if (tech.length) {
-        h += '<div class="autoinv-section-title">MITRE ATT&amp;CK</div><div>'
-           + tech.map(t => '<span class="autoinv-tag">' + esc(String(t)) + '</span>').join(' ') + '</div>';
-    }
-    h += '<div class="autoinv-section-title">Evidence ledger (' + ev.length + ')</div>';
-    if (!ev.length) {
-        h += '<div class="autoinv-empty">No corroborating evidence was found — Bob reasoned from the subject alone.</div>';
-    } else {
-        h += '<table class="autoinv-ledger"><tbody>';
-        for (const it of ev) {
-            const d = it.detail || {};
-            const parts = [];
-            for (const k of Object.keys(d)) {
-                if (d[k] === null || d[k] === '' || (Array.isArray(d[k]) && !d[k].length)) continue;
-                parts.push(esc(k) + ': ' + esc(String(Array.isArray(d[k]) ? d[k].join(', ') : d[k])));
-            }
-            h += '<tr><td class="autoinv-eid"><span class="autoinv-ref">' + esc(String(it.id)) + '</span></td>'
-               + '<td><span class="autoinv-ekind">' + esc(String(it.kind)) + '</span> ' + esc(String(it.title))
-               + (parts.length ? '<div class="autoinv-edetail">' + parts.join(' · ') + '</div>' : '') + '</td></tr>';
-        }
-        h += '</tbody></table>';
-    }
-    const srcBits = Object.keys(counts).map(k => counts[k] + ' ' + k.replace(/_/g, ' ')).join(' · ');
-    if (srcBits) h += '<div class="autoinv-sources">Gathered: ' + esc(srcBits) + (data.model ? ' · model: ' + esc(String(data.model)) : '') + '</div>';
-    h += '</div>';
-    return h;
-}
-
-function _autoinvToMarkdown(data) {
-    const rep = data.report || {};
-    const lines = ['**Bob Auto-Investigate**', ''];
-    lines.push('- **Verdict:** ' + (rep.verdict || 'inconclusive') + ' (confidence: ' + (rep.confidence_level || '?') + ', severity: ' + (rep.severity || '?') + ')');
-    if (rep.summary) lines.push('', rep.summary);
-    if (rep.analyst_explanation) lines.push('', rep.analyst_explanation);
-    if ((rep.findings || []).length) {
-        lines.push('', '_Findings:_');
-        for (const f of rep.findings) lines.push('- ' + (f.claim || '') + ' [' + (f.evidence_refs || []).join(', ') + ']');
-    }
-    if (rep.recommended_playbook && rep.recommended_playbook.name) {
-        lines.push('', '_Recommended playbook:_ ' + rep.recommended_playbook.name + (rep.recommended_playbook.rationale ? ' — ' + rep.recommended_playbook.rationale : ''));
-    }
-    return lines.join('\n');
-}
-
-async function runCaseAutoInvestigate(caseId) {
-    const panel = document.getElementById('autoinv-panel-' + caseId);
-    const body = document.getElementById('autoinv-body-' + caseId);
-    if (panel) panel.style.display = 'block';
-    if (body) body.textContent = 'Bob is investigating — gathering evidence and reasoning (15–60s)…';
-    try {
-        const resp = await fetch('/api/cases/' + caseId + '/auto-investigate',
-            { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-        const data = await resp.json();
-        if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
-        _autoinvCache[caseId] = data;
-        if (body) body.innerHTML = renderAutoInvestigateReport(data);
-        showToast('Auto-Investigate complete', 'success');
-    } catch (e) {
-        if (body) body.textContent = 'Auto-Investigate failed: ' + e.message;
-        showToast('Auto-Investigate failed: ' + e.message, 'error');
-    }
-}
-
-async function saveAutoInvestigateAsNote(caseId) {
-    const data = _autoinvCache[caseId];
-    if (!data) { showToast("Run Auto-Investigate first.", 'warning'); return; }
-    if (!confirm("Save this Auto-Investigate report as a note on the case?")) return;
-    try {
-        const resp = await fetch('/api/cases/' + caseId + '/notes',
-            { method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ content: _autoinvToMarkdown(data) }) });
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        showToast('Saved as note', 'success');
-        delete _autoinvCache[caseId];
-        openCaseDetail(caseId);
-    } catch (e) {
-        showToast("Save failed: " + e.message, 'error');
-    }
-}
-
-function hideAutoInvestigate(caseId) {
-    const panel = document.getElementById('autoinv-panel-' + caseId);
-    if (panel) panel.style.display = 'none';
 }
 
 // =============================================================================

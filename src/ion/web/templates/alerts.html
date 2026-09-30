@@ -8839,7 +8839,7 @@ async function showAlertDetail(alertId) {
     document.getElementById('alert-detail-title').textContent = alert.title;
 
     ionAlertDetail.mount(document.getElementById('alert-detail-body'), alert, {
-        layout: 'tabs',              // /alerts keeps its tab strip, unchanged
+        layout: 'stacked',           // sections, not tabs — same layout /cases proved
         aiAvailable: aiAvailable,
         arkimeEnabled: arkimeEnabled,
         detailV2: document.querySelector('[data-alert-detail-v2]')?.dataset.alertDetailV2 === '1',
@@ -10085,9 +10085,16 @@ async function confirmAddToCase() {
     const caseId = document.getElementById('target-case-id').value;
     if (!caseId) return;
 
+    const ids = Array.from(selectedAlertIds);
+    const ruleNames = {};
+    ids.forEach(id => {
+        const a = allAlerts.find(x => x.id === id);
+        if (a && a.rule_name) { ruleNames[id] = a.rule_name; }
+    });
     const payload = {
-        alert_ids: Array.from(selectedAlertIds),
-        case_id: parseInt(caseId)
+        alert_ids: ids,
+        case_id: parseInt(caseId),
+        rule_names: ruleNames
     };
 
     try {

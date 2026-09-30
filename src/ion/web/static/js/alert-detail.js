@@ -32,6 +32,7 @@
  *   opts = {
  *     layout:        'tabs' | 'stacked'   (default 'tabs')
  *     aiAvailable:   bool                 show AI Analyze / Discuss
+ *     discussEnabled: bool (default true) show the Discuss chat jump
  *     arkimeEnabled: bool                 show the Arkime PCAP link
  *     classPrefix:   'alert-parsed' | 'cpanel-alert'
  *     caseId:        number|null          enables "add fields as evidence"
@@ -1083,6 +1084,19 @@
       const payload = _alertPayload(alertId);
       if (!payload) return;
 
+      // The rule's own description and investigation guide travel with the
+      // request -- the model was judging an alert without ever seeing what
+      // the rule that fired it actually looks for.
+      try {
+          const raw = await fetchRawOnce(alertId);
+          const flat = flattenAlertFields(raw || {});
+          payload.rule_description = flat['kibana.alert.rule.description']
+              || flat['signal.rule.description'] || flat['rule.description'] || null;
+          payload.rule_note = flat['kibana.alert.rule.note']
+              || flat['kibana.alert.rule.parameters.note']
+              || flat['signal.rule.note'] || flat['rule.note'] || null;
+      } catch (_) { /* raw fetch is best-effort */ }
+
       container.className = 'ai-analysis-result visible';
       container.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>Analyzing alert with AI...</div>';
 
@@ -1404,7 +1418,7 @@
     if (_opts.aiAvailable) {
         html += `<div class="ai-analysis-bar">
             <button class="ai-assist-btn" data-click-action="aiAnalyzeAlert" data-args='["${escapeHtml(alert.id)}"]'>&#9733; AI Analyze</button>
-            <button class="ai-assist-btn bg-[rgba(16,185,129,0.15)] border-[rgba(16,185,129,0.3)] text-[#10b981]" data-click-action="openAIChatWithContext" data-args='["${escapeHtml(alert.id)}"]'>&#9993; Discuss with AI</button>
+            ${_opts.discussEnabled !== false ? `<button class="ai-assist-btn bg-[rgba(16,185,129,0.15)] border-[rgba(16,185,129,0.3)] text-[#10b981]" data-click-action="openAIChatWithContext" data-args='["${escapeHtml(alert.id)}"]'>&#9993; Discuss with AI</button>` : ''}
             <div class="ai-analysis-result" id="ai-analysis-result"></div>
         </div>`;
     }
@@ -1559,7 +1573,9 @@
     }
     if (_opts.aiAvailable) {
       tools += '<button class="ai-assist-btn iad2-act" data-click-action="aiAnalyzeAlert" data-args=\'["' + escapeHtml(alert.id) + '"]\'>★ AI Analyze</button>';
-      tools += '<button class="ai-assist-btn iad2-act" data-click-action="openAIChatWithContext" data-args=\'["' + escapeHtml(alert.id) + '"]\'>✉ Discuss</button>';
+      if (_opts.discussEnabled !== false) {
+        tools += '<button class="ai-assist-btn iad2-act" data-click-action="openAIChatWithContext" data-args=\'["' + escapeHtml(alert.id) + '"]\'>✉ Discuss</button>';
+      }
     }
     if (alert.rule_name) {
       _tuneRegistry[alert.id] = { rule_name: alert.rule_name };
@@ -1620,6 +1636,12 @@
   // -- section shell: the ONLY thing that differs between the two layouts ----
   // A host declares which sections it can populate; default is all. Rendering a
   // section the host cannot fill leaves a spinner that never resolves.
+  var _FOLD_KEY = 'ion-alert-detail-folds-v1';
+  function _foldPrefs() {
+    try { return JSON.parse(localStorage.getItem(_FOLD_KEY) || '{}') || {}; }
+    catch (_) { return {}; }
+  }
+
   function _visibleSections() {
     var allow = _opts.sections;
     if (!allow || !allow.length) return SECTIONS;
@@ -1629,6 +1651,15 @@
   function _sectionsHtml(alert) {
     var stacked = _opts.layout === 'stacked';
     var SECTIONS = _visibleSections();
+    // The Guide section (rule note + Bob custom template) exists in both
+    // layouts or neither -- the tabbed builder injects it too.
+    if (_opts.bobTemplates && !SECTIONS.some(function (s) { return s.id === 'guide'; })) {
+      SECTIONS = SECTIONS.slice();
+      var ai = -1;
+      SECTIONS.forEach(function (s, i) { if (s.id === 'autoinvestigate') ai = i; });
+      var guide = { id: 'guide', label: 'Guide' };
+      if (ai >= 0) SECTIONS.splice(ai + 1, 0, guide); else SECTIONS.push(guide);
+    }
     var h = '';
 
     if (stacked) {
@@ -1640,13 +1671,27 @@
            + ' data-click-action="ionAlertDetailJump" data-section="' + s.id + '">' + s.label + '</a>';
       });
       h += '</div>';
-      SECTIONS.forEach(function (s) {
-        h += '<section class="iad-section" id="iad-sec-' + s.id + '">'
+      // Two columns at width: working material (fields, guide, raw data,
+      // auto-investigate) left, context (case, related, timeline, notes)
+      // right. Single column below 1100px via CSS.
+      var MAIN = { fields: 1, guide: 1, rawdata: 1, autoinvestigate: 1 };
+      var folds = _foldPrefs();
+      function sectionHtml(s) {
+        var folded = folds[s.id] != null ? folds[s.id] : (s.id === 'rawdata');
+        return '<section class="iad-section iad-boxed' + (folded ? ' iad-folded' : '') + '" id="iad-sec-' + s.id + '">'
+           + '<div class="iad-sec-head" data-click-action="ionAlertDetailFold" data-section="' + s.id + '">'
            + '<h4 class="iad-section-title">' + s.label + '</h4>'
-           + '<div id="detail-tab-' + s.id + '" class="detail-tab-content active">'
+           + '<span class="iad-fold-chev" aria-hidden="true">\u25BC</span>'
+           + '</div>'
+           + '<div id="detail-tab-' + s.id + '" class="detail-tab-content active iad-sec-body">'
            + _sectionPlaceholder(s.id, alert)
            + '</div></section>';
-      });
+      }
+      h += '<div class="iad-cols"><div class="iad-col-main">';
+      SECTIONS.forEach(function (s) { if (MAIN[s.id]) h += sectionHtml(s); });
+      h += '</div><div class="iad-col-side">';
+      SECTIONS.forEach(function (s) { if (!MAIN[s.id]) h += sectionHtml(s); });
+      h += '</div></div>';
       return h;
     }
 
@@ -2012,6 +2057,15 @@
   window.requestTuningSubmit = requestTuningSubmit;
 
   window.ionAlertDetailJump = function (event, dataset) { showSection(dataset && dataset.section); };
+  window.ionAlertDetailFold = function (event, dataset) {
+    if (event && event.target && event.target.closest('button, a, select, input')) return;
+    var sec = document.getElementById('iad-sec-' + (dataset && dataset.section));
+    if (!sec) return;
+    sec.classList.toggle('iad-folded');
+    var prefs = _foldPrefs();
+    prefs[dataset.section] = sec.classList.contains('iad-folded');
+    try { localStorage.setItem(_FOLD_KEY, JSON.stringify(prefs)); } catch (_) { /* blocked */ }
+  };
   window.switchDetailTab = switchDetailTab;
   window.ionAlertAddComment = ionAlertAddComment;
   window.loadAlertComments = loadAlertComments;

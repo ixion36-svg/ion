@@ -162,10 +162,12 @@ def test_component_takes_capabilities_as_options_not_page_globals(module_js):
 # ── /alerts must not regress ─────────────────────────────────────────────
 
 
-def test_alerts_still_uses_the_tabs_layout(alerts):
+def test_alerts_uses_the_stacked_layout(alerts):
+    # /alerts moved from tabs to the stacked sections /cases proved, so the
+    # two hosts render the alert through one code path.
     js = _inline_js(alerts)
     assert "ionAlertDetail.mount(" in js
-    assert "layout: 'tabs'" in js
+    assert "layout: 'stacked'" in js
 
 
 def test_alerts_keeps_its_page_specific_wiring(alerts):
