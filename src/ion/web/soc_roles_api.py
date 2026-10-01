@@ -1,32 +1,24 @@
 """SOC roles & daily duties reference page (``/soc-roles``).
 
-Extracted from ``course_api`` when the courseware cluster was archived: the
-page is part of the skills surface ION keeps, but it lived in the course
-module because each role declares the ``CourseLevel`` its training path
-starts at and the route joins that to the published-course catalogue.
+Extracted from ``course_api`` when the courseware cluster was archived. The
+page is part of the skills surface ION keeps; it lived in the course module
+only because each role declares the ``CourseLevel`` its training path starts
+at, and the route joined that to the published-course catalogue.
 
-The catalogue join is retained as-is. ``Course`` and ``course_enrolments``
-remain live because the workforce onboarding journey resolves COURSE
-requirements from them. With the courseware pages archived the links the
-join produces have no page to land on, so whether this page keeps a
-training-path section at all is an open product decision.
+That join is gone with the courseware pages — it produced links to
+``/courses``, which no longer exists. Each role still declares its ``level``,
+so a training path can be rebuilt here if one is ever wanted.
 """
 
 from __future__ import annotations
 
-import logging
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
-from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_page_auth
-from ion.models.course import Course
 from ion.models.user import User
-from ion.web.api import get_db_session
 from ion.web.templating import make_templates
 
-logger = logging.getLogger(__name__)
 router = APIRouter(tags=["soc-roles"])
 _templates = make_templates()
 
@@ -204,35 +196,10 @@ _SOC_ROLES: list = [
 def soc_roles_page(
     request: Request,
     _user: User = Depends(require_page_auth),
-    session: Session = Depends(get_db_session),
 ):
-    """SOC roles & daily duties — training-section reference page.
-
-    Joins each role's declared CourseLevel to the live published-course
-    catalogue so the expanded card links to the actual training path.
-    Best-effort: with no published courses (fresh install) the cards fall
-    back to a link to the /courses catalogue.
-    """
-    courses_by_level: dict = {}
-    try:
-        rows = (
-            session.query(Course)
-            .filter(Course.published.is_(True))
-            .order_by(Course.order_in_level.asc(), Course.id.asc())
-            .all()
-        )
-        for c in rows:
-            # SQLEnum(native_enum=False) reads back as the enum member —
-            # normalise to the plain value ("L1") the role dicts declare.
-            lvl = c.level.value if hasattr(c.level, "value") else str(c.level)
-            courses_by_level.setdefault(lvl, []).append(
-                {"title": c.title, "slug": c.slug}
-            )
-    except Exception as exc:  # noqa: BLE001 — page must render without the catalogue
-        logger.warning("soc-roles: course-catalogue lookup failed: %s", exc)
-        courses_by_level = {}
+    """SOC roles & daily duties — a static, server-rendered reference page."""
     return _templates.TemplateResponse(
         request=request,
         name="soc_roles.html",
-        context={"roles": _SOC_ROLES, "courses_by_level": courses_by_level},
+        context={"roles": _SOC_ROLES},
     )

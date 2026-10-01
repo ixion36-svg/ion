@@ -38,15 +38,6 @@
       <div role="alert" class="alert sr-good">
         <div><b>WHAT GOOD LOOKS LIKE</b><br>{{ r.good }}</div>
       </div>
-      <h3 class="sr-h3">Training path</h3>
-      {% set path = courses_by_level.get(r.level) %}
-      {% if path %}
-        {% for c in path %}
-        <a class="btn btn-ghost btn-sm w-full sr-course" href="/courses/{{ c.slug }}">{{ c.title }} <span class="badge badge-xs sr-lvl">{{ r.level }}</span></a>
-        {% endfor %}
-      {% else %}
-        <div class="sr-duty">No published {{ r.level }} course yet &mdash; <a class="link sr-link" href="/courses">browse the catalogue</a>.</div>
-      {% endif %}
       <div class="sr-chips">
         <span class="sr-chiplabel">LIVES IN</span>
         {% for a in r.apps %}<span class="badge badge-sm badge-ghost sr-chip">{{ a }}</span>{% endfor %}
