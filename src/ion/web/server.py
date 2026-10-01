@@ -753,6 +753,7 @@ async def _startup_event():
         LOCK_SCHEDULER_BG,
         LOCK_SEED_ANALYTICS_JOBS,
         LOCK_SEED_CAPABILITY_KB,
+        LOCK_SEED_COMM_TEMPLATES,
         LOCK_SEED_DEFAULT_PLAYBOOKS,
         LOCK_SEED_FORENSIC_PB,
         LOCK_SEED_KEV_CATALOG,
@@ -887,6 +888,40 @@ async def _startup_event():
         finally:
             session.close()
     run_locked(engine, LOCK_SEED_CAPABILITY_KB, "seed_capability_articles", _seed_capability_articles)
+
+    # ---------------------------------------------------------------
+    # Seed the six default incident-notification templates.
+    #
+    # OFF unless config.comm_templates_seed is set (ION_COMM_TEMPLATES_SEED).
+    # This is the ONLY path by which rows reach comm_templates — there is no
+    # seeding endpoint and no UI for it — so leaving it on by default would
+    # mean every boot wrote six rows into a production database that nobody
+    # asked for.
+    #
+    # The flag is passed to the service rather than branched on here, so the
+    # gate is one unit-tested function instead of a line buried in startup.
+    # With the flag on it is idempotent: the service no-ops when the table
+    # holds ANY row, so an operator's own templates are never joined by a
+    # half-seeded set.
+    # ---------------------------------------------------------------
+    def _seed_comm_templates():
+        from ion.services.comm_template_service import (
+            seed_default_templates_if_enabled,
+        )
+        session = factory()
+        try:
+            seeded = seed_default_templates_if_enabled(
+                session, enabled=config.comm_templates_seed,
+            )
+            if seeded:
+                session.commit()
+                logger.info("Seeded %d default communication templates", seeded)
+        finally:
+            session.close()
+    run_locked(
+        engine, LOCK_SEED_COMM_TEMPLATES, "seed_comm_templates",
+        _seed_comm_templates,
+    )
 
     # ---------------------------------------------------------------
     # Warm the lazily-imported AI stack per worker. The first import of

@@ -25,13 +25,20 @@ FLAG_ENV = {
     "chat_grounding_check": "ION_CHAT_GROUNDING_CHECK",
 }
 
+# Default-OFF flags whose env var the fixture must also clear, or an ambient
+# value in the shell would make the "stays opt-in" assertions below pass or
+# fail for the wrong reason.
+OPT_IN_ENV = {
+    "comm_templates_seed": "ION_COMM_TEMPLATES_SEED",
+}
+
 
 @pytest.fixture
 def fresh_config(monkeypatch):
     """A Config built with no ION_* flag env vars set."""
 
     def _build(**env):
-        for var in FLAG_ENV.values():
+        for var in (*FLAG_ENV.values(), *OPT_IN_ENV.values()):
             monkeypatch.delenv(var, raising=False)
         for k, v in env.items():
             monkeypatch.setenv(k, v)
@@ -92,6 +99,24 @@ def test_dev_and_debug_stay_off(fresh_config):
     cfg = fresh_config()
     assert cfg.dev_mode is False
     assert cfg.debug_mode is False
+
+
+def test_comm_template_seeding_stays_opt_in(fresh_config):
+    """Startup seeding is the ONLY path by which rows reach comm_templates --
+    there is no seeding endpoint and no UI -- so defaulting it on would mean
+    every boot wrote six rows into a production database nobody asked for.
+    Turn it on with ION_COMM_TEMPLATES_SEED=true; it is idempotent once on."""
+    assert fresh_config().comm_templates_seed is False
+
+
+def test_comm_template_seeding_can_be_turned_on(fresh_config):
+    assert fresh_config(ION_COMM_TEMPLATES_SEED="true").comm_templates_seed is True
+
+
+def test_a_typod_seeding_value_does_not_silently_enable(fresh_config):
+    """_get_env_bool falls back to its `default`, which for this flag is False --
+    so a typo leaves the database untouched rather than writing to it."""
+    assert fresh_config(ION_COMM_TEMPLATES_SEED="maybe").comm_templates_seed is False
 
 
 def test_response_actions_stay_off_and_dry_run_stays_on(fresh_config):

@@ -298,14 +298,47 @@ def render_template(session: Session, template_id: int, variables: dict) -> dict
     }
 
 
-def seed_default_templates(session: Session):
+def seed_default_templates_if_enabled(session: Session, *, enabled: bool) -> int:
+    """Seed the default templates only when an operator has opted in.
+
+    This is the single gate on the only code path by which rows reach
+    ``comm_templates``: there is no seeding endpoint and no UI for it. Startup
+    passes ``config.comm_templates_seed`` (``ION_COMM_TEMPLATES_SEED``), which
+    defaults to False, so a boot writes nothing to the database unless that flag
+    is explicitly set.
+
+    The gate lives here rather than at the call site so that both of its states
+    are unit-testable — and the disabled state is the production default, which
+    makes it the branch most worth pinning.
+
+    Returns the number of rows inserted: 0 when disabled, 0 when the table
+    already holds rows, otherwise ``len(DEFAULT_TEMPLATES)``.
+    """
+    if not enabled:
+        logger.debug(
+            "Communication-template seeding is off (config.comm_templates_seed); "
+            "no rows written"
+        )
+        return 0
+    return seed_default_templates(session)
+
+
+def seed_default_templates(session: Session) -> int:
+    """Insert the default templates, unless the table already holds any row.
+
+    Idempotent and all-or-nothing: the guard counts rows rather than matching
+    names, so an operator's own templates are never joined by a half-seeded
+    default set, and a second boot with the flag on is a no-op.
+
+    Returns the number of rows inserted.
+    """
     existing_count = session.execute(
         select(func.count(CommTemplate.id))
     ).scalar() or 0
 
     if existing_count > 0:
         logger.info("Communication templates already seeded (%d exist), skipping", existing_count)
-        return
+        return 0
 
     for tmpl_data in DEFAULT_TEMPLATES:
         tmpl = CommTemplate(
@@ -320,6 +353,7 @@ def seed_default_templates(session: Session):
 
     session.flush()
     logger.info("Seeded %d default communication templates", len(DEFAULT_TEMPLATES))
+    return len(DEFAULT_TEMPLATES)
 
 
 def _template_to_dict(tmpl: CommTemplate) -> dict:

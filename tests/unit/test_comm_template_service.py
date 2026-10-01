@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 
 import pytest
+from sqlalchemy import func, select
 
 from ion.models.oncall import CommTemplate
 from ion.models.user import User
@@ -249,6 +250,76 @@ class TestSeeding:
         assert [t["name"] for t in svc.get_templates(session)] == [
             "an analyst's own"
         ]
+
+
+class TestSeedingGate:
+    """The opt-in gate on the only path by which rows reach comm_templates.
+
+    There is no seeding endpoint and no UI, so this function decides whether a
+    boot writes to the database at all. `enabled=False` is the production
+    default, which makes it the branch most worth pinning: a regression there
+    would mean six rows appearing in a customer's Postgres on upgrade, which no
+    test of the seeder itself would catch.
+    """
+
+    def test_disabled_writes_nothing_at_all(self, session):
+        inserted = svc.seed_default_templates_if_enabled(session, enabled=False)
+
+        assert inserted == 0
+        assert session.execute(
+            select(func.count(CommTemplate.id))).scalar() == 0
+        assert svc.get_templates(session) == []
+
+    def test_disabled_does_not_even_query_the_table(self, session, monkeypatch):
+        """Returns before touching the session, so an unmigrated database on an
+        upgrade boot cannot fail here either."""
+        def boom(*a, **k):
+            raise AssertionError("the disabled gate must not touch the session")
+
+        monkeypatch.setattr(session, "execute", boom)
+
+        assert svc.seed_default_templates_if_enabled(session, enabled=False) == 0
+
+    def test_enabled_on_an_empty_table_seeds_the_catalogue(self, session):
+        inserted = svc.seed_default_templates_if_enabled(session, enabled=True)
+
+        assert inserted == len(svc.DEFAULT_TEMPLATES)
+        assert len(svc.get_templates(session)) == len(svc.DEFAULT_TEMPLATES)
+
+    def test_enabled_with_rows_already_present_writes_nothing(self, session):
+        """A second boot with the flag on. Idempotent, so leaving the flag set
+        is safe rather than something an operator has to remember to unset."""
+        svc.seed_default_templates_if_enabled(session, enabled=True)
+
+        inserted = svc.seed_default_templates_if_enabled(session, enabled=True)
+
+        assert inserted == 0
+        assert len(svc.get_templates(session)) == len(svc.DEFAULT_TEMPLATES)
+
+    def test_enabled_leaves_an_operators_own_template_alone(self, session):
+        """The guard counts rows rather than matching names, so turning the flag
+        on against a table somebody has already populated by hand is a no-op —
+        it does not top up the set."""
+        _template(session, "an analyst's own")
+
+        inserted = svc.seed_default_templates_if_enabled(session, enabled=True)
+
+        assert inserted == 0
+        assert [t["name"] for t in svc.get_templates(session)] == [
+            "an analyst's own"
+        ]
+
+    def test_the_flag_defaults_to_off_in_config(self):
+        """If this ever defaults to True, every boot writes to production."""
+        from ion.core.config import Config
+
+        assert Config().comm_templates_seed is False
+
+    def test_the_seeder_reports_what_it_inserted(self, session):
+        """Startup commits only on a non-zero return, so the count is load
+        bearing rather than decoration."""
+        assert svc.seed_default_templates(session) == len(svc.DEFAULT_TEMPLATES)
+        assert svc.seed_default_templates(session) == 0
 
 
 class TestCatalogueIntegrity:

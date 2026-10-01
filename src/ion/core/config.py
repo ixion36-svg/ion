@@ -60,6 +60,11 @@ class Config:
     authz_alert_enabled: bool = True  # Record 401/403 and alert on repeated unauthorized-access attempts
     authz_alert_threshold: int = 5  # 401/403 responses from one actor within the window that escalate to a HIGH event
     response_actions_enabled: bool = False  # Expose the response-action surface (request/approve/execute); opt-in, off by default
+    # Seed the six default incident-notification templates at startup.
+    # OFF by default: startup seeding is the only way rows reach
+    # comm_templates, and nothing should write to a production database
+    # unless an operator asks for it. Idempotent when on.
+    comm_templates_seed: bool = False
     response_actions_live: bool = False  # Dispatch to real firewall/EDR/AD adapters. Off = every execution is forced dry-run
     alert_detail_v2: bool = True  # Serve the redesigned alert-detail panel (decision-first header + tabbed body + source badges). Set false to fall back to the previous render
     alert_field_pins: bool = True  # Let analysts pin alert fields to the Case-context panel (per-user, per-rule). Inert unless alert_detail_v2 is on
@@ -337,6 +342,7 @@ class Config:
             authz_alert_enabled=data.get("authz_alert_enabled", True),
             authz_alert_threshold=data.get("authz_alert_threshold", 5),
             response_actions_enabled=data.get("response_actions_enabled", False),
+            comm_templates_seed=data.get("comm_templates_seed", False),
             response_actions_live=data.get("response_actions_live", False),
             alert_detail_v2=data.get("alert_detail_v2", True),
             alert_field_pins=data.get("alert_field_pins", True),
@@ -743,6 +749,8 @@ def get_config() -> Config:
             _config.authz_alert_enabled = _get_env_bool("ION_AUTHZ_ALERT_ENABLED", True)
         if os.environ.get("ION_RESPONSE_ACTIONS_ENABLED"):
             _config.response_actions_enabled = _get_env_bool("ION_RESPONSE_ACTIONS_ENABLED")
+        if os.environ.get("ION_COMM_TEMPLATES_SEED"):
+            _config.comm_templates_seed = _get_env_bool("ION_COMM_TEMPLATES_SEED")
         if os.environ.get("ION_RESPONSE_ACTIONS_LIVE"):
             _config.response_actions_live = _get_env_bool("ION_RESPONSE_ACTIONS_LIVE")
         if os.environ.get("ION_ALERT_DETAIL_V2"):
