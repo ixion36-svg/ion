@@ -4,24 +4,47 @@ from __future__ import annotations
 
 import logging
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
 
 
 def _parse_ts(value: Optional[str]) -> Optional[datetime]:
-    """Best-effort ISO timestamp parse."""
+    """Best-effort ISO timestamp parse, normalised to offset-aware UTC.
+
+    The normalisation is load-bearing, not tidiness. ``ElasticsearchService``
+    parses ``@timestamp`` into an offset-AWARE datetime when it carries a ``Z``
+    and falls back to NAIVE ``datetime.utcnow()`` when the field is missing or
+    unparsable, so a single odd document puts both kinds in one group — and
+    sorting that group raises ``TypeError``. The caller is wrapped in a blanket
+    ``except`` in the API, so the whole pattern report came back empty with no
+    indication why. A bare timestamp is read as UTC because that is exactly
+    what the upstream fallback produces.
+
+    Anything that is neither a datetime nor an ISO string yields ``None``
+    rather than raising — an epoch integer used to escape as ``AttributeError``,
+    which the old ``except (ValueError, TypeError)`` did not catch.
+    """
     if value is None:
         return None
     if isinstance(value, datetime):
-        return value
+        return _as_utc(value)
+    if not isinstance(value, str):
+        return None
     try:
         # Handle both 'Z' suffix and '+00:00' offset
         cleaned = value.replace("Z", "+00:00")
-        return datetime.fromisoformat(cleaned)
+        return _as_utc(datetime.fromisoformat(cleaned))
     except (ValueError, TypeError):
         return None
+
+
+def _as_utc(dt: datetime) -> datetime:
+    """Attach UTC to a naive datetime; convert an aware one to UTC."""
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _classify_pattern(
