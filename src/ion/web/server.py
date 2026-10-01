@@ -110,7 +110,6 @@ from ion.web.shift_handover_api import router as shift_handover_router
 from ion.web.skill_publisher_api import router as skill_publisher_router
 from ion.web.skills_api import router as skills_router
 from ion.web.soc_health_api import router as soc_health_router
-from ion.web.social_api import router as social_router
 from ion.web.story_api import router as story_router
 from ion.web.templating import make_templates
 from ion.web.tenant_api import router as tenant_router
@@ -419,7 +418,6 @@ app.include_router(wise_router, prefix="/api")
 app.include_router(forensics_router, prefix="/api/forensics")
 # ForensicCase Workbench — pinned evidence + tamper-evident ledger
 app.include_router(forensic_workbench_router, prefix="/api/forensics")
-app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 app.include_router(cyab_router, prefix="/api/cyab")
@@ -2193,12 +2191,6 @@ async def notes_page(request: Request, user: User = Depends(require_page_auth)):
 
 
 
-
-
-@app.get("/social", response_class=HTMLResponse)
-async def social_page(request: Request, user: User = Depends(require_page_auth)):
-    """Render the Social Hub page."""
-    return templates.TemplateResponse(request=request, name="social.html")
 
 
 @app.get("/engineering-analytics")

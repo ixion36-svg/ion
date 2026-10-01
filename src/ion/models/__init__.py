@@ -214,11 +214,6 @@ from ion.models.sla import (
     SLAPolicy,
     # ThreatHunt removed v0.27.0; see ion/models/sla.py for the removal note.
 )
-from ion.models.social import (
-    SocialComment,
-    SocialPost,
-    SocialReaction,
-)
 
 # JSON-DAG playbook automation (Tines-inspired).
 from ion.models.story import Story, StoryRun  # noqa: F401
@@ -410,10 +405,6 @@ __all__ = [
     "VulnStatus",
     # Threat Intel watch model
     "ThreatIntelWatch",
-    # Social Hub models
-    "SocialPost",
-    "SocialComment",
-    "SocialReaction",
     # Service desk — bug reports + CAB change requests
     "BugReport",
     "BugReportSeverity",
