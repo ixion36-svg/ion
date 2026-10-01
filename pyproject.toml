@@ -272,31 +272,3 @@ exclude_also = [
     "@overload",
     "if __name__ == .__main__.:",
 ]
-
-# diff-cover (the coverage ratchet's changed-lines gate in
-# .github/workflows/test.yml). Inert until that workflow passes
-# `-c pyproject.toml`, because diff-cover does NOT auto-discover this file.
-#
-# `de_tide_api.py` is excluded from the CHANGED-LINES gate only. The module was
-# not written, it was MOVED: 1,281 of its 1,298 non-blank lines are verbatim
-# from the pre-split `cyab_api.py`, extracted so the CyAB assessment product
-# could be archived without ten delicate excisions from the file that hosted a
-# headline feature's entire HTTP surface. git records an extraction as
-# wholly-added lines, so the gate reads 1,298 lines of pre-existing untested
-# code as newly authored and uncovered -- 28% of changed lines, against 98% for
-# everything actually written alongside it. The gate's stated intent is to
-# grandfather existing gaps; a pure move defeats the MECHANISM, not the intent.
-#
-# This reclassifies, it does not forgive, and the difference is load-bearing:
-# the file is deliberately NOT in [tool.coverage.run] omit above, so the FLOOR
-# still counts all 1,298 of its lines at their real 13.4%. Omitting it instead
-# would drop 1,298 mostly-uncovered lines out of the denominator and inflate the
-# headline figure -- gaming the ratchet. The debt stays measured; it is just not
-# billed to the commit that relocated it.
-#
-# DELETE THIS SECTION once de_tide_api.py has tests. It records outstanding
-# work, not permission -- the same contract as KNOWN_REMAINING in
-# tests/test_v080_csp_inline_styles.py.
-[tool.diff_cover]
-exclude = ["*/de_tide_api.py"]
-
