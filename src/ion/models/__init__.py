@@ -57,21 +57,6 @@ from ion.models.case_evidence import (  # noqa: F401
     PinSeverity,
     PinSourceType,
 )
-
-# L1/L2/L3/L4 SOC analyst training course subsystem.
-from ion.models.course import (  # noqa: F401
-    Course,
-    CourseLevel,
-    CourseModule,
-    Lesson,
-    LessonProgressStatus,
-    LessonType,
-    Question,
-    QuestionKind,
-    UserAnswer,
-    UserEnrolment,
-    UserLessonProgress,
-)
 from ion.models.cyab import CyabDataSource, CyabSnapshot, CyabSystem
 from ion.models.cyab_doc_checklist import CyabDocChecklistItem
 from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
@@ -249,6 +234,8 @@ from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeve
 
 # daily-work tracking — manual work-log entries + admin task taxonomy.
 from ion.models.workforce import (  # noqa: F401
+    Course,
+    CourseLevel,
     JourneyRequirement,
     LeaverRecord,
     OrgPost,
@@ -256,6 +243,7 @@ from ion.models.workforce import (  # noqa: F401
     ProfileRequirement,
     RoleProfile,
     RoleProfileVersion,
+    UserEnrolment,
     UserJourney,
 )
 from ion.models.worklog import (  # noqa: F401

@@ -16,6 +16,7 @@ what was this person required to hold on the day they were granted access?
 from __future__ import annotations
 
 from datetime import date, datetime
+from enum import Enum
 from typing import Optional
 
 from sqlalchemy import (
@@ -29,6 +30,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
+)
+from sqlalchemy import (
+    Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -333,3 +338,103 @@ class OrgPost(Base, TimestampMixin):
     unit: Mapped["OrgUnit"] = relationship("OrgUnit", back_populates="posts")
     filled_by: Mapped[Optional["UserJourney"]] = relationship("UserJourney")
     profile: Mapped[Optional["RoleProfile"]] = relationship("RoleProfile")
+
+
+# --- training record --------------------------------------------------------
+# Course, CourseLevel and UserEnrolment moved here when the courseware cluster
+# was archived (see archive/courseware/). The product that authored and
+# delivered courses is gone; the record of what training a person holds is a
+# workforce concern. JourneyRequirement.course_id is a foreign key to
+# courses.id, and sync_course_requirements resolves COURSE requirements from
+# course_enrolments rather than a manual tick.
+#
+# Table names are unchanged, so existing databases need no migration. Columns
+# the courseware wrote but nothing now reads (badge_image_path, pass_threshold,
+# description_md and the rest) are kept deliberately: dropping them would
+# rewrite tables holding real completion history, for no benefit.
+
+
+class CourseLevel(str, Enum):
+    """Training tier — maps to SOC career ladder."""
+    L1 = "L1"
+    L2 = "L2"
+    L3 = "L3"
+    L4 = "L4"
+
+
+class Course(Base):
+    """A training course at a specific tier (L1/L2/L3/L4)."""
+
+    __tablename__ = "courses"
+    __table_args__ = (
+        Index("ix_courses_level", "level"),
+        Index("ix_courses_published", "published"),
+        Index("ix_courses_slug", "slug", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str] = mapped_column(String(255), nullable=False)  # URL-safe, unique
+    level: Mapped[str] = mapped_column(
+        SQLEnum(CourseLevel, native_enum=False), nullable=False
+    )
+    description_md: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    estimated_hours: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    badge_image_path: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Optional prerequisite — UI can lock the course until the prereq is
+    # completed. Self-referential FK so existing v0 courses stay valid.
+    prerequisite_course_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="SET NULL"), nullable=True
+    )
+    order_in_level: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    pass_threshold: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=70
+    )  # percent — quiz lessons need ≥ this to be marked completed
+    published: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    skill_keys: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )  # JSON array — skills bumped on course completion (links to SkillAssessment.skill_key)
+    author_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    def __repr__(self) -> str:
+        return f"<Course(id={self.id}, level={self.level}, title='{self.title}')>"
+
+
+class UserEnrolment(Base):
+    """A user's enrolment in a Course."""
+
+    __tablename__ = "course_enrolments"
+    __table_args__ = (
+        UniqueConstraint("user_id", "course_id", name="uq_course_enrolment_user_course"),
+        Index("ix_course_enrolments_user", "user_id"),
+        Index("ix_course_enrolments_course", "course_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    course_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False
+    )
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=func.now(), nullable=False
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    badge_earned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # URL of generated PDF certificate (v0.11.7+). Nullable until then.
+    certificate_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    # Aggregate score across all quiz lessons (percent). Caches expensive
+    # rollup so the catalog can sort by score without touching UserAnswer.
+    score_pct: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    def __repr__(self) -> str:
+        return f"<UserEnrolment(user={self.user_id}, course={self.course_id}, completed={self.completed_at is not None})>"

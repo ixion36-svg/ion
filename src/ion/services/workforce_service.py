@@ -23,7 +23,6 @@ from typing import List, Optional, Sequence
 
 from sqlalchemy.orm import Session
 
-from ion.models.course import UserEnrolment
 from ion.models.user import AuditLog, User
 from ion.models.workforce import (
     KIND_CERT,
@@ -48,6 +47,7 @@ from ion.models.workforce import (
     ProfileRequirement,
     RoleProfile,
     RoleProfileVersion,
+    UserEnrolment,
     UserJourney,
 )
 

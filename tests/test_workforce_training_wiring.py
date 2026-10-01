@@ -12,10 +12,16 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from ion.models.base import Base
-from ion.models.course import Course, UserEnrolment
 from ion.models.skills import TeamCertification, TrainingPlan, TrainingPlanItem
 from ion.models.user import Permission, Role, User
-from ion.models.workforce import KIND_CERT, KIND_DOCUMENT, PHASE_GATE, PHASE_READINESS
+from ion.models.workforce import (
+    KIND_CERT,
+    KIND_DOCUMENT,
+    PHASE_GATE,
+    PHASE_READINESS,
+    Course,
+    UserEnrolment,
+)
 from ion.services import workforce_service as wf
 
 

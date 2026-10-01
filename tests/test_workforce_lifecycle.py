@@ -14,7 +14,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from ion.models.base import Base
-from ion.models.course import Course, CourseLevel, UserEnrolment
 from ion.models.user import Permission, Role, User
 from ion.models.workforce import (
     KIND_CERT,
@@ -30,6 +29,9 @@ from ion.models.workforce import (
     STAGE_WITHDRAWN,
     STATUS_EXPIRED,
     STATUS_VERIFIED,
+    Course,
+    CourseLevel,
+    UserEnrolment,
 )
 from ion.services import workforce_service as wf
 
