@@ -561,7 +561,7 @@ def export_lesson_pdf(
     if module is None or module.course_id != course.id:
         raise HTTPException(status_code=404, detail="Lesson not found in this course")
 
-    from ion.services.pdf_export_service import render_lesson_pdf
+    from archive.courseware.services.lesson_pdf_export import render_lesson_pdf
 
     slug_safe = re.sub(r"[^A-Za-z0-9._-]+", "_", slug).strip("_")[:50] or "course"
     module_order = str(module.order) if module else "0"

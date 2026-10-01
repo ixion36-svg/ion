@@ -43,13 +43,21 @@ def generate_executive_report(
 
 
 def generate_executive_html(report: dict) -> str:
-    """Render the executive report as standalone HTML (for PDF conversion)."""
+    """Render the executive report as standalone HTML (for PDF conversion).
+
+    The accumulator is named ``out`` rather than ``html`` deliberately: this
+    module imports the stdlib ``html`` module for ``_esc``, and a local named
+    ``html`` shadowed it for the length of this function. Nothing broke, because
+    ``_esc`` resolves the name at module scope — but the first person to reach
+    for ``html.escape`` inside this function would have got ``AttributeError``
+    on a ``str``, in the one place where failing to escape matters.
+    """
     d = report
     c = d["cases"]
     a = d["alerts"]
     t = d["team"]
 
-    html = f"""<!DOCTYPE html>
+    out = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8">
 <title>ION Executive Report</title>
 <style>
@@ -86,24 +94,24 @@ th{{color:#57606a;border-color:#d0d7de}}td{{border-color:#d0d7de}}.footer{{color
 
     # Closure reasons
     if c["closure_reasons"]:
-        html += "<h2>Closure Reasons</h2><table><tr><th>Reason</th><th>Count</th><th>%</th></tr>"
+        out += "<h2>Closure Reasons</h2><table><tr><th>Reason</th><th>Count</th><th>%</th></tr>"
         total = sum(c["closure_reasons"].values())
         for reason, count in sorted(c["closure_reasons"].items(), key=lambda x: -x[1]):
             pct = round(count / total * 100) if total else 0
-            html += f"<tr><td>{_esc(reason.replace('_', ' ').title())}</td><td>{_esc(count)}</td><td>{_esc(pct)}%</td></tr>"
-        html += "</table>"
+            out += f"<tr><td>{_esc(reason.replace('_', ' ').title())}</td><td>{_esc(count)}</td><td>{_esc(pct)}%</td></tr>"
+        out += "</table>"
 
     # Severity breakdown
     if c["by_severity"]:
-        html += "<h2>Cases by Severity</h2><table><tr><th>Severity</th><th>Opened</th></tr>"
+        out += "<h2>Cases by Severity</h2><table><tr><th>Severity</th><th>Opened</th></tr>"
         for sev in ["critical", "high", "medium", "low"]:
             cnt = c["by_severity"].get(sev, 0)
             if cnt:
-                html += f'<tr><td class="sev-{_esc(sev)}">{_esc(sev.title())}</td><td>{_esc(cnt)}</td></tr>'
-        html += "</table>"
+                out += f'<tr><td class="sev-{_esc(sev)}">{_esc(sev.title())}</td><td>{_esc(cnt)}</td></tr>'
+        out += "</table>"
 
     # Alert metrics
-    html += f"""<h2>Alert Metrics</h2>
+    out += f"""<h2>Alert Metrics</h2>
 <div class="stats">
 <div class="stat"><div class="stat-val">{_esc(a['total_triaged'])}</div><div class="stat-label">Alerts Triaged</div></div>
 <div class="stat"><div class="stat-val">{_esc(a['analysts_active'])}</div><div class="stat-label">Analysts Active</div></div>
@@ -111,29 +119,29 @@ th{{color:#57606a;border-color:#d0d7de}}td{{border-color:#d0d7de}}.footer{{color
 
     # Team
     if t["analysts"]:
-        html += "<h2>Team Performance</h2><table><tr><th>Analyst</th><th>Cases Closed</th><th>Actions</th></tr>"
+        out += "<h2>Team Performance</h2><table><tr><th>Analyst</th><th>Cases Closed</th><th>Actions</th></tr>"
         for analyst in t["analysts"][:10]:
-            html += f"<tr><td>{_esc(analyst['username'])}</td><td>{_esc(analyst['cases_closed'])}</td><td>{_esc(analyst['total_actions'])}</td></tr>"
-        html += "</table>"
+            out += f"<tr><td>{_esc(analyst['username'])}</td><td>{_esc(analyst['cases_closed'])}</td><td>{_esc(analyst['total_actions'])}</td></tr>"
+        out += "</table>"
 
     # Notable incidents
     incidents = d.get("notable_incidents", [])
     if incidents:
-        html += "<h2>Notable Incidents</h2><table><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th></tr>"
+        out += "<h2>Notable Incidents</h2><table><tr><th>Case</th><th>Title</th><th>Severity</th><th>Status</th></tr>"
         for inc in incidents[:10]:
-            html += f'<tr><td>{_esc(inc["case_number"])}</td><td>{_esc(inc["title"])}</td><td class="sev-{_esc(inc["severity"])}">{_esc(inc["severity"])}</td><td>{_esc(inc["status"])}</td></tr>'
-        html += "</table>"
+            out += f'<tr><td>{_esc(inc["case_number"])}</td><td>{_esc(inc["title"])}</td><td class="sev-{_esc(inc["severity"])}">{_esc(inc["severity"])}</td><td>{_esc(inc["status"])}</td></tr>'
+        out += "</table>"
 
     # Trends
     trends = d.get("trends", {})
     if trends.get("daily"):
-        html += "<h2>Daily Activity Trend</h2><table><tr><th>Date</th><th>Opened</th><th>Closed</th></tr>"
+        out += "<h2>Daily Activity Trend</h2><table><tr><th>Date</th><th>Opened</th><th>Closed</th></tr>"
         for day in trends["daily"]:
-            html += f"<tr><td>{_esc(day['date'])}</td><td>{_esc(day['opened'])}</td><td>{_esc(day['closed'])}</td></tr>"
-        html += "</table>"
+            out += f"<tr><td>{_esc(day['date'])}</td><td>{_esc(day['opened'])}</td><td>{_esc(day['closed'])}</td></tr>"
+        out += "</table>"
 
-    html += '<div class="footer">Generated by ION — Intelligent Operating Network</div></body></html>'
-    return html
+    out += '<div class="footer">Generated by ION — Intelligent Operating Network</div></body></html>'
+    return out
 
 
 def generate_executive_pdf(report: dict) -> Optional[bytes]:
