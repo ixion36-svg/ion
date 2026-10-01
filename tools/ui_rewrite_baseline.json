@@ -698,27 +698,6 @@
     "ion_style_hooks": 0,
     "raw_inline_styles": 0
   },
-  "emails/alert_digest.html": {
-    "lines": 93,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 25
-  },
-  "emails/case_update.html": {
-    "lines": 101,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 31
-  },
-  "emails/sla_breach.html": {
-    "lines": 84,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 25
-  },
   "entity_timeline.html": {
     "lines": 225,
     "hashed_classes": [

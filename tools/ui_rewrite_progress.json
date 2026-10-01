@@ -147,15 +147,6 @@
     "convert": true,
     "restyle": true
   },
-  "emails/alert_digest.html": {
-    "convert": true
-  },
-  "emails/case_update.html": {
-    "convert": true
-  },
-  "emails/sla_breach.html": {
-    "convert": true
-  },
   "entity_timeline.html": {
     "convert": true,
     "restyle": true
