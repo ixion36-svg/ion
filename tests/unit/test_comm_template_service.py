@@ -309,6 +309,76 @@ class TestSeedingGate:
             "an analyst's own"
         ]
 
+    def test_startup_commits_when_it_seeded(self, session):
+        """The startup wrapper owns the session lifecycle and the conditional
+        commit. A missing commit would discard the seed silently."""
+        commits = []
+        closed = []
+
+        class _Session:
+            def __getattr__(self, name):
+                return getattr(session, name)
+
+            def commit(self):
+                commits.append(1)
+                session.flush()
+
+            def close(self):
+                closed.append(1)
+
+        seeded = svc.seed_default_templates_at_startup(
+            lambda: _Session(), enabled=True,
+        )
+
+        assert seeded == len(svc.DEFAULT_TEMPLATES)
+        assert commits == [1]
+        assert closed == [1]
+
+    def test_startup_does_not_commit_when_it_seeded_nothing(self, session):
+        """An empty transaction on every boot is the cost of committing
+        unconditionally, and the disabled path is every boot by default."""
+        commits = []
+        closed = []
+
+        class _Session:
+            def __getattr__(self, name):
+                return getattr(session, name)
+
+            def commit(self):
+                commits.append(1)
+
+            def close(self):
+                closed.append(1)
+
+        seeded = svc.seed_default_templates_at_startup(
+            lambda: _Session(), enabled=False,
+        )
+
+        assert seeded == 0
+        assert commits == []
+        assert closed == [1]
+
+    def test_startup_closes_the_session_even_when_seeding_raises(self, session):
+        """A leaked connection at boot is worse than a failed seed."""
+        closed = []
+
+        class _Session:
+            def __getattr__(self, name):
+                return getattr(session, name)
+
+            def execute(self, *a, **k):
+                raise RuntimeError("database not migrated yet")
+
+            def close(self):
+                closed.append(1)
+
+        with pytest.raises(RuntimeError):
+            svc.seed_default_templates_at_startup(
+                lambda: _Session(), enabled=True,
+            )
+
+        assert closed == [1]
+
     def test_the_flag_defaults_to_off_in_config(self):
         """If this ever defaults to True, every boot writes to production."""
         from ion.core.config import Config

@@ -906,18 +906,13 @@ async def _startup_event():
     # ---------------------------------------------------------------
     def _seed_comm_templates():
         from ion.services.comm_template_service import (
-            seed_default_templates_if_enabled,
+            seed_default_templates_at_startup,
         )
-        session = factory()
-        try:
-            seeded = seed_default_templates_if_enabled(
-                session, enabled=config.comm_templates_seed,
-            )
-            if seeded:
-                session.commit()
-                logger.info("Seeded %d default communication templates", seeded)
-        finally:
-            session.close()
+        seeded = seed_default_templates_at_startup(
+            factory, enabled=config.comm_templates_seed,
+        )
+        if seeded:
+            logger.info("Seeded %d default communication templates", seeded)
     run_locked(
         engine, LOCK_SEED_COMM_TEMPLATES, "seed_comm_templates",
         _seed_comm_templates,

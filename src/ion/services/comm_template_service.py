@@ -298,6 +298,27 @@ def render_template(session: Session, template_id: int, variables: dict) -> dict
     }
 
 
+def seed_default_templates_at_startup(session_factory, *, enabled: bool) -> int:
+    """Open a session, seed if enabled, commit only if anything was inserted.
+
+    This exists so the startup hook is a one-line call instead of a closure
+    nobody can reach: the session lifecycle and the conditional commit are the
+    part most likely to be got wrong (a commit on the disabled path would write
+    an empty transaction every boot; a missing commit would silently discard the
+    seed), and as a closure inside `_init_database` neither could be tested.
+
+    Returns the number of rows inserted.
+    """
+    session = session_factory()
+    try:
+        seeded = seed_default_templates_if_enabled(session, enabled=enabled)
+        if seeded:
+            session.commit()
+        return seeded
+    finally:
+        session.close()
+
+
 def seed_default_templates_if_enabled(session: Session, *, enabled: bool) -> int:
     """Seed the default templates only when an operator has opted in.
 
