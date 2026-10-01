@@ -58,9 +58,6 @@ from ion.models.case_evidence import (  # noqa: F401
     PinSourceType,
 )
 from ion.models.cyab import CyabDataSource, CyabSnapshot, CyabSystem
-from ion.models.cyab_doc_checklist import CyabDocChecklistItem
-from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
-from ion.models.cyab_wizard import CyabWizardSession  # noqa: F401
 from ion.models.detection_proposal import (  # noqa: F401
     DetectionProposal,
     DetectionProposalChangeType,
@@ -370,9 +367,6 @@ __all__ = [
     "CyabSystem",
     "CyabDataSource",
     "CyabSnapshot",
-    "CyabPillar",
-    "CyabSubProfile",
-    "CyabWizardSession",
     # Canary / deception
     "Canary",
     "CanaryHit",

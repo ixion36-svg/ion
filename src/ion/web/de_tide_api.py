@@ -30,16 +30,97 @@ from ion.auth.dependencies import (
 from ion.core.concurrency import map_bounded
 from ion.core.safe_errors import safe_error
 from ion.models.cyab import (
+    CyabDataSource,
     CyabSystem,
 )
 from ion.services.elasticsearch_service import ElasticsearchService
 from ion.services.tide_service import get_tide_service
 from ion.web.api import get_db_session
-from ion.web.cyab_api import _SEV_ORDER, _system_to_dict
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# Helpers inlined from cyab_api when the CyAB cluster was archived. These
+# four were its only part this module needed, and nothing else reads them
+# now, so they live here rather than in a shared module with one caller.
+
+_SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+
+def _parse_json(val: Optional[str]):
+    if not val:
+        return None
+    try:
+        return json.loads(val)
+    except (ValueError, TypeError):
+        return None
+
+
+def _ds_to_dict(ds: CyabDataSource) -> dict:
+    return {
+        "id": ds.id,
+        "system_id": ds.system_id,
+        "name": ds.name,
+        "data_source_type": ds.data_source_type,
+        "icon": ds.icon,
+        "sal_tier": ds.sal_tier,
+        "uptime_target": ds.uptime_target,
+        "max_latency": ds.max_latency,
+        "retention": ds.retention,
+        "p1_sla": ds.p1_sla,
+        "field_mapping": _parse_json(ds.field_mapping),
+        "field_mapping_score": ds.field_mapping_score,
+        "mandatory_score": ds.mandatory_score,
+        "readiness_score": ds.readiness_score,
+        "risk_rating": ds.risk_rating,
+        "sal_compliance": ds.sal_compliance,
+        "field_notes": ds.field_notes,
+        "use_case_status": ds.use_case_status,
+        "use_case_review_date": ds.use_case_review_date.isoformat() if ds.use_case_review_date else None,
+        "use_case_gaps": ds.use_case_gaps,
+        "use_case_remediation": ds.use_case_remediation,
+        "tide_system_id": ds.tide_system_id,
+        "data_namespace": ds.data_namespace,
+        "created_at": ds.created_at.isoformat() if ds.created_at else None,
+        "updated_at": ds.updated_at.isoformat() if ds.updated_at else None,
+    }
+
+
+def _system_to_dict(s: CyabSystem, include_sources: bool = False) -> dict:
+    d = {
+        "id": s.id,
+        "name": s.name,
+        "department": s.department,
+        "department_lead": s.department_lead,
+        "soc_team": s.soc_team,
+        "soc_lead": s.soc_lead,
+        "reference": s.reference,
+        "version": s.version,
+        "status": s.status,
+        "icon": s.icon or "monitor",
+        "tags": _parse_json(s.tags) or [],
+        "readiness_score": s.readiness_score,
+        "field_mapping_score": s.field_mapping_score,
+        "mandatory_score": s.mandatory_score,
+        "risk_rating": s.risk_rating,
+        "sal_compliance": s.sal_compliance,
+        "review_cadence_days": s.review_cadence_days,
+        "next_review_date": s.next_review_date.isoformat() if s.next_review_date else None,
+        "last_reviewed_date": s.last_reviewed_date.isoformat() if s.last_reviewed_date else None,
+        "sign_dept_name": s.sign_dept_name,
+        "sign_dept_date": s.sign_dept_date.isoformat() if s.sign_dept_date else None,
+        "sign_soc_name": s.sign_soc_name,
+        "sign_soc_date": s.sign_soc_date.isoformat() if s.sign_soc_date else None,
+        "created_by": s.created_by,
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "updated_at": s.updated_at.isoformat() if s.updated_at else None,
+        "data_source_count": len(s.data_sources) if s.data_sources else 0,
+    }
+    if include_sources:
+        d["data_sources"] = [_ds_to_dict(ds) for ds in (s.data_sources or [])]
+    return d
 
 
 # ---------------------------------------------------------------------------

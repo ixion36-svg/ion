@@ -14,11 +14,32 @@ boundary has leaked and the import is the bug, not the exclusion.
 | Cluster | Archived | What it was |
 |---|---|---|
 | `courseware/` | v0.99.5 | L1–L4 SOC training courses: enrolment, lessons, quizzes, PDF certificates, the scored training simulator, and the 1.4 MB course seed. |
-| `cyber_range/` | v0.99.5 | Hands-on lab exercises and the Kali/DVWA/JuiceShop range: lab grading and sessions, replayable lab fixtures, adversary emulation, and the range compose file. |
+| `cyber_range/` | v0.99.5 | Hands-on lab exercises and the Kali/DVWA/JuiceShop range: lab grading and sessions, replayable lab fixtures, and the range compose file. Adversary emulation was archived here in error and restored to `src/` — it verifies that expected detections fired, so it belongs to Detection Engineering. |
+| `cyab/` | v0.99.5 | CyAB — the system onboarding and assurance workbench: the assessment questionnaire, sub-profile catalogue, scoping and onboarding wizards, documentation checklist, sign-off packs, fleet coverage matrix and audit feed, plus the whole `/cyab` UI. |
 
 The two were archived together because they are one subsystem: labs are
 LAB-type lessons inside seeded courses, `labs_api` resolved them through
 `Course`, and `seed_lab_fixtures.py` runs only after `seed_courses.py`.
+
+### What CyAB left behind in `src/`
+
+Two pieces stayed, because live features read them rather than the CyAB UI:
+
+- `models/cyab.py` — `CyabSystem` and `CyabDataSource` are the asset registry.
+  A data source carries the Elasticsearch `data_namespace` and the
+  `tide_system_id` it maps to.
+- `services/system_resolver_service.py` — resolves an alert's `source_system`
+  namespace through that registry to a CyAB system *and a TIDE system*.
+  `elasticsearch_api` stamps `cyab_system_name` and `tide_system_id` onto
+  every alert in the queue from it, and `analytics_api` and `de_tide_api`
+  read the same tables to scope TIDE rules and use cases.
+
+So the registry tables are live data, not archive fodder. What left was the
+workbench on top of them: the questionnaire, sub-profiles, wizards,
+checklists, sign-off and the `/cyab` pages. `CyabSnapshot`, `CyabAssessment`
+and `CyabSystemAssessment` stay declared in `models/cyab.py` even though
+nothing reads them now, because their tables hold data.
+
 
 ## Restoring
 

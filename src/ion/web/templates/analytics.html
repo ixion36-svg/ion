@@ -1613,7 +1613,7 @@ function buildSysCard(sys) {
     // Unmapped badge
     let unmappedHtml = '';
     if (!isMapped) {
-        unmappedHtml = `<div class="sys-unmapped-badge">Not mapped to CyAB — <a href="/cyab">configure in CyAB</a></div>`;
+        unmappedHtml = `<div class="sys-unmapped-badge">No system mapping for this namespace</div>`;
     }
 
     return `<div class="sys-card ${isMapped ? 'mapped' : ''}">
