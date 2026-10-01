@@ -21,7 +21,6 @@ from ion.models.alert_triage import AlertCase, AlertCaseStatus
 from ion.models.user import User
 from ion.services import soc_health_service as svc
 
-
 # --- helpers ---------------------------------------------------------------
 
 class _Tide:
