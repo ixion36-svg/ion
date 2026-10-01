@@ -259,6 +259,10 @@ omit = [
     "src/ion/services/soc_template_service.py",
     "src/ion/services/soc_maturity_seed.py",
     "src/ion/services/forensic_seed_service.py",
+    # A manual smoke script, not a module the app loads: its own docstring
+    # says to run it with `python -m ion.services._pii_anon_smoke` and eyeball
+    # the tokenisation. 0% is the correct reading for it, not a gap.
+    "src/ion/services/_pii_anon_smoke.py",
 ]
 
 [tool.coverage.report]

@@ -16,10 +16,31 @@ boundary has leaked and the import is the bug, not the exclusion.
 | `courseware/` | v0.99.5 | L1–L4 SOC training courses: enrolment, lessons, quizzes, PDF certificates, the scored training simulator, and the 1.4 MB course seed. |
 | `cyber_range/` | v0.99.5 | Hands-on lab exercises and the Kali/DVWA/JuiceShop range: lab grading and sessions, replayable lab fixtures, and the range compose file. Adversary emulation was archived here in error and restored to `src/` — it verifies that expected detections fired, so it belongs to Detection Engineering. |
 | `cyab/` | v0.99.5 | CyAB — the system onboarding and assurance workbench: the assessment questionnaire, sub-profile catalogue, scoping and onboarding wizards, documentation checklist, sign-off packs, fleet coverage matrix and audit feed, plus the whole `/cyab` UI. |
+| `unwired/` | v0.99.5 | Seven services nothing ever called, found by the first coverage run: AI document analysis (superseded by `large_doc_service`), email notifications and the SMTP service under them, SLA policies, the change log, dashboard layouts, and saved searches (superseded by `SavedSearchRepository`). With their five model classes and the three email templates. |
 
 The two were archived together because they are one subsystem: labs are
 LAB-type lessons inside seeded courses, `labs_api` resolved them through
 `Course`, and `seed_lab_fixtures.py` runs only after `seed_courses.py`.
+
+### Why `unwired/` is different
+
+The other three clusters were working features someone decided to stop
+shipping. These seven were never reachable at all: no route, no caller, no
+test, in any released version. The coverage ratchet found them — they were
+the only modules at 0% with nothing importing them.
+
+`smtp_service` went with them by cascade: `notification_service` was its only
+caller, so sending mail became unreachable the moment that left. If email is
+wanted later, both come back together.
+
+Two were superseded rather than abandoned. `/saved-searches` is live and
+always went through `storage/saved_search_repository.py`; `saved_search_service`
+was a second implementation nothing picked up. `large_doc_service` does what
+`ai_document_service` describes.
+
+Not archived, but dead by the same test and worth a decision: `OnCallRoster`,
+`EscalationPolicy` and `EscalationLog` in `models/oncall.py` have zero
+references anywhere, and `models/__init__.py` does not even export them.
 
 ### What CyAB left behind in `src/`
 

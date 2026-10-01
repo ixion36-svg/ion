@@ -113,21 +113,6 @@ class ServiceAccount(Base, TimestampMixin):
     last_reviewed_by = relationship("User", foreign_keys=[last_reviewed_by_id])
 
 
-class UserBookmark(Base, TimestampMixin):
-    """User's bookmarked searches and workspace shortcuts."""
-
-    __tablename__ = "user_bookmarks"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    search_type: Mapped[str] = mapped_column(String(50), nullable=False)  # alert, case, observable, discover, entity_timeline
-    query: Mapped[str] = mapped_column(Text, nullable=False)  # the search query or filter JSON
-    is_pinned: Mapped[bool] = mapped_column(Boolean, default=False)
-    use_count: Mapped[int] = mapped_column(Integer, default=0)
-    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-
-
 class CommTemplate(Base, TimestampMixin):
     """Communication templates for incident notifications."""
 
@@ -143,23 +128,3 @@ class CommTemplate(Base, TimestampMixin):
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)
 
     created_by = relationship("User", foreign_keys=[created_by_id])
-
-
-class ChangeLogEntry(Base, TimestampMixin):
-    """Change management log — tracks config/rule/system changes with approval."""
-
-    __tablename__ = "change_log"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    change_type: Mapped[str] = mapped_column(String(50), nullable=False)  # detection_rule, integration, config, user, policy
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    changed_by_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    approved_by_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="applied")  # proposed, approved, applied, rolled_back
-    rollback_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    affected_systems: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list
-    risk_level: Mapped[str] = mapped_column(String(20), nullable=False, default="low")  # critical, high, medium, low
-
-    changed_by = relationship("User", foreign_keys=[changed_by_id])
-    approved_by = relationship("User", foreign_keys=[approved_by_id])

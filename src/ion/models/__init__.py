@@ -136,10 +136,8 @@ from ion.models.observable import (
     WatchlistAlertType,
 )
 from ion.models.oncall import (
-    ChangeLogEntry,
     CommTemplate,
     ServiceAccount,
-    UserBookmark,
 )
 from ion.models.playbook import (
     ExecutionStatus,
@@ -188,13 +186,12 @@ from ion.models.skills import (
     UserCareerGoal,
 )
 from ion.models.sla import (
-    DashboardLayout,
     PlaybookAction,
     PlaybookActionLog,
     ScheduledReport,
-    SLABreachLog,
-    SLAPolicy,
     # ThreatHunt removed v0.27.0; see ion/models/sla.py for the removal note.
+    # SLAPolicy, SLABreachLog and DashboardLayout went to archive/unwired
+    # with the services that were their only callers.
 )
 
 # JSON-DAG playbook automation (Tines-inspired).

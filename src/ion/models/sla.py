@@ -6,7 +6,6 @@ from typing import Optional
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Float,
     ForeignKey,
     Integer,
     String,
@@ -16,51 +15,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ion.models.base import Base, TimestampMixin
 
-
-class SLAPolicy(Base, TimestampMixin):
-    """SLA response time targets per severity level."""
-
-    __tablename__ = "sla_policies"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    severity: Mapped[str] = mapped_column(String(20), nullable=False, unique=True)  # critical, high, medium, low
-    acknowledge_minutes: Mapped[int] = mapped_column(Integer, nullable=False)  # target time to acknowledge
-    resolve_minutes: Mapped[int] = mapped_column(Integer, nullable=False)  # target time to resolve
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-
-
-class SLABreachLog(Base, TimestampMixin):
-    """Log of SLA breaches — when response targets were missed."""
-
-    __tablename__ = "sla_breach_log"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    case_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("alert_cases.id"), nullable=True)
-    alert_id: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    severity: Mapped[str] = mapped_column(String(20), nullable=False)
-    breach_type: Mapped[str] = mapped_column(String(20), nullable=False)  # acknowledge, resolve
-    target_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
-    actual_minutes: Mapped[float] = mapped_column(Float, nullable=False)
-    exceeded_by_minutes: Mapped[float] = mapped_column(Float, nullable=False)
-
-
 # ThreatHunt model removed alongside the half-built
 # /threat-hunting page + threat_hunt_api. The threat_hunts table is
 # dropped via the migration in storage/database.py. Hunt workflow
 # now lives in /discover (queries) + /cases (findings); the parallel
 # CRUD surface never integrated with either.
-
-
-class DashboardLayout(Base, TimestampMixin):
-    """Per-user dashboard widget layout."""
-
-    __tablename__ = "dashboard_layouts"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
-    widgets: Mapped[str] = mapped_column(Text, nullable=False, default="[]")  # JSON array of {widget_id, position, size, visible}
-    theme_overrides: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON
 
 
 class ScheduledReport(Base, TimestampMixin):
