@@ -104,6 +104,7 @@ dependencies = [
 dev = [
     "pytest>=9.0.3",  # CVE-2025-71176: /tmp race (Unix)
     "pytest-cov",
+    "diff-cover",     # v0.100.0: gates coverage on CHANGED lines, not the total
     "ruff",
     "mypy",
 ]
@@ -234,3 +235,36 @@ strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+# ---------------------------------------------------------------------------
+# Coverage (v0.100.0)
+#
+# The gate that matters is on CHANGED lines, not the total — see the
+# `coverage` job in .github/workflows/test.yml. A global threshold would
+# demand backfilling every untested module before anything could merge, so
+# it would be waived inside a week. The total is held by a monotonic floor
+# in .coverage-floor instead: it may only ever rise.
+#
+# `omit` covers content masquerading as code. src/ion/data is ~125k lines of
+# knowledge-base prose in .py files, and the three service modules below are
+# Jinja2 templates and seed rows with a handful of functions between them.
+# Counting their untouched lines would move the headline number without
+# telling anyone anything about the logic.
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src/ion"]
+branch = true
+omit = [
+    "src/ion/data/*",
+    "src/ion/services/soc_template_service.py",
+    "src/ion/services/soc_maturity_seed.py",
+    "src/ion/services/forensic_seed_service.py",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "@overload",
+    "if __name__ == .__main__.:",
+]

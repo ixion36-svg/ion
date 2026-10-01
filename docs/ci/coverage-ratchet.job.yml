@@ -1,0 +1,64 @@
+# The coverage-ratchet CI job.
+#
+# This file is NOT a workflow. It is the `cov` job, kept here because the
+# session that wrote it could not push to .github/workflows/ (the GitHub
+# OAuth app lacks the `workflow` scope). Paste the job below into
+# .github/workflows/test.yml alongside the existing five jobs — it is
+# independent of them, so a coverage failure will not mask a lint failure —
+# then delete this file.
+#
+# It pairs with [tool.coverage.run] in pyproject.toml and the .coverage-floor
+# file at the repo root. Both are already committed.
+#
+# What it does:
+#   - On a pull request, diff-cover fails the build when fewer than 80% of
+#     the lines CHANGED by that PR are covered. Existing gaps are
+#     grandfathered: nobody has to backfill an untested module to merge a
+#     one-line fix.
+#   - On every run, it holds the project total at or above .coverage-floor.
+#     The floor may only ever rise. Raise it by hand after a scope cut —
+#     deleting untested code lifts the total without a test being written,
+#     and a floor left behind goes slack exactly when it looks like it is
+#     working.
+
+  cov:
+    name: coverage ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # diff-cover compares against the base branch, so it needs real history.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run the suite under coverage
+        run: pytest tests/ -q --tb=short --cov --cov-report=xml --cov-report=term
+
+      - name: Gate changed lines
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          diff-cover coverage.xml \
+            --compare-branch="origin/${{ github.base_ref }}" --fail-under=80
+
+      - name: Hold the floor
+        run: |
+          floor=$(tr -d " \t\n" < .coverage-floor)
+          total=$(python -c "import xml.etree.ElementTree as E; \
+            print(round(float(E.parse('coverage.xml').getroot().get('line-rate')) * 100, 2))")
+          echo "total=${total}%  floor=${floor}%"
+          awk -v t="$total" -v f="$floor" 'BEGIN { exit !(t + 0.005 >= f) }' || {
+            echo "::error::coverage ${total}% is below the floor ${floor}% in .coverage-floor"
+            exit 1
+          }
