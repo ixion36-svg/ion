@@ -390,6 +390,25 @@ def _run_migrations(engine: Engine) -> None:
             conn.execute(text("DROP TABLE threat_hunts"))
             logger.info("Migrated: dropped threat_hunts table (v0.27.0)")
 
+    # drop the scheduled_reports table — report_scheduler_service was its only
+    # reader and has been archived. The service was orphaned by the v0.26.0
+    # route audit (its router went; the CHANGELOG recorded that the service
+    # "remains", which was never true) and `scheduler_service` supersedes it.
+    #
+    # Portable by construction rather than by dialect branch: `has_table` is
+    # asked through SQLAlchemy's inspector and plain `DROP TABLE` is valid on
+    # both backends, so this runs identically under the SQLite the test suite
+    # uses and the PostgreSQL production runs. The table's only foreign key
+    # points OUT (created_by_id -> users.id) and nothing references it, so
+    # there is no dependent object to drop first and no CASCADE needed.
+    if insp.has_table("scheduled_reports"):
+        with engine.begin() as conn:
+            conn.execute(text("DROP TABLE scheduled_reports"))
+            logger.info(
+                "Migrated: dropped scheduled_reports "
+                "(report_scheduler_service archived; scheduler_service replaces it)"
+            )
+
     # KB RAG moved from whole-document vectors to chunk-level
     # (kb_chunk_embeddings — created by create_all). The retired per-doc
     # table is dropped without preserving data: embeddings are regenerable,

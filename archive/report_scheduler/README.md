@@ -24,13 +24,21 @@ an advisory-locked single-worker loop, `JobExecution` rows, and a wired
 `scheduler_api`. It supersedes this module in every respect. Anything that
 needs a daily report should register a handler there.
 
-## What is kept live
+## The model went too
 
-`ScheduledReport` (`src/ion/models/sla.py`) stays declared even though this was
-its only reader. The `scheduled_reports` table exists in deployed databases;
-dropping the model would take it out of `Base.metadata` and out of step with the
-migration history, which is how the CyAB `data_sources` FK drifted. Retiring the
-model and the table is a migration, not an archive move.
+`ScheduledReport` has since been removed from `src/ion/models/sla.py` and the
+`scheduled_reports` table is dropped by the idempotent sweep in
+`storage/database.py` (ION has no Alembic; that sweep is where schema changes
+live, alongside the `notifications`, `threat_hunts` and `kb_document_embeddings`
+drops that set the pattern). So the `from ion.models.sla import ScheduledReport`
+at the top of this module no longer resolves.
+
+That is expected of archived code and matches `archive/courseware/`, whose
+modules import archived models. Reviving this module means restoring the model
+and the table alongside it — at which point `scheduler_service` is almost
+certainly the better place to put the work.
+
+## What is kept live
 
 `_dispatch_report` called four services that are all still live and now tested:
 `executive_report_service`, `soc_health_service`, `shift_handover_service` and

@@ -1,11 +1,15 @@
-"""SLA targets, threat hunting, dashboard widgets, reporting schedule, playbook actions."""
+"""Playbook action definitions and their execution log.
 
-from datetime import datetime
+Named for the SLA/reporting models it used to hold. SLAPolicy,
+SLABreachLog, DashboardLayout, ThreatHunt and ScheduledReport have all
+been removed with the services that were their only callers; the removal
+notes below record which went when and why.
+"""
+
 from typing import Optional
 
 from sqlalchemy import (
     Boolean,
-    DateTime,
     ForeignKey,
     Integer,
     String,
@@ -22,26 +26,13 @@ from ion.models.base import Base, TimestampMixin
 # CRUD surface never integrated with either.
 
 
-class ScheduledReport(Base, TimestampMixin):
-    """Scheduled report generation config."""
-
-    __tablename__ = "scheduled_reports"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    report_type: Mapped[str] = mapped_column(String(50), nullable=False)  # executive, shift_handover, soc_health, compliance
-    schedule: Mapped[str] = mapped_column(String(50), nullable=False)  # daily, weekly, monthly
-    day_of_week: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 0=Mon for weekly
-    day_of_month: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # 1-28 for monthly
-    time_utc: Mapped[Optional[str]] = mapped_column(String(5), nullable=True)  # HH:MM
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_by_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False)
-    last_run_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    last_result: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON: {status, file_path, error}
-    recipients: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON list of user_ids
-    config: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON: report-specific params (days, etc.)
-
-    created_by = relationship("User", foreign_keys=[created_by_id])
+# ScheduledReport model removed alongside report_scheduler_service, which
+# was its only reader. The service was orphaned by the v0.26.0 route audit
+# (its router went, and the CHANGELOG's claim that the service "remains"
+# was never true of this one) and `scheduler_service` supersedes it with
+# generic crontab expressions, a handler registry and a wired API. The
+# scheduled_reports table is dropped via the migration in
+# storage/database.py.
 
 
 class PlaybookAction(Base, TimestampMixin):

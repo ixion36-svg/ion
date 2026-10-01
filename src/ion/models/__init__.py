@@ -188,8 +188,8 @@ from ion.models.skills import (
 from ion.models.sla import (
     PlaybookAction,
     PlaybookActionLog,
-    ScheduledReport,
-    # ThreatHunt removed v0.27.0; see ion/models/sla.py for the removal note.
+    # ScheduledReport removed with report_scheduler_service; ThreatHunt
+    # removed v0.27.0. See ion/models/sla.py for both removal notes.
     # SLAPolicy, SLABreachLog and DashboardLayout went to archive/unwired
     # with the services that were their only callers.
 )
