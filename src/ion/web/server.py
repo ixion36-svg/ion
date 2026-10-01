@@ -64,6 +64,7 @@ from ion.web.cyab_api import router as cyab_router
 from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.de_api import router as de_router
+from ion.web.de_tide_api import router as de_tide_router
 from ion.web.detection_health_api import router as detection_health_router
 from ion.web.elasticsearch_api import router as elasticsearch_router
 from ion.web.emulation_api import router as emulation_router
@@ -418,6 +419,9 @@ app.include_router(forensic_workbench_router, prefix="/api/forensics")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
 app.include_router(cyab_router, prefix="/api/cyab")
+# TIDE + Detection Engineering endpoints, extracted from cyab_api. Mounted on
+# the same prefix so every /api/cyab/tide/... path is unchanged.
+app.include_router(de_tide_router, prefix="/api/cyab")
 app.include_router(wallboard_router, prefix="")
 # translator — page route + /api/translator/* routes share the
 # same router so it owns its own prefixes internally.
