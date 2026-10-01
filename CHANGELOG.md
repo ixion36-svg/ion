@@ -1,13 +1,52 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.4 -->
-<!-- ion-doc:version=0.99.4 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.5 -->
+<!-- ion-doc:version=0.99.5 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-09-28 -->
+<!-- ion-doc:date=2026-10-01 -->
 
 # Changelog
+
+## v0.99.5 — 2026-10-01
+
+**The case window becomes the analyst's to arrange, and the AI stops judging alerts cold.**
+
+**Arranged case sections.** Every section of `/cases/{id}` is now a defined
+box in one of three folding columns: drag it by its handle to any column,
+fold it from its title, hide it from the header's Sections menu, or start
+from the Triage, Dossier or Review presets. One arrangement is remembered
+per analyst for all cases, and a section a case doesn't have keeps its saved
+place, so arranging a small case never forgets a fuller one. The header
+gains previous/next case navigation. The pattern follows TIDE v6's rule and
+technique windows, so the two tools feel like one shop.
+
+**The alert detail on /alerts drops its nine tabs** for the same stacked
+sections the case page already used: working material (fields, guide, raw
+data, Auto-Investigate) on the left, context (case, related, timeline,
+notes) on the right, folding per analyst, raw data folded by default. The
+investigation guide is capped and scrolls inside its own box — a long rule
+note no longer pushes every later section off the bottom of the screen.
+
+**AI analysis now gets the whole picture.** Analyze an alert and the model
+receives the rule's own description and investigation guide plus the SOC's
+first-party history inside the same trust fence: how this rule's recent
+alerts were resolved, up to five prior cases with closure reasons, active
+known-false-positive patterns, and the host's other cases — with explicit
+instruction to treat a repeatedly-FP'd rule with scepticism and an
+already-cased host with urgency.
+
+**Rule names survive every path to a case.** Extraction now reads
+`kibana.alert.rule.name`, `signal.rule.name` and `rule.name`, flat or
+nested; and adding selected alerts to an existing case carries their names
+instead of creating nameless triage rows — the reason a case's alert rail
+sometimes showed raw document ids.
+
+**Removed:** the case-level "Get Bob's analysis" and "Auto-Investigate"
+buttons, whose output landed in panels the page layout never showed (the
+per-alert Auto-Investigate section stays), and the Discuss chat jump on the
+cases page only.
 
 ## v0.99.4 — 2026-09-28
 
