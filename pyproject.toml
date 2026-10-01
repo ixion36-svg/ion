@@ -128,6 +128,10 @@ ion = ["web/static/**/*", "web/templates/**/*", "data/**/*.md", "data/**/*.yaml"
 # payloads) still get flagged.
 line-length = 200
 target-version = "py311"
+# Archived feature clusters are kept for reference only — not linted, not
+# packaged (packages.find reads src/ alone), not collected by pytest
+# (testpaths = tests), and not in the Docker context (.dockerignore).
+exclude = ["archive"]
 
 # Content-heavy data/seed modules — long single-line dict entries are intentional.
 [tool.ruff.lint.per-file-ignores]

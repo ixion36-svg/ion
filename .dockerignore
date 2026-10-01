@@ -48,3 +48,6 @@ scripts/
 *.md
 *.txt
 !requirements.txt
+
+# Archived feature clusters (reference only, never shipped)
+archive/

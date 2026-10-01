@@ -60,9 +60,7 @@ from ion.web.case_similarity_api import router as case_similarity_router
 from ion.web.change_request_api import router as change_request_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.compliance_api import router as compliance_router
-from ion.web.course_api import router as course_router
 from ion.web.cyab_api import router as cyab_router
-from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.de_api import router as de_router
@@ -85,7 +83,6 @@ from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.kev_api import router as kev_router
 from ion.web.kibana_api import router as kibana_router
 from ion.web.knowledge_graph_api import router as knowledge_graph_router
-from ion.web.labs_api import router as labs_router
 from ion.web.large_doc_api import router as large_doc_router
 from ion.web.log_source_api import router as log_source_router
 from ion.web.logging_middleware import RequestLoggingMiddleware
@@ -110,12 +107,12 @@ from ion.web.shift_handover_api import router as shift_handover_router
 from ion.web.skill_publisher_api import router as skill_publisher_router
 from ion.web.skills_api import router as skills_router
 from ion.web.soc_health_api import router as soc_health_router
+from ion.web.soc_roles_api import router as soc_roles_router
 from ion.web.story_api import router as story_router
 from ion.web.templating import make_templates
 from ion.web.tenant_api import router as tenant_router
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
-from ion.web.training_sim_api import router as training_sim_router
 from ion.web.translator_api import router as translator_router
 from ion.web.triage_suggestion_api import router as triage_suggestion_router
 from ion.web.verdict_review_api import router as verdict_review_router
@@ -454,30 +451,29 @@ app.include_router(workbench_router, prefix="/api")
 app.include_router(log_source_router, prefix="/api")
 app.include_router(briefing_router, prefix="/api")
 app.include_router(knowledge_graph_router, prefix="/api")
-app.include_router(emulation_router, prefix="/api")
 app.include_router(kev_router, prefix="/api")
 app.include_router(vulnerability_router, prefix="/api")
 app.include_router(maturity_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
 app.include_router(network_correlation_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
-app.include_router(training_sim_router, prefix="/api")
 app.include_router(service_account_router, prefix="/api")
 app.include_router(incident_cost_router, prefix="/api")
 app.include_router(compliance_router, prefix="/api")
 app.include_router(comm_template_router, prefix="/api")
 app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
-app.include_router(cyber_range_router, prefix="/api")
 app.include_router(enrichment_router, prefix="/api/enrichment")
 app.include_router(alert_prompt_router, prefix="")
 # JSON-DAG playbook automation (Stories). The router declares
 # its own /api/ + page paths internally, so prefix="" here.
+# Adversary emulation — a Detection Engineering capability, not training.
+app.include_router(emulation_router, prefix="/api")
 app.include_router(story_router, prefix="")
+# /soc-roles — kept when the courseware cluster was archived (skills surface).
+app.include_router(soc_roles_router, prefix="")
 # L1/L2/L3 SOC training course subsystem
-app.include_router(course_router, prefix="")
 # Lab fixture launch/complete lifecycle
-app.include_router(labs_router, prefix="")
 # Service desk — user bug reports (→ GitLab) + CAB change requests.
 app.include_router(bug_report_router, prefix="")
 app.include_router(change_request_router, prefix="")
@@ -2349,18 +2345,6 @@ async def de_bob_page(request: Request, user: User = Depends(require_page_permis
 async def guide_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the interactive training guide."""
     return templates.TemplateResponse(request=request, name="guide.html")
-
-
-@app.get("/guide/sim", response_class=HTMLResponse)
-async def guide_sim_page(request: Request, user: User = Depends(require_page_auth)):
-    """Render the interactive training simulator."""
-    return templates.TemplateResponse(request=request, name="guide_sim.html")
-
-
-@app.get("/guide/range", response_class=HTMLResponse)
-async def cyber_range_page(request: Request, user: User = Depends(require_page_auth)):
-    """Render the Cyber Range training page."""
-    return templates.TemplateResponse(request=request, name="cyber_range.html")
 
 
 @app.get("/attack-stories")
