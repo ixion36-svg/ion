@@ -635,8 +635,7 @@
                 if (lang === 'mermaid') {
                   // DOMPurify by default strips unknown tags; we configure
                   // the rendered output by sanitising AFTER this hook with
-                  // ADD_TAGS to keep <div class="mermaid"> intact. See md()
-                  // helper in lesson.html / course_detail.html.
+                  // ADD_TAGS to keep <div class="mermaid"> intact.
                   const safe = String(code).replace(/[<>&]/g, c =>
                     ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
                   return `<div class="mermaid">${safe}</div>`;

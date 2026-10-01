@@ -11,14 +11,6 @@
     "convert": true,
     "restyle": true
   },
-  "admin_course_edit.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "admin_courses.html": {
-    "convert": true,
-    "restyle": true
-  },
   "alert_arkime.html": {
     "convert": true,
     "restyle": true
@@ -92,14 +84,6 @@
     "restyle": true
   },
   "compliance.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "course_detail.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "courses.html": {
     "convert": true,
     "restyle": true
   },
@@ -210,10 +194,6 @@
     "convert": true,
     "restyle": true
   },
-  "cyber_range.html": {
-    "convert": true,
-    "restyle": true
-  },
   "daily_standup.html": {
     "convert": true,
     "restyle": true
@@ -302,10 +282,6 @@
     "convert": true,
     "restyle": true
   },
-  "guide_sim.html": {
-    "convert": true,
-    "restyle": true
-  },
   "integrations.html": {
     "convert": true,
     "restyle": true
@@ -319,10 +295,6 @@
     "restyle": true
   },
   "knowledge_graph.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "lesson.html": {
     "convert": true,
     "restyle": true
   },
@@ -391,10 +363,6 @@
     "restyle": true
   },
   "soc_roles.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "social.html": {
     "convert": true,
     "restyle": true
   },

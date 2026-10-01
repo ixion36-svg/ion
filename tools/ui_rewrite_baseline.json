@@ -22,38 +22,6 @@
     "ion_style_hooks": 0,
     "raw_inline_styles": 0
   },
-  "admin_course_edit.html": {
-    "lines": 402,
-    "hashed_classes": [
-      "_ion-s-09e8c5ac29",
-      "_ion-s-22df499f68",
-      "_ion-s-4500b7ef55",
-      "_ion-s-59b87fdbd1",
-      "_ion-s-62a1d0e646",
-      "_ion-s-65e3af54b5",
-      "_ion-s-690f054c4e",
-      "_ion-s-7fce3abc18",
-      "_ion-s-81c26f8ca5",
-      "_ion-s-a26d92bbf4",
-      "_ion-s-bba5e32d4a",
-      "_ion-s-c9ef2a58eb",
-      "_ion-s-e802b7a103"
-    ],
-    "hashed_count": 17,
-    "ion_style_hooks": 1,
-    "raw_inline_styles": 0
-  },
-  "admin_courses.html": {
-    "lines": 185,
-    "hashed_classes": [
-      "_ion-s-2f3e0c5eac",
-      "_ion-s-9e454cc368",
-      "_ion-s-d85efb1967"
-    ],
-    "hashed_count": 4,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
   "alert_arkime.html": {
     "lines": 503,
     "hashed_classes": [],
@@ -485,23 +453,6 @@
     "ion_style_hooks": 2,
     "raw_inline_styles": 0
   },
-  "course_detail.html": {
-    "lines": 149,
-    "hashed_classes": [
-      "_ion-s-16884469a8",
-      "_ion-s-690f054c4e"
-    ],
-    "hashed_count": 2,
-    "ion_style_hooks": 1,
-    "raw_inline_styles": 0
-  },
-  "courses.html": {
-    "lines": 148,
-    "hashed_classes": [],
-    "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
   "cyab/_audit_feed.html": {
     "lines": 65,
     "hashed_classes": [],
@@ -689,30 +640,6 @@
     "hashed_classes": [],
     "hashed_count": 0,
     "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
-  "cyber_range.html": {
-    "lines": 361,
-    "hashed_classes": [
-      "_ion-s-12fd79867c",
-      "_ion-s-1ddeb06923",
-      "_ion-s-2bb98b3958",
-      "_ion-s-2e2d5e0cb8",
-      "_ion-s-5dd0211252",
-      "_ion-s-6638751246",
-      "_ion-s-6b99de8b69",
-      "_ion-s-7171988908",
-      "_ion-s-76d19a0156",
-      "_ion-s-865f9ff974",
-      "_ion-s-87c136dfd0",
-      "_ion-s-979f3129c0",
-      "_ion-s-bf6b8b4f0e",
-      "_ion-s-c141e8cb58",
-      "_ion-s-c8e1a1adb7",
-      "_ion-s-efaee0e4c8"
-    ],
-    "hashed_count": 19,
-    "ion_style_hooks": 1,
     "raw_inline_styles": 0
   },
   "daily_standup.html": {
@@ -1179,33 +1106,6 @@
     "ion_style_hooks": 0,
     "raw_inline_styles": 0
   },
-  "guide_sim.html": {
-    "lines": 587,
-    "hashed_classes": [
-      "_ion-s-1c8066d23c",
-      "_ion-s-3599ef6997",
-      "_ion-s-5367325448",
-      "_ion-s-53cce34fa0",
-      "_ion-s-5dd0211252",
-      "_ion-s-6b99de8b69",
-      "_ion-s-766e488b93",
-      "_ion-s-87c136dfd0",
-      "_ion-s-947b39942a",
-      "_ion-s-96628d4d70",
-      "_ion-s-97445a8d93",
-      "_ion-s-a86ebff019",
-      "_ion-s-a975440d91",
-      "_ion-s-b00112b508",
-      "_ion-s-b1a8a836ea",
-      "_ion-s-d9f8a31df1",
-      "_ion-s-de4bcf5c43",
-      "_ion-s-ebb3a47e42",
-      "_ion-s-fdf33f2304"
-    ],
-    "hashed_count": 23,
-    "ion_style_hooks": 4,
-    "raw_inline_styles": 0
-  },
   "integrations.html": {
     "lines": 3064,
     "hashed_classes": [
@@ -1249,40 +1149,6 @@
     ],
     "hashed_count": 1,
     "ion_style_hooks": 1,
-    "raw_inline_styles": 0
-  },
-  "lesson.html": {
-    "lines": 449,
-    "hashed_classes": [
-      "_ion-s-0e42856cf0",
-      "_ion-s-1b3ebf28b4",
-      "_ion-s-21d5a347b4",
-      "_ion-s-27fae56e60",
-      "_ion-s-37149aea5a",
-      "_ion-s-3965425ce7",
-      "_ion-s-586dee8c5b",
-      "_ion-s-6e58ee35af",
-      "_ion-s-74e2e4902a",
-      "_ion-s-7ee8d1002a",
-      "_ion-s-82ea167a73",
-      "_ion-s-99d9b53847",
-      "_ion-s-a76779735c",
-      "_ion-s-b93035ced5",
-      "_ion-s-ba14db93df",
-      "_ion-s-bdbf1f7451",
-      "_ion-s-c1224911b6",
-      "_ion-s-c51489969c",
-      "_ion-s-d110d4972e",
-      "_ion-s-d1b1c0a49d",
-      "_ion-s-d4c3d39ab0",
-      "_ion-s-d6d316dc26",
-      "_ion-s-d997572aeb",
-      "_ion-s-e9c02e2a09",
-      "_ion-s-ebfdcc23be",
-      "_ion-s-eccba22010"
-    ],
-    "hashed_count": 29,
-    "ion_style_hooks": 3,
     "raw_inline_styles": 0
   },
   "log_sources.html": {
@@ -1574,15 +1440,6 @@
     "lines": 104,
     "hashed_classes": [],
     "hashed_count": 0,
-    "ion_style_hooks": 0,
-    "raw_inline_styles": 0
-  },
-  "social.html": {
-    "lines": 456,
-    "hashed_classes": [
-      "_ion-s-c3be19bb5e"
-    ],
-    "hashed_count": 1,
     "ion_style_hooks": 0,
     "raw_inline_styles": 0
   },
