@@ -71,6 +71,12 @@ def _strip(src: str) -> str:
     return re.sub(r"^\s*//.*$", "", src, flags=re.M)     # JS line
 
 
+def _is_csp_exempt(f: Path) -> bool:
+    """Email and PDF templates are not served under ION's CSP, and email
+    requires inline styles, so the sweep skips them."""
+    return "emails" in f.parts or "_pdf" in f.name
+
+
 def _first_party_files():
     for root in ROOTS:
         for f in sorted(root.rglob("*")):
@@ -78,7 +84,7 @@ def _first_party_files():
                 continue
             if any(v in f.name for v in VENDOR):
                 continue
-            if "emails" in f.parts or "_pdf" in f.name:
+            if _is_csp_exempt(f):
                 continue
             yield f
 
@@ -132,15 +138,28 @@ def test_no_inline_styles_remain_anywhere():
     )
 
 
-def test_email_and_pdf_templates_are_deliberately_exempt():
-    """They are not served under ION's CSP and email requires inline styles.
-    Asserted so a future reader does not 'helpfully' extend the ban to them."""
-    emails = list(Path("src/ion/web/templates/emails").glob("*.html"))
-    assert emails, "email templates moved — revisit the exemption in this test"
-    assert any(_count(f) > 0 for f in emails), (
-        "email templates now have no inline styles, which would be surprising — "
-        "confirm they still render correctly in mail clients"
-    )
+def test_the_csp_exemption_still_recognises_email_and_pdf_templates():
+    """The exemption outlived the files it was written for.
+
+    Both categories have since left the tree — the last ``*_pdf.html`` with
+    CyAB in 7b50049, and ``templates/emails/`` with the unwired services in
+    da22fa8, since nothing rendered them once notification_service went. This
+    used to assert those files existed, which is how their removal was caught.
+
+    It now tests the predicate directly, so the skip cannot be deleted as dead
+    code and the ban cannot be 'helpfully' extended the moment such a template
+    comes back.
+    """
+    assert _is_csp_exempt(BASE / "web/templates/emails/alert_digest.html")
+    assert _is_csp_exempt(BASE / "web/templates/report_pdf.html")
+    assert not _is_csp_exempt(BASE / "web/templates/alerts.html")
+    assert not _is_csp_exempt(BASE / "web/static/js/app.js")
+
+
+def test_no_exempt_templates_remain_in_the_tree():
+    """Recorded so the vacuous exemption above is not mistaken for a bug."""
+    assert not list(Path("src/ion/web/templates").glob("**/*_pdf*.html"))
+    assert not Path("src/ion/web/templates/emails").exists()
 
 
 def test_the_sanctioned_alternative_is_wired():

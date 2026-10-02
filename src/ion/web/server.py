@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from ion.auth.dependencies import require_page_auth, require_page_permission
@@ -35,7 +35,7 @@ from ion.core.config import get_config, get_elasticsearch_config
 from ion.core.config import get_config as get_app_config
 from ion.core.logging import get_logger, setup_logging
 from ion.licensing.gating import de_module_status, require_de_module
-from ion.storage.database import get_db_session, init_db
+from ion.storage.database import init_db
 from ion.web.admin_api import router as admin_router
 from ion.web.ai_api import router as ai_router
 from ion.web.alert_pattern_api import router as alert_pattern_router
@@ -60,12 +60,10 @@ from ion.web.case_similarity_api import router as case_similarity_router
 from ion.web.change_request_api import router as change_request_router
 from ion.web.comm_template_api import router as comm_template_router
 from ion.web.compliance_api import router as compliance_router
-from ion.web.course_api import router as course_router
-from ion.web.cyab_api import router as cyab_router
-from ion.web.cyber_range_api import router as cyber_range_router
 from ion.web.d3fend_api import router as d3fend_router
 from ion.web.daily_standup_api import router as daily_standup_router
 from ion.web.de_api import router as de_router
+from ion.web.de_tide_api import router as de_tide_router
 from ion.web.detection_health_api import router as detection_health_router
 from ion.web.elasticsearch_api import router as elasticsearch_router
 from ion.web.emulation_api import router as emulation_router
@@ -85,7 +83,6 @@ from ion.web.ioc_staleness_api import router as ioc_staleness_router
 from ion.web.kev_api import router as kev_router
 from ion.web.kibana_api import router as kibana_router
 from ion.web.knowledge_graph_api import router as knowledge_graph_router
-from ion.web.labs_api import router as labs_router
 from ion.web.large_doc_api import router as large_doc_router
 from ion.web.log_source_api import router as log_source_router
 from ion.web.logging_middleware import RequestLoggingMiddleware
@@ -110,13 +107,12 @@ from ion.web.shift_handover_api import router as shift_handover_router
 from ion.web.skill_publisher_api import router as skill_publisher_router
 from ion.web.skills_api import router as skills_router
 from ion.web.soc_health_api import router as soc_health_router
-from ion.web.social_api import router as social_router
+from ion.web.soc_roles_api import router as soc_roles_router
 from ion.web.story_api import router as story_router
 from ion.web.templating import make_templates
 from ion.web.tenant_api import router as tenant_router
 from ion.web.threat_intel_api import router as threat_intel_router
 from ion.web.threat_landscape_api import router as threat_landscape_router
-from ion.web.training_sim_api import router as training_sim_router
 from ion.web.translator_api import router as translator_router
 from ion.web.triage_suggestion_api import router as triage_suggestion_router
 from ion.web.verdict_review_api import router as verdict_review_router
@@ -419,10 +415,11 @@ app.include_router(wise_router, prefix="/api")
 app.include_router(forensics_router, prefix="/api/forensics")
 # ForensicCase Workbench — pinned evidence + tamper-evident ledger
 app.include_router(forensic_workbench_router, prefix="/api/forensics")
-app.include_router(social_router, prefix="/api/social")
 app.include_router(analytics_router, prefix="/api/analytics")
 app.include_router(engineering_analytics_router, prefix="/api/engineering/analytics")
-app.include_router(cyab_router, prefix="/api/cyab")
+# TIDE + Detection Engineering endpoints, extracted from cyab_api. Mounted on
+# the same prefix so every /api/cyab/tide/... path is unchanged.
+app.include_router(de_tide_router, prefix="/api/cyab")
 app.include_router(wallboard_router, prefix="")
 # translator — page route + /api/translator/* routes share the
 # same router so it owns its own prefixes internally.
@@ -456,30 +453,29 @@ app.include_router(workbench_router, prefix="/api")
 app.include_router(log_source_router, prefix="/api")
 app.include_router(briefing_router, prefix="/api")
 app.include_router(knowledge_graph_router, prefix="/api")
-app.include_router(emulation_router, prefix="/api")
 app.include_router(kev_router, prefix="/api")
 app.include_router(vulnerability_router, prefix="/api")
 app.include_router(maturity_router, prefix="/api")
 app.include_router(executive_report_router, prefix="/api")
 app.include_router(network_correlation_report_router, prefix="/api")
 app.include_router(ioc_staleness_router, prefix="/api")
-app.include_router(training_sim_router, prefix="/api")
 app.include_router(service_account_router, prefix="/api")
 app.include_router(incident_cost_router, prefix="/api")
 app.include_router(compliance_router, prefix="/api")
 app.include_router(comm_template_router, prefix="/api")
 app.include_router(network_map_router, prefix="/api")
 app.include_router(bulk_ops_router, prefix="/api")
-app.include_router(cyber_range_router, prefix="/api")
 app.include_router(enrichment_router, prefix="/api/enrichment")
 app.include_router(alert_prompt_router, prefix="")
 # JSON-DAG playbook automation (Stories). The router declares
 # its own /api/ + page paths internally, so prefix="" here.
+# Adversary emulation — a Detection Engineering capability, not training.
+app.include_router(emulation_router, prefix="/api")
 app.include_router(story_router, prefix="")
+# /soc-roles — kept when the courseware cluster was archived (skills surface).
+app.include_router(soc_roles_router, prefix="")
 # L1/L2/L3 SOC training course subsystem
-app.include_router(course_router, prefix="")
 # Lab fixture launch/complete lifecycle
-app.include_router(labs_router, prefix="")
 # Service desk — user bug reports (→ GitLab) + CAB change requests.
 app.include_router(bug_report_router, prefix="")
 app.include_router(change_request_router, prefix="")
@@ -757,7 +753,7 @@ async def _startup_event():
         LOCK_SCHEDULER_BG,
         LOCK_SEED_ANALYTICS_JOBS,
         LOCK_SEED_CAPABILITY_KB,
-        LOCK_SEED_CYAB_SUBPROFILES,
+        LOCK_SEED_COMM_TEMPLATES,
         LOCK_SEED_DEFAULT_PLAYBOOKS,
         LOCK_SEED_FORENSIC_PB,
         LOCK_SEED_KEV_CATALOG,
@@ -894,21 +890,34 @@ async def _startup_event():
     run_locked(engine, LOCK_SEED_CAPABILITY_KB, "seed_capability_articles", _seed_capability_articles)
 
     # ---------------------------------------------------------------
-    # Seed CyAB Onboarding Studio catalogue (6 pillars + 14
-    # sub-profiles) and backfill cyab_data_sources.subprofile_id from
-    # legacy data_source_type. Idempotent — operator-edited
-    # sub-profiles (is_custom=true) are preserved.
+    # Seed the six default incident-notification templates.
+    #
+    # OFF unless config.comm_templates_seed is set (ION_COMM_TEMPLATES_SEED).
+    # This is the ONLY path by which rows reach comm_templates — there is no
+    # seeding endpoint and no UI for it — so leaving it on by default would
+    # mean every boot wrote six rows into a production database that nobody
+    # asked for.
+    #
+    # The flag is passed to the service rather than branched on here, so the
+    # gate is one unit-tested function instead of a line buried in startup.
+    # With the flag on it is idempotent: the service no-ops when the table
+    # holds ANY row, so an operator's own templates are never joined by a
+    # half-seeded set.
     # ---------------------------------------------------------------
-    def _seed_cyab_subprofiles():
-        from ion.services.cyab_subprofile_service import (
-            backfill_subprofile_ids,
-            seed_catalogue,
+    def _seed_comm_templates():
+        # No log line here: seed_default_templates already emits
+        # "Seeded N default communication templates" on the path that inserts,
+        # and a second identical line at the call site only doubles it in the
+        # operator's log.
+        from ion.services.comm_template_service import (
+            seed_default_templates_at_startup,
         )
-        seed_catalogue()
-        backfill_subprofile_ids()
+        seed_default_templates_at_startup(
+            factory, enabled=config.comm_templates_seed,
+        )
     run_locked(
-        engine, LOCK_SEED_CYAB_SUBPROFILES,
-        "seed_cyab_subprofiles", _seed_cyab_subprofiles,
+        engine, LOCK_SEED_COMM_TEMPLATES, "seed_comm_templates",
+        _seed_comm_templates,
     )
 
     # ---------------------------------------------------------------
@@ -1511,7 +1520,6 @@ async def alert_deeplink(
     `selected` param so the user lands on a sensible page instead of a
     404 error.
     """
-    from sqlalchemy.orm import Session
 
     from ion.models.alert_triage import AlertTriage
     from ion.storage.database import get_session
@@ -1554,7 +1562,6 @@ async def case_page(
     mode: static in the document flow, so long content scrolls with the page
     instead of fighting a fixed inset overlay.
     """
-    from sqlalchemy.orm import Session
 
     from ion.models.alert_triage import AlertCase
     from ion.storage.database import get_session
@@ -1657,529 +1664,6 @@ async def investigations_redirect():
     return RedirectResponse(url="/investigation-memory", status_code=302)
 
 
-
-
-@app.get("/cyab/scoping", response_class=HTMLResponse)
-async def cyab_scoping_page(request: Request):
-    """Anonymous scoping questionnaire — no system created.
-
-    Intentionally has no auth dependency: this is the stakeholder-facing
-    surface for "given your stack, here's what coverage you'd get". The
-    convert-to-system CTA does require auth (handled in /api/cyab/scoping/convert).
-    """
-    from ion.services import cyab_scoping_engine
-    questions = cyab_scoping_engine.load_questions()
-    initial = cyab_scoping_engine.score_answers({})
-    return templates.TemplateResponse(
-        request=request,
-        name="cyab/scoping.html",
-        context={"questions": questions, "initial_scores": initial},
-    )
-
-
-@app.get("/cyab", response_class=HTMLResponse)
-async def cyab_overview_page(
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """CyAB Overview landing — KPIs + in-progress + needs-attention.
-
-    Replaces the legacy 3,500-line cyab.html dashboard. Per-system
-    content moved to /cyab/systems/{id} (Sub-plan A); fleet table moved
-    to /cyab/systems (next task).
-    """
-    from sqlalchemy import select
-
-    from ion.models.cyab import CyabSystem
-    from ion.services import cyab_doc_checklist_service
-    from ion.web.cyab_api import dashboard_metrics
-
-    # Reuse the existing /api/cyab/dashboard endpoint internally rather
-    # than duplicating the math. Call the function directly to avoid
-    # the HTTP round-trip.
-    kpis = dashboard_metrics(session=session)
-
-    # In-progress = 5 most-recently-updated systems
-    in_progress = session.execute(
-        select(CyabSystem).order_by(CyabSystem.updated_at.desc()).limit(5)
-    ).scalars().all()
-
-    # Needs-attention = systems with any critical checklist item not done.
-    # Stale-data check (last_event_at > 24h) is a Sub-plan C live signal;
-    # for Sub-plan B we approximate using the doc-checklist
-    # critical-missing flag.
-    all_systems = session.execute(select(CyabSystem)).scalars().all()
-    needs_attention = []
-    for s in all_systems:
-        summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
-        crit_missing = summary.get("critical_missing") or []
-        if crit_missing:
-            needs_attention.append(type("Row", (), {
-                "id": s.id, "name": s.name,
-                "reason": f"{len(crit_missing)} critical doc(s) missing",
-            })())
-
-    return templates.TemplateResponse(
-        request=request,
-        name="cyab/overview.html",
-        context={
-            "kpis": kpis,
-            "in_progress": in_progress,
-            "needs_attention": needs_attention[:10],
-            "active_tab": "overview",
-            "user": user,
-        },
-    )
-
-
-@app.get("/cyab/systems", response_class=HTMLResponse)
-def cyab_systems_list_page(
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """Portfolio list — table loads via HTMX from /cyab/systems/_table."""
-    from ion.services.cyab_subprofile_service import (
-        list_pillars,
-        list_subprofiles_for_pillar,
-    )
-
-    pillars = list_pillars(session)
-    # Flatten sub-profiles across all pillars for the global filter.
-    subprofiles = []
-    for p in pillars:
-        subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
-    return templates.TemplateResponse(
-        request=request,
-        name="cyab/systems_list.html",
-        context={
-            "active_tab": "systems",
-            "user": user,
-            "pillars": pillars,
-            "subprofiles": subprofiles,
-        },
-    )
-
-
-@app.get("/cyab/systems/_table", response_class=HTMLResponse)
-def cyab_systems_table_partial(
-    request: Request,
-    q: str = "",
-    pillar: str = "",
-    subprofile: str = "",
-    status: str = "",
-    owner: str = "",
-    missing: str = "",
-    stale: int = 0,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """HTMX partial — filtered + searched portfolio table.
-
-    Reuses the same data set as /api/cyab/systems but filters server-side
-    so HTMX swaps stay fast.
-    """
-    from sqlalchemy import select
-
-    from ion.models.cyab import CyabSystem
-    from ion.services import cyab_doc_checklist_service
-
-    stmt = select(CyabSystem)
-    if q:
-        like = f"%{q}%"
-        stmt = stmt.where(
-            (CyabSystem.name.ilike(like))
-            | (CyabSystem.soc_analyst_owner.ilike(like))
-        )
-    if status:
-        stmt = stmt.where(CyabSystem.status == status)
-    if owner:
-        stmt = stmt.where(CyabSystem.soc_analyst_owner.ilike(f"%{owner}%"))
-    # pillar / subprofile filters work on the data-source level — for
-    # simplicity in this sub-plan filter post-fetch (Sub-plan C will
-    # join CyabDataSource.subprofile_id → pillar).
-
-    systems = session.execute(
-        stmt.order_by(CyabSystem.updated_at.desc().nulls_last())
-    ).scalars().all()
-
-    rows = []
-    for s in systems:
-        summary = cyab_doc_checklist_service.coverage_summary(session, s.id)
-        crit = summary.get("critical_missing") or []
-        if missing and missing not in crit:
-            continue
-        rows.append(type("Row", (), {
-            "id": s.id,
-            "name": s.name,
-            "pillar": None,        # joined in via subprofile in Sub-plan C
-            "subprofile": None,
-            "owner": s.soc_analyst_owner,
-            "progress": summary,
-            "critical_missing": len(crit),
-            "updated_at": s.updated_at,
-            "status": s.status,
-        })())
-
-    return templates.TemplateResponse(
-        request=request,
-        name="cyab/_systems_table.html",
-        context={"rows": rows},
-    )
-
-
-@app.get("/cyab/systems/{system_id}", response_class=HTMLResponse)
-def cyab_system_detail_page(
-    system_id: int,
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """Per-system CyAB page (replaces /cyab/studio for a given system)."""
-    from ion.models.cyab import CyabSystem
-    from ion.services import cyab_doc_checklist_service
-
-    system = session.get(CyabSystem, system_id)
-    if not system:
-        raise HTTPException(status_code=404, detail="System not found")
-
-    # Lazy-seed checklist on first access (idempotent)
-    cyab_doc_checklist_service.seed_for_system(session, system_id)
-    progress = cyab_doc_checklist_service.coverage_summary(session, system_id)
-
-    return templates.TemplateResponse(
-        request=request,
-        name="cyab/system_detail.html",
-        context={"system": system, "user": user, "progress": progress},
-    )
-
-
-_CYAB_TABS = {
-    "overview": ("Overview", "cyab/tabs/_overview.html"),
-    "intake": ("Intake", "cyab/tabs/_intake.html"),
-    "sources": ("Sources", "cyab/tabs/_sources.html"),
-    "data-health": ("Data Health", "cyab/tabs/_data_health.html"),
-    "detection": ("Detection Use Cases", "cyab/tabs/_detection.html"),
-    "audit-use-cases": ("Audit Use Cases", "cyab/tabs/_audit_use_cases.html"),
-    "signoff": ("Sign-off", "cyab/tabs/_signoff.html"),
-}
-
-
-@app.get("/cyab/systems/{system_id}/tab/{tab_name}", response_class=HTMLResponse)
-def cyab_system_tab(
-    system_id: int,
-    tab_name: str,
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """HTMX endpoint returning a single tab's content (no page chrome)."""
-    if tab_name not in _CYAB_TABS:
-        raise HTTPException(status_code=404, detail="Unknown tab")
-
-    label, template_name = _CYAB_TABS[tab_name]
-
-    from ion.models.cyab import CyabSystem
-
-    system = session.get(CyabSystem, system_id)
-    if not system:
-        raise HTTPException(status_code=404, detail="System not found")
-
-    ctx = {"system": system, "user": user, "tab_name": tab_name, "tab_label": label}
-
-    if tab_name == "overview":
-        from ion.services import cyab_doc_checklist_service
-        cyab_doc_checklist_service.seed_for_system(session, system_id)  # idempotent
-        ctx["checklist"] = cyab_doc_checklist_service.list_for_system(session, system_id)
-        ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
-    elif tab_name == "intake":
-        from ion.services.cyab_assessment_service import load_answers
-        from ion.services.cyab_subprofile_service import (
-            get_subprofile_full,
-            system_coverage,
-        )
-        # The sub-profile tag lives on data sources (see
-        # CyabDataSource.subprofile_id). For the per-system intake
-        # view, pick the first tagged source's sub-profile as the
-        # primary one. Future: per-source intake tabs.
-        sub_id = next(
-            (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
-            None,
-        )
-        ctx["subprofile"] = (
-            get_subprofile_full(session, sub_id) if sub_id else None
-        )
-        ctx["coverage"] = system_coverage(session, system_id)
-        ctx["answers"] = load_answers(session, system_id) or {}
-    elif tab_name == "sources":
-        import json as _json
-
-        from sqlalchemy import select
-
-        from ion.models.cyab import CyabDataSource
-        sources = session.execute(
-            select(CyabDataSource)
-            .where(CyabDataSource.system_id == system_id)
-            .order_by(CyabDataSource.name)
-        ).scalars().all()
-        # field_mapping is JSON-as-text on the model; parse once per
-        # source so the template can iterate without a custom filter.
-        mappings = {}
-        for ds in sources:
-            if ds.field_mapping:
-                try:
-                    parsed = _json.loads(ds.field_mapping)
-                    if isinstance(parsed, dict):
-                        mappings[ds.id] = parsed
-                except (ValueError, TypeError):
-                    pass
-        ctx["sources"] = sources
-        ctx["source_mappings"] = mappings
-    elif tab_name == "data-health":
-        from ion.services import cyab_data_health_service as dh
-        ctx["ingestion"] = dh.ingestion_freshness(session, system_id)
-        ctx["mapping"] = dh.field_mapping_completeness(session, system_id)
-        ctx["coverage"] = dh.coverage_rollup(session, system_id)
-        ctx["reconciliation"] = dh.reconciliation_panel(session, system_id)
-    elif tab_name == "signoff":
-        from ion.services import cyab_doc_checklist_service
-        ctx["progress"] = cyab_doc_checklist_service.coverage_summary(session, system_id)
-        # Existing sign-off history lives on CyabSystem itself
-        # (sign_dept_*/sign_soc_* — populated by the existing
-        # POST /api/cyab/systems/{id}/onboarding-pack/sign
-        # endpoint). The CyabSnapshot model has no ``kind`` or
-        # ``signed_by`` columns, so the de-duped history is read
-        # directly from the canonical fields on the system row.
-        signoffs = []
-        if system.sign_dept_name and system.sign_dept_date:
-            signoffs.append({
-                "role": "Department",
-                "signed_by": system.sign_dept_name,
-                "signed_on": system.sign_dept_date,
-            })
-        if system.sign_soc_name and system.sign_soc_date:
-            signoffs.append({
-                "role": "SOC",
-                "signed_by": system.sign_soc_name,
-                "signed_on": system.sign_soc_date,
-            })
-        # Newest first (the two are typically same-day; tie-break by role)
-        signoffs.sort(key=lambda x: (x["signed_on"], x["role"]), reverse=True)
-        ctx["signoffs"] = signoffs
-    elif tab_name in ("detection", "audit-use-cases"):
-        from ion.services.cyab_subprofile_service import get_subprofile_full
-        # Per Task 5 finding, subprofile_id lives on CyabDataSource (not
-        # CyabSystem). Resolve the system's primary sub-profile from the
-        # first tagged data source.
-        sub_id = next(
-            (ds.subprofile_id for ds in system.data_sources if ds.subprofile_id),
-            None,
-        )
-        sub = get_subprofile_full(session, sub_id) if sub_id else None
-        cat = (sub or {}).get("catalogue") if sub else {}
-        key = "detection_use_cases" if tab_name == "detection" else "audit_use_cases"
-        ctx["use_cases"] = (cat or {}).get(key, []) if cat else []
-        ctx["subprofile"] = sub
-        # Per-source status (existing studio JS cycles via the existing
-        # use-case-status endpoint, keyed by source id + uc id).
-        from sqlalchemy import select
-
-        from ion.models.cyab import CyabDataSource
-        ctx["sources"] = session.execute(
-            select(CyabDataSource).where(CyabDataSource.system_id == system_id)
-        ).scalars().all()
-
-    # Fall back to the placeholder template if the tab template doesn't exist yet.
-    from jinja2 import TemplateNotFound
-    try:
-        return templates.TemplateResponse(request=request, name=template_name, context=ctx)
-    except TemplateNotFound:
-        return templates.TemplateResponse(
-            request=request,
-            name="cyab/tabs/_placeholder.html",
-            context={"tab_name": tab_name, "tab_label": label},
-        )
-
-
-@app.get("/cyab/coverage", response_class=HTMLResponse)
-async def cyab_coverage_page(
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-):
-    """Fleet data-health matrix: systems x dimensions.
-
-    Calls into the matrix builder helper directly (rather than HTTP-calling
-    our own /api endpoint) so the request stays in-process. Filters mirror
-    the API: ``pillar``, ``owner``, ``any_red``.
-    """
-    from ion.web.cyab_api import _build_coverage_matrix
-    matrix = _build_coverage_matrix(
-        pillar=request.query_params.get("pillar") or None,
-        owner=request.query_params.get("owner") or None,
-        any_red=int(request.query_params.get("any_red") or 0),
-    )
-    return templates.TemplateResponse(
-        request=request,
-        name="cyab/coverage.html",
-        context={
-            "matrix": matrix,
-            "user": user,
-            "active_tab": "coverage",
-            "filters": {
-                "pillar":  request.query_params.get("pillar") or "",
-                "owner":   request.query_params.get("owner") or "",
-                "any_red": request.query_params.get("any_red") or "",
-            },
-        },
-    )
-
-
-@app.get("/cyab/audit", response_class=HTMLResponse)
-async def cyab_audit_page(
-    request: Request,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """Compliance audit trail.
-
-    Chronological union of sign-offs, checklist deltas, system lifecycle
-    events, and containment-authority changes. Calls the audit_feed
-    helper directly (rather than HTTP-calling our own /api endpoint) so
-    the request stays in-process — same pattern as /cyab/coverage.
-    """
-    from ion.web.cyab_api import audit_feed
-
-    sid_raw = request.query_params.get("system_id") or ""
-    try:
-        sid = int(sid_raw) if sid_raw else None
-    except ValueError:
-        sid = None
-    feed = await audit_feed(
-        system_id=sid,
-        user=request.query_params.get("user") or None,
-        action_type=request.query_params.get("action_type") or None,
-        since=request.query_params.get("since") or None,
-        until=request.query_params.get("until") or None,
-        session=session,
-    )
-
-    return templates.TemplateResponse(
-        request=request,
-        name="cyab/audit.html",
-        context={
-            "feed": feed,
-            "user": user,
-            "active_tab": "audit",
-            "filters": {
-                "system_id":   request.query_params.get("system_id") or "",
-                "user":        request.query_params.get("user") or "",
-                "action_type": request.query_params.get("action_type") or "",
-                "since":       request.query_params.get("since") or "",
-                "until":       request.query_params.get("until") or "",
-            },
-        },
-    )
-
-
-# ---------------------------------------------------------------------------
-# CyAB Onboarding Wizard (Sub-plan B / Task 3)
-# ---------------------------------------------------------------------------
-
-
-@app.get("/cyab/onboard", response_class=HTMLResponse)
-def cyab_onboard_page(
-    request: Request,
-    wid: str | None = None,
-    step: int = 1,
-    user: User = Depends(require_page_permission("alert:read")),
-    session: Session = Depends(get_db_session),
-):
-    """4-step wizard. Without ``wid``, starts a new session and 302s with
-    the wid baked in so refresh/back work.
-
-    Each step is a separate URL so back/forward navigation works. POST
-    /api/cyab/onboard/{wid}/step/{n} advances state and returns an
-    HTMX-replaceable partial.
-    """
-    from ion.services import cyab_wizard_service
-    from ion.services.cyab_subprofile_service import (
-        list_pillars,
-        list_subprofiles_for_pillar,
-    )
-
-    if not wid:
-        new_wid = cyab_wizard_service.start_wizard(
-            session, user_id=getattr(user, "id", None)
-        )
-        return RedirectResponse(
-            url=f"/cyab/onboard?wid={new_wid}&step=1", status_code=302
-        )
-
-    try:
-        state = cyab_wizard_service.load_state(session, wid)
-    except LookupError:
-        raise HTTPException(status_code=404, detail="Wizard session not found")
-
-    # Aggregate sub-profiles across all pillars (the catalogue helper
-    # is per-pillar; the wizard form needs a flat list for the
-    # combined dropdown).
-    pillars = list_pillars(session)
-    subprofiles: list = []
-    for p in pillars:
-        subprofiles.extend(list_subprofiles_for_pillar(session, p["id"]))
-
-    ctx = {
-        "wid": wid,
-        "step": step,
-        "state": state,
-        "pillars": pillars,
-        "subprofiles": subprofiles,
-        "active_tab": "onboard",
-        "user": user,
-    }
-
-    # Step 4 needs the seeded checklist so a refresh on ?step=4 works.
-    if step == 4 and state.get("system_id"):
-        from ion.services import cyab_doc_checklist_service
-        cyab_doc_checklist_service.seed_for_system(
-            session, state["system_id"]
-        )
-        ctx["checklist"] = cyab_doc_checklist_service.list_for_system(
-            session, state["system_id"]
-        )
-
-    # Step 2 needs the live counter pre-rendered with the current
-    # answer set so a hard refresh shows the right numbers (HTMX
-    # then takes over for subsequent updates). Same engine as the
-    # /cyab/scoping page — shared backend per the spec.
-    if step == 2:
-        from ion.services import cyab_scoping_engine
-        ctx["scoping_initial"] = cyab_scoping_engine.score_answers(
-            state.get("intake", {}) or {}
-        )
-
-    return templates.TemplateResponse(
-        request=request, name="cyab/onboard.html", context=ctx
-    )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 @app.get("/notes", response_class=HTMLResponse)
 async def notes_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the full-page notes view."""
@@ -2193,12 +1677,6 @@ async def notes_page(request: Request, user: User = Depends(require_page_auth)):
 
 
 
-
-
-@app.get("/social", response_class=HTMLResponse)
-async def social_page(request: Request, user: User = Depends(require_page_auth)):
-    """Render the Social Hub page."""
-    return templates.TemplateResponse(request=request, name="social.html")
 
 
 @app.get("/engineering-analytics")
@@ -2357,18 +1835,6 @@ async def de_bob_page(request: Request, user: User = Depends(require_page_permis
 async def guide_page(request: Request, user: User = Depends(require_page_auth)):
     """Render the interactive training guide."""
     return templates.TemplateResponse(request=request, name="guide.html")
-
-
-@app.get("/guide/sim", response_class=HTMLResponse)
-async def guide_sim_page(request: Request, user: User = Depends(require_page_auth)):
-    """Render the interactive training simulator."""
-    return templates.TemplateResponse(request=request, name="guide_sim.html")
-
-
-@app.get("/guide/range", response_class=HTMLResponse)
-async def cyber_range_page(request: Request, user: User = Depends(require_page_auth)):
-    """Render the Cyber Range training page."""
-    return templates.TemplateResponse(request=request, name="cyber_range.html")
 
 
 @app.get("/attack-stories")

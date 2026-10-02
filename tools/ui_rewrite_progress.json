@@ -11,14 +11,6 @@
     "convert": true,
     "restyle": true
   },
-  "admin_course_edit.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "admin_courses.html": {
-    "convert": true,
-    "restyle": true
-  },
   "alert_arkime.html": {
     "convert": true,
     "restyle": true
@@ -95,125 +87,6 @@
     "convert": true,
     "restyle": true
   },
-  "course_detail.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "courses.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_audit_feed.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_coverage_matrix.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_progress_header.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_scoping_counter.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_scoping_pack_pdf.html": {
-    "convert": true
-  },
-  "cyab/_scoping_summary.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_section_nav.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_systems_table.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_wizard_step_1_identity.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_wizard_step_2_intake.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_wizard_step_3_source.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/_wizard_step_4_docs.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/audit.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/coverage.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/onboard.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/overview.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/scoping.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/system_detail.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/systems_list.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_audit_use_cases.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_data_health.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_detection.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_intake.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_overview.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_placeholder.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_signoff.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyab/tabs/_sources.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "cyber_range.html": {
-    "convert": true,
-    "restyle": true
-  },
   "daily_standup.html": {
     "convert": true,
     "restyle": true
@@ -274,15 +147,6 @@
     "convert": true,
     "restyle": true
   },
-  "emails/alert_digest.html": {
-    "convert": true
-  },
-  "emails/case_update.html": {
-    "convert": true
-  },
-  "emails/sla_breach.html": {
-    "convert": true
-  },
   "entity_timeline.html": {
     "convert": true,
     "restyle": true
@@ -302,10 +166,6 @@
     "convert": true,
     "restyle": true
   },
-  "guide_sim.html": {
-    "convert": true,
-    "restyle": true
-  },
   "integrations.html": {
     "convert": true,
     "restyle": true
@@ -319,10 +179,6 @@
     "restyle": true
   },
   "knowledge_graph.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "lesson.html": {
     "convert": true,
     "restyle": true
   },
@@ -391,10 +247,6 @@
     "restyle": true
   },
   "soc_roles.html": {
-    "convert": true,
-    "restyle": true
-  },
-  "social.html": {
     "convert": true,
     "restyle": true
   },

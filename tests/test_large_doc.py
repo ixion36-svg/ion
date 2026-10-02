@@ -6,7 +6,7 @@ lifecycle without needing a real Ollama.
 """
 
 import asyncio
-import time
+import threading
 
 from sqlalchemy.orm import sessionmaker
 
@@ -163,16 +163,29 @@ def test_start_analysis_runs_to_completion(session, temp_db, monkeypatch):
     job_id = lds.start_analysis(
         session, 1, "notes.txt", b"This is a real document with content to analyse.", "summary", None
     )
-    # poll from a fresh session each tick so we see the worker's commits
+    # Wait on the worker itself, not on a wall clock. start_analysis does not
+    # hand the thread back, but it names it after the job, so it can be found
+    # and joined; _worker commits the terminal status before it returns, so a
+    # finished join means the row is readable. join() returns the moment the
+    # thread ends, and the timeout only bounds a genuinely stuck worker.
+    #
+    # This replaced an 80 x 0.1s poll. That gave the thread a fixed 8-second
+    # budget, which was ample in isolation (the work takes ~2s) but flaked
+    # under full-suite load — the test failed once in a full run and passed on
+    # a re-run of the same tree.
+    worker = next(
+        (t for t in threading.enumerate() if t.name == f"large-doc-{job_id[:8]}"),
+        None,
+    )
+    if worker is not None:  # None means it already finished
+        worker.join(timeout=60)
+        assert not worker.is_alive(), "analysis worker still running after 60s"
+
+    # Read from a fresh session so we see the worker's commits.
     Sess = sessionmaker(bind=temp_db)
-    job = None
-    for _ in range(80):
-        s2 = Sess()
-        job = lds.get_job(s2, job_id)
-        s2.close()
-        if job and job["status"] in ("done", "error"):
-            break
-        time.sleep(0.1)
+    s2 = Sess()
+    job = lds.get_job(s2, job_id)
+    s2.close()
     assert job is not None and job["status"] == "done", job
     assert job["result"]["result"]
     assert job["result"]["map_hits"] >= 1

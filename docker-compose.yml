@@ -299,10 +299,13 @@ services:
       - .env
     environment:
       - ION_SEED_URL=http://ion:8000
-      # The DB-direct seeds (seed_courses, seed_lab_fixtures) run in THIS
-      # container. Without the URL they fall back to a throwaway SQLite inside
-      # the container and the courses and labs never reach Postgres -- silently,
-      # with the seeder reporting success.
+      # Kept deliberately although every seed is now HTTP-only: the two
+      # DB-direct seeds (seed_courses, seed_lab_fixtures) went to archive/
+      # with the courseware subsystem. It is inert for the current set and
+      # costs nothing, and the failure it guards against is silent -- a
+      # DB-direct seed with no URL falls back to a throwaway SQLite inside
+      # the container and never reaches Postgres, while still reporting
+      # success. Leave it here for the next such script.
       - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD}@postgres:5432/ion
     networks:
       - ion-net

@@ -2,7 +2,7 @@
 
 // DOMPurify's defaults allow `id` and `name`, which are a DOM-clobbering
 // primitive: an attacker-set id becomes a global that shadows a real one.
-// Stored cross-user content (social posts, case notes) reaches these sinks.
+// Stored cross-user content (case notes, comments) reaches these sinks.
 const ION_SANITIZE_CONFIG = { FORBID_ATTR: ['id', 'name'] };
 
 // An absolute http(s) link in stored content points off-platform. Marking it

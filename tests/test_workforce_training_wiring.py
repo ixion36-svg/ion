@@ -12,10 +12,16 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from ion.models.base import Base
-from ion.models.course import Course, UserEnrolment
 from ion.models.skills import TeamCertification, TrainingPlan, TrainingPlanItem
 from ion.models.user import Permission, Role, User
-from ion.models.workforce import KIND_CERT, KIND_DOCUMENT, PHASE_GATE, PHASE_READINESS
+from ion.models.workforce import (
+    KIND_CERT,
+    KIND_DOCUMENT,
+    PHASE_GATE,
+    PHASE_READINESS,
+    Course,
+    UserEnrolment,
+)
 from ion.services import workforce_service as wf
 
 
@@ -135,3 +141,39 @@ def test_a_lapsed_cert_flips_the_certification_record_too(db):
         user_id=person.id, cert_name="GCIH").one()
     assert cert.status == "expired", \
         "the /training roadmap must not keep showing a lapsed cert as active"
+
+
+# ── repr ─────────────────────────────────────────────────────────────────
+#
+# Both models moved here from the archived courseware package in 32b887b.
+# Their __repr__ is what a developer sees in a debugger or a failed-assertion
+# message, so one that raises turns a small bug into a confusing one. Cheap to
+# pin, and these were the only lines the move left uncovered.
+
+
+def test_course_repr_names_the_level_and_title(db):
+    course = Course(title="SOC Analyst L1", slug="soc-l1", level="L1")
+    db.add(course)
+    db.flush()
+
+    text_ = repr(course)
+
+    assert f"id={course.id}" in text_
+    assert "level=L1" in text_
+    assert "SOC Analyst L1" in text_
+
+
+def test_enrolment_repr_reports_whether_it_completed(db):
+    course = Course(title="SOC Analyst L2", slug="soc-l2", level="L2")
+    user = User(username="repr-user", email="repr@example.com", password_hash="x")
+    db.add_all([course, user])
+    db.flush()
+
+    enrolment = UserEnrolment(user_id=user.id, course_id=course.id)
+    db.add(enrolment)
+    db.flush()
+
+    assert "completed=False" in repr(enrolment)
+
+    enrolment.completed_at = date.today()
+    assert "completed=True" in repr(enrolment)

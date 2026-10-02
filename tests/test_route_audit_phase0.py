@@ -5,11 +5,11 @@
    as complete. Only the Workbench multipart upload appended. These tests pin that
    the JSON evidence path and custody entries now appear in the ledger and that the
    chain still verifies.
-2. LAB lessons could be completed through the generic
-   `POST /api/lessons/{id}/complete`, skipping LabGradingService and the teardown of
-   materialised mock data.
-3. `/tuning-proposals` had no nav link anywhere while two live write paths kept
+2. `/tuning-proposals` had no nav link anywhere while two live write paths kept
    filling it.
+
+The LAB-completion guard test was removed with the courseware and
+cyber-range clusters; it read course_api.py, which now lives under archive/.
 """
 
 from __future__ import annotations
@@ -167,19 +167,7 @@ def test_chain_still_verifies_after_new_appends(app_client: TestClient, case_id:
     assert body["first_break_seq"] is None, body
 
 
-# ── 2. LAB completion guard ──────────────────────────────────────────────
-
-
-def test_lab_guard_present_in_source():
-    """A LAB lesson must not be completable via the generic reading endpoint —
-    that path skips LabGradingService and the materialised-fixture teardown."""
-    src = Path("src/ion/web/course_api.py").read_text(encoding="utf-8")
-    fn = src.split("def mark_lesson_complete", 1)[1].split("\ndef ", 1)[0]
-    assert "LessonType.LAB" in fn, "LAB guard missing from mark_lesson_complete"
-    assert "lab/complete" in fn, "guard should point the caller at the lab endpoint"
-
-
-# ── 3. tuning-proposals reachability ─────────────────────────────────────
+# ── 2. tuning-proposals reachability ─────────────────────────────────────
 
 
 def test_tuning_proposals_queue_is_reachable():

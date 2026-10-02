@@ -13,7 +13,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from ion.auth.dependencies import require_page_auth
-from ion.models.course import Course, CourseLevel
 from ion.models.user import User
 from ion.web.api import get_db_session
 from ion.web.server import app
@@ -64,35 +63,6 @@ def test_day_in_the_life_content_present(client):
     assert "WHAT GOOD LOOKS LIKE" in r.text
     assert "Queue triage block" in r.text          # L1 timeline entry
     assert "Hypothesis discipline" in r.text        # Hunter duty
-
-
-def test_training_path_links_published_courses(client, session):
-    session.add_all([
-        Course(title="Alert Triage Fundamentals", slug="alert-triage-fundamentals",
-               level=CourseLevel.L1, published=True),
-        Course(title="Threat Hunting with KQL", slug="threat-hunting-kql",
-               level=CourseLevel.L2, published=True),
-        Course(title="Unpublished Draft", slug="unpublished-draft",
-               level=CourseLevel.L1, published=False),
-    ])
-    session.commit()
-    r = client.get("/soc-roles")
-    assert r.status_code == 200
-    # L1 + L2 cards link their real courses...
-    assert '/courses/alert-triage-fundamentals' in r.text
-    assert '/courses/threat-hunting-kql' in r.text
-    # ...drafts never appear...
-    assert "Unpublished Draft" not in r.text
-    # ...and levels with no published course fall back to the catalogue link
-    # (L4 / SOC Manager has none here).
-    assert 'No published L4 course yet' in r.text
-    assert 'href="/courses"' in r.text
-
-
-def test_empty_catalogue_falls_back_everywhere(client):
-    r = client.get("/soc-roles")
-    for lvl in ("L1", "L2", "L3", "L4"):
-        assert f"No published {lvl} course yet" in r.text
 
 
 def test_nav_carries_soc_roles_link(client):

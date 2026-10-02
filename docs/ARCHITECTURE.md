@@ -177,7 +177,6 @@ ION's business logic lives in `src/ion/services/` (80+ modules). Key services:
 | `AnalystEfficiencyService` | `analyst_efficiency_service.py` | Per-analyst MTTR, FP rates |
 | `ComplianceMappingService` | `compliance_mapping_service.py` | Multi-framework compliance mapping |
 | `MaturityService` | `maturity_service.py` | SOC-CMM maturity assessment |
-| `ReportSchedulerService` | `report_scheduler_service.py` | Scheduled report generation |
 
 ### AI Services
 

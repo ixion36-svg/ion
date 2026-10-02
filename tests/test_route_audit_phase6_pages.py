@@ -125,7 +125,6 @@ def test_gitlab_issue_browser_survived():
 @pytest.mark.parametrize("retired,target", [
     ("/engineering-analytics", "/analytics"),
     ("/ai-scorecard", "/alert-prompts"),
-    ("/my-courses", "/courses"),
 ])
 def test_retired_pages_redirect_not_404(paths, retired, target):
     """Merged-away pages keep a route so links and bookmarks survive."""
@@ -170,16 +169,6 @@ def test_ai_scorecard_kpis_folded_into_alert_prompts():
 def test_scorecards_api_exposes_exact_evaluated_count():
     src = Path("src/ion/web/alert_prompt_api.py").read_text(encoding="utf-8")
     assert '"evaluated": b["evaluated"]' in src
-
-
-def test_courses_page_has_scope_toggle():
-    html = (TEMPLATES / "courses.html").read_text(encoding="utf-8")
-    assert "cl-scope-all" in html and "cl-scope-mine" in html
-    assert "'/api/my-courses'" in html, "toggle must still call the enrolment endpoint"
-
-
-def test_my_courses_api_survived_the_page_merge(paths):
-    assert "/api/my-courses" in paths
 
 
 @pytest.mark.parametrize("tpl", ["bug_reports.html", "change_requests.html"])

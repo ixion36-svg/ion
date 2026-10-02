@@ -27,7 +27,7 @@ ION is a server-rendered Security Operations Centre portal for threat detection,
 - **Threat Intel & integrations** — Unified threat-intel page (actors, IOCs, reports, watchlist), knowledge graph, canaries, and observable enrichment across OpenCTI, VirusTotal, Shodan, AbuseIPDB, and DFIR-IRIS.
 - **Playbooks & response** — 25+ SOC playbooks with execution tracking and analytics, full DFIR forensics pipeline (chain of custody, timeline, IOC extraction), PCAP analysis (protocol heuristics, JA3, file/credential extraction), and 6 approval-gated response actions (block IP, disable account, quarantine host, DNS sinkhole, email block, webhook).
 - **Reporting & operations** — SOC health scorecard, executive/compliance report scheduler, analyst efficiency, SLA tracking, morning briefing, shift handover, on-call roster, and a configurable command-centre dashboard.
-- **Labs & training** — Knowledge base (~392 articles across 28 collections), scored training scenarios, cyber range lab exercises, role-match self-assessment, and the interactive ION Guide.
+- **Knowledge & reference** — Knowledge base (~392 articles across 28 collections), the SOC roles and daily-duties reference, skills and schedule tracking, and the interactive ION Guide.
 
 Also included: an optional **MCP server mode** (`POST /api/mcp`, `ION_MCP_ENABLED`, default off) exposing core SOC data as MCP tools, and optional **observability** (Prometheus `/metrics` + Elastic APM, both default off).
 

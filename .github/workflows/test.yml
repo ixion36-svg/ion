@@ -16,6 +16,11 @@
 #   - image: builds the Dockerfile. Does not push — it exists so a broken
 #            build surfaces on the commit that broke it rather than at
 #            release, when the tag is already cut.
+#   - cov  : coverage ratchet — full suite under pytest-cov. On PRs,
+#            diff-cover fails the build when under 80% of the CHANGED lines
+#            are covered (existing gaps are grandfathered). Every run must
+#            hold the total at or above .coverage-floor; the floor only
+#            rises — raise it by hand after a scope cut, or it goes slack.
 #   - sca  : pip-audit (v0.25.0) — scans the project's pinned dependency
 #            graph for known CVEs via the OSV database. Fails the build
 #            only on HIGH-severity (and above) findings; MEDIUM/LOW are
@@ -119,6 +124,48 @@ jobs:
       # High-severity findings fail the job; medium and below are warnings.
       - name: Run bandit
         run: bandit -r src/ --skip B602,B608,B101 -lll
+
+  cov:
+    name: coverage ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # diff-cover compares against the base branch, so it needs real history.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run the suite under coverage
+        run: pytest tests/ -q --tb=short --cov --cov-report=xml --cov-report=term
+
+      - name: Gate changed lines
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          diff-cover coverage.xml \
+            --compare-branch="origin/${{ github.base_ref }}" --fail-under=80
+
+      - name: Hold the floor
+        run: |
+          floor=$(tr -d " \t\n" < .coverage-floor)
+          total=$(python -c "import xml.etree.ElementTree as E; \
+            print(round(float(E.parse('coverage.xml').getroot().get('line-rate')) * 100, 2))")
+          echo "total=${total}%  floor=${floor}%"
+          awk -v t="$total" -v f="$floor" 'BEGIN { exit !(t + 0.005 >= f) }' || {
+            echo "::error::coverage ${total}% is below the floor ${floor}% in .coverage-floor"
+            exit 1
+          }
 
   sca:
     name: pip-audit

@@ -8,7 +8,7 @@ the most advanced intrusions first.
 
 import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -45,15 +45,31 @@ def _normalise_tactic(name: str | None) -> str | None:
     return name.strip().lower().replace("_", "-").replace(" ", "-")
 
 
+def _as_utc(dt: datetime) -> datetime:
+    """Attach UTC to a naive datetime; convert an aware one to UTC.
+
+    Same hazard as ``alert_pattern_service._as_utc``, from the same source:
+    ``ElasticsearchService`` yields an offset-AWARE datetime for a ``Z``
+    timestamp and falls back to NAIVE ``utcnow()`` when the field is missing or
+    unparsable. One such alert in an entity's bucket made ``parsed.sort()``
+    raise TypeError, and the API's blanket ``except`` turned that into an empty
+    story list. Normalising here also makes the "UTC" in the narrative true for
+    an alert carrying a non-UTC offset, rather than a mislabelled local time.
+    """
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def _parse_timestamp(value: Any) -> datetime | None:
-    """Parse a timestamp from an alert dict value (str or datetime)."""
+    """Parse a timestamp from an alert dict value (str or datetime), as UTC."""
     if isinstance(value, datetime):
-        return value
+        return _as_utc(value)
     if isinstance(value, str):
         # Accept ISO-8601 with or without trailing Z / timezone
         cleaned = value.replace("Z", "+00:00")
         try:
-            return datetime.fromisoformat(cleaned)
+            return _as_utc(datetime.fromisoformat(cleaned))
         except (ValueError, TypeError):
             pass
     return None

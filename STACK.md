@@ -30,14 +30,13 @@ Credentials live in [secrets.txt](secrets.txt) (gitignored).
 | `tide-app` | (internal 8000) | TIDE detection-eng backend | `~/TIDE/docker-compose.yml` |
 | `tide-nginx` | 443 | TIDE reverse proxy (TLS) | `~/TIDE/docker-compose.yml` |
 
-Cross-compose networking: ION reaches external stacks via `host.docker.internal:<port>`. Only the main compose joins the `ion_ion-net` network; the range compose joins it externally.
+Cross-compose networking: ION reaches external stacks via `host.docker.internal:<port>`. Only the main compose joins the `ion_ion-net` network.
 
 ## Compose files (in `~/ION`)
 
 - **`docker-compose.yml`** — core: postgres + ion + seeder + optional ollama (profile `ai`)
 - **`docker-compose.dev.yml`** — dev overrides
 - **`docker-compose.test.yml`** — test harness
-- **`docker-compose.range.yml`** — cyber range (kali, dvwa, juiceshop, webgoat, vuln-ssh/smb/ftp, filebeat); layers on top of core. Joins `ion_ion-net` externally.
 - **`deploy/docker-compose.yml` / `.elk.yml` / `.https.yml`** — deployment variants (nginx, full ELK stack, HTTPS)
 
 ## ION integration env vars

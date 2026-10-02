@@ -57,25 +57,7 @@ from ion.models.case_evidence import (  # noqa: F401
     PinSeverity,
     PinSourceType,
 )
-
-# L1/L2/L3/L4 SOC analyst training course subsystem.
-from ion.models.course import (  # noqa: F401
-    Course,
-    CourseLevel,
-    CourseModule,
-    Lesson,
-    LessonProgressStatus,
-    LessonType,
-    Question,
-    QuestionKind,
-    UserAnswer,
-    UserEnrolment,
-    UserLessonProgress,
-)
 from ion.models.cyab import CyabDataSource, CyabSnapshot, CyabSystem
-from ion.models.cyab_doc_checklist import CyabDocChecklistItem
-from ion.models.cyab_subprofile import CyabPillar, CyabSubProfile
-from ion.models.cyab_wizard import CyabWizardSession  # noqa: F401
 from ion.models.detection_proposal import (  # noqa: F401
     DetectionProposal,
     DetectionProposalChangeType,
@@ -154,10 +136,8 @@ from ion.models.observable import (
     WatchlistAlertType,
 )
 from ion.models.oncall import (
-    ChangeLogEntry,
     CommTemplate,
     ServiceAccount,
-    UserBookmark,
 )
 from ion.models.playbook import (
     ExecutionStatus,
@@ -206,18 +186,12 @@ from ion.models.skills import (
     UserCareerGoal,
 )
 from ion.models.sla import (
-    DashboardLayout,
     PlaybookAction,
     PlaybookActionLog,
-    ScheduledReport,
-    SLABreachLog,
-    SLAPolicy,
-    # ThreatHunt removed v0.27.0; see ion/models/sla.py for the removal note.
-)
-from ion.models.social import (
-    SocialComment,
-    SocialPost,
-    SocialReaction,
+    # ScheduledReport removed with report_scheduler_service; ThreatHunt
+    # removed v0.27.0. See ion/models/sla.py for both removal notes.
+    # SLAPolicy, SLABreachLog and DashboardLayout went to archive/unwired
+    # with the services that were their only callers.
 )
 
 # JSON-DAG playbook automation (Tines-inspired).
@@ -254,6 +228,8 @@ from ion.models.vulnerability import Vulnerability, VulnerabilityAsset, VulnSeve
 
 # daily-work tracking — manual work-log entries + admin task taxonomy.
 from ion.models.workforce import (  # noqa: F401
+    Course,
+    CourseLevel,
     JourneyRequirement,
     LeaverRecord,
     OrgPost,
@@ -261,6 +237,7 @@ from ion.models.workforce import (  # noqa: F401
     ProfileRequirement,
     RoleProfile,
     RoleProfileVersion,
+    UserEnrolment,
     UserJourney,
 )
 from ion.models.worklog import (  # noqa: F401
@@ -387,9 +364,6 @@ __all__ = [
     "CyabSystem",
     "CyabDataSource",
     "CyabSnapshot",
-    "CyabPillar",
-    "CyabSubProfile",
-    "CyabWizardSession",
     # Canary / deception
     "Canary",
     "CanaryHit",
@@ -410,10 +384,6 @@ __all__ = [
     "VulnStatus",
     # Threat Intel watch model
     "ThreatIntelWatch",
-    # Social Hub models
-    "SocialPost",
-    "SocialComment",
-    "SocialReaction",
     # Service desk — bug reports + CAB change requests
     "BugReport",
     "BugReportSeverity",
