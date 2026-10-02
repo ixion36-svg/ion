@@ -1,13 +1,131 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.5 -->
-<!-- ion-doc:version=0.99.5 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.6 -->
+<!-- ion-doc:version=0.99.6 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-01 -->
+<!-- ion-doc:date=2026-10-02 -->
 
 # Changelog
+
+## v0.99.6 — 2026-10-02
+
+**Scope reduction: 23,000 lines leave the live tree, and a ratchet stops the
+gap between "built" and "finished" reopening.**
+
+**Read this first if you are upgrading.** Two operator-visible changes. The
+`scheduled_reports` table is **dropped** on first boot — see *Database
+migration* below; no data is migrated because nothing has read that table since
+v0.26.0. And `ION_COMM_TEMPLATES_SEED` is a **new, default-off** flag; leave it
+unset and nothing changes.
+
+**Features archived.** The Social Hub notice board is deleted. Courseware and
+the cyber range are archived together — they are one subsystem, since labs are
+LAB-type lessons inside seeded courses. The CyAB onboarding and assurance
+workbench is archived, after first extracting the part still in use: TIDE and
+Detection Engineering, lifted into `web/de_tide_api.py`, mounted at the same
+`/api/cyab/tide/...` paths so no URL moved. The training record moves under
+`workforce`. Skills & Schedule and the workforce pages stay; worklog stays as
+an audit spec. Seven unwired services and `report_scheduler_service` are
+archived. In total **108 files move to `archive/`** (67 of them Python) and the live
+tree under `src/` loses **23,015 lines net** (+2,065 / −25,080).
+
+Every archive move was verified by collecting the full `(method, path)` route
+table before and after and diffing it — which is what caught `/soc-roles` and
+adversary emulation being swept up in error, and what proves the
+`report_scheduler` removal changed nothing (851 routes either side).
+
+**Database migration — `scheduled_reports` is dropped.** `ScheduledReport` lost
+its only reader when `report_scheduler_service` was archived; the model is
+removed and the table goes with it, via the idempotent `_run_migrations` sweep
+in `storage/database.py` alongside the `notifications`, `threat_hunts` and
+`kb_document_embeddings` drops. **Rows are not migrated anywhere** — there is no
+reader left to migrate them to. Any scheduled-report configuration still in that
+table is lost on upgrade; `scheduler_service` (generic crontab, handler
+registry, advisory-locked worker, wired `scheduler_api`) supersedes it, and a
+daily report should register a handler there. The drop is guarded by
+`has_table`, so a fresh install and a second boot are both no-ops, and it needs
+no dialect branch: plain `DROP TABLE` is identical on SQLite and PostgreSQL and
+the table's only foreign key points outward.
+
+`OnCallRoster`, `EscalationPolicy` and `EscalationLog` are deliberately left
+declared and untouched — on-call roster remains a README feature.
+
+**New flag: `ION_COMM_TEMPLATES_SEED`, default OFF.** The six curated
+incident-notification templates had no path into a database — the seeder was
+never called, there is no seeding endpoint, and `/comm-templates` has no UI
+page. Startup now seeds them when this flag is set. It defaults off because
+startup seeding is the *only* way rows reach `comm_templates`, so defaulting it
+on would write six rows into every production database on upgrade. Idempotent
+once on: the guard counts rows rather than matching names, so turning it on
+against a table an analyst has already populated is a no-op and their templates
+are never joined by a half-seeded default set.
+
+**A coverage ratchet.** `diff-cover` fails a PR when under 80% of its *changed*
+lines are covered, and every run must hold total coverage at or above
+`.coverage-floor`, which only rises. The floor moved **48.6 → 53.3** across this
+release — set a tenth of a point below the measured 53.4 on purpose, so that an
+unrelated change is not failed by movement in the third decimal place. The suite grew to **3,590 tests** — 3,580 passing, 8 skipped, 2 xpassed —
+green on Python 3.11 and 3.14.
+
+**Four bugs, every one silent in production.** The ratchet found the first three
+by pointing at modules nothing had ever tested:
+
+* **One malformed alert emptied an entire report.** `ElasticsearchService`
+  parses `@timestamp` into an offset-*aware* datetime when it ends in `Z` and
+  falls back to naive `utcnow()` when the field is missing or unparsable.
+  `alert_pattern_service` and `attack_story_service` both sorted a list that
+  could hold both kinds, which raises `TypeError` — and both APIs wrap the call
+  in a blanket `except`, so one odd document blanked every rule, every host and
+  every attack story, with no error and no log line. Both now normalise to UTC.
+  `alert_pattern_service` additionally let an epoch-integer timestamp escape as
+  `AttributeError`, which its own `except (ValueError, TypeError)` did not catch.
+* **Every inline image was dropped from every exported PDF.** The air-gap URL
+  blocker in `pdf_export_service` allows `data:` URIs through
+  `default_url_fetcher`, which WeasyPrint removed in 63; `pyproject.toml` asks
+  for `>=62.0` and 70.0 is installed. The `ImportError` fired *inside* the
+  fetcher, where WeasyPrint catches it and renders without the resource — and a
+  PDF with a missing image still looks like a PDF. Now resolved through
+  whichever API the installed version exposes, with both paths tested.
+* **A dead service documented as live.** `report_scheduler_service`, 128
+  statements, zero references. Its router went in the v0.26.0 route audit, whose
+  changelog entry recorded that the `playbook_action` / `report_scheduler` /
+  `smtp` services "remain — they are used elsewhere". That held for
+  `playbook_action_service`; it was never true of this one, which has read as a
+  live service in `docs/ARCHITECTURE.md` ever since.
+* **The Docker image had stopped building.** The Dockerfile still `COPY`d
+  `seed_courses.py` and `seed_lab_fixtures.py` after the courseware archive
+  removed them. Caught by CI rather than by reading, because the archive
+  verification was a route-table diff and an image build is invisible to route
+  tables. `seed_all.py` stopped orchestrating them in the same change — fixing
+  only the `COPY` would have produced a green build shipping a seeder that
+  referenced two scripts absent from the image.
+
+Each of these was invisible by construction: a blanket `except` turning a crash
+into an empty result, an `ImportError` swallowed by a library, a dead module
+listed in the architecture doc. None would have arrived as a bug report, which
+is the case for a ratchet over testing where trouble is already suspected.
+
+**Smaller fixes.** `_build_pdf_html` escaped metadata values but not keys
+(literals at every call site today, so pre-emptive on a document that gets
+mailed outside the SOC). `generate_executive_html`'s accumulator was named
+`html`, shadowing the stdlib module its own `_esc` depends on — harmless as
+written, but the next person to reach for `html.escape` inside that function
+would have got `AttributeError` in the one place where failing to escape
+matters. A duplicated startup log line removed. 78 lines of `render_lesson_pdf`,
+left behind by the courseware archive with both its caller and its models
+already in `archive/`, moved out of the live tree.
+
+**Coverage, module by module.** Twelve modules had effectively none. Eleven are
+now at 100% statement and branch coverage — `execution_report_service`,
+`comm_template_service`, `alert_pattern_service`, `compliance_mapping_service`,
+`triage_suggestion_service`, `attack_story_service`, `case_similarity_service`,
+`executive_report_service`, `pdf_export_service`, plus `analyst_efficiency_service`
+at 100%/99% with its two remaining branches documented as unreachable given the
+column definitions rather than contorted around. `web/de_tide_api.py` went from
+13.4% to 99%. The twelfth, `report_scheduler_service`, was archived instead.
+**20 new test files; 92 mutations run against them and 92 caught.**
 
 ## v0.99.5 — 2026-10-01
 
