@@ -78,21 +78,51 @@ ION follows **semver**:
 
 ## 4.2 Where the version appears (the 8-file release ritual)
 
-Every release bumps **exactly these 8 files** atomically. This rule is load-bearing: skipping any file rots the version across the system. The list is the canonical source.
+Every release bumps **exactly these files** atomically. This rule is load-bearing: skipping any file rots the version across the system. The list is the canonical source.
 
-| File | Why it matters |
-|---|---|
-| `src/ion/__init__.py:__version__` | UI footer (`{{ ion_version }}`) — load-bearing for every Jinja template |
-| `pyproject.toml:version` | Build metadata; PyPI / Docker label inputs |
-| `docker-compose.yml` (`ION_VERSION`) | Local dev compose |
-| `docker-compose.deploy.yml` (`ION_VERSION`) | Deploy compose |
-| `Dockerfile` (OCI label `org.opencontainers.image.version`) | Image metadata |
-| `README.md` badge | Public-facing version statement |
-| `.env.deploy` (`ION_VERSION`) | Deploy template |
-| `CHANGELOG.md` | New top entry for the version |
-| `SECURITY_ASSESSMENT.md` | Delta row added |
+| File | Occurrences | Why it matters |
+|---|---|---|
+| `src/ion/__init__.py:__version__` | 1 | UI footer (`{{ ion_version }}`) — load-bearing for every Jinja template |
+| `pyproject.toml:version` | 1 | Build metadata; PyPI / Docker label inputs |
+| `docker-compose.yml` (`ION_VERSION` default) | **2** | Local dev compose — the string appears on two `image:` lines |
+| `Dockerfile` (OCI label `org.opencontainers.image.version`) | 1 | Image metadata |
+| `README.md` badge | 1 | Public-facing version statement |
+| `.env.deploy` (`ION_VERSION`) | 1 | Deploy template |
+| `CHANGELOG.md` | — | New top entry, plus the `ion-doc:version`, `ion-doc:subtitle` and `ion-doc:date` header comments |
+| `SECURITY_ASSESSMENT.md` | — | Delta prepended to the **Application Version** chain, plus the same three header comments and the **Assessment Date** line |
 
-**This is 9 items in total** — `SECURITY_ASSESSMENT.md` is bumped alongside but is sometimes considered an output rather than a version-bearing file. The "8-file rule" name persists from `feedback_release_version_bump.md` memory.
+**Eight files; six of them carry a version string, across seven occurrences.**
+That is what the "8-file rule" counts, and it is correct.
+
+**Corrected in v0.99.6.** This section previously listed a ninth file,
+`docker-compose.deploy.yml` — *which does not exist in this repository* — and
+then explained the discrepancy away as "9 items, but SECURITY_ASSESSMENT is
+sometimes considered an output". Both halves were wrong. The deploy compose
+files present are `docker-compose.dev.yml` and `docker-compose.test.yml`,
+neither of which carries a version; the deploy version lives in `.env.deploy`,
+already in the table. The phantom row is removed, and the `docker-compose.yml`
+row now states its **two** occurrences, which a single-substitution edit would
+otherwise leave half-bumped.
+
+This table now agrees with the two canonical lists in
+`docs/RUNBOOK.md` ("Release Ritual — Version Bump") and
+`docs/DEVELOPMENT_LIFECYCLE.md` §3, **both of which were already right.** If the
+three ever disagree again, RUNBOOK is canonical — `DEVELOPMENT_LIFECYCLE.md`
+says so explicitly, and it carries the sanity-check greps.
+
+### Rot check
+
+After bumping, verify no stale version remains. Three classes of match are
+expected and must NOT be changed:
+
+* `CHANGELOG.md` — every prior entry names its own version. That is history.
+* `SECURITY_ASSESSMENT.md` — the **Application Version** chain names prior
+  versions deliberately.
+* `archive/README.md` — provenance rows record *when* each subsystem was
+  archived, not the current version.
+* KB content and tooling fixtures contain IP addresses and sample data that
+  look like versions (`10.0.99.50`, `10.0.99.5`, `10.20.99.5`). Match on a
+  version *assignment*, not a bare substring.
 
 ## 4.3 Image digest immutability
 
