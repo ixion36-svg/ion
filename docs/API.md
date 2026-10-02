@@ -239,12 +239,12 @@ ION exposes 73 routers grouped by domain. Each router is mounted at a prefix; th
 
 | Router | Prefix | Scope |
 |---|---|---|
-| `tide_api` | `/api/tide` | TIDE rules, posture, execution reports |
+| `de_tide_api` | `/api/cyab/tide` | TIDE rules, posture, execution reports, Detection Engineering. The `/api/cyab` prefix is a historical fact about these URLs, not a statement about ownership — see 6.9 |
 | `engineering_analytics_api` | `/api/engineering/analytics` | Per-rule FP rate × volume |
 | `compliance_api` | `/api/compliance` | Multi-framework compliance mapping |
 | `d3fend_api` | `/api/d3fend` | D3FEND defensive technique map |
 | `emulation_api` | `/api/emulation` | Adversary emulation plans + execution |
-| `tuning_proposal_api` | `/api/tuning-proposals` | Tuning proposal lifecycle |
+| `bob_proposal_api` | `/api/de/bob-proposals` | Tuning proposal lifecycle (draft, approve, reject, revert) |
 
 ## 6.6 Operations
 
@@ -273,13 +273,21 @@ ION exposes 73 routers grouped by domain. Each router is mounted at a prefix; th
 | `canary_api` | `/api/canaries` | Canary token deploy + trip handling |
 | `bulk_ops_api` | `/api/bulk` | Bulk alert/case operations |
 
-## 6.9 CyAB + Curriculum
+## 6.9 Detection Engineering (TIDE)
 
 | Router | Prefix | Scope |
 |---|---|---|
-| `cyab_api` | `/api/cyab` | CyAB pillars, sub-profiles, assessments, ATT&CK heatmap |
-| `course_api` | `/api/courses` | Curriculum module/lesson/quiz CRUD |
-| `cyber_range_api` | `/api/cyber-range` | Range exercise execution |
+| `de_tide_api` | `/api/cyab/tide` | TIDE systems and rules, MITRE coverage, Navigator layer export, detection posture and gaps, kill-chain progression, threat-actor readiness, execution metrics |
+
+**Why the `/api/cyab` prefix.** These endpoints were extracted from `cyab_api`
+in v0.99.6 when the CyAB assessment workbench was archived. They scope TIDE
+rules by CyAB system, so they read `CyabSystem` / `CyabDataSource`, and they
+remount at the identical paths so that no URL moved. The prefix records where
+they used to live, not which subsystem owns them.
+
+**Archived in v0.99.6:** `cyab_api` (`/api/cyab` — CyAB pillars, sub-profiles,
+assessments, ATT&CK heatmap), `course_api` (`/api/courses`) and
+`cyber_range_api` (`/api/cyber-range`). Those prefixes now serve nothing.
 
 ## 6.10 Knowledge
 
@@ -287,15 +295,14 @@ ION exposes 73 routers grouped by domain. Each router is mounted at a prefix; th
 |---|---|---|
 | `notes_api` | `/api/notes` | Notes + folders |
 | `comm_template_api` | `/api/templates` | Comm templates CRUD |
-| `kb_api` | `/api/kb` | Knowledge-base docs + embeddings |
-| `social_api` | `/api/social` | Social hub for team |
+| `analyst_api` | `/api/analyst/knowledge-base` | Knowledge-base docs + embeddings |
 
 ## 6.11 Infra
 
 | Router | Prefix | Scope |
 |---|---|---|
-| `network_asset_api` | `/api/network-assets` | CMDB |
-| `log_source_health_api` | `/api/log-source-health` | Per-source ingest health |
+| `network_map_api` | `/api/network-map/assets` | CMDB |
+| `log_source_api` | `/api/log-sources` | Log-source inventory + per-source ingest health |
 | `integration_api` | `/api/integrations` | Integration config + webhook config |
 | `wallboard_api` | `/` | Wallboard surface (root-mounted) |
 

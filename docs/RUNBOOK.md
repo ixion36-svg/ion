@@ -277,12 +277,12 @@ Past releases rotted version strings in less-obvious files. v0.22.0 cleaned up 1
 |---|------|----------------|
 | 1 | `src/ion/__init__.py` | `__version__ = "X.Y.Z"` — **load-bearing** for `{{ ion_version }}` in every Jinja template. **Verify before assuming any other file is authoritative.** |
 | 2 | `pyproject.toml` | `version = "X.Y.Z"` |
-| 3 | `docker-compose.yml` | TWO `${ION_VERSION:-X.Y.Z}` fallback defaults (currently lines 101, 260; verify before bump) |
+| 3 | `docker-compose.yml` | TWO `${ION_VERSION:-X.Y.Z}` fallback defaults (currently lines 114, 292; verify before bump — they drift with every compose edit) |
 | 4 | `Dockerfile` | `org.opencontainers.image.version="X.Y.Z"` OCI label |
 | 5 | `README.md` | Version badge `version-X.Y.Z-blue` |
 | 6 | `.env.deploy` | `ION_VERSION=X.Y.Z` AND the human-readable comment on the line above it |
 | 7 | `CHANGELOG.md` | New top entry `## vX.Y.Z — YYYY-MM-DD` |
-| 8 | `SECURITY_ASSESSMENT.md` | Bump "Application Version" header, add new column to severity-trend table, add "Net-New Surfaces in vX.Y.Z" section (and "Net-Removed Surface" if applicable) |
+| 8 | `SECURITY_ASSESSMENT.md` | Prepend the new delta to the **Application Version** chain on one line, ending `Prior version: <previous> — ...` so the chain stays intact; bump the **Assessment Date** line and the `ion-doc:version` / `ion-doc:date` header comments. Record net-new surfaces and a `0C / 0H / 0M / 0L` finding count, and say so explicitly when the surface *shrinks*. **There is no severity-trend table** — the subtitle still advertises one, but the document has carried the inline chain since well before v0.99.6 |
 
 ### Also refresh the doc metadata stamps
 
@@ -303,7 +303,8 @@ grep -RnE "0\.19\.19|0\.11\.6|0\.9\.98|0\.11\.21" \
   --exclude=RUNBOOK.md \
   --exclude='_spec_v0_*.md' \
   --exclude='_research_*.md' \
-  --exclude='seed_courses.py'
+  --exclude='seed_courses.py'   # archived in v0.99.6; exclusion kept because the grep
+                                # also walks archive/, where the file still lives
 
 # B — previous-released version must NOT remain in canonical-version files:
 # (substitute PREV_VERSION with the version you're shipping over)
