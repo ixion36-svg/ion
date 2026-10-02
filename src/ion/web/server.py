@@ -905,14 +905,16 @@ async def _startup_event():
     # half-seeded set.
     # ---------------------------------------------------------------
     def _seed_comm_templates():
+        # No log line here: seed_default_templates already emits
+        # "Seeded N default communication templates" on the path that inserts,
+        # and a second identical line at the call site only doubles it in the
+        # operator's log.
         from ion.services.comm_template_service import (
             seed_default_templates_at_startup,
         )
-        seeded = seed_default_templates_at_startup(
+        seed_default_templates_at_startup(
             factory, enabled=config.comm_templates_seed,
         )
-        if seeded:
-            logger.info("Seeded %d default communication templates", seeded)
     run_locked(
         engine, LOCK_SEED_COMM_TEMPLATES, "seed_comm_templates",
         _seed_comm_templates,
