@@ -1125,6 +1125,10 @@ def get_config() -> Config:
 # fails if someone adds an override without a map entry. Regenerate rather
 # than hand-editing.
 ENV_FIELD_MAP: dict[str, str] = {
+    # Assigned via a local (_env_base_url) rather than a literal
+    # os.environ.get on the right-hand side, so the generator cannot see
+    # it. Kept by hand; test_indirect_overrides_are_mapped guards it.
+    "base_url": "ION_BASE_URL",
     "abuseipdb_api_key": "ION_ABUSEIPDB_API_KEY",
     "abuseipdb_enabled": "ION_ABUSEIPDB_ENABLED",
     "account_lockout_enabled": "ION_ACCOUNT_LOCKOUT_ENABLED",

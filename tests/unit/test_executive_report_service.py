@@ -568,6 +568,7 @@ class TestHtmlEscaping:
 
 
 class TestPdf:
+    @pytest.mark.requires_weasyprint
     def test_a_pdf_is_produced(self, session):
         pdf = generate_executive_pdf(_report(session))
         assert pdf is not None

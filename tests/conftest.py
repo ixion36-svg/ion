@@ -86,3 +86,41 @@ Acme Corporation
 123 Main Street
 New York, NY 10001
 """
+
+
+# ── WeasyPrint's native libraries ──
+#
+# PDF rendering needs Pango, Cairo and GDK-Pixbuf, which are present on the
+# ubuntu-latest CI runner but not on a bare Windows host. ION's own error says
+# as much: "Install them or use the Docker image."
+#
+# Without this, nine tests fail locally for a reason that has nothing to do
+# with the code, and real regressions hide in the noise. Tests that genuinely
+# render carry @pytest.mark.requires_weasyprint and skip when the libraries
+# cannot be loaded. They still run in CI, so coverage is unchanged there.
+try:
+    from weasyprint import HTML as _WeasyHTML  # noqa: F401
+
+    WEASYPRINT_AVAILABLE = True
+except Exception:  # ImportError, OSError, and whatever else the loader raises
+    WEASYPRINT_AVAILABLE = False
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "requires_weasyprint: needs WeasyPrint's native libraries (Pango, "
+        "Cairo, GDK-Pixbuf); skipped where they are not installed",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if WEASYPRINT_AVAILABLE:
+        return
+    skip = pytest.mark.skip(
+        reason="WeasyPrint's native libraries (Pango, Cairo, GDK-Pixbuf) are "
+        "not available on this host; these run in CI and in the Docker image"
+    )
+    for item in items:
+        if "requires_weasyprint" in item.keywords:
+            item.add_marker(skip)

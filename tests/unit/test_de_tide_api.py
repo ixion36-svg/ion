@@ -1742,6 +1742,7 @@ class TestReadinessPdf:
         payload.update(body)
         return client.post("/api/cyab/tide/de/readiness-pdf", json=payload)
 
+    @pytest.mark.requires_weasyprint
     def test_a_pdf_is_produced(self, client, tide, opencti, ollama):
         tide(coverage=GLOBAL_COV)
         opencti(actor=ACTOR)
@@ -1754,6 +1755,7 @@ class TestReadinessPdf:
         assert r.content.startswith(b"%PDF")
         assert r.headers["x-content-type-options"] == "nosniff"
 
+    @pytest.mark.requires_weasyprint
     def test_the_filename_is_slugged_from_the_actor_name(self, client, tide,
                                                           opencti, ollama):
         """An actor name reaches this from OpenCTI, so it cannot be trusted to

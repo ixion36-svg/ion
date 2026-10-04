@@ -134,3 +134,19 @@ def test_env_field_map_matches_override_block():
         if ENV_FIELD_MAP.get(f) != derived[f]
     }
     assert disagree == {}, f"map disagrees with the override block: {disagree}"
+
+
+def test_indirect_overrides_are_mapped():
+    """Some overrides are invisible to the generator, and must not be dropped.
+
+    get_config() assigns base_url from a local (`_env_base_url`) rather than
+    from a literal os.environ.get call, so regenerating ENV_FIELD_MAP from the
+    source silently lost it once already. The field is genuinely environment
+    held — docker-compose.yml injects ION_BASE_URL with a default — so losing
+    it means the settings UI offers an edit that cannot win, with no badge.
+    """
+    indirect = {"base_url": "ION_BASE_URL"}
+    for field, env in indirect.items():
+        assert ENV_FIELD_MAP.get(field) == env, (
+            f"{field} must stay mapped to {env}; the generator cannot derive it"
+        )

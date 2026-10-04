@@ -183,6 +183,7 @@ class TestUrlFetcher:
         with pytest.raises(ValueError, match="evil.example"):
             _block_external_url_fetcher("http://evil.example/x.png")
 
+    @pytest.mark.requires_weasyprint
     def test_an_inline_image_actually_reaches_the_pdf(self):
         """The point of allowing data: at all. This is the regression that was
         live: on WeasyPrint >= 63 the data: branch raised ImportError inside the
@@ -231,15 +232,18 @@ class TestUrlFetcher:
 
 
 class TestGeneratePdf:
+    @pytest.mark.requires_weasyprint
     def test_a_pdf_is_produced(self):
         pdf = generate_pdf("<p>hello</p>", title="Report")
         assert pdf.startswith(b"%PDF")
 
+    @pytest.mark.requires_weasyprint
     def test_metadata_and_body_survive_into_a_rendered_pdf(self):
         pdf = generate_pdf("<h1>Body</h1>", title="R", metadata={"K": "V"})
         assert pdf.startswith(b"%PDF")
         assert len(pdf) > 1000
 
+    @pytest.mark.requires_weasyprint
     def test_an_external_image_does_not_abort_the_render(self):
         """The fetcher raises, and `_fail_on_errors = False` means WeasyPrint
         skips the resource rather than failing the export. An analyst gets a PDF
@@ -248,6 +252,7 @@ class TestGeneratePdf:
                            title="R")
         assert pdf.startswith(b"%PDF")
 
+    @pytest.mark.requires_weasyprint
     def test_the_fetcher_carries_the_flag_newer_weasyprint_reads(self):
         generate_pdf("<p>x</p>", title="R")
         from ion.services import pdf_export_service as svc
@@ -282,6 +287,7 @@ class TestDocumentToPdf:
                      "current_version", "source_template", "created_at"):
             assert hasattr(d, attr), attr
 
+    @pytest.mark.requires_weasyprint
     def test_a_document_renders_to_a_pdf(self, session):
         pdf = document_to_pdf(self._doc(session))
         assert pdf.startswith(b"%PDF")
