@@ -76,9 +76,20 @@ def test_deploy_template_sets_no_ui_managed_key():
     if not path.exists():
         pytest.skip(".env.deploy not present")
     live = set(re.findall(r"^([A-Z_]+)=", path.read_text(encoding="utf-8"), re.M))
-    # ION_TIDE_API_KEY is UI-editable but absent from ENV_FIELD_MAP, so it
-    # would override with no badge at all. Guard it explicitly.
-    managed = set(ENV_FIELD_MAP.values()) | {"ION_TIDE_API_KEY"}
+    # Scope: the integration sections the settings UI exposes. ENV_FIELD_MAP
+    # now covers every environment override get_config() applies (150 of them),
+    # which is right for source reporting but wrong as the guard here: it would
+    # also flag deployment-level policy such as ION_PASSWORD_MIN_LENGTH and
+    # ION_IP_BLOCKING_ENABLED, which have no settings-UI section and belong in
+    # a deployment template.
+    sections = (
+        "ELASTICSEARCH", "KIBANA", "GITLAB", "OPENCTI", "ARKIME", "TIDE",
+        "OLLAMA", "OIDC", "DFIR_IRIS", "ABUSEIPDB", "VIRUSTOTAL",
+    )
+    managed = {
+        env for env in ENV_FIELD_MAP.values()
+        if any(env.startswith(f"ION_{s}_") for s in sections)
+    }
     stray = sorted(live & managed)
     assert stray == [], (
         ".env.deploy sets keys managed in the settings UI, which would "

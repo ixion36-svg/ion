@@ -84,3 +84,53 @@ def test_secret_fields_are_mapped():
         "opencti_token",
     ):
         assert field in ENV_FIELD_MAP
+
+
+def test_env_field_map_matches_override_block():
+    """ENV_FIELD_MAP must cover every override get_config() actually applies.
+
+    The map is what the settings UI badges. A field that get_config() reads from
+    the environment but the map omits is editable in the UI and silently
+    overridden with no badge — the exact failure this whole mechanism exists to
+    prevent. This test re-derives the pairs from the source and compares, so
+    adding an override without a map entry fails here rather than in the field.
+
+    Regenerate the map rather than hand-editing it.
+    """
+    import dataclasses
+    import re
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / "src" / "ion" / "core" / "config.py"
+    text = src.read_text(encoding="utf-8")
+    known = {f.name for f in dataclasses.fields(Config)}
+
+    derived = {}
+    pattern = re.compile(
+        r"_config\.([a-z_0-9]+)\s*=\s*(.+?)"
+        r"(?=\n\s*(?:if|elif|else|_config\.|#|try|except|for|return|\Z))",
+        re.S,
+    )
+    for match in pattern.finditer(text):
+        field, rhs = match.group(1), match.group(2)
+        if field not in known:
+            continue
+        envs = [
+            e for e in re.findall(r'"([A-Z][A-Z0-9_]*)"', rhs)
+            if e.startswith(("ION_", "OLLAMA_"))
+        ]
+        if envs:
+            derived.setdefault(field, envs[0])
+
+    missing = sorted(set(derived) - set(ENV_FIELD_MAP))
+    assert missing == [], (
+        "get_config() reads these from the environment but ENV_FIELD_MAP omits "
+        "them, so the UI cannot badge them: " + ", ".join(missing)
+    )
+
+    disagree = {
+        f: (ENV_FIELD_MAP[f], derived[f])
+        for f in derived
+        if ENV_FIELD_MAP.get(f) != derived[f]
+    }
+    assert disagree == {}, f"map disagrees with the override block: {disagree}"

@@ -306,13 +306,18 @@ including env-held values. Dropping the field client-side prevents a masked
 secret being written back, an SSRF rejection on an env-held empty URL, and
 needless reassignment. It does not stop env values reaching `config.json`.
 
-**The badge is a partial guard, not a general one.** `ENV_FIELD_MAP`
-(`src/ion/core/config.py`) covers 37 of the ~153 `ION_*` variables
-`get_config()` honours. Fields outside it — most of OIDC, `dfir_iris_*`,
-`abuseipdb_*`, `virustotal_*`, `tide_api_key`, `elasticsearch_api_key`,
-`ollama_model`, `ollama_timeout`, `kibana_case_owner` — are editable in the UI
-and can still be silently overridden by an environment variable with no badge.
-Extending the map to every field `GET /config` returns is outstanding work.
+**The badge is a complete guard.** `ENV_FIELD_MAP`
+(`src/ion/core/config.py`) covers all 150 fields `get_config()` assigns from an
+environment variable, so any override the application honours can be reported
+and badged. It is generated from the override block rather than hand-written;
+regenerate rather than editing entries by hand.
+
+Two tests hold it there: `test_every_mapped_field_exists_on_config` catches a
+field name that no longer exists on `Config`, and
+`test_env_field_map_matches_override_block` re-derives the pairs from the
+source and fails if an override is added without a map entry. The second is
+the one that matters — an unmapped override is a field the UI will silently
+discard edits to, with no badge to explain why.
 
 **Two fields are injected by Compose and are always environment-held.**
 `docker-compose.yml` sets `ION_BASE_URL` and `ION_OLLAMA_URL` with `:-`
