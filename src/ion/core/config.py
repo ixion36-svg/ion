@@ -1167,6 +1167,19 @@ ENV_FIELD_MAP: dict[str, str] = {
     "oidc_enabled": "ION_OIDC_ENABLED",
 }
 
+# Read before the app can consult its own settings, so these cannot move into
+# config.json. ION_DATA_DIR is the strongest case: it is how config.json is
+# located. ION_VERSION is read by Compose to resolve the image tag, and
+# ION_LOG_LEVEL when logging is configured, which happens before config loads.
+BOOTSTRAP_ENV_KEYS: frozenset[str] = frozenset({
+    "ION_VERSION",
+    "ION_DATA_DIR",
+    "ION_HOST",
+    "ION_PORT",
+    "ION_WORKERS",
+    "ION_LOG_LEVEL",
+})
+
 
 def _config_file_path() -> Path:
     """The same path get_config() loads from."""
