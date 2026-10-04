@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_admin, require_permission
-from ion.core.config import Config, get_config, set_config
+from ion.core.config import Config, config_field_sources, get_config, set_config
 from ion.core.safe_errors import safe_error
 from ion.core.url_validator import validate_integration_url
 from ion.models.user import User
@@ -202,6 +202,9 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
     config = get_config()
 
     return {
+        # Which fields the environment is holding, so the settings page can
+        # render them read-only instead of offering an edit that cannot win.
+        "sources": config_field_sources(),
         "general": {
             "db_path": str(config.db_path),
             "default_format": config.default_format,
