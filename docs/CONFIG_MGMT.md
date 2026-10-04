@@ -328,10 +328,14 @@ the settings UI.
 
 `tests/test_env_boundary.py` keeps the shipped templates honest.
 
-**Known stale guidance.** `.env.deploy`, `deploy/DEPLOYMENT_GUIDE.md`,
-`deploy/OPENCTI_INTEGRATION.md`, `docs/DEPLOYMENT.md` and `docs/LLD.md` still
-describe configuring integrations through `.env`. They predate this boundary
-and have not been rewritten.
+**Related documents, brought into line 2026-10-04.** `.env.deploy` had 23 live
+UI-managed keys, which would have silently overridden the settings UI on every
+deployment made from it; they are removed, and
+`tests/test_env_boundary.py::test_deploy_template_sets_no_ui_managed_key`
+keeps them out. `docs/DEPLOYMENT.md` and `deploy/OPENCTI_INTEGRATION.md` carry
+a banner above their `.env` examples marking them reference-only.
+`deploy/DEPLOYMENT_GUIDE.md` and `docs/LLD.md` mention integration variables in
+prose but set none, so they were left alone.
 
 # 12. Change history
 

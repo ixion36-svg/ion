@@ -61,3 +61,26 @@ def test_template_holds_every_required_key(name):
     assert missing == [], (
         f".{name} is missing required keys: " + ", ".join(missing)
     )
+
+
+def test_deploy_template_sets_no_ui_managed_key():
+    """.env.deploy is a working template people deploy from.
+
+    It is not held to the 8-key boundary, because it legitimately carries
+    deployment tuning with no Config field (resource limits, Postgres tuning,
+    pool sizes). But a live key that ION also exposes in the settings UI would
+    silently override that UI on every deployment made from this file.
+    """
+    repo_root = Path(__file__).resolve().parents[1]
+    path = repo_root / ".env.deploy"
+    if not path.exists():
+        pytest.skip(".env.deploy not present")
+    live = set(re.findall(r"^([A-Z_]+)=", path.read_text(encoding="utf-8"), re.M))
+    # ION_TIDE_API_KEY is UI-editable but absent from ENV_FIELD_MAP, so it
+    # would override with no badge at all. Guard it explicitly.
+    managed = set(ENV_FIELD_MAP.values()) | {"ION_TIDE_API_KEY"}
+    stray = sorted(live & managed)
+    assert stray == [], (
+        ".env.deploy sets keys managed in the settings UI, which would "
+        "silently override it: " + ", ".join(stray)
+    )

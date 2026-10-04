@@ -65,6 +65,14 @@ Add to `.ion/config.json`:
 
 ### Via Environment Variables
 
+> **Out of date as of 2026-10-04.** The integration settings shown below are no
+> longer configured through `.env`. They are managed in ION's settings UI and
+> stored in `$ION_DATA_DIR/.ion/config.json`. Environment variables still
+> outrank that file, so setting these keys silently overrides the UI — a value
+> edited in the app saves successfully and changes nothing. See
+> [CONFIG_MGMT.md](../docs/CONFIG_MGMT.md) section 11a for the 8 keys that do
+> belong in `.env`. The examples are kept for reference only.
+
 ```bash
 ION_OPENCTI_ENABLED=true
 ION_OPENCTI_URL=https://opencti.example.com

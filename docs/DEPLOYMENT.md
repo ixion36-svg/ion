@@ -51,6 +51,14 @@ Edit `.env` with your environment-specific values. At minimum, set:
 ION_ADMIN_PASSWORD=<strong-password>
 ION_DB_PASSWORD=<strong-password>
 
+> **Out of date as of 2026-10-04.** The integration settings shown below are no
+> longer configured through `.env`. They are managed in ION's settings UI and
+> stored in `$ION_DATA_DIR/.ion/config.json`. Environment variables still
+> outrank that file, so setting these keys silently overrides the UI — a value
+> edited in the app saves successfully and changes nothing. See
+> [CONFIG_MGMT.md](CONFIG_MGMT.md) section 11a for the 8 keys that do
+> belong in `.env`. The examples are kept for reference only.
+
 # Elasticsearch (required for alert functionality)
 ION_ELASTICSEARCH_URL=https://your-es-host:9200
 ION_ELASTICSEARCH_USERNAME=elastic
