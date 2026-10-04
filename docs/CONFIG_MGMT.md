@@ -285,10 +285,37 @@ inside that volume. Losing the volume loses them.
 
 **Environment variables still win.** `get_config()` ranks env above
 `config.json`, so re-adding a key to `.env` silently overrides the UI. The
-settings page guards against that: an environment-held field renders read-only
-with a "set by environment" badge, and the save path drops it rather than
-writing the env value back into `config.json`. `tests/test_env_boundary.py`
-keeps the shipped templates honest.
+settings page shows an environment-held field read-only with a "set by
+environment" badge, and drops it from the save payload.
+
+Be precise about what that drop buys, because it is narrower than it looks:
+every section `PUT` ends in `config.to_file(get_config_path())` against the
+env-merged config object, so a save to any section rewrites the whole file
+including env-held values. Dropping the field client-side prevents a masked
+secret being written back, an SSRF rejection on an env-held empty URL, and
+needless reassignment. It does not stop env values reaching `config.json`.
+
+**The badge is a partial guard, not a general one.** `ENV_FIELD_MAP`
+(`src/ion/core/config.py`) covers 37 of the ~153 `ION_*` variables
+`get_config()` honours. Fields outside it — most of OIDC, `dfir_iris_*`,
+`abuseipdb_*`, `virustotal_*`, `tide_api_key`, `elasticsearch_api_key`,
+`ollama_model`, `ollama_timeout`, `kibana_case_owner` — are editable in the UI
+and can still be silently overridden by an environment variable with no badge.
+Extending the map to every field `GET /config` returns is outstanding work.
+
+**Two fields are injected by Compose and are always environment-held.**
+`docker-compose.yml` sets `ION_BASE_URL` and `ION_OLLAMA_URL` with `:-`
+defaults, so they are present in the container whether or not `.env` lists
+them. Both therefore render read-only with the badge and are managed in
+`docker-compose.yml`, not in the UI. `base_url` is the OIDC redirect URI, so
+check it before enabling OIDC.
+
+**A fresh install starts from defaults.** `docker-entrypoint.sh` seeds a new
+volume's `config.json` from `ION_*` variables that are now absent, so a brand
+new deployment comes up with built-in defaults and must be configured through
+the settings UI.
+
+`tests/test_env_boundary.py` keeps the shipped templates honest.
 
 **Known stale guidance.** `.env.deploy`, `deploy/DEPLOYMENT_GUIDE.md`,
 `deploy/OPENCTI_INTEGRATION.md`, `docs/DEPLOYMENT.md` and `docs/LLD.md` still

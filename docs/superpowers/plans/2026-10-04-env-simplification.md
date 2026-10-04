@@ -794,11 +794,12 @@ Add a short section:
 ```markdown
 ## Configuration boundary
 
-`.env` holds two kinds of key and nothing else:
+`.env` holds 8 keys and nothing else:
 
-- **Secrets** (8): passwords, tokens and API keys.
 - **Bootstrap** (6): read before the app can consult its own settings, so they
   cannot live in `config.json`. `ION_DATA_DIR` locates `config.json` itself.
+- **Structural secrets** (2): `ION_DB_PASSWORD`, which Compose interpolates
+  before ION exists, and `ION_ADMIN_PASSWORD`, which has no `Config` field.
 
 Everything else is managed in the settings UI and stored in
 `$ION_DATA_DIR/.ion/config.json`. Environment variables still outrank that
@@ -813,7 +814,7 @@ keeps the shipped templates honest.
 git add .env.example .env.template CLAUDE.md src/ion/core/config.py tests/test_env_boundary.py
 git commit -m "refactor(config): prune .env to secrets and bootstrap keys
 
-45 keys down to 14. The other 31 are managed in the settings UI and stored in
+45 keys down to 8. The other 37 are managed in the settings UI and stored in
 config.json, which the app already supported but could never win against."
 ```
 
@@ -836,5 +837,5 @@ Then confirm by hand:
 
 - `.env` has 8 keys and no `*_URL`, `*_ENABLED` or `*_VERIFY_SSL` entries.
 - Changing the Elasticsearch URL in the settings UI and restarting takes effect with no `.env` edit.
-- The Elasticsearch **password** field shows the "set by environment" badge and cannot be edited.
+- A field Compose still injects (`base_url`, `ollama_url`) shows the "set by environment" badge and cannot be edited. The Elasticsearch password no longer does: `ION_ELASTICSEARCH_PASSWORD` has been pruned and the value now lives in `config.json`.
 - The startup TLS warning names only the integrations actually enabled, not all seven.

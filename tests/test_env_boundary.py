@@ -1,7 +1,10 @@
 """The shipped .env templates must match the agreed boundary.
 
-Secrets and bootstrap keys stay. Everything else is managed in the settings UI,
-so a non-secret key reappearing in .env.example would quietly re-break it.
+The check runs both ways on purpose. A managed key reappearing would quietly
+re-break the settings UI, and a missing required key is worse than untidy:
+docker-compose.yml declares ION_DB_PASSWORD with `:?`, so Compose refuses to
+start without it, and a template that omits it hands someone a file that
+cannot boot.
 """
 import re
 from pathlib import Path
@@ -46,3 +49,15 @@ def test_bootstrap_and_managed_sets_do_not_overlap():
 
 def test_structural_secrets_are_not_claimed_as_bootstrap():
     assert not (STRUCTURAL_ENV_KEYS & set(BOOTSTRAP_ENV_KEYS))
+
+
+@pytest.mark.parametrize("name", TEMPLATES)
+def test_template_holds_every_required_key(name):
+    """One-directional checks let .env.example ship without ION_DB_PASSWORD."""
+    repo_root = Path(__file__).resolve().parents[1]
+    keys = _keys(repo_root / f".{name}")
+    required = STRUCTURAL_ENV_KEYS | BOOTSTRAP_ENV_KEYS
+    missing = sorted(required - keys)
+    assert missing == [], (
+        f".{name} is missing required keys: " + ", ".join(missing)
+    )

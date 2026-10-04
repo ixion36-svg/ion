@@ -71,7 +71,11 @@ def test_sources_covers_the_whole_map(monkeypatch, tmp_path):
 
 
 def test_secret_fields_are_mapped():
-    """The eight secrets stay in .env, so the UI must be able to badge them."""
+    """These stay badgeable: if anyone re-adds the env var, the UI must say so.
+
+    (They no longer live in .env — Config.to_file persists them to config.json —
+    but an operator re-adding one must not get a silent override.)
+    """
     for field in (
         "elasticsearch_password",
         "kibana_password",

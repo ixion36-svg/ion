@@ -144,10 +144,15 @@ services:
       # refuses to start unset -- so no fallback here either.
       - ION_DATABASE_URL=postgresql://ion:${ION_DB_PASSWORD}@postgres:5432/ion
       # Ollama LLM — defaults to the compose Ollama container when the
-      # `ai` profile is enabled. Override in .env to point at a remote
-      # Ollama host (e.g. ION_OLLAMA_URL=http://gpu-box:11434).
+      # `ai` profile is enabled. Set it HERE, not in the settings UI: because
+      # this line always injects a value, ollama_url is permanently
+      # environment-held and the UI renders it read-only with a "set by
+      # environment" badge. Point at a remote host by editing this default or
+      # exporting ION_OLLAMA_URL (e.g. http://gpu-box:11434).
       - ION_OLLAMA_URL=${ION_OLLAMA_URL:-http://ollama:11434}
-      # Base URL for OIDC redirect URIs — must match Keycloak Valid Redirect URIs
+      # Base URL for OIDC redirect URIs — must match Keycloak Valid Redirect
+      # URIs. Same as ION_OLLAMA_URL above: always injected, so base_url is
+      # permanently environment-held and is managed here, not in the UI.
       - ION_BASE_URL=${ION_BASE_URL:-https://ion.guardedglass.internal}
       # uvicorn workers. Background tasks (Kibana sync, Analytics Engine, TIDE
       # sync, Network Mapper, CyAB reminders) run on ONE worker, elected by a
