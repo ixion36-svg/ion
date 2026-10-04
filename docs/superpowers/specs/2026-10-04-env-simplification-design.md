@@ -107,3 +107,50 @@ to Docker secrets or a vault later. Neither is designed here.
 **Archiving unused integrations.** Arkime, GitLab, OpenCTI and TIDE are disabled
 by toggle, not removed. They work, and deleting working code to tidy a config
 file is a poor trade.
+
+## Revision, 2026-10-04: bootstrap-only after all
+
+The "secrets stay in the environment" boundary above does not survive contact
+with the code, and the design is revised to bootstrap-only.
+
+`Config.to_file` (`src/ion/core/config.py:499`) serialises the whole in-memory
+config, secrets included, and every section `PUT` calls it. So the first save
+through the settings UI persists environment-held secrets to `config.json` in
+plaintext, whatever `.env` says. This is not hypothetical: the live
+`config.json` already held real values for `elasticsearch_password` and
+`opencti_token` before any of this work began.
+
+Keeping secrets in `.env` therefore bought nothing. It described a boundary the
+application does not honour, and it would have left each integration configured
+in two places for no gain. The original objection to bootstrap-only was that it
+puts credentials in a file on the `ion-data` volume; the app already does that.
+
+**Revised boundary: 8 keys stay in `.env`.**
+
+Six are read before the app can consult its own settings: `ION_VERSION`,
+`ION_DATA_DIR`, `ION_HOST`, `ION_PORT`, `ION_WORKERS`, `ION_LOG_LEVEL`.
+
+Two are secrets that are structurally pinned there, and this is why
+bootstrap-only does not mean "no secrets in `.env`":
+
+- `ION_DB_PASSWORD` is interpolated by Compose into `POSTGRES_PASSWORD`
+  (`docker-compose.yml:71`, with `:?` so it refuses to start without it) and
+  into `ION_DATABASE_URL` (`:145`, `:309`). Compose reads it before any ION
+  process exists.
+- `ION_ADMIN_PASSWORD` is read from `os.environ` at `server.py:583` and `:785`.
+  There is no `admin_password` field on `Config`, so it cannot be stored in
+  `config.json` without new code, and removing it from `.env` makes the
+  startup weak-password check fail the boot outright.
+
+The other six integration secrets — Elasticsearch, Kibana, Arkime, GitLab,
+OpenCTI and TIDE — move into `config.json` with everything else.
+
+**What this changes elsewhere.** The source reporting and the "set by
+environment" badge from Tasks 1 to 3 stay: environment overrides remain
+possible and must stay visible. The badge simply fires rarely once `.env` is
+pruned, which is the point. Task 5's boundary test asserts the 8 keys above
+rather than secrets-plus-bootstrap.
+
+**Consequence to accept.** With the integration secrets in `config.json` only,
+the `ion-data` volume becomes the thing to back up. Losing it loses those
+credentials, where previously `.env` carried a copy.
