@@ -1106,6 +1106,105 @@ def get_config() -> Config:
     return _config
 
 
+# ── Where did a setting come from? ──
+#
+# get_config() ranks environment variables above .ion/config.json. That is
+# deliberate, but it used to be invisible: a value edited in the settings UI
+# saved successfully and changed nothing, which is how the dashboard spent an
+# hour reporting ELASTICSEARCH DEGRADED on 2026-10-04.
+#
+# This map is declarative rather than instrumented into the override block
+# above, because that block is several hundred hand-written `if os.environ.get`
+# lines and threading a recorder through every one of them would be a far
+# larger change for the same answer. test_every_mapped_field_exists_on_config
+# guards the map against typos and renames.
+ENV_FIELD_MAP: dict[str, str] = {
+    # General
+    "base_url": "ION_BASE_URL",
+    "cookie_secure": "ION_COOKIE_SECURE",
+    "debug_mode": "ION_DEBUG_MODE",
+    # Elasticsearch
+    "elasticsearch_enabled": "ION_ELASTICSEARCH_ENABLED",
+    "elasticsearch_url": "ION_ELASTICSEARCH_URL",
+    "elasticsearch_username": "ION_ELASTICSEARCH_USERNAME",
+    "elasticsearch_password": "ION_ELASTICSEARCH_PASSWORD",
+    "elasticsearch_verify_ssl": "ION_ELASTICSEARCH_VERIFY_SSL",
+    "elasticsearch_alert_index": "ION_ELASTICSEARCH_ALERT_INDEX",
+    "elasticsearch_case_index": "ION_ELASTICSEARCH_CASE_INDEX",
+    # Kibana
+    "kibana_cases_enabled": "ION_KIBANA_CASES_ENABLED",
+    "kibana_url": "ION_KIBANA_URL",
+    "kibana_username": "ION_KIBANA_USERNAME",
+    "kibana_password": "ION_KIBANA_PASSWORD",
+    "kibana_verify_ssl": "ION_KIBANA_VERIFY_SSL",
+    "kibana_space_id": "ION_KIBANA_SPACE_ID",
+    # GitLab
+    "gitlab_enabled": "ION_GITLAB_ENABLED",
+    "gitlab_url": "ION_GITLAB_URL",
+    "gitlab_token": "ION_GITLAB_TOKEN",
+    "gitlab_project_id": "ION_GITLAB_PROJECT_ID",
+    "gitlab_verify_ssl": "ION_GITLAB_VERIFY_SSL",
+    # OpenCTI
+    "opencti_enabled": "ION_OPENCTI_ENABLED",
+    "opencti_url": "ION_OPENCTI_URL",
+    "opencti_token": "ION_OPENCTI_TOKEN",
+    "opencti_verify_ssl": "ION_OPENCTI_VERIFY_SSL",
+    # Arkime
+    "arkime_enabled": "ION_ARKIME_ENABLED",
+    "arkime_url": "ION_ARKIME_URL",
+    "arkime_username": "ION_ARKIME_USERNAME",
+    "arkime_password": "ION_ARKIME_PASSWORD",
+    "arkime_verify_ssl": "ION_ARKIME_VERIFY_SSL",
+    # TIDE
+    "tide_enabled": "ION_TIDE_ENABLED",
+    "tide_url": "ION_TIDE_URL",
+    "tide_space": "ION_TIDE_SPACE",
+    "tide_verify_ssl": "ION_TIDE_VERIFY_SSL",
+    # Ollama
+    "ollama_enabled": "ION_OLLAMA_ENABLED",
+    "ollama_url": "ION_OLLAMA_URL",
+    # OIDC
+    "oidc_enabled": "ION_OIDC_ENABLED",
+}
+
+
+def _config_file_path() -> Path:
+    """The same path get_config() loads from."""
+    data_dir = os.environ.get("ION_DATA_DIR")
+    if data_dir:
+        return Path(data_dir) / ".ion" / "config.json"
+    return Path.cwd() / ".ion" / "config.json"
+
+
+def config_field_source(field: str) -> str:
+    """Report where `field`'s effective value came from.
+
+    Returns "environment", "file" or "default". An unmapped field, or one whose
+    environment variable is set to whitespace, reports as if it were unset:
+    blanking a key is how people disable it in a .env file.
+    """
+    env_name = ENV_FIELD_MAP.get(field)
+    if env_name and os.environ.get(env_name, "").strip():
+        return "environment"
+
+    path = _config_file_path()
+    if path.exists():
+        try:
+            with open(path, encoding="utf-8") as fh:
+                stored = json.load(fh)
+        except (OSError, json.JSONDecodeError):
+            stored = {}
+        if isinstance(stored, dict) and field in stored:
+            return "file"
+
+    return "default"
+
+
+def config_field_sources() -> dict[str, str]:
+    """config_field_source() for every field the settings UI can show."""
+    return {field: config_field_source(field) for field in ENV_FIELD_MAP}
+
+
 def set_config(config: Optional[Config]) -> None:
     """Set the global configuration instance. Pass None to clear cache."""
     global _config
