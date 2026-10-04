@@ -279,6 +279,17 @@ included, and every section `PUT` calls it. Secrets therefore reach
 `config.json` whatever `.env` says, so keeping a second copy in `.env` bought
 nothing and described a boundary the code does not honour.
 
+**Before pruning `.env` on any other instance, check the secrets are already
+persisted.** The migration script never sends secrets; they reach `config.json`
+only because `Config.to_file` has serialised them during some earlier save. On
+an instance where an integration was configured purely through `.env` and never
+saved through the UI, `config.json` may hold nothing for it, and pruning
+deletes the only copy. The integration then starts failing authentication with
+no warning. For each enabled integration, confirm `<name>_set` is true in
+`GET /api/admin/config` with the environment variable unset, or re-enter the
+secret in the settings UI, and only then prune. Keep the timestamped `.env`
+backup until you have confirmed it.
+
 **Consequence: back up the `ion-data` volume.** The Elasticsearch, Kibana,
 Arkime, GitLab, OpenCTI and TIDE credentials now live only in `config.json`
 inside that volume. Losing the volume loses them.
