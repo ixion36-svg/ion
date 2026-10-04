@@ -2208,6 +2208,14 @@ async function saveSettings(event, section) {
         data.oidc_verify_ssl = form.oidc_verify_ssl.checked;
     }
 
+    // Fields the environment holds are locked (applyConfigSources). A disabled
+    // input still exposes .value/.checked, so drop them here: otherwise the env
+    // value is copied into config.json and silently takes over later.
+    Object.keys(data).forEach(k => {
+        const el = form.elements[k];
+        if (el && el.disabled) delete data[k];
+    });
+
     try {
         const response = await fetch(`/api/admin/config/${section}`, {
             method: 'PUT',

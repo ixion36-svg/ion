@@ -51,3 +51,27 @@ def test_settings_page_has_badge_markup(admin_client):
     assert resp.status_code == 200
     html = resp.text
     assert "set by environment" in html.lower()
+
+
+def test_settings_page_calls_helper_after_config_fetch(admin_client):
+    """Defining the helper is not enough: loadAllSettings must invoke it."""
+    html = admin_client.get("/settings").text
+    assert "applyConfigSources(currentConfig.sources)" in html
+    assert html.index("populateForms(currentConfig);") < html.index(
+        "applyConfigSources(currentConfig.sources)"
+    )
+
+
+def test_save_settings_drops_locked_fields(admin_client):
+    """saveSettings must not PUT env-held (disabled) fields back to config.json.
+
+    A disabled input still exposes .value, so without this filter the
+    environment's value is copied into the file on every section save.
+    """
+    html = admin_client.get("/settings").text
+    save = html[html.index("async function saveSettings("):]
+    save = save[: save.index("async function testConnection(")]
+    filter_at = save.index("if (el && el.disabled) delete data[k];")
+    assert "form.elements[k]" in save
+    # The filter must run after the payload is built and before it is sent.
+    assert save.index("data.oidc_verify_ssl") < filter_at < save.index("JSON.stringify(data)")
