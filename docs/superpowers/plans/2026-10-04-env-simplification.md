@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Cut `.env` from 45 keys to 14 by moving every non-secret setting into ION's existing in-app settings, and make the remaining environment overrides visible in the UI instead of silent.
+**Goal:** Cut `.env` from 45 keys to 8 by moving every setting ION can store into its existing in-app settings, and make the remaining environment overrides visible in the UI instead of silent.
 
 **Architecture:** ION already has the settings UI, the `PUT /config/<integration>` endpoints and a persistent `config.json`. Environment variables outrank the file, so the UI cannot win. This plan adds a declarative field-to-env-var map that reports where each field's effective value came from, surfaces that in `GET /config` and the settings page, then migrates values into `config.json` and prunes `.env`.
 
@@ -17,7 +17,28 @@
 - `ruff check` must be clean.
 - Secrets never appear in test fixtures, log lines, or committed files. Use obviously fake values such as `env-secret` in tests.
 
-**Deviation from the spec, already agreed:** the spec counted 13 keys staying and 32 moving. `log_level` does not exist as a `Config` field (verified against `dataclasses.fields(Config)`, 162 fields), and `ION_LOG_LEVEL` is consumed when logging is configured, before config loads. It therefore joins the bootstrap set. Final counts are **14 staying, 31 moving**.
+**Revised boundary (2026-10-04, after Task 4 surfaced the reason).** The spec's
+original "secrets stay in .env" split is withdrawn: `Config.to_file`
+(`config.py:499`) serialises the whole config including secrets, and every
+section PUT calls it, so secrets reach `config.json` regardless. The live file
+already held `elasticsearch_password` and `opencti_token`. See the spec's
+"Revision" section.
+
+Final boundary is **8 keys staying, 37 moving**:
+
+- Six read before the app can consult its own config: `ION_VERSION`,
+  `ION_DATA_DIR`, `ION_HOST`, `ION_PORT`, `ION_WORKERS`, `ION_LOG_LEVEL`.
+  (`log_level` is not a `Config` field at all, verified against
+  `dataclasses.fields(Config)`, 162 fields.)
+- Two secrets structurally pinned to the environment: `ION_DB_PASSWORD`, which
+  Compose interpolates into `POSTGRES_PASSWORD` (`docker-compose.yml:71`) and
+  `ION_DATABASE_URL` (`:145`, `:309`) before ION exists; and
+  `ION_ADMIN_PASSWORD`, read from `os.environ` at `server.py:583` and `:785`
+  with no `admin_password` field on `Config`, so removing it fails the startup
+  weak-password check outright.
+
+Tasks 1 to 3 are unaffected and already complete: environment overrides remain
+possible, so they must stay visible.
 
 ---
 
@@ -540,8 +561,8 @@ foreach ($section in $sections) {
         continue
     }
     # Strip secret fields. GET /config returns them masked, so writing them
-    # back would store the mask itself. The eight secrets stay in .env and
-    # never need to reach config.json.
+    # back would store the mask itself. Real secret values reach config.json
+    # via Config.to_file on the server side, not through this script.
     $obj = $effective.$section
     $clean = [ordered]@{}
     foreach ($prop in $obj.PSObject.Properties) {
@@ -631,15 +652,13 @@ import pytest
 
 from ion.core.config import BOOTSTRAP_ENV_KEYS, ENV_FIELD_MAP
 
-SECRET_ENV_KEYS = frozenset({
-    "ION_ADMIN_PASSWORD",
+# Only these two secrets are structurally pinned to the environment:
+# Compose interpolates ION_DB_PASSWORD before ION exists, and
+# ION_ADMIN_PASSWORD has no Config field so it cannot be stored at all.
+# The other six integration secrets now live in config.json.
+STRUCTURAL_ENV_KEYS = frozenset({
     "ION_DB_PASSWORD",
-    "ION_ELASTICSEARCH_PASSWORD",
-    "ION_KIBANA_PASSWORD",
-    "ION_ARKIME_PASSWORD",
-    "ION_GITLAB_TOKEN",
-    "ION_OPENCTI_TOKEN",
-    "ION_TIDE_API_KEY",
+    "ION_ADMIN_PASSWORD",
 })
 
 TEMPLATES = ("env.example", "env.template")
@@ -655,7 +674,7 @@ def _keys(path: Path) -> set[str]:
 def test_template_holds_only_secrets_and_bootstrap(name):
     repo_root = Path(__file__).resolve().parents[1]
     keys = _keys(repo_root / f".{name}")
-    allowed = SECRET_ENV_KEYS | BOOTSTRAP_ENV_KEYS
+    allowed = STRUCTURAL_ENV_KEYS | BOOTSTRAP_ENV_KEYS
     stray = sorted(keys - allowed)
     assert stray == [], (
         "these belong in the settings UI, not .env: " + ", ".join(stray)
@@ -667,8 +686,8 @@ def test_bootstrap_and_managed_sets_do_not_overlap():
     assert not (managed & set(BOOTSTRAP_ENV_KEYS))
 
 
-def test_secrets_are_not_claimed_as_bootstrap():
-    assert not (SECRET_ENV_KEYS & set(BOOTSTRAP_ENV_KEYS))
+def test_structural_secrets_are_not_claimed_as_bootstrap():
+    assert not (STRUCTURAL_ENV_KEYS & set(BOOTSTRAP_ENV_KEYS))
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -704,7 +723,7 @@ Back up first, with a timestamp so repeated runs do not clobber each other:
 cp .env ".env.bak.$(date +%Y%m%d-%H%M%S)"
 ```
 
-Remove every key from `.env`, `.env.example` and `.env.template` that is neither in `SECRET_ENV_KEYS` nor in `BOOTSTRAP_ENV_KEYS`. The 31 to remove are exactly the values of `ENV_FIELD_MAP` minus the eight secrets:
+Remove every key from `.env`, `.env.example` and `.env.template` that is neither in `STRUCTURAL_ENV_KEYS` nor in `BOOTSTRAP_ENV_KEYS`. The 37 to remove are every value of `ENV_FIELD_MAP` except the two structural secrets:
 
 ```bash
 python - <<'PY'
@@ -712,12 +731,8 @@ import re
 from pathlib import Path
 from ion.core.config import BOOTSTRAP_ENV_KEYS, ENV_FIELD_MAP
 
-SECRETS = {
-    "ION_ADMIN_PASSWORD", "ION_DB_PASSWORD", "ION_ELASTICSEARCH_PASSWORD",
-    "ION_KIBANA_PASSWORD", "ION_ARKIME_PASSWORD", "ION_GITLAB_TOKEN",
-    "ION_OPENCTI_TOKEN", "ION_TIDE_API_KEY",
-}
-keep = SECRETS | set(BOOTSTRAP_ENV_KEYS)
+STRUCTURAL = {"ION_DB_PASSWORD", "ION_ADMIN_PASSWORD"}
+keep = STRUCTURAL | set(BOOTSTRAP_ENV_KEYS)
 
 for name in (".env", ".env.example", ".env.template"):
     path = Path(name)
@@ -734,7 +749,7 @@ for name in (".env", ".env.example", ".env.template"):
 PY
 ```
 
-Expected: `.env now 14 keys`.
+Expected: `.env now 8 keys`.
 
 - [ ] **Step 5: Run the tests to verify they pass**
 
@@ -819,7 +834,7 @@ Expected: all four test files pass, ruff is clean, and total coverage is at or a
 
 Then confirm by hand:
 
-- `.env` has 14 keys and no `*_URL`, `*_ENABLED` or `*_VERIFY_SSL` entries.
+- `.env` has 8 keys and no `*_URL`, `*_ENABLED` or `*_VERIFY_SSL` entries.
 - Changing the Elasticsearch URL in the settings UI and restarting takes effect with no `.env` edit.
 - The Elasticsearch **password** field shows the "set by environment" badge and cannot be edited.
 - The startup TLS warning names only the integrations actually enabled, not all seven.
