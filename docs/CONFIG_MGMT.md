@@ -253,6 +253,48 @@ For the customer's CCB / CMDB:
 - Customer change-control board (process acceptance per customer policy)
 - Customer SRO (Acceptance gate)
 
+# 11a. Runtime configuration boundary
+
+As of 2026-10-04, `.env` holds **8 keys and nothing else**. Everything else is
+managed in the settings UI and stored in `$ION_DATA_DIR/.ion/config.json`.
+
+**Read before ION can consult its own config, so they cannot move (6):**
+`ION_VERSION`, `ION_DATA_DIR`, `ION_HOST`, `ION_PORT`, `ION_WORKERS`,
+`ION_LOG_LEVEL`. `ION_DATA_DIR` is the strongest case: it is how `config.json`
+is located. `ION_LOG_LEVEL` has no `Config` field and is consumed when logging
+is set up, before config loads.
+
+**Secrets structurally pinned to the environment (2):**
+
+- `ION_DB_PASSWORD` — Compose interpolates it into `POSTGRES_PASSWORD`
+  (`docker-compose.yml:71`, with `:?` so Compose refuses to start without it)
+  and into `ION_DATABASE_URL` (`:145`, `:309`), before any ION process exists.
+- `ION_ADMIN_PASSWORD` — read from `os.environ` at `src/ion/web/server.py:583`
+  and `:785`. There is no `admin_password` field on `Config`. Removing it makes
+  the startup weak-password check abort the boot with `CONFIG FATAL`.
+
+**Why the other integration secrets are NOT in `.env`.** `Config.to_file`
+(`src/ion/core/config.py:499`) serialises the whole in-memory config, secrets
+included, and every section `PUT` calls it. Secrets therefore reach
+`config.json` whatever `.env` says, so keeping a second copy in `.env` bought
+nothing and described a boundary the code does not honour.
+
+**Consequence: back up the `ion-data` volume.** The Elasticsearch, Kibana,
+Arkime, GitLab, OpenCTI and TIDE credentials now live only in `config.json`
+inside that volume. Losing the volume loses them.
+
+**Environment variables still win.** `get_config()` ranks env above
+`config.json`, so re-adding a key to `.env` silently overrides the UI. The
+settings page guards against that: an environment-held field renders read-only
+with a "set by environment" badge, and the save path drops it rather than
+writing the env value back into `config.json`. `tests/test_env_boundary.py`
+keeps the shipped templates honest.
+
+**Known stale guidance.** `.env.deploy`, `deploy/DEPLOYMENT_GUIDE.md`,
+`deploy/OPENCTI_INTEGRATION.md`, `docs/DEPLOYMENT.md` and `docs/LLD.md` still
+describe configuring integrations through `.env`. They predate this boundary
+and have not been rewritten.
+
 # 12. Change history
 
 | Version | Date | Author | Change |
