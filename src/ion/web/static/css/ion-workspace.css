@@ -401,3 +401,18 @@
     .case-panel.page-mode .pm-cols { grid-template-columns: 1fr !important; }
 }
 
+
+/* Settings fields the environment holds: visibly not editable here. */
+.cfg-env-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 6px;
+    border: 1px solid var(--ion-border);
+    border-radius: 4px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+.cfg-env-locked { opacity: 0.6; cursor: not-allowed; }

@@ -1964,10 +1964,33 @@ async function loadAllSettings() {
 
         currentConfig = await response.json();
         populateForms(currentConfig);
+        applyConfigSources(currentConfig.sources);
 
     } catch (error) {
         showToast('Error loading settings: ' + error.message, 'error');
     }
+}
+
+// A field the environment holds cannot be changed from here: get_config()
+// ranks env above config.json. Show that rather than offering a save that
+// silently loses.
+function applyConfigSources(sources) {
+    if (!sources) return;
+    Object.entries(sources).forEach(([field, source]) => {
+        if (source !== 'environment') return;
+        const input = document.querySelector(`[name="${field}"], #${field}`);
+        if (!input) return;
+        input.readOnly = true;
+        input.disabled = true;
+        input.classList.add('cfg-env-locked');
+        if (input.parentElement.querySelector('.cfg-env-badge')) return;
+        const badge = document.createElement('span');
+        badge.className = 'cfg-env-badge';
+        badge.textContent = 'set by environment';
+        badge.title = `Held by ${field.toUpperCase()} in the environment. ` +
+                      'Remove it from .env to manage this here.';
+        input.parentElement.appendChild(badge);
+    });
 }
 
 function populateForms(config) {
