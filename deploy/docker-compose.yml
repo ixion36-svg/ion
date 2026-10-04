@@ -41,6 +41,9 @@ services:
       - .env
 
     environment:
+      # Injected here, so ollama_url is environment-held: the settings UI
+      # renders it read-only with a "set by environment" badge and drops it
+      # from saves. Change it here, not in the UI. See docs/CONFIG_MGMT.md 11a.
       - ION_OLLAMA_URL=http://ollama:11434
 
     security_opt:

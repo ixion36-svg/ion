@@ -347,8 +347,14 @@ deployment made from it; they are removed, and
 `tests/test_env_boundary.py::test_deploy_template_sets_no_ui_managed_key`
 keeps them out. `docs/DEPLOYMENT.md` and `deploy/OPENCTI_INTEGRATION.md` carry
 a banner above their `.env` examples marking them reference-only.
-`deploy/DEPLOYMENT_GUIDE.md` and `docs/LLD.md` mention integration variables in
-prose but set none, so they were left alone.
+`SETUP.md` and `deploy/ELASTICSEARCH_INTEGRATION.md` carry the same banner.
+`deploy/docker-compose.yml` injects `ION_OLLAMA_URL`, which is annotated there
+for the same reason as the root compose: that makes `ollama_url`
+environment-held in any stack started from it. `deploy/DEPLOYMENT_GUIDE.md` and
+`docs/LLD.md` mention integration variables in prose but set none, so they were
+left alone. `.env.deploy` and `.env.template` still carry managed keys as
+commented examples; they are inert, but worth pruning next time either file is
+touched.
 
 # 12. Change history
 
