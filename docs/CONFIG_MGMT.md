@@ -128,9 +128,16 @@ expected and must NOT be changed:
 
 | Property | Value |
 |---|---|
-| Image tag is immutable per version | YES — never re-pushed |
+| Image tag is immutable per version | USUALLY — see the exception below |
 | Image digest captured per release | YES — recorded in `_mod_design_passport.md` §2 at gate sign-off |
 | Customer verification | `docker inspect <image> --format '{{.RepoDigests}}'` |
+
+**Exception, v0.99.7 (2026-10-04).** The `0.99.7` image tag was re-pushed about
+an hour after release, to fold in a `base_url` fix. Two artifacts therefore
+exist under that version: the original `sha256:0b456156456e9d8d60907bf44b3b1c218f95e028aa1da87e61cf379ea7db10b2`
+and the replacement recorded at the next gate sign-off. The registry is private
+and the release had no external consumers at the time. Recorded here because a
+control the project does not follow is worse than one it never claimed.
 
 # 5. Release ritual
 

@@ -50,6 +50,16 @@ credentials and becomes the thing to back up.
 
 **Also in this release**
 
+- **`base_url` stayed badgeable.** Generating `ENV_FIELD_MAP` from the override
+  block dropped it: the generator looks for a literal `os.environ.get` on the
+  assignment's right-hand side, and `get_config()` assigns `base_url` from a
+  local. `docker-compose.yml` injects `ION_BASE_URL` with a default, so the
+  field is genuinely environment-held and was rendering as editable with no
+  badge. Restored, with a test covering overrides the generator cannot derive.
+- **PDF tests skip where WeasyPrint's native libraries are missing.** Nine
+  tests need Pango, Cairo and GDK-Pixbuf. They run on the CI runner and in the
+  Docker image, and now skip rather than fail on a host without them.
+
 - **The alert detail had no room to lay out.** It needs ~1100px before its
   two-column grid stops collapsing, and neither host gave it that: the modal
   was capped at 600px by a generic `.modal-content` rule beating the Tailwind
