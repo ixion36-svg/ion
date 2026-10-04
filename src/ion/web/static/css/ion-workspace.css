@@ -333,6 +333,10 @@
     align-items: start;
 }
 .pm-col { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+/* Sections needing more room than a single track — currently Alerts, which
+   embeds a whole alert-detail view and collapses below ~1100px. Spans every
+   track, so it lands on its own row under the three columns. */
+.case-panel.page-mode .pm-col[data-col="full"] { grid-column: 1 / -1; }
 .pm-col--empty { display: none; }
 .pm-col--drop { outline: 1.5px dashed var(--accent-color); outline-offset: 4px;
                 border-radius: 10px; min-height: 60px; }

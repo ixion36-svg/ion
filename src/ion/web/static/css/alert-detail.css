@@ -762,3 +762,20 @@
 .iad-folded .iad-sec-body { display: none; }
 .iad-sec-body { padding: 10px 12px; }
 
+
+/* ── Modal width ──
+ *
+ * The alert modal's markup asks for max-w-[min(1180px,94vw)] w-full, but the
+ * theme's generic `.modal-content { width:90%; max-width:600px }` wins: the
+ * Tailwind utilities are imported unlayered (frontend/tailwind.input.css), so
+ * two single-class selectors tie on specificity and the later rule — the
+ * theme's — takes it. 600px is below the 1100px breakpoint `.iad-cols` needs,
+ * so every section collapsed into one narrow column.
+ *
+ * Scoped to the alert modal by id, which cannot lose to a class selector
+ * whatever the source order. Other modals keep the 600px default.
+ */
+#alert-detail-modal .modal-content {
+    width: 100%;
+    max-width: min(1180px, 94vw);
+}

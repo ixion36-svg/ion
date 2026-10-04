@@ -4273,18 +4273,27 @@ function switchPanelTab(tabName) {
 // columns. ONE arrangement is remembered for all cases
 // (ion-case-window-layout-v1); sections a case does not have keep their
 // saved place, so arranging a small case never forgets a fuller one.
-const PM_LAYOUT_KEY = 'ion-case-window-layout-v1';
+// v2: alerts moved from the centre track to the full-width row, so saved v1
+// layouts have to be dropped or they would pin it back into 609px.
+const PM_LAYOUT_KEY = 'ion-case-window-layout-v2';
+// `full` is a spanning row rather than a track, so it carries no width here;
+// pmFitCols skips it when building grid-template-columns.
 const PM_COL_WIDTHS = { left: 'minmax(230px,1fr)', centre: 'minmax(0,1.7fr)', right: 'minmax(220px,0.9fr)' };
-const PM_TAB_COL = { alerts: 'centre', timeline: 'centre', attackpath: 'centre',
+// Alerts hosts a whole nested alert-detail view, which needs ~1100px before its
+// own two-column layout stops collapsing. The centre track is ~609px on a
+// 1600px viewport, so it gets the full-width row instead.
+const PM_TAB_COL = { alerts: 'full', timeline: 'centre', attackpath: 'centre',
                      observables: 'left', overview: 'right', actions: 'right', notes: 'right' };
 const PM_SLUG_COL = { 'similar-cases': 'left', 'workbench': 'left',
                       'observable-sightings': 'left' };
 const PM_PRESETS = {
     triage: null,   // the defaults above
     dossier: function (key, tab) {
+        if (tab === 'alerts') return 'full';
         return (tab === 'overview' || tab === 'actions' || tab === 'notes') ? 'right' : 'centre';
     },
     review: function (key, tab) {
+        if (tab === 'alerts') return 'full';
         if (tab === 'timeline' || key === 'similar-cases' || tab === 'observables') return 'left';
         if (tab === 'overview' || tab === 'actions') return 'right';
         return 'centre';
@@ -4358,6 +4367,10 @@ function pmFitCols(body) {
         const any = [...col.children].some(el =>
             el.classList.contains('cpanel-section') && !el.hidden);
         col.classList.toggle('pm-col--empty', !any && !_pmDragging);
+        // The full-width row spans every track (grid-column: 1/-1) rather than
+        // being one, so it must not contribute a width or the template would
+        // gain a fourth, undefined track.
+        if (col.dataset.col === 'full') return;
         if (any || _pmDragging) widths.push(PM_COL_WIDTHS[col.dataset.col]);
     });
     body.querySelector('.pm-cols').style.setProperty('--pm-cols', widths.join(' ') || '1fr');
@@ -4521,7 +4534,7 @@ function applyPageModeLayout() {
     if (!body.querySelector('.pm-cols')) {
         const grid = document.createElement('div');
         grid.className = 'pm-cols';
-        ['left', 'centre', 'right'].forEach(c => {
+        ['left', 'centre', 'right', 'full'].forEach(c => {
             const col = document.createElement('div');
             col.className = 'pm-col';
             col.dataset.col = c;
