@@ -1,13 +1,67 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.8 -->
-<!-- ion-doc:version=0.99.8 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.9 -->
+<!-- ion-doc:version=0.99.9 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-10-05 -->
 
 # Changelog
+
+## v0.99.9 — 2026-10-05
+
+**Five findings from an external review of v0.99.8, all verified in source and
+all closed, plus an audit trail for refused requests.** Two of the five are the
+same defect seen from opposite sides: a control at one layer bypassed by
+another layer that did not know about it. Nothing in the configuration or API
+contract changes; everything applies on restart.
+
+**Upgrading.** No action. Page routes now redirect a user flagged
+`must_change_password` to `/profile` instead of rendering, which is the
+behaviour the API already had.
+
+- **Security monitoring buffered whole request bodies before authentication.**
+  `SecurityMonitoringMiddleware._buffer_body()` drained the entire body, joined
+  it, and decoded all of it before slicing the decoded string to 10,000
+  characters — a cap on scanned text, not on bytes received or allocated. The
+  middleware runs before routing, CSRF and auth, so an anonymous POST to any
+  non-excluded path sized a worker allocation; `/api/pcap/analyze` is not an
+  excluded path, so this defeated the streaming cap added for exactly that
+  reason. It now consumes only the scanning prefix and delegates the rest to
+  the real `receive`, so the route still reads a complete body this layer never
+  holds.
+- **Entry points that validated a session directly applied no policy.** The
+  password-change gate and tenant resolution lived inside the REST dependency,
+  so MCP, both page authenticators (58+ routes) and the SSE stream inherited
+  neither: a flagged user could call MCP tools, and because an unresolved
+  tenant means *the default estate* to the ES/Kibana overlay, a tenant-bound
+  caller's case note synced to the wrong estate. `apply_post_session_policy()`
+  now holds both and every entry point goes through it. The page
+  authenticators became async with a threadpool split so the tenant
+  ContextVars are set in the request's own context.
+- **A generic webhook acknowledged alerts and discarded them.**
+  `POST /api/webhooks/alert` accepted a title, severity, message, host, user,
+  tags and raw data, stored a triage row holding only a generated id, OPEN
+  status and the source, and returned `ok: true`. No Elasticsearch document
+  backs a webhook alert id, so nothing ION stored could rebuild the incident.
+  The payload now lands in an `IntegrationEvent` row — the same durable record
+  the integration receiver writes — in the triage row's transaction.
+- **Document-analysis results were readable by job id alone.**
+  `GET /api/document-analysis/jobs/{job_id}` checked only `ai:chat` and
+  returned any job's filename and full analysis text. Job ids carry a 64-bit
+  random tail, so enumeration is impractical, but that is not an authorization
+  check. The read is owner-scoped and returns 404 to anyone else.
+- **Notes could be filed in another user's folder.** Create and the general
+  update wrote `folder_id` through unchecked; only the dedicated move endpoint
+  verified ownership. All three paths now share one check.
+- **Refused requests now reach `audit_logs`.** Permission denials, the
+  password-change gate and both tenant refusals wrote only to the application
+  log, so a deployment could not answer "who was refused what, from where"
+  from the database. Each writes a row on its own committed session, because
+  the refusal abandons the request session and a row written there would roll
+  back with it. The permission name stays out of the response and goes to the
+  record.
 
 ## v0.99.8 — 2026-10-05
 
