@@ -127,9 +127,19 @@ engine = init_db()
 
 config_path = Path('${CONFIG_PATH}')
 if not config_path.exists():
+    # cookie_secure is deliberately NOT seeded here. It used to be read as
+    # os.environ.get('ION_COOKIE_SECURE', 'false'), and once ION_COOKIE_SECURE
+    # left .env in v0.99.7 that 'false' became the value every fresh
+    # deployment persisted -- session cookies with no Secure flag, written to
+    # config.json where nothing corrects them. Config's own default is True,
+    # and get_config() still applies ION_COOKIE_SECURE and the dev_mode
+    # relaxation on every load, so leaving it out is both safer and complete.
+    #
+    # oidc_enabled IS seeded false on purpose: Config defaults it True, and a
+    # fresh install has no Keycloak to talk to, so the first boot must leave
+    # local admin login working. It is managed in the settings UI afterwards.
     config = Config(
         db_path=Path('${CONFIG_DIR}/ion.db'),
-        cookie_secure=os.environ.get('ION_COOKIE_SECURE', 'false').lower() == 'true',
         oidc_enabled=os.environ.get('ION_OIDC_ENABLED', 'false').lower() == 'true',
         oidc_keycloak_url=os.environ.get('ION_OIDC_KEYCLOAK_URL', ''),
         oidc_realm=os.environ.get('ION_OIDC_REALM', ''),

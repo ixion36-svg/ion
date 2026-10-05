@@ -95,3 +95,71 @@ def test_deploy_template_sets_no_ui_managed_key():
         ".env.deploy sets keys managed in the settings UI, which would "
         "silently override it: " + ", ".join(stray)
     )
+
+
+# ── Consequences of the pruning ──
+#
+# Removing a key from .env hands the decision to whatever default was behind
+# it. ION_COOKIE_SECURE is the case that bit: docker-entrypoint.sh seeded the
+# first-boot config.json with
+# `cookie_secure=os.environ.get('ION_COOKIE_SECURE', 'false') == 'true'`, which
+# was harmless while .env.template shipped ION_COOKIE_SECURE=true and became
+# the operative value the moment the key left. Config's own default is True;
+# the entrypoint must not override it.
+
+ENTRYPOINT = "docker-entrypoint.sh"
+
+
+def test_entrypoint_does_not_seed_cookie_secure():
+    repo_root = Path(__file__).resolve().parents[1]
+    path = repo_root / ENTRYPOINT
+    if not path.exists():
+        pytest.skip(f"{ENTRYPOINT} not present")
+    text = path.read_text(encoding="utf-8")
+    assert "cookie_secure=os.environ.get" not in text, (
+        "docker-entrypoint.sh is seeding cookie_secure again. Its env default "
+        "decides the value for every fresh deployment and persists it to "
+        "config.json, where get_config() finds no environment variable to "
+        "correct it. Leave it out: Config defaults it True, and get_config() "
+        "still applies ION_COOKIE_SECURE and the dev_mode relaxation."
+    )
+
+
+def test_a_pruned_env_still_yields_secure_cookies(monkeypatch, tmp_path):
+    """The end state the test above protects, asserted end to end.
+
+    Replicates the entrypoint's first-boot seed with .env pruned to the 8-key
+    boundary, then loads the config the way the app does.
+    """
+    from ion.core import config as config_mod
+    from ion.core.config import Config
+
+    for key in ("ION_COOKIE_SECURE", "ION_DEV_MODE"):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("ION_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+
+    # docker-entrypoint.sh, first boot: db_path and oidc_enabled only.
+    Config(
+        db_path=tmp_path / ".ion" / "ion.db",
+        oidc_enabled=False,
+    ).to_file(tmp_path / ".ion" / "config.json")
+
+    assert config_mod.get_config().cookie_secure is True
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+
+
+def test_dev_mode_can_still_relax_the_cookie(monkeypatch, tmp_path):
+    """Not seeding it must not break plain-HTTP development.
+
+    get_config() drops cookie_secure when dev_mode is on, so the relaxation
+    survives without the entrypoint writing anything.
+    """
+    from ion.core import config as config_mod
+
+    monkeypatch.delenv("ION_COOKIE_SECURE", raising=False)
+    monkeypatch.setenv("ION_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ION_DEV_MODE", "true")
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
+    assert config_mod.get_config().cookie_secure is False
+    monkeypatch.setattr(config_mod, "_config", None, raising=False)
