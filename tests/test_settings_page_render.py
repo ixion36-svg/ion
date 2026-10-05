@@ -56,10 +56,21 @@ def test_settings_page_has_badge_markup(admin_client):
 def test_settings_page_calls_helper_after_config_fetch(admin_client):
     """Defining the helper is not enough: loadAllSettings must invoke it."""
     html = admin_client.get("/settings").text
-    assert "applyConfigSources(currentConfig.sources)" in html
-    assert html.index("populateForms(currentConfig);") < html.index(
-        "applyConfigSources(currentConfig.sources)"
-    )
+    call = "applyConfigSources(currentConfig.sources, currentConfig.source_env_names)"
+    assert call in html
+    assert html.index("populateForms(currentConfig);") < html.index(call)
+
+
+def test_the_badge_tooltip_does_not_derive_the_variable_name(admin_client):
+    """It must name the key the server sent, not one built from the field.
+
+    field.toUpperCase() drops the ION_ prefix on every field and is simply
+    wrong for gitlab_sudo_enabled (ION_GITLAB_SUDO), so the tooltip told the
+    operator to remove a variable that does not exist.
+    """
+    html = admin_client.get("/settings").text
+    assert "field.toUpperCase()" not in html
+    assert "envNames[field]" in html
 
 
 def test_save_settings_drops_locked_fields(admin_client):

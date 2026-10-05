@@ -19,6 +19,14 @@
     whose name looks secret, and every *_set flag, is dropped from each payload.
     The PUT handlers also ignore values starting with "*", but the script does
     not rely on that.
+
+    The PUT handlers also drop any field the environment is currently holding,
+    which is every field this script cares about at the moment it runs. That
+    does not defeat it: each handler ends in Config.to_file against the
+    env-merged config object, so the environment's effective value is written
+    to config.json regardless of what the payload said. The PUT is what
+    triggers the write; the values come from the running config, not from here.
+    tests/test_config_write_guard.py pins both halves of that.
 #>
 param(
     [string]$BaseUrl = "http://localhost:8000",

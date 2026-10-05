@@ -1343,6 +1343,17 @@ def _env_override(field: str) -> Optional[str]:
     return value or None
 
 
+def env_held_fields() -> frozenset[str]:
+    """Every field whose effective value the environment is currently holding.
+
+    The right question for a write path, and cheaper than
+    config_field_sources(): these are the fields a `PUT` must not persist,
+    because config.json loses to the environment on the next load. No file read
+    — provenance is not needed, only "is the environment deciding this".
+    """
+    return frozenset(f for f in ENV_FIELD_MAP if _env_override(f) is not None)
+
+
 def _stored_config() -> dict:
     """The parsed config.json, or {} when it is absent or unreadable."""
     path = _config_file_path()

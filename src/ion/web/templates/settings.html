@@ -1964,7 +1964,7 @@ async function loadAllSettings() {
 
         currentConfig = await response.json();
         populateForms(currentConfig);
-        applyConfigSources(currentConfig.sources);
+        applyConfigSources(currentConfig.sources, currentConfig.source_env_names);
 
     } catch (error) {
         showToast('Error loading settings: ' + error.message, 'error');
@@ -1974,7 +1974,7 @@ async function loadAllSettings() {
 // A field the environment holds cannot be changed from here: get_config()
 // ranks env above config.json. Show that rather than offering a save that
 // silently loses.
-function applyConfigSources(sources) {
+function applyConfigSources(sources, envNames) {
     if (!sources) return;
     Object.entries(sources).forEach(([field, source]) => {
         if (source !== 'environment') return;
@@ -1987,8 +1987,16 @@ function applyConfigSources(sources) {
         const badge = document.createElement('span');
         badge.className = 'cfg-env-badge';
         badge.textContent = 'set by environment';
-        badge.title = `Held by ${field.toUpperCase()} in the environment. ` +
-                      'Remove it from .env to manage this here.';
+        // The server sends the real variable name. Do not derive it: no
+        // field's key is simply its name upper-cased, and gitlab_sudo_enabled
+        // does not even correspond (ION_GITLAB_SUDO), so a guessed name sends
+        // the operator looking for a key that is not there.
+        const envName = (envNames && envNames[field]) || null;
+        badge.title = (envName ? `Held by ${envName} in the environment. `
+                               : 'Held by an environment variable. ') +
+                      'Remove it from .env (or from the compose file, which ' +
+                      'injects ION_BASE_URL and ION_OLLAMA_URL) to manage ' +
+                      'this here.';
         input.parentElement.appendChild(badge);
     });
 }

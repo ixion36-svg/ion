@@ -1,5 +1,6 @@
 """Admin API endpoints for system configuration and management."""
 
+import logging
 import os
 import platform
 import sys
@@ -12,11 +13,20 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_admin, require_permission
-from ion.core.config import Config, config_field_sources, get_config, set_config
+from ion.core.config import (
+    ENV_FIELD_MAP,
+    Config,
+    config_field_sources,
+    env_held_fields,
+    get_config,
+    set_config,
+)
 from ion.core.safe_errors import safe_error
 from ion.core.url_validator import validate_integration_url
 from ion.models.user import User
 from ion.web.api import get_db_session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -192,6 +202,60 @@ def _ssrf_safe_url(url: str, integration_type: str) -> str:
     return url.rstrip("/")
 
 
+def _drop_env_held(settings: BaseModel) -> list[str]:
+    """Blank every submitted field the environment is holding.
+
+    get_config() ranks the environment above config.json, so persisting one of
+    these stores a value that never takes effect: a save that reports success
+    and changes nothing, which is the bug v0.99.7 exists to close. The settings
+    page drops them client-side, but a client-side filter is a courtesy, not an
+    invariant — curl, a script and the setup wizard all reach the same writes.
+
+    Setting the field to None makes each handler's `if settings.x is not None`
+    skip it, so no handler needs to know this ran. The section models name
+    their fields exactly as Config does, which is what makes the lookup valid;
+    the wizard does not, and uses _env_held_snapshot instead.
+    """
+    held = env_held_fields()
+    dropped = [
+        name for name in type(settings).model_fields
+        if name in held and getattr(settings, name, None) is not None
+    ]
+    for name in dropped:
+        setattr(settings, name, None)
+    if dropped:
+        logger.info(
+            "Ignored %d environment-held field(s) in a config save: %s",
+            len(dropped), ", ".join(sorted(dropped)),
+        )
+    return dropped
+
+
+def _env_held_snapshot(config: Config) -> dict:
+    """The environment-held fields' current values, for _restore_env_held.
+
+    The setup wizard's payload uses generic names (`url`, `api_key`,
+    `enabled`) rather than Config field names, so it cannot be filtered
+    field-by-field. Snapshot before the handler assigns and restore before the
+    write instead: get_config() has already applied the environment, so these
+    ARE the environment's values.
+    """
+    return {f: getattr(config, f) for f in env_held_fields() if hasattr(config, f)}
+
+
+def _restore_env_held(config: Config, snapshot: dict) -> list[str]:
+    """Undo any write the payload made to an environment-held field."""
+    reverted = [f for f, v in snapshot.items() if getattr(config, f, v) != v]
+    for field, value in snapshot.items():
+        setattr(config, field, value)
+    if reverted:
+        logger.info(
+            "Ignored %d environment-held field(s) in a wizard save: %s",
+            len(reverted), ", ".join(sorted(reverted)),
+        )
+    return reverted
+
+
 # =============================================================================
 # Configuration Endpoints
 # =============================================================================
@@ -205,6 +269,12 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
         # Which fields the environment is holding, so the settings page can
         # render them read-only instead of offering an edit that cannot win.
         "sources": config_field_sources(),
+        # The variable to name in the badge's tooltip. The page used to derive
+        # it as field.toUpperCase(), which is wrong for every field (the real
+        # keys are ION_-prefixed) and wrong twice over for gitlab_sudo_enabled,
+        # whose key is ION_GITLAB_SUDO: the tooltip told operators to delete a
+        # variable that does not exist. Names only, never values.
+        "source_env_names": dict(ENV_FIELD_MAP),
         "general": {
             "db_path": str(config.db_path),
             "default_format": config.default_format,
@@ -316,6 +386,7 @@ async def update_general_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update general application settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.default_format is not None:
@@ -344,6 +415,7 @@ async def update_gitlab_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update GitLab integration settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.gitlab_enabled is not None:
@@ -377,6 +449,7 @@ async def update_opencti_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update OpenCTI integration settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.opencti_enabled is not None:
@@ -402,6 +475,7 @@ async def update_elasticsearch_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update Elasticsearch integration settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.elasticsearch_enabled is not None:
@@ -453,6 +527,7 @@ async def update_oidc_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update OIDC/Keycloak settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.base_url is not None:
@@ -493,6 +568,7 @@ async def update_kibana_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update Kibana Cases integration settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.kibana_cases_enabled is not None:
@@ -531,6 +607,7 @@ async def update_dfir_iris_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update DFIR-IRIS integration settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.dfir_iris_enabled is not None:
@@ -559,6 +636,7 @@ async def update_tide_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update TIDE integration settings."""
+    _drop_env_held(settings)
     config = get_config()
 
     if settings.tide_enabled is not None:
@@ -595,6 +673,7 @@ async def update_arkime_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update Arkime PCAP analysis settings."""
+    _drop_env_held(settings)
     config = get_config()
     if settings.arkime_enabled is not None:
         config.arkime_enabled = settings.arkime_enabled
@@ -617,6 +696,7 @@ async def update_ollama_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update Ollama AI / LLM settings."""
+    _drop_env_held(settings)
     config = get_config()
     if settings.ollama_enabled is not None:
         config.ollama_enabled = settings.ollama_enabled
@@ -645,6 +725,7 @@ async def update_abuseipdb_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update AbuseIPDB settings."""
+    _drop_env_held(settings)
     config = get_config()
     if settings.abuseipdb_enabled is not None:
         config.abuseipdb_enabled = settings.abuseipdb_enabled
@@ -661,6 +742,7 @@ async def update_virustotal_settings(
     current_user: User = Depends(require_permission("system:settings")),
 ):
     """Update VirusTotal settings."""
+    _drop_env_held(settings)
     config = get_config()
     if settings.virustotal_enabled is not None:
         config.virustotal_enabled = settings.virustotal_enabled
@@ -1907,6 +1989,7 @@ async def save_wizard_integration(
 ):
     """Save configuration for a single integration."""
     config = get_config()
+    _env_held = _env_held_snapshot(config)
 
     if integration == "elasticsearch":
         if config_data.enabled is not None:
@@ -2005,6 +2088,7 @@ async def save_wizard_integration(
     else:
         raise HTTPException(400, f"Unknown integration: {integration}")
 
+    _restore_env_held(config, _env_held)
     config.to_file(get_config_path())
     reload_config()
 
@@ -2029,6 +2113,7 @@ async def save_all_wizard_integrations(
 ):
     """Save all integration configurations at once."""
     config = get_config()
+    _env_held = _env_held_snapshot(config)
     saved = []
     errors = []
 
@@ -2146,6 +2231,7 @@ async def save_all_wizard_integrations(
             errors.append({"integration": integration_name, "error": safe_error(e)})
 
     # Save all changes
+    _restore_env_held(config, _env_held)
     config.to_file(get_config_path())
     reload_config()
 
