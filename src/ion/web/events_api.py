@@ -20,7 +20,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 
-from ion.auth.dependencies import SESSION_COOKIE_NAME
+from ion.auth.dependencies import SESSION_COOKIE_NAME, apply_post_session_policy
 from ion.auth.service import AuthService
 from ion.services import event_stream
 from ion.storage.database import get_session_factory
@@ -32,7 +32,13 @@ router = APIRouter(tags=["events"])
 
 def _authenticate(request: Request) -> bool:
     """Validate the session token (cookie first, then Bearer) on a short-lived
-    session that we close immediately. Returns True iff authenticated."""
+    session that we close immediately. Returns True iff authenticated.
+
+    The stream carries no estate data — only ``refresh`` signals for an
+    allow-listed topic — but it still applies the shared post-session policy so
+    a flagged user cannot hold a stream open, and so this entry point does not
+    drift from the others. Raises HTTPException when a policy refuses.
+    """
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         auth_header = request.headers.get("Authorization", "")
@@ -43,8 +49,12 @@ def _authenticate(request: Request) -> bool:
 
     session = get_session_factory()()
     try:
-        user = AuthService(session).validate_session(token)
-        return user is not None
+        auth_service = AuthService(session)
+        user = auth_service.validate_session(token)
+        if user is None:
+            return False
+        apply_post_session_policy(request, user, auth_service)
+        return True
     finally:
         session.close()
 

@@ -110,7 +110,7 @@ class TestFeatureFlag:
 
     def test_endpoint_reachable_when_enabled(self, monkeypatch):
         monkeypatch.setenv("ION_MCP_ENABLED", "true")
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = client.post("/api/mcp", json=_rpc("ping"))
         assert resp.status_code == 200
@@ -130,7 +130,7 @@ class TestAuthGate:
         assert data["error"]["code"] == -32001
 
     def test_authenticated_request_reaches_handler(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, _rpc("ping"))
         assert resp.status_code == 200
@@ -145,7 +145,7 @@ class TestAuthGate:
 class TestJsonRpcProtocol:
     @pytest.fixture(autouse=True)
     def authed(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             yield
 
     def test_initialize(self):
@@ -175,7 +175,7 @@ class TestJsonRpcProtocol:
         assert data["error"]["code"] == -32601
 
     def test_parse_error_on_non_json_body(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = client.post("/api/mcp", content=b"not json", headers={"Content-Type": "application/json"})
         assert resp.status_code == 400
@@ -214,7 +214,7 @@ class TestJsonRpcProtocol:
 
 class TestToolsList:
     def test_returns_all_tools_for_full_user(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, _rpc("tools/list"))
         tools = resp.json()["result"]["tools"]
@@ -227,7 +227,7 @@ class TestToolsList:
     def test_filters_by_permission(self):
         # User with ONLY alert:read
         user = _user(perms=["alert:read"])
-        with patch.object(mcp_mod, "_authenticate", return_value=user):
+        with patch.object(mcp_mod, "_authenticate", return_value=(user, None)):
             client = TestClient(_app())
             resp = _post(client, _rpc("tools/list"))
         names = {t["name"] for t in resp.json()["result"]["tools"]}
@@ -235,7 +235,7 @@ class TestToolsList:
         assert "list_cases" not in names
 
     def test_no_private_keys_in_response(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, _rpc("tools/list"))
         for tool in resp.json()["result"]["tools"]:
@@ -243,7 +243,7 @@ class TestToolsList:
                 assert not key.startswith("_")
 
     def test_each_tool_has_required_fields(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, _rpc("tools/list"))
         for tool in resp.json()["result"]["tools"]:
@@ -260,7 +260,7 @@ class TestToolsList:
 class TestToolsCallDispatch:
     @pytest.fixture(autouse=True)
     def authed(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             yield
 
     def test_unknown_tool_returns_tool_error(self):
@@ -272,7 +272,7 @@ class TestToolsCallDispatch:
 
     def test_permission_denied_on_missing_perm(self):
         user = _user(perms=[])  # no permissions at all
-        with patch.object(mcp_mod, "_authenticate", return_value=user):
+        with patch.object(mcp_mod, "_authenticate", return_value=(user, None)):
             client = TestClient(_app())
             resp = _post(client, _rpc("tools/call", {"name": "list_alerts", "arguments": {}}))
         result = resp.json()["result"]
@@ -301,7 +301,7 @@ class TestToolsCallDispatch:
 
 class TestBatchRequests:
     def test_batch_returns_list(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, [
                 _rpc("ping", req_id=1),
@@ -315,7 +315,7 @@ class TestBatchRequests:
         assert ids == {1, 2}
 
     def test_batch_of_notifications_returns_204(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, [
                 {"jsonrpc": "2.0", "method": "notifications/initialized"},
@@ -791,7 +791,7 @@ class TestBatchNonObjectEntries:
     -32600 error, not an AttributeError -> 500."""
 
     def test_batch_with_non_object_entries_returns_per_item_errors(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, [1, "x", _rpc("ping", req_id=7)])
         assert resp.status_code == 200
@@ -806,7 +806,7 @@ class TestBatchNonObjectEntries:
         assert len(ok) == 1 and ok[0]["id"] == 7
 
     def test_batch_of_only_invalid_entries_still_200(self):
-        with patch.object(mcp_mod, "_authenticate", return_value=_user()):
+        with patch.object(mcp_mod, "_authenticate", return_value=(_user(), None)):
             client = TestClient(_app())
             resp = _post(client, [None, 42])
         assert resp.status_code == 200

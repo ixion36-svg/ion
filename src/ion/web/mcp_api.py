@@ -47,11 +47,16 @@ import logging
 import os
 from typing import Any, Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import selectinload
 
-from ion.auth.dependencies import SESSION_COOKIE_NAME
+from ion.auth.dependencies import (
+    SESSION_COOKIE_NAME,
+    apply_post_session_policy,
+    install_tenant_binding,
+)
 from ion.auth.service import AuthService
 from ion.models.alert_triage import (
     AlertCase,
@@ -279,18 +284,28 @@ def _public_tool(t: dict) -> dict:
 # Auth — short-lived session (same pattern as events_api.py)
 # ---------------------------------------------------------------------------
 
-def _authenticate(request: Request) -> Optional[User]:
-    """Return the User for a valid session token, or None."""
+def _authenticate(request: Request) -> tuple:
+    """Return (User, tenant_binding) for a valid session, else (None, None).
+
+    MCP is a full entry point, so it applies the same post-session policy as
+    the REST API — validating the session alone skipped the password-change
+    gate and left the tenant unresolved, which the ES/Kibana overlay reads as
+    the default estate. Raises HTTPException when a policy refuses.
+    """
     token = request.cookies.get(SESSION_COOKIE_NAME)
     if not token:
         auth = request.headers.get("Authorization", "")
         if auth.startswith("Bearer "):
             token = auth[7:]
     if not token:
-        return None
+        return None, None
     session = get_session_factory()()
     try:
-        return AuthService(session).validate_session(token)
+        auth_service = AuthService(session)
+        user = auth_service.validate_session(token)
+        if user is None:
+            return None, None
+        return user, apply_post_session_policy(request, user, auth_service)
     finally:
         session.close()
 
@@ -764,12 +779,25 @@ async def mcp_endpoint(request: Request) -> JSONResponse:
             status_code=404,
         )
 
-    user = _authenticate(request)
+    try:
+        # Threadpool: session validation and tenant resolution are blocking DB
+        # work. The binding is installed below, in this handler's own context —
+        # a ContextVar set in the threadpool's copied context is discarded.
+        user, tenant_binding = await run_in_threadpool(_authenticate, request)
+    except HTTPException as exc:
+        # A policy refused this session (pending password change, unavailable
+        # estate). Carry its status rather than reporting it as unauthenticated.
+        return JSONResponse(
+            _rpc_err(None, -32001, str(exc.detail)),
+            status_code=exc.status_code,
+        )
     if user is None:
         return JSONResponse(
             _rpc_err(None, -32001, "Unauthorized — supply a valid ION session."),
             status_code=401,
         )
+    # Set here, in the handler's own context: the tools run inside this call.
+    install_tenant_binding(tenant_binding)
 
     try:
         body = await request.json()

@@ -27,6 +27,14 @@ _CONTENT_EVENT_TYPES = frozenset({
 })
 from ion.storage.database import get_engine, get_session_factory
 
+# Bytes of request body retained for attack scanning. The middleware runs
+# before routing, CSRF and auth, so whatever it holds is allocated for
+# unauthenticated callers on any non-excluded path: buffering the whole body
+# here would defeat the streaming caps the upload handlers enforce (see
+# ion.core.uploads.read_upload_capped) and let an anonymous POST size a worker
+# allocation. Bytes, not characters — the cap has to bound the allocation.
+_SCAN_BYTES = 10_000
+
 logger = get_structured_logger(__name__)
 
 
@@ -150,22 +158,31 @@ class SecurityMonitoringMiddleware:
 
     @staticmethod
     async def _buffer_body(receive):
-        """Drain the request body, returning (bytes, replay_receive).
+        """Read at most ``_SCAN_BYTES`` of body, returning (prefix, replay_receive).
 
-        BaseHTTPMiddleware did this implicitly. In pure ASGI a body read here
-        would leave nothing for the route handler, so the raw messages are kept
-        and handed back in order.
+        In pure ASGI a body read here would leave nothing for the route handler,
+        so the consumed messages are handed back in order. Only the scanning
+        prefix is consumed: the replay then delegates to the real ``receive``,
+        so the route still sees a complete body that this layer never held.
         """
         messages = []
-        while True:
+        size = 0
+        while size < _SCAN_BYTES:
             message = await receive()
             messages.append(message)
             if message["type"] == "http.disconnect":
                 break
+            size += len(message.get("body", b""))
             if not message.get("more_body", False):
                 break
-        body = b"".join(
+        prefix = b"".join(
             m.get("body", b"") for m in messages if m["type"] == "http.request"
+        )[:_SCAN_BYTES]
+        # Whether the body ended within the prefix, which decides what a replay
+        # past the buffered messages means.
+        drained = bool(messages) and (
+            messages[-1]["type"] == "http.disconnect"
+            or not messages[-1].get("more_body", False)
         )
         pending = iter(messages)
 
@@ -173,11 +190,13 @@ class SecurityMonitoringMiddleware:
             try:
                 return next(pending)
             except StopIteration:
-                # The app asked for more than arrived; anything further is a
-                # disconnect, never a hang.
-                return {"type": "http.disconnect"}
+                if drained:
+                    # The app asked for more than arrived; anything further is a
+                    # disconnect, never a hang.
+                    return {"type": "http.disconnect"}
+                return await receive()
 
-        return body, replay
+        return prefix, replay
 
     async def _handle(self, request: Request, scope, receive, send) -> None:
         if not self.enabled or not self.session_factory:
@@ -231,7 +250,9 @@ class SecurityMonitoringMiddleware:
                 if request.method in ("POST", "PUT", "PATCH"):
                     try:
                         body_bytes, downstream_receive = await self._buffer_body(receive)
-                        body = body_bytes.decode("utf-8", errors="ignore")[:10000]  # Limit size
+                        # Already capped at _SCAN_BYTES; errors="ignore" drops a
+                        # multi-byte character split by the cut.
+                        body = body_bytes.decode("utf-8", errors="ignore")
                     except Exception:
                         pass
 

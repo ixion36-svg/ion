@@ -34,6 +34,12 @@ _PWD_CHANGE_ALLOWED_PREFIXES = (
     "/static/",
 )
 
+# The page the login redirect sends a flagged user to. Gating page routes
+# without this allowlisted locks the account out of its own remediation: the
+# change-password form lives on /profile and nowhere else. Matched exactly, not
+# by prefix — a prefix would silently exempt any future /profile* route.
+_PWD_CHANGE_ALLOWED_PAGES = frozenset({"/profile"})
+
 
 def get_auth_service(session: Session = Depends(get_db_session)) -> AuthService:
     """Get authentication service instance."""
@@ -81,11 +87,7 @@ async def get_current_user(
     user, binding = await run_in_threadpool(
         _authenticate, request, session_token, auth_service
     )
-    if binding is not None:
-        from ion.core.tenant_context import set_tenant_connection, set_tenant_id
-
-        set_tenant_id(binding[0])
-        set_tenant_connection(binding[1])
+    install_tenant_binding(binding)
     return user
 
 
@@ -110,18 +112,58 @@ def _authenticate(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # ION_ENFORCE_PASSWORD_CHANGE, default ON: a must_change_password user may
-    # only reach the password-change endpoints. Without this the flag is
-    # advisory (frontend-only) and a default-credential session could call any
-    # API. In ION's deployment the only local account is admin (others are
-    # OIDC), so this primarily protects the admin account.
-    if getattr(user, "must_change_password", False) and get_config().enforce_password_change:
-        path = request.url.path
-        if not any(path.startswith(p) for p in _PWD_CHANGE_ALLOWED_PREFIXES):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Password change required before continuing",
-            )
+    return user, apply_post_session_policy(request, user, auth_service)
+
+
+def password_change_blocks(request: Request, user: User, *, pages: bool = False) -> bool:
+    """Whether this request must be refused until the user changes password.
+
+    ION_ENFORCE_PASSWORD_CHANGE, default ON. Without it the flag is advisory
+    (frontend-only) and a default-credential session could call any API. In
+    ION's deployment the only local account is admin (others are OIDC), so this
+    primarily protects the admin account. ``pages`` additionally permits the
+    page hosting the change-password form.
+    """
+    if not getattr(user, "must_change_password", False):
+        return False
+    if not get_config().enforce_password_change:
+        return False
+    path = request.url.path
+    if pages and path.rstrip("/") in _PWD_CHANGE_ALLOWED_PAGES:
+        return False
+    return not any(path.startswith(p) for p in _PWD_CHANGE_ALLOWED_PREFIXES)
+
+
+def _password_change_required(pages: bool) -> HTTPException:
+    """Pages redirect to the form; API callers get a status they can read."""
+    if pages:
+        return HTTPException(
+            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+            headers={"Location": "/profile?change_password=1"},
+        )
+    return HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Password change required before continuing",
+    )
+
+
+def apply_post_session_policy(
+    request: Request, user: User, auth_service: AuthService, *, pages: bool = False
+) -> Optional[tuple]:
+    """Every policy that applies after a session validates. Shared by all entry points.
+
+    ``validate_session()`` proves a token is live; it does not gate a pending
+    password change or resolve the caller's tenant. An entry point that calls
+    it directly and skips this inherits neither — MCP did, so a flagged user
+    could run tools, and a tenant-bound user's writes reached the default
+    estate because an unresolved tenant means "default" to the ES/Kibana
+    overlay.
+
+    Returns the tenant binding for the caller to install with
+    :func:`install_tenant_binding`, from the request's own context.
+    """
+    if password_change_blocks(request, user, pages=pages):
+        raise _password_change_required(pages)
 
     # APM: tag the transaction with the analyst (no-op when APM is off).
     from ion.core import apm
@@ -131,7 +173,19 @@ def _authenticate(
         email=getattr(user, "email", None),
     )
 
-    return user, _resolve_tenant_binding(request, user, auth_service)
+    return _resolve_tenant_binding(request, user, auth_service)
+
+
+def install_tenant_binding(binding: Optional[tuple]) -> None:
+    """Set the tenant ContextVars. Only correct from the request's own context:
+    a ContextVar set in a copied context (a sync dependency, a threadpool call)
+    is discarded before the route runs."""
+    if binding is None:
+        return
+    from ion.core.tenant_context import set_tenant_connection, set_tenant_id
+
+    set_tenant_id(binding[0])
+    set_tenant_connection(binding[1])
 
 
 def _resolve_tenant_binding(
@@ -182,12 +236,7 @@ def _bind_tenant(request: Request, user: User, auth_service: AuthService) -> Non
     and sets the variables in its async body, because a threadpool dependency
     runs in a copied context whose ContextVar writes are discarded.
     """
-    binding = _resolve_tenant_binding(request, user, auth_service)
-    if binding is not None:
-        from ion.core.tenant_context import set_tenant_connection, set_tenant_id
-
-        set_tenant_id(binding[0])
-        set_tenant_connection(binding[1])
+    install_tenant_binding(_resolve_tenant_binding(request, user, auth_service))
 
 
 def get_current_user_optional(
@@ -196,7 +245,9 @@ def get_current_user_optional(
 ) -> Optional[User]:
     """Get current user if authenticated, None otherwise.
 
-    Does not raise an exception if not authenticated.
+    Does not raise an exception if not authenticated. No caller today: a route
+    that adopts it skips apply_post_session_policy, so route it through that
+    first or it reintroduces the MCP bypass.
     """
     if not session_token:
         return None
@@ -215,6 +266,10 @@ def get_current_user_hybrid(
     backward compatibility, then falls back to OIDC if enabled.
 
     Raises HTTPException 401 if neither authentication method succeeds.
+
+    No caller today: like get_current_user_optional it applies no
+    post-session policy, so a route adopting it must call
+    apply_post_session_policy itself.
     """
     # Extract token from request
     token = get_session_token(request)
@@ -337,50 +392,70 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def require_page_auth(
+def _login_redirect(request: Request) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+        headers={"Location": "/login?redirect=" + str(request.url.path)},
+    )
+
+
+def _authenticate_page(
+    request: Request,
+    session_token: Optional[str],
+    auth_service: AuthService,
+    permission_name: Optional[str] = None,
+) -> tuple:
+    """Blocking half of the page authenticators: session, policy, permission.
+
+    Pages apply the same post-session policy as the API, but a flagged user is
+    redirected to the change-password form rather than shown a 403 they cannot
+    act on.
+    """
+    if not session_token:
+        raise _login_redirect(request)
+
+    user = auth_service.validate_session(session_token)
+    if user is None:
+        raise _login_redirect(request)
+
+    # Policy first: a flagged user should meet the change-password redirect, not
+    # a permission error on a page they would be allowed once remediated.
+    binding = apply_post_session_policy(request, user, auth_service, pages=True)
+
+    if permission_name is not None and not user.has_permission(permission_name):
+        raise _permission_denied(user, permission_name)
+
+    return user, binding
+
+
+async def require_page_auth(
     request: Request,
     session_token: Optional[str] = Depends(get_session_token),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> User:
-    """For page routes: redirect to /login if not authenticated."""
-    if not session_token:
-        raise HTTPException(
-            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-            headers={"Location": "/login?redirect=" + str(request.url.path)},
-        )
+    """For page routes: redirect to /login if not authenticated.
 
-    user = auth_service.validate_session(session_token)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-            headers={"Location": "/login?redirect=" + str(request.url.path)},
-        )
-
+    Async for the same reason as get_current_user — the tenant ContextVars must
+    be set here, in the request's own context.
+    """
+    user, binding = await run_in_threadpool(
+        _authenticate_page, request, session_token, auth_service
+    )
+    install_tenant_binding(binding)
     return user
 
 
 def require_page_permission(permission_name: str) -> Callable:
     """For page routes: redirect to /login if not auth'd, 403 if no permission."""
-    def dependency(
+    async def dependency(
         request: Request,
         session_token: Optional[str] = Depends(get_session_token),
         auth_service: AuthService = Depends(get_auth_service),
     ) -> User:
-        if not session_token:
-            raise HTTPException(
-                status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-                headers={"Location": "/login?redirect=" + str(request.url.path)},
-            )
-
-        user = auth_service.validate_session(session_token)
-        if user is None:
-            raise HTTPException(
-                status_code=status.HTTP_307_TEMPORARY_REDIRECT,
-                headers={"Location": "/login?redirect=" + str(request.url.path)},
-            )
-
-        if not user.has_permission(permission_name):
-            raise _permission_denied(user, permission_name)
+        user, binding = await run_in_threadpool(
+            _authenticate_page, request, session_token, auth_service, permission_name
+        )
+        install_tenant_binding(binding)
         return user
     return dependency
 
