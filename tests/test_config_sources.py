@@ -36,10 +36,46 @@ def test_env_backed_field_reports_environment(monkeypatch):
     assert config_field_source("elasticsearch_url") == "environment"
 
 
-def test_blank_env_var_is_not_a_source(monkeypatch):
-    """An empty value is how people 'unset' a key in .env; it must not count."""
-    monkeypatch.setenv("ION_ELASTICSEARCH_URL", "   ")
+def test_empty_env_var_is_not_a_source(monkeypatch):
+    """An empty value is how people 'unset' a key in .env; it must not count.
+
+    get_config() agrees: `if os.environ.get("ION_ELASTICSEARCH_URL")` is false
+    for "", so the override is skipped and the file or default value stands.
+    """
+    monkeypatch.setenv("ION_ELASTICSEARCH_URL", "")
     assert config_field_source("elasticsearch_url") != "environment"
+
+
+def test_whitespace_env_var_is_a_source_because_get_config_applies_it(
+    monkeypatch, tmp_path
+):
+    """Report what the application does, not what would be tidier.
+
+    This test used to assert the opposite, and the implementation stripped
+    before testing. But the override block tests the RAW value for truthiness,
+    so "   " IS applied: the effective elasticsearch_url became "   " while the
+    badge reported "default", leaving the field editable in the settings UI with
+    a save that silently lost to the environment — the precise failure the
+    source reporting exists to prevent.
+    """
+    monkeypatch.setenv("ION_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ION_ELASTICSEARCH_URL", "   ")
+    assert config_mod.get_config().elasticsearch_url == "   "
+    assert config_field_source("elasticsearch_url") == "environment"
+
+
+def test_base_url_is_the_one_field_that_strips(monkeypatch, tmp_path):
+    """get_config() strips ION_BASE_URL before testing it, so this one differs.
+
+    _STRIPPED_ENV_FIELDS records that exception. If the override block ever
+    stops stripping (or starts stripping elsewhere), this test and
+    test_whitespace_env_var_is_a_source_because_get_config_applies_it are the
+    pair that disagree with it.
+    """
+    monkeypatch.setenv("ION_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv("ION_BASE_URL", "   ")
+    assert config_mod.get_config().base_url != "   "
+    assert config_field_source("base_url") == "default"
 
 
 def test_file_backed_field_reports_file(monkeypatch, tmp_path):

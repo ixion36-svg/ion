@@ -678,6 +678,12 @@ class Config:
                 f,
                 indent=2,
             )
+        try:
+            os.chmod(path, 0o600)
+        except OSError:
+            # A filesystem that cannot carry the mode (a bind-mounted CIFS
+            # share, some Windows paths) must not break saving settings.
+            logger.warning("Could not set 0600 on %s; check its permissions", path)
 
 
 _config: Optional[Config] = None
@@ -1313,33 +1319,74 @@ def _config_file_path() -> Path:
     return Path.cwd() / ".ion" / "config.json"
 
 
+# get_config()'s override block tests the RAW value for truthiness
+# (`if os.environ.get("ION_ELASTICSEARCH_URL")`), so a key blanked with spaces
+# rather than emptied is applied as-is: the effective elasticsearch_url becomes
+# "   ". Only base_url strips before testing, so only base_url treats a
+# whitespace-only value as unset.
+#
+# These functions therefore mirror truthiness rather than doing the tidier
+# thing, because the tidier answer is the dangerous one: reporting "default"
+# for a field the environment is in fact holding renders it editable in the
+# settings UI, the save reports success, and the environment keeps winning —
+# the exact failure this mechanism exists to prevent.
+_STRIPPED_ENV_FIELDS: frozenset[str] = frozenset({"base_url"})
+
+
+def _env_override(field: str) -> Optional[str]:
+    """The environment value get_config() would apply to `field`, else None."""
+    env_name = ENV_FIELD_MAP.get(field)
+    if not env_name:
+        return None
+    raw = os.environ.get(env_name, "")
+    value = raw.strip() if field in _STRIPPED_ENV_FIELDS else raw
+    return value or None
+
+
+def _stored_config() -> dict:
+    """The parsed config.json, or {} when it is absent or unreadable."""
+    path = _config_file_path()
+    if not path.exists():
+        return {}
+    try:
+        with open(path, encoding="utf-8") as fh:
+            stored = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return stored if isinstance(stored, dict) else {}
+
+
 def config_field_source(field: str) -> str:
     """Report where `field`'s effective value came from.
 
     Returns "environment", "file" or "default". An unmapped field, or one whose
-    environment variable is set to whitespace, reports as if it were unset:
-    blanking a key is how people disable it in a .env file.
+    environment variable is empty, reports as if it were unset — which is how
+    get_config() treats it. A whitespace-only value is NOT unset: see
+    _STRIPPED_ENV_FIELDS.
     """
-    env_name = ENV_FIELD_MAP.get(field)
-    if env_name and os.environ.get(env_name, "").strip():
+    if _env_override(field) is not None:
         return "environment"
-
-    path = _config_file_path()
-    if path.exists():
-        try:
-            with open(path, encoding="utf-8") as fh:
-                stored = json.load(fh)
-        except (OSError, json.JSONDecodeError):
-            stored = {}
-        if isinstance(stored, dict) and field in stored:
-            return "file"
-
+    if field in _stored_config():
+        return "file"
     return "default"
 
 
 def config_field_sources() -> dict[str, str]:
-    """config_field_source() for every field the settings UI can show."""
-    return {field: config_field_source(field) for field in ENV_FIELD_MAP}
+    """config_field_source() for every field the settings UI can show.
+
+    Reads config.json once rather than once per field: this runs on every
+    GET /api/admin/config, and ENV_FIELD_MAP has 151 entries.
+    """
+    stored = _stored_config()
+    sources = {}
+    for field in ENV_FIELD_MAP:
+        if _env_override(field) is not None:
+            sources[field] = "environment"
+        elif field in stored:
+            sources[field] = "file"
+        else:
+            sources[field] = "default"
+    return sources
 
 
 def set_config(config: Optional[Config]) -> None:
