@@ -158,10 +158,18 @@ def _now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
-def get_job(session, job_id: str) -> Optional[Dict[str, Any]]:
+def get_job(session, job_id: str, user_id: int) -> Optional[Dict[str, Any]]:
+    """The job, only for the analyst who started it.
+
+    ``user_id`` is required rather than defaulted: the id is unguessable but
+    unguessable is not an authorization check, and a caller that omitted the
+    owner would silently read any analyst's extracted document text.
+    """
     from ion.models.service_desk import DocAnalysisJob
     job = session.get(DocAnalysisJob, job_id)
-    return job.to_dict() if job else None
+    if job is None or job.created_by_id != user_id:
+        return None
+    return job.to_dict()
 
 
 def _resolve_instructions(task: str, custom_prompt: Optional[str]) -> Dict[str, str]:

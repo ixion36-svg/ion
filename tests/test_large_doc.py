@@ -184,7 +184,7 @@ def test_start_analysis_runs_to_completion(session, temp_db, monkeypatch):
     # Read from a fresh session so we see the worker's commits.
     Sess = sessionmaker(bind=temp_db)
     s2 = Sess()
-    job = lds.get_job(s2, job_id)
+    job = lds.get_job(s2, job_id, 1)
     s2.close()
     assert job is not None and job["status"] == "done", job
     assert job["result"]["result"]

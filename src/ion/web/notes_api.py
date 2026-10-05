@@ -52,6 +52,26 @@ class NoteMove(BaseModel):
 
 
 # =============================================================================
+# Shared validation
+# =============================================================================
+
+
+def _require_own_folder(
+    repo: AnalystNoteRepository, folder_id: Optional[int], user_id: int
+) -> None:
+    """Refuse a folder the caller does not own. ``None`` means uncategorized.
+
+    Every path that assigns ``folder_id`` must call this: the column's foreign
+    key only proves the folder exists, so an unchecked assignment files a note
+    in another user's tree, where that owner's folder delete then reassigns it.
+    """
+    if folder_id is None:
+        return
+    if not repo.get_folder_by_id(folder_id, user_id):
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+
+# =============================================================================
 # Folder Endpoints
 # =============================================================================
 
@@ -182,6 +202,7 @@ def create_note(
 ):
     """Create a new note."""
     repo = AnalystNoteRepository(session)
+    _require_own_folder(repo, body.folder_id, user.id)
     note = repo.create(
         user_id=user.id,
         title=body.title,
@@ -220,6 +241,7 @@ def update_note(
     note = repo.get_by_id(note_id, user.id)
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
+    _require_own_folder(repo, body.folder_id, user.id)
     # Use sentinel for folder_id so we can distinguish "not provided" from "set to null"
     folder_id = ... if body.folder_id is None and "folder_id" not in body.model_fields_set else body.folder_id
     repo.update(
@@ -246,11 +268,7 @@ def move_note(
     note = repo.get_by_id(note_id, user.id)
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    # Validate folder exists if provided
-    if body.folder_id is not None:
-        folder = repo.get_folder_by_id(body.folder_id, user.id)
-        if not folder:
-            raise HTTPException(status_code=404, detail="Folder not found")
+    _require_own_folder(repo, body.folder_id, user.id)
     repo.move_note_to_folder(note, body.folder_id)
     session.commit()
     return note.to_dict()

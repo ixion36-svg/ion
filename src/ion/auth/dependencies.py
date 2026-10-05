@@ -110,7 +110,7 @@ def _authenticate(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # F4 (opt-in ION_ENFORCE_PASSWORD_CHANGE): a must_change_password user may
+    # ION_ENFORCE_PASSWORD_CHANGE, default ON: a must_change_password user may
     # only reach the password-change endpoints. Without this the flag is
     # advisory (frontend-only) and a default-credential session could call any
     # API. In ION's deployment the only local account is admin (others are

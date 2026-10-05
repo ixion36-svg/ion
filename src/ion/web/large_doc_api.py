@@ -69,8 +69,13 @@ async def start_document_analysis(
 
 
 @router.get("/api/document-analysis/jobs/{job_id}", dependencies=[Depends(require_permission(_PERM))])
-def get_analysis_job(job_id: str, session: Session = Depends(get_db_session)):
-    job = lds.get_job(session, job_id)
+def get_analysis_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    # 404, not 403: a non-owner must not learn that the job id exists.
+    job = lds.get_job(session, job_id, current_user.id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
