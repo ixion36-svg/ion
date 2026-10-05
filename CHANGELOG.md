@@ -1,77 +1,26 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.7 -->
-<!-- ion-doc:version=0.99.7 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.8 -->
+<!-- ion-doc:version=0.99.8 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-04 -->
+<!-- ion-doc:date=2026-10-05 -->
 
 # Changelog
 
-## v0.99.7 — 2026-10-04
+## v0.99.8 — 2026-10-05
 
-**Configuration moves into the app, and `.env` drops from 45 keys to 8.**
+**Seven defects found reviewing v0.99.7, all in that release's own subject
+matter.** Moving configuration out of `.env` changed what the default behind
+each removed key means, and three of the seven are that change biting from a
+direction the release did not look at. Two are Low security findings; the
+v0.99.7 tag carries both, so upgrade rather than patching in place.
 
-ION already had the settings UI for this: a section and a `PUT` endpoint per
-integration, a connection tester, and a persistent `config.json`. None of it
-could win, because `get_config()` ranks environment variables above the file.
-Forty-five keys in `.env` shadowed the UI, so a value edited in the app saved
-successfully and changed nothing. That cost an hour of debugging a
-`ELASTICSEARCH DEGRADED` dashboard whose only fault was an `.env` password
-disagreeing with the stack.
-
-- **`.env` now holds 8 keys.** Six are read before ION can consult its own
-  config (`ION_VERSION`, `ION_DATA_DIR`, `ION_HOST`, `ION_PORT`,
-  `ION_WORKERS`, `ION_LOG_LEVEL`). Two are structurally pinned there:
-  `ION_DB_PASSWORD`, which Compose interpolates into `POSTGRES_PASSWORD`
-  before ION exists, and `ION_ADMIN_PASSWORD`, which has no `Config` field at
-  all. Everything else is managed in the settings UI.
-- **Environment overrides are now visible instead of silent.** A new
-  `ENV_FIELD_MAP` reports, per field, whether the effective value came from
-  the environment, `config.json` or a default. `GET /api/admin/config` returns
-  that as a `sources` object, and the settings page renders an
-  environment-held field read-only with a "set by environment" badge, and
-  drops it from the save payload.
-- **The map covers all 150 overrides**, not a subset. It is generated from the
-  override block, and a test re-derives the pairs on every run, so an override
-  added without a map entry fails CI rather than silently discarding a user's
-  edit.
-- **`.env.deploy` no longer sets 23 UI-managed keys.** As a deployment
-  template it would have reintroduced the exact bug this release removes, on
-  every deployment made from it. A test keeps them out.
-
-**Upgrading.** Nothing breaks: environment variables still win, so an existing
-`.env` keeps working untouched. Pruning is opt-in. If you do prune, read
-`docs/CONFIG_MGMT.md` section 11a first — integration secrets reach
-`config.json` only once something has saved them, so verify they are persisted
-before deleting the only copy. The `ion-data` volume then holds those
-credentials and becomes the thing to back up.
-
-**Also in this release**
-
-- **`base_url` stayed badgeable.** Generating `ENV_FIELD_MAP` from the override
-  block dropped it: the generator looks for a literal `os.environ.get` on the
-  assignment's right-hand side, and `get_config()` assigns `base_url` from a
-  local. `docker-compose.yml` injects `ION_BASE_URL` with a default, so the
-  field is genuinely environment-held and was rendering as editable with no
-  badge. Restored, with a test covering overrides the generator cannot derive.
-- **PDF tests skip where WeasyPrint's native libraries are missing.** Nine
-  tests need Pango, Cairo and GDK-Pixbuf. They run on the CI runner and in the
-  Docker image, and now skip rather than fail on a host without them.
-
-- **The alert detail had no room to lay out.** It needs ~1100px before its
-  two-column grid stops collapsing, and neither host gave it that: the modal
-  was capped at 600px by a generic `.modal-content` rule beating the Tailwind
-  utility on the markup (utilities are imported unlayered, so equal-specificity
-  selectors are decided by source order), and the case page put it in a 609px
-  grid track. The modal width is now id-scoped, and "Alerts in case" has a
-  full-width row of its own. Measured at a 1600px viewport, that section went
-  from 609px to 1318px.
-
-**Post-tag review fixes.** A review of the release found four defects in it.
-All four are in the tag's own subject matter: moving configuration out of
-`.env` changed what the defaults behind each removed key mean.
+**Upgrading.** Nothing in the configuration contract changes. One action is
+needed only if you deployed v0.99.7 onto a *fresh* volume: re-tick "Secure
+cookies" in Settings → General, because the fix cannot reach a `config.json`
+that was already seeded. Everything else applies on restart.
 
 - **A fresh deployment served session cookies with no `Secure` flag.**
   `docker-entrypoint.sh` seeded a new volume's `config.json` with
@@ -133,6 +82,66 @@ All four are in the tag's own subject matter: moving configuration out of
   the `admin_api` row, together with the fact that a `PUT` returns `200` while
   silently dropping an environment-held field — which a non-browser caller has
   no other way to discover.
+
+## v0.99.7 — 2026-10-04
+
+**Configuration moves into the app, and `.env` drops from 45 keys to 8.**
+
+ION already had the settings UI for this: a section and a `PUT` endpoint per
+integration, a connection tester, and a persistent `config.json`. None of it
+could win, because `get_config()` ranks environment variables above the file.
+Forty-five keys in `.env` shadowed the UI, so a value edited in the app saved
+successfully and changed nothing. That cost an hour of debugging a
+`ELASTICSEARCH DEGRADED` dashboard whose only fault was an `.env` password
+disagreeing with the stack.
+
+- **`.env` now holds 8 keys.** Six are read before ION can consult its own
+  config (`ION_VERSION`, `ION_DATA_DIR`, `ION_HOST`, `ION_PORT`,
+  `ION_WORKERS`, `ION_LOG_LEVEL`). Two are structurally pinned there:
+  `ION_DB_PASSWORD`, which Compose interpolates into `POSTGRES_PASSWORD`
+  before ION exists, and `ION_ADMIN_PASSWORD`, which has no `Config` field at
+  all. Everything else is managed in the settings UI.
+- **Environment overrides are now visible instead of silent.** A new
+  `ENV_FIELD_MAP` reports, per field, whether the effective value came from
+  the environment, `config.json` or a default. `GET /api/admin/config` returns
+  that as a `sources` object, and the settings page renders an
+  environment-held field read-only with a "set by environment" badge, and
+  drops it from the save payload.
+- **The map covers all 150 overrides**, not a subset. It is generated from the
+  override block, and a test re-derives the pairs on every run, so an override
+  added without a map entry fails CI rather than silently discarding a user's
+  edit.
+- **`.env.deploy` no longer sets 23 UI-managed keys.** As a deployment
+  template it would have reintroduced the exact bug this release removes, on
+  every deployment made from it. A test keeps them out.
+
+**Upgrading.** Nothing breaks: environment variables still win, so an existing
+`.env` keeps working untouched. Pruning is opt-in. If you do prune, read
+`docs/CONFIG_MGMT.md` section 11a first — integration secrets reach
+`config.json` only once something has saved them, so verify they are persisted
+before deleting the only copy. The `ion-data` volume then holds those
+credentials and becomes the thing to back up.
+
+**Also in this release**
+
+- **`base_url` stayed badgeable.** Generating `ENV_FIELD_MAP` from the override
+  block dropped it: the generator looks for a literal `os.environ.get` on the
+  assignment's right-hand side, and `get_config()` assigns `base_url` from a
+  local. `docker-compose.yml` injects `ION_BASE_URL` with a default, so the
+  field is genuinely environment-held and was rendering as editable with no
+  badge. Restored, with a test covering overrides the generator cannot derive.
+- **PDF tests skip where WeasyPrint's native libraries are missing.** Nine
+  tests need Pango, Cairo and GDK-Pixbuf. They run on the CI runner and in the
+  Docker image, and now skip rather than fail on a host without them.
+
+- **The alert detail had no room to lay out.** It needs ~1100px before its
+  two-column grid stops collapsing, and neither host gave it that: the modal
+  was capped at 600px by a generic `.modal-content` rule beating the Tailwind
+  utility on the markup (utilities are imported unlayered, so equal-specificity
+  selectors are decided by source order), and the case page put it in a 609px
+  grid track. The modal width is now id-scoped, and "Alerts in case" has a
+  full-width row of its own. Measured at a 1600px viewport, that section went
+  from 609px to 1318px.
 
 ## v0.99.6 — 2026-10-02
 
