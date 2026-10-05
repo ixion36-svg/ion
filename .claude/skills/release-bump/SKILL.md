@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # /release-bump — ION release ritual
 
-ION's version string lives in 8 files. Past releases rotted them (`src/ion/__init__.py` was stuck at 0.19.19 across 13 releases). This skill is the canonical checklist + drift checker.
+ION's version string lives in 10 files. Past releases rotted them (`src/ion/__init__.py` was stuck at 0.19.19 across 13 releases). This skill is the canonical checklist + drift checker.
 
 ## When to use
 
@@ -37,6 +37,11 @@ ION's version string lives in 8 files. Past releases rotted them (`src/ion/__ini
    - `Dockerfile` → `org.opencontainers.image.version="X.Y.Z"`
    - `docker-compose.yml` → **both** `fubsxploitapps/ion:${ION_VERSION:-X.Y.Z}` occurrences
    - `.env.deploy` → `ION_VERSION=X.Y.Z` (plus header comment if present)
+   - `.env.example` and `.env.template` → `ION_VERSION=X.Y.Z`. Added at
+     v0.99.7: these were off the list, so both sat at 0.99.6 through a
+     release and a retag while the checker reported PASS, and root
+     `docker-compose.yml` resolves the image tag from this key — a deploy
+     from either template pulled the previous image.
    - `CHANGELOG.md` → new `## vX.Y.Z — YYYY-MM-DD` heading at top + entries
    - `SECURITY_ASSESSMENT.md` → bump `<!-- ion-doc:version=X.Y.Z -->` + `Assessment Date` + `Application Version`, update the compact **current-posture** table's `(vX.Y.Z)` version header (single cell — the values stay 0 unless a finding lands), and add a "Net-New Surfaces" paragraph if material. (The old 70-column per-version trend table was retired at v0.40.0; the checker only anchors on the `ion-doc:version` stamp.)
 
@@ -45,7 +50,8 @@ ION's version string lives in 8 files. Past releases rotted them (`src/ion/__ini
 6. **Sanity grep for stragglers** — catches *prior* versions still hiding in the live files:
    ```
    grep -nE 'version *= *"<OLD>"|ION_VERSION:-<OLD>|__version__ *= *"<OLD>"|version-<OLD>-blue' \
-     pyproject.toml docker-compose.yml src/ion/__init__.py Dockerfile README.md .env.deploy
+     pyproject.toml docker-compose.yml src/ion/__init__.py Dockerfile README.md \
+     .env.deploy .env.example .env.template
    ```
    (Replace `<OLD>` with the previous version.) Expected: empty output.
 
@@ -53,7 +59,7 @@ ION's version string lives in 8 files. Past releases rotted them (`src/ion/__ini
    ```
    chore(release): vX.Y.Z — version bumps + CHANGELOG + SECURITY_ASSESSMENT delta
    ```
-   Applied at the very end of the release ritual, after feature commits land. Touches all 8 files.
+   Applied at the very end of the release ritual, after feature commits land. Touches all 10 files.
 
 8. **Image push** (after the tag lands and the image is built). ION is a
    Guarded Glass product: distribution is the org's PRIVATE repo only, since

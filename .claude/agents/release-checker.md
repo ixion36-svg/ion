@@ -1,6 +1,6 @@
 ---
 name: release-checker
-description: Pre-tag release-readiness audit for ION. Walks the 8-file version-bump checklist, validates CHANGELOG structure, confirms no version-string rot, and reports clean/dirty. Use BEFORE creating a release-tag commit.
+description: Pre-tag release-readiness audit for ION. Walks the 10-file version-bump checklist, validates CHANGELOG structure, confirms no version-string rot, and reports clean/dirty. Use BEFORE creating a release-tag commit.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---
@@ -20,13 +20,14 @@ You are the ION release-readiness auditor. Your job is to report whether the rep
 3. **No stragglers from the previous version.** Identify the previous release (second `## v…` heading in CHANGELOG.md). Run:
    ```
    grep -nE 'version *= *"<PREV>"|ION_VERSION:-<PREV>|__version__ *= *"<PREV>"|version-<PREV>-blue|opencontainers\.image\.version="<PREV>"' \
-     pyproject.toml docker-compose.yml src/ion/__init__.py Dockerfile README.md .env.deploy
+     pyproject.toml docker-compose.yml src/ion/__init__.py Dockerfile README.md \
+     .env.deploy .env.example .env.template
    ```
    (Substitute `<PREV>` literally.) Expected: empty. Anything returned is rot.
 
 4. **`SECURITY_ASSESSMENT.md` has a column for the new version.** Read the severity table; confirm the new version appears as a header. Don't assess the assessment's content — just confirm the column exists.
 
-5. **Git working tree clean.** Run `git status --short`. Expected: empty, OR exactly the bump-commit's 8 files staged. Anything else is leftover work.
+5. **Git working tree clean.** Run `git status --short`. Expected: empty, OR exactly the bump-commit's 10 files staged. Anything else is leftover work.
 
 6. **CI signals (optional, if accessible).** Note whether the latest commit on the release branch has green status; do not block on this.
 

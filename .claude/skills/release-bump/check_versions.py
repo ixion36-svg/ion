@@ -34,6 +34,13 @@ CANONICAL_FILES: list[tuple[str, str, str]] = [
     ("Dockerfile",             r'org\.opencontainers\.image\.version="([0-9.]+)"',  "single"),
     ("docker-compose.yml",     r'fubsxploitapps/ion:\$\{ION_VERSION:-([0-9.]+)\}',         "all"),
     (".env.deploy",            r'^ION_VERSION=([0-9.]+)',                           "single"),
+    # The three .env files all pin ION_VERSION, and root docker-compose.yml
+    # resolves the image tag from it. Only .env.deploy was listed until
+    # v0.99.7, so .env.example and .env.template sat at 0.99.6 through a
+    # release and a retag with a PASS: a deploy from either pulled the
+    # previous image. One omission from this list is one shipped wrong tag.
+    (".env.example",           r'^ION_VERSION=([0-9.]+)',                           "single"),
+    (".env.template",          r'^ION_VERSION=([0-9.]+)',                           "single"),
     ("CHANGELOG.md",           r'^## v([0-9.]+)',                                   "first"),
     # ION shipping docs all carry an `<!-- ion-doc:version=X.Y.Z -->` stamp
     # near the top — that's the canonical anchor. Many docs/*.md files use
