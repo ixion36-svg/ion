@@ -159,7 +159,7 @@ def test_mcp_rejects_flagged_user_before_dispatch(monkeypatch):
     monkeypatch.setattr(mcp_mod, "AuthService", lambda s: _auth_service(_flagged()))
     dispatched = []
     monkeypatch.setattr(mcp_mod, "_handle_message",
-                        lambda *a: dispatched.append(a) or {})
+                        lambda *a, **k: dispatched.append(a) or {})
     with _enforced():
         r = _mcp_client().post("/api/mcp", json=_call_add_note(),
                                headers={"Authorization": "Bearer tok"})
@@ -173,7 +173,7 @@ def test_mcp_allows_unflagged_user(monkeypatch):
     monkeypatch.setattr(mcp_mod, "get_session_factory", lambda: factory)
     monkeypatch.setattr(mcp_mod, "AuthService", lambda s: _auth_service(_clear()))
     monkeypatch.setattr(mcp_mod, "_handle_message",
-                        lambda msg, user: {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}})
+                        lambda *a, **k: {"jsonrpc": "2.0", "id": 1, "result": {"ok": True}})
     with _enforced():
         r = _mcp_client().post("/api/mcp", json=_call_add_note(),
                                headers={"Authorization": "Bearer tok"})

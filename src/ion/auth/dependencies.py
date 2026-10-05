@@ -134,6 +134,44 @@ def password_change_blocks(request: Request, user: User, *, pages: bool = False)
     return not any(path.startswith(p) for p in _PWD_CHANGE_ALLOWED_PREFIXES)
 
 
+def audit_refusal(
+    action: str,
+    user: object,
+    request: Optional[Request] = None,
+    **details,
+) -> None:
+    """Record a refused request in audit_logs, on its own committed session.
+
+    The caller raises immediately after, abandoning the request session, so a
+    row written on that session would roll back with it. A failure here is
+    logged and swallowed: the refusal is the security outcome and must not
+    become a 500 because the record could not be written.
+    """
+    try:
+        from ion.storage.auth_repository import AuditLogRepository
+        from ion.storage.database import get_engine, get_session_factory
+
+        if request is not None:
+            details = {
+                "path": request.url.path,
+                "method": request.method,
+                **details,
+            }
+        session = get_session_factory(get_engine(get_config().db_path))()
+        try:
+            AuditLogRepository(session).create(
+                user_id=getattr(user, "id", None),
+                action=action,
+                details=details or None,
+                ip_address=get_client_ip(request) if request is not None else None,
+            )
+            session.commit()
+        finally:
+            session.close()
+    except Exception:  # noqa: BLE001
+        logger.warning("could not record %s in audit_logs", action, exc_info=True)
+
+
 def _password_change_required(pages: bool) -> HTTPException:
     """Pages redirect to the form; API callers get a status they can read."""
     if pages:
@@ -163,6 +201,7 @@ def apply_post_session_policy(
     :func:`install_tenant_binding`, from the request's own context.
     """
     if password_change_blocks(request, user, pages=pages):
+        audit_refusal("password_change_required", user, request)
         raise _password_change_required(pages)
 
     # APM: tag the transaction with the analyst (no-op when APM is off).
@@ -216,11 +255,16 @@ def _resolve_tenant_binding(
         raise
     except Exception:  # noqa: BLE001
         logger.warning("tenant resolution failed; refusing the request", exc_info=True)
+        audit_refusal("tenant_resolve_failed", user, request, requested=requested)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Tenant resolution failed",
         )
     if tenant is None and getattr(user, "tenant_id", None) is not None:
+        audit_refusal(
+            "tenant_unavailable", user, request,
+            bound_tenant_id=getattr(user, "tenant_id", None),
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your estate is not available",
@@ -335,10 +379,18 @@ def get_current_user_hybrid(
 _PERMISSION_DENIED_DETAIL = "Permission denied"
 
 
-def _permission_denied(user: object, required: object) -> HTTPException:
+def _permission_denied(
+    user: object, required: object, request: Optional[Request] = None
+) -> HTTPException:
     logger.warning(
         "Permission denied for user %s: %s required",
         getattr(user, "username", "<unknown>"), required,
+    )
+    # The permission goes to the record, never to the caller: _PERMISSION_DENIED_DETAIL
+    # above withholds ION's permission taxonomy from whoever was refused.
+    audit_refusal(
+        "permission_denied", user, request,
+        required=required if isinstance(required, (str, list)) else str(required),
     )
     return HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
@@ -354,9 +406,9 @@ def require_permission(permission_name: str) -> Callable:
         def admin_endpoint():
             ...
     """
-    def dependency(user: User = Depends(get_current_user)) -> User:
+    def dependency(request: Request, user: User = Depends(get_current_user)) -> User:
         if not user.has_permission(permission_name):
-            raise _permission_denied(user, permission_name)
+            raise _permission_denied(user, permission_name, request)
         return user
     return dependency
 
@@ -369,9 +421,9 @@ def require_any_permission(permission_names: List[str]) -> Callable:
         def edit_endpoint():
             ...
     """
-    def dependency(user: User = Depends(get_current_user)) -> User:
+    def dependency(request: Request, user: User = Depends(get_current_user)) -> User:
         if not user.has_any_permission(permission_names):
-            raise _permission_denied(user, permission_names)
+            raise _permission_denied(user, permission_names, request)
         return user
     return dependency
 
@@ -423,7 +475,7 @@ def _authenticate_page(
     binding = apply_post_session_policy(request, user, auth_service, pages=True)
 
     if permission_name is not None and not user.has_permission(permission_name):
-        raise _permission_denied(user, permission_name)
+        raise _permission_denied(user, permission_name, request)
 
     return user, binding
 
@@ -486,17 +538,17 @@ class PermissionChecker:
         self.required_permissions = required_permissions
         self.require_all = require_all
 
-    def __call__(self, user: User = Depends(get_current_user)) -> User:
+    def __call__(self, request: Request, user: User = Depends(get_current_user)) -> User:
         if self.require_all:
             missing = [
                 p for p in self.required_permissions
                 if not user.has_permission(p)
             ]
             if missing:
-                raise _permission_denied(user, missing)
+                raise _permission_denied(user, missing, request)
         else:
             if not user.has_any_permission(self.required_permissions):
-                raise _permission_denied(user, self.required_permissions)
+                raise _permission_denied(user, self.required_permissions, request)
         return user
 
 

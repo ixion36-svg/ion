@@ -55,6 +55,7 @@ from sqlalchemy.orm import selectinload
 from ion.auth.dependencies import (
     SESSION_COOKIE_NAME,
     apply_post_session_policy,
+    audit_refusal,
     install_tenant_binding,
 )
 from ion.auth.service import AuthService
@@ -700,7 +701,7 @@ _DISPATCH: dict[str, Any] = {
 # JSON-RPC dispatch
 # ---------------------------------------------------------------------------
 
-def _handle_message(msg: dict, user: User) -> Optional[dict]:
+def _handle_message(msg: dict, user: User, request: Optional[Request] = None) -> Optional[dict]:
     """Process one JSON-RPC 2.0 message.  Returns None for notifications."""
     method = msg.get("method", "")
     req_id = msg.get("id")  # absent on notifications
@@ -736,6 +737,12 @@ def _handle_message(msg: dict, user: User) -> Optional[dict]:
         if not tool_def:
             return _ok(req_id, _tool_error(f"Unknown tool: '{name}'."))
         if not user.has_permission(tool_def["_permission"]):
+            # Audited here, not by _permission_denied: a refused tool call is a
+            # JSON-RPC tool error, so it never reaches the HTTP 403 path.
+            audit_refusal(
+                "permission_denied", user, request,
+                required=tool_def["_permission"], tool=name, entry="mcp",
+            )
             return _ok(req_id, _tool_error(
                 f"Permission denied: '{name}' requires {tool_def['_permission']}."
             ))
@@ -815,7 +822,7 @@ async def mcp_endpoint(request: Request) -> JSONResponse:
             if not isinstance(msg, dict):
                 responses.append(_rpc_err(None, -32600, "Invalid Request."))
                 continue
-            r = _handle_message(msg, user)
+            r = _handle_message(msg, user, request)
             if r is not None:
                 responses.append(r)
         if not responses:
@@ -823,7 +830,7 @@ async def mcp_endpoint(request: Request) -> JSONResponse:
         return JSONResponse(responses)
 
     if isinstance(body, dict):
-        response = _handle_message(body, user)
+        response = _handle_message(body, user, request)
         if response is None:
             return JSONResponse(None, status_code=202)
         return JSONResponse(response)
