@@ -497,9 +497,19 @@ class Config:
         )
 
     def to_file(self, path: Path) -> None:
-        """Save configuration to a JSON file."""
+        """Save configuration to a JSON file.
+
+        Written 0600. Since v0.99.7 this file — not `.env` — is where the
+        Elasticsearch, Kibana, Arkime, GitLab, OpenCTI, TIDE, SMTP, OIDC and
+        response-action credentials live, in plaintext. It is created with the
+        mode rather than chmod'd afterwards so the secrets never exist
+        world-readable, not even briefly; the mode argument only applies on
+        creation, so an inherited 0644 file from an earlier version is also
+        tightened below.
+        """
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(
                 {
                     "db_path": str(self.db_path),
