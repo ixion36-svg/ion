@@ -69,6 +69,40 @@ credentials and becomes the thing to back up.
   full-width row of its own. Measured at a 1600px viewport, that section went
   from 609px to 1318px.
 
+**Post-tag review fixes.** A review of the release found four defects in it.
+All four are in the tag's own subject matter: moving configuration out of
+`.env` changed what the defaults behind each removed key mean.
+
+- **A fresh deployment served session cookies with no `Secure` flag.**
+  `docker-entrypoint.sh` seeded a new volume's `config.json` with
+  `cookie_secure=os.environ.get('ION_COOKIE_SECURE', 'false') == 'true'`. That
+  was inert while `.env.template` shipped `ION_COOKIE_SECURE=true`; once the
+  key left `.env` the `'false'` decided it, and it was persisted to
+  `config.json` where no environment variable remained to correct it.
+  `Config` defaults the field `True` and `get_config()` still applies both
+  `ION_COOKIE_SECURE` and the `dev_mode` relaxation, so the seed is simply
+  removed. Existing deployments are unaffected: the seed only runs when
+  `config.json` does not yet exist. **If you deployed v0.99.7 onto a fresh
+  volume, check Settings → General and re-tick "Secure cookies".**
+- **`.env.example` and `.env.template` still pinned `ION_VERSION=0.99.6`**, and
+  root `docker-compose.yml` resolves the image tag from that key, so a deploy
+  from either template ran the previous image. Both were off
+  `check_versions.py`'s canonical list, so the release and its retag both
+  reported PASS. The list is now 10 files, not 8.
+- **`config.json` was written world-readable.** It is where the Elasticsearch,
+  Kibana, Arkime, GitLab, OpenCTI, TIDE, SMTP, OIDC and response-action
+  credentials now live, in plaintext, and it was being created 0644 under the
+  usual umask — in the container and in every backup of the `ion-data` volume.
+  `Config.to_file` now creates it 0600 and tightens an inherited 0644 file on
+  the next save.
+- **The badge misreported a key blanked with spaces.** The override block tests
+  the raw value for truthiness, so `ION_ELASTICSEARCH_URL="   "` is applied and
+  the effective URL becomes three spaces; `config_field_source` stripped first
+  and answered "default", so the field rendered editable and the save reported
+  success while the environment kept winning — the exact failure the badge
+  exists to prevent. It now mirrors the override block, with `base_url` (the
+  one field `get_config()` strips) recorded as the exception.
+
 ## v0.99.6 — 2026-10-02
 
 **Scope reduction: 23,000 lines leave the live tree, and a ratchet stops the

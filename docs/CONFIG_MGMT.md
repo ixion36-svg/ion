@@ -300,7 +300,17 @@ backup until you have confirmed it.
 
 **Consequence: back up the `ion-data` volume.** The Elasticsearch, Kibana,
 Arkime, GitLab, OpenCTI and TIDE credentials now live only in `config.json`
-inside that volume. Losing the volume loses them.
+inside that volume. Losing the volume loses them. Whatever you back it up to
+inherits those credentials in plaintext, so hold the backup to the same
+standard as the volume.
+
+**`config.json` is written 0600.** It was being created under the usual umask,
+so every secret ION holds was world-readable inside the container and in any
+copy of the volume. `Config.to_file` now creates it with the mode (via
+`os.open`, so the window where it is readable never exists) and chmods an
+inherited 0644 file from an earlier version on the next save. The owning
+directory is left at its existing mode; only `ion` runs in the image.
+`tests/test_config_at_rest.py` holds it.
 
 **Environment variables still win.** `get_config()` ranks env above
 `config.json`, so re-adding a key to `.env` silently overrides the UI. The
@@ -315,10 +325,20 @@ secret being written back, an SSRF rejection on an env-held empty URL, and
 needless reassignment. It does not stop env values reaching `config.json`.
 
 **The badge is a complete guard.** `ENV_FIELD_MAP`
-(`src/ion/core/config.py`) covers all 150 fields `get_config()` assigns from an
+(`src/ion/core/config.py`) covers all 151 fields `get_config()` assigns from an
 environment variable, so any override the application honours can be reported
 and badged. It is generated from the override block rather than hand-written;
 regenerate rather than editing entries by hand.
+
+**A key blanked with spaces is not an unset key.** The override block tests
+the raw value for truthiness (`if os.environ.get("ION_ELASTICSEARCH_URL")`), so
+`ION_ELASTICSEARCH_URL="   "` is applied verbatim and the effective URL becomes
+three spaces. `config_field_source` reports that honestly rather than treating
+it as unset: reporting "default" for a field the environment is in fact holding
+is what renders it editable in the UI with a save that cannot win. `base_url`
+is the one exception — `get_config()` strips it before testing — and
+`_STRIPPED_ENV_FIELDS` records that. To disable a key, empty it (`KEY=`) or
+delete the line; spaces leave it set.
 
 Two tests hold it there: `test_every_mapped_field_exists_on_config` catches a
 field name that no longer exists on `Config`, and
@@ -338,6 +358,23 @@ check it before enabling OIDC.
 volume's `config.json` from `ION_*` variables that are now absent, so a brand
 new deployment comes up with built-in defaults and must be configured through
 the settings UI.
+
+Read that seed carefully when adding to it, because it decides what a pruned
+`.env` means. It used to seed
+`cookie_secure=os.environ.get('ION_COOKIE_SECURE', 'false') == 'true'`, which
+was inert while `.env.template` shipped `ION_COOKIE_SECURE=true` and became the
+operative value the moment the key left: every fresh v0.99.7 deployment
+persisted `cookie_secure: false` into `config.json`, where no environment
+variable remained to correct it, and served session cookies with no `Secure`
+flag. The field is no longer seeded — `Config` defaults it `True`, and
+`get_config()` still applies `ION_COOKIE_SECURE` and the `dev_mode` relaxation
+on every load, so the seed had nothing to add. `oidc_enabled` is still seeded
+`false` deliberately: `Config` defaults it `True` and a fresh install has no
+Keycloak, so the first boot must leave local admin login working. The rule for
+anything added here: seed a field only when its `Config` default is wrong for a
+first boot, and never seed one whose default is the safer value.
+
+`tests/test_env_boundary.py` guards both the grep and the end state.
 
 `tests/test_env_boundary.py` keeps the shipped templates honest.
 
