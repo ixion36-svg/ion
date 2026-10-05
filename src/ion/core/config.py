@@ -1390,13 +1390,15 @@ def config_field_sources() -> dict[str, str]:
     """
     stored = _stored_config()
     sources = {}
-    for field in ENV_FIELD_MAP:
-        if _env_override(field) is not None:
-            sources[field] = "environment"
-        elif field in stored:
-            sources[field] = "file"
+    # `name`, not `field`: this module imports `field` from dataclasses, and a
+    # loop variable of that name shadows it (ruff F402).
+    for name in ENV_FIELD_MAP:
+        if _env_override(name) is not None:
+            sources[name] = "environment"
+        elif name in stored:
+            sources[name] = "file"
         else:
-            sources[field] = "default"
+            sources[name] = "default"
     return sources
 
 
