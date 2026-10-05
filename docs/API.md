@@ -203,6 +203,22 @@ ION exposes 73 routers grouped by domain. Each router is mounted at a prefix; th
 | `security_api` | `/api/security` | Login, logout, OIDC flow, user info |
 | `admin_api` | `/api/admin` | User / role / permission CRUD; API tokens; settings |
 
+**`GET /api/admin/config` carries two provenance fields** (v0.99.7,
+`system:settings`). `sources` maps each of the 151 settable fields to
+`"environment"`, `"file"` or `"default"` — where its effective value came
+from, since `get_config()` ranks environment variables above `config.json`.
+`source_env_names` maps the same fields to the variable that would hold each
+one (`elasticsearch_url` → `ION_ELASTICSEARCH_URL`). Both carry names only,
+never values; secrets elsewhere in the response stay masked.
+
+A field `sources` reports as `"environment"` cannot be written: the twelve
+`PUT /api/admin/config/{section}` routes, `PUT
+/api/admin/wizard/save/{integration}` and `POST /api/admin/wizard/save-all`
+all drop it from the payload, because a stored value would lose to the
+environment on the next load. The write still returns `200` — the rest of the
+payload is applied — so a caller that needs to know whether a field took
+should read `sources` first. See `docs/CONFIG_MGMT.md` 11a.
+
 ## 6.2 Cases
 
 | Router | Prefix | Scope |

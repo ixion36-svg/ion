@@ -102,6 +102,37 @@ All four are in the tag's own subject matter: moving configuration out of
   success while the environment kept winning — the exact failure the badge
   exists to prevent. It now mirrors the override block, with `base_url` (the
   one field `get_config()` strips) recorded as the exception.
+- **The env-held guard is now server-side, and covers the wizard.** It was a
+  client-side filter in the settings page, so `curl`, a script and the setup
+  wizard reached the same handlers unguarded — and the wizard is gated
+  `integration:manage`, a lower bar than the `system:settings` the settings
+  page needs. The twelve section `PUT`s drop any submitted field the
+  environment holds; both wizard save paths, whose payloads are generically
+  named, snapshot and restore instead. `GET /api/admin/config` is unchanged
+  apart from the field below.
+- **The badge's tooltip named a variable that does not exist.** It derived the
+  name as `field.toUpperCase()`, which drops the `ION_` prefix on every field
+  and is simply wrong for `gitlab_sudo_enabled`, whose key is
+  `ION_GITLAB_SUDO` — so it told operators to go and delete a key that was not
+  there. The server now sends the real name in a `source_env_names` field
+  (names only, never values).
+- **`SECURITY_ASSESSMENT.md`'s v0.99.7 entry described v0.99.6.** The release
+  carried v0.99.6's narrative forward with the version number changed, so the
+  word `config.json` did not appear anywhere in the document while this was
+  the release that made it the credential store; the posture table was headed
+  v0.99.5 and the assessment date line still said v0.99.6. v0.99.6's text is
+  kept, moved into the per-version prose chain, and v0.99.7 now has its own
+  entry: credentials at rest, the two new response fields, the write guard,
+  and the two Low findings above recorded as closed. Two stale labels went
+  with it — the posture heading read v0.54.1, 45 releases behind, and the
+  claim that Low findings had "stayed at zero since v0.34.0" is now stated
+  accurately: these two were present in the v0.99.7 tag itself, so an instance
+  running it unpatched carries both.
+- **`docs/API.md` did not document the provenance fields.** `sources` shipped
+  in v0.99.7 with no entry; it and `source_env_names` are now described under
+  the `admin_api` row, together with the fact that a `PUT` returns `200` while
+  silently dropping an environment-held field — which a non-browser caller has
+  no other way to discover.
 
 ## v0.99.6 — 2026-10-02
 

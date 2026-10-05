@@ -315,14 +315,42 @@ directory is left at its existing mode; only `ion` runs in the image.
 **Environment variables still win.** `get_config()` ranks env above
 `config.json`, so re-adding a key to `.env` silently overrides the UI. The
 settings page shows an environment-held field read-only with a "set by
-environment" badge, and drops it from the save payload.
+environment" badge, and drops it from the save payload. The badge's tooltip
+names the variable to remove, and `GET /api/admin/config` supplies that name
+in `source_env_names` rather than letting the page derive it: a derived name
+is wrong for every field (the real keys are `ION_`-prefixed) and wrong twice
+over for `gitlab_sudo_enabled`, whose key is `ION_GITLAB_SUDO`, so the tooltip
+used to name a variable that does not exist.
 
 Be precise about what that drop buys, because it is narrower than it looks:
 every section `PUT` ends in `config.to_file(get_config_path())` against the
 env-merged config object, so a save to any section rewrites the whole file
-including env-held values. Dropping the field client-side prevents a masked
-secret being written back, an SSRF rejection on an env-held empty URL, and
-needless reassignment. It does not stop env values reaching `config.json`.
+including env-held values. Dropping the field prevents a masked secret being
+written back, an SSRF rejection on an env-held empty URL, and needless
+reassignment. It does not stop env values reaching `config.json`.
+
+**The drop is enforced server-side as well.** It was a client-side filter
+only, which made it a courtesy rather than an invariant: `curl`, a script, and
+the setup wizard all reach the same handlers. The twelve section `PUT`s now
+call `_drop_env_held`, which blanks any submitted field the environment holds
+so the handler's own `if settings.x is not None` skips it. That works because
+the section models name their fields exactly as `Config` does.
+
+`PUT /api/admin/wizard/save/{integration}` and `POST
+/api/admin/wizard/save-all` do not — their payloads are generically named
+(`url`, `api_key`, `enabled`) — so they snapshot the env-held values before
+the assignment chain and restore them before the write. Both wizard routes are
+gated `integration:manage` rather than `system:settings`, so before this they
+were the easiest way to reach `config.json` with a value that could never take
+effect, with no badge anywhere to explain the result.
+`tests/test_config_write_guard.py` covers all four paths.
+
+This does not defeat `scripts/migrate-env-to-settings.ps1`, whose whole job is
+getting effective values into `config.json` before `.env` is pruned — every
+field it cares about is env-held at the moment it runs. The `PUT` is only what
+triggers the write: the handler still ends in `Config.to_file` against the
+env-merged object, so the environment's effective value is persisted whatever
+the payload said. The guard rejects the submitted value, not the write.
 
 **The badge is a complete guard.** `ENV_FIELD_MAP`
 (`src/ion/core/config.py`) covers all 151 fields `get_config()` assigns from an
