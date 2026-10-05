@@ -69,10 +69,44 @@ ION's version string lives in 10 files. Past releases rotted them (`src/ion/__in
    ```
    docker build -t fubsxploitapps/ion:X.Y.Z .
    docker push fubsxploitapps/ion:X.Y.Z
+   python .claude/skills/release-bump/check_image.py
    ```
    Skipping the push is how three releases (0.80.3, 0.81.0, 0.81.2) once
    shipped as tags with no image — the push is part of the release, not an
    afterthought.
+
+9. **Verify what actually landed.** `check_image.py` reads
+   `org.opencontainers.image.version` out of the published image's config blob
+   and compares it to `pyproject.toml`. It needs no daemon, no local image and
+   no login (stdlib HTTPS against the registry). Exit codes: `0` PASS, `1`
+   drift or missing tag, `2` INCONCLUSIVE — the registry did not answer
+   (rate limit or 5xx), which is **not** drift; re-run it.
+
+   This exists because v0.99.8 shipped the wrong image twice, and
+   `docker push` reported success both times because it had something to send:
+
+   - the first push sent a **stale local image** already tagged `0.99.8`,
+     whose baked-in label read `0.99.5` — four days older than the release;
+   - the second was a genuine build, but from a checkout that had never been
+     fast-forwarded, so it stamped `0.99.5` again.
+
+   The trap worth knowing: **`git fetch origin main` followed by
+   `git checkout main` does NOT move local `main`.** The fetch updates
+   `origin/main`; the checkout switches to a local branch that may be months
+   behind, and the build then stamps whatever version that tree carries. Use
+   `git reset --hard origin/main` (or `git merge --ff-only origin/main`) and
+   confirm with `grep opencontainers.image.version Dockerfile` before building.
+
+   A tag with the wrong image is worse than a tag with no image: it looks
+   correct from the outside, and anyone pulling it gets code from a different
+   release — in v0.99.8's case, a version missing both of that release's
+   security fixes. Run the check; do not infer success from `docker push`
+   printing a digest.
+
+   If you move `latest` per release, check it too:
+   ```
+   python .claude/skills/release-bump/check_image.py --also-latest
+   ```
 
 ## What NOT to bump
 
