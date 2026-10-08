@@ -35,6 +35,7 @@ from ion.models.workforce import (
     STAGE_SUSPENDED,
     STAGE_TRAINING,
     STAGE_WITHDRAWN,
+    STATUS_EQUIVALENT,
     STATUS_EXPIRED,
     STATUS_PENDING,
     STATUS_SUBMITTED,
@@ -660,6 +661,70 @@ def verify_requirement(session: Session, *, requirement: JourneyRequirement,
     return requirement
 
 
+def record_equivalence(session: Session, *, requirement: JourneyRequirement,
+                       assessor: User, basis: str,
+                       expires_on: Optional[date] = None) -> JourneyRequirement:
+    """Satisfy a requirement by assessed proficiency instead of the item itself.
+
+    "CompTIA Security+ (or equivalent)" is routinely met by somebody who
+    demonstrates the same competence without holding the certificate.
+    There was no way to record that honestly: marking it verified claims
+    they hold the cert, and waiving it claims the requirement was set
+    aside rather than met.
+
+    So this is its own status. The requirement counts as satisfied, and
+    anyone reading the record is told it was satisfied by assessment, by
+    whom, and on what basis.
+
+    The basis is mandatory. An equivalence with nothing written down is a
+    tick, and the entire value of this path is that somebody had to say
+    what they assessed and how.
+
+    It expires like the thing it stands in for. Demonstrated proficiency
+    goes stale exactly as a certificate does, and an equivalence that
+    never expires is a permanent exemption wearing a different name.
+    """
+    journey = session.get(UserJourney, requirement.journey_id)
+    if journey is None:
+        raise WorkforceError("Journey not found")
+    # The same bar as verifying. Without it this is a way round the
+    # submit/verify split: declare your own proficiency, award yourself
+    # the role.
+    if not _may_verify(assessor, journey):
+        raise WorkforceError("Permission denied")
+    if not (basis or "").strip():
+        raise WorkforceError(
+            "State what was assessed and how. An equivalence with no basis "
+            "recorded cannot be reviewed, and is indistinguishable from "
+            "waiving the requirement."
+        )
+
+    now = datetime.utcnow()
+    requirement.status = STATUS_EQUIVALENT
+    requirement.verified_by_id = assessor.id
+    requirement.verified_at = now
+    requirement.completed_on = requirement.completed_on or now.date()
+    requirement.expires_on = expires_on or _expiry_for(
+        requirement.validity_months, now)
+    note = (f"Met by assessed proficiency, not by holding "
+            f"{requirement.name!r}. Assessed by {assessor.username} on "
+            f"{now:%Y-%m-%d}: {basis.strip()}")
+    requirement.notes = (
+        f"{requirement.notes}\n{note}" if requirement.notes else note)
+
+    session.add(AuditLog(
+        user_id=assessor.id, action="workforce_requirement_equivalence",
+        resource_type="journey_requirement", resource_id=requirement.id,
+        details=f"user {journey.user_id}: {requirement.name} met by assessed "
+                f"proficiency - {basis.strip()[:200]}",
+    ))
+    session.flush()
+    _sync_roles_for(session, journey)
+    _recompute_stage(session, journey)
+    session.commit()
+    return requirement
+
+
 def _may_verify(verifier: User, journey: UserJourney) -> bool:
     if verifier.has_permission("workforce:verify"):
         return True
@@ -756,9 +821,26 @@ def awaiting_verification(session: Session) -> List[JourneyRequirement]:
 def confers_role(journey: UserJourney, now: Optional[datetime] = None) -> bool:
     """Whether this journey should currently confer its profile's ION role.
 
-    The gate is the condition. A suspended journey keeps conferring until its
-    grace expires, so a certificate lapsing overnight does not strip access
-    from someone on shift before anyone has seen the alert.
+    BOTH phases, not just the gate. This asked only about the gate, and on
+    2026-10-08 a joiner who had cleared the four mandatory induction items
+    was assigned SOC Analyst L1 and immediately held the analyst role with
+    18 permissions -- with role readiness at 0 of 3. The ION platform
+    training, the triage sign-off and the SIEM access had not been touched.
+
+    The gate is still a precondition and still person-level: a lapse there
+    suspends every role at once, where a lapsed readiness item withdraws
+    only this one. That distinction is unchanged. What changed is that the
+    role's own training is now part of the condition for holding it, which
+    is the thing this module exists to enforce.
+
+    A profile with no readiness items still confers on the gate alone.
+    That is a legitimate shape -- a role whose only requirements are the
+    mandatory ones -- and requiring readiness that does not exist would
+    make it permanently inert.
+
+    A suspended journey keeps conferring until its grace expires, so a
+    certificate lapsing overnight does not strip access from someone on
+    shift before anyone has seen the alert.
     """
     now = now or datetime.utcnow()
     if journey.stage in (STAGE_CLOSED, STAGE_WITHDRAWN):
@@ -770,7 +852,7 @@ def confers_role(journey: UserJourney, now: Optional[datetime] = None) -> bool:
     # asked BEFORE gate_cleared() -- which is already False by definition here.
     if journey.stage == STAGE_SUSPENDED:
         return journey.grace_until is not None and now < journey.grace_until
-    return gate_cleared(journey)
+    return gate_cleared(journey) and readiness_complete(journey)
 
 
 def sync_granted_roles(session: Session, user: User,

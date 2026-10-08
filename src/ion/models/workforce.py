@@ -61,7 +61,15 @@ STATUS_SUBMITTED = "submitted"
 STATUS_VERIFIED = "verified"
 STATUS_EXPIRED = "expired"
 STATUS_WAIVED = "waived"
-STATUSES = (STATUS_PENDING, STATUS_SUBMITTED, STATUS_VERIFIED, STATUS_EXPIRED, STATUS_WAIVED)
+#: Met by assessed proficiency rather than by the named certificate.
+#:
+#: Distinct from both neighbours on purpose. Recording it as VERIFIED would
+#: be a lie -- an assessor asking "does your L2 hold GCIA" would be told
+#: yes. Recording it as WAIVED is also wrong: waived means the requirement
+#: was set aside, not met. The record has to say which happened.
+STATUS_EQUIVALENT = "equivalent"
+STATUSES = (STATUS_PENDING, STATUS_SUBMITTED, STATUS_VERIFIED, STATUS_EXPIRED,
+            STATUS_WAIVED, STATUS_EQUIVALENT)
 
 STAGE_PRE_ACCESS = "pre_access"
 STAGE_TRAINING = "role_training"
@@ -252,7 +260,7 @@ class JourneyRequirement(Base, TimestampMixin):
 
     @property
     def satisfied(self) -> bool:
-        return self.status in (STATUS_VERIFIED, STATUS_WAIVED)
+        return self.status in (STATUS_VERIFIED, STATUS_WAIVED, STATUS_EQUIVALENT)
 
 
 class LeaverRecord(Base, TimestampMixin):

@@ -92,6 +92,19 @@ def _clear_gate(db, journey, admin):
         wf.verify_requirement(db, requirement=r, verifier=admin)
 
 
+def _clear_everything(db, journey, admin):
+    """Both phases.
+
+    Since 2026-10-08 conferral needs the readiness items too, so the tests
+    below that are about granting, revoking and auditing -- rather than
+    about the phase split itself -- have to finish the whole journey to
+    get a role at all.
+    """
+    for r in list(journey.requirements):
+        if not r.satisfied:
+            wf.verify_requirement(db, requirement=r, verifier=admin)
+
+
 def test_assigning_a_role_does_not_hand_over_its_permissions(db):
     """The whole point: assignment starts a journey, it does not grant access."""
     admin = _user(db, "admin", ["workforce:manage", "workforce:verify"])
@@ -104,7 +117,21 @@ def test_assigning_a_role_does_not_hand_over_its_permissions(db):
     assert not person.has_permission("alert:read")
 
 
-def test_clearing_the_gate_grants_the_role(db):
+def test_the_role_arrives_only_when_both_phases_are_done(db):
+    """Reversed deliberately, 2026-10-08.
+
+    This asserted "readiness is not a precondition for access", and a
+    joiner on the live estate cleared the four mandatory induction items,
+    was assigned SOC Analyst L1 and immediately held the analyst role with
+    18 permissions -- with role readiness at 0 of 3. The ION platform
+    training, the triage sign-off and the SIEM access had not been
+    touched.
+
+    The gate is still person-level and still a precondition: a lapse there
+    suspends every role at once, where a lapsed readiness item withdraws
+    only this one. What changed is that the role's own training is now
+    part of the condition for holding the role.
+    """
     admin = _user(db, "admin", ["workforce:manage", "workforce:verify"])
     person = _user(db, "joiner")
     role = _granted_role(db)
@@ -117,8 +144,14 @@ def test_clearing_the_gate_grants_the_role(db):
 
     wf.verify_requirement(db, requirement=gate[1], verifier=admin)
     db.refresh(person)
+    assert role not in person.roles, \
+        "the gate alone must not grant the role's permissions"
+
+    for r in [r for r in journey.requirements if r.phase == PHASE_READINESS]:
+        wf.verify_requirement(db, requirement=r, verifier=admin)
+    db.refresh(person)
     assert role in person.roles
-    assert person.has_permission("alert:read"), "readiness is not a precondition for access"
+    assert person.has_permission("alert:read")
 
 
 def test_a_lapse_suspends_at_once_but_permissions_survive_the_grace(db):
@@ -166,7 +199,7 @@ def test_re_verifying_after_a_lapse_restores_the_role(db):
     person = _user(db, "joiner")
     role = _granted_role(db)
     journey = _assign(db, admin, person, role)
-    _clear_gate(db, journey, admin)
+    _clear_everything(db, journey, admin)
 
     lapsed = next(r for r in journey.requirements if r.name == "Security clearance")
     lapsed.expires_on = date.today() - timedelta(days=1)
@@ -189,7 +222,7 @@ def test_offboarding_takes_the_permissions_back(db):
     person = _user(db, "leaver")
     role = _granted_role(db)
     journey = _assign(db, admin, person, role)
-    _clear_gate(db, journey, admin)
+    _clear_everything(db, journey, admin)
     db.refresh(person)
     assert role in person.roles
 
@@ -317,7 +350,7 @@ def test_revoke_now_checks_permission_inside_the_service(db):
     person = _user(db, "leaver")
     role = _granted_role(db)
     journey = _assign(db, admin, person, role)
-    _clear_gate(db, journey, admin)
+    _clear_everything(db, journey, admin)
     record = wf.start_offboarding(db, user=person, raiser=admin,
                                   last_working_day=date.today())
 
@@ -334,7 +367,7 @@ def test_role_changes_leave_an_audit_trail(db):
     person = _user(db, "joiner")
     role = _granted_role(db)
     journey = _assign(db, admin, person, role)
-    _clear_gate(db, journey, admin)
+    _clear_everything(db, journey, admin)
 
     actions = [a.action for a in db.query(AuditLog).all()]
     assert "workforce_profile_assigned" in actions
