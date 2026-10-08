@@ -3970,12 +3970,34 @@ function dismissAlertAttention() {
 // =========================================================================
 // Cases
 // =========================================================================
+/* The case list is paginated server side (review 2026-10-08, stage 5), so
+   this asks for an explicit window instead of relying on the old unbounded
+   response. The panel only ever shows the first ten, but the badge counts
+   active cases -- and counting a capped array would undercount it on any
+   SOC with more cases than the page size. So the badge comes from the
+   server's aggregate, which is right whatever the window. */
+let casesActiveTotal = null;
+
 async function loadCases() {
     try {
-        const response = await fetch('/api/cases');
+        const response = await fetch('/api/cases?limit=50&sort=created_at&order=desc');
         if (!response.ok) return;
         const data = await response.json();
         casesData = data.cases || [];
+
+        try {
+            const facets = await fetch('/api/cases/facets');
+            if (facets.ok) {
+                const f = await facets.json();
+                const byStatus = f.by_status || {};
+                casesActiveTotal = (byStatus.open || 0) + (byStatus.acknowledged || 0);
+            }
+        } catch (e) {
+            // Fall back to counting what we have; the list is still correct,
+            // the badge is just the page's view of it.
+            casesActiveTotal = null;
+        }
+
         renderCasesSummary();
     } catch (e) {
         console.error('Error loading cases:', e);
@@ -3986,7 +4008,7 @@ function renderCasesSummary() {
     const container = document.getElementById('cases-summary');
     const badge = document.getElementById('cases-count');
     const activeCases = casesData.filter(c => c.status === 'open' || c.status === 'acknowledged');
-    badge.textContent = activeCases.length;
+    badge.textContent = (casesActiveTotal === null) ? activeCases.length : casesActiveTotal;
 
     if (casesData.length === 0) {
         container.innerHTML = '<div class="empty-state">No cases</div>';

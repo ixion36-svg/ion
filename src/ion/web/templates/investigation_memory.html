@@ -333,6 +333,14 @@
     repeated_uncertainty: 'badge-info',
   };
 
+  /* A raw ISO string is not a date to a reader. These carry an offset, so
+     the browser converts rather than guessing a zone. */
+  function imReviewDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
+  }
+
   function imReviewEvidenceRows(item) {
     const e = item.evidence || {};
     const rows = [];
@@ -344,19 +352,19 @@
 
     if (item.kind === 'expired_quirk') {
       add('lapsed for', e.days_lapsed + ' day(s)');
-      add('review date', e.review_date);
+      add('review date', imReviewDate(e.review_date));
       add('annotation', e.annotation);
     } else if (item.kind === 'stale_fp_signature') {
       add('state', e.governance_state);
       add('suppressed', e.hit_count + ' alert(s) so far');
-      add('last match', e.last_matched_at);
-      add('review date', e.review_date);
+      add('last match', imReviewDate(e.last_matched_at));
+      add('review date', imReviewDate(e.review_date));
       add('reason', e.reason);
     } else if (item.kind === 'contradictory_outcome') {
       add('verdicts', (e.verdicts || []).join(' vs '));
       (e.closures || []).forEach(c => {
         add('closed', c.human_verdict + ' by ' + (c.closed_by || ('user ' + c.closed_by_id))
-            + (c.closed_at ? ' on ' + c.closed_at.slice(0, 16) : ''));
+            + (c.closed_at ? ' on ' + imReviewDate(c.closed_at) : ''));
       });
     } else if (item.kind === 'repeated_uncertainty') {
       // The denominator is not optional.

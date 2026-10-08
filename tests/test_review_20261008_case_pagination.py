@@ -458,3 +458,48 @@ class TestWiring:
     def test_the_page_reads_the_servers_counts(self):
         """Client-side counts over a capped array understate the backlog."""
         assert "/api/cases/facets" in self._page()
+
+
+# ── No page relies on the old unbounded default ──────────────────────────
+
+
+class TestNoUnboundedCallers:
+    """Found in the browser: /cases had been converted, but the alerts page
+    still did a bare `fetch('/api/cases')`.
+
+    With the endpoint's default limit that call silently returns the first
+    page, and the panel's badge -- a count of *active* cases taken from the
+    array -- would undercount on any SOC with more cases than the page size.
+    The list being short is a display choice; the count being wrong is not.
+    """
+
+    @staticmethod
+    def _templates():
+        return sorted(
+            (_SRC / "ion" / "web" / "templates").rglob("*.html")
+        )
+
+    def test_the_glob_finds_templates(self):
+        assert len(self._templates()) > 30
+
+    def test_no_template_reads_the_case_list_without_a_window(self):
+        import re
+
+        # A GET with no query string. POSTs to the same path create a case
+        # and are unaffected, so the pattern requires the closing paren.
+        bare = re.compile(r"""fetch\(\s*['"`]/api/cases['"`]\s*\)""")
+        offenders = []
+        for path in self._templates():
+            text = path.read_text(encoding="utf-8")
+            for match in bare.finditer(text):
+                offenders.append(f"{path.name}:{text[:match.start()].count(chr(10)) + 1}")
+        assert not offenders, (
+            "these read the case list with no limit, so they silently get "
+            f"only the first page: {offenders}"
+        )
+
+    def test_the_alerts_summary_counts_from_the_server(self):
+        page = (_SRC / "ion" / "web" / "templates" / "alerts.html"
+                ).read_text(encoding="utf-8")
+        assert "/api/cases/facets" in page
+        assert "casesActiveTotal" in page
