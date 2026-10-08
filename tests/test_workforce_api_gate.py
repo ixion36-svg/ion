@@ -91,8 +91,11 @@ def test_mutating_routes_require_a_permission():
     # record_equivalent is here for the same reason as verify: the
     # authorisation is _may_verify, which depends on whether the caller
     # sponsors THIS journey, so it cannot be a static route dependency.
+    # acknowledge_duty joins them: only the person ON duty may
+    # acknowledge it, which depends on the row rather than on a role, so
+    # it cannot be a static route dependency either.
     service_checked = ("verify", "submit_item", "withdraw_item",
-                       "record_equivalent")
+                       "record_equivalent", "acknowledge_duty")
     for route in writes:
         name = route.name
         if name in service_checked:

@@ -11,7 +11,7 @@ import logging
 from datetime import date
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -775,6 +775,74 @@ def people(
 
 
 # --- org structure ----------------------------------------------------------
+
+
+class DutyIn(BaseModel):
+    user_id: int
+    week_start: date
+    duty: str = "duty_analyst"
+    notes: str = ""
+
+
+@router.get("/duty", dependencies=[Depends(require_workforce_module)])
+def duty_rota(
+    weeks: int = Query(6, ge=1, le=52),
+    session: Session = Depends(get_db_session),
+    _user: User = Depends(require_permission("workforce:read")),
+) -> dict:
+    """Who is on duty, and which coming weeks have nobody.
+
+    Unfilled weeks come back as rows rather than being absent: a caller
+    that only ever sees assigned weeks cannot tell an empty one from a
+    week it has not loaded, and that is how the standup quietly stops
+    happening.
+    """
+    from ion.services import duty_roster_service as duty
+
+    return duty.rota_summary(session, weeks=weeks)
+
+
+@router.post("/duty", dependencies=[Depends(require_workforce_module)],
+             status_code=201)
+def set_duty(
+    body: DutyIn,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("workforce:manage")),
+) -> dict:
+    """Put somebody on duty for a week, replacing whoever held it."""
+    from ion.services import duty_roster_service as duty
+
+    target = session.get(User, body.user_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    try:
+        row = duty.assign(session, duty=body.duty, week_start=body.week_start,
+                          user=target, actor=user, notes=body.notes)
+    except duty.DutyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    return row.to_dict()
+
+
+@router.post("/duty/{assignment_id}/acknowledge",
+             dependencies=[Depends(require_workforce_module)])
+def acknowledge_duty(
+    assignment_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """The holder confirms they have picked it up.
+
+    Only the holder: an entry nobody acknowledged is a plan rather than a
+    fact, and a lead ticking it for them erases that signal.
+    """
+    from ion.services import duty_roster_service as duty
+
+    try:
+        row = duty.acknowledge(session, assignment_id=assignment_id,
+                               actor=user)
+    except duty.DutyError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from None
+    return row.to_dict()
 
 
 @router.get("/establishment", dependencies=[Depends(require_workforce_module)])

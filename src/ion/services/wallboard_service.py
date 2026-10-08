@@ -823,6 +823,68 @@ def _compute_attention(alerts: Dict[str, Any], cases: Dict[str, Any]) -> Dict[st
     }
 
 
+def _collect_org(session: Session, today=None) -> Dict[str, Any]:
+    """Staffing against the establishment, and who is on duty this week.
+
+    A board showing alert counts and nothing about people answers "what is
+    happening" and not "who is dealing with it".
+
+    The empty cases are the ones that matter here, because they are where
+    a staffing widget misleads. "0 gaps" with nothing established reads as
+    fully staffed to everybody who walks past. A blank duty line reads as
+    "not loaded". Both say what they actually mean instead.
+
+    ``filling`` stays separate from ``filled`` for the same reason it does
+    in the ORBAT: somebody in a post but still in training is not cover
+    tonight.
+    """
+    from ion.services import duty_roster_service as duty
+    from ion.services import workforce_service as wf
+
+    summary = wf.establishment_summary(session)
+    tree = wf.org_tree(session)
+    established = summary.get("established", 0)
+
+    if not established:
+        headline = (
+            "No establishment defined, so there is nothing to measure "
+            "staffing against."
+        )
+    else:
+        gap = summary.get("gap", 0)
+        filling = summary.get("filling", 0)
+        parts = [f"{summary.get('filled', 0)} of {established} posts filled"]
+        if filling:
+            parts.append(f"{filling} still in training")
+        if gap:
+            parts.append(f"{gap} vacant")
+        headline = ", ".join(parts) + "."
+
+    # The roles furthest short, because a headline number tells the room it
+    # is short and the role name is the thing somebody can act on.
+    worst = sorted(
+        (r for r in summary.get("roles", []) if r["gap"]),
+        key=lambda r: (-r["gap"], r["role"]),
+    )[:5]
+
+    rota = duty.rota_summary(session, weeks=6, today=today)
+    return {
+        "established": established,
+        "filled": summary.get("filled", 0),
+        "filling": summary.get("filling", 0),
+        "gap": summary.get("gap", 0),
+        "has_establishment": bool(established),
+        "headline": headline,
+        "worst": worst,
+        # Tracked apart from the post count: "nobody answers for detection
+        # engineering" is a different problem from being an analyst short.
+        "leads_gapped": tree.get("leads_gapped", 0),
+        "duty": duty.current(session, today=today),
+        "duty_unfilled_weeks": rota.get("unfilled", 0),
+        "duty_next_unfilled": rota.get("next_unfilled"),
+    }
+
+
 def _gather(session: Session) -> Dict[str, Any]:
     """Build a single snapshot. Each panel is in its own try/except."""
     health = _safe("service_health", lambda: _collect_service_health(session), default={})
@@ -840,6 +902,13 @@ def _gather(session: Session) -> Dict[str, Any]:
         "topology":         _safe("topology", lambda: _collect_topology(health), default={"nodes": [], "counts": {}}),
         "threat_landscape": _safe("threat_landscape", lambda: _collect_threat_landscape(session), default={"summary": None, "summary_kind": "stats", "stats": {}}),
         "ticker":           _safe("ticker", lambda: _collect_ticker(session), default={"items": [], "count": 0}),
+        "org":              _safe("org", lambda: _collect_org(session), default={
+            "established": 0, "filled": 0, "filling": 0, "gap": 0,
+            "has_establishment": False, "headline": "Staffing unavailable.",
+            "worst": [], "leads_gapped": 0, "duty_unfilled_weeks": 0,
+            "duty": {"assigned": False, "user": None, "acknowledged": False,
+                     "summary": "Duty rota unavailable."},
+        }),
         "service_health":   health,
     }
 
