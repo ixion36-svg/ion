@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import secrets
 import string
 from datetime import datetime, timezone
@@ -65,6 +66,54 @@ def _generate_password(length: int = 20) -> str:
             return pwd
 
 
+#: A ``sAMAccountName`` allowlist. Review 2026-10-08 finding 2: the
+#: approved target used to be interpolated into the search filter raw, so
+#: a target of ``*`` became ``(sAMAccountName=*)`` — every account in the
+#: search base — and the adapter modified whichever one the DC returned
+#: first. The approver authorised one account; another was changed.
+_SAM_ACCOUNT_NAME_RE = re.compile(r"^[A-Za-z0-9._$-]{1,64}$")
+
+
+def _is_valid_sam_account_name(value: Any) -> bool:
+    """Return True if ``value`` is a plausible ``sAMAccountName``.
+
+    An allowlist, not a denylist. AD caps ``sAMAccountName`` at 20
+    characters and rejects ``" / \\ [ ] : ; | = , + * ? < >`` outright, so
+    anything beyond letters, digits, dot, dash, underscore and the
+    trailing ``$`` of a machine account is not a name worth resolving.
+    The 64-character bound is deliberately looser than AD's own 20 so an
+    unusual directory still works, while an obvious payload is refused.
+    """
+    if not isinstance(value, str):
+        return False
+    return bool(_SAM_ACCOUNT_NAME_RE.match(value))
+
+
+def _escape_ldap_filter_value(value: str) -> str:
+    """Escape a value for use inside an LDAP search filter (RFC 4515 §3).
+
+    Belt and braces alongside :func:`_is_valid_sam_account_name`, which
+    should already have refused anything containing these. The filter is
+    built through this function so a future caller that forgets to
+    validate still cannot broaden the search.
+    """
+    out: list[str] = []
+    for ch in value:
+        if ch == "\\":
+            out.append(r"\5c")
+        elif ch == "*":
+            out.append(r"\2a")
+        elif ch == "(":
+            out.append(r"\28")
+        elif ch == ")":
+            out.append(r"\29")
+        elif ch == "\x00":
+            out.append(r"\00")
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def _encode_ad_password(pwd: str) -> bytes:
     """Encode a plaintext password the way Active Directory expects it.
 
@@ -91,6 +140,15 @@ def _perform_ldap_action(
     is already safe for redaction — it carries only LDAP result codes,
     description strings, and the target DN (no secrets).
     """
+    # Refuse an implausible identifier before binding, so a payload never
+    # reaches the directory at all.
+    if not _is_valid_sam_account_name(target_sam):
+        return (
+            False,
+            f"Refusing AD action: {target_sam!r} is not a valid sAMAccountName",
+            {"error": "invalid_target"},
+        )
+
     # Import lazily so the module loads even if ldap3 isn't installed
     # (dry-run mode should still work).
     try:
@@ -120,7 +178,7 @@ def _perform_ldap_action(
         return (False, f"LDAP bind failed: {exc}", {"error": "bind_failed"})
 
     try:
-        search_filter = f"(sAMAccountName={target_sam})"
+        search_filter = f"(sAMAccountName={_escape_ldap_filter_value(target_sam)})"
         ok = conn.search(
             search_base=search_base,
             search_filter=search_filter,
@@ -133,9 +191,33 @@ def _perform_ldap_action(
                 {"ldap_result": dict(conn.result)},
             )
 
+        # Exactly one match, or nothing happens. An ambiguous search is not
+        # an invitation to pick the first row — the approver authorised one
+        # specific account.
+        if len(conn.entries) > 1:
+            return (
+                False,
+                (
+                    f"Refusing AD action: '{target_sam}' matched "
+                    f"{len(conn.entries)} accounts in {search_base} (ambiguous "
+                    "target, multiple matches)"
+                ),
+                {
+                    "error": "ambiguous_target",
+                    "match_count": len(conn.entries),
+                    "matched_dns": [
+                        str(e.distinguishedName.value) for e in conn.entries[:10]
+                    ],
+                    "ldap_result": dict(conn.result),
+                },
+            )
+
         entry = conn.entries[0]
         user_dn = str(entry.distinguishedName.value)
         current_uac = int(entry.userAccountControl.value or 0)
+        # The identity actually resolved, so the approver's record and the
+        # executed change can be compared after the fact.
+        resolved_sam = str(entry.sAMAccountName.value)
 
         if action_type == "disable_account":
             new_uac = current_uac | _UAC_ACCOUNTDISABLE
@@ -145,6 +227,7 @@ def _perform_ldap_action(
             )
             resp = {
                 "user_dn": user_dn,
+                "resolved_sam_account_name": resolved_sam,
                 "old_userAccountControl": current_uac,
                 "new_userAccountControl": new_uac,
                 "ldap_result": dict(conn.result),
@@ -166,6 +249,7 @@ def _perform_ldap_action(
             # Do NOT include the password in the response payload.
             resp = {
                 "user_dn": user_dn,
+                "resolved_sam_account_name": resolved_sam,
                 "ldap_result": dict(conn.result),
                 "force_change_on_next_logon": True,
             }
@@ -213,6 +297,23 @@ async def execute(action_type: str, params: dict[str, Any], config) -> ExecutorR
             request_payload=redact(request_payload),
             response_payload={},
             error="unsupported_action_type",
+        )
+
+    # Checked before the dry-run branch on purpose: a dry run of a
+    # wildcard target must report the target as invalid, not claim the
+    # action would have worked.
+    if not _is_valid_sam_account_name(target):
+        return ExecutorResult(
+            success=False,
+            adapter=ADAPTER_NAME,
+            action_type=action_type,
+            target=target,
+            message=f"Refusing AD action: {target!r} is not a valid sAMAccountName",
+            started_at=started,
+            completed_at=datetime.now(timezone.utc),
+            request_payload=redact(request_payload),
+            response_payload={},
+            error="invalid_target",
         )
 
     if getattr(config, "exec_dry_run", True):
