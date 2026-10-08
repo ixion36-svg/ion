@@ -72,9 +72,16 @@ def test_alert_read_alone_is_rejected_by_the_manage_dependency():
     import pytest
     from fastapi import HTTPException
 
+    # `request` became a parameter of the dependency in 62d09c0
+    # (feat(audit): record refused requests in audit_logs) so a refusal can
+    # be recorded with its client IP. None is accepted — _permission_denied
+    # types it Optional — which keeps this a unit test of the permission
+    # check itself. The audit trail has its own coverage in
+    # tests/test_refusal_audit_trail.py.
     dep = require_permission("integration:manage")
     with pytest.raises(HTTPException) as exc:
-        dep(user=_User("alert:read", "integration:read"))
+        dep(request=None, user=_User("alert:read", "integration:read"))
     assert exc.value.status_code == 403
 
-    assert dep(user=_User("integration:manage"))._perms == {"integration:manage"}
+    granted = dep(request=None, user=_User("integration:manage"))
+    assert granted._perms == {"integration:manage"}
