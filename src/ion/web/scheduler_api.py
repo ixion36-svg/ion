@@ -26,7 +26,13 @@ from ion.services.scheduler_service import (
     list_executions as svc_list_executions,
 )
 from ion.services.scheduler_service import (
+    describe_handlers as svc_describe_handlers,
+)
+from ion.services.scheduler_service import (
     list_handlers as svc_list_handlers,
+)
+from ion.services.scheduler_service import (
+    preview_schedule as svc_preview_schedule,
 )
 from ion.services.scheduler_service import (
     list_jobs as svc_list_jobs,
@@ -192,5 +198,25 @@ def list_handlers():
     Handlers are registered at import time via ``@register_handler`` in
     whatever service defines them, so this list reflects the modules
     that have been imported in the current worker process.
+
+    ``catalogue`` carries the label, description and typed parameters the
+    form renders, so creating an ordinary job does not require knowing an
+    internal handler key or hand-writing JSON.
     """
-    return {"handlers": svc_list_handlers()}
+    return {
+        "handlers": svc_list_handlers(),
+        "catalogue": svc_describe_handlers(),
+    }
+
+
+@router.get(
+    "/preview-schedule",
+    dependencies=[Depends(require_permission("system:settings"))],
+)
+def preview_schedule(cron_expr: str, count: int = 5):
+    """Next firing times for a cron expression, before the job is saved.
+
+    An invalid expression comes back as ``valid: false`` with the error,
+    not as a 4xx, because this backs live feedback in a form.
+    """
+    return svc_preview_schedule(cron_expr, count=count)

@@ -40,16 +40,22 @@
           <input id="sch-name" class="input w-full" type="text" required maxlength="200" placeholder="Daily IOC sync">
         </fieldset>
         <fieldset class="fieldset p-0">
-          <legend class="fieldset-legend">Handler *</legend>
-          <select id="sch-handler" class="select w-full" required></select>
+          <legend class="fieldset-legend">Job type *</legend>
+          <select id="sch-handler" class="select w-full" required
+                  data-change-action="schOnHandlerChange"></select>
+          <p class="text-xs opacity-50" id="sch-handler-desc"></p>
         </fieldset>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
         <fieldset class="fieldset p-0">
           <legend class="fieldset-legend">Cron expression *</legend>
-          <input id="sch-cron" class="input w-full font-mono" type="text" required maxlength="120" placeholder="*/5 * * * *">
+          <input id="sch-cron" class="input w-full font-mono" type="text" required maxlength="120" placeholder="*/5 * * * *" data-input-action="schPreviewCron">
           <p class="text-xs opacity-50">5-field crontab (min hour dom mon dow). Example: <code class="bg-base-300 px-1 rounded font-mono">0 3 * * *</code> = 3am daily.</p>
+          <!-- Reads the expression back in plain English with its next few
+               firing times, so a wrong schedule is caught here rather than
+               by an unexpected run. -->
+          <div id="sch-cron-preview" class="text-xs mt-1"></div>
         </fieldset>
         <fieldset class="fieldset p-0">
           <legend class="fieldset-legend">Enabled</legend>
@@ -65,7 +71,16 @@
         <textarea id="sch-desc" class="textarea w-full" rows="2" placeholder="What does this job do?"></textarea>
       </fieldset>
 
-      <fieldset class="fieldset p-0">
+      <!-- Typed inputs built from the handler catalogue. An ordinary SOC
+           job should not need an internal handler key and hand-written
+           JSON; the raw field stays available for a handler that declares
+           no parameters of its own. -->
+      <fieldset class="fieldset p-0" id="sch-params-typed-wrap">
+        <legend class="fieldset-legend">Settings</legend>
+        <div id="sch-params-typed" class="flex flex-col gap-3"></div>
+      </fieldset>
+
+      <fieldset class="fieldset p-0" id="sch-params-raw-wrap">
         <legend class="fieldset-legend">Params (JSON)</legend>
         <textarea id="sch-params" class="textarea w-full font-mono text-sm" rows="4" placeholder='{"foo": "bar"}'></textarea>
         <p class="text-xs opacity-50">Passed to the handler as a dict. Leave blank for {}.</p>
@@ -146,6 +161,119 @@
 const SCH_API = '/api/scheduler';
 let schCache = [];
 let schHandlers = [];
+// Handler metadata: label, description and typed parameters, so the form
+// can be a form rather than a handler key and a JSON textarea.
+let schCatalogue = [];
+let schCronPreviewTimer = null;
+
+function schMeta(key) {
+  return schCatalogue.find(h => h.key === key) || null;
+}
+
+// ---- typed parameter form ------------------------------------------------
+
+function schRenderParams(handlerKey, existing) {
+  const meta = schMeta(handlerKey);
+  const typedWrap = document.getElementById('sch-params-typed-wrap');
+  const rawWrap = document.getElementById('sch-params-raw-wrap');
+  const typed = document.getElementById('sch-params-typed');
+  const params = (meta && meta.parameters) || [];
+
+  // No declared parameters means there is nothing to render a form from,
+  // so fall back to the raw field rather than show an empty section.
+  if (!params.length) {
+    typedWrap.style.display = 'none';
+    rawWrap.style.display = '';
+    typed.innerHTML = '';
+    return;
+  }
+
+  typedWrap.style.display = '';
+  rawWrap.style.display = 'none';
+
+  const current = existing || {};
+  typed.innerHTML = params.map(p => {
+    const val = (current[p.name] !== undefined) ? current[p.name] : p.default;
+    const help = p.help
+      ? `<p class="text-xs opacity-50">${schEsc(p.help)}</p>` : '';
+    if (p.type === 'boolean') {
+      return `<label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" class="checkbox checkbox-sm" data-sch-param="${schEsc(p.name)}"
+               data-sch-type="boolean" ${val ? 'checked' : ''}>
+        <span class="text-sm">${schEsc(p.label)}</span>
+      </label>${help}`;
+    }
+    const bounds = (p.type === 'integer')
+      ? `${p.minimum !== undefined ? ' min="' + schEsc(p.minimum) + '"' : ''}`
+        + `${p.maximum !== undefined ? ' max="' + schEsc(p.maximum) + '"' : ''}`
+      : '';
+    return `<div>
+      <label class="text-sm block mb-1">${schEsc(p.label)}</label>
+      <input class="input w-full" data-sch-param="${schEsc(p.name)}"
+             data-sch-type="${schEsc(p.type || 'string')}"
+             type="${p.type === 'integer' ? 'number' : 'text'}"${bounds}
+             value="${schEsc(val === undefined || val === null ? '' : val)}">
+      ${help}
+    </div>`;
+  }).join('');
+}
+
+function schCollectParams(handlerKey) {
+  const meta = schMeta(handlerKey);
+  if (!meta || !meta.parameters.length) return undefined;  // raw field wins
+  const out = {};
+  document.querySelectorAll('#sch-params-typed [data-sch-param]').forEach(el => {
+    const name = el.getAttribute('data-sch-param');
+    const type = el.getAttribute('data-sch-type');
+    if (type === 'boolean') {
+      out[name] = el.checked;
+    } else if (type === 'integer') {
+      const n = parseInt(el.value, 10);
+      if (!Number.isNaN(n)) out[name] = n;
+    } else if (el.value !== '') {
+      out[name] = el.value;
+    }
+  });
+  return out;
+}
+
+function schOnHandlerChange() {
+  const key = document.getElementById('sch-handler').value;
+  const meta = schMeta(key);
+  const descEl = document.getElementById('sch-handler-desc');
+  if (descEl) descEl.textContent = (meta && meta.description) || '';
+  schRenderParams(key, null);
+}
+
+// ---- schedule preview ----------------------------------------------------
+
+async function schPreviewCron() {
+  const expr = document.getElementById('sch-cron').value.trim();
+  const out = document.getElementById('sch-cron-preview');
+  if (!out) return;
+  if (!expr) { out.innerHTML = ''; return; }
+
+  // Debounced: this fires on every keystroke.
+  clearTimeout(schCronPreviewTimer);
+  schCronPreviewTimer = setTimeout(async () => {
+    try {
+      const r = await fetch(SCH_API + '/preview-schedule?cron_expr='
+                            + encodeURIComponent(expr) + '&count=3');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const p = await r.json();
+      if (!p.valid) {
+        out.innerHTML = `<span class="text-error">${schEsc(p.error || 'Invalid cron expression')}</span>`;
+        return;
+      }
+      const runs = (p.next_runs || [])
+        .map(t => schEsc(new Date(t).toLocaleString())).join(' · ');
+      out.innerHTML = `<span class="text-success">${schEsc(p.description)}</span>`
+        + `<span class="opacity-60"> — next: ${runs} (${schEsc(p.timezone)})</span>`;
+    } catch (e) {
+      out.innerHTML = '';
+    }
+  }, 300);
+}
 
 function schEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
 function schFmtTime(iso){if(!iso)return'never';try{const d=new Date(iso);const diff=(Date.now()-d.getTime())/1000;if(diff<0){const a=-diff;if(a<60)return'in '+Math.round(a)+'s';if(a<3600)return'in '+Math.round(a/60)+'m';if(a<86400)return'in '+Math.round(a/3600)+'h';return'in '+Math.round(a/86400)+'d';}if(diff<60)return Math.round(diff)+'s ago';if(diff<3600)return Math.round(diff/60)+'m ago';if(diff<86400)return Math.round(diff/3600)+'h ago';return Math.round(diff/86400)+'d ago';}catch(e){return iso}}
@@ -156,6 +284,7 @@ async function schBootstrap() {
     if (r.ok) {
       const data = await r.json();
       schHandlers = data.handlers || [];
+      schCatalogue = data.catalogue || [];
     }
   } catch (e) {}
   await schLoad();
@@ -222,7 +351,11 @@ async function schRefresh() { await schLoad(); }
 
 function schOpenForm(jobId) {
   const sel = document.getElementById('sch-handler');
-  sel.innerHTML = schHandlers.map(h => `<option value="${schEsc(h)}">${schEsc(h)}</option>`).join('') || '<option value="noop">noop</option>';
+  // Show the human label; the internal key stays as the option value.
+  sel.innerHTML = (schCatalogue.length
+    ? schCatalogue.map(h => `<option value="${schEsc(h.key)}">${schEsc(h.label)}</option>`)
+    : schHandlers.map(h => `<option value="${schEsc(h)}">${schEsc(h)}</option>`)
+  ).join('') || '<option value="noop">No-op (smoke test)</option>';
 
   if (jobId) {
     const j = schCache.find(x => x.id === jobId);
@@ -235,12 +368,22 @@ function schOpenForm(jobId) {
     document.getElementById('sch-desc').value = j.description || '';
     document.getElementById('sch-params').value = j.params_json || '';
     document.getElementById('sch-enabled').value = j.enabled ? 'true' : 'false';
+
+    let existing = null;
+    try { existing = j.params_json ? JSON.parse(j.params_json) : null; }
+    catch (e) { existing = null; }
+    const meta = schMeta(j.handler_key);
+    const descEl = document.getElementById('sch-handler-desc');
+    if (descEl) descEl.textContent = (meta && meta.description) || '';
+    schRenderParams(j.handler_key, existing);
   } else {
     document.getElementById('sch-modal-title').textContent = 'New Job';
     document.getElementById('sch-id').value = '';
     document.getElementById('sch-form').reset();
     document.getElementById('sch-cron').value = '*/15 * * * *';
+    schOnHandlerChange();
   }
+  schPreviewCron();
   document.getElementById('sch-modal-bg').classList.add('show');
 }
 
@@ -251,16 +394,23 @@ function schCloseForm() {
 async function schSubmit(ev) {
   ev.preventDefault();
   const id = document.getElementById('sch-id').value;
-  const paramsRaw = document.getElementById('sch-params').value.trim();
-  let params = null;
-  if (paramsRaw) {
-    try { params = JSON.parse(paramsRaw); }
-    catch(e) { alert('Params must be valid JSON: ' + e.message); return false; }
+  const handlerKey = document.getElementById('sch-handler').value;
+
+  // Typed inputs win when the handler declares parameters; the raw JSON
+  // field is only read for handlers that declare none.
+  let params = schCollectParams(handlerKey);
+  if (params === undefined) {
+    params = null;
+    const paramsRaw = document.getElementById('sch-params').value.trim();
+    if (paramsRaw) {
+      try { params = JSON.parse(paramsRaw); }
+      catch(e) { alert('Params must be valid JSON: ' + e.message); return false; }
+    }
   }
   const payload = {
     name: document.getElementById('sch-name').value.trim(),
     cron_expr: document.getElementById('sch-cron').value.trim(),
-    handler_key: document.getElementById('sch-handler').value,
+    handler_key: handlerKey,
     description: document.getElementById('sch-desc').value.trim() || null,
     params: params,
     enabled: document.getElementById('sch-enabled').value === 'true',
