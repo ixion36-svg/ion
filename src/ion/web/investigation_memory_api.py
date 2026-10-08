@@ -34,6 +34,7 @@ from ion.models.investigation import (
     IOCSighting,
 )
 from ion.models.user import User
+from ion.services import knowledge_review_service as knowledge_review
 from ion.storage import investigation_memory_repository as repo
 
 logger = logging.getLogger(__name__)
@@ -485,6 +486,51 @@ def review_fp_endpoint(
     db.commit()
     db.refresh(fp)
     return _fp_to_response(fp)
+
+
+# =========================================================================
+# Knowledge review inbox (review 2026-10-08 §8)
+#
+# Four kinds of decaying knowledge that nothing was surfacing as work:
+# lapsed quirks, stale FP signatures, the same alert closed two different
+# ways, and prompts Bob keeps abstaining on.
+# =========================================================================
+
+@router.get("/api/knowledge-review/summary")
+def knowledge_review_summary_endpoint(
+    window_days: int = Query(
+        knowledge_review.DEFAULT_WINDOW_DAYS, ge=1, le=730),
+    db: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("alert:read")),
+) -> dict:
+    """Counts only, for a dashboard tile. No item bodies."""
+    return knowledge_review.review_summary(db, window_days=window_days)
+
+
+@router.get("/api/knowledge-review")
+def knowledge_review_endpoint(
+    kind: Optional[str] = Query(
+        None, description="Restrict to one kind; omit for all"),
+    window_days: int = Query(
+        knowledge_review.DEFAULT_WINDOW_DAYS, ge=1, le=730),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("alert:read")),
+) -> dict:
+    """Everything decaying that needs a human decision, worst first.
+
+    `total` is the true backlog rather than the size of this page, so a
+    capped response does not understate how much is waiting.
+    """
+    try:
+        return knowledge_review.review_inbox(
+            db,
+            kinds=[kind] if kind else None,
+            window_days=window_days,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 # =========================================================================

@@ -31,6 +31,7 @@
     <button role="tab" id="im-tab-inv" class="tab im-tab im-tab-active" data-click-action="imSwitchTab" data-args='["inv"]'>Investigations</button>
     <button role="tab" id="im-tab-iocs" class="tab im-tab" data-click-action="imSwitchTab" data-args='["iocs"]'>IOC Sightings</button>
     <button role="tab" id="im-tab-fps" class="tab im-tab" data-click-action="imSwitchTab" data-args='["fps"]'>False Positives</button>
+    <button role="tab" id="im-tab-review" class="tab im-tab" data-click-action="imSwitchTab" data-args='["review"]'>Review Inbox <span id="im-review-badge" class="badge badge-sm ml-1 hidden"></span></button>
   </div>
 
   <!-- =============== Investigations Tab =============== -->
@@ -180,6 +181,17 @@
     </div>
   </section>
 
+  <!-- =============== Review Inbox Tab ===============
+       Decaying knowledge that needs a human decision: lapsed quirks, stale
+       FP signatures, the same alert closed two different ways, and prompts
+       Bob keeps abstaining on. Every item names an owner and an action,
+       because an inbox of observations nobody owns is another dashboard. -->
+  <section id="im-pane-review" class="im-pane hidden">
+    <div id="im-review-content">
+      <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading the review inbox...</div>
+    </div>
+  </section>
+
 </div>
 </div>
 
@@ -300,8 +312,132 @@
 <script nonce="{{ csp_nonce }}">
 (function() {
   // ---- Tab state --------------------------------------------------------
+  /* Knowledge review inbox (review 2026-10-08 s8).
+
+     Every label here comes from the server payload. The rates carry their
+     denominators on purpose: the whole point of the thresholds block is
+     that a reader can see what bar was applied rather than trusting a
+     percentage of unknown sample size. */
+
+  const IM_REVIEW_KIND_LABEL = {
+    expired_quirk: 'Lapsed quirk',
+    contradictory_outcome: 'Contradictory closure',
+    stale_fp_signature: 'Stale FP signature',
+    repeated_uncertainty: 'Repeated uncertainty',
+  };
+
+  const IM_REVIEW_KIND_TONE = {
+    expired_quirk: 'badge-error',
+    contradictory_outcome: 'badge-error',
+    stale_fp_signature: 'badge-warning',
+    repeated_uncertainty: 'badge-info',
+  };
+
+  function imReviewEvidenceRows(item) {
+    const e = item.evidence || {};
+    const rows = [];
+    const add = (k, v) => {
+      if (v === null || v === undefined || v === '') return;
+      rows.push('<div><span class="opacity-50">' + imEscape(k) + '</span> '
+                + imEscape(String(v)) + '</div>');
+    };
+
+    if (item.kind === 'expired_quirk') {
+      add('lapsed for', e.days_lapsed + ' day(s)');
+      add('review date', e.review_date);
+      add('annotation', e.annotation);
+    } else if (item.kind === 'stale_fp_signature') {
+      add('state', e.governance_state);
+      add('suppressed', e.hit_count + ' alert(s) so far');
+      add('last match', e.last_matched_at);
+      add('review date', e.review_date);
+      add('reason', e.reason);
+    } else if (item.kind === 'contradictory_outcome') {
+      add('verdicts', (e.verdicts || []).join(' vs '));
+      (e.closures || []).forEach(c => {
+        add('closed', c.human_verdict + ' by ' + (c.closed_by || ('user ' + c.closed_by_id))
+            + (c.closed_at ? ' on ' + c.closed_at.slice(0, 16) : ''));
+      });
+    } else if (item.kind === 'repeated_uncertainty') {
+      // The denominator is not optional.
+      add('abstentions', e.abstentions + ' of ' + e.sample_size
+          + ' (' + Math.round((e.abstention_rate || 0) * 100) + '%)');
+      add('window', e.window_days + ' day(s)');
+      add('raised above', e.min_sample_size + ' closures and '
+          + Math.round((e.threshold_rate || 0) * 100) + '%');
+    }
+    return rows.join('');
+  }
+
+  function imReviewCard(item) {
+    const tone = IM_REVIEW_KIND_TONE[item.kind] || 'badge-ghost';
+    const label = IM_REVIEW_KIND_LABEL[item.kind] || item.kind;
+    return '<div class="card bg-base-200 shadow mb-3">'
+      + '<div class="card-body p-4 gap-2">'
+      + '<div class="flex flex-wrap items-center gap-2">'
+      +   '<span class="badge ' + tone + '">' + imEscape(label) + '</span>'
+      +   '<span class="font-semibold">' + imEscape(item.title) + '</span>'
+      +   '<span class="ml-auto text-xs opacity-60">'
+      +     (item.owner ? 'owner: ' + imEscape(item.owner)
+                        : '<span class="text-warning">no owner recorded</span>')
+      +   '</span>'
+      + '</div>'
+      + '<div class="text-sm opacity-80">' + imEscape(item.why) + '</div>'
+      + '<div class="text-sm"><span class="opacity-50">Do:</span> ' + imEscape(item.action) + '</div>'
+      + '<div class="text-xs grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 mt-1">'
+      +   imReviewEvidenceRows(item)
+      + '</div>'
+      + '<div class="mt-2"><a class="btn btn-xs" href="' + imEscape(item.link) + '">Open</a></div>'
+      + '</div></div>';
+  }
+
+  async function imLoadReviewInbox() {
+    const host = document.getElementById('im-review-content');
+    if (!host) return;
+    try {
+      const r = await fetch('/api/knowledge-review?limit=200');
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const d = await r.json();
+      const items = d.items || [];
+
+      const badge = document.getElementById('im-review-badge');
+      if (badge) {
+        if (d.total) {
+          badge.textContent = d.total;
+          badge.classList.remove('hidden');
+        } else {
+          badge.classList.add('hidden');
+        }
+      }
+
+      if (!items.length) {
+        host.innerHTML = '<div class="card bg-base-200 shadow"><div class="card-body items-center text-center py-10">'
+          + '<h3 class="card-title">Nothing needs review</h3>'
+          + '<p class="opacity-70">No lapsed quirks, stale FP signatures, contradictory closures or over-abstaining prompts.</p>'
+          + '</div></div>';
+        return;
+      }
+
+      const counts = d.by_kind || {};
+      const chips = Object.keys(IM_REVIEW_KIND_LABEL).map(k =>
+        '<span class="badge ' + (counts[k] ? (IM_REVIEW_KIND_TONE[k] || 'badge-ghost') : 'badge-ghost')
+        + '">' + (counts[k] || 0) + ' ' + imEscape(IM_REVIEW_KIND_LABEL[k]) + '</span>').join(' ');
+
+      const shown = items.length;
+      host.innerHTML = '<div class="flex flex-wrap items-center gap-2 mb-4">' + chips
+        + '<span class="text-xs opacity-60 ml-auto">'
+        + (shown < d.total ? ('showing ' + shown + ' of ' + d.total) : (d.total + ' item(s)'))
+        + ' &middot; ' + d.window_days + '-day window</span></div>'
+        + items.map(imReviewCard).join('');
+    } catch (e) {
+      host.innerHTML = '<div class="alert alert-error"><div>'
+        + imEscape(e.message || 'Could not load the review inbox') + '</div></div>';
+    }
+  }
+  window.imLoadReviewInbox = imLoadReviewInbox;
+
   function imSwitchTab(name) {
-    const tabs = ['inv', 'iocs', 'fps'];
+    const tabs = ['inv', 'iocs', 'fps', 'review'];
     tabs.forEach(t => {
       const tab = document.getElementById('im-tab-' + t);
       const pane = document.getElementById('im-pane-' + t);
@@ -317,6 +453,7 @@
     if (name === 'inv')  imLoadInvestigations();
     if (name === 'iocs') imLoadIocs();
     if (name === 'fps')  imLoadFps();
+    if (name === 'review') imLoadReviewInbox();
   }
   window.imSwitchTab = imSwitchTab;
 
