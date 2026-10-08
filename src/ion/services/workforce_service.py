@@ -69,14 +69,56 @@ class WorkforceError(Exception):
 # --- profiles ---------------------------------------------------------------
 
 
+def _career_roles() -> dict:
+    """The career roles the skills questionnaires define, by id."""
+    from ion.services.role_skills_service import ROLE_DEFINITIONS
+
+    return {r["id"]: r for r in ROLE_DEFINITIONS}
+
+
+def validate_skills_role(skills_role_id: Optional[str]) -> Optional[str]:
+    """Check a career-role id, or raise. None and "" mean no link."""
+    if not skills_role_id:
+        return None
+    roles = _career_roles()
+    if skills_role_id not in roles:
+        raise WorkforceError(
+            f"{skills_role_id!r} is not a career role with a skills "
+            f"questionnaire. Available: {', '.join(sorted(roles))}."
+        )
+    return skills_role_id
+
+
+def skills_areas_for(profile: RoleProfile) -> list:
+    """The competency areas of this profile's career role.
+
+    Empty rather than raising when there is no link, or when the link is
+    stale because a career role was removed from the questionnaires later:
+    a page that renders a profile must not break over it.
+    """
+    if not getattr(profile, "skills_role_id", None):
+        return []
+    role = _career_roles().get(profile.skills_role_id)
+    if role is None:
+        logger.info(
+            "Profile %s points at career role %r, which no longer exists",
+            profile.name, profile.skills_role_id,
+        )
+        return []
+    return list(role.get("areas", []))
+
+
 def create_profile(session: Session, *, name: str, description: str = "",
-                   nice_work_role: str = "", is_baseline: bool = False) -> RoleProfile:
+                   nice_work_role: str = "", is_baseline: bool = False,
+                   skills_role_id: Optional[str] = None) -> RoleProfile:
     existing = session.query(RoleProfile).filter(RoleProfile.name == name).one_or_none()
     if existing is not None:
         raise WorkforceError(f"A role profile named {name!r} already exists")
+    skills_role_id = validate_skills_role(skills_role_id)
     profile = RoleProfile(
         name=name, description=description or None,
         nice_work_role=nice_work_role or None, is_baseline=is_baseline,
+        skills_role_id=skills_role_id,
     )
     session.add(profile)
     session.flush()

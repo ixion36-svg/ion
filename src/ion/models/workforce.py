@@ -99,6 +99,17 @@ class RoleProfile(Base, TimestampMixin):
     grants_role_id: Mapped[Optional[int]] = mapped_column(
         Integer, ForeignKey("roles.id", ondelete="SET NULL"), nullable=True
     )
+    # The career role in role_skills_service whose questionnaire applies to
+    # this profile, e.g. "l2_soc_analyst". Optional: a SOC may define a role
+    # the questionnaires do not cover.
+    #
+    # Not a foreign key, because the career roles are code rather than rows.
+    # Validated on write against the definitions that exist, since a profile
+    # pointing at an assessment nobody can take sends the next person
+    # looking for something that is not there.
+    skills_role_id: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )
 
     versions: Mapped[list["RoleProfileVersion"]] = relationship(
         "RoleProfileVersion", back_populates="profile", cascade="all, delete-orphan",

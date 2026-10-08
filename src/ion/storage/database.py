@@ -1169,6 +1169,12 @@ def _run_migrations(engine: Engine) -> None:
             _add_column_tolerant(
                 engine, "role_profiles", "grants_role_id",
                 "INTEGER REFERENCES roles(id) ON DELETE SET NULL")
+        if "skills_role_id" not in existing:
+            # Which career role's skills questionnaire applies to this
+            # profile. Plain VARCHAR rather than a foreign key: the career
+            # roles live in role_skills_service as code, not as rows.
+            _add_column_tolerant(
+                engine, "role_profiles", "skills_role_id", "VARCHAR(64)")
 
     if insp.has_table("user_journeys"):
         existing = {col["name"] for col in insp.get_columns("user_journeys")}

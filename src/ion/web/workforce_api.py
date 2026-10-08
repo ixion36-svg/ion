@@ -61,6 +61,10 @@ class ProfileIn(BaseModel):
     description: str = ""
     nice_work_role: str = ""
     is_baseline: bool = False
+    # The career role whose skills questionnaire applies, e.g.
+    # "l2_soc_analyst". Lets a lead recording an equivalence find the
+    # right assessment without having to know the slug.
+    skills_role_id: Optional[str] = None
 
 
 class RequirementIn(BaseModel):
@@ -153,6 +157,7 @@ def list_profiles(
         out.append({
             "id": p.id, "name": p.name, "description": p.description,
             "nice_work_role": p.nice_work_role, "is_baseline": p.is_baseline,
+            "skills_role_id": p.skills_role_id,
             "published_version": published.version if published else None,
             "people_on_version": wf.people_on_version(session, published.id) if published else 0,
         })
@@ -169,6 +174,7 @@ def create_profile(
         profile = wf.create_profile(
             session, name=payload.name, description=payload.description,
             nice_work_role=payload.nice_work_role, is_baseline=payload.is_baseline,
+            skills_role_id=payload.skills_role_id,
         )
     except wf.WorkforceError as exc:
         raise _err(exc) from exc
