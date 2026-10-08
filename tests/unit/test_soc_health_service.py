@@ -203,8 +203,16 @@ class TestOperationalEfficiency:
 # --- team readiness --------------------------------------------------------
 
 class TestTeamReadiness:
-    def test_no_active_analysts_scores_zero(self, session):
-        assert svc._team_readiness(session)["score"] == 0
+    def test_no_active_analysts_is_unavailable_not_a_zero_score(self, session):
+        """Review 2026-10-08 §18: no people is a missing input, not a measurement.
+
+        A hard 0 read as "this SOC is catastrophically unready", when the
+        truth was that nothing had been recorded to assess.
+        """
+        out = svc._team_readiness(session)
+        assert out["score"] is None
+        assert out["label"] == "Unavailable"
+        assert out["details"]["available"] is False
 
     def test_inactive_users_do_not_count(self, session):
         _user(session, "gone", active=False)
@@ -244,31 +252,50 @@ class TestTeamReadiness:
 # --- knowledge completeness ------------------------------------------------
 
 class TestKnowledgeCompleteness:
-    def test_an_empty_knowledge_base_scores_zero(self, session):
+    def test_an_empty_capability_registry_is_unavailable(self, session):
+        """Review 2026-10-08 §18 retired the 200-article target.
+
+        KnowledgeArticle is one row per SOC capability carrying a
+        doc_status, not a KB document, and the server seeds every
+        capability as `undocumented`. Counting those rows toward 200
+        "articles" meant a fresh install scored ~45/100 with nothing
+        written, and the dimension could never exceed 46.
+        """
         out = svc._knowledge_completeness(session)
-        assert out["score"] == 0
-        assert out["details"]["target"] == 200
+        assert out["score"] is None
+        assert out["label"] == "Unavailable"
+        assert out["details"]["available"] is False
+        assert "target" not in out["details"]
 
-    def test_the_score_is_linear_to_the_target(self, session, monkeypatch):
-        import ion.services.soc_health_service as mod
+    def test_the_score_is_the_mean_documentation_completeness(self, session):
+        """Half the capabilities fully documented, half not → 50."""
+        from ion.models.skills import KnowledgeArticle
 
-        class _Result:
-            @staticmethod
-            def scalar():
-                return 100
+        for i in range(5):
+            session.add(KnowledgeArticle(
+                capability_key=f"done_{i}", doc_status="comprehensive",
+                has_runbooks=True, has_procedures=True,
+            ))
+        for i in range(5):
+            session.add(KnowledgeArticle(
+                capability_key=f"todo_{i}", doc_status="undocumented",
+            ))
+        session.commit()
 
-        monkeypatch.setattr(session, "execute", lambda *a, **k: _Result())
-        out = mod._knowledge_completeness(session)
-        assert out["details"]["article_count"] == 100
+        out = svc._knowledge_completeness(session)
+        assert out["details"]["capabilities_tracked"] == 10
         assert out["score"] == 50
 
-    def test_exceeding_the_target_is_capped(self, session, monkeypatch):
-        class _Result:
-            @staticmethod
-            def scalar():
-                return 10_000
+    def test_full_documentation_scores_one_hundred_and_no_more(self, session):
+        from ion.models.skills import KnowledgeArticle
 
-        monkeypatch.setattr(session, "execute", lambda *a, **k: _Result())
+        for i in range(12):
+            session.add(KnowledgeArticle(
+                capability_key=f"cap_{i}", doc_status="comprehensive",
+                has_runbooks=True, has_procedures=True,
+            ))
+        session.commit()
+
         assert svc._knowledge_completeness(session)["score"] == 100
 
 
@@ -376,7 +403,13 @@ class TestScorecard:
 
         card = svc.get_soc_health_scorecard(session)
 
-        assert set(card) == {"overall_score", "grade", "dimensions", "recommendations"}
+        # Review 2026-10-08 §18 added the provenance of the overall score:
+        # which dimensions were measured, which were unavailable, and the
+        # weight denominator the average was taken over.
+        assert set(card) == {
+            "overall_score", "grade", "dimensions", "recommendations",
+            "scored_dimensions", "unavailable_dimensions", "weight_basis",
+        }
         assert set(card["dimensions"]) == set(svc.WEIGHTS)
         assert card["grade"] in {"A", "B", "C", "D", "F"}
 
@@ -387,11 +420,24 @@ class TestScorecard:
         monkeypatch.setattr(httpx, "post", lambda *a, **k: None)
 
         card = svc.get_soc_health_scorecard(session)
-        expected = svc._clamp(sum(
-            card["dimensions"][d]["score"] * w for d, w in svc.WEIGHTS.items()
+
+        # The average is taken over the dimensions that could actually be
+        # measured, with the weights renormalised across them, so an
+        # unconfigured source neither invents a neutral score nor counts
+        # as a zero.
+        measured = {
+            d: card["dimensions"][d]["score"]
+            for d in svc.WEIGHTS
+            if card["dimensions"][d]["score"] is not None
+        }
+        basis = sum(svc.WEIGHTS[d] for d in measured)
+        expected = svc._clamp(round(
+            sum(measured[d] * svc.WEIGHTS[d] for d in measured) / basis
         ))
 
         assert card["overall_score"] == expected
+        assert card["weight_basis"] == round(basis, 4)
+        assert set(card["scored_dimensions"]) == set(measured)
 
     def test_a_failing_scorecard_comes_with_advice(self, session, tide, monkeypatch):
         tide(posture=None, enabled=False)
@@ -585,21 +631,29 @@ class TestRemainingRecommendations:
         assert recs[1]["priority"] == "high"
 
 
-def test_a_team_readiness_failure_scores_zero(session, monkeypatch):
-    """A broken query must not read as a healthy team."""
+def test_a_team_readiness_failure_is_unavailable(session, monkeypatch):
+    """A broken query must not read as a healthy team — nor as a measured one.
+
+    It used to score 0, which reads as "assessed, and dire". Unavailable
+    is what actually happened.
+    """
     def boom(*a, **k):
         raise RuntimeError("db gone")
 
     monkeypatch.setattr(session, "execute", boom)
-    assert svc._team_readiness(session)["score"] == 0
+    out = svc._team_readiness(session)
+    assert out["score"] is None
+    assert out["label"] == "Unavailable"
 
 
-def test_a_knowledge_query_failure_scores_zero(session, monkeypatch):
+def test_a_knowledge_query_failure_is_unavailable(session, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("db gone")
 
     monkeypatch.setattr(session, "execute", boom)
-    assert svc._knowledge_completeness(session)["score"] == 0
+    out = svc._knowledge_completeness(session)
+    assert out["score"] is None
+    assert out["label"] == "Unavailable"
 
 
 def test_a_null_mttr_with_a_sample_is_neutral(session, monkeypatch):

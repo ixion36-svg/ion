@@ -89,29 +89,46 @@ function gradeColor(score) {
     return 'var(--sev-critical)';
 }
 
+// A dimension with no inputs reports score null rather than a neutral or
+// zero number, so every read here has to tell "not measured" apart from
+// "measured badly". `${null}` would otherwise render the text "null".
+function shHasScore(v) { return v !== null && v !== undefined; }
+
 function renderScorecard(d) {
     let html = '';
-    const color = gradeColor(d.overall_score);
+    const scored = shHasScore(d.overall_score);
+    const color = scored ? gradeColor(d.overall_score) : 'rgba(99,110,123,.6)';
+    const pct = scored ? d.overall_score : 0;
+    const shownOverall = scored ? (d.overall_score + '/100') : 'Not assessed';
+
+    // How much of the weighting the overall score actually rests on.
+    const unavailable = d.unavailable_dimensions || [];
+    const basisNote = unavailable.length
+        ? `Weighted over ${Math.round((d.weight_basis || 0) * 100)}% of the scorecard; `
+          + `${unavailable.length} dimension${unavailable.length > 1 ? 's' : ''} `
+          + `could not be measured (${unavailable.map(x => esc(x.replace(/_/g, ' '))).join(', ')}).`
+        : 'All five dimensions measured.';
 
     // Overall grade
     html += `<div class="card bg-base-200 shadow mb-6">
         <div class="card-body flex-col sm:flex-row items-center gap-6">
-        <div class="sh-grade-ring" data-ion-style="background:conic-gradient(${color} ${d.overall_score}%, rgba(99,110,123,.2) ${d.overall_score}%)">
+        <div class="sh-grade-ring" data-ion-style="background:conic-gradient(${color} ${pct}%, rgba(99,110,123,.2) ${pct}%)">
             <div class="sh-grade-inner">
-                <div class="font-mono text-4xl font-bold" data-ion-style="color:${color}">${esc(d.grade)}</div>
-                <div class="text-xs opacity-60">${d.overall_score}/100</div>
+                <div class="font-mono text-4xl font-bold" data-ion-style="color:${color}">${esc(d.grade || '—')}</div>
+                <div class="text-xs opacity-60">${scored ? d.overall_score + '/100' : 'n/a'}</div>
             </div>
         </div>
         <div>
             <div class="stat-title">SOC Maturity Score</div>
-            <div class="stat-value">${d.overall_score}/100</div>
-            <div class="stat-desc">Grade <strong data-ion-style="color:${color}">${esc(d.grade)}</strong> — ${
+            <div class="stat-value">${shownOverall}</div>
+            <div class="stat-desc">${scored ? `Grade <strong data-ion-style="color:${color}">${esc(d.grade)}</strong> — ${
                 d.overall_score >= 80 ? 'Excellent maturity across all dimensions' :
                 d.overall_score >= 65 ? 'Good maturity with some areas for improvement' :
                 d.overall_score >= 50 ? 'Moderate maturity — several areas need attention' :
                 d.overall_score >= 35 ? 'Below average — significant improvement needed' :
                 'Critical — immediate action required across multiple dimensions'
-            }</div>
+            }` : 'No dimension could be measured, so no overall score is shown.'}</div>
+            <div class="stat-desc opacity-60 mt-1">${basisNote}</div>
         </div>
         </div>
     </div>`;
@@ -129,18 +146,30 @@ function renderScorecard(d) {
     for (const key of dimOrder) {
         const dim = dims[key];
         if (!dim) continue;
-        const dc = gradeColor(dim.score);
+        const dimScored = shHasScore(dim.score);
+        const dc = dimScored ? gradeColor(dim.score) : 'rgba(99,110,123,.6)';
         const details = dim.details || {};
         let detailHtml = '';
         for (const [k, v] of Object.entries(details)) {
-            if (v != null) detailHtml += `<div><strong>${k.replace(/_/g,' ')}:</strong> ${v}</div>`;
+            if (v === null || v === undefined || v === '') continue;
+            // Details now carry definitions and nested breakdowns. Render
+            // them readably, and escape: these values reach the DOM.
+            let shown;
+            if (typeof v === 'object') {
+                shown = Object.entries(v).map(([ik, iv]) => esc(ik) + ': ' + esc(String(iv))).join(', ');
+            } else if (typeof v === 'boolean') {
+                shown = v ? 'yes' : 'no';
+            } else {
+                shown = esc(String(v));
+            }
+            detailHtml += `<div><strong>${esc(k.replace(/_/g,' '))}:</strong> ${shown}</div>`;
         }
         html += `<div class="card bg-base-200 shadow relative overflow-hidden" data-ion-data-ion-style="--dim-color:${dc}">
             <div class="absolute top-0 left-0 right-0 h-[3px]" data-ion-style="background:${dc}"></div>
             <div class="stat">
                 <div class="stat-title"><i class="icon-${dimIcons[key] || 'circle'}"></i> ${esc(dim.label)}</div>
-                <div class="stat-value font-mono" data-ion-style="color:${dc}">${dim.score}</div>
-                <div class="h-1.5 bg-base-300 rounded overflow-hidden my-2"><div class="sh-dim-bar-fill" data-ion-style="width:${dim.score}%; background:${dc}"></div></div>
+                <div class="stat-value font-mono" data-ion-style="color:${dc}">${dimScored ? dim.score : 'n/a'}</div>
+                <div class="h-1.5 bg-base-300 rounded overflow-hidden my-2"><div class="sh-dim-bar-fill" data-ion-style="width:${dimScored ? dim.score : 0}%; background:${dc}"></div></div>
                 <div class="stat-desc">${detailHtml}</div>
             </div>
         </div>`;

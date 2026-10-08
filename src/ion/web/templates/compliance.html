@@ -97,6 +97,8 @@ function cmpStateBadge(state) {
     if (state === 'covered') return 'badge-success';
     if (state === 'partial') return 'badge-warning';
     if (state === 'blind') return 'badge-error';
+    // Nothing mapped, so neither a pass nor a gap — never coloured as either.
+    if (state === 'not_assessable') return 'badge-ghost';
     return 'badge-ghost';
 }
 
@@ -123,7 +125,12 @@ function cmpRender() {
 
     html += '<div class="cmp-fw-list">';
     for (const f of frameworks) {
-        const cls = cmpScoreClass(f.overall_score || 0);
+        // `overall_score || 0` used to turn "not assessed" into "0% covered",
+        // which is the opposite claim. null now renders as not assessed.
+        const scored = f.overall_score !== null && f.overall_score !== undefined;
+        const pct = scored ? f.overall_score : 0;
+        const shown = scored ? (f.overall_score + '%') : 'n/a';
+        const cls = scored ? cmpScoreClass(pct) : 'opacity-50';
         const isSel = _cmpSelected === f.framework_id ? 'selected' : '';
         const s = f.summary || {};
         html += `<div class="card bg-base-200 shadow cmp-fw ${isSel}" data-click-action="cmpSelect" data-args='["${cmpEsc(f.framework_id)}"]'>
@@ -131,10 +138,11 @@ function cmpRender() {
             <h2 class="card-title text-base">${cmpEsc(f.framework)}</h2>
             <p class="text-xs uppercase tracking-wide opacity-50">${cmpEsc(f.version || '')}</p>
             <div class="flex justify-between items-center mt-2">
-                <div class="stat-value font-mono text-2xl ${cls}">${f.overall_score||0}%</div>
-                <div class="stat-desc text-right">${s.fully_covered||0} / ${s.total_controls||0} controls<br>${s.partial||0} partial &middot; ${s.no_coverage||0} blind</div>
+                <div class="stat-value font-mono text-2xl ${cls}">${shown}</div>
+                <div class="stat-desc text-right">${s.fully_covered||0} / ${s.scored_controls||0} scored controls<br>${s.partial||0} partial &middot; ${s.no_coverage||0} blind${s.not_assessable ? ' &middot; ' + s.not_assessable + ' unmapped' : ''}</div>
             </div>
-            <div class="cmp-fw-bar"><div class="cmp-fw-bar-fill" data-ion-style="width:${f.overall_score||0}%; background:${cmpScoreColor(f.overall_score||0)}"></div></div>
+            <div class="cmp-fw-bar"><div class="cmp-fw-bar-fill" data-ion-style="width:${pct}%; background:${cmpScoreColor(pct)}"></div></div>
+            <p class="text-[11px] opacity-50 mt-1">Detection coverage, not control implementation or effectiveness.</p>
             </div>
         </div>`;
     }
@@ -159,11 +167,18 @@ function cmpRenderDetail(f) {
                 <div class="text-xs opacity-50 mt-1">${cmpEsc(f.version)} &middot; <a class="text-[var(--primary)] no-underline" href="${cmpEsc(f.url||'#')}" target="_blank" rel="noopener noreferrer">official spec &rarr;</a></div>
             </div>
             <div class="flex flex-wrap gap-4 text-sm">
-                <span class="opacity-70"><strong class="font-mono">${f.overall_score||0}%</strong> overall</span>
+                <span class="opacity-70"><strong class="font-mono">${(f.overall_score === null || f.overall_score === undefined) ? 'n/a' : f.overall_score + '%'}</strong> detection coverage</span>
                 <span class="text-success">covered <strong class="font-mono">${s.fully_covered||0}</strong></span>
                 <span class="text-warning">partial <strong class="font-mono">${s.partial||0}</strong></span>
                 <span class="text-error">blind <strong class="font-mono">${s.no_coverage||0}</strong></span>
+                <span class="opacity-50">unmapped <strong class="font-mono">${s.not_assessable||0}</strong></span>
             </div>
+        </div>
+        <div class="px-5 py-2 border-b border-base-300 text-xs opacity-60">
+            Scored over ${s.scored_controls||0} of ${s.total_controls||0} controls.
+            This measures whether a detection rule maps to each control's MITRE
+            techniques. It does not measure whether the control is implemented,
+            whether it works, or whether anyone has independently reviewed it.
         </div>
         <div class="overflow-x-auto"><table class="table table-sm"><thead><tr><th class="w-[130px]">Control</th><th>Name</th><th class="w-[70px]">Score</th><th class="w-[80px]">State</th><th>Techniques</th></tr></thead><tbody>`;
     for (const ctl of (f.controls || [])) {
@@ -173,8 +188,8 @@ function cmpRenderDetail(f) {
         html += `<tr>
             <td><span class="font-mono font-semibold text-primary">${cmpEsc(ctl.control_id)}</span></td>
             <td>${cmpEsc(ctl.name)}</td>
-            <td><span class="font-mono font-bold" data-ion-style="color:${cmpScoreColor(ctl.score||0)}">${ctl.score||0}%</span></td>
-            <td><span class="badge badge-sm ${cmpStateBadge(ctl.state)}">${cmpEsc(ctl.state)}</span></td>
+            <td><span class="font-mono font-bold" data-ion-style="color:${cmpScoreColor(ctl.score||0)}">${(ctl.score === null || ctl.score === undefined) ? '&mdash;' : ctl.score + '%'}</span></td>
+            <td><span class="badge badge-sm ${cmpStateBadge(ctl.state)}" ${ctl.reason ? 'title="' + cmpEsc(ctl.reason) + '"' : ''}>${cmpEsc(ctl.state === 'not_assessable' ? 'unmapped' : ctl.state)}</span></td>
             <td><div class="flex flex-wrap gap-1">${tids.join('')}</div></td>
         </tr>`;
     }

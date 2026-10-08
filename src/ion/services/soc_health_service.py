@@ -183,12 +183,55 @@ def _operational_efficiency(session: Session) -> dict[str, Any]:
     return {"score": score, "label": _label(score), "details": details}
 
 
+def _verified_operational_headcount(session: Session) -> int:
+    """How many people have actually reached the operational stage of a role.
+
+    The workforce module already tracks verified readiness through role
+    journeys, so capacity does not have to be inferred from account rows.
+    Returns 0 when no journeys exist, which the caller reads as "fall back
+    to accounts, and say so".
+    """
+    try:
+        from ion.models.workforce import UserJourney
+        from ion.services.workforce_service import STAGE_OPERATIONAL
+
+        return int(
+            session.execute(
+                select(func.count(func.distinct(UserJourney.user_id)))
+                .where(UserJourney.stage == STAGE_OPERATIONAL)
+            ).scalar() or 0
+        )
+    except Exception:
+        logger.debug("Role journeys unavailable; readiness falls back to accounts")
+        return 0
+
+
 def _team_readiness(session: Session) -> dict[str, Any]:
-    """Score team readiness based on active analysts and case load."""
+    """Score analyst capacity against open case load.
+
+    Review 2026-10-08 §18: this counted rows in ``users`` where
+    ``is_active``, and called the result team readiness. An active account
+    is not a verified, on-duty analyst — a service account, a departed
+    joiner not yet offboarded and a trainee all counted as capacity.
+
+    Verified operational role journeys are now preferred, and when none
+    exist the account count is still used but labelled an estimate, so a
+    reader can tell which number they are looking at.
+    """
     details: dict[str, Any] = {
+        "available": False,
         "active_analysts": 0,
+        "analyst_capacity": 0,
+        "capacity_source": "active_accounts",
+        "estimated": True,
         "open_cases": 0,
         "cases_per_analyst": None,
+        "definition": (
+            "Open cases per analyst, against verified operational role "
+            "journeys where they exist. With no journeys recorded this "
+            "falls back to counting active user accounts, which overstates "
+            "capacity: an account is not a verified, on-duty analyst."
+        ),
     }
 
     try:
@@ -205,7 +248,25 @@ def _team_readiness(session: Session) -> dict[str, Any]:
         details["active_analysts"] = active_analysts
         details["open_cases"] = open_cases
 
+        verified = _verified_operational_headcount(session)
+        if verified > 0:
+            details["analyst_capacity"] = verified
+            details["capacity_source"] = "verified_journeys"
+            details["estimated"] = False
+        else:
+            details["analyst_capacity"] = active_analysts
+            details["capacity_source"] = "active_accounts"
+            details["estimated"] = True
+            if active_analysts:
+                details["reason"] = (
+                    "No verified operational role journeys recorded, so "
+                    "capacity is estimated from active accounts."
+                )
+
+        active_analysts = details["analyst_capacity"]
+
         if active_analysts > 0:
+            details["available"] = True
             cases_per = open_cases / active_analysts
             details["cases_per_analyst"] = round(cases_per, 1)
 
@@ -227,34 +288,98 @@ def _team_readiness(session: Session) -> dict[str, Any]:
 
             score = _clamp(load_score * 0.6 + size_score * 0.4)
         else:
-            score = 0
+            # Nobody to score. That is missing input, not zero readiness.
+            details["reason"] = "No analyst capacity recorded."
+            return {"score": None, "label": "Unavailable", "details": details}
 
     except Exception:
         logger.exception("Failed to compute team readiness")
-        score = 0
+        details["reason"] = "Capacity inputs could not be read."
+        return {"score": None, "label": "Unavailable", "details": details}
 
     return {"score": score, "label": _label(score), "details": details}
 
 
+#: Weights for one capability's documentation score. doc_status is the
+#: substance; runbooks and procedures are what make it usable on shift.
+_DOC_STATUS_WEIGHT = 0.7
+_RUNBOOK_WEIGHT = 0.15
+_PROCEDURE_WEIGHT = 0.15
+
+#: doc_status is a three-step scale, not a boolean.
+_DOC_STATUS_SCORE = {
+    "undocumented": 0.0,
+    "basic": 0.5,
+    "comprehensive": 1.0,
+}
+
+
 def _knowledge_completeness(session: Session) -> dict[str, Any]:
-    """Score knowledge base completeness by article count."""
+    """Score documentation coverage across the tracked SOC capabilities.
+
+    Review 2026-10-08 §18: this used to divide a count of
+    ``KnowledgeArticle`` rows by a target of 200 "articles". But
+    ``KnowledgeArticle`` is one row per capability area carrying a
+    ``doc_status``, unique on ``capability_key``, and the server seeds
+    every capability in the catalogue as ``undocumented`` at startup. A
+    fresh install with no documentation therefore scored about 45/100,
+    and the dimension could never exceed 46 however well documented the
+    SOC actually was. It counted placeholders, not written knowledge.
+
+    The score is now the mean documentation completeness of the tracked
+    capabilities, and the details carry the definition, the denominator
+    and a status breakdown, so a manager can explain the number from
+    records rather than trusting it.
+    """
     details: dict[str, Any] = {
-        "article_count": 0,
-        "target": 200,
+        "available": False,
+        "capabilities_tracked": 0,
+        "definition": (
+            "Mean documentation completeness across tracked SOC capability "
+            "areas. Each capability scores on its doc_status "
+            "(undocumented/basic/comprehensive, 70%) plus whether it has "
+            "runbooks (15%) and procedures (15%). A seeded but undocumented "
+            "capability scores zero."
+        ),
+        "by_doc_status": {"undocumented": 0, "basic": 0, "comprehensive": 0},
+        "with_runbooks": 0,
+        "with_procedures": 0,
     }
 
     try:
         from ion.models.skills import KnowledgeArticle
-        count = session.execute(
-            select(func.count(KnowledgeArticle.id))
-        ).scalar() or 0
-        details["article_count"] = count
-    except (ImportError, Exception):
-        logger.debug("KnowledgeArticle model not available, falling back to 0")
-        count = 0
+        rows = session.execute(select(KnowledgeArticle)).scalars().all()
+    except Exception:
+        logger.exception("KnowledgeArticle not queryable; knowledge score unavailable")
+        details["reason"] = "Capability documentation registry could not be read."
+        return {"score": None, "label": "Unavailable", "details": details}
 
-    # Target: >= 200 articles = 100 score
-    score = _clamp(count / 200 * 100)
+    if not rows:
+        # An unseeded registry is unknown, not zero documentation.
+        details["reason"] = "No capability documentation rows exist yet."
+        return {"score": None, "label": "Unavailable", "details": details}
+
+    total = 0.0
+    for row in rows:
+        status = (row.doc_status or "undocumented").lower()
+        details["by_doc_status"][status] = details["by_doc_status"].get(status, 0) + 1
+        if row.has_runbooks:
+            details["with_runbooks"] += 1
+        if row.has_procedures:
+            details["with_procedures"] += 1
+
+        total += _DOC_STATUS_SCORE.get(status, 0.0) * _DOC_STATUS_WEIGHT
+        total += (_RUNBOOK_WEIGHT if row.has_runbooks else 0.0)
+        total += (_PROCEDURE_WEIGHT if row.has_procedures else 0.0)
+
+    details["available"] = True
+    details["capabilities_tracked"] = len(rows)
+    details["fully_documented"] = details["by_doc_status"].get("comprehensive", 0)
+
+    # Round before clamping: _clamp truncates, and the weights sum to
+    # 0.9999999999999999 in binary float, so a fully documented SOC would
+    # otherwise score 99.
+    score = _clamp(round(total / len(rows) * 100))
     return {"score": score, "label": _label(score), "details": details}
 
 
@@ -344,7 +469,13 @@ def _build_recommendations(dimensions: dict[str, dict]) -> list[dict[str, str]]:
     recs: list[dict[str, str]] = []
     threshold = 60
 
-    score_map = {k: v["score"] for k, v in dimensions.items()}
+    # An unavailable dimension has score None. Treat it as "nothing to
+    # recommend from" rather than a failing score: its own details already
+    # say why it could not be measured, and None < 60 is a TypeError.
+    score_map = {
+        k: (v["score"] if v.get("score") is not None else threshold)
+        for k, v in dimensions.items()
+    }
 
     if score_map["detection_coverage"] < threshold:
         details = dimensions["detection_coverage"]["details"]
@@ -482,16 +613,35 @@ def get_soc_health_scorecard(session: Session) -> dict:
         "integration_health": _integration_health(),
     }
 
-    # Weighted average
-    overall = sum(
-        dimensions[dim]["score"] * weight
-        for dim, weight in WEIGHTS.items()
-    )
-    overall_score = _clamp(overall)
+    # Weighted average over the dimensions that could actually be
+    # measured. A dimension with no inputs now reports score None rather
+    # than a neutral or zero number, so including it would either invent
+    # data or punish the SOC for an unconfigured source. The weights are
+    # renormalised across what remains, and the result says which
+    # dimensions were left out and what denominator was used.
+    measured = {
+        dim: d["score"] for dim, d in dimensions.items()
+        if d.get("score") is not None
+    }
+    unavailable = sorted(set(dimensions) - set(measured))
+    weight_total = sum(WEIGHTS[dim] for dim in measured)
+
+    if weight_total > 0:
+        overall = sum(
+            measured[dim] * WEIGHTS[dim] for dim in measured
+        ) / weight_total
+        overall_score = _clamp(round(overall))
+        grade = _grade(overall_score)
+    else:
+        overall_score = None
+        grade = None
 
     return {
         "overall_score": overall_score,
-        "grade": _grade(overall_score),
+        "grade": grade,
         "dimensions": dimensions,
+        "scored_dimensions": sorted(measured),
+        "unavailable_dimensions": unavailable,
+        "weight_basis": round(weight_total, 4),
         "recommendations": _build_recommendations(dimensions),
     }

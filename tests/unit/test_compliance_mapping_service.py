@@ -182,20 +182,26 @@ class TestScoring:
         assert svc._score_framework(fw, {"T1110.001"})["controls"][0][
             "state"] == "blind"
 
-    def test_a_control_listing_no_techniques_is_unknown_not_blind(self):
-        """Nothing was assessed, so claiming a gap would be a fabrication."""
+    def test_a_control_listing_no_techniques_is_not_assessable_not_blind(self):
+        """Nothing was assessed, so claiming a gap would be a fabrication.
+
+        Review 2026-10-08 §18 renamed this state from ``unknown`` to
+        ``not_assessable`` and excluded it from the mean, so the summary
+        now carries its own count and the scored denominator.
+        """
         fw = _framework([{"id": "C1", "name": "n", "techniques": []}])
 
         out = svc._score_framework(fw, {"T1071"})
 
-        assert out["controls"][0]["state"] == "unknown"
+        assert out["controls"][0]["state"] == "not_assessable"
         assert out["summary"] == {"fully_covered": 0, "partial": 0,
-                                 "no_coverage": 0, "total_controls": 1}
+                                 "no_coverage": 0, "not_assessable": 1,
+                                 "scored_controls": 0, "total_controls": 1}
 
     def test_a_control_with_no_techniques_key_is_tolerated(self):
         fw = _framework([{"id": "C1", "name": "n"}])
         assert svc._score_framework(fw, {"T1071"})["controls"][0][
-            "state"] == "unknown"
+            "state"] == "not_assessable"
 
     def test_the_overall_score_is_the_mean_of_the_control_scores(self):
         fw = _framework([
@@ -205,19 +211,33 @@ class TestScoring:
 
         assert svc._score_framework(fw, {"T1071"})["overall_score"] == 50
 
-    def test_an_unassessed_control_drags_the_overall_score_down(self):
-        """Recorded, not endorsed: a ``techniques: []`` control scores 0 in the
-        mean while reporting state 'unknown'. Leave the lists populated."""
+    def test_an_unassessed_control_no_longer_drags_the_overall_score_down(self):
+        """The wart the previous version of this test recorded but did not endorse.
+
+        A ``techniques: []`` control used to score 0 inside the mean while
+        reporting state 'unknown', so controls nobody had mapped silently
+        depressed the framework score. Review 2026-10-08 §18: it is now
+        excluded from the mean and counted separately.
+        """
         fw = _framework([
             {"id": "C1", "name": "n", "techniques": ["T1071"]},
             {"id": "C2", "name": "n", "techniques": []},
         ])
 
-        assert svc._score_framework(fw, {"T1071"})["overall_score"] == 50
+        out = svc._score_framework(fw, {"T1071"})
+        assert out["overall_score"] == 100
+        assert out["summary"]["scored_controls"] == 1
+        assert out["summary"]["not_assessable"] == 1
 
-    def test_an_empty_framework_scores_zero_rather_than_dividing_by_zero(self):
+    def test_an_empty_framework_is_unscored_rather_than_dividing_by_zero(self):
+        """Nothing to score reads as absent, not as 0% coverage.
+
+        Same principle as test_no_tide_is_an_error_not_a_zero_score below:
+        0 means "no detections found", None means "we did not measure".
+        """
         out = svc._score_framework(_framework([]), {"T1071"})
-        assert out["overall_score"] == 0
+        assert out["overall_score"] is None
+        assert out["summary"]["scored_controls"] == 0
         assert out["summary"]["total_controls"] == 0
 
     def test_the_scorecard_identifies_its_framework(self):
@@ -250,7 +270,10 @@ class TestPosture:
 
     def test_an_unknown_framework_is_an_error_naming_the_id(self):
         out = svc.get_compliance_posture(_tide("T1071"), "nope")
-        assert out == {"error": "Unknown framework: nope"}
+        assert out["error"] == "Unknown framework: nope"
+        # Explicitly absent rather than missing, so a caller doing
+        # .get("overall_score", 0) cannot read it as zero coverage.
+        assert out["overall_score"] is None
 
     def test_an_unknown_framework_is_rejected_before_tide_is_called(self):
         """No point making a TIDE round-trip for a framework we cannot score."""
@@ -263,7 +286,10 @@ class TestPosture:
         out = svc.get_compliance_posture(None)
         assert out["error"] == "TIDE not configured"
         assert out["framework_id"] == "nist_csf"
-        assert "overall_score" not in out
+        # Present and None beats absent: an absent key lets a caller's
+        # .get("overall_score", 0) turn "unknown" into "0% covered".
+        assert out["overall_score"] is None
+        assert out["availability"] == "source_not_configured"
 
     def test_a_disabled_tide_is_the_same_error(self):
         out = svc.get_compliance_posture(FakeTide({}, enabled=False))

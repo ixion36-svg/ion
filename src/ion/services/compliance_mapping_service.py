@@ -281,13 +281,40 @@ def _covered_techniques(tide_service) -> set[str]:
     }
 
 
+#: What this scorecard measures, and — just as important — what it does
+#: not. Review 2026-10-08 §18: the score is the fraction of a framework's
+#: mapped MITRE techniques that have at least one detection rule, and it
+#: was presented as a "compliance posture" under the name overall_score.
+#: Detection coverage is evidence toward a control, not an implemented
+#: control, and certainly not an independently reviewed effective one.
+_MEASURE = "detection_coverage"
+_MEASURES = [
+    "Whether at least one enabled detection rule maps to each MITRE "
+    "technique associated with a control.",
+]
+_DOES_NOT_MEASURE = [
+    "Whether the control is implemented in the organisation.",
+    "Whether the control is operating effectively.",
+    "Whether an independent assessor has reviewed it.",
+    "Non-detective controls, such as policy, training or physical security.",
+    "Whether the telemetry those rules depend on is actually collected.",
+]
+
+
 def _score_framework(framework: dict, covered: set[str]) -> dict:
-    """Compute the per-control + overall score for one framework."""
+    """Compute per-control and overall detection coverage for a framework.
+
+    A control with no mapped techniques is ``not_assessable``. It used to
+    contribute a hard 0 to the mean while being labelled ``unknown``, so
+    unmappable controls silently depressed the score and the summary
+    counts did not add up to the control total.
+    """
     controls_out: list[dict] = []
     total_score = 0
     fully_covered = 0
     partial = 0
     no_coverage = 0
+    not_assessable = 0
 
     for c in framework["controls"]:
         required = c.get("techniques") or []
@@ -302,12 +329,29 @@ def _score_framework(framework: dict, covered: set[str]) -> dict:
             else:
                 gap_techs.append(tid)
 
-        score = int(len(covered_techs) / total * 100) if total > 0 else 0
+        if total == 0:
+            # Nothing to measure. Excluded from the mean rather than
+            # scored zero, so an unmappable control cannot drag the
+            # framework down.
+            not_assessable += 1
+            controls_out.append({
+                "control_id": c["id"],
+                "name": c["name"],
+                "description": c.get("description"),
+                "score": None,
+                "state": "not_assessable",
+                "covered": 0,
+                "total": 0,
+                "covered_techniques": [],
+                "gap_techniques": [],
+                "reason": "No MITRE techniques are mapped to this control.",
+            })
+            continue
+
+        score = int(len(covered_techs) / total * 100)
         total_score += score
 
-        if total == 0:
-            state = "unknown"
-        elif score == 100:
+        if score == 100:
             state = "covered"
             fully_covered += 1
         elif score > 0:
@@ -329,19 +373,33 @@ def _score_framework(framework: dict, covered: set[str]) -> dict:
             "gap_techniques": gap_techs,
         })
 
-    overall_score = int(total_score / len(framework["controls"])) if framework["controls"] else 0
+    scored_controls = fully_covered + partial + no_coverage
+    # None, not 0: with nothing assessable there is no coverage figure.
+    overall_score = (
+        int(total_score / scored_controls) if scored_controls else None
+    )
 
     return {
         "framework_id": framework["id"],
         "framework": framework["name"],
         "version": framework["version"],
         "url": framework["url"],
+        # Kept for existing readers, but it is a detection-coverage figure
+        # and the explicit alias beside it says so.
         "overall_score": overall_score,
+        "detection_coverage_score": overall_score,
+        "measure": _MEASURE,
+        "measures": list(_MEASURES),
+        "does_not_measure": list(_DOES_NOT_MEASURE),
         "controls": controls_out,
         "summary": {
             "fully_covered": fully_covered,
             "partial": partial,
             "no_coverage": no_coverage,
+            "not_assessable": not_assessable,
+            # The denominator behind overall_score, separate from the
+            # control total so the two are never confused.
+            "scored_controls": scored_controls,
             "total_controls": len(framework["controls"]),
         },
     }
@@ -351,23 +409,48 @@ def get_compliance_posture(tide_service, framework_id: str = "nist_csf") -> dict
     """Compute the posture scorecard for one framework."""
     framework = _FRAMEWORK_INDEX.get(framework_id)
     if not framework:
-        return {"error": f"Unknown framework: {framework_id}"}
+        return {"error": f"Unknown framework: {framework_id}", "overall_score": None}
+    # An unavailable source is not zero coverage, so the score is absent
+    # rather than 0 on every one of these paths.
     if not tide_service or not tide_service.enabled:
-        return {"error": "TIDE not configured", "framework_id": framework_id}
+        return {
+            "error": "TIDE not configured",
+            "framework_id": framework_id,
+            "overall_score": None,
+            "measure": _MEASURE,
+            "availability": "source_not_configured",
+        }
     covered = _covered_techniques(tide_service)
     if not covered:
-        return {"error": "TIDE returned no coverage data", "framework_id": framework_id}
+        return {
+            "error": "TIDE returned no coverage data",
+            "framework_id": framework_id,
+            "overall_score": None,
+            "measure": _MEASURE,
+            "availability": "source_returned_no_data",
+        }
     return _score_framework(framework, covered)
 
 
 def get_all_postures(tide_service) -> dict:
     """Compute scorecards for every framework in one TIDE round-trip."""
     if not tide_service or not tide_service.enabled:
-        return {"error": "TIDE not configured", "frameworks": []}
+        return {
+            "error": "TIDE not configured",
+            "frameworks": [],
+            "availability": "source_not_configured",
+        }
     covered = _covered_techniques(tide_service)
     if not covered:
-        return {"error": "TIDE returned no coverage data", "frameworks": []}
+        return {
+            "error": "TIDE returned no coverage data",
+            "frameworks": [],
+            "availability": "source_returned_no_data",
+        }
     return {
+        "measure": _MEASURE,
+        "measures": list(_MEASURES),
+        "does_not_measure": list(_DOES_NOT_MEASURE),
         "frameworks": [_score_framework(f, covered) for f in FRAMEWORKS],
     }
 
