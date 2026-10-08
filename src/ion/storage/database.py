@@ -1104,59 +1104,24 @@ def _run_migrations(engine: Engine) -> None:
             if col_name not in existing:
                 _add_column_tolerant(engine, "investigations", col_name, col_type)
 
-    # lab_fixtures + lab_session_fixtures for replayable labs.
-    # lab_fixtures holds the template rows (what to seed for a lesson).
-    # lab_session_fixtures tracks which rows were materialised per-enrolment
-    # so teardown only removes the session's own data.
-    if not insp.has_table("lab_fixtures"):
-        json_type = "JSONB" if _is_postgres(engine) else "JSON"
-        with engine.begin() as conn:
-            conn.execute(text(f"""
-                CREATE TABLE lab_fixtures (
-                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
-                    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
-                    fixture_kind VARCHAR(32) NOT NULL,
-                    payload {json_type} NOT NULL,
-                    target_table TEXT NOT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_fixtures_lesson ON lab_fixtures (lesson_id)"
-            ))
-            logger.info("Migrated: CREATE TABLE lab_fixtures")
-
-    if not insp.has_table("lab_session_fixtures"):
-        # session_id ships in the initial CREATE on fresh deploys.
-        # The ALTER block below remains the upgrade path for v0.21/v0.22
-        # databases that already have the table without the column.
-        with engine.begin() as conn:
-            conn.execute(text(f"""
-                CREATE TABLE lab_session_fixtures (
-                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
-                    enrollment_id INTEGER NOT NULL REFERENCES course_enrolments(id) ON DELETE CASCADE,
-                    lesson_id INTEGER NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
-                    fixture_id INTEGER NOT NULL REFERENCES lab_fixtures(id) ON DELETE CASCADE,
-                    materialised_row_id BIGINT NOT NULL,
-                    materialised_table TEXT NOT NULL,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    torn_down_at TIMESTAMP,
-                    session_id INTEGER
-                )
-            """))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_sess_fix_enroll_lesson "
-                "ON lab_session_fixtures (enrollment_id, lesson_id)"
-            ))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_sess_fix_torn_down "
-                "ON lab_session_fixtures (torn_down_at)"
-            ))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_sess_fix_session "
-                "ON lab_session_fixtures (session_id)"
-            ))
-            logger.info("Migrated: CREATE TABLE lab_session_fixtures")
+    # The replayable-labs tables (lab_fixtures, lab_session_fixtures,
+    # lab_sessions, lab_rubrics, lab_criterion_results) used to be created
+    # here. They all had a foreign key to `lessons`, whose Lesson model
+    # arrived in v0.11.2 and was removed in 0d07781 ("scope reduction...
+    # dark-module sweep") — but these migrations were left behind, so
+    # nothing created `lessons` any more.
+    #
+    # On SQLite that passed unnoticed: it does not resolve a foreign key's
+    # target table at CREATE TABLE time. PostgreSQL does, so a fresh
+    # Postgres database died during startup with
+    # `relation "lessons" does not exist`, while existing deployments were
+    # fine because they still had the table from when the model existed.
+    # Removing the dead blocks completes that sweep.
+    #
+    # Migrations never drop, so any deployment that already has these
+    # tables keeps them and their data; this only stops a new database
+    # growing tables no code reads. tests/test_migration_fk_targets.py
+    # guards the general case.
 
     # Bob confidence scoring + circuit breakers.
     # Adds numeric confidence columns and circuit-breaker fields.
@@ -1359,88 +1324,6 @@ def _run_migrations(engine: Engine) -> None:
             ))
             logger.info('Migrated: CREATE TABLE forensic_case_annotations')
 
-    # adaptive lab grading — promote the implicit lab session state
-    # (via lab_session_fixtures.torn_down_at) to a first-class lab_sessions
-    # parent row carrying score + attempt metadata, add per-lesson rubric
-    # table, and a criterion-result audit-trail table.
-    if not insp.has_table("lab_sessions"):
-        json_type = "JSONB" if _is_postgres(engine) else "JSON"
-        pk_def = "GENERATED ALWAYS AS IDENTITY" if _is_postgres(engine) else "AUTOINCREMENT"
-        with engine.begin() as conn:
-            conn.execute(text(f"""
-                CREATE TABLE lab_sessions (
-                    id INTEGER PRIMARY KEY {pk_def},
-                    enrollment_id INTEGER NOT NULL
-                        REFERENCES course_enrolments(id) ON DELETE CASCADE,
-                    lesson_id INTEGER NOT NULL
-                        REFERENCES lessons(id) ON DELETE CASCADE,
-                    attempt_number INTEGER NOT NULL DEFAULT 1,
-                    started_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    completed_at TIMESTAMP,
-                    score INTEGER,
-                    points_earned INTEGER NOT NULL DEFAULT 0,
-                    points_max INTEGER NOT NULL DEFAULT 0,
-                    CONSTRAINT uq_lab_session_attempt
-                        UNIQUE (enrollment_id, lesson_id, attempt_number)
-                )
-            """))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_sessions_enroll_lesson "
-                "ON lab_sessions (enrollment_id, lesson_id)"
-            ))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_sessions_completed "
-                "ON lab_sessions (completed_at)"
-            ))
-            logger.info("Migrated: CREATE TABLE lab_sessions")
-
-    if not insp.has_table("lab_rubrics"):
-        json_type = "JSONB" if _is_postgres(engine) else "JSON"
-        pk_def = "GENERATED ALWAYS AS IDENTITY" if _is_postgres(engine) else "AUTOINCREMENT"
-        with engine.begin() as conn:
-            conn.execute(text(f"""
-                CREATE TABLE lab_rubrics (
-                    id INTEGER PRIMARY KEY {pk_def},
-                    lesson_id INTEGER NOT NULL
-                        REFERENCES lessons(id) ON DELETE CASCADE,
-                    criterion_kind VARCHAR(48) NOT NULL,
-                    criterion_config {json_type} NOT NULL,
-                    points INTEGER NOT NULL DEFAULT 10,
-                    sort_order INTEGER NOT NULL DEFAULT 0,
-                    description TEXT,
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_rubrics_lesson ON lab_rubrics (lesson_id)"
-            ))
-            logger.info("Migrated: CREATE TABLE lab_rubrics")
-
-    if not insp.has_table("lab_criterion_results"):
-        pk_def = "GENERATED ALWAYS AS IDENTITY" if _is_postgres(engine) else "AUTOINCREMENT"
-        with engine.begin() as conn:
-            conn.execute(text(f"""
-                CREATE TABLE lab_criterion_results (
-                    id INTEGER PRIMARY KEY {pk_def},
-                    session_id INTEGER NOT NULL
-                        REFERENCES lab_sessions(id) ON DELETE CASCADE,
-                    rubric_id INTEGER NOT NULL
-                        REFERENCES lab_rubrics(id) ON DELETE CASCADE,
-                    points_earned INTEGER NOT NULL DEFAULT 0,
-                    points_max INTEGER NOT NULL,
-                    matched BOOLEAN NOT NULL DEFAULT FALSE,
-                    matched_audit_log_id INTEGER,
-                    evaluated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                    notes TEXT,
-                    CONSTRAINT uq_criterion_result UNIQUE (session_id, rubric_id)
-                )
-            """))
-            conn.execute(text(
-                "CREATE INDEX ix_lab_criterion_results_session "
-                "ON lab_criterion_results (session_id)"
-            ))
-            logger.info("Migrated: CREATE TABLE lab_criterion_results")
-
     # system_runtime_flags — small key/value bag for runtime
     # toggles that must be visible across all workers (e.g. the leader
     # worker that owns the investigation sweep loop AND the request-
@@ -1459,22 +1342,12 @@ def _run_migrations(engine: Engine) -> None:
             """))
             logger.info("Migrated: CREATE TABLE system_runtime_flags")
 
-    # link existing lab_session_fixtures rows to their parent session.
-    # NULL is permitted for legacy rows persisted before this version.
-    if insp.has_table("lab_session_fixtures"):
-        existing = {col["name"] for col in insp.get_columns("lab_session_fixtures")}
-        if "session_id" not in existing:
-            with engine.begin() as conn:
-                conn.execute(text(
-                    "ALTER TABLE lab_session_fixtures "
-                    "ADD COLUMN session_id INTEGER REFERENCES lab_sessions(id) "
-                    "ON DELETE SET NULL"
-                ))
-                conn.execute(text(
-                    "CREATE INDEX IF NOT EXISTS ix_lab_sess_fix_session "
-                    "ON lab_session_fixtures (session_id)"
-                ))
-                logger.info("Migrated: lab_session_fixtures.session_id")
+    # The lab_session_fixtures.session_id upgrade used to run here. It is
+    # gone with the rest of the replayable-labs migrations: it added a
+    # foreign key to lab_sessions, which is no longer created, so on a
+    # database that has lab_session_fixtures but never got lab_sessions it
+    # would have become the next `relation does not exist` startup
+    # failure. A deployment that already ran it keeps the column.
 
     # Migrate old triage/case statuses to simplified open/acknowledged/closed
     _migrate_status_values(engine)
