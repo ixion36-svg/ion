@@ -90,6 +90,16 @@ class VerifyIn(BaseModel):
     expires_on: Optional[date] = None
 
 
+class EquivalenceIn(BaseModel):
+    """Satisfy a requirement by assessed proficiency instead of the item."""
+
+    # Required, with a minimum length, so an equivalence cannot be recorded
+    # as a bare tick. The whole value of this path is that somebody had to
+    # write down what they assessed and how.
+    basis: str = Field(..., min_length=1, max_length=2000)
+    expires_on: Optional[date] = None
+
+
 class SubmitIn(BaseModel):
     completed_on: Optional[date] = None
     evidence_ref: str = Field("", max_length=500)
@@ -335,6 +345,33 @@ def verify(
     try:
         wf.verify_requirement(session, requirement=req, verifier=user,
                               evidence_ref=payload.evidence_ref,
+                              expires_on=payload.expires_on)
+    except wf.WorkforceError as exc:
+        raise _err(exc) from exc
+    return _jreq_out(req)
+
+
+@router.post("/requirements/{requirement_id}/equivalent",
+             dependencies=[Depends(require_workforce_module)])
+def record_equivalent(
+    requirement_id: int,
+    payload: EquivalenceIn,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Mark a requirement met by assessed proficiency rather than the item.
+
+    Deliberately a separate endpoint from verify, not a flag on it. The two
+    record different facts -- "they hold this" and "they do not hold this,
+    and here is what was assessed instead" -- and collapsing them into one
+    call with a boolean is how the distinction gets lost at the call site.
+    """
+    req = session.get(JourneyRequirement, requirement_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="Requirement not found")
+    try:
+        wf.record_equivalence(session, requirement=req, assessor=user,
+                              basis=payload.basis,
                               expires_on=payload.expires_on)
     except wf.WorkforceError as exc:
         raise _err(exc) from exc

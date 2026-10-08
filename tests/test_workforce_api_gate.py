@@ -88,13 +88,17 @@ def test_mutating_routes_require_a_permission():
     # Only routes whose authorisation is genuinely data-dependent (owner or
     # sponsor) stay single-layer; static-permission writes carry BOTH the route
     # dependency and the in-service check.
-    service_checked = ("verify", "submit_item", "withdraw_item")
+    # record_equivalent is here for the same reason as verify: the
+    # authorisation is _may_verify, which depends on whether the caller
+    # sponsors THIS journey, so it cannot be a static route dependency.
+    service_checked = ("verify", "submit_item", "withdraw_item",
+                       "record_equivalent")
     for route in writes:
         name = route.name
         if name in service_checked:
             block = source.split("def " + name + "(")[1].split("\n\n\n")[0]
             assert "user: User = Depends(get_current_user)" in block, name
-            assert re.search(r"(assigner|verifier|raiser|submitter|actor)=user|actor=user", block), \
+            assert re.search(r"(assigner|verifier|raiser|submitter|actor|assessor)=user", block), \
                 f"{name} must pass the caller to the service for the check"
         else:
             block = source.split("def " + name + "(")[1].split("\n\n\n")[0]
