@@ -707,6 +707,11 @@ function switchDiscoverTab(tabName) {
 
 // ==================== DISCOVER SEARCH ====================
 
+// The last completed search, kept so an export can state what it is an
+// export of. A result set with no query, index, time window or execution
+// time behind it is not evidence of anything.
+let _lastDiscoverSearch = null;
+
 async function executeDiscoverSearch() {
     const indexPattern = document.getElementById('search-index').value;
     const query = document.getElementById('search-query').value;
@@ -731,8 +736,22 @@ async function executeDiscoverSearch() {
         if (!response.ok) throw new Error('Search failed');
 
         const data = await response.json();
+        _lastDiscoverSearch = {
+            executed_at: new Date().toISOString(),
+            index_pattern: indexPattern,
+            query: query,
+            time_field: timeField,
+            time_from: timeFrom,
+            time_to: 'now',
+            requested_size: size,
+            total_hits: data.total,
+            returned_hits: (data.hits || []).length,
+            took_ms: data.took_ms,
+            hits: data.hits || []
+        };
         displaySearchResults(data);
     } catch (error) {
+        _lastDiscoverSearch = null;
         showToast('Search failed: ' + error.message, 'error');
     }
 }
@@ -829,8 +848,90 @@ function displayHistogram(data) {
     }).join('');
 }
 
+// RFC 4180 quoting, no formula guard. Used for the column names, which
+// this exporter assembles itself — and guarding them would rewrite
+// `@timestamp`, the ECS field every result carries, as `'@timestamp` for
+// every downstream tool that is not Excel.
+function csvName(value) {
+    const text = (value === null || value === undefined) ? '' : String(value);
+    return '"' + text.replace(/"/g, '""') + '"';
+}
+
+// RFC 4180 quoting plus a formula guard, for values. A leading =, +, -
+// or @ gets an apostrophe so a spreadsheet treats a field like
+// `=cmd|' /c calc'!A0` as text: log content is untrusted input, and this
+// is the path it travels. Excel hides the apostrophe on display.
+function csvCell(value) {
+    if (value === null || value === undefined) return '';
+    let text = (typeof value === 'object') ? JSON.stringify(value) : String(value);
+    if (/^[=+\-@]/.test(text)) text = "'" + text;
+    return '"' + text.replace(/"/g, '""') + '"';
+}
+
 function exportSearchResults() {
-    showToast('Export functionality coming soon', 'info');
+    const s = _lastDiscoverSearch;
+    if (!s || !s.hits.length) {
+        showToast('Run a search first — there are no results to export', 'info');
+        return;
+    }
+
+    // Every field present across the result set, not just the five the
+    // table happens to show.
+    const keys = new Set();
+    s.hits.forEach(hit => Object.keys(hit).forEach(k => keys.add(k)));
+    const columns = [...keys].sort();
+
+    const truncated = s.total_hits > s.returned_hits;
+
+    // Provenance first: the query, scope, window, timing and whether the
+    // result set is complete. Commented so a spreadsheet import can skip
+    // it, but present so the file can stand as evidence.
+    // csvName for the structural metadata (so `@timestamp` stays
+    // readable), csvCell for the query, which is free text.
+    const lines = [
+        '# ION Discover export',
+        '# exported_at,' + csvName(new Date().toISOString()),
+        '# executed_at,' + csvName(s.executed_at),
+        '# index_pattern,' + csvName(s.index_pattern),
+        '# query,' + csvCell(s.query || '(match all)'),
+        '# time_field,' + csvName(s.time_field),
+        '# time_from,' + csvName(s.time_from),
+        '# time_to,' + csvName(s.time_to),
+        '# took_ms,' + csvName(s.took_ms),
+        '# total_hits,' + csvName(s.total_hits),
+        '# returned_hits,' + csvName(s.returned_hits),
+        '# requested_size,' + csvName(s.requested_size),
+        '# truncated,' + csvName(truncated ? 'yes' : 'no'),
+    ];
+    if (truncated) {
+        lines.push('# note,' + csvCell(
+            'This export contains ' + s.returned_hits + ' of ' + s.total_hits +
+            ' matching documents. Raise the size limit to export more.'));
+    }
+    lines.push('');
+    lines.push(columns.map(csvName).join(','));
+    for (const hit of s.hits) {
+        lines.push(columns.map(c => csvCell(hit[c])).join(','));
+    }
+
+    // A BOM so Excel reads it as UTF-8, and CRLF endings per RFC 4180.
+    const BOM = String.fromCharCode(0xFEFF);
+    const blob = new Blob([BOM + lines.join('\r\n')],
+                          { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const stamp = s.executed_at.replace(/[:.]/g, '-');
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'ion-discover-' + stamp + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast('Exported ' + s.returned_hits + ' result' +
+              (s.returned_hits === 1 ? '' : 's') +
+              (truncated ? ' (truncated from ' + s.total_hits + ')' : ''),
+              'success');
 }
 
 // ==================== INDEX BROWSER ====================
