@@ -46,10 +46,23 @@ def test_every_route_carries_the_module_gate():
     assert ungated == [], ungated
 
 
-def test_the_flag_defaults_off():
+def test_the_flag_defaults_on():
+    """Reversed deliberately, 2026-10-08.
+
+    This asserted False, on the reasoning that a lifecycle must be opted
+    into. The module shipped complete, migrated and inert behind a 404 an
+    operator cannot tell apart from broken, and "who is cleared to be on
+    this console today, and what did we take off them when they left" is
+    not an optional extra for a SOC.
+
+    Being on grants nobody anything: a journey still has to be assigned and
+    its requirements verified before sync_granted_roles confers a role. The
+    flag stays so a deployment that does not want the module can switch it
+    off -- see test_workforce_enabled_by_default.py.
+    """
     code = (SRC / "core" / "config.py").read_text(encoding="utf-8")
     match = re.search(r"workforce_enabled:\s*bool\s*=\s*(\w+)", code)
-    assert match and match.group(1) == "False", "a lifecycle must be opted into"
+    assert match and match.group(1) == "True"
 
 
 def test_rule_violations_are_client_errors_not_500s():

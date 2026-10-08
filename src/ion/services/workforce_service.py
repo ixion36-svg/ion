@@ -194,13 +194,60 @@ def verified_gate_names(session: Session, user_id: int) -> set:
     return {r.name for r in rows}
 
 
+def _live_journey_for_profile(session: Session, user_id: int,
+                              profile_id: int) -> Optional[UserJourney]:
+    """This person's open journey for a role, whatever version it is on."""
+    return (
+        session.query(UserJourney)
+        .join(RoleProfileVersion,
+              UserJourney.version_id == RoleProfileVersion.id)
+        .filter(UserJourney.user_id == user_id,
+                RoleProfileVersion.profile_id == profile_id,
+                UserJourney.stage.notin_([STAGE_CLOSED, STAGE_WITHDRAWN]))
+        .first()
+    )
+
+
+def _carryable(journey: UserJourney, today: Optional[date] = None) -> dict:
+    """Items on ``journey`` that a superseding journey may inherit.
+
+    Keyed by name, both phases. Gate items are person-level and already
+    handled by ``verified_gate_names``; readiness items were earned for
+    THIS role, so reissuing them on a version bump is pure rework -- the
+    person is asked again for a sign-off they already hold.
+
+    Expired items are excluded. Carrying one across would launder a lapse
+    into a clean record, which is the one thing this must never do.
+    """
+    day = today or date.today()
+    out = {}
+    for req in journey.requirements:
+        if req.status not in (STATUS_VERIFIED, STATUS_WAIVED):
+            continue
+        if req.expires_on and req.expires_on < day:
+            continue
+        out[req.name] = req
+    return out
+
+
 def assign_profile(session: Session, *, user: User, version: RoleProfileVersion,
                    assigner: User, is_cover: bool = False,
-                   sponsor: Optional[User] = None) -> UserJourney:
+                   sponsor: Optional[User] = None,
+                   supersede: bool = False) -> UserJourney:
     """Start a journey for ``user`` against ``version``.
 
     Requirements are copied, not referenced. Gate items the person has already
     satisfied elsewhere are carried across as verified rather than reissued.
+
+    ``supersede`` rolls an existing journey for the same role onto this
+    version: the old one closes and items already verified and still in date
+    come across by name.
+
+    Without it, someone already on v1 of a role is refused v2. The guard is
+    per PROFILE rather than per version because two live journeys for one
+    role duplicate that person's requirements, list every expiry twice, and
+    make capability cover count them twice. The last one matters most: that
+    number answers "are we covered tonight", and it was over-reporting.
     """
     if not assigner.has_permission("workforce:manage"):
         raise WorkforceError("Permission denied")
@@ -211,15 +258,18 @@ def assign_profile(session: Session, *, user: User, version: RoleProfileVersion,
     if sponsor is not None and sponsor.id == user.id:
         raise WorkforceError("A person cannot sponsor their own journey")
 
-    open_same = (
-        session.query(UserJourney)
-        .filter(UserJourney.user_id == user.id,
-                UserJourney.version_id == version.id,
-                UserJourney.stage.notin_([STAGE_CLOSED, STAGE_WITHDRAWN]))
-        .first()
-    )
-    if open_same is not None:
-        raise WorkforceError("This person already holds an open journey for that role")
+    open_same = _live_journey_for_profile(session, user.id, version.profile_id)
+    if open_same is not None and not supersede:
+        held = session.get(RoleProfileVersion, open_same.version_id)
+        raise WorkforceError(
+            f"This person already holds an open journey for that role "
+            f"(journey {open_same.id}, version {held.version if held else '?'}). "
+            f"Supersede it to move them onto this version: that closes the "
+            f"old journey and carries across what they already hold."
+        )
+
+    superseded = open_same if (open_same is not None and supersede) else None
+    inherited = _carryable(superseded) if superseded is not None else {}
 
     journey = UserJourney(
         user_id=user.id, version_id=version.id, is_cover=is_cover,
@@ -232,6 +282,26 @@ def assign_profile(session: Session, *, user: User, version: RoleProfileVersion,
     now = datetime.utcnow()
 
     for src in version.requirements:
+        prior = inherited.get(src.name)
+        if prior is not None:
+            # From the journey being superseded: keep its status, when it was
+            # verified, and its ORIGINAL expiry. Recalculating the expiry
+            # would let a change to the role's wording extend every clearance
+            # in the SOC by its full validity period.
+            session.add(JourneyRequirement(
+                journey_id=journey.id,
+                source_requirement_id=src.id,
+                name=src.name, kind=src.kind, phase=src.phase,
+                validity_months=src.validity_months, course_id=src.course_id,
+                cost=src.cost, ordering=src.ordering,
+                status=prior.status,
+                verified_at=prior.verified_at,
+                completed_on=prior.completed_on,
+                evidence_ref=prior.evidence_ref,
+                expires_on=prior.expires_on,
+                notes=f"Carried from journey {superseded.id} on supersede",
+            ))
+            continue
         carried = src.phase == PHASE_GATE and src.name in already
         session.add(JourneyRequirement(
             journey_id=journey.id,
@@ -243,6 +313,17 @@ def assign_profile(session: Session, *, user: User, version: RoleProfileVersion,
             verified_at=now if carried else None,
             notes="Carried from an existing verified gate item" if carried else None,
             expires_on=_expiry_for(src.validity_months, now) if carried else None,
+        ))
+
+    if superseded is not None:
+        superseded.stage = STAGE_CLOSED
+        session.add(AuditLog(
+            user_id=assigner.id, action="workforce_journey_superseded",
+            resource_type="user_journey", resource_id=superseded.id,
+            details=f"user {user.username}: journey {superseded.id} closed, "
+                    f"replaced by journey {journey.id} on "
+                    f"{version.profile.name} v{version.version}; "
+                    f"{len(inherited)} item(s) carried across",
         ))
 
     session.flush()

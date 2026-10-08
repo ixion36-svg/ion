@@ -177,8 +177,14 @@ class Config:
     # dormant: while de_license_enforced is False the module behaves as it did
     # before licensing (mounted, RBAC-gated, no licence). See ion.licensing.
     de_license_enforced: bool = False  # master switch — gate DE behind a licence
-    # ION_WORKFORCE_ENABLED — onboarding/offboarding lifecycle. Off by default.
-    workforce_enabled: bool = False
+    # ION_WORKFORCE_ENABLED — onboarding/offboarding lifecycle. On by
+    # default: "who is cleared to be on this console today, and what did we
+    # take off them when they left" is a question every SOC has to answer,
+    # and the module was shipping complete, migrated and inert behind a
+    # 404 that looks the same as broken. Turning it on grants nobody
+    # anything — a journey still has to be assigned and its requirements
+    # verified before sync_granted_roles confers a role.
+    workforce_enabled: bool = True
     # How long a granted ION role outlives a lapsed mandatory item. The journey
     # suspends at once and the lead is told; 0 revokes the permissions with it.
     workforce_lapse_grace_days: int = 7
@@ -432,7 +438,7 @@ class Config:
             tide_space=data.get("tide_space", "default"),
             tide_client_id=data.get("tide_client_id", ""),
             de_license_enforced=data.get("de_license_enforced", False),
-            workforce_enabled=data.get("workforce_enabled", False),
+            workforce_enabled=data.get("workforce_enabled", True),
             de_module_enabled=data.get("de_module_enabled", False),
             de_license=data.get("de_license", ""),
             # Generic scheduler
@@ -824,7 +830,7 @@ def get_config() -> Config:
         if os.environ.get("ION_DE_LICENSE_ENFORCED"):
             _config.de_license_enforced = _get_env_bool("ION_DE_LICENSE_ENFORCED", False)
         if os.environ.get("ION_WORKFORCE_ENABLED"):
-            _config.workforce_enabled = _get_env_bool("ION_WORKFORCE_ENABLED", False)
+            _config.workforce_enabled = _get_env_bool("ION_WORKFORCE_ENABLED", True)
         if os.environ.get("ION_WORKFORCE_LAPSE_GRACE_DAYS"):
             try:
                 _config.workforce_lapse_grace_days = int(

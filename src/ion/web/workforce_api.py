@@ -79,6 +79,10 @@ class AssignIn(BaseModel):
     version_id: int
     is_cover: bool = False
     sponsor_id: Optional[int] = None
+    # Roll an existing journey for the same role onto this version. Off by
+    # default so closing somebody's journey is always something the lead
+    # asked for, never a side effect of pressing assign.
+    supersede: bool = False
 
 
 class VerifyIn(BaseModel):
@@ -254,7 +258,8 @@ def assign(
     sponsor = session.get(User, payload.sponsor_id) if payload.sponsor_id else None
     try:
         journey = wf.assign_profile(session, user=target, version=version, assigner=user,
-                                    is_cover=payload.is_cover, sponsor=sponsor)
+                                    is_cover=payload.is_cover, sponsor=sponsor,
+                                    supersede=payload.supersede)
     except wf.WorkforceError as exc:
         raise _err(exc) from exc
     return wf.journey_summary(session, journey)
