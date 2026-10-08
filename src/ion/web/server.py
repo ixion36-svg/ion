@@ -1326,6 +1326,27 @@ def _register_pages() -> None:
 _register_pages()
 
 
+@app.get("/api/nav/permissions")
+async def nav_permissions_endpoint(
+    user: User = Depends(require_page_auth),
+):
+    """Which page each navigation link needs, read off the live routes.
+
+    The header used to hide links from a hand-written list of element ids in
+    app.js, covering about a fifth of them; the rest showed to everyone and
+    handed them a 403. The routes were never unsafe -- they enforce whatever
+    the menu shows -- but a menu full of links that fail is a menu people
+    stop reading (review 2026-10-08 §23).
+
+    This is a map of what is *declared*, not a decision about this user, so
+    it needs only a signed-in session. The client intersects it with its own
+    permission list to decide what to render.
+    """
+    from ion.web.nav_permissions import nav_permission_payload
+
+    return nav_permission_payload()
+
+
 
 @app.get("/scheduler", response_class=HTMLResponse)
 async def scheduler_page(request: Request, user: User = Depends(require_page_auth)):

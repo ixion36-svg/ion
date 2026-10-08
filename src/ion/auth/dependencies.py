@@ -497,6 +497,13 @@ async def require_page_auth(
     return user
 
 
+#: Attribute under which a page dependency records the permission it
+#: enforces. Read by ion.web.nav_permissions so navigation visibility is
+#: derived from the live routes instead of a second hand-written list that
+#: has to be kept in step (review 2026-10-08 §23).
+PAGE_PERMISSION_ATTR = "_ion_page_permission"
+
+
 def require_page_permission(permission_name: str) -> Callable:
     """For page routes: redirect to /login if not auth'd, 403 if no permission."""
     async def dependency(
@@ -509,6 +516,12 @@ def require_page_permission(permission_name: str) -> Callable:
         )
         install_tenant_binding(binding)
         return user
+
+    # The closure captures permission_name, which nothing outside can read.
+    # Recording it lets the navigation derive what it may show from what the
+    # route actually enforces, rather than from a parallel list in
+    # JavaScript that drifts and leaves links that 403.
+    setattr(dependency, PAGE_PERMISSION_ATTR, permission_name)
     return dependency
 
 

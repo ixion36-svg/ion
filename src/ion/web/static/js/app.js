@@ -290,6 +290,81 @@ function updateNavForPermissions() {
         const allHidden = Array.from(items).every(el => el.style.display === 'none');
         group.style.display = allHidden ? 'none' : '';
     });
+
+    // The per-id rules above cover about a fifth of the header. This covers
+    // the rest, from what the routes actually declare.
+    applyNavPermissionMap(perms);
+}
+
+/* Hide every nav link whose page needs a permission this user lacks.
+
+   The header carries 55 links; the hand-written rules above name twelve of
+   them. The other forty-three showed to everyone and handed them a 403 --
+   the routes were never unsafe, they enforce regardless of what the menu
+   shows, but a menu full of links that fail is a menu people stop reading
+   (review 2026-10-08 s23).
+
+   The map comes from /api/nav/permissions, which reads the permission off
+   each registered page route. Nothing here is hardcoded, so a page added
+   tomorrow is covered without anyone editing this file -- which is the
+   only version of this that stays true.
+
+   Failure is deliberately silent and leaves everything visible: a fetch
+   that fell over must not blank the navigation. The old behaviour (a link
+   that 403s) is strictly better than no way to get anywhere. */
+let _navPermissionMap = null;
+
+async function applyNavPermissionMap(perms) {
+    try {
+        if (_navPermissionMap === null) {
+            const resp = await fetch('/api/nav/permissions', { credentials: 'include' });
+            if (!resp.ok) return;
+            _navPermissionMap = await resp.json();
+        }
+        const pages = (_navPermissionMap && _navPermissionMap.pages) || {};
+
+        document.querySelectorAll('a.tw-drop-item[href], a.tw-nav-link[href]')
+            .forEach(link => {
+                // Compare the path only: hrefs may carry a query, and an
+                // external or anchor href has no page permission at all.
+                let path;
+                try {
+                    path = new URL(link.getAttribute('href'), window.location.origin)
+                        .pathname;
+                } catch (e) {
+                    return;
+                }
+                if (path !== '/' && path.endsWith('/')) path = path.slice(0, -1);
+
+                const needed = pages[path];
+                // Unmapped means open to any signed-in user. Hiding those
+                // would empty the menu for everyone.
+                if (!needed) return;
+                if (!perms.has(needed)) link.style.display = 'none';
+            });
+
+        hideEmptyNavGroups();
+    } catch (e) {
+        // See above: leave the navigation alone.
+        console.debug('nav permission sweep skipped:', e);
+    }
+}
+
+/* A dropdown whose every item is hidden should not stay as an empty menu.
+
+   The loop above this does the same thing for three groups named by id. This
+   finds them all, so a new group does not need remembering. */
+function hideEmptyNavGroups() {
+    document.querySelectorAll('.tw-drop, .nav-dropdown').forEach(group => {
+        const menu = group.querySelector('.tw-drop-menu, .nav-dropdown-menu');
+        if (!menu) return;
+        const items = menu.querySelectorAll('.tw-drop-item, li');
+        if (!items.length) return;
+        const allHidden = Array.from(items).every(
+            el => el.style.display === 'none'
+        );
+        group.style.display = allHidden ? 'none' : '';
+    });
 }
 
 // Nav dropdown — click label navigates, click chevron toggles menu
