@@ -777,6 +777,39 @@ def people(
 # --- org structure ----------------------------------------------------------
 
 
+@router.get("/establishment", dependencies=[Depends(require_workforce_module)])
+def establishment(
+    session: Session = Depends(get_db_session),
+    _user: User = Depends(require_permission("workforce:read")),
+) -> dict:
+    """Per role: how many posts, how many held, how short.
+
+    Deliberately separate from /org, which is the org-chart shape. This
+    answers the question a lead actually asks, and keeps "filling" apart
+    from "filled" because somebody still in training is a gap in cover
+    tonight just as much as an empty post is.
+    """
+    return wf.establishment_summary(session)
+
+
+@router.post("/establishment/from-catalogue",
+             dependencies=[Depends(require_workforce_module)],
+             status_code=201)
+def establish(
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("workforce:manage")),
+) -> dict:
+    """Create posts for adopted roles at the catalogue's suggested strength.
+
+    Only adds, never removes: a lead who has already trimmed the
+    establishment must not have it reset by running this again.
+    """
+    try:
+        return wf.establish_from_catalogue(session, actor=user)
+    except wf.WorkforceError as exc:
+        raise _err(exc) from exc
+
+
 @router.get("/org", dependencies=[Depends(require_workforce_module)])
 def org(
     session: Session = Depends(get_db_session),

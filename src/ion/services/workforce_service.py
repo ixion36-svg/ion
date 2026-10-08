@@ -1462,6 +1462,144 @@ def fill_post(session: Session, *, post: OrgPost, journey_id: Optional[int],
     return post
 
 
+#: Catalogue categories as org units, in the order an org chart reads.
+_CATEGORY_UNITS = {
+    "operations": "Operations",
+    "detection_engineering": "Detection Engineering",
+    "incident_response": "Incident Response",
+    "threat_intelligence": "Threat Intelligence",
+    "governance": "Governance",
+    "specialist": "Specialist",
+}
+
+
+def establish_from_catalogue(session: Session, *, actor: User) -> dict:
+    """Create posts for the roles this SOC has adopted, at catalogue strength.
+
+    Turns the catalogue's suggested headcounts into real posts so the
+    ORBAT is not empty on day one. Those numbers are a starting shape for
+    a mid-sized 24/7 SOC and not a recommendation for anybody's actual
+    SOC, so this is something a lead runs once and then edits.
+
+    Only adopted roles. The catalogue holds nineteen; creating posts for
+    the ones this SOC has not taken on would invent an establishment
+    nobody asked for.
+
+    It only ever adds. A lead who has already trimmed the establishment
+    must not have it silently reset by running this again, so a role that
+    already has posts is left exactly as it is -- even if that is fewer
+    posts than the catalogue suggests, because that is probably a
+    deliberate decision.
+    """
+    from ion.data.soc_role_catalogue import catalogue
+
+    if not actor.has_permission("workforce:manage"):
+        raise WorkforceError("Permission denied")
+
+    profiles = {p.name: p for p in session.query(RoleProfile).all()}
+    units = {u.name: u for u in session.query(OrgUnit).all()}
+    existing_posts = {}
+    for post in session.query(OrgPost).all():
+        existing_posts.setdefault(post.profile_id, 0)
+        existing_posts[post.profile_id] += 1
+
+    created = 0
+    roles_done = []
+    for entry in catalogue():
+        profile = profiles.get(entry["name"])
+        if profile is None:
+            continue  # not adopted by this SOC
+        if existing_posts.get(profile.id):
+            continue  # already established; leave the lead's numbers alone
+
+        unit_name = _CATEGORY_UNITS.get(entry["category"], "Other")
+        unit = units.get(unit_name)
+        if unit is None:
+            unit = OrgUnit(name=unit_name, ordering=len(units))
+            session.add(unit)
+            session.flush()
+            units[unit_name] = unit
+
+        wanted = int(entry.get("typical_establishment") or 0)
+        for n in range(1, wanted + 1):
+            # Numbered so two posts for the same role can be told apart in
+            # the tree and filled independently.
+            session.add(OrgPost(
+                unit_id=unit.id,
+                title=f"{entry['name']} #{n}" if wanted > 1 else entry["name"],
+                profile_id=profile.id,
+                ordering=n,
+            ))
+            created += 1
+        if wanted:
+            roles_done.append(f"{entry['name']} x{wanted}")
+
+    if created:
+        session.add(AuditLog(
+            user_id=actor.id, action="workforce_establishment_created",
+            resource_type="org_post", resource_id=None,
+            details=f"{actor.username} established {created} post(s) at "
+                    f"catalogue strength: {', '.join(roles_done)}",
+        ))
+    session.commit()
+    return {"posts_created": created, "roles": roles_done}
+
+
+def establishment_summary(session: Session) -> dict:
+    """Per role: how many posts, how many held, how short.
+
+    org_tree answers the org-chart question. This answers the one a lead
+    actually asks -- "how many L2s should we have, how many do we have,
+    and how short are we" -- which is a different grouping.
+
+    ``filling`` is kept separate from ``filled`` throughout. A post held
+    by somebody still in training is a gap in cover tonight just as much
+    as an empty one, and conflating them is how a rota looks staffed while
+    nobody on it can take the queue.
+    """
+    posts = session.query(OrgPost).all()
+    if not posts:
+        # No posts means nobody has said what this SOC needs, which is not
+        # the same as needing nothing. Reporting zero gaps would read as
+        # fully staffed.
+        return {"roles": [], "established": 0, "filled": 0, "filling": 0,
+                "gap": 0,
+                "note": "No establishment defined yet, so there is nothing "
+                        "to compare against."}
+
+    profiles = {p.id: p for p in session.query(RoleProfile).all()}
+    journey_ids = [p.filled_by_journey_id for p in posts
+                   if p.filled_by_journey_id]
+    journeys = {j.id: j for j in session.query(UserJourney)
+                .filter(UserJourney.id.in_(journey_ids or [0])).all()}
+
+    rows: dict = {}
+    for post in posts:
+        profile = profiles.get(post.profile_id)
+        name = profile.name if profile else "(no role profile)"
+        row = rows.setdefault(name, {
+            "role": name, "profile_id": post.profile_id,
+            "established": 0, "filled": 0, "filling": 0, "gap": 0,
+        })
+        row["established"] += 1
+        journey = journeys.get(post.filled_by_journey_id)
+        if journey is None:
+            row["gap"] += 1
+        elif journey.stage == STAGE_OPERATIONAL:
+            row["filled"] += 1
+        else:
+            row["filling"] += 1
+
+    ordered = sorted(rows.values(), key=lambda r: r["role"])
+    return {
+        "roles": ordered,
+        "established": sum(r["established"] for r in ordered),
+        "filled": sum(r["filled"] for r in ordered),
+        "filling": sum(r["filling"] for r in ordered),
+        "gap": sum(r["gap"] for r in ordered),
+    }
+
+
 def org_tree(session: Session) -> dict:
     """The whole structure in three queries, nested for the page.
 
