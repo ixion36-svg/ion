@@ -6,7 +6,8 @@ import platform
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+import re
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -160,6 +161,140 @@ def mask_secret(value: str, visible_chars: int = 4) -> str:
     if len(value) <= visible_chars:
         return "*" * len(value)
     return "*" * (len(value) - visible_chars) + value[-visible_chars:]
+
+
+#: ``scheme://user:password@host`` in any value, however the variable is
+#: named. The password class excludes '@' so the match ends at the host
+#: separator, which is what a URL parser does.
+_URL_CREDENTIALS = re.compile(
+    r"(?P<scheme>[a-zA-Z][\w+.-]*://)(?P<user>[^/@\s:]+):(?P<pw>[^@\s/]*)@"
+)
+
+#: Variable names whose whole value is a secret.
+_ENV_SECRET_HINTS = ("password", "secret", "token", "key", "credential")
+
+
+def mask_env_value(name: str, value: str) -> str:
+    """Mask an environment value for the Settings -> System panel.
+
+    Two rules, because the original had only the first and that was not
+    enough. Masking by variable *name* against
+    ``["password", "secret", "token", "key"]`` left::
+
+        ION_DATABASE_URL: postgresql://ion:ion2025@127.0.0.1:5432/ion
+
+    printed in full on an admin page, and in every screenshot and support
+    bundle taken of it. The name says nothing about a credential carried
+    inside the value, and any URL can carry one: the Elasticsearch and
+    Kibana URLs take ``user:pass@`` just as readily as a DSN does.
+
+    So the whole value is masked when the *name* marks it a secret, and
+    embedded credentials are redacted wherever they appear regardless of
+    the name. The rest of a URL survives, because the host, port and
+    database name are exactly what an operator opened the panel to check,
+    and a panel that shows nothing gets replaced by someone reading .env.
+    """
+    if not value:
+        return "(not set)"
+    if any(hint in name.lower() for hint in _ENV_SECRET_HINTS):
+        return mask_secret(value)
+    return _URL_CREDENTIALS.sub(
+        lambda m: f"{m.group('scheme')}{m.group('user')}:***@", value
+    )
+
+
+#: Substrings that make a field's value a secret.
+#:
+#: Name-based because the Config dataclass carries no marking, and a
+#: hand-kept list of secret fields would drift the same way the hand-kept
+#: sections in get_configuration() did. Erring toward masking: a masked
+#: value that did not need it costs an operator one lookup elsewhere, an
+#: unmasked one that did is now on a page and in every screenshot of it.
+_SECRET_HINTS = (
+    "password", "token", "secret", "api_key", "apikey", "license",
+    # The DSN embeds its own credentials, so matching on "password" alone
+    # would print this one in full.
+    "database_url", "dsn",
+)
+
+#: Fields the Settings page already has a form control for. Used only to
+#: tell the operator where to change something, never to decide what to
+#: show: everything is listed either way.
+_EDITABLE_PREFIXES = (
+    "elasticsearch_", "kibana_", "gitlab_", "opencti_", "tide_",
+    "arkime_", "ollama_", "oidc_", "dfir_iris_", "abuseipdb_",
+    "virustotal_",
+)
+_EDITABLE_EXTRA = frozenset({
+    "base_url", "default_format", "auto_save", "max_versions_to_keep",
+    "cookie_secure",
+})
+#: ...minus the ones that match a prefix but have no control on the page.
+_NOT_EDITABLE = frozenset({
+    "elasticsearch_esql_enabled", "elasticsearch_process_events_index",
+})
+
+
+def _is_secret_field(field: str) -> bool:
+    return any(hint in field for hint in _SECRET_HINTS)
+
+
+def _is_editable_in_settings(field: str) -> bool:
+    if field in _NOT_EDITABLE:
+        return False
+    if field in _EDITABLE_EXTRA:
+        return True
+    return field.startswith(_EDITABLE_PREFIXES)
+
+
+def build_config_inventory() -> List[dict]:
+    """Every setting ION reads, with its value, source and variable name.
+
+    The sections in ``get_configuration()`` are hand-written, so a field
+    nobody remembered to add to one is invisible. 84 of ION's 151 settings
+    had no representation anywhere in the UI, and on at least one
+    deployment that included ``response_actions_live`` -- set from the
+    environment, and the difference between a containment action really
+    executing against a live system and only being recorded as a dry run.
+
+    Derived from ``ENV_FIELD_MAP`` rather than listed by hand, so a field
+    added to the config cannot go missing from here the way it did there.
+
+    Read-only on purpose. Most of these should not be editable from a web
+    page -- an AD bind password, or ``csrf_enabled``, does not belong
+    behind a Save button -- but none of them should be unknowable.
+    """
+    config = get_config()
+    sources = config_field_sources()
+    rows: List[dict] = []
+    for field in sorted(ENV_FIELD_MAP):
+        secret = _is_secret_field(field)
+        available = hasattr(config, field)
+        if available:
+            raw = getattr(config, field)
+            if secret:
+                value = mask_secret(str(raw)) if raw else ""
+            elif raw is None or isinstance(raw, (str, int, float, bool)):
+                value = raw
+            else:
+                # Paths, lists and anything else render as text rather than
+                # being dropped; the point is that nothing is hidden.
+                value = str(raw)
+        else:
+            # ENV_FIELD_MAP and the dataclass can drift. Report that rather
+            # than raising, which would take the whole settings page down
+            # over one stale map entry.
+            value = None
+        rows.append({
+            "field": field,
+            "env_var": ENV_FIELD_MAP[field],
+            "source": sources.get(field, "default"),
+            "value": value,
+            "is_secret": secret,
+            "available": available,
+            "editable": _is_editable_in_settings(field),
+        })
+    return rows
 
 
 def get_config_path() -> Path:
@@ -377,6 +512,11 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
             "virustotal_api_key_set": bool(config.virustotal_api_key),
         },
         "config_path": str(get_config_path()),
+        # Every field ION reads, not just the ones with a section above.
+        # The sections are hand-written and 84 of 151 settings had no entry
+        # in any of them, so there was no way to see from the UI what the
+        # application was actually running with.
+        "inventory": build_config_inventory(),
     }
 
 
@@ -935,15 +1075,15 @@ async def get_system_info(current_user: User = Depends(require_admin)):
 @router.get("/system/env")
 async def get_environment_variables(current_user: User = Depends(require_admin)):
     """Get ION-related environment variables (values masked)."""
-    env_vars = {}
-    for key, value in os.environ.items():
-        if key.startswith("ION_"):
-            # Mask sensitive values
-            if any(s in key.lower() for s in ["password", "secret", "token", "key"]):
-                env_vars[key] = mask_secret(value) if value else "(not set)"
-            else:
-                env_vars[key] = value if value else "(not set)"
-
+    # mask_env_value, not a bare name check: the previous rule matched the
+    # variable *name* against password/secret/token/key, which left
+    # ION_DATABASE_URL printing its whole DSN -- credentials included -- on
+    # an admin page. A name says nothing about a credential inside a value.
+    env_vars = {
+        key: mask_env_value(key, value)
+        for key, value in os.environ.items()
+        if key.startswith("ION_")
+    }
     return {"variables": env_vars}
 
 

@@ -663,6 +663,40 @@
             <div id="env-vars" class="bg-base-100 border border-base-300 rounded p-4 max-h-[300px] overflow-y-auto">
                 <div class="loading">Loading...</div>
             </div>
+
+            <h3 class="mt-8">All Settings</h3>
+            <p class="text-base-content/60 mb-4 text-[0.9rem]">
+                Every setting ION reads, with the value in force and where it came
+                from. The sections above cover the integrations; most of the rest
+                are deliberately not editable here, but nothing ION runs on should
+                be invisible. Secrets are masked.
+            </p>
+            <div class="flex items-center gap-3 mb-3 flex-wrap">
+                <input type="text" id="inventory-filter" class="input input-bordered input-sm flex-1 min-w-[200px]"
+                       placeholder="Filter by name, variable or value..."
+                       data-input-action="filterConfigInventory">
+                <label class="flex items-center gap-2 text-[0.85rem] text-base-content/70">
+                    <input type="checkbox" class="checkbox w-[16px] h-[16px]" id="inventory-non-default"
+                           data-change-action="filterConfigInventory">
+                    Only values not left at the default
+                </label>
+                <span id="inventory-count" class="text-[0.8rem] text-base-content/60"></span>
+            </div>
+            <div class="bg-base-100 border border-base-300 rounded max-h-[420px] overflow-y-auto">
+                <table class="table table-sm w-full">
+                    <thead class="sticky top-0 bg-base-200 z-10">
+                        <tr>
+                            <th>Setting</th>
+                            <th>Value</th>
+                            <th>Source</th>
+                            <th>Environment variable</th>
+                        </tr>
+                    </thead>
+                    <tbody id="inventory-body">
+                        <tr><td colspan="4" class="loading">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </section>
 
         <!-- System Logs -->
@@ -1972,6 +2006,11 @@ async function loadAllSettings() {
         currentConfig = await response.json();
         populateForms(currentConfig);
         applyConfigSources(currentConfig.sources, currentConfig.source_env_names);
+        // Render last and in its own try: the inventory is a read-only
+        // report, and a fault in it must not stop the editable forms above
+        // from being populated. populateForms is one long chain of
+        // getElementById assignments, so order matters here.
+        renderConfigInventory(currentConfig.inventory);
 
     } catch (error) {
         showToast('Error loading settings: ' + error.message, 'error');
@@ -2007,6 +2046,87 @@ function applyConfigSources(sources, envNames) {
         input.parentElement.appendChild(badge);
     });
 }
+
+// The read-only inventory of every setting ION reads.
+//
+// The sections above are hand-written, so a field nobody added to one is
+// invisible: 84 of ION's 151 settings had no representation anywhere, and
+// on at least one deployment that included response_actions_live, which
+// decides whether a containment action really runs or is only recorded as
+// a dry run. This table is built from the server's ENV_FIELD_MAP, so a new
+// setting cannot go missing from it the way it did from the sections.
+let configInventory = [];
+
+function renderConfigInventory(rows) {
+    configInventory = Array.isArray(rows) ? rows : [];
+    filterConfigInventory();
+}
+
+const SOURCE_LABEL = {
+    environment: ['Environment', 'badge-warning'],
+    file: ['Config file', 'badge-info'],
+    default: ['Default', 'badge-ghost'],
+};
+
+function filterConfigInventory() {
+    const body = document.getElementById('inventory-body');
+    if (!body) return;
+    const term = (document.getElementById('inventory-filter')?.value || '')
+        .trim().toLowerCase();
+    const nonDefaultOnly = !!document.getElementById('inventory-non-default')?.checked;
+
+    const rows = configInventory.filter(r => {
+        if (nonDefaultOnly && r.source === 'default') return false;
+        if (!term) return true;
+        return [r.field, r.env_var, String(r.value ?? '')]
+            .some(v => v.toLowerCase().includes(term));
+    });
+
+    const count = document.getElementById('inventory-count');
+    if (count) {
+        count.textContent = rows.length === configInventory.length
+            ? `${configInventory.length} settings`
+            : `${rows.length} of ${configInventory.length} settings`;
+    }
+
+    if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="4" class="text-base-content/60 p-4">'
+            + 'No settings match that filter.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = rows.map(r => {
+        const [label, badge] = SOURCE_LABEL[r.source] || ['Unknown', 'badge-ghost'];
+        // Distinguish the three ways a value can be empty, because they
+        // mean different things: not set at all, set to an empty string,
+        // and a name the running config does not expose.
+        let value;
+        if (!r.available) {
+            value = '<span class="text-warning">not available in this build</span>';
+        } else if (r.value === null || r.value === undefined) {
+            value = '<span class="text-base-content/50">not set</span>';
+        } else if (r.value === '') {
+            value = r.is_secret
+                ? '<span class="text-base-content/50">no secret set</span>'
+                : '<span class="text-base-content/50">empty</span>';
+        } else if (typeof r.value === 'boolean') {
+            value = r.value ? 'true' : 'false';
+        } else {
+            value = escapeHtml(String(r.value));
+        }
+        const editable = r.editable
+            ? ' <span class="text-[0.72rem] text-base-content/50">(editable above)</span>'
+            : '';
+        return `<tr>
+            <td class="font-mono text-[0.8rem]">${escapeHtml(r.field)}${editable}</td>
+            <td class="font-mono text-[0.8rem] break-all">${value}</td>
+            <td><span class="badge badge-sm ${badge}">${label}</span></td>
+            <td class="font-mono text-[0.75rem] text-base-content/60">${escapeHtml(r.env_var)}</td>
+        </tr>`;
+    }).join('');
+}
+window.filterConfigInventory = filterConfigInventory;
+window.renderConfigInventory = renderConfigInventory;
 
 function populateForms(config) {
     // General settings
