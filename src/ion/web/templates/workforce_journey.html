@@ -268,27 +268,42 @@
     f('status').classList.add(st[1]);
     f('status').textContent = st[2];
 
+    // Capture the elements NOW, while the fragment still holds them.
+    //
+    // `node` is a DocumentFragment: appending it moves its children into
+    // the list and leaves the fragment empty, so f() returns null from
+    // that moment on. A handler that called f() therefore threw on its
+    // own first line -- the click arrived, nothing was sent, and the row
+    // stayed "To do" with no error on screen and no failed request to
+    // find. Closing over the elements instead keeps them valid after the
+    // row is in the document.
     if (r.status === 'pending' || r.status === 'expired') {
-      f('form').classList.remove('hidden');
-      f('date').value = new Date().toISOString().slice(0, 10);
-      if (r.evidence_ref) { f('evidence').value = r.evidence_ref; }
-      f('submit').addEventListener('click', function () {
-        f('submit').disabled = true;
+      const form = f('form');
+      const dateEl = f('date');
+      const evidenceEl = f('evidence');
+      const submitEl = f('submit');
+      form.classList.remove('hidden');
+      dateEl.value = new Date().toISOString().slice(0, 10);
+      if (r.evidence_ref) { evidenceEl.value = r.evidence_ref; }
+      submitEl.addEventListener('click', function () {
+        submitEl.disabled = true;
         api('POST', '/api/workforce/requirements/' + r.id + '/submit', {
-          completed_on: f('date').value || null,
-          evidence_ref: f('evidence').value.trim()
+          completed_on: dateEl.value || null,
+          evidence_ref: evidenceEl.value.trim()
         }).then(function () { return load(true); })
-          .catch(function (e) { f('submit').disabled = false; alert(e.message); });
+          .catch(function (e) { submitEl.disabled = false; alert(e.message); });
       });
     } else if (r.status === 'submitted') {
+      const withdrawEl = f('withdraw');
       f('pendingbar').classList.remove('hidden');
       f('pendingtext').textContent = 'Submitted ' +
         (r.completed_on ? '(completed ' + r.completed_on + ') ' : '') +
         '- your lead has been asked to verify it.';
-      f('withdraw').addEventListener('click', function () {
+      withdrawEl.addEventListener('click', function () {
+        withdrawEl.disabled = true;
         api('POST', '/api/workforce/requirements/' + r.id + '/withdraw')
           .then(function () { return load(true); })
-          .catch(function (e) { alert(e.message); });
+          .catch(function (e) { withdrawEl.disabled = false; alert(e.message); });
       });
     }
     return node;

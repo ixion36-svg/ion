@@ -51,6 +51,11 @@ EXEMPT_PATHS: Dict[str, str] = {
     # failed".
     "/": "The dashboard. Every signed-in user lands here.",
     "/guide": "Training material. Withholding it helps nobody.",
+    "/workforce": (
+        "A person's own onboarding. Hiding it from someone with no "
+        "permissions hides it from exactly the people being onboarded, "
+        "who need it to earn any."
+    ),
     "/soc-roles": "Role reference documentation.",
     "/scheduler": "Guarded by require_page_auth: signed in is the bar.",
     "/alert-prompts": "Guarded by require_page_auth.",

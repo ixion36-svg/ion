@@ -1789,8 +1789,25 @@ async def verdict_review_page(request: Request, user: User = Depends(require_pag
 
 
 @app.get("/workforce", response_class=HTMLResponse)
-async def workforce_page(request: Request, user: User = Depends(require_page_permission("workforce:read")), _gate: None = Depends(require_workforce_module)):
-    """A person's own journey: the gate, then role readiness."""
+async def workforce_page(request: Request, user: User = Depends(require_page_auth), _gate: None = Depends(require_workforce_module)):
+    """A person's own journey: the gate, then role readiness.
+
+    Signed in is the only requirement, deliberately. This needed
+    ``workforce:read``, which on a real estate only admin and
+    principal_analyst hold, so the page telling somebody what they must
+    complete before they are allowed to do anything was visible to
+    everybody except the people it is for.
+
+    The circularity is the point: permissions are withheld until the
+    mandatory training is verified, and the training was listed behind a
+    permission, so a joiner could not start.
+
+    Nothing leaks by opening it. The page renders from
+    ``/api/workforce/journeys/me``, which resolves the caller's own
+    journeys and nobody else's. The other three workforce pages keep their
+    permissions, because the profile builder, the verification queue and
+    the roster are other people's business.
+    """
     return templates.TemplateResponse(
         request=request, name="workforce_journey.html",
         context={"current_user": user},
