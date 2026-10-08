@@ -10,9 +10,10 @@ through the real adapter layer, but is forced to a dry-run unless
 
 import json
 import logging
+import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from ion.core.config import get_config
@@ -57,6 +58,138 @@ def _action_to_dict(action: PlaybookAction) -> dict:
         "is_active": action.is_active,
         "risk_level": action.risk_level,
     }
+
+
+# ---------------------------------------------------------------------------
+# Decision atomicity
+# ---------------------------------------------------------------------------
+
+#: Stable namespace for dispatch idempotency keys. Fixed for the lifetime
+#: of the deployment so a key regenerated after a restart still matches the
+#: one an external system already saw.
+_DISPATCH_NAMESPACE = uuid.UUID("6f3d2a18-0c4b-4f8e-9a71-5d2e8b6c4f10")
+
+
+def _claim_status_transition(
+    session: Session,
+    log_id: int,
+    *,
+    expected: str,
+    new: str,
+    **extra_fields,
+) -> bool:
+    """Move a log row from ``expected`` to ``new``, atomically.
+
+    Returns True only if *this* caller made the transition. The guard is
+    in the ``WHERE`` clause, so the database decides the winner:
+
+        UPDATE playbook_action_log
+           SET status = :new
+         WHERE id = :log_id AND status = :expected
+
+    Review 2026-10-08 finding 3: the previous code read ``status``, checked
+    it in Python, then wrote unconditionally. Two approvals could both pass
+    the check and both dispatch, and a delayed decision could overwrite a
+    state another request had already advanced. Approve/reject raced the
+    same way, silently discarding the losing decision.
+
+    ``extra_fields`` are applied in the same statement, so a decision and
+    the identity of its decider land together or not at all.
+    """
+    result = session.execute(
+        update(PlaybookActionLog)
+        .where(
+            PlaybookActionLog.id == log_id,
+            PlaybookActionLog.status == expected,
+        )
+        .values(status=new, **extra_fields)
+    )
+    won = result.rowcount == 1
+    session.commit()
+    if not won:
+        # Someone else holds the row; drop our stale copy so the caller
+        # reads the winner's state rather than its own.
+        session.expire_all()
+    return won
+
+
+def dispatch_idempotency_key(session: Session, log_id: int) -> str | None:
+    """A stable key identifying one externally-visible dispatch.
+
+    Derived deterministically from the log row rather than generated, so
+    the same request produces the same key on a retry after a crash — an
+    adapter (or the system behind it) can use it to recognise work it has
+    already done instead of containing the same target twice.
+
+    Returns None if the log row does not exist.
+    """
+    log_entry = session.get(PlaybookActionLog, log_id)
+    if log_entry is None:
+        return None
+    seed = "|".join(
+        str(part)
+        for part in (
+            log_entry.id,
+            log_entry.action_id,
+            log_entry.target,
+            log_entry.created_at.isoformat() if log_entry.created_at else "",
+        )
+    )
+    return f"ion-act-{uuid.uuid5(_DISPATCH_NAMESPACE, seed)}"
+
+
+def format_action_note(result: dict, username: str) -> str:
+    """Render a response-action result as a case note.
+
+    Review 2026-10-08 finding 6: a successful dry run is stored with
+    status ``completed``, and the old note writer printed that status
+    while ignoring the nested ``result.dry_run`` flag. The case journal
+    and its Kibana mirror therefore stated that a response action had
+    completed when nothing had been done — a note claiming an account was
+    disabled when it was not is worse than no note at all.
+
+    A simulation is now labelled as one, and the execution id and adapter
+    are recorded either way so the note points at the underlying record.
+    """
+    inner = result.get("result") or {}
+    dry_run = bool(inner.get("dry_run"))
+    adapter = inner.get("adapter") or "unknown adapter"
+    action_type = result.get("action_type")
+    target = result.get("target")
+    exec_id = result.get("id")
+    failed = result.get("status") == "failed"
+
+    if dry_run:
+        headline = "**Response action — DRY RUN, no action performed**"
+        outcome = "simulated only"
+    elif failed:
+        headline = "**Response action — failed**"
+        outcome = "failed"
+    else:
+        headline = "**Response action — executed**"
+        outcome = "succeeded"
+
+    lines = [
+        headline,
+        "",
+        f"- Action: `{action_type}` on `{target}`",
+        f"- Outcome: {outcome}",
+        f"- Adapter: `{adapter}`",
+        f"- Execution ID: {exec_id}",
+        f"- Approved by: {username}",
+    ]
+    if inner.get("message"):
+        lines.append(f"- Adapter message: {inner['message']}")
+    if result.get("error"):
+        lines.append(f"- Error: {result['error']}")
+    if dry_run:
+        lines += [
+            "",
+            "No change was made to the target. Live execution is off "
+            "(`ION_RESPONSE_ACTIONS_LIVE`), so this records intent, not "
+            "containment.",
+        ]
+    return "\n".join(lines)
 
 
 def _log_to_dict(log: PlaybookActionLog) -> dict:
@@ -209,9 +342,24 @@ def approve_action(
             "status": "error",
         }
 
-    log_entry.approved_by_id = approved_by_id
-    log_entry.status = "approved"
-    session.commit()
+    # Atomic claim: the WHERE clause decides the winner, so a second
+    # approval (or a racing rejection) cannot also advance the row and
+    # dispatch the action again.
+    if not _claim_status_transition(
+        session,
+        log_id,
+        expected="pending_approval",
+        new="approved",
+        approved_by_id=approved_by_id,
+    ):
+        current = session.get(PlaybookActionLog, log_id)
+        return {
+            "error": (
+                "Action was already decided concurrently (now "
+                f"'{current.status if current else 'missing'}')"
+            ),
+            "status": "error",
+        }
 
     logger.info("Action log %d approved by user %d", log_id, approved_by_id)
 
@@ -241,11 +389,23 @@ def reject_action(
     if log_entry.status != "pending_approval":
         return {"error": f"Cannot reject action in status '{log_entry.status}'", "status": "error"}
 
-    log_entry.approved_by_id = approved_by_id
-    log_entry.status = "rejected"
-    session.commit()
-    session.refresh(log_entry)
+    if not _claim_status_transition(
+        session,
+        log_id,
+        expected="pending_approval",
+        new="rejected",
+        approved_by_id=approved_by_id,
+    ):
+        current = session.get(PlaybookActionLog, log_id)
+        return {
+            "error": (
+                "Action was already decided concurrently (now "
+                f"'{current.status if current else 'missing'}')"
+            ),
+            "status": "error",
+        }
 
+    log_entry = session.get(PlaybookActionLog, log_id)
     logger.info("Action log %d rejected by user %d", log_id, approved_by_id)
 
     return _log_to_dict(log_entry)
@@ -276,8 +436,22 @@ def execute_action(session: Session, log_id: int) -> dict:
     action_type = action.action_type if action else "unknown"
     now = datetime.now(timezone.utc)
 
-    log_entry.status = "executing"
-    session.commit()
+    # A separate claim from the approval one: approval decides *whether* to
+    # act, this decides *who* acts. Without it two workers that both saw
+    # `approved` would each dispatch to the adapter.
+    if not _claim_status_transition(
+        session, log_id, expected="approved", new="executing"
+    ):
+        current = session.get(PlaybookActionLog, log_id)
+        return {
+            "error": (
+                "Action is already being executed elsewhere (now "
+                f"'{current.status if current else 'missing'}')"
+            ),
+            "status": "error",
+        }
+    log_entry = session.get(PlaybookActionLog, log_id)
+    _idempotency_key = dispatch_idempotency_key(session, log_id)
 
     try:
         # --- Real execution via adapter layer ---
@@ -313,9 +487,10 @@ def execute_action(session: Session, log_id: int) -> dict:
         session.refresh(log_entry)
 
         logger.info(
-            "Action log %d executed (adapter=%s, success=%s, dry_run=%s): %s on %s",
+            "Action log %d executed (adapter=%s, success=%s, dry_run=%s, "
+            "idempotency_key=%s): %s on %s",
             log_id, exec_result.adapter, exec_result.success, exec_result.dry_run,
-            action_type, log_entry.target,
+            _idempotency_key, action_type, log_entry.target,
         )
 
     except Exception as exc:

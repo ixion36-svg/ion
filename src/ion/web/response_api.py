@@ -66,10 +66,10 @@ def _post_execution_note(session: Session, result: dict, username: str) -> None:
         case = session.query(AlertCase).filter_by(id=case_id).first()
         if case is None:
             return
-        content = (
-            f"**Response action** `{result.get('action_type')}` on "
-            f"`{result.get('target')}` — {result.get('status')} — approved by {username}"
-        )
+        # format_action_note reads the nested result.dry_run flag, so a
+        # simulated action can no longer produce a note that reads like
+        # real containment (review 2026-10-08 finding 6).
+        content = actions.format_action_note(result, username)
         session.add(
             Note(
                 entity_type=NoteEntityType.CASE,
