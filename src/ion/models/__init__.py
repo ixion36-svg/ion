@@ -194,6 +194,13 @@ from ion.models.sla import (
     # with the services that were their only callers.
 )
 
+from ion.models.shift_handover import (  # noqa: F401
+    HandoverActionStatus,
+    HandoverStatus,
+    ShiftHandover,
+    ShiftHandoverAction,
+)
+
 # JSON-DAG playbook automation (Tines-inspired).
 from ion.models.story import Story, StoryRun  # noqa: F401
 from ion.models.system_quirk import SystemQuirk, SystemQuirkStatus  # noqa: F401
@@ -249,6 +256,10 @@ from ion.models.worklog import (  # noqa: F401
 
 __all__ = [
     "Base",
+    "ShiftHandover",
+    "ShiftHandoverAction",
+    "HandoverStatus",
+    "HandoverActionStatus",
     "WorkTaskType",
     "WorkLogEntry",
     "Template",

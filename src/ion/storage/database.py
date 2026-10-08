@@ -1186,6 +1186,79 @@ def _run_migrations(engine: Engine) -> None:
             if col_name not in existing:
                 _add_column_tolerant(engine, "journey_requirements", col_name, col_type)
 
+    # Shift handover as an accountable transfer (review 2026-10-08 §17).
+    # Base.metadata.create_all makes these on a fresh database; the blocks
+    # below add them to an existing deployment. Both FK targets (users,
+    # alert_cases) are model tables, so PostgreSQL can resolve them at
+    # CREATE TABLE time — see tests/test_migration_fk_targets.py for why
+    # that matters.
+    if not insp.has_table("shift_handovers"):
+        ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+        bool_default = "FALSE" if _is_postgres(engine) else "0"
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE shift_handovers (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    shift_start {ts_type},
+                    shift_end {ts_type},
+                    shift_hours INTEGER,
+                    outgoing_lead_id INTEGER NOT NULL REFERENCES users(id),
+                    incoming_lead_id INTEGER REFERENCES users(id),
+                    status VARCHAR(20) NOT NULL DEFAULT 'draft',
+                    summary TEXT,
+                    snapshot {'JSONB' if _is_postgres(engine) else 'JSON'},
+                    snapshot_taken_at {ts_type},
+                    submitted_at {ts_type},
+                    accepted_at {ts_type},
+                    accepted_by_id INTEGER REFERENCES users(id),
+                    accepted_by_designated_lead BOOLEAN DEFAULT {bool_default},
+                    rejection_reason TEXT,
+                    previous_handover_id INTEGER REFERENCES shift_handovers(id) ON DELETE SET NULL,
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            for stmt in (
+                "CREATE INDEX ix_shift_handovers_status ON shift_handovers (status)",
+                "CREATE INDEX ix_shift_handovers_shift_end ON shift_handovers (shift_end)",
+                "CREATE INDEX ix_shift_handovers_outgoing ON shift_handovers (outgoing_lead_id)",
+            ):
+                conn.execute(text(stmt))
+            logger.info("Migrated: CREATE TABLE shift_handovers")
+
+    if not insp.has_table("shift_handover_actions"):
+        ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE shift_handover_actions (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    handover_id INTEGER NOT NULL REFERENCES shift_handovers(id) ON DELETE CASCADE,
+                    description TEXT NOT NULL,
+                    owner_id INTEGER REFERENCES users(id),
+                    due_at {ts_type},
+                    case_id INTEGER REFERENCES alert_cases(id) ON DELETE SET NULL,
+                    status VARCHAR(20) NOT NULL DEFAULT 'open',
+                    completed_at {ts_type},
+                    completed_by_id INTEGER REFERENCES users(id),
+                    resolution_note TEXT,
+                    carried_from_id INTEGER REFERENCES shift_handover_actions(id) ON DELETE SET NULL,
+                    carry_count INTEGER NOT NULL DEFAULT 0,
+                    created_by_id INTEGER REFERENCES users(id),
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            for stmt in (
+                "CREATE INDEX ix_shift_handover_actions_handover "
+                "ON shift_handover_actions (handover_id)",
+                "CREATE INDEX ix_shift_handover_actions_status "
+                "ON shift_handover_actions (status)",
+                "CREATE INDEX ix_shift_handover_actions_owner "
+                "ON shift_handover_actions (owner_id)",
+            ):
+                conn.execute(text(stmt))
+            logger.info("Migrated: CREATE TABLE shift_handover_actions")
+
     # Bob Prompt Evaluation Harness — eval run + sample tables.
     # Base.metadata.create_all creates these on fresh deployments. The blocks
     # below add them idempotently on upgrades and ensure indexes exist.
