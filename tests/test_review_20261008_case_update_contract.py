@@ -116,9 +116,9 @@ def second_analyst(db: Session) -> User:
 @pytest.fixture()
 def app_client(engine, case_updater):
     reset_engine()
-    from ion.web.server import app
     from ion.auth.dependencies import get_current_user, get_db_session
     from ion.web.api import get_db_session as api_get_db_session
+    from ion.web.server import app
 
     test_sf = sessionmaker(bind=engine, expire_on_commit=False)
 

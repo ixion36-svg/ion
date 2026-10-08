@@ -20,22 +20,22 @@ from ion.services.scheduler_service import (
     delete_job as svc_delete_job,
 )
 from ion.services.scheduler_service import (
+    describe_handlers as svc_describe_handlers,
+)
+from ion.services.scheduler_service import (
     get_job as svc_get_job,
 )
 from ion.services.scheduler_service import (
     list_executions as svc_list_executions,
 )
 from ion.services.scheduler_service import (
-    describe_handlers as svc_describe_handlers,
-)
-from ion.services.scheduler_service import (
     list_handlers as svc_list_handlers,
 )
 from ion.services.scheduler_service import (
-    preview_schedule as svc_preview_schedule,
+    list_jobs as svc_list_jobs,
 )
 from ion.services.scheduler_service import (
-    list_jobs as svc_list_jobs,
+    preview_schedule as svc_preview_schedule,
 )
 from ion.services.scheduler_service import (
     trigger_now as svc_trigger_now,

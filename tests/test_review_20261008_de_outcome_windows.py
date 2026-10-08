@@ -45,11 +45,11 @@ if str(_SRC) not in sys.path:
 import ion.models  # noqa: F401
 from ion.models.alert_triage import AlertCase, AlertTriage
 from ion.models.base import Base
-from ion.models.user import User
 from ion.models.detection_proposal import (  # noqa: F401
     DetectionProposal,
     DetectionProposalStatus,
 )
+from ion.models.user import User
 from ion.services import de_proposal_service as svc
 
 RULE = "Suspicious PowerShell Download"

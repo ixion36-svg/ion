@@ -36,7 +36,6 @@ if str(_SRC) not in sys.path:
 
 from ion.services.playbook_executors import active_directory_ldap as ad
 
-
 # ── Fakes ─────────────────────────────────────────────────────────────────
 
 
