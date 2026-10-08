@@ -158,7 +158,12 @@
             <div id="analytics-workload"></div>
         </div>
         <div class="bg-base-100 border border-base-300 border-t-2 border-t-warning rounded-lg p-4 transition-shadow hover:shadow-[0_2px_12px_rgba(0,0,0,.15)]">
-            <h4 class="m-0 mb-3 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">SLA / Case Age</h4>
+            <!-- Not an SLA: there is no response or resolution policy
+                 behind this, no pause handling and no recorded breaches,
+                 only fixed age thresholds. Review 2026-10-08 §2 — a label
+                 has to match what the thing measures. -->
+            <h4 class="m-0 mb-1 text-[0.7rem] font-semibold text-base-content/60 uppercase tracking-[0.06em]">Open Case Age</h4>
+            <p class="m-0 mb-3 text-[0.65rem] text-base-content/50">Fixed age thresholds, not an SLA policy.</p>
             <div id="analytics-sla"></div>
         </div>
     </div>
@@ -1855,7 +1860,10 @@
     border-radius: 2px;
 }
 
-/* ── SLA / Case Age ─────────────────────────────────────── */
+/* ── Open case age ───────────────────────────────────────────
+   The `sla-*` class names stay because the hashed class map and the
+   migrated-CSS sweep reference them. The panel is age-based only;
+   there is no SLA policy behind it. */
 .sla-row {
     display: flex;
     align-items: center;
@@ -5005,7 +5013,7 @@ function renderAnalyticsPanel() {
     renderClosureDonut();
     renderStatusDonut();
     renderWorkloadBars();
-    renderSLAIndicators();
+    renderOpenCaseAges();
     renderRecentClosures();
 }
 
@@ -5171,7 +5179,11 @@ function renderWorkloadBars() {
     }).join('');
 }
 
-function getSLAColor(ageMs) {
+// Colours a case by age alone. Named for what it does: there is no SLA
+// policy, target or breach record behind these thresholds. The CSS class
+// names still read `sla-*` because they are referenced by the hashed
+// class map; only the labels people read have changed.
+function getCaseAgeColor(ageMs) {
     const hours = ageMs / 3600000;
     if (hours < 24) return 'sla-green';
     if (hours < 72) return 'sla-yellow';
@@ -5179,7 +5191,7 @@ function getSLAColor(ageMs) {
     return 'sla-red';
 }
 
-function renderSLAIndicators() {
+function renderOpenCaseAges() {
     const container = document.getElementById('analytics-sla');
     if (!container) return;
     const active = allCases.filter(c => c.status === 'open' || c.status === 'acknowledged');
@@ -5196,7 +5208,7 @@ function renderSLAIndicators() {
     const slaCounts = { green: 0, yellow: 0, orange: 0, red: 0 };
     active.forEach(c => {
         const ageMs = now - new Date(c.created_at).getTime();
-        const cls = getSLAColor(ageMs);
+        const cls = getCaseAgeColor(ageMs);
         if (cls === 'sla-green') slaCounts.green++;
         else if (cls === 'sla-yellow') slaCounts.yellow++;
         else if (cls === 'sla-orange') slaCounts.orange++;
@@ -5218,7 +5230,7 @@ function renderSLAIndicators() {
 
     container.innerHTML = slaBar + top8.map(c => {
         const ageMs = now - new Date(c.created_at).getTime();
-        const colorClass = getSLAColor(ageMs);
+        const colorClass = getCaseAgeColor(ageMs);
         const sevBadge = '<span class="cw-sevtag sev-' + esc(c.severity || 'medium') + ' mr-1">' + esc(c.severity || 'med') + '</span>';
         return '<div class="sla-row" data-click-action="openCaseDetail" data-args=\'[' + c.id + ']\'>'
             + '<span class="sla-dot ' + colorClass + '"></span>'

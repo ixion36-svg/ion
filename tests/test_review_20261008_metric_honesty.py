@@ -289,3 +289,35 @@ class TestComplianceLabelling:
         result = compliance.get_compliance_posture(_Off(), "nist_csf")
         assert "error" in result
         assert result.get("overall_score") is None
+
+
+# ── The case board's age panel is not an SLA ──────────────────────────────
+
+
+class TestCaseAgePanelIsNotCalledSla:
+    """Review §2: the panel colours cases by age in fixed bands.
+
+    There is no response or resolution policy behind it, no pause
+    handling and no recorded breaches, so calling it SLA promised a
+    policy engine that does not exist.
+    """
+
+    @property
+    def _cases_template(self) -> str:
+        return (
+            Path(__file__).resolve().parent.parent
+            / "src" / "ion" / "web" / "templates" / "cases.html"
+        ).read_text(encoding="utf-8")
+
+    def test_the_panel_heading_no_longer_claims_an_sla(self):
+        assert "SLA / Case Age" not in self._cases_template
+
+    def test_the_panel_says_what_it_actually_measures(self):
+        template = self._cases_template
+        assert "Open Case Age" in template
+        assert "not an SLA policy" in template
+
+    def test_the_colour_helper_is_named_for_age(self):
+        template = self._cases_template
+        assert "getCaseAgeColor" in template
+        assert "getSLAColor" not in template
