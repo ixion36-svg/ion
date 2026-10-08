@@ -1058,7 +1058,7 @@ async function dscLoadCaseOptions() {
     const select = document.getElementById('pin-query-case');
     if (!select) return;
     try {
-        const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN');
+        const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN&limit=500&sort=case_number&order=desc');
         if (!r.ok) throw new Error('HTTP ' + r.status);
         const data = await r.json();
         const cases = data.cases || data || [];

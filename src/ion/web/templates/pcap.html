@@ -1167,7 +1167,7 @@
         if (!select) return;
         if (_pcapCases === null) {
             try {
-                const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN');
+                const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN&limit=500&sort=case_number&order=desc');
                 _pcapCases = r.ok ? ((await r.json()).cases || []) : [];
             } catch (e) {
                 _pcapCases = [];

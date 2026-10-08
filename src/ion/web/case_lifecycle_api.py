@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, selectinload
 
@@ -110,65 +110,74 @@ class CloseAsFPRequest(BaseModel):
     known_fp_id: int
 
 
-@router.get("/elasticsearch/alerts/cases")
-async def list_cases(
-    status: Optional[str] = None,
+@router.get("/elasticsearch/alerts/cases/facets")
+async def case_facets_endpoint(
     current_user: User = Depends(require_permission("case:read")),
     session: Session = Depends(get_db_session),
 ):
-    """List all investigation cases."""
-    # Wrapped in to_thread — query + serialization access relationships
-    # (created_by, assigned_to, triage_entries, observables) so both must
-    # run in the same thread while the session is open.
-    def _query_cases():
-        query = session.query(AlertCase).options(
-            selectinload(AlertCase.created_by),
-            selectinload(AlertCase.assigned_to),
-            selectinload(AlertCase.triage_entries),
-        )
-        if status:
-            query = query.filter(AlertCase.status == status)
-        cases = query.order_by(AlertCase.created_at.desc()).all()
+    """Counts for the case filter bar, without fetching any rows.
 
-        iris_service = get_dfir_iris_service()
+    Declared before the /{case_id} route: FastAPI matches in declaration
+    order, so the other way round "facets" is parsed as a case id and the
+    request 422s on int conversion.
+    """
+    from ion.services import case_query_service as cq
 
-        def get_iris_url(case):
-            if case.dfir_iris_case_id:
-                return iris_service.get_case_url(case.dfir_iris_case_id)
-            return None
+    return await asyncio.to_thread(cq.case_facets, session)
 
-        return {
-            "cases": [
-                {
-                    "id": c.id,
-                    "case_number": c.case_number,
-                    "title": c.title,
-                    "description": c.description,
-                    "status": c.status.value if hasattr(c.status, "value") else c.status,
-                    "severity": c.severity,
-                    "created_by": c.created_by.username if c.created_by else None,
-                    "assigned_to": c.assigned_to.username if c.assigned_to else None,
-                    "assigned_to_id": c.assigned_to_id,
-                    "alert_count": len(c.triage_entries),
-                    "affected_hosts": c.affected_hosts,
-                    "affected_users": c.affected_users,
-                    "triggered_rules": c.triggered_rules,
-                    "evidence_summary": c.evidence_summary,
-                    "source_alert_ids": c.source_alert_ids,
-                    "observables_count": len(c.observables) if c.observables else 0,
-                    "kibana_case_id": c.kibana_case_id,
-                    "kibana_url": get_kibana_case_url(c.kibana_case_id),
-                    "dfir_iris_case_id": c.dfir_iris_case_id,
-                    "dfir_iris_url": get_iris_url(c),
-                    "closure_reason": c.closure_reason,
-                    "created_at": c.created_at.isoformat() if c.created_at else None,
-                    "updated_at": c.updated_at.isoformat() if c.updated_at else None,
-                }
-                for c in cases
-            ]
-        }
 
-    return await asyncio.to_thread(_query_cases)
+@router.get("/elasticsearch/alerts/cases")
+async def list_cases(
+    status: Optional[str] = None,
+    severity: Optional[str] = None,
+    assigned_to_id: Optional[int] = None,
+    unassigned: bool = False,
+    q: Optional[str] = None,
+    sort: str = "created_at",
+    order: str = "desc",
+    limit: int = Query(None, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    current_user: User = Depends(require_permission("case:read")),
+    session: Session = Depends(get_db_session),
+):
+    """One page of investigation cases, newest first by default.
+
+    This used to be `query.order_by(created_at.desc()).all()`: every case,
+    with created_by/assigned_to/triage_entries eager-loaded on each, fully
+    serialised, on every page load -- then filtered and sorted in the
+    browser. Fine at fifty cases, a page that never loads at fifty
+    thousand, and it degrades gradually so it breaks first for whoever has
+    used ION most (review 2026-10-08 §2, stage 5).
+
+    The response keeps `cases` where it was, and adds `total` -- a COUNT
+    over the same filters, so a truncated page is visible as truncated
+    rather than reporting "showing 50 of 50". Filtering and sorting are
+    server side; see ion.services.case_query_service for why severity
+    cannot sort alphabetically and why an unknown sort field is a 400.
+
+    Wrapped in to_thread because the query and its serialisation both touch
+    the session, so they must run in the same thread while it is open.
+    """
+    from ion.services import case_query_service as cq
+
+    def _page():
+        try:
+            return cq.list_cases_page(
+                session,
+                status=status,
+                severity=severity,
+                assigned_to_id=assigned_to_id,
+                unassigned=unassigned,
+                q=q,
+                sort=sort,
+                order=order,
+                limit=cq.DEFAULT_LIMIT if limit is None else limit,
+                offset=offset,
+            )
+        except cq.CaseQueryError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return await asyncio.to_thread(_page)
 
 def _build_case_es_doc(case, session) -> dict:
     """Build the full Elasticsearch document from an AlertCase ORM object."""

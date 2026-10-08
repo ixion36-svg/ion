@@ -72,6 +72,11 @@
     </div>
   </div>
 
+<!-- Filled by renderCaseLoadNotice() only when the load was capped, so the
+     board never silently shows a subset of the cases (review 2026-10-08,
+     stage 5). -->
+<div id="cases-load-notice" class="mb-4"></div>
+
 <!-- Filters Bar -->
 <div class="flex flex-col sm:flex-row gap-3 mb-4">
     <input type="text" id="filter-search" class="flex-1 px-3 py-2 bg-base-200 border border-base-300 rounded text-[0.85rem] text-base-content placeholder:text-base-content/50 focus:outline-none focus:border-primary" placeholder="Search case number or title..." data-input-action="debouncedFilter">
@@ -2264,19 +2269,83 @@ function debouncedFilter() { _filterDebounce(); }
 // =============================================================================
 // Data Loading
 // =============================================================================
+/* The case list is paginated server side since the 2026-10-08 review
+   (stage 5): the endpoint used to return every case with three
+   relationships eager-loaded on each, and this page then filtered and
+   sorted the whole set in the browser.
+
+   The board still wants the working set in memory -- its columns, stats
+   and attention panel all read it -- so this walks pages rather than
+   demanding one unbounded response, and stops at a ceiling. When it
+   stops, it says so, because a board silently showing a third of the
+   cases is worse than one that admits it. */
+const CASES_PAGE_SIZE = 500;   // the endpoint's own MAX_LIMIT
+const CASES_LOAD_CEILING = 2000;
+
+let casesTruncated = false;
+let casesTotal = 0;
+
 async function loadAllCases() {
+    const collected = [];
+    casesTruncated = false;
+    casesTotal = 0;
+
     try {
-        const resp = await fetch('/api/cases');
-        if (!resp.ok) throw new Error('Failed to load cases');
-        const data = await resp.json();
-        allCases = data.cases || [];
+        let offset = 0;
+        for (;;) {
+            const resp = await fetch('/api/cases?limit=' + CASES_PAGE_SIZE
+                                     + '&offset=' + offset);
+            if (!resp.ok) throw new Error('Failed to load cases');
+            const data = await resp.json();
+            const page = data.cases || [];
+            collected.push(...page);
+            casesTotal = (data.total != null) ? data.total : collected.length;
+
+            if (!data.has_more || page.length === 0) break;
+            offset += page.length;
+            if (collected.length >= CASES_LOAD_CEILING) {
+                casesTruncated = true;
+                break;
+            }
+        }
+        allCases = collected;
         casesLoaded = true;
     } catch (e) {
         console.error('Error loading cases:', e);
         allCases = [];
         casesLoaded = true;
     }
+    renderCaseLoadNotice();
     filterCases();
+}
+
+function renderCaseLoadNotice() {
+    const host = document.getElementById('cases-load-notice');
+    if (!host) return;
+    if (!casesTruncated) {
+        host.innerHTML = '';
+        return;
+    }
+    host.innerHTML = '<div class="alert alert-warning"><div>'
+        + 'Showing the ' + allCases.length.toLocaleString() + ' most recent of '
+        + casesTotal.toLocaleString() + ' cases. Counts above are for all '
+        + 'cases; the board and filters below cover the loaded set only. '
+        + 'Narrow by status or severity to work on the rest.'
+        + '</div></div>';
+}
+
+/* Counts come from the server's aggregate queries, not from the loaded
+   array. Deriving them client side only worked while the array was the
+   whole table -- once the load is capped, a client-side count reports the
+   size of the page and the dashboard quietly understates the backlog. */
+async function loadCaseFacets() {
+    try {
+        const resp = await fetch('/api/cases/facets');
+        if (!resp.ok) return null;
+        return await resp.json();
+    } catch (e) {
+        return null;
+    }
 }
 
 async function loadUsers() {
