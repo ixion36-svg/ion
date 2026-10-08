@@ -269,3 +269,91 @@ def tenant_connection(tenant: Optional[Tenant]) -> Optional[dict]:
     return {"es": es, "kibana": kibana}
 
 
+
+
+# ---------------------------------------------------------------------------
+# What switching estate actually changes (review 2026-10-08 §22)
+# ---------------------------------------------------------------------------
+
+#: The column that makes an ION table tenant-scoped.
+TENANT_SCOPE_COLUMN = "tenant_id"
+
+
+def _scoped_tables() -> List[str]:
+    """Mapped tables that actually carry a tenant column.
+
+    Derived from the model metadata rather than written down. The header
+    control is labelled "Estate", and switching it changes Elasticsearch and
+    Kibana routing but not ION's own rows — so the honest version of that
+    label depends on which tables are scoped *today*. A hand-maintained list
+    would go on saying "cases are not isolated" for as long as nobody
+    remembered to edit it after phase 2 added the column, which is the same
+    class of error in a new place.
+    """
+    from ion.models.base import Base
+
+    return sorted(
+        {
+            name
+            for name, table in Base.metadata.tables.items()
+            if TENANT_SCOPE_COLUMN in table.columns
+        }
+    )
+
+
+def tenant_scope() -> dict:
+    """A factual statement of what an estate switch does and does not cover.
+
+    The switcher says "Estate" and lists client names. An analyst moving
+    between them sees the alert data change, because Elasticsearch and
+    Kibana are routed per tenant, and sees the same cases, notes and
+    scheduled jobs, because ``tenant_id`` is on ``users`` and nowhere else.
+
+    That is worth stating plainly in the interface. A control labelled as an
+    estate switch which changes only part of the estate invites someone to
+    act on one client's case while the header says they are in another's.
+
+    Returns:
+        ``{"complete", "summary", "switch_changes",
+        "switch_does_not_change", "scoped_tables", "scope_column"}``
+    """
+    scoped = _scoped_tables()
+
+    changes = [
+        "Elasticsearch cluster, alert indices and saved searches",
+        "Kibana space, cases and dashboards",
+        "Which estate new audit records are attributed to",
+    ]
+
+    # Phrased from the schema, so it stops saying this once the column lands.
+    not_changed = []
+    if "alert_cases" not in scoped:
+        not_changed.append(
+            "ION cases, triage entries, notes and evidence pins — these are "
+            "shared across every estate on this instance"
+        )
+    not_changed += [
+        "Scheduled jobs and background loops, which run once per instance "
+        "rather than once per estate",
+        "Arkime PCAP retrieval and OpenCTI threat intelligence, which are "
+        "deliberately estate-wide services",
+    ]
+
+    summary = (
+        "Switches Elasticsearch and Kibana only. "
+        + (
+            "ION cases, notes and scheduled jobs are shared across estates."
+            if "alert_cases" not in scoped
+            else "Scheduled jobs are shared across estates."
+        )
+    )
+
+    return {
+        # True only when every ION table an analyst can reach is scoped.
+        "complete": "alert_cases" in scoped,
+        "summary": summary,
+        "switch_changes": changes,
+        "switch_does_not_change": not_changed,
+        "scoped_tables": scoped,
+        "scope_column": TENANT_SCOPE_COLUMN,
+    }

@@ -25,6 +25,7 @@ from ion.services.tenant_service import (
     accessible_tenants,
     multi_tenant_enabled,
     resolve_tenant_for_user,
+    tenant_scope,
 )
 from ion.storage.database import get_db_session
 
@@ -52,6 +53,13 @@ class TenantState(BaseModel):
     can_switch: bool
     active: Optional[TenantInfo] = None
     available: List[TenantInfo] = []
+    # What switching actually covers. Derived from the schema by
+    # tenant_scope(), because the control says "Estate" while only
+    # Elasticsearch and Kibana are routed per tenant -- ION's own cases and
+    # notes are shared (review 2026-10-08 §22). Returned even when
+    # multi-tenancy is off, so an admin reading this endpoint on a
+    # single-estate deploy still gets a straight answer.
+    isolation: dict = Field(default_factory=dict)
 
 
 class SwitchRequest(BaseModel):
@@ -72,7 +80,9 @@ def get_tenant_state(
 ) -> TenantState:
     """The estates this analyst may view, and which one is active."""
     if not multi_tenant_enabled():
-        return TenantState(enabled=False, can_switch=False)
+        return TenantState(
+            enabled=False, can_switch=False, isolation=tenant_scope()
+        )
 
     available = accessible_tenants(db, current_user)
     requested = request.cookies.get(TENANT_COOKIE)
@@ -83,6 +93,7 @@ def get_tenant_state(
         can_switch=len(available) > 1,
         active=_info(active) if active else None,
         available=[_info(t) for t in available],
+        isolation=tenant_scope(),
     )
 
 

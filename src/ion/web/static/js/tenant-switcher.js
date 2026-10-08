@@ -63,6 +63,23 @@
             html += "</select>";
         }
 
+        // The caveat, beside the control rather than only in a tooltip.
+        // Switching changes Elasticsearch and Kibana but not ION's own
+        // cases and notes, and a control labelled "Estate" that changes
+        // only part of the estate invites someone to act on one client's
+        // case while the header names another (review 2026-10-08 s22).
+        //
+        // The wording comes from the server, which derives it from the
+        // schema. A copy here would keep saying "cases are not isolated"
+        // after the column lands.
+        var note = state.isolation && state.isolation.summary;
+        if (note) {
+            html +=
+                '<span id="tenant-scope-note"' +
+                ' class="hidden xl:inline text-[10px] text-amber-400/80 max-w-[22rem] truncate"' +
+                ' title="' + esc(note) + '">' + esc(note) + "</span>";
+        }
+
         mount.innerHTML = html;
         mount.classList.remove("hidden");
         wire(mount);
