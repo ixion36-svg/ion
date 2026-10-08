@@ -29,8 +29,10 @@
 </div>
 </div>
 
-<script>
-const RAP_API = '/response';
+<script nonce="{{ csp_nonce }}">
+/* The response router is mounted at /api (server.py: include_router
+   prefix="/api"), so the browser path is /api/response/*. */
+const RAP_API = '/api/response';
 
 /* The inbox is rendered from server-resolved fields. Nothing here derives a
    label from `status` directly: a successful dry run and a real dispatch are

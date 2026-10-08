@@ -29,7 +29,7 @@ Two tables:
     unrelated tasks.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
@@ -49,6 +49,22 @@ from ion.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
     from ion.models.user import User
+
+
+def _iso_utc(value: Optional[datetime]) -> Optional[str]:
+    """ISO-8601 with an explicit UTC offset.
+
+    These columns store naive UTC. Emitting a bare "2026-10-07T21:20:00"
+    makes ``new Date(...)`` in the browser read it as *local* time, so a
+    shift recorded at 21:20 UTC renders as 21:20 in BST instead of 22:20 --
+    an hour out, silently, and only visible beside another timestamp that
+    was serialised correctly. Found by rendering the page next to the live
+    shift report, which does carry an offset.
+    """
+    if value is None:
+        return None
+    aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return aware.isoformat()
 
 
 class HandoverStatus(str, Enum):
@@ -149,25 +165,23 @@ class ShiftHandover(Base, TimestampMixin):
         return {
             "id": self.id,
             "status": self.status,
-            "shift_start": self.shift_start.isoformat() if self.shift_start else None,
-            "shift_end": self.shift_end.isoformat() if self.shift_end else None,
+            "shift_start": _iso_utc(self.shift_start),
+            "shift_end": _iso_utc(self.shift_end),
             "shift_hours": self.shift_hours,
             "outgoing_lead_id": self.outgoing_lead_id,
             "outgoing_lead": self.outgoing_lead.username if self.outgoing_lead else None,
             "incoming_lead_id": self.incoming_lead_id,
             "incoming_lead": self.incoming_lead.username if self.incoming_lead else None,
             "summary": self.summary,
-            "snapshot_taken_at": (
-                self.snapshot_taken_at.isoformat() if self.snapshot_taken_at else None
-            ),
-            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
-            "accepted_at": self.accepted_at.isoformat() if self.accepted_at else None,
+            "snapshot_taken_at": _iso_utc(self.snapshot_taken_at),
+            "submitted_at": _iso_utc(self.submitted_at),
+            "accepted_at": _iso_utc(self.accepted_at),
             "accepted_by_id": self.accepted_by_id,
             "accepted_by": self.accepted_by.username if self.accepted_by else None,
             "accepted_by_designated_lead": self.accepted_by_designated_lead,
             "rejection_reason": self.rejection_reason,
             "previous_handover_id": self.previous_handover_id,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "created_at": _iso_utc(self.created_at),
         }
 
 
@@ -253,7 +267,7 @@ class ShiftHandoverAction(Base, TimestampMixin):
             "case_id": self.case_id,
             "status": self.status,
             "overdue": overdue,
-            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            "completed_at": _iso_utc(self.completed_at),
             "completed_by_id": self.completed_by_id,
             "completed_by": self.completed_by.username if self.completed_by else None,
             "resolution_note": self.resolution_note,

@@ -742,3 +742,56 @@ class TestWiring:
         assert "carry_count" in tpl
         assert "overdue_action_count" in tpl
         assert "unowned_action_count" in tpl
+
+
+# ── Timestamps carry their zone ──────────────────────────────────────────
+#
+# Found by rendering the page: the transfer showed "21:20 - 05:20" beside a
+# live shift report showing "22:19 - 06:19" for the same window. An hour
+# out, silently.
+#
+# These columns store naive UTC. A bare "2026-10-07T21:20:00" makes
+# `new Date(...)` in the browser read it as *local* time, so a shift
+# recorded at 21:20 UTC renders as 21:20 in BST instead of 22:20. It is only
+# visible next to a timestamp that was serialised correctly, which is why no
+# unit test caught it.
+
+
+class TestTimestampZones:
+    @pytest.mark.parametrize("field", [
+        "shift_start", "shift_end", "snapshot_taken_at", "created_at",
+    ])
+    def test_handover_timestamps_carry_an_offset(self, db, field):
+        payload = _draft(db).to_dict()
+        assert payload[field], field
+        assert payload[field].endswith("+00:00"), (
+            f"{field} has no UTC offset, so the browser will read it as "
+            f"local time: {payload[field]}"
+        )
+
+    def test_submitted_and_accepted_carry_an_offset(self, db):
+        h = _accepted(db)
+        payload = h.to_dict()
+        assert payload["submitted_at"].endswith("+00:00")
+        assert payload["accepted_at"].endswith("+00:00")
+
+    def test_an_absent_timestamp_stays_none(self, db):
+        """Stamping must not turn a missing value into a fake one."""
+        payload = _draft(db).to_dict()
+        assert payload["accepted_at"] is None
+        assert payload["submitted_at"] is None
+
+    def test_action_timestamps_carry_an_offset(self, db):
+        h = _draft(db)
+        a = handovers.add_action(
+            db, handover_id=h.id, actor_id=1, description="x", owner_id=3,
+            due_at=datetime.now(timezone.utc) + timedelta(hours=2))
+        handovers.complete_action(db, action_id=a.id, actor_id=3)
+        payload = db.get(ShiftHandoverAction, a.id).to_dict()
+        assert payload["due_at"].endswith("+00:00")
+        assert payload["completed_at"].endswith("+00:00")
+
+    def test_an_already_aware_value_is_not_double_stamped(self, db):
+        h = _draft(db)
+        h.shift_start = datetime(2026, 10, 7, 21, 20, tzinfo=timezone.utc)
+        assert h.to_dict()["shift_start"] == "2026-10-07T21:20:00+00:00"
