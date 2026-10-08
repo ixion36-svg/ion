@@ -487,6 +487,17 @@ class AuthService:
             ip_address=ip_address,
         )
 
+        # Open the mandatory journey now rather than waiting for a lead to
+        # remember. The gate is what holds a role's permissions back, so a
+        # person with no journey has nothing holding anything back, and the
+        # person nobody remembered to enrol is exactly the one who should
+        # be gated. Returns None and never raises when no baseline profile
+        # is published: a deployment that cannot add users because of this
+        # would be a worse failure than one with no journeys.
+        from ion.services.workforce_service import enrol_on_baseline
+
+        enrol_on_baseline(self.db_session, user)
+
         return user, None
 
     def update_user_roles(

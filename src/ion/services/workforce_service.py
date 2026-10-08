@@ -194,6 +194,121 @@ def verified_gate_names(session: Session, user_id: int) -> set:
     return {r.name for r in rows}
 
 
+def _baseline_version(session: Session) -> Optional[RoleProfileVersion]:
+    """The published version of the baseline profile, or None.
+
+    Deterministic when a deployment has misconfigured two baselines:
+    lowest profile id wins. Two baselines is a mistake either way, but one
+    that enrols one starter on induction A and the next on induction B is
+    the hardest kind to notice.
+    """
+    profile = (
+        session.query(RoleProfile)
+        .filter(RoleProfile.is_baseline.is_(True),
+                RoleProfile.is_active.is_(True))
+        .order_by(RoleProfile.id.asc())
+        .first()
+    )
+    if profile is None:
+        return None
+    # Latest published, not the first: a deployment that has revised its
+    # induction should put new starters on the current one. A draft is
+    # somebody still writing it, and enrolling people onto a half-written
+    # mandatory list is worse than enrolling them onto none, because it
+    # looks deliberate.
+    return latest_published(session, profile.id)
+
+
+def enrol_on_baseline(session: Session,
+                      user: User) -> Optional[UserJourney]:
+    """Open the mandatory journey for a newly created account.
+
+    The workflow this serves: somebody gets a local account, the account is
+    gated behind permissions until they pass the mandatory training, and
+    passing it is what confers their role and its permissions.
+
+    ``is_baseline`` and ``grants_role_id`` already described that, and
+    nothing opened the journey, so it only applied to people a lead had
+    remembered to enrol by hand -- when the person nobody remembered is
+    exactly the one who should be gated.
+
+    Unlike ``assign_profile`` this takes no assigner and checks no
+    permission. It runs when an account is created, which may be a
+    bootstrap or an SSO first login with no human in the loop. It cannot
+    grant anything: the journey opens at pre_access with everything
+    pending, and ``sync_granted_roles`` still decides what a cleared gate
+    confers.
+
+    Returns None rather than raising, always. A deployment that cannot add
+    users because the workforce module has a problem is a worse failure
+    than one with no journeys.
+    """
+    try:
+        version = _baseline_version(session)
+        if version is None:
+            logger.debug(
+                "No published baseline profile; %s enrolled on nothing",
+                user.username,
+            )
+            return None
+
+        existing = _live_journey_for_profile(
+            session, user.id, version.profile_id)
+        if existing is not None:
+            # A re-run bootstrap or a repeated SSO callback must not
+            # duplicate somebody's mandatory list.
+            return existing
+
+        journey = UserJourney(
+            user_id=user.id, version_id=version.id, is_cover=False,
+            stage=STAGE_PRE_ACCESS,
+        )
+        session.add(journey)
+        session.flush()
+
+        already = verified_gate_names(session, user.id)
+        now = datetime.utcnow()
+        for src in version.requirements:
+            carried = src.phase == PHASE_GATE and src.name in already
+            session.add(JourneyRequirement(
+                journey_id=journey.id,
+                source_requirement_id=src.id,
+                name=src.name, kind=src.kind, phase=src.phase,
+                validity_months=src.validity_months, course_id=src.course_id,
+                cost=src.cost, ordering=src.ordering,
+                status=STATUS_VERIFIED if carried else STATUS_PENDING,
+                verified_at=now if carried else None,
+                notes=("Carried from an existing verified gate item"
+                       if carried else None),
+                expires_on=(_expiry_for(src.validity_months, now)
+                            if carried else None),
+            ))
+        session.flush()
+        _sync_training_artifacts(session, journey)
+        _recompute_stage(session, journey)
+        session.add(AuditLog(
+            user_id=user.id, action="workforce_baseline_enrolled",
+            resource_type="user_journey", resource_id=journey.id,
+            details=f"{user.username} enrolled on "
+                    f"{version.profile.name} v{version.version} at account "
+                    f"creation",
+        ))
+        session.commit()
+        logger.info("Enrolled %s on baseline %s v%s",
+                    user.username, version.profile.name, version.version)
+        return journey
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Baseline enrolment failed for %s; the account still exists",
+            getattr(user, "username", "?"),
+        )
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return None
+
+
 def _live_journey_for_profile(session: Session, user_id: int,
                               profile_id: int) -> Optional[UserJourney]:
     """This person's open journey for a role, whatever version it is on."""
