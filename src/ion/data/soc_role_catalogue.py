@@ -48,6 +48,10 @@ CATEGORIES = (
 
 #: tier is the seniority band used to match training scenarios and to sort
 #: the ORBAT; it mirrors role_skills_service's T1-T4 where they overlap.
+#:
+#: ``leads`` names the category this role heads. A role with it is placed
+#: above that unit's members rather than beside them, because a flat list
+#: of posts does not say who answers for the function.
 SOC_ROLE_CATALOGUE: List[Dict[str, Any]] = [
     # ---------------------------------------------------------------- ops
     {
@@ -143,6 +147,74 @@ SOC_ROLE_CATALOGUE: List[Dict[str, Any]] = [
         ],
     },
     {
+        "id": "lead_analyst",
+        "name": "Lead Analyst",
+        "category": "operations",
+        "tier": "T4",
+        "common": True,
+        "leads": "operations",
+        "typical_establishment": 1,
+        "description": (
+            "Heads the analysis function. Owns the quality of what the "
+            "queue produces and develops the analysts who produce it."
+        ),
+        "skills_role_id": None,
+        "typical_certifications": [
+            "GIAC GCIA", "GIAC GCIH", "GIAC GSOM",
+        ],
+        "core_skills": [
+            "Setting and holding the analytical standard",
+            "Quality review of investigations and verdicts",
+            "Developing analysts across the tiers",
+            "Deciding what the queue stops doing",
+        ],
+    },
+    {
+        "id": "operations_analyst",
+        "name": "Operations Analyst",
+        "category": "operations",
+        "tier": "T3",
+        "common": True,
+        "typical_establishment": 1,
+        "description": (
+            "Keeps the SOC running as a service: process, metrics, "
+            "reporting and the day-to-day friction nobody else owns."
+        ),
+        "skills_role_id": None,
+        "typical_certifications": [
+            "GIAC GSOM", "CompTIA CySA+", "ITIL Foundation",
+        ],
+        "core_skills": [
+            "Process definition and the discipline to keep it current",
+            "Service metrics and reporting that drive a decision",
+            "Shift pattern and cover planning",
+            "Chasing the things that fall between roles",
+        ],
+    },
+    {
+        "id": "technical_analyst",
+        "name": "Technical Analyst",
+        "category": "operations",
+        "tier": "T3",
+        "common": True,
+        "typical_establishment": 1,
+        "description": (
+            "The deep technical hand on the floor: the hard investigation, "
+            "the tooling nobody else can make work, the question that "
+            "needs an answer today."
+        ),
+        "skills_role_id": None,
+        "typical_certifications": [
+            "GIAC GCIA", "GIAC GCFA", "Offensive Security OSCP",
+        ],
+        "core_skills": [
+            "Deep host and network analysis",
+            "Scripting and tooling to answer a one-off question",
+            "Reverse engineering a problem nobody has documented",
+            "Supporting the tiers on what they cannot resolve",
+        ],
+    },
+    {
         "id": "soc_manager",
         "name": "SOC Manager",
         "category": "operations",
@@ -186,6 +258,29 @@ SOC_ROLE_CATALOGUE: List[Dict[str, Any]] = [
             "ATT&CK coverage mapping and gap analysis",
             "Testing a detection before it reaches the queue",
             "Tuning without blinding the detection",
+        ],
+    },
+    {
+        "id": "lead_engineer",
+        "name": "Lead Engineer",
+        "category": "detection_engineering",
+        "tier": "T4",
+        "common": True,
+        "leads": "detection_engineering",
+        "typical_establishment": 1,
+        "description": (
+            "Heads the engineering function. Owns the platform's health "
+            "and the detection estate built on it."
+        ),
+        "skills_role_id": None,
+        "typical_certifications": [
+            "GIAC GCDA", "Elastic Certified Engineer", "GIAC GSOM",
+        ],
+        "core_skills": [
+            "Detection and platform roadmap",
+            "Change control over the detection estate",
+            "Capacity, retention and cost decisions",
+            "Developing engineers and detection authors",
         ],
     },
     {

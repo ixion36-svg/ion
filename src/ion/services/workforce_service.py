@@ -1463,6 +1463,8 @@ def fill_post(session: Session, *, post: OrgPost, journey_id: Optional[int],
 
 
 #: Catalogue categories as org units, in the order an org chart reads.
+_ROOT_UNIT = "SOC"
+
 _CATEGORY_UNITS = {
     "operations": "Operations",
     "detection_engineering": "Detection Engineering",
@@ -1498,6 +1500,21 @@ def establish_from_catalogue(session: Session, *, actor: User) -> dict:
 
     profiles = {p.name: p for p in session.query(RoleProfile).all()}
     units = {u.name: u for u in session.query(OrgUnit).all()}
+
+    def unit_for(name: str, parent: Optional[OrgUnit] = None) -> OrgUnit:
+        unit = units.get(name)
+        if unit is None:
+            unit = OrgUnit(name=name, ordering=len(units),
+                           parent_id=parent.id if parent else None)
+            session.add(unit)
+            session.flush()
+            units[name] = unit
+        return unit
+
+    # Everything hangs off one root, so the SOC Manager has somewhere to
+    # sit that is not inside a function they oversee -- putting them under
+    # Operations would say they lead analysis, a different job.
+    root = unit_for(_ROOT_UNIT)
     existing_posts = {}
     for post in session.query(OrgPost).all():
         existing_posts.setdefault(post.profile_id, 0)
@@ -1512,13 +1529,17 @@ def establish_from_catalogue(session: Session, *, actor: User) -> dict:
         if existing_posts.get(profile.id):
             continue  # already established; leave the lead's numbers alone
 
-        unit_name = _CATEGORY_UNITS.get(entry["category"], "Other")
-        unit = units.get(unit_name)
-        if unit is None:
-            unit = OrgUnit(name=unit_name, ordering=len(units))
-            session.add(unit)
-            session.flush()
-            units[unit_name] = unit
+        # A role that leads the whole SOC sits on the root; one that leads
+        # a function sits in that function, marked as its head.
+        if entry["id"] == "soc_manager":
+            unit, is_lead = root, True
+        elif entry.get("leads"):
+            unit = unit_for(_CATEGORY_UNITS.get(entry["leads"], "Other"), root)
+            is_lead = True
+        else:
+            unit = unit_for(_CATEGORY_UNITS.get(entry["category"], "Other"),
+                            root)
+            is_lead = False
 
         wanted = int(entry.get("typical_establishment") or 0)
         for n in range(1, wanted + 1):
@@ -1528,7 +1549,8 @@ def establish_from_catalogue(session: Session, *, actor: User) -> dict:
                 unit_id=unit.id,
                 title=f"{entry['name']} #{n}" if wanted > 1 else entry["name"],
                 profile_id=profile.id,
-                ordering=n,
+                ordering=(-1 if is_lead else n),
+                is_lead=is_lead,
             ))
             created += 1
         if wanted:
@@ -1618,7 +1640,9 @@ def org_tree(session: Session) -> dict:
 
     gaps = 0
     filling = 0
+    leads_gapped = 0
     by_unit: dict = {}
+    leads: dict = {}
     for post in posts:
         journey = journeys.get(post.filled_by_journey_id)
         occupant = None
@@ -1636,21 +1660,35 @@ def org_tree(session: Session) -> dict:
             gaps += 1
         elif state == "filling":
             filling += 1
-        by_unit.setdefault(post.unit_id, []).append({
+        row = {
             "id": post.id, "title": post.title, "profile_id": post.profile_id,
-            "state": state, "occupant": occupant,
-        })
+            "state": state, "occupant": occupant, "is_lead": post.is_lead,
+        }
+        if post.is_lead:
+            # Kept apart so the page can render it above the members. A
+            # lead post nobody holds is the gap most worth seeing --
+            # "nobody answers for detection engineering tonight" -- and it
+            # disappears into the list otherwise.
+            leads[post.unit_id] = row
+            if state == "gapped":
+                leads_gapped += 1
+        else:
+            by_unit.setdefault(post.unit_id, []).append(row)
 
     def node(unit: OrgUnit) -> dict:
         return {
             "id": unit.id, "name": unit.name,
+            # None rather than an error when a unit has no lead: a small
+            # SOC may run one manager and no functional leads, and
+            # reporting that as a fault would be noise.
+            "lead": leads.get(unit.id),
             "posts": by_unit.get(unit.id, []),
             "children": [node(c) for c in units if c.parent_id == unit.id],
         }
 
     roots = [node(u) for u in units if u.parent_id is None]
     return {"units": roots, "posts_total": len(posts), "gaps": gaps,
-            "filling": filling}
+            "filling": filling, "leads_gapped": leads_gapped}
 
 
 # --- offboarding ------------------------------------------------------------

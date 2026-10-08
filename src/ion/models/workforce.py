@@ -353,6 +353,12 @@ class OrgPost(Base, TimestampMixin):
         Integer, ForeignKey("user_journeys.id", ondelete="SET NULL"), nullable=True
     )
     ordering: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # This post heads its unit. Rendered above the members rather than
+    # beside them: a flat list of posts says how many of each role exist
+    # and nothing about who answers for the function.
+    is_lead: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     unit: Mapped["OrgUnit"] = relationship("OrgUnit", back_populates="posts")
     filled_by: Mapped[Optional["UserJourney"]] = relationship("UserJourney")

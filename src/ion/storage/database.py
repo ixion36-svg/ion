@@ -1176,6 +1176,17 @@ def _run_migrations(engine: Engine) -> None:
             _add_column_tolerant(
                 engine, "role_profiles", "skills_role_id", "VARCHAR(64)")
 
+    if insp.has_table("org_posts"):
+        existing = {col["name"] for col in insp.get_columns("org_posts")}
+        if "is_lead" not in existing:
+            # Marks the post that heads its unit, so the ORBAT can render a
+            # hierarchy rather than a flat list of columns.
+            bool_type = "BOOLEAN" if _is_postgres(engine) else "INTEGER"
+            _add_column_tolerant(
+                engine, "org_posts", "is_lead",
+                f"{bool_type} NOT NULL DEFAULT 0" if not _is_postgres(engine)
+                else f"{bool_type} NOT NULL DEFAULT FALSE")
+
     if insp.has_table("user_journeys"):
         existing = {col["name"] for col in insp.get_columns("user_journeys")}
         if "grace_until" not in existing:
