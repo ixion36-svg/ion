@@ -176,6 +176,36 @@ def test_draft_does_not_mutate_template(session):
     assert t.prompt_text == _ORIGINAL  # untouched while still a draft
 
 
+def _evidence(session, proposal, template):
+    """Attach a completed evaluation of the proposal's exact text.
+
+    Approval has required a referenced evaluation since the 2026-10-08
+    review (§6: "prompt approval does not require a referenced
+    evaluation"). The tests below are about separation of duty, applying,
+    snapshotting and reverting -- not about the evidence rule -- so they
+    satisfy it properly rather than using the override, which would stop
+    them exercising the normal path.
+    """
+    from ion.models.bob_eval import BobEvalRun
+    from ion.services.bob_eval_service import prompt_body_hash
+
+    run = BobEvalRun(
+        template_id=template.id,
+        template_name=template.name,
+        prompt_body_hash=prompt_body_hash(proposal.proposed_text),
+        model_name="test-model",
+        sample_size=25,
+        status="completed",
+        tp_count=15, fp_count=3, fn_count=2, tn_count=5,
+    )
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    proposal.evaluation_run_id = run.id
+    session.commit()
+    return run
+
+
 # ── approval SoD + apply + snapshot ───────────────────────────────────────────
 
 
@@ -190,6 +220,7 @@ def test_approve_requires_different_user_and_applies(session):
         psvc.approve_proposal(session, p.id, user_id=1)
 
     # a different user approves → applied to the live template
+    _evidence(session, p, t)
     approved = psvc.approve_proposal(session, p.id, user_id=2, notes="LGTM")
     assert approved.status == BobTuningProposalStatus.APPROVED
     assert approved.decided_by_id == 2
@@ -212,6 +243,7 @@ def test_revert_restores_before_text(session):
     p = psvc.create_proposal(session, {
         "title": "tune", "proposed_text": "NEW GUIDANCE", "template_id": t.id,
     }, user_id=1)
+    _evidence(session, p, t)
     psvc.approve_proposal(session, p.id, user_id=2)
     session.refresh(t)
     assert t.prompt_text == "NEW GUIDANCE"
@@ -259,6 +291,7 @@ def test_audit_trail_on_approve_and_revert(session):
     p = psvc.create_proposal(session, {
         "title": "tune", "proposed_text": "NEW", "template_id": t.id,
     }, user_id=1)
+    _evidence(session, p, t)
     psvc.approve_proposal(session, p.id, user_id=2)
     psvc.revert_proposal(session, p.id, user_id=3)
     assert _audit_actions(session, p.id) == {"bob_tuning_approved", "bob_tuning_reverted"}

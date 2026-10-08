@@ -130,9 +130,75 @@ def update_proposal(session: Session, proposal_id: int, payload: Dict[str, Any])
     return p
 
 
+def _require_evaluation_evidence(session: Session, p: BobTuningProposal) -> None:
+    """A prompt change may only be approved against an evaluation of itself.
+
+    Review 2026-10-08 §6: "prompt approval does not require a referenced
+    evaluation ... approval of exact evaluated text". The harness existed
+    beside the approval flow rather than inside it, so a prompt could go
+    live with nothing measured behind it.
+
+    Five things have to hold, each ruling out a different way of presenting
+    evidence that is not evidence:
+
+    * the run exists — a dangling id proves nothing;
+    * it completed — a running or errored run has no result;
+    * it ran against the same template, since scores from another prompt's
+      cohort say nothing about this one;
+    * it had samples, because zero samples is not evidence whatever the
+      status column says;
+    * and its ``prompt_body_hash`` matches this proposal's ``proposed_text``
+      exactly, so evaluating one draft and approving another is refused.
+    """
+    from ion.models.bob_eval import BobEvalRun
+    from ion.services.bob_eval_service import prompt_body_hash
+
+    run = session.get(BobEvalRun, p.evaluation_run_id)
+    if run is None:
+        raise ValueError(
+            f"evaluation run {p.evaluation_run_id} not found — approval needs "
+            "a completed evaluation of this exact prompt text"
+        )
+    if (run.status or "").lower() != "completed":
+        raise ValueError(
+            f"evaluation run {run.id} is '{run.status}', not completed — an "
+            "unfinished evaluation is not evidence"
+        )
+    if run.template_id != p.template_id:
+        raise ValueError(
+            f"evaluation run {run.id} targets template {run.template_id}, not "
+            f"{p.template_id} — scores from another prompt's cohort say "
+            "nothing about this one"
+        )
+    if not run.sample_size:
+        raise ValueError(
+            f"evaluation run {run.id} has no samples — zero samples is not "
+            "evidence"
+        )
+    if run.prompt_body_hash != prompt_body_hash(p.proposed_text):
+        raise ValueError(
+            f"evaluation run {run.id} evaluated different text from the one "
+            "being approved — re-run the evaluation against the exact "
+            "proposed prompt"
+        )
+
+
 def approve_proposal(session: Session, proposal_id: int, user_id: Optional[int],
-                     notes: Optional[str] = None) -> BobTuningProposal:
-    """Approve + APPLY to the live template. SoD: approver != drafter. Versioned."""
+                     notes: Optional[str] = None,
+                     override_reason: Optional[str] = None) -> BobTuningProposal:
+    """Approve + APPLY to the live template. SoD: approver != drafter. Versioned.
+
+    Requires a referenced evaluation of the exact proposed text
+    (:func:`_require_evaluation_evidence`), so a prompt cannot go live with
+    nothing measured behind it.
+
+    ``override_reason`` waives *only* that requirement, and is recorded. The
+    escape hatch has to exist — an incident at 03:00 should not be blocked
+    by the harness being down, and reverting to a known-good prompt is a
+    legitimate approval with no fresh run behind it — but an unevidenced
+    approval then looks different from an evidenced one in the record
+    instead of identical. Separation of duty is not waived.
+    """
     p = session.get(BobTuningProposal, proposal_id)
     if p is None:
         raise ValueError("proposal not found")
@@ -142,6 +208,26 @@ def approve_proposal(session: Session, proposal_id: int, user_id: Optional[int],
         raise ValueError("separation of duties: a different user must approve")
     if not p.template_id:
         raise ValueError("proposal has no target template to apply to")
+
+    if override_reason is not None:
+        if not override_reason.strip():
+            raise ValueError(
+                "an override needs a reason: approving without an evaluation "
+                "is a decision that should be explainable later"
+            )
+        # Deliberately cleared: an approval is either backed by a matching
+        # run or it is not, and a stale id beside an override would read as
+        # evidence that was not actually used.
+        p.evaluation_run_id = None
+        p.evaluation_override_reason = override_reason.strip()
+    elif p.evaluation_run_id is None:
+        raise ValueError(
+            "approval needs a referenced evaluation of this exact prompt "
+            "text, or an explicit override reason"
+        )
+    else:
+        _require_evaluation_evidence(session, p)
+        p.evaluation_override_reason = None
 
     repo = AlertPromptRepository(session)
     tmpl = repo.get_by_id(p.template_id)

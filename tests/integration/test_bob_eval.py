@@ -385,7 +385,31 @@ class TestEvalMetrics:
     def test_abstentions_counted_not_penalised(
         self, db_session, admin_user, template, monkeypatch
     ):
-        """auto_escalated rows are abstentions — should not count as FP/FN."""
+        """A sample with no scoreable outcome must not become an FP or FN.
+
+        The counting changed in the 2026-10-08 review (stage 4). It used to
+        be one bucket::
+
+            if auto_escalated or human_verdict == "pending":
+                abstentions += 1
+                continue
+
+        which conflated three different facts. They are now separate:
+
+        * ``historical_abstention_count`` -- production's circuit breaker
+          fired. A fact about the *old* prompt, not the candidate.
+        * ``unresolved_label_count`` -- no human verdict to score against.
+          Not an abstention: that blamed the prompt for a missing human
+          decision.
+        * ``abstention_count`` -- the *candidate* produced no verdict, on a
+          sample that did have a label.
+
+        The row seeded below is auto_escalated AND human_verdict="pending",
+        so it is a historical abstention and an unresolved label, and is
+        not the candidate's abstention. What has not changed, and is still
+        the point of this test, is that it contributes to no confusion
+        matrix cell.
+        """
         from ion.services.bob_eval_service import create_eval_run, _execute_eval
 
         # 2 real rows + 1 escalated abstention
@@ -412,7 +436,11 @@ class TestEvalMetrics:
         db_session.refresh(run)
 
         assert run.status == "completed"
-        assert run.abstention_count >= 1
+        # Production abstained on it, and there is no human label.
+        assert run.historical_abstention_count >= 1
+        assert run.unresolved_label_count >= 1
+        # Not counted against the candidate prompt.
+        assert run.abstention_count == 0
         # Abstention should not inflate FP or FN counts.
         assert run.fp_count + run.fn_count < 10  # sanity
 

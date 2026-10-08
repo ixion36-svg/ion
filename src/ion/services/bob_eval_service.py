@@ -116,9 +116,166 @@ def _compute_hallucination_proxy(
     return mismatches / len(eligible)
 
 
+def prompt_body_hash(prompt_text: Optional[str]) -> str:
+    """SHA-256 of a prompt body — the identity of the exact text evaluated.
+
+    Public because the approval flow needs it: a prompt change may only be
+    approved against an evaluation of the *same* text, and that tie is made
+    by comparing this hash (review 2026-10-08 §6, "approval of exact
+    evaluated text").
+
+    sha256 and not Python's ``hash()``: the built-in is salted per process,
+    so the tie between a stored run and a later approval would break at the
+    next restart. Whitespace is significant, because a prompt differing only
+    in whitespace is a different prompt to a model.
+    """
+    return hashlib.sha256((prompt_text or "").encode("utf-8")).hexdigest()
+
+
 def _prompt_hash(prompt_text: str) -> str:
     """SHA-256 of the prompt text at run start — snapshot for drift detection."""
-    return hashlib.sha256(prompt_text.encode("utf-8")).hexdigest()
+    return prompt_body_hash(prompt_text)
+
+
+# ---------------------------------------------------------------------------
+# Replay accounting (review 2026-10-08 §6)
+# ---------------------------------------------------------------------------
+
+def _is_unresolved(human_verdict: Optional[str]) -> bool:
+    """No human decision to score against."""
+    return (human_verdict or "").strip().lower() in ("pending", "")
+
+
+def classify_replay_sample(
+    *,
+    production_abstained: bool,
+    candidate_verdict: Optional[str],
+    human_verdict: Optional[str],
+) -> Dict[str, Any]:
+    """Describe one replayed sample, keeping production and candidate apart.
+
+    The harness used to do this::
+
+        if auto_escalated or human_verdict == "pending":
+            abstentions += 1
+            continue
+
+    which conflated three different things and made the most useful question
+    unanswerable. ``auto_escalated`` means *production's* circuit breaker
+    fired — Bob's confidence was too low and a human resolved the alert
+    manually. Counting that as an abstention of the *candidate*, without
+    asking the candidate, means a new prompt that recovered every one of
+    those samples would still report them as its own failures.
+
+    Returns independent facts rather than one label, because a sample can be
+    several at once (production abstained, the candidate answered, and the
+    answer was wrong):
+
+    ``production_abstained``
+        What happened in production. A fact about the past.
+    ``candidate_abstained``
+        The candidate produced no verdict on replay.
+    ``recovered``
+        Production abstained, the candidate answered, and the answer matched
+        the human. The number a tuner is looking for.
+    ``answered_but_wrong``
+        Production abstained, the candidate answered, and it was wrong.
+        Progress of a kind, but not a recovery.
+    ``newly_abstained``
+        Production answered and the candidate gave up. The regression
+        direction, which matters just as much.
+    ``unresolved_label``
+        No human verdict, so nothing to score against. Not an abstention:
+        blaming the prompt for a missing human decision is the same category
+        error the shortcut made.
+    ``scored``
+        Whether this sample can enter the confusion matrix at all.
+    """
+    unresolved = _is_unresolved(human_verdict)
+    candidate_abstained = (
+        candidate_verdict is None or not str(candidate_verdict).strip()
+    )
+
+    agrees = False
+    if not unresolved and not candidate_abstained:
+        agrees = _verdicts_agree(candidate_verdict, human_verdict)
+
+    # A recovery needs a label to confirm the candidate was right, so an
+    # unresolved sample can never be one however the candidate answered.
+    recovered = bool(
+        production_abstained and not candidate_abstained
+        and not unresolved and agrees
+    )
+    answered_but_wrong = bool(
+        production_abstained and not candidate_abstained
+        and not unresolved and not agrees
+    )
+    newly_abstained = bool(
+        not production_abstained and candidate_abstained and not unresolved
+    )
+
+    return {
+        "production_abstained": bool(production_abstained),
+        "candidate_abstained": candidate_abstained,
+        "recovered": recovered,
+        "answered_but_wrong": answered_but_wrong,
+        "newly_abstained": newly_abstained,
+        "unresolved_label": unresolved,
+        "agrees": agrees,
+        # Needs both a label and a candidate verdict to land in a cell.
+        "scored": bool(not unresolved and not candidate_abstained),
+    }
+
+
+def cohort_composition(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Describe the cohort an evaluation ran against.
+
+    The review asks to "expose sample size, class balance and unresolved
+    labels". A score over an unknown cohort is not interpretable: 94%
+    agreement on a set that is 95% false positives is worse than guessing,
+    and nothing in the score itself says so. Hence
+    ``dominant_class_share``.
+
+    ``dominant_class`` is ``None`` for an empty cohort rather than a zero
+    share, because zero would read as "perfectly balanced".
+    """
+    balance: Dict[str, int] = {}
+    unresolved = 0
+    production_abstentions = 0
+
+    for row in rows:
+        verdict = row.get("human_verdict")
+        if _is_unresolved(verdict):
+            unresolved += 1
+        else:
+            key = str(verdict)
+            balance[key] = balance.get(key, 0) + 1
+        if row.get("auto_escalated"):
+            production_abstentions += 1
+
+    total = len(rows)
+    scored = total - unresolved
+
+    dominant = None
+    dominant_share = None
+    if balance:
+        dominant = max(balance, key=lambda k: balance[k])
+        # Share of the *scoreable* cohort: an unlabelled row is not evidence
+        # of balance either way.
+        dominant_share = round(balance[dominant] / scored, 4) if scored else None
+
+    return {
+        "sample_size": total,
+        "scored_sample_size": scored,
+        "unresolved_labels": unresolved,
+        "class_balance": balance,
+        "dominant_class": dominant,
+        "dominant_class_share": dominant_share,
+        "production_abstentions": production_abstentions,
+        # Every production abstention is replayable: the alert and its human
+        # verdict are both still there, only Bob's answer was missing.
+        "replayable_abstentions": production_abstentions,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -396,32 +553,24 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
     svc = get_ollama_service()
     sample_records: List[Dict[str, Any]] = []
     tp = fp = fn = tn = abstentions = skipped = 0
+    # Kept apart from `abstentions`, which is now the candidate's own.
+    recovered = newly_abstained = 0
 
     for fb_row in feedback_rows:
         fb_id = fb_row["id"]
         human_verdict = fb_row["human_verdict"]
         auto_escalated = fb_row.get("auto_escalated", False)
 
-        # Auto-escalated rows are abstentions regardless of fresh Ollama call.
-        if auto_escalated or human_verdict == "pending":
-            abstentions += 1
-            sample_rec = BobEvalRunSample(
-                eval_run_id=run.id,
-                ai_feedback_id=fb_id,
-                bob_verdict=None,
-                human_verdict=human_verdict,
-                agreement=None,
-                confidence_int=None,
-                reasoning_text=None,
-            )
-            session.add(sample_rec)
-            sample_records.append({
-                "bob_verdict": None,
-                "reasoning_text": None,
-            })
-            continue
+        # A production abstention is NOT skipped any more (review
+        # 2026-10-08 §6). `auto_escalated` means production's circuit
+        # breaker fired, which is a fact about the old prompt; counting it
+        # as an abstention of the candidate, without asking the candidate,
+        # made "has the new prompt learned to answer what the old one gave
+        # up on" unmeasurable — and counted the recovery as a failure.
+        # These are exactly the samples a tuner most wants replayed, so the
+        # Ollama call below runs for them too.
 
-        # Fix 2: call Ollama using the live prompt-builder path.
+        # Call Ollama using the live prompt-builder path.
         # Returns skipped=True when the investigation/alert was deleted.
         fresh_verdict, confidence_int, reasoning_text, was_skipped = _call_ollama_for_sample(
             svc=svc,
@@ -434,13 +583,34 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
             skipped += 1
             continue
 
-        # Classify sample.
-        agreement: Optional[bool] = None
-        if fresh_verdict is not None and human_verdict not in ("pending", ""):
-            agreement = _verdicts_agree(fresh_verdict, human_verdict)
+        # Classify sample, keeping production's behaviour apart from the
+        # candidate's.
+        replay = classify_replay_sample(
+            production_abstained=bool(auto_escalated),
+            candidate_verdict=fresh_verdict,
+            human_verdict=human_verdict,
+        )
+        # historical_abstention_count and unresolved_label_count are cohort
+        # facts, taken from cohort_composition below rather than counted
+        # here: a sample whose alert has since been deleted is skipped
+        # before this point, and "production abstained on 7 of these 40"
+        # stays true whether or not all 40 could be replayed. Counting them
+        # in the loop would silently undercount by the skipped rows and
+        # disagree with the composition block on the same run.
+        if replay["recovered"]:
+            recovered += 1
+        if replay["newly_abstained"]:
+            newly_abstained += 1
 
-        if agreement is None:
-            abstentions += 1
+        agreement: Optional[bool] = None
+        if replay["scored"]:
+            agreement = replay["agrees"]
+
+        if not replay["scored"]:
+            # The candidate gave no verdict, or there is no human label to
+            # score against. Either way there is no confusion-matrix cell.
+            if replay["candidate_abstained"] and not replay["unresolved_label"]:
+                abstentions += 1
         else:
             # real confusion matrix against the analyst's verdict.
             #
@@ -477,6 +647,9 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
             agreement=agreement,
             confidence_int=confidence_int,
             reasoning_text=reasoning_text,
+            # So a changed-decision review can list exactly which samples
+            # the candidate recovered, not just how many.
+            production_abstained=bool(auto_escalated),
         )
         session.add(sample_rec)
         sample_records.append({
@@ -494,6 +667,14 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
     run.tn_count = tn
     run.abstention_count = abstentions
     run.skipped_count = skipped
+    # Sample size, class balance and unresolved labels travel with the
+    # scores, so a reader can tell whether the scores mean anything.
+    composition = cohort_composition(feedback_rows)
+    run.class_balance = composition
+    run.historical_abstention_count = composition["production_abstentions"]
+    run.unresolved_label_count = composition["unresolved_labels"]
+    run.recovered_count = recovered
+    run.newly_abstained_count = newly_abstained
     run.precision_score = round(precision, 4) if precision is not None else None
     run.recall_score = round(recall, 4) if recall is not None else None
     run.f1_score = round(f1, 4) if f1 is not None else None
@@ -503,8 +684,11 @@ def _execute_eval(run: BobEvalRun, session: Session) -> None:
     session.commit()
     logger.info(
         "BobEvalRun %d completed: tp=%d fp=%d fn=%d tn=%d abs=%d skipped=%d "
+        "hist_abs=%d recovered=%d newly_abs=%d unresolved=%d "
         "P=%.4f R=%.4f F1=%.4f",
         run.id, tp, fp, fn, tn, abstentions, skipped,
+        composition["production_abstentions"], recovered, newly_abstained,
+        composition["unresolved_labels"],
         precision or 0.0, recall or 0.0, f1 or 0.0,
     )
 

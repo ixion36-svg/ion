@@ -1186,6 +1186,46 @@ def _run_migrations(engine: Engine) -> None:
             if col_name not in existing:
                 _add_column_tolerant(engine, "journey_requirements", col_name, col_type)
 
+    # Bob change lab (review 2026-10-08 §6). Two gaps: approval did not
+    # require a referenced evaluation, and the harness counted a production
+    # abstention as an abstention of the candidate prompt without ever
+    # asking the candidate. These columns keep the two apart and tie an
+    # approval to the exact text that was evaluated.
+    if insp.has_table("bob_eval_runs"):
+        existing = {c["name"] for c in insp.get_columns("bob_eval_runs")}
+        for col_name, col_type in {
+            "historical_abstention_count": "INTEGER NOT NULL DEFAULT 0",
+            "recovered_count": "INTEGER NOT NULL DEFAULT 0",
+            "newly_abstained_count": "INTEGER NOT NULL DEFAULT 0",
+            "unresolved_label_count": "INTEGER NOT NULL DEFAULT 0",
+            "class_balance": "JSONB" if _is_postgres(engine) else "JSON",
+        }.items():
+            if col_name not in existing:
+                _add_column_tolerant(engine, "bob_eval_runs", col_name, col_type)
+
+    if insp.has_table("bob_eval_run_samples"):
+        existing = {c["name"] for c in insp.get_columns("bob_eval_run_samples")}
+        if "production_abstained" not in existing:
+            _add_column_tolerant(
+                engine, "bob_eval_run_samples", "production_abstained",
+                "BOOLEAN NOT NULL DEFAULT FALSE" if _is_postgres(engine)
+                else "BOOLEAN NOT NULL DEFAULT 0",
+            )
+
+    if insp.has_table("bob_tuning_proposals"):
+        existing = {c["name"] for c in insp.get_columns("bob_tuning_proposals")}
+        # No REFERENCES clause: SQLite cannot add a foreign key by ALTER, and
+        # the integrity that matters here (a completed run whose hash matches
+        # the exact proposed text) is checked in the service, not by the FK.
+        for col_name, col_type in {
+            "evaluation_run_id": "INTEGER",
+            "evaluation_override_reason": "TEXT",
+        }.items():
+            if col_name not in existing:
+                _add_column_tolerant(
+                    engine, "bob_tuning_proposals", col_name, col_type
+                )
+
     # FP-signature governance (review 2026-10-08 §8). Quirks require a
     # different verifier and a review date after which they stop matching;
     # FP signatures made the same claim with neither, despite suppressing

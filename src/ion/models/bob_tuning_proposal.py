@@ -89,6 +89,23 @@ class BobTuningProposal(Base, TimestampMixin):
     decided_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     decision_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # ── Evidence (review 2026-10-08 §6) ──────────────────────────────────
+    # "prompt approval does not require a referenced evaluation". Approval
+    # now demands a completed BobEvalRun whose prompt_body_hash matches the
+    # exact proposed_text being approved -- evaluating one draft and
+    # approving another is evidence for nothing.
+    evaluation_run_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("bob_eval_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    #: Set only when someone approved without that evidence. The escape
+    #: hatch has to exist -- an incident at 03:00 should not be blocked by
+    #: the harness being down -- but it leaves a record rather than looking
+    #: identical to an evidenced approval.
+    evaluation_override_reason: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True
+    )
+
     # Versioning for reversibility: the template's text captured at apply time.
     before_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     applied_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
@@ -118,6 +135,11 @@ class BobTuningProposal(Base, TimestampMixin):
             "decided_by_username": self.decided_by.username if self.decided_by else None,
             "decided_at": self.decided_at.isoformat() if self.decided_at else None,
             "decision_notes": self.decision_notes,
+            "evaluation_run_id": self.evaluation_run_id,
+            "evaluation_override_reason": self.evaluation_override_reason,
+            # One boolean so a reader does not have to infer it: an approval
+            # backed by a matching evaluation, or not.
+            "evidence_backed": self.evaluation_run_id is not None,
             "applied_at": self.applied_at.isoformat() if self.applied_at else None,
             "reverted_by_id": self.reverted_by_id,
             "reverted_by_username": self.reverted_by.username if self.reverted_by else None,

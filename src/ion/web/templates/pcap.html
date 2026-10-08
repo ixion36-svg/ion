@@ -79,7 +79,14 @@
 .pcap-attach-hint { flex: 1 1 18rem; font-size: .78rem; color: var(--text-secondary); }
 .pcap-pick { display: inline-flex; align-items: center; margin-right: .4rem; }
 .pcap-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
-    padding: .55rem .7rem; border-bottom: 1px solid var(--border, rgba(255,255,255,.08));
+    /* --ion-border is ION's border COLOUR. daisyUI 5 claims the bare
+       unprefixed name for its border-WIDTH token, so using that one here
+       would resolve to `1px solid 1px` -- an invalid shorthand the browser
+       discards entirely, making the border vanish rather than change
+       colour. test_ui_rewrite_theme_parity.py guards the distinction, and
+       its regex matches the bare name in comments too, so this one avoids
+       spelling it. */
+    padding: .55rem .7rem; border-bottom: 1px solid var(--ion-border, rgba(255,255,255,.08));
     font-size: .82rem; }
 .pcap-history-row:last-child { border-bottom: 0; }
 .pcap-history-row .mono { font-family: ui-monospace, monospace; opacity: .65; }

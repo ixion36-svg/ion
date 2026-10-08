@@ -7,6 +7,7 @@ bob_eval_run_samples: one row per ai_feedback sample evaluated.
 from typing import Optional
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     ForeignKey,
     Index,
@@ -75,6 +76,38 @@ class BobEvalRun(Base, TimestampMixin):
     # Fix 2: rows skipped because the linked alert/investigation was deleted.
     skipped_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
+    # ── Replay accounting (review 2026-10-08 §6) ─────────────────────────
+    # The harness used to count a production abstention as an abstention of
+    # the *candidate* prompt, without ever asking the candidate. These keep
+    # the two apart, which is what makes "has the new prompt learned to
+    # answer what the old one gave up on" a measurable question.
+    #
+    # historical_abstention_count: production's circuit breaker fired for
+    #   this many samples. A fact about the past, not about the candidate.
+    # recovered_count: production abstained AND the candidate answered AND
+    #   the answer matched the human. The number a tuner is looking for.
+    # newly_abstained_count: production answered and the candidate gave up.
+    #   The regression direction, which matters just as much.
+    # unresolved_label_count: no human verdict to score against. Not an
+    #   abstention -- blaming the prompt for a missing human decision is the
+    #   same category error the shortcut made.
+    historical_abstention_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    recovered_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    newly_abstained_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    unresolved_label_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    #: human_verdict -> count for the cohort, plus the dominant-class share.
+    #: A cohort that is 95%% one class makes any accuracy figure meaningless,
+    #: so the imbalance travels with the scores.
+    class_balance: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+
     def to_dict(self) -> dict:
         return {
             "id": self.id,
@@ -99,6 +132,11 @@ class BobEvalRun(Base, TimestampMixin):
             "abstention_count": self.abstention_count,
             "hallucination_proxy": float(self.hallucination_proxy) if self.hallucination_proxy is not None else None,
             "skipped_count": self.skipped_count,
+            "historical_abstention_count": self.historical_abstention_count,
+            "recovered_count": self.recovered_count,
+            "newly_abstained_count": self.newly_abstained_count,
+            "unresolved_label_count": self.unresolved_label_count,
+            "class_balance": self.class_balance or {},
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
@@ -125,6 +163,13 @@ class BobEvalRunSample(Base):
     agreement: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     confidence_int: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     reasoning_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    #: Whether production's circuit breaker fired for this sample. Kept on
+    #: the row so a changed-decision review can list exactly which samples
+    #: the candidate recovered rather than recomputing from counts.
+    production_abstained: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0"
+    )
 
     def to_dict(self) -> dict:
         return {

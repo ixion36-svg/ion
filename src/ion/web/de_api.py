@@ -356,6 +356,13 @@ class BobProposalUpdate(BaseModel):
 
 class DecisionRequest(BaseModel):
     notes: Optional[str] = None
+    #: A completed BobEvalRun of this proposal's exact text. Required to
+    #: approve, unless `override_reason` is given (review 2026-10-08 §6).
+    #: Also settable on the proposal itself; this is the convenience path.
+    evaluation_run_id: Optional[int] = None
+    #: Approve with no evaluation behind it, and say why. Recorded, so an
+    #: unevidenced approval does not look identical to an evidenced one.
+    override_reason: Optional[str] = None
 
 
 def _bob_err(e: ValueError):
@@ -585,11 +592,28 @@ def approve_bob_proposal(
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_db_session),
 ):
-    """Approve + apply to the live template. SoD: approver must differ from drafter."""
+    """Approve + apply to the live template.
+
+    Separation of duty: the approver must differ from the drafter. Since the
+    2026-10-08 review the approval also needs a completed evaluation of the
+    exact proposed text, or an explicit `override_reason` that is recorded
+    on the proposal.
+    """
+    from ion.models.bob_tuning_proposal import BobTuningProposal
     from ion.services.de_bob_proposal_service import approve_proposal as _approve
 
+    if payload.evaluation_run_id is not None:
+        proposal = session.get(BobTuningProposal, proposal_id)
+        if proposal is None:
+            raise HTTPException(status_code=404, detail="proposal not found")
+        proposal.evaluation_run_id = payload.evaluation_run_id
+        session.commit()
+
     try:
-        p = _approve(session, proposal_id, current_user.id, notes=payload.notes)
+        p = _approve(
+            session, proposal_id, current_user.id, notes=payload.notes,
+            override_reason=payload.override_reason,
+        )
     except ValueError as e:
         _bob_err(e)
     logger.info("Bob-tuning proposal %d APPROVED+applied by user %s", proposal_id, current_user.id)
