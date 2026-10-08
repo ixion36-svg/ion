@@ -2416,20 +2416,25 @@ async function loadRecoveryCapability() {
         const notCovered = (cap.not_covered || [])
             .map(n => `<li>${escapeHtml(n)}</li>`).join('');
 
+        // Everything goes in ONE child of .alert: DaisyUI lays the alert out
+        // as a grid, so sibling elements get split into separate columns and
+        // the guidance ends up in a cramped vertical strip.
         container.innerHTML = `
-            <div class="alert ${supported ? 'alert-info' : 'alert-warning'} flex-col items-start gap-2 text-left">
-                <div class="font-medium">
-                    ${supported
-                        ? 'Built-in file copy applies to this deployment'
-                        : 'Built-in file copy does not apply to this deployment'}
+            <div class="alert ${supported ? 'alert-info' : 'alert-warning'} text-left">
+                <div class="w-full">
+                    <div class="font-medium">
+                        ${supported
+                            ? 'Built-in file copy applies to this deployment'
+                            : 'Built-in file copy does not apply to this deployment'}
+                    </div>
+                    <div class="text-sm opacity-80 mt-1">
+                        Backend: <code>${escapeHtml(cap.backend || 'unknown')}</code>
+                        &middot; Target: <code>${escapeHtml(cap.target || 'unknown')}</code>
+                    </div>
+                    <ul class="text-sm list-disc ml-5 mt-2 space-y-0.5">${guidance}</ul>
+                    <div class="text-sm font-medium mt-3">Not covered by a database backup</div>
+                    <ul class="text-sm list-disc ml-5 mt-1 opacity-80 space-y-0.5">${notCovered}</ul>
                 </div>
-                <div class="text-sm opacity-80">
-                    Backend: <code>${escapeHtml(cap.backend || 'unknown')}</code>
-                    &middot; Target: <code>${escapeHtml(cap.target || 'unknown')}</code>
-                </div>
-                <ul class="text-sm list-disc ml-5">${guidance}</ul>
-                <div class="text-sm font-medium mt-1">Not covered by a database backup</div>
-                <ul class="text-sm list-disc ml-5 opacity-80">${notCovered}</ul>
             </div>`;
     } catch (error) {
         container.innerHTML =

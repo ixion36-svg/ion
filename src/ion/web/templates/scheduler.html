@@ -265,8 +265,14 @@ async function schPreviewCron() {
         out.innerHTML = `<span class="text-error">${schEsc(p.error || 'Invalid cron expression')}</span>`;
         return;
       }
+      // Render in UTC, because that is the clock the cron expression is
+      // evaluated against. toLocaleString() without a timeZone formats in
+      // the viewer's local zone, which showed 08:00 beside a "(UTC)" label
+      // for an 07:00 UTC schedule on a UTC+1 machine.
       const runs = (p.next_runs || [])
-        .map(t => schEsc(new Date(t).toLocaleString())).join(' · ');
+        .map(t => schEsc(new Date(t).toLocaleString(undefined, {
+          timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short',
+        }))).join(' · ');
       out.innerHTML = `<span class="text-success">${schEsc(p.description)}</span>`
         + `<span class="opacity-60"> — next: ${runs} (${schEsc(p.timezone)})</span>`;
     } catch (e) {
