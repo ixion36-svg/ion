@@ -519,6 +519,13 @@ class Config:
         creation, so an inherited 0644 file from an earlier version is also
         tightened below.
         """
+        # The whole env-merged object is written, deliberately: that is
+        # what makes scripts/migrate-env-to-settings.ps1 work, since it
+        # exists to get effective values into config.json before .env is
+        # pruned, and every field it cares about is environment-held by
+        # definition at that moment. _drop_env_held stops a *submitted*
+        # env-held value being stored; it does not stop the environment's
+        # own value being persisted, and should not.
         payload = {}
         for f in fields(self):
             value = getattr(self, f.name)
@@ -1207,9 +1214,14 @@ def env_held_fields() -> frozenset[str]:
     return frozenset(f for f in ENV_FIELD_MAP if _env_override(f) is not None)
 
 
-def _stored_config() -> dict:
-    """The parsed config.json, or {} when it is absent or unreadable."""
-    path = _config_file_path()
+def _stored_config(path: Optional[Path] = None) -> dict:
+    """The parsed config.json, or {} when it is absent or unreadable.
+
+    ``path`` is explicit for ``to_file``, which may be writing somewhere
+    other than the resolved location (the setup wizard, and tests).
+    """
+    if path is None:
+        path = _config_file_path()
     if not path.exists():
         return {}
     try:

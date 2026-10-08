@@ -122,6 +122,56 @@ class TestEverySettingPersists:
         assert mode == 0o600, oct(mode)
 
 
+# -- What saving does with environment-held values -------------------------
+
+
+class TestEnvironmentIsStillPersisted:
+    """A save writes the environment-merged object, on purpose.
+
+    It looks wrong at first and is worth stating so nobody "fixes" it
+    again. ``get_config()`` builds one Config and mutates it in place with
+    the environment, so ``to_file`` serialises the merged view: save one
+    unrelated setting on a configured estate and every environment value is
+    written to the file too.
+
+    That is what ``scripts/migrate-env-to-settings.ps1`` depends on. It
+    exists to get effective values into config.json so .env can then be
+    pruned, and every field it cares about is environment-held by
+    definition at that moment. ``_drop_env_held`` rejects a *submitted*
+    env-held value; it deliberately does not stop the environment's own
+    value being persisted. tests/test_config_write_guard.py holds the
+    contract.
+
+    The cost is real and worth knowing: after such a save, removing the
+    variable from .env leaves the value in force from the file. That is the
+    accepted trade for the migration path, not an oversight.
+    """
+
+    def test_the_merged_value_is_written(self, tmp_path, monkeypatch):
+        from ion.core import config as config_mod
+
+        monkeypatch.setenv("ION_TIDE_URL", "https://from-the-environment")
+        config_mod.set_config(None)
+        try:
+            config = config_mod.get_config()
+            assert config.tide_url == "https://from-the-environment"
+            path = tmp_path / "config.json"
+            config.to_file(path)
+            saved = json.loads(path.read_text(encoding="utf-8"))
+            assert saved["tide_url"] == "https://from-the-environment"
+        finally:
+            config_mod.set_config(None)
+
+    def test_everything_is_written_when_nothing_is_overridden(self, tmp_path):
+        config = Config()
+        config.oidc_realm = "plain"
+        path = tmp_path / "config.json"
+        config.to_file(path)
+        saved = json.loads(path.read_text(encoding="utf-8"))
+        assert saved["oidc_realm"] == "plain"
+        assert len(saved) == len(dataclasses.fields(Config))
+
+
 # -- Type coercion ---------------------------------------------------------
 
 
