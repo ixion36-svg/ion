@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from ion.models.user import AuditLog, User
 from ion.models.workforce import (
     KIND_CERT,
+    KIND_SIGNOFF,
     KIND_COURSE,
     PHASE_GATE,
     PHASE_READINESS,
@@ -123,6 +124,104 @@ def create_profile(session: Session, *, name: str, description: str = "",
     session.add(profile)
     session.flush()
     draft_version(session, profile)
+    session.commit()
+    return profile
+
+
+def adopt_catalogue_role(session: Session, role_id: str, *,
+                         adopter: User) -> RoleProfile:
+    """Build a role profile from the SOC role catalogue.
+
+    The catalogue is reference data so a lead does not start from an empty
+    page. Nothing in it exists until it is adopted, and adopting produces
+    an ordinary draft profile they can then edit.
+
+    Two things it deliberately does not do.
+
+    It does not publish. A lead reviews what they are taking on before
+    anybody is held to it, and the suggested certificates are what the
+    role is usually advertised with rather than what somebody needs to do
+    the job.
+
+    It adds no gate requirements. The catalogue describes a role, not an
+    organisation's vetting: right-to-work, the acceptable use agreement
+    and the induction are the SOC's to define once on its baseline, and a
+    role catalogue guessing at them per role would scatter the same
+    decision across twenty profiles. The consequence is that an adopted
+    profile that grants an ION role cannot be published until the lead
+    adds its mandatory items, which the publish guard already enforces --
+    deliberately, because that decision should be made on purpose.
+
+    Every certificate is phrased "(or equivalent)". The catalogue lists
+    what the role usually asks for; recording it as an absolute would
+    harden a suggestion into a rule at the moment of adoption, and
+    record_equivalence exists precisely because people without the
+    certificate can hold the competence.
+    """
+    from ion.data.soc_role_catalogue import get_role
+
+    if not adopter.has_permission("workforce:manage"):
+        raise WorkforceError("Permission denied")
+
+    entry = get_role(role_id)
+    if entry is None:
+        raise WorkforceError(
+            f"{role_id!r} is not in the SOC role catalogue."
+        )
+
+    existing = (
+        session.query(RoleProfile)
+        .filter(RoleProfile.name == entry["name"])
+        .one_or_none()
+    )
+    if existing is not None:
+        # Adopting twice is a double click or a re-run, not a request for
+        # a second copy of the same role.
+        return existing
+
+    profile = create_profile(
+        session,
+        name=entry["name"],
+        description=(
+            f"{entry['description']}\n\n"
+            f"Adopted from the SOC role catalogue. The requirements below "
+            f"are what this role is usually advertised with, not what "
+            f"somebody needs to do the job -- adjust or remove them, and "
+            f"note that any of them can be met by assessed proficiency "
+            f"instead of the certificate itself. The mandatory items "
+            f"(vetting, agreements, induction) are not here: they belong "
+            f"on the baseline profile, once, rather than being repeated "
+            f"per role."
+        ),
+        skills_role_id=entry.get("skills_role_id"),
+    )
+    version = draft_version(session, profile)
+
+    ordering = 0
+    for cert in entry.get("typical_certifications", []):
+        label = cert if "equivalent" in cert.lower() else f"{cert} (or equivalent)"
+        add_requirement(
+            session, version, name=label, kind=KIND_CERT,
+            phase=PHASE_READINESS, validity_months=36, ordering=ordering,
+        )
+        ordering += 1
+
+    # The core skills become sign-offs rather than certificates: they are
+    # things somebody observes you doing, not things you hold a card for.
+    for skill in entry.get("core_skills", []):
+        add_requirement(
+            session, version, name=f"Competent: {skill}", kind=KIND_SIGNOFF,
+            phase=PHASE_READINESS, validity_months=12, ordering=ordering,
+        )
+        ordering += 1
+
+    session.add(AuditLog(
+        user_id=adopter.id, action="workforce_role_adopted",
+        resource_type="role_profile", resource_id=profile.id,
+        details=f"{adopter.username} adopted {role_id!r} from the SOC role "
+                f"catalogue as {entry['name']!r} "
+                f"({ordering} suggested requirement(s), left as a draft)",
+    ))
     session.commit()
     return profile
 

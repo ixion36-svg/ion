@@ -146,6 +146,59 @@ class OffboardIn(BaseModel):
 # --- profiles ---------------------------------------------------------------
 
 
+@router.get("/catalogue", dependencies=[Depends(require_workforce_module)])
+def role_catalogue(
+    _user: User = Depends(require_permission("workforce:read")),
+) -> dict:
+    """Roles a SOC might have, for a lead to pick from.
+
+    Reference data, not configuration. Nothing here exists until it is
+    adopted, and ``adopted`` says which ones this SOC already has so the
+    page can show the difference between "we have this" and "we could".
+    """
+    from ion.data.soc_role_catalogue import CATEGORIES, by_category
+
+    return {
+        "categories": list(CATEGORIES),
+        "roles": by_category(),
+        "note": (
+            "Certificates listed are what each role is usually advertised "
+            "with, not what somebody needs to do the job. Any requirement "
+            "can be met by assessed proficiency instead. Establishment "
+            "numbers are a starting shape for a mid-sized 24/7 SOC, not a "
+            "recommendation for yours."
+        ),
+    }
+
+
+@router.post("/catalogue/{role_id}/adopt",
+             dependencies=[Depends(require_workforce_module)],
+             status_code=201)
+def adopt_role(
+    role_id: str,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("workforce:manage")),
+) -> dict:
+    """Build a role profile from a catalogue entry, as an editable draft."""
+    try:
+        profile = wf.adopt_catalogue_role(session, role_id, adopter=user)
+    except wf.WorkforceError as exc:
+        raise _err(exc) from exc
+    version = wf.draft_version(session, profile)
+    return {
+        "profile": {
+            "id": profile.id, "name": profile.name,
+            "skills_role_id": profile.skills_role_id,
+        },
+        "draft_version_id": version.id,
+        "requirements": len(version.requirements),
+        "next": (
+            "Review the suggested requirements, add the mandatory items "
+            "this SOC requires, then publish."
+        ),
+    }
+
+
 @router.get("/profiles", dependencies=[Depends(require_workforce_module)])
 def list_profiles(
     session: Session = Depends(get_db_session),
