@@ -1880,7 +1880,7 @@
 {% endblock %}
 
 {% block scripts %}
-<script nonce="{{ csp_nonce }}" src="/static/js/integration-wizard.js"></script>
+<script nonce="{{ csp_nonce }}" src="/static/js/integration-wizard.js?v={{ ion_version }}"></script>
 <script nonce="{{ csp_nonce }}">
 let currentConfig = {};
 

@@ -7353,7 +7353,7 @@ function _renderAlertsFallback() {
         return `
         <tr class="alert-row ${isSelected ? 'selected' : ''}"
             data-click-action="showAlertDetail" data-args='["${escapeHtml(a.id)}"]'
-            oncontextmenu="showContextMenu(event, '${escapeHtml(a.id)}')"
+            data-contextmenu-action="showContextMenu" data-contextmenu-args='["$event", "${escapeHtml(a.id)}"]'
             data-alert-id="${escapeHtml(a.id)}">
             <td class="checkbox-col" data-stop-propagation>
                 <input type="checkbox" class="alert-checkbox" data-alert-id="${escapeHtml(a.id)}"

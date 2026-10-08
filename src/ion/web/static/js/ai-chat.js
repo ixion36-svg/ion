@@ -142,7 +142,7 @@ function addAIChatView() {
     aiView.className = 'chat-active-view';
     aiView.innerHTML = `
         <div class="chat-room-header ai-header">
-            <button class="chat-back-btn" onclick="closeAIChat()">
+            <button class="chat-back-btn" data-click-action="closeAIChat">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M15 18l-6-6 6-6"/>
                 </svg>
@@ -155,7 +155,7 @@ function addAIChatView() {
                     AI Assistant
                 </div>
                 <div class="chat-room-header-members">
-                    <select id="ai-context-select" onchange="changeAIContext(this.value)" class="ai-context-select">
+                    <select id="ai-context-select" data-change-action="changeAIContext" data-args='["$value"]' class="ai-context-select">
                         <option value="security">Security</option>
                         <option value="engineering">Engineering</option>
                         <option value="coding">Coding</option>
@@ -163,7 +163,7 @@ function addAIChatView() {
                     </select>
                 </div>
             </div>
-            <button class="chat-header-btn" onclick="clearAIChat()" title="Clear chat">
+            <button class="chat-header-btn" data-click-action="clearAIChat" title="Clear chat">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
                 </svg>
@@ -175,10 +175,10 @@ function addAIChatView() {
                 <h3>AI Assistant</h3>
                 <p>I can help you with security analysis, coding questions, and more.</p>
                 <div class="ai-quick-prompts">
-                    <button onclick="sendAIQuickPrompt('Analyze this alert for potential threats')">Analyze alert</button>
-                    <button onclick="sendAIQuickPrompt('Help me write a YARA rule')">Write YARA rule</button>
-                    <button onclick="sendAIQuickPrompt('Explain this MITRE ATT&CK technique')">MITRE help</button>
-                    <button onclick="sendAIQuickPrompt('Generate an Elasticsearch query')">ES query</button>
+                    <button data-click-action="sendAIQuickPrompt" data-args='["Analyze this alert for potential threats"]'>Analyze alert</button>
+                    <button data-click-action="sendAIQuickPrompt" data-args='["Help me write a YARA rule"]'>Write YARA rule</button>
+                    <button data-click-action="sendAIQuickPrompt" data-args='["Explain this MITRE ATT&amp;CK technique"]'>MITRE help</button>
+                    <button data-click-action="sendAIQuickPrompt" data-args='["Generate an Elasticsearch query"]'>ES query</button>
                 </div>
             </div>
         </div>
@@ -189,9 +189,9 @@ function addAIChatView() {
         <div class="chat-input-area">
             <div class="chat-input-wrapper">
                 <textarea class="chat-input" id="ai-chat-input" placeholder="Ask the AI assistant..." rows="1"
-                    onkeydown="handleAIInputKeydown(event)"
-                    oninput="autoResizeTextarea(this)"></textarea>
-                <button class="chat-send-btn" onclick="sendAIMessage()" id="ai-send-btn">
+                    data-keydown-action="handleAIInputKeydown" data-keydown-args='["$event"]'
+                    data-input-action="autoResizeTextarea" data-input-args='["$target"]'></textarea>
+                <button class="chat-send-btn" data-click-action="sendAIMessage" id="ai-send-btn">
                     <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
                     </svg>
@@ -262,10 +262,10 @@ function clearAIChat() {
             <h3>AI Assistant</h3>
             <p>I can help you with security analysis, coding questions, and more.</p>
             <div class="ai-quick-prompts">
-                <button onclick="sendAIQuickPrompt('Analyze this alert for potential threats')">Analyze alert</button>
-                <button onclick="sendAIQuickPrompt('Help me write a YARA rule')">Write YARA rule</button>
-                <button onclick="sendAIQuickPrompt('Explain this MITRE ATT&CK technique')">MITRE help</button>
-                <button onclick="sendAIQuickPrompt('Generate an Elasticsearch query')">ES query</button>
+                <button data-click-action="sendAIQuickPrompt" data-args='["Analyze this alert for potential threats"]'>Analyze alert</button>
+                <button data-click-action="sendAIQuickPrompt" data-args='["Help me write a YARA rule"]'>Write YARA rule</button>
+                <button data-click-action="sendAIQuickPrompt" data-args='["Explain this MITRE ATT&amp;CK technique"]'>MITRE help</button>
+                <button data-click-action="sendAIQuickPrompt" data-args='["Generate an Elasticsearch query"]'>ES query</button>
             </div>
         </div>
     `;
@@ -444,7 +444,7 @@ function addAIMessageToUI(role, content, streaming = false) {
             </div>
             <div class="ai-message-content">${streaming ? '<span class="ai-cursor">▊</span>' : formatAIMessage(content)}</div>
             <div class="ai-message-actions">
-                <button onclick="copyAIMessage(this)" title="Copy">
+                <button data-click-action="copyAIMessage" data-args='["$target"]' title="Copy">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="9" y="9" width="13" height="13" rx="2"/>
                         <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/>

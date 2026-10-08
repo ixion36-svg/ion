@@ -57,7 +57,7 @@
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
          .htmx-indicator class anywhere, so disabling it has no UI impact. -->
     <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
-    <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js"></script>
+    <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
     {# CSRF token for state-changing requests. Guarded so anonymous pages emit
        nothing. csrf.js reads this and attaches it to same-origin unsafe fetch

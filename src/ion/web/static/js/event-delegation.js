@@ -63,6 +63,11 @@
     keyup: 'data-keyup-action',
     blur: 'data-blur-action',
     focus: 'data-focus-action',
+    // Right-click menus. The alert table's row menu was the last inline
+    // `oncontextmenu=` in ION and had nowhere to migrate to until now. The
+    // handler is expected to call preventDefault itself, or the element to
+    // set data-prevent-default, or the browser menu opens over it.
+    contextmenu: 'data-contextmenu-action',
     // drag and drop for the Kanban + Workbench surfaces.
     dragstart: 'data-dragstart-action',
     dragend: 'data-dragend-action',
@@ -85,6 +90,7 @@
     var skip = new Set([
       'clickAction', 'changeAction', 'inputAction', 'submitAction',
       'keydownAction', 'keyupAction', 'blurAction', 'focusAction',
+      'contextmenuAction',
       'dragstartAction', 'dragendAction', 'dragoverAction',
       'dragenterAction', 'dragleaveAction', 'dropAction',
       'preventDefault', 'stopPropagation', 'onlySelfClick',

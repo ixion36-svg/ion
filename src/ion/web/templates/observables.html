@@ -1685,7 +1685,8 @@ function renderObservableDetail(obs, alerts, cases, coOccurring) {
                         <span class="remove" data-click-action="removeTag" data-args='[${obs.id}, "${escapeHtml(t)}"]'>&times;</span>
                     </span>
                 `).join('')}
-                <input type="text" id="tag-input" placeholder="Add tag..." onkeypress="handleTagInput(event, ${obs.id})">
+                <input type="text" id="tag-input" placeholder="Add tag..."
+                       data-enter-key-action="handleTagInput" data-args='["$event", ${obs.id}]'>
             </div>
         </div>
     `;

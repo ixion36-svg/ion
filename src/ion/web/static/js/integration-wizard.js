@@ -109,6 +109,18 @@ async function openIntegrationWizard() {
 /**
  * Close the wizard modal
  */
+// Close the wizard and refresh the settings forms behind it, so anything
+// the wizard just saved is visible without a page reload. Named rather than
+// written as two statements in an attribute: delegation dispatches one
+// function per action, and a caller that forgets the reload leaves the
+// operator looking at the values from before they pressed Save.
+function finishWizard() {
+    closeWizard();
+    if (typeof loadAllSettings === 'function') loadAllSettings();
+}
+window.finishWizard = finishWizard;
+
+
 function closeWizard() {
     if (wizardModal) {
         wizardModal.remove();
@@ -127,7 +139,7 @@ function createWizardModal() {
         <div class="wizard-modal">
             <div class="wizard-header">
                 <h2>Integration Wizard</h2>
-                <button class="wizard-close" onclick="closeWizard()">&times;</button>
+                <button class="wizard-close" data-click-action="closeWizard">&times;</button>
             </div>
             <div class="wizard-progress" id="wizard-progress">
                 <div class="wizard-progress-step active" data-step="welcome">Welcome</div>
@@ -213,8 +225,8 @@ function renderResumePrompt() {
     `;
 
     footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="startFresh()">Start Fresh</button>
-        <button class="btn btn-primary" onclick="renderCurrentStep()">Continue</button>
+        <button class="btn btn-secondary" data-click-action="startFresh">Start Fresh</button>
+        <button class="btn btn-primary" data-click-action="renderCurrentStep">Continue</button>
     `;
 }
 
@@ -284,8 +296,8 @@ function renderWelcomeStep() {
     `;
 
     footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="closeWizard()">Cancel</button>
-        <button class="btn btn-primary" onclick="goToStep('select')">Get Started</button>
+        <button class="btn btn-secondary" data-click-action="closeWizard">Cancel</button>
+        <button class="btn btn-primary" data-click-action="goToStep" data-args='["select"]'>Get Started</button>
     `;
 }
 
@@ -302,9 +314,12 @@ function renderSelectStep() {
         const isConfigured = meta.configured;
 
         integrationsHtml += `
-            <div class="integration-select-card ${isSelected ? 'selected' : ''}" onclick="toggleIntegration('${name}')">
+            <div class="integration-select-card ${isSelected ? 'selected' : ''}"
+                 data-click-action="toggleIntegration" data-args='["${escapeHtml(name)}"]'>
                 <div class="integration-checkbox">
-                    <input type="checkbox" ${isSelected ? 'checked' : ''} onclick="event.stopPropagation(); toggleIntegration('${name}')">
+                    <input type="checkbox" ${isSelected ? 'checked' : ''}
+                           data-click-action="toggleIntegration" data-args='["${escapeHtml(name)}"]'
+                           data-stop-propagation>
                 </div>
                 <div class="integration-info">
                     <div class="integration-name">${escapeHtml(meta.name)}</div>
@@ -329,17 +344,17 @@ function renderSelectStep() {
             </div>
 
             <div class="quick-actions">
-                <button class="btn btn-sm" onclick="selectAllIntegrations()">Select All</button>
-                <button class="btn btn-sm" onclick="selectUnconfigured()">Select Unconfigured</button>
-                <button class="btn btn-sm" onclick="clearSelection()">Clear Selection</button>
+                <button class="btn btn-sm" data-click-action="selectAllIntegrations">Select All</button>
+                <button class="btn btn-sm" data-click-action="selectUnconfigured">Select Unconfigured</button>
+                <button class="btn btn-sm" data-click-action="clearSelection">Clear Selection</button>
             </div>
         </div>
     `;
 
     const canProceed = wizardState.selectedIntegrations.length > 0;
     footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="goToStep('welcome')">Back</button>
-        <button class="btn btn-primary" onclick="goToStep('configure')" ${canProceed ? '' : 'disabled'}>
+        <button class="btn btn-secondary" data-click-action="goToStep" data-args='["welcome"]'>Back</button>
+        <button class="btn btn-primary" data-click-action="goToStep" data-args='["configure"]' ${canProceed ? '' : 'disabled'}>
             Configure (${wizardState.selectedIntegrations.length})
         </button>
     `;
@@ -449,10 +464,10 @@ function renderConfigureStep() {
         : 'Next';
 
     footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="wizardDispatch('${backAction}')">Back</button>
+        <button class="btn btn-secondary" data-click-action="wizardDispatch" data-args='["${escapeHtml(backAction)}"]'>Back</button>
         <div class="footer-spacer"></div>
-        <button class="btn ion-u-mr-auto" onclick="skipIntegration()">Skip This Integration</button>
-        <button class="btn btn-primary" onclick="saveSubStepAndContinue('${nextAction}')">${nextLabel}</button>
+        <button class="btn ion-u-mr-auto" data-click-action="skipIntegration">Skip This Integration</button>
+        <button class="btn btn-primary" data-click-action="saveSubStepAndContinue" data-args='["${escapeHtml(nextAction)}"]'>${nextLabel}</button>
     `;
 }
 
@@ -605,18 +620,20 @@ function renderTestStep(integrationName) {
             </div>
         `;
     } else {
-        // Escape the error for both HTML and the inline JS string literal:
-        // backslash MUST be escaped first, otherwise the subsequent single-quote
-        // escapes can be neutralised by an attacker-controlled trailing backslash.
-        const errorJsLiteral = escapeHtml(testResult.error)
-            .replace(/\\/g, '\\\\')
-            .replace(/'/g, "\\'");
+        // The arguments go through JSON and then a single HTML escape.
+        // There is no inline JS literal to break out of any more, so the
+        // old two-layer escaping (and its backslash-ordering trap) is gone:
+        // escapeHtml covers & < > " ', which is every character that could
+        // end the attribute, and the browser hands JSON.parse back exactly
+        // what went in.
+        const diagnosisArgs = escapeHtml(
+            JSON.stringify([integrationName, testResult.error]));
         statusHtml = `
             <div class="test-status error">
                 <div class="test-icon">&#10007;</div>
                 <h4>Connection Failed</h4>
                 <p class="error-message">${escapeHtml(testResult.error)}</p>
-                <button class="btn btn-secondary" onclick="requestAIDiagnosis('${integrationName}', '${errorJsLiteral}')">
+                <button class="btn btn-secondary" data-click-action="requestAIDiagnosis" data-args="${diagnosisArgs}">
                     Get AI Diagnosis
                 </button>
             </div>
@@ -631,7 +648,7 @@ function renderTestStep(integrationName) {
             ${statusHtml}
 
             <div class="test-actions">
-                <button class="btn btn-primary" onclick="testWizardConnection('${integrationName}')" id="test-connection-btn">
+                <button class="btn btn-primary" data-click-action="testWizardConnection" data-args='["${escapeHtml(integrationName)}"]' id="test-connection-btn">
                     Test Connection
                 </button>
             </div>
@@ -715,7 +732,7 @@ async function requestAIDiagnosis(integrationName, errorMessage) {
             panel.innerHTML = `
                 <div class="diagnosis-unavailable">
                     <p>${escapeHtml(result.message || 'AI diagnosis is not available')}</p>
-                    <button class="btn btn-sm" onclick="hideDiagnosisPanel()">Close</button>
+                    <button class="btn btn-sm" data-click-action="hideDiagnosisPanel">Close</button>
                 </div>
             `;
             return;
@@ -727,7 +744,7 @@ async function requestAIDiagnosis(integrationName, errorMessage) {
         panel.innerHTML = `
             <div class="diagnosis-error">
                 <p>Failed to get AI diagnosis: ${escapeHtml(error.message)}</p>
-                <button class="btn btn-sm" onclick="hideDiagnosisPanel()">Close</button>
+                <button class="btn btn-sm" data-click-action="hideDiagnosisPanel">Close</button>
             </div>
         `;
     }
@@ -753,19 +770,26 @@ function renderDiagnosisPanel(integrationName, diagnosis) {
         actionableHtml = '<div class="diagnosis-actionable"><h5>Quick Fixes:</h5>';
         diagnosis.actionable.forEach(action => {
             let label = action;
-            let handler = '';
+            let fn = '';
+            let args = null;
             if (action === 'disable_ssl_verification') {
                 label = 'Disable SSL Verification';
-                handler = `applyQuickFix('${integrationName}', 'verify_ssl', false)`;
+                fn = 'applyQuickFix';
+                args = [integrationName, 'verify_ssl', false];
             } else if (action === 'increase_timeout') {
                 label = 'Increase Timeout to 300s';
-                handler = `applyQuickFix('${integrationName}', 'timeout', 300)`;
+                fn = 'applyQuickFix';
+                args = [integrationName, 'timeout', 300];
             } else if (action === 'use_http') {
                 label = 'Switch to HTTP';
-                handler = `applyHttpFix('${integrationName}')`;
+                fn = 'applyHttpFix';
+                args = [integrationName];
             }
-            if (handler) {
-                actionableHtml += `<button class="btn btn-sm btn-warning" onclick="${handler}">${escapeHtml(label)}</button> `;
+            if (fn) {
+                actionableHtml += `<button class="btn btn-sm btn-warning" `
+                    + `data-click-action="${fn}" `
+                    + `data-args="${escapeHtml(JSON.stringify(args))}">`
+                    + `${escapeHtml(label)}</button> `;
             }
         });
         actionableHtml += '</div>';
@@ -784,7 +808,7 @@ function renderDiagnosisPanel(integrationName, diagnosis) {
         <div class="diagnosis-content">
             <div class="diagnosis-header">
                 <h4>AI Diagnosis</h4>
-                <button class="btn-close" onclick="hideDiagnosisPanel()">&times;</button>
+                <button class="btn-close" data-click-action="hideDiagnosisPanel">&times;</button>
             </div>
 
             <div class="diagnosis-summary">
@@ -802,7 +826,7 @@ function renderDiagnosisPanel(integrationName, diagnosis) {
             ${securityHtml}
 
             <div class="diagnosis-actions">
-                <button class="btn btn-primary" onclick="testWizardConnection('${integrationName}')">Retry Connection</button>
+                <button class="btn btn-primary" data-click-action="testWizardConnection" data-args='["${escapeHtml(integrationName)}"]'>Retry Connection</button>
             </div>
         </div>
     `;
@@ -972,7 +996,7 @@ function renderSummaryStep() {
                     </div>
                 </div>
                 <div class="summary-actions">
-                    <button class="btn btn-sm" onclick="editIntegration('${integrationName}')">Edit</button>
+                    <button class="btn btn-sm" data-click-action="editIntegration" data-args='["${escapeHtml(integrationName)}"]'>Edit</button>
                 </div>
             </div>
         `;
@@ -995,8 +1019,8 @@ function renderSummaryStep() {
     `;
 
     footer.innerHTML = `
-        <button class="btn btn-secondary" onclick="goToStep('configure')">Back to Configure</button>
-        <button class="btn btn-primary" onclick="saveAllConfigurations()">Save All</button>
+        <button class="btn btn-secondary" data-click-action="goToStep" data-args='["configure"]'>Back to Configure</button>
+        <button class="btn btn-primary" data-click-action="saveAllConfigurations">Save All</button>
     `;
 }
 
@@ -1069,7 +1093,7 @@ async function saveAllConfigurations() {
         }
 
         document.getElementById('wizard-footer').innerHTML = `
-            <button class="btn btn-primary" onclick="closeWizard(); loadAllSettings();">Done</button>
+            <button class="btn btn-primary" data-click-action="finishWizard">Done</button>
         `;
 
     } catch (error) {
@@ -1080,8 +1104,8 @@ async function saveAllConfigurations() {
             </div>
         `;
         document.getElementById('wizard-footer').innerHTML = `
-            <button class="btn btn-secondary" onclick="goToStep('summary')">Back</button>
-            <button class="btn btn-primary" onclick="saveAllConfigurations()">Retry</button>
+            <button class="btn btn-secondary" data-click-action="goToStep" data-args='["summary"]'>Back</button>
+            <button class="btn btn-primary" data-click-action="saveAllConfigurations">Retry</button>
         `;
     }
 }
