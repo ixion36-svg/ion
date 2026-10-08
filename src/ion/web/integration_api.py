@@ -133,6 +133,10 @@ class IntegrationStatusResponse(BaseModel):
     # appears only on failure is an age nobody learns to look for.
     check_age_seconds: Optional[float] = None
     is_stale: bool = False
+    # Why this status, whatever the status is. Separate from `error` because
+    # a degraded integration has a cause without having failed, and the
+    # cause used to be discarded for exactly that reason.
+    reason: Optional[str] = None
 
 
 class IntegrationLogResponse(BaseModel):
@@ -223,6 +227,60 @@ STALE_HEALTH_CHECK_SECONDS = int(
 UNKNOWN_STATUS = "unknown"
 
 
+#: Statuses that are a problem and therefore owe an explanation. `healthy`
+#: and `disabled` are deliberately absent: a reason on a good row is noise,
+#: and noise trains people to stop reading the column.
+_STATUSES_NEEDING_REASON = ("degraded", "error", UNKNOWN_STATUS)
+
+
+def _explain_status(response: IntegrationStatusResponse) -> IntegrationStatusResponse:
+    """Give every non-healthy status a stated cause.
+
+    Elasticsearch and Kibana both reported `degraded` with `connected: true`
+    and `error: None` on 2026-10-08. The reason existed --
+    ConnectorBase.health_check sets DEGRADED on a version outside
+    SUPPORTED_VERSIONS and writes the explanation into
+    HealthCheckResult.message -- but the row is persisted with
+    `error_message=result.error`, which is None for a degraded result, so
+    the text survived only in metadata.version_compatibility.message where
+    nothing read it.
+
+    Order matters: a real failure outranks a version remark that happens to
+    be recorded alongside it.
+    """
+    status = (response.status or "").lower()
+    if status not in _STATUSES_NEEDING_REASON:
+        response.reason = None
+        return response
+
+    if response.error:
+        response.reason = response.error
+        return response
+
+    # metadata is a free JSON column; a non-object there must not take down
+    # the page whose job is to say which integration is broken.
+    meta = response.metadata if isinstance(response.metadata, dict) else {}
+    compat = meta.get("version_compatibility")
+    if isinstance(compat, dict) and compat.get("in_range") is False:
+        message = compat.get("message")
+        if message:
+            response.reason = str(message)
+            return response
+
+    # Some connectors record a plain health message rather than an error.
+    message = meta.get("health_message") or meta.get("message")
+    if message:
+        response.reason = str(message)
+        return response
+
+    # Blank renders as "fine". Saying nothing was recorded is honest, and
+    # is itself a reportable gap in whichever connector produced the row.
+    response.reason = (
+        f"Reported {status}, but no reason was recorded by the connector."
+    )
+    return response
+
+
 def _apply_check_freshness(
     response: IntegrationStatusResponse,
     checked_at,
@@ -302,7 +360,7 @@ def _status_for(connector, latest_checks) -> IntegrationStatusResponse:
         # Still goes through the freshness rule: "no check" must report
         # unknown rather than inheriting whatever the connector's own
         # describe-yourself call implied.
-        return _apply_check_freshness(response, None)
+        return _explain_status(_apply_check_freshness(response, None))
 
     health = latest_check.health_status
     response.status = health.value if hasattr(health, "value") else str(health)
@@ -335,6 +393,10 @@ def _status_for(connector, latest_checks) -> IntegrationStatusResponse:
         )
         response.metadata = {**(response.metadata or {}), "raw_details": meta}
 
+
+    # Last, so it sees the final status -- including a downgrade to
+    # `unknown` by the freshness rule -- and the merged metadata.
+    _explain_status(response)
     return response
 
 

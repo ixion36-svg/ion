@@ -253,9 +253,14 @@ PROBES = [
     Probe("Arkime", "arkime",
           "http://127.0.0.1:8005/api/user", (ARKIME_USER, ARKIME_PASS),
           arkime_ready, "PCAP retrieval"),
-    Probe("TIDE", "tide-app",
-          "http://127.0.0.1:8501/", None, tide_ready,
-          "detection inventory"),
+    # TIDE 6.0.2 runs behind its own nginx, which terminates TLS on 443;
+    # tide-app itself no longer publishes a port, so the container to watch
+    # is the proxy. The certificate is CN=tide.local with no SAN, which no
+    # modern client will verify, hence the loopback exception -- see
+    # _tls_context, which refuses it for anything but a loopback host.
+    Probe("TIDE", "tide-nginx",
+          "https://127.0.0.1/", None, tide_ready,
+          "detection inventory", insecure_tls=True),
     Probe("GitLab", "ion-gitlab",
           "http://127.0.0.1:8929/users/sign_in", None, gitlab_ready,
           "detection-as-code"),
