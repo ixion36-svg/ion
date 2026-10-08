@@ -5,6 +5,7 @@ indicators, and threat actors associated with given IOC values.
 """
 
 import asyncio
+import re
 import threading
 import logging
 from typing import Any, Dict, List, Optional
@@ -97,6 +98,133 @@ class OpenCTIError(Exception):
     def __init__(self, message: str, status_code: Optional[int] = None):
         super().__init__(message)
         self.status_code = status_code
+
+
+#: Which STIX pattern assertion actually speaks about each ION observable
+#: type, and whether the compared value is case-significant.
+#:
+#: Separate from ``OpenCTIService.TYPE_MAP``, which maps to OpenCTI *entity*
+#: types for the observable lookup. A pattern names the STIX SCO type and a
+#: property path instead, and the two are not interchangeable: an
+#: ``IPv4-Addr`` entity is matched by ``ipv4-addr:value``, while a
+#: ``StixFile`` entity is matched by several different hash properties that
+#: must not be mixed with one another.
+#:
+#: The third element marks values where case carries no meaning. DNS names
+#: and hex digests are case-insensitive, so folding them keeps true positives
+#: that differ only in case. URL paths and file names are case-significant,
+#: so folding them would invent matches.
+_PATTERN_PROPERTY = {
+    "ipv4-addr": ("ipv4-addr", "value", False),
+    "ipv6-addr": ("ipv6-addr", "value", True),
+    "domain-name": ("domain-name", "value", True),
+    "url": ("url", "value", False),
+    "email-addr": ("email-addr", "value", True),
+    "file-sha256": ("file", "sha256", True),
+    "file-sha1": ("file", "sha1", True),
+    "file-md5": ("file", "md5", True),
+    "file-name": ("file", "name", False),
+    # ION's own aliases, mirroring TYPE_MAP so a value arriving from the
+    # alert pipeline verifies the same way as one typed into the UI.
+    "ip": ("ipv4-addr", "value", False),
+    "domain": ("domain-name", "value", True),
+    "hostname": ("domain-name", "value", True),
+    "source_ip": ("ipv4-addr", "value", False),
+    "destination_ip": ("ipv4-addr", "value", False),
+}
+
+#: One comparison inside a STIX pattern: ``<object>:<property> <op> '<value>'``.
+#:
+#: Deliberately a scan for comparisons rather than a parse of the pattern
+#: grammar. Qualifiers (WITHIN, REPEATS, START/STOP), observation grouping
+#: and AND/OR all affect *when* a pattern fires, never which value it is
+#: about, and a half-written grammar would reject real feed patterns. The
+#: question here is only "does this pattern assert this value".
+_PATTERN_COMPARISON = re.compile(
+    r"(?P<obj>[A-Za-z0-9_-]+)\s*:\s*"
+    r"(?P<prop>[A-Za-z0-9_.\-'\"\[\]]+?)\s*"
+    r"(?P<op>!=|=)\s*"
+    r"(?P<q>['\"])(?P<val>(?:\\.|(?!(?P=q)).)*)(?P=q)",
+    re.DOTALL,
+)
+
+
+def _normalise_property(prop: str) -> str:
+    """Reduce a pattern property path to a comparable key.
+
+    STIX allows the hash key to be quoted or not and spelled with or without
+    a hyphen, so ``hashes.'SHA-256'``, ``hashes.SHA-256`` and
+    ``hashes.SHA256`` are the same claim and must compare equal. Everything
+    else is lowercased only.
+    """
+    key = prop.strip().strip("'\"").lower()
+    if key.startswith("hashes."):
+        return key[len("hashes."):].strip("'\"").replace("-", "")
+    return key
+
+
+def _unescape_pattern_value(value: str) -> str:
+    """Undo STIX pattern escaping of quotes and backslashes."""
+    return (
+        value.replace("\\'", "'")
+        .replace('\\"', '"')
+        .replace("\\\\", "\\")
+    )
+
+
+def pattern_asserts(
+    pattern: Optional[str], obs_type: str, obs_value: Optional[str]
+) -> bool:
+    """Whether ``pattern`` claims ``obs_value`` is the given observable.
+
+    This is the guard between OpenCTI's full-text indicator search and ION
+    calling something a match. ``indicators(search: ...)`` matches an
+    indicator's name, description and pattern, so searching a value returns
+    rows that merely *mention* it: a malicious URL hosted on github.com comes
+    back for a lookup of ``github.com``, and every reporter name and
+    reference URL sitting in a description is matchable too. Accepting those
+    made every shared hosting platform a standing false positive.
+
+    An indicator already carries the answer in its STIX pattern, which names
+    the observable type and the exact value. So a candidate counts only when
+    its pattern asserts *this* value for a *compatible* type, with ``=``
+    rather than ``!=``.
+
+    Returns False rather than raising on anything unparseable. Patterns come
+    from third-party feeds, and the honest answer to "is this a match" for a
+    pattern we cannot read is no, not a 500 on the enrichment endpoint.
+    """
+    if not pattern or not obs_value or not str(obs_value).strip():
+        return False
+
+    target = _PATTERN_PROPERTY.get((obs_type or "").strip().lower())
+    if target is None:
+        # An unmapped type cannot be verified, and an unverifiable match is
+        # not a match. Logged because it means a caller is using a type the
+        # map has not caught up with.
+        logger.debug(
+            "No pattern property mapping for observable type %r", obs_type
+        )
+        return False
+
+    want_obj, want_prop, fold = target
+    wanted = str(obs_value).strip()
+    if fold:
+        wanted = wanted.lower()
+
+    for m in _PATTERN_COMPARISON.finditer(pattern):
+        if m.group("op") != "=":
+            continue  # "!=" asserts the opposite of a match.
+        if m.group("obj").strip().lower() != want_obj:
+            continue
+        if _normalise_property(m.group("prop")) != want_prop:
+            continue
+        found = _unescape_pattern_value(m.group("val")).strip()
+        if fold:
+            found = found.lower()
+        if found == wanted:
+            return True
+    return False
 
 
 class OpenCTIService:
@@ -536,6 +664,27 @@ class OpenCTIService:
             edges = data.get("indicators", {}).get("edges", [])
             if not edges:
                 return None
+
+            # OpenCTI's `search` is full-text over name, description and
+            # pattern, so these are candidates, not matches. Keep only the
+            # ones whose pattern actually asserts this value for this type.
+            verified = [
+                e for e in edges
+                if pattern_asserts(
+                    (e.get("node") or {}).get("pattern"), obs_type, obs_value
+                )
+            ]
+            if not verified:
+                # Say so at debug rather than silently: a value that keeps
+                # drawing candidates none of which verify is either a popular
+                # hosting platform or a gap in the property map.
+                logger.debug(
+                    "OpenCTI returned %d indicator candidate(s) for %s=%s, "
+                    "none asserting that value",
+                    len(edges), obs_type, obs_value,
+                )
+                return None
+            edges = verified
 
             indicators = []
             labels = []
