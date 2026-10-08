@@ -32,6 +32,7 @@ from ion.models.workforce import (
     RoleProfileVersion,
     UserJourney,
 )
+from ion.services import coverage_service
 from ion.services import workforce_service as wf
 from ion.web.api import get_db_session
 
@@ -858,6 +859,26 @@ def establishment(
     tonight just as much as an empty post is.
     """
     return wf.establishment_summary(session)
+
+
+@router.get("/coverage", dependencies=[Depends(require_workforce_module)])
+def coverage(
+    session: Session = Depends(get_db_session),
+    _user: User = Depends(require_permission("workforce:read")),
+) -> dict:
+    """Who could cover each day-to-day pillar, and on what evidence.
+
+    Separate from /establishment, which counts posts. This counts
+    capability, a different question: a fully established SOC can still
+    have nobody who can do forensics, and six filled L1 posts do not
+    cover threat intelligence.
+
+    The three bases stay in separate fields on purpose. Collapsing them
+    into one number turns "three analysts who rated themselves 4 out of
+    5" into "three forensics analysts", and the people reading this
+    screen will believe it.
+    """
+    return coverage_service.pillar_coverage(session)
 
 
 @router.post("/establishment/from-catalogue",

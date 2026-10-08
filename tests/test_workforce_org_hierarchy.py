@@ -132,8 +132,8 @@ class TestTheTree:
         tree = wf.org_tree(db)
         ops = find_unit(tree, "Operations")
         assert ops is not None
-        assert ops["lead"] is not None
-        assert "Lead Analyst" in ops["lead"]["title"]
+        assert len(ops["leads"]) == 1
+        assert "Lead Analyst" in ops["leads"][0]["title"]
         assert all("Lead Analyst" not in p["title"] for p in ops["posts"])
 
     def test_a_unit_with_no_lead_is_not_an_error(self, db, lead):
@@ -142,7 +142,7 @@ class TestTheTree:
         wf.establish_from_catalogue(db, actor=lead)
         ops = find_unit(wf.org_tree(db), "Operations")
         assert ops is not None
-        assert ops["lead"] is None
+        assert ops["leads"] == []
         assert ops["posts"]
 
     def test_an_empty_lead_post_is_counted_as_a_gap(self, db, lead):
@@ -194,8 +194,7 @@ class TestTheManager:
         tree = wf.org_tree(db)
         root = find_unit(tree, "SOC")
         assert root is not None
-        assert root["lead"] is not None
-        assert "SOC Manager" in root["lead"]["title"]
+        assert [p["title"] for p in root["leads"]] == ["SOC Manager"]
 
     def test_the_functions_sit_under_it(self, db, lead):
         adopt(db, lead, "soc_manager", "lead_analyst", "l1_soc_analyst")
@@ -203,6 +202,80 @@ class TestTheManager:
         tree = wf.org_tree(db)
         root = find_unit(tree, "SOC")
         assert {c["name"] for c in root["children"]} >= {"Operations"}
+
+
+class TestTheSOCLeadAndTheManager:
+    """Both head the SOC, and they are not the same job.
+
+    The manager is accountable for the service: cover, capability, budget,
+    the people. The SOC Lead runs it day to day, and the functional leads
+    answer to them. A SOC can have one, the other, or both.
+
+    They sit on the same unit, which the tree used to handle by keeping
+    one lead post per unit in a dict keyed on unit id -- so the second
+    silently replaced the first and vanished from the page and from the
+    gap count. A head nobody can see is worse than no head at all.
+    """
+
+    def test_both_sit_at_the_root(self, db, lead):
+        adopt(db, lead, "soc_manager", "soc_lead", "l1_soc_analyst")
+        wf.establish_from_catalogue(db, actor=lead)
+        root = find_unit(wf.org_tree(db), "SOC")
+        assert sorted(p["title"] for p in root["leads"]) == [
+            "SOC Lead", "SOC Manager"]
+
+    def test_neither_is_dropped_from_the_gap_count(self, db, lead):
+        """The silent-overwrite bug showed up here as one gap, not two."""
+        adopt(db, lead, "soc_manager", "soc_lead")
+        wf.establish_from_catalogue(db, actor=lead)
+        assert wf.org_tree(db)["leads_gapped"] == 2
+
+    def test_the_functional_leads_are_below_them(self, db, lead):
+        adopt(db, lead, "soc_lead", "lead_analyst", "l1_soc_analyst")
+        wf.establish_from_catalogue(db, actor=lead)
+        tree = wf.org_tree(db)
+        assert [p["title"] for p in find_unit(tree, "SOC")["leads"]] == \
+            ["SOC Lead"]
+        assert [p["title"] for p in find_unit(tree, "Operations")["leads"]] == \
+            ["Lead Analyst"]
+
+    def test_the_soc_lead_is_not_inside_a_function(self, db, lead):
+        """Under Operations they would be the analysis lead, which is the
+        Lead Analyst's job."""
+        adopt(db, lead, "soc_lead", "l1_soc_analyst")
+        wf.establish_from_catalogue(db, actor=lead)
+        unit = db.query(OrgUnit).filter_by(name="Operations").one()
+        titles = {p.title for p in db.query(OrgPost).filter_by(unit_id=unit.id)}
+        assert not any("SOC Lead" in t for t in titles)
+
+
+class TestTheFunctionsWithoutLeads:
+    """Incident response, threat intelligence and governance have no lead
+    role in the catalogue, deliberately.
+
+    They are small functions -- one or two people -- and inventing a lead
+    post for each would put three permanent vacancies on the ORBAT that no
+    SOC this size intends to fill. They answer to the SOC Lead directly.
+    """
+
+    @pytest.mark.parametrize("unit_name,role_id", [
+        ("Incident Response", "incident_responder"),
+        ("Threat Intelligence", "cti_analyst"),
+        ("Governance", "grc_analyst"),
+    ])
+    def test_the_function_has_members_and_no_lead_post(self, db, lead,
+                                                       unit_name, role_id):
+        adopt(db, lead, role_id)
+        wf.establish_from_catalogue(db, actor=lead)
+        unit = find_unit(wf.org_tree(db), unit_name)
+        assert unit is not None
+        assert unit["posts"], unit_name
+        assert unit["leads"] == [], unit_name
+
+    def test_they_do_not_inflate_the_lead_gap_count(self, db, lead):
+        adopt(db, lead, "incident_responder", "cti_analyst", "grc_analyst")
+        wf.establish_from_catalogue(db, actor=lead)
+        assert wf.org_tree(db)["leads_gapped"] == 0
 
 
 class TestTheNewRoles:

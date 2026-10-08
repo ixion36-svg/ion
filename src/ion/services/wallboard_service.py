@@ -838,6 +838,7 @@ def _collect_org(session: Session, today=None) -> Dict[str, Any]:
     in the ORBAT: somebody in a post but still in training is not cover
     tonight.
     """
+    from ion.services import coverage_service as cov
     from ion.services import duty_roster_service as duty
     from ion.services import workforce_service as wf
 
@@ -867,9 +868,27 @@ def _collect_org(session: Session, today=None) -> Dict[str, Any]:
         key=lambda r: (-r["gap"], r["role"]),
     )[:5]
 
+    # Capability alongside headcount, because they fail separately. A
+    # fully established SOC can still have nobody who does forensics, and
+    # the post count reads as fine the whole time that is true.
+    try:
+        coverage = cov.pillar_coverage(session, today=today)
+    except Exception:  # pragma: no cover - the board must not go down
+        logger.exception("pillar coverage failed for the wallboard")
+        coverage = {"measured": False, "uncovered": 0,
+                    "self_rated_pillars": 0, "pillars": []}
+
     rota = duty.rota_summary(session, weeks=6, today=today)
     return {
         "established": established,
+        # Separate from the post figures above: one is how many people the
+        # SOC has, the other is what they can actually do.
+        "pillars_total": len(coverage["pillars"]),
+        "pillars_uncovered": coverage["uncovered"],
+        "pillars_self_rated": coverage["self_rated_pillars"],
+        # False means nobody has recorded anything, which is not the same
+        # as nobody being capable and must not be rendered as a gap.
+        "pillars_measured": coverage["measured"],
         "filled": summary.get("filled", 0),
         "filling": summary.get("filling", 0),
         "gap": summary.get("gap", 0),
@@ -906,6 +925,8 @@ def _gather(session: Session) -> Dict[str, Any]:
             "established": 0, "filled": 0, "filling": 0, "gap": 0,
             "has_establishment": False, "headline": "Staffing unavailable.",
             "worst": [], "leads_gapped": 0, "duty_unfilled_weeks": 0,
+            "pillars_total": 0, "pillars_uncovered": 0,
+            "pillars_self_rated": 0, "pillars_measured": False,
             "duty": {"assigned": False, "user": None, "acknowledged": False,
                      "summary": "Duty rota unavailable."},
         }),

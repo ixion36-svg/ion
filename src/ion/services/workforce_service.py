@@ -255,6 +255,11 @@ def adopt_catalogue_role(session: Session, role_id: str, *,
     if existing is not None:
         # Adopting twice is a double click or a re-run, not a request for
         # a second copy of the same role.
+        if existing.catalogue_id is None:
+            # Adopted before the column existed. Linking it now is what
+            # lets coverage see which pillars the role answers for.
+            existing.catalogue_id = role_id
+            session.commit()
         return existing
 
     profile = create_profile(
@@ -273,6 +278,8 @@ def adopt_catalogue_role(session: Session, role_id: str, *,
         ),
         skills_role_id=entry.get("skills_role_id"),
     )
+    profile.catalogue_id = role_id
+    session.commit()
     version = draft_version(session, profile)
 
     ordering = 0
@@ -1530,8 +1537,10 @@ def establish_from_catalogue(session: Session, *, actor: User) -> dict:
             continue  # already established; leave the lead's numbers alone
 
         # A role that leads the whole SOC sits on the root; one that leads
-        # a function sits in that function, marked as its head.
-        if entry["id"] == "soc_manager":
+        # a function sits in that function, marked as its head. The root
+        # can hold more than one: the SOC Lead runs it day to day and the
+        # SOC Manager is accountable for it, and they are not the same job.
+        if entry.get("leads") == "soc":
             unit, is_lead = root, True
         elif entry.get("leads"):
             unit = unit_for(_CATEGORY_UNITS.get(entry["leads"], "Other"), root)
@@ -1665,11 +1674,17 @@ def org_tree(session: Session) -> dict:
             "state": state, "occupant": occupant, "is_lead": post.is_lead,
         }
         if post.is_lead:
-            # Kept apart so the page can render it above the members. A
+            # Kept apart so the page can render these above the members. A
             # lead post nobody holds is the gap most worth seeing --
             # "nobody answers for detection engineering tonight" -- and it
             # disappears into the list otherwise.
-            leads[post.unit_id] = row
+            #
+            # A list rather than one per unit, because the root legitimately
+            # has two heads: the SOC Lead runs the floor and the SOC
+            # Manager is accountable for the service. Keyed singly, the
+            # second silently replaced the first and vanished from both
+            # the page and the gap count.
+            leads.setdefault(post.unit_id, []).append(row)
             if state == "gapped":
                 leads_gapped += 1
         else:
@@ -1678,10 +1693,10 @@ def org_tree(session: Session) -> dict:
     def node(unit: OrgUnit) -> dict:
         return {
             "id": unit.id, "name": unit.name,
-            # None rather than an error when a unit has no lead: a small
+            # Empty rather than an error when a unit has no lead: a small
             # SOC may run one manager and no functional leads, and
             # reporting that as a fault would be noise.
-            "lead": leads.get(unit.id),
+            "leads": leads.get(unit.id, []),
             "posts": by_unit.get(unit.id, []),
             "children": [node(c) for c in units if c.parent_id == unit.id],
         }

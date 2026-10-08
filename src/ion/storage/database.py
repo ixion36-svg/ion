@@ -1175,6 +1175,13 @@ def _run_migrations(engine: Engine) -> None:
             # roles live in role_skills_service as code, not as rows.
             _add_column_tolerant(
                 engine, "role_profiles", "skills_role_id", "VARCHAR(64)")
+        if "catalogue_id" not in existing:
+            # Which SOC role catalogue entry this profile was adopted
+            # from. Needed because the profile name is not a safe key:
+            # renaming a role to a house title would unlink it from the
+            # catalogue, and pillar coverage would read as a gap.
+            _add_column_tolerant(
+                engine, "role_profiles", "catalogue_id", "VARCHAR(64)")
 
     if insp.has_table("org_posts"):
         existing = {col["name"] for col in insp.get_columns("org_posts")}

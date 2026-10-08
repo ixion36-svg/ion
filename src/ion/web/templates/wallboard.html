@@ -277,6 +277,30 @@
          alerts are already on the alerts panel; the dedicated ticker
          feature still renders inside the main app shell. -->
 
+    <!-- People. A board that shows alert counts and nothing about who is
+         dealing with them answers half the question, and the first thing
+         anybody asks when something lands out of hours is who to call.
+
+         A strip rather than a seventh panel: the grid above is six fixed
+         cells on a wall display, and shrinking all of them to add this
+         would cost more than it buys. -->
+    <section id="wb-org" class="shrink-0 mt-4 rounded-[12px] border
+             border-base-300 bg-base-200 px-5 py-3 flex items-center gap-5
+             text-[13px]">
+      <span class="label-tiny text-base-content/50 shrink-0">People</span>
+      <span id="wb-org-duty" class="font-semibold text-base-content
+            tabular-nums">&mdash;</span>
+      <span class="text-base-content/20">&middot;</span>
+      <span id="wb-org-posts" class="text-base-content/70 tabular-nums"
+            >&mdash;</span>
+      <span id="wb-org-leads" class="badge badge-error badge-sm hidden
+            tabular-nums"></span>
+      <span id="wb-org-pillars" class="badge badge-sm hidden tabular-nums"
+            ></span>
+      <span id="wb-org-note" class="label-tiny text-base-content/40 ml-auto
+            text-right"></span>
+    </section>
+
   </div>
 
   <!-- Embed Lucide icon sprite (subset used here) -->
@@ -654,6 +678,70 @@ function deltaHtml(curr, prev, goodDown) {
          `<span class="text-slate-600"> vs prev 24h</span>`;
 }
 
+function renderOrg(o) {
+  // Every branch here says what it means rather than showing a number
+  // that reads as fine by default. An empty duty line looks like a panel
+  // that has not loaded, "0 gaps" with nothing established looks fully
+  // staffed, and an unmeasured pillar looks covered. All three are
+  // wrong in the direction that stops somebody acting.
+  const duty = o.duty || {};
+  const dutyEl = $('wb-org-duty');
+  if (duty.assigned && duty.user) {
+    dutyEl.textContent = duty.user.name + ' on duty';
+    // A rota entry nobody picked up is a plan, not cover, and the
+    // difference matters on the Monday somebody is off sick.
+    dutyEl.className = duty.acknowledged
+      ? 'font-semibold text-base-content tabular-nums'
+      : 'font-semibold text-warning tabular-nums';
+    if (!duty.acknowledged) { dutyEl.textContent += ' (not acknowledged)'; }
+  } else {
+    dutyEl.textContent = 'Nobody on duty this week';
+    dutyEl.className = 'font-semibold text-warning tabular-nums';
+  }
+
+  $('wb-org-posts').textContent = o.headline || '\u2014';
+
+  const leads = $('wb-org-leads');
+  if (o.leads_gapped) {
+    // Counted apart from the post gaps: a function with nobody answering
+    // for it is a different kind of short from being an analyst down.
+    leads.textContent = o.leads_gapped + ' with no lead';
+    leads.classList.remove('hidden');
+  } else {
+    leads.classList.add('hidden');
+  }
+
+  const pillars = $('wb-org-pillars');
+  if (!o.pillars_measured) {
+    pillars.textContent = 'capability unmeasured';
+    pillars.className = 'badge badge-sm badge-ghost tabular-nums';
+    pillars.classList.remove('hidden');
+  } else if (o.pillars_uncovered) {
+    pillars.textContent = o.pillars_uncovered + ' of ' + o.pillars_total +
+      ' pillars uncovered';
+    pillars.className = 'badge badge-sm badge-error tabular-nums';
+    pillars.classList.remove('hidden');
+  } else if (o.pillars_self_rated) {
+    pillars.textContent = o.pillars_self_rated + ' self-rated only';
+    pillars.className = 'badge badge-sm badge-warning tabular-nums';
+    pillars.classList.remove('hidden');
+  } else {
+    pillars.classList.add('hidden');
+  }
+
+  const note = $('wb-org-note');
+  if (o.duty_unfilled_weeks) {
+    note.textContent = o.duty_unfilled_weeks + ' week(s) ahead with nobody' +
+      (o.duty_next_unfilled ? ', from ' + o.duty_next_unfilled : '');
+  } else if ((o.worst || []).length) {
+    note.textContent = 'shortest: ' + o.worst.slice(0, 2).map(function (r) {
+      return r.role + ' \u2212' + r.gap;
+    }).join(', ');
+  } else {
+    note.textContent = '';
+  }
+}
+
 function renderAttention(a) {
   a = a || {};
   const el = $('wb-attention'); if (!el) return;
@@ -692,6 +780,7 @@ async function refresh() {
     renderBob(s.bob || {});
     renderRules(s.rules || {});
     renderThreatLandscape(s.threat_landscape || {});
+    renderOrg(s.org || {});
     $('wb-cache-age').textContent = 'refreshed ' + fmtAge(s.cache_age_seconds || 0);
   } catch (e) {
     console.error('refresh error', e);

@@ -110,6 +110,16 @@ class RoleProfile(Base, TimestampMixin):
     skills_role_id: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True
     )
+    # The SOC role catalogue entry this profile was adopted from, if any.
+    #
+    # Kept because the name is not a safe key. A SOC that renames "SOC
+    # Analyst (L1)" to its own house title would stop matching the
+    # catalogue, and everything reading it downstream -- which pillars the
+    # role is accountable for, which certificates are expected -- would go
+    # blank rather than fail. Null for a profile somebody wrote themselves.
+    catalogue_id: Mapped[Optional[str]] = mapped_column(
+        String(64), nullable=True
+    )
 
     versions: Mapped[list["RoleProfileVersion"]] = relationship(
         "RoleProfileVersion", back_populates="profile", cascade="all, delete-orphan",

@@ -164,13 +164,50 @@ class TestTheDutyLine:
         assert panel["duty_unfilled_weeks"] >= 1
 
 
+class TestCapabilityNotJustHeadcount:
+    """Posts and capability fail separately.
+
+    A fully established SOC can have nobody who does forensics, and the
+    post count reads as fine the whole time that is true. Both go on the
+    board, apart, so neither can stand in for the other.
+    """
+
+    def test_nothing_recorded_is_not_reported_as_uncovered(self, db):
+        panel = _collect_org(db)
+        assert panel["pillars_measured"] is False
+        assert panel["pillars_uncovered"] == 0
+
+    def test_a_staffed_soc_with_one_function_covered_shows_the_rest(
+            self, db, lead):
+        establish(db, lead, "incident_responder")
+        person = User(username="s", email="s@x", password_hash="x",
+                      display_name="Sam Reilly", is_active=True)
+        db.add(person)
+        db.commit()
+        profile = db.query(wf.RoleProfile).filter(
+            wf.RoleProfile.catalogue_id == "incident_responder").one()
+        version = wf.latest_published(db, profile.id)
+        journey = wf.assign_profile(db, user=person, version=version,
+                                    assigner=lead)
+        journey.stage = wf.STAGE_OPERATIONAL
+        db.commit()
+
+        panel = _collect_org(db)
+        assert panel["pillars_measured"] is True
+        assert panel["pillars_total"] == 10
+        # Incident response is covered; the other nine are not.
+        assert panel["pillars_uncovered"] == 9
+
+
 class TestItNeverBreaksTheBoard:
     def test_the_panel_has_a_stable_shape(self, db):
         """The renderer reads these keys whatever state the SOC is in."""
         panel = _collect_org(db)
         for key in ("established", "filled", "filling", "gap",
                     "has_establishment", "headline", "worst", "duty",
-                    "leads_gapped", "duty_unfilled_weeks"):
+                    "leads_gapped", "duty_unfilled_weeks", "pillars_total",
+                    "pillars_uncovered", "pillars_self_rated",
+                    "pillars_measured"):
             assert key in panel, key
 
     def test_it_is_wired_into_the_snapshot(self):

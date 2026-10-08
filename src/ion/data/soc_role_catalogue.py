@@ -49,9 +49,16 @@ CATEGORIES = (
 #: tier is the seniority band used to match training scenarios and to sort
 #: the ORBAT; it mirrors role_skills_service's T1-T4 where they overlap.
 #:
-#: ``leads`` names the category this role heads. A role with it is placed
-#: above that unit's members rather than beside them, because a flat list
-#: of posts does not say who answers for the function.
+#: ``leads`` names the category this role heads, or ``"soc"`` for a role
+#: that heads the whole thing. A role with it is placed above that unit's
+#: members rather than beside them, because a flat list of posts does not
+#: say who answers for the function.
+#:
+#: Incident response, threat intelligence and governance have no lead
+#: role on purpose. At one or two people each, a lead post per function
+#: would put permanent vacancies on the ORBAT that a SOC this size never
+#: intends to fill; they answer to the SOC Lead directly. A SOC big
+#: enough to want one adds it -- the catalogue is a starting point.
 SOC_ROLE_CATALOGUE: List[Dict[str, Any]] = [
     # ---------------------------------------------------------------- ops
     {
@@ -215,11 +222,36 @@ SOC_ROLE_CATALOGUE: List[Dict[str, Any]] = [
         ],
     },
     {
+        "id": "soc_lead",
+        "name": "SOC Lead",
+        "category": "operations",
+        "tier": "T4",
+        "common": True,
+        "leads": "soc",
+        "typical_establishment": 1,
+        "description": (
+            "Runs the SOC day to day. The functional leads answer to them, "
+            "and so do the functions too small to have a lead of their own."
+        ),
+        "skills_role_id": None,
+        "typical_certifications": [
+            "GIAC GSOM", "GIAC GCIH", "ISACA CISM",
+        ],
+        "core_skills": [
+            "Holding the shape of the day: cover, handover, escalation",
+            "Deciding what gets dropped when the queue beats the team",
+            "Running the standup and the weekly duty rota",
+            "Fronting the SOC in an incident nobody has seen before",
+            "Knowing which function is one person deep",
+        ],
+    },
+    {
         "id": "soc_manager",
         "name": "SOC Manager",
         "category": "operations",
         "tier": "T4",
         "common": True,
+        "leads": "soc",
         "typical_establishment": 1,
         "description": (
             "Accountable for the service: cover, capability, metrics and "
