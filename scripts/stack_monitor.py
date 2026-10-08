@@ -43,7 +43,7 @@ from typing import Callable, Optional
 
 ES_USER = os.environ.get("ION_ES_USER", "elastic")
 ES_PASS = os.environ.get("ION_ES_PASSWORD", "testpassword123")
-ARKIME_USER = os.environ.get("ION_ARKIME_USER", "admin")
+ARKIME_USER = os.environ.get("ION_ARKIME_USER", "arkime")
 ARKIME_PASS = os.environ.get("ION_ARKIME_PASSWORD", "arkime")
 
 TIMEOUT = 6
@@ -179,10 +179,11 @@ def iris_ready(body: str) -> tuple:
 
 
 def arkime_ready(body: str) -> tuple:
+    """/api/user returns the authenticated account, so a 200 here proves the
+    credentials ION uses actually work."""
     d = json.loads(body)
-    return d.get("status") in ("green", "yellow"), (
-        f"ES {d.get('status')}, {d.get('number_of_nodes')} node(s)"
-    )
+    user = d.get("userId") or d.get("userName") or "?"
+    return bool(d), f"authenticated as '{user}'"
 
 
 def tide_ready(body: str) -> tuple:
@@ -245,8 +246,12 @@ PROBES = [
     Probe("DFIR-IRIS", "iris-app",
           "http://127.0.0.1:8100/login", None, iris_ready,
           "case escalation"),
+    # /api/user, not /eshealth.json: the latter needs no authentication, so
+    # it went green while ION -- which calls /api/user -- was getting 401
+    # against a username that does not exist. A health probe that skips the
+    # auth the real caller uses is not probing the same thing.
     Probe("Arkime", "arkime",
-          "http://127.0.0.1:8005/eshealth.json", (ARKIME_USER, ARKIME_PASS),
+          "http://127.0.0.1:8005/api/user", (ARKIME_USER, ARKIME_PASS),
           arkime_ready, "PCAP retrieval"),
     Probe("TIDE", "tide-app",
           "http://127.0.0.1:8501/", None, tide_ready,
