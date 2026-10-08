@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
 from pydantic import BaseModel
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import require_permission
 from ion.core.concurrency import map_bounded

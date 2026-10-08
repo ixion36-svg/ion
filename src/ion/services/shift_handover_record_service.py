@@ -43,7 +43,6 @@ from ion.models.shift_handover import (
     ShiftHandover,
     ShiftHandoverAction,
 )
-from ion.models.user import User
 from ion.services.shift_handover_service import generate_shift_report
 
 logger = logging.getLogger(__name__)

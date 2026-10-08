@@ -39,7 +39,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Sequence
+from typing import Optional, Sequence
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session

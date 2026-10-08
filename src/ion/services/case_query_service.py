@@ -39,7 +39,7 @@ bug to be told about.
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
