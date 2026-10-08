@@ -51,6 +51,8 @@ async def enrich_pcap_observables(result, is_private_fn) -> dict:
         # Create IP observables
         for ip in list(seen_ips)[:50]:  # Cap at 50 to avoid flooding
             try:
+                if obs_service._allowlisted("ipv4", ip):
+                    continue
                 obs, created = obs_service.get_or_create(ObservableType.IPV4, ip)
                 observables.append(obs)
             except Exception as e:

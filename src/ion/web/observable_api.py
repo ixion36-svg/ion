@@ -1133,3 +1133,215 @@ def disable_auto_enrich(
         return {"success": True, "auto_enrich": obs.auto_enrich}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=safe_error(e))
+
+
+# ---------------------------------------------------------------------------
+# Allowlist
+#
+# ION's per-observable switches (is_whitelisted, is_ignored,
+# ignore_similarity) are reactive: the observable has to exist and be wrong
+# before anyone can mark it. These endpoints manage the proactive list --
+# values, ranges and suffixes that never become observables at all.
+#
+# Creation needs observable:delete rather than observable:create. Adding an
+# allowlist entry stops sightings being recorded, which is destructive in a
+# way that creating one is not, so it sits with the permission that already
+# governs removing evidence.
+# ---------------------------------------------------------------------------
+
+
+class AllowlistCreate(BaseModel):
+    """One allowlist entry."""
+
+    match_type: str = Field(
+        ..., description="exact | cidr | domain_suffix | wildcard"
+    )
+    pattern: str = Field(..., min_length=1, max_length=512)
+    # Required, and min_length=1 so an empty string is rejected at the edge
+    # rather than reaching the service. An entry nobody can review is
+    # permanent.
+    reason: str = Field(..., min_length=1, max_length=2000)
+    observable_type: Optional[str] = Field(
+        None, description="ip | domain | url | user | hash | ... (omit for any)"
+    )
+    expires_at: Optional[str] = Field(
+        None, description="ISO-8601. Honoured: an expired entry stops matching."
+    )
+
+
+@router.get("/observables/allowlist")
+def list_allowlist(
+    include_inactive: bool = Query(True),
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+) -> dict:
+    """The allowlist, with what each entry has actually suppressed."""
+    from ion.services import observable_allowlist_service as allowlist
+
+    entries = allowlist.list_entries(session, include_inactive=include_inactive)
+    return {
+        "entries": [e.to_dict() for e in entries],
+        "summary": allowlist.review_summary(session),
+    }
+
+
+@router.post("/observables/allowlist", status_code=201)
+def create_allowlist_entry(
+    body: AllowlistCreate,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:delete")),
+) -> dict:
+    """Add an allowlist entry."""
+    from datetime import datetime
+
+    from ion.services import observable_allowlist_service as allowlist
+
+    expires = None
+    if body.expires_at:
+        try:
+            expires = datetime.fromisoformat(body.expires_at.replace("Z", "+00:00"))
+        except ValueError:
+            raise HTTPException(400, "expires_at must be ISO-8601") from None
+
+    try:
+        entry = allowlist.add_entry(
+            session,
+            match_type=body.match_type,
+            pattern=body.pattern,
+            reason=body.reason,
+            observable_type=body.observable_type,
+            expires_at=expires,
+            created_by=user.username,
+            created_by_id=user.id,
+        )
+    except allowlist.AllowlistError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+    AuditLogRepository(session).log(
+        user_id=user.id,
+        action="observable_allowlist_add",
+        resource_type="observable_allowlist",
+        resource_id=str(entry.id),
+        details={
+            "match_type": entry.match_type,
+            "pattern": entry.pattern,
+            "observable_type": entry.observable_type,
+            "reason": entry.reason,
+        },
+    )
+    session.commit()
+    return entry.to_dict()
+
+
+@router.post("/observables/allowlist/{entry_id}/disable")
+def disable_allowlist_entry(
+    entry_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:delete")),
+) -> dict:
+    """Stop an entry suppressing, without losing its history."""
+    from ion.services import observable_allowlist_service as allowlist
+
+    try:
+        entry = allowlist.set_active(session, entry_id, False)
+    except allowlist.AllowlistError as exc:
+        raise HTTPException(404, str(exc)) from None
+    AuditLogRepository(session).log(
+        user_id=user.id, action="observable_allowlist_disable",
+        resource_type="observable_allowlist", resource_id=str(entry_id),
+        details={"pattern": entry.pattern},
+    )
+    session.commit()
+    return entry.to_dict()
+
+
+@router.post("/observables/allowlist/{entry_id}/enable")
+def enable_allowlist_entry(
+    entry_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:delete")),
+) -> dict:
+    """Put a disabled entry back into effect."""
+    from ion.services import observable_allowlist_service as allowlist
+
+    try:
+        entry = allowlist.set_active(session, entry_id, True)
+    except allowlist.AllowlistError as exc:
+        raise HTTPException(404, str(exc)) from None
+    AuditLogRepository(session).log(
+        user_id=user.id, action="observable_allowlist_enable",
+        resource_type="observable_allowlist", resource_id=str(entry_id),
+        details={"pattern": entry.pattern},
+    )
+    session.commit()
+    return entry.to_dict()
+
+
+@router.delete("/observables/allowlist/{entry_id}")
+def delete_allowlist_entry(
+    entry_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:delete")),
+) -> dict:
+    """Remove an entry entirely.
+
+    Disabling is usually better: it keeps the hit count and the reason, so
+    the next person to wonder why a value stopped appearing can find out.
+    """
+    from ion.services import observable_allowlist_service as allowlist
+
+    try:
+        allowlist.delete_entry(session, entry_id)
+    except allowlist.AllowlistError as exc:
+        raise HTTPException(404, str(exc)) from None
+    AuditLogRepository(session).log(
+        user_id=user.id, action="observable_allowlist_delete",
+        resource_type="observable_allowlist", resource_id=str(entry_id),
+        details={},
+    )
+    session.commit()
+    return {"success": True, "deleted": entry_id}
+
+
+@router.post("/observables/allowlist/preview")
+def preview_allowlist_entry(
+    body: AllowlistCreate,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("observable:read")),
+) -> dict:
+    """What an entry would suppress, before committing to it.
+
+    Checked against the observables already recorded. A pattern that would
+    hide three hundred existing sightings is a different proposition from
+    one that hides two, and the time to find that out is before saving.
+    """
+    from ion.services.observable_allowlist import (
+        AllowlistRule,
+        MatchType,
+        normalise_pattern,
+    )
+
+    try:
+        mt = MatchType(str(body.match_type).strip().lower())
+        canonical = normalise_pattern(mt, body.pattern)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from None
+
+    rule = AllowlistRule(
+        pattern=canonical, match_type=mt,
+        observable_type=(body.observable_type or None),
+    )
+    matched = [
+        o for o in session.query(Observable).limit(10000).all()
+        if rule.matches(o.type.value if hasattr(o.type, "value") else str(o.type), o.value)
+    ]
+    return {
+        "pattern": canonical,
+        "match_type": mt.value,
+        "would_suppress": len(matched),
+        "examples": [
+            {"id": o.id, "type": str(o.type), "value": o.value,
+             "sighting_count": o.sighting_count}
+            for o in matched[:20]
+        ],
+    }

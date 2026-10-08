@@ -681,6 +681,11 @@ def _link_pcap_observables(case_id: int, pcap_result: Optional[Any]) -> None:
         linked_count = 0
         for obs_type, value, context in items:
             try:
+                # Automatic extraction, so the allowlist applies: a capture
+                # of a busy host otherwise fills the case with the corporate
+                # ranges and resolvers somebody already said to ignore.
+                if service._allowlisted(str(obs_type), str(value)):
+                    continue
                 obs, created = service.get_or_create(obs_type, value)
                 if created:
                     created_count += 1

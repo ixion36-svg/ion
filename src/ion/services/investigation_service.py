@@ -961,6 +961,34 @@ def _kev_lines(text: Any) -> List[str]:
         return []
 
 
+#: Subtrees of an alert that the rule author wrote, rather than the event.
+#:
+#: A Kibana security alert carries the whole rule definition beside the
+#: matched event, and an investigation guide routinely contains example
+#: IPs, domains and hashes. ``false_positives`` is the sharpest case: that
+#: field exists to list values which are explicitly benign.
+#:
+#: Walking those values made every IOC a rule author ever typed into their
+#: documentation an observable on every alert that rule raised, attached to
+#: a host that never touched it. Reported from a live SOC, 2026-10-08.
+#:
+#: Matched on the path, never on the field name, so a process called
+#: ``rule.exe`` or a user called ``note`` is still evidence. The whole rule
+#: subtree goes rather than a list of leaf names: nothing under it is
+#: event-derived, and Kibana mirrors most of it under ``.parameters``, so a
+#: leaf-by-leaf list would let the same text back in by another path.
+#:
+#: ``kibana.alert.reason`` is deliberately absent from this list. It is
+#: generated per alert from the matched event, so a hostname in it is a
+#: real sighting and excluding it would lose true positives.
+_AUTHORED_SUBTREES = (
+    ("kibana", "alert", "rule"),
+    ("signal", "rule"),            # the pre-8.x alert format
+    ("kibana", "alert", "ancestors"),
+    ("rule",),                     # some forwarders flatten it to the root
+)
+
+
 def _alert_to_text_blob(alert: dict) -> str:
     """Flatten an alert dict into a single text blob for IOC extraction.
 
@@ -969,6 +997,10 @@ def _alert_to_text_blob(alert: dict) -> str:
     were fed to the domain regex and mis-extracted as domain IOCs (their last
     label is a real TLD). Walking values-only structurally prevents that, while
     still surfacing hostnames/URLs/hashes embedded in message/reason fields.
+
+    It also skips the rule-definition subtrees in ``_AUTHORED_SUBTREES``,
+    which is the same lesson one level up: the *values* of fields the rule
+    author wrote are no more evidence than the field names were.
     """
     import ipaddress
 
@@ -988,15 +1020,26 @@ def _alert_to_text_blob(alert: dict) -> str:
         except ValueError:
             return False
 
-    def _walk(node) -> None:
+    def _is_authored(path: tuple) -> bool:
+        return any(path[:len(p)] == p for p in _AUTHORED_SUBTREES)
+
+    def _walk(node, path: tuple = ()) -> None:
         if isinstance(node, dict):
             for k, v in node.items():
+                # Dotted keys appear when an alert has been flattened, so
+                # the path has to be extended by each segment or
+                # {"kibana.alert.rule.note": ...} would slip past.
+                child = path + tuple(k.split(".")) if isinstance(k, str) else path + (k,)
+                if _is_authored(child):
+                    continue
                 if _is_ip_key(k):
                     parts.append(k)
-                _walk(v)
+                _walk(v, child)
         elif isinstance(node, (list, tuple)):
             for v in node:
-                _walk(v)
+                # A list index is not a path segment: the elements belong
+                # to the list's own path.
+                _walk(v, path)
         elif node is not None and not isinstance(node, bool):
             parts.append(str(node))
 
