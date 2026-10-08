@@ -24,9 +24,17 @@ from ion.models.detection_proposal import (
     DetectionProposalSource,
     DetectionProposalStatus,
 )
-from ion.services.de_metrics_service import fp_alerts_for_rule, get_noise_campaigns
+from ion.services.de_metrics_service import (
+    fp_alerts_for_rule,
+    get_noise_campaigns,
+    tp_alerts_for_rule,
+)
 
 _CHANGE_TYPES = {c.value for c in DetectionProposalChangeType}
+
+#: Below this much post-change observation there is no honest percentage
+#: to quote, so none is quoted. Review 2026-10-08 §7.
+MIN_OBSERVATION_DAYS = 3
 
 
 def _now() -> datetime:
@@ -198,8 +206,22 @@ def decide_proposal(
 def measure_outcome(
     session: Session, proposal_id: int, days: int = 30
 ) -> Dict[str, Any]:
-    """Measure realized noise drop for an APPLIED proposal: rule FP count in the
-    `days` before `applied_at` vs since `applied_at`. Persists to outcome_json."""
+    """Measure the realised noise change for an APPLIED proposal.
+
+    Review 2026-10-08 §7: this used to compare the full ``days`` before
+    ``applied_at`` against however long had elapsed since, which could be
+    a single day. A rule closing 3 FPs a day, still closing 3 a day,
+    scored a 96.7% "drop" on its first day. ``days_observed`` and a
+    causality caveat were recorded, but the percentage was what people
+    read, and it flattered every change that had only just landed.
+
+    The record now leads with ``comparable``: equal-length windows, so
+    the baseline shrinks to match the observation period, plus per-day
+    rates and an explicit refusal to quote a percentage before
+    :data:`MIN_OBSERVATION_DAYS`. ``confirmed_threats`` travels alongside,
+    so a change that silenced true positives cannot read as a pure win.
+    The original uneven keys are kept so existing readers still work.
+    """
     p = session.get(DetectionProposal, proposal_id)
     if p is None:
         raise ValueError("proposal not found")
@@ -210,25 +232,94 @@ def measure_outcome(
 
     now = _now()
     applied = p.applied_at
-    before_start = applied - timedelta(days=days)
     after_end = min(now, applied + timedelta(days=days))
+    observed = max(after_end - applied, timedelta(0))
+    observed_days_exact = observed.total_seconds() / 86400.0
+    days_observed = max(0, observed.days)
+
+    # ── The uneven figures, kept for compatibility and context ──────────
+    before_start = applied - timedelta(days=days)
     before = fp_alerts_for_rule(session, p.rule_name, before_start, applied)
     after = fp_alerts_for_rule(session, p.rule_name, applied, after_end)
-    days_observed = max(0, (after_end - applied).days)
-
     drop_pct: Optional[float] = None
     if before > 0:
         drop_pct = round((before - after) / before * 100, 1)
+
+    # ── The comparable figures: same duration either side of the change ─
+    cmp_before_start = applied - observed
+    cmp_before = fp_alerts_for_rule(session, p.rule_name, cmp_before_start, applied)
+    cmp_after = after  # the observed window IS the after window
+    sufficient = observed_days_exact >= MIN_OBSERVATION_DAYS
+
+    cmp_drop_pct: Optional[float] = None
+    reason = ""
+    if not sufficient:
+        reason = (
+            f"Only {observed_days_exact:.1f} days observed since the change; "
+            f"at least {MIN_OBSERVATION_DAYS} are needed before a percentage "
+            "means anything."
+        )
+    elif cmp_before == 0:
+        reason = (
+            "No false-positive closures in the matched window before the "
+            "change, so there is no baseline to reduce."
+        )
+    else:
+        cmp_drop_pct = round((cmp_before - cmp_after) / cmp_before * 100, 1)
+
+    def _per_day(count: int) -> Optional[float]:
+        if observed_days_exact <= 0:
+            return None
+        return round(count / observed_days_exact, 2)
+
+    comparable = {
+        "window_days": days_observed,
+        "window_days_exact": round(observed_days_exact, 2),
+        "before_count": cmp_before,
+        "after_count": cmp_after,
+        "before_per_day": _per_day(cmp_before),
+        "after_per_day": _per_day(cmp_after),
+        "drop_pct": cmp_drop_pct,
+        "sufficient_observation": sufficient,
+        "min_observation_days": MIN_OBSERVATION_DAYS,
+        "reason": reason,
+    }
+
+    # ── What the change may have cost ───────────────────────────────────
+    tp_before = tp_alerts_for_rule(session, p.rule_name, cmp_before_start, applied)
+    tp_after = tp_alerts_for_rule(session, p.rule_name, applied, after_end)
+    confirmed_threats = {
+        "window_days": days_observed,
+        "before_count": tp_before,
+        "after_count": tp_after,
+        # Worth a human look rather than a verdict: the rule used to
+        # confirm threats in a window this long and now confirms none.
+        "lost_confirmed_threats": tp_before > 0 and tp_after == 0,
+    }
+
     outcome = {
+        # Original keys — the uneven full-window comparison.
         "before_count": before,
         "after_count": after,
         "window_days": days,
         "days_observed": days_observed,
         "drop_pct": drop_pct,
+        "uneven_comparison": True,
+        # What should actually be quoted.
+        "comparable": comparable,
+        "confirmed_threats": confirmed_threats,
+        "headline": comparable["drop_pct"],
+        "total_volume": {
+            "before_count": before,
+            "after_count": after,
+            "full_window_days": days,
+        },
         "measured_at": now.isoformat(),
         "note": (
             "Fewer FP closures observed since the change was applied is consistent "
-            "with the tuning working; it is not proof of causation."
+            "with the tuning working; it is not proof of causation. Quote the "
+            "comparable figures: the before_count/after_count at the top of this "
+            "record cover windows of different length."
         ),
     }
     p.outcome_json = outcome

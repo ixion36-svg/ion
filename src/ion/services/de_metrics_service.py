@@ -50,6 +50,7 @@ from ion.services.ai_feedback_dedupe import (
 
 _FALSE_POSITIVE = "false_positive"
 _BENIGN_TP = "benign_true_positive"
+_TRUE_POSITIVE = "true_positive"
 _UNMAPPED = "(unmapped)"
 
 
@@ -283,6 +284,37 @@ def fp_alerts_for_rule(
         .select_from(AlertTriage)
         .join(AlertCase, AlertTriage.case_id == AlertCase.id)
         .where(AlertCase.closure_reason.in_(reasons))
+        .where(AlertCase.closed_at.is_not(None))
+        .where(AlertCase.closed_at >= start)
+        .where(AlertCase.closed_at < end)
+    )
+    if rule_name == _UNMAPPED:
+        q = q.where(AlertTriage.rule_name.is_(None))
+    else:
+        q = q.where(AlertTriage.rule_name == rule_name)
+    return int(session.execute(q).scalar_one())
+
+
+def tp_alerts_for_rule(
+    session: Session, rule_name: str, start: datetime, end: datetime
+) -> int:
+    """Count confirmed-threat closures for one rule with ``start <= closed_at < end``.
+
+    The counterpart to :func:`fp_alerts_for_rule`, so outcome measurement
+    can report what a tuning change cost as well as what it saved. Review
+    2026-10-08 §7: a fall in noise is only good news if the rule still
+    catches real threats, and the outcome record showed noise alone.
+
+    ``benign_true_positive`` is excluded whatever the benign-as-FP toggle
+    says: a benign true positive is not a confirmed threat, and counting
+    it here would let a display toggle change whether a rule appears to be
+    catching intrusions.
+    """
+    q = (
+        select(func.count())
+        .select_from(AlertTriage)
+        .join(AlertCase, AlertTriage.case_id == AlertCase.id)
+        .where(AlertCase.closure_reason == _TRUE_POSITIVE)
         .where(AlertCase.closed_at.is_not(None))
         .where(AlertCase.closed_at >= start)
         .where(AlertCase.closed_at < end)

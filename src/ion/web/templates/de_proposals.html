@@ -163,9 +163,40 @@ function dpPill(status){
 function dpOutcome(p){
     const o = p.outcome;
     if(!o) return p.status === 'applied' ? '<div class="bg-base-300 rounded p-2 mt-2 text-sm opacity-60">Not yet measured.</div>' : '';
-    const drop = (o.drop_pct === null || o.drop_pct === undefined) ? 'n/a' : (o.drop_pct + '%');
-    return '<div class="bg-base-300 rounded p-2 mt-2 text-sm">Noise drop <strong>' + drop + '</strong> — '
-        + o.before_count + ' FP before vs ' + o.after_count + ' after (' + o.days_observed + 'd observed)</div>';
+
+    // Quote the equal-window comparison, never the top-level drop_pct:
+    // that one divides a full 30-day baseline by however little time has
+    // passed since the change, so it flatters anything applied recently.
+    const c = o.comparable;
+    if(!c){
+        // Outcome measured before this fix — say so rather than quote it
+        // as though the windows matched.
+        const legacy = (o.drop_pct === null || o.drop_pct === undefined) ? 'n/a' : (o.drop_pct + '%');
+        return '<div class="bg-base-300 rounded p-2 mt-2 text-sm opacity-70">Legacy measurement: '
+            + legacy + ' (uneven windows — re-measure for a comparable figure)</div>';
+    }
+
+    if(!c.sufficient_observation || c.drop_pct === null || c.drop_pct === undefined){
+        return '<div class="bg-base-300 rounded p-2 mt-2 text-sm">'
+            + '<strong>Not enough observation yet</strong> — '
+            + c.before_count + ' FP before vs ' + c.after_count + ' after over '
+            + c.window_days_exact + 'd each way'
+            + (c.reason ? '<div class="opacity-70 mt-1">' + dpEsc(c.reason) + '</div>' : '')
+            + '</div>';
+    }
+
+    const threats = o.confirmed_threats || {};
+    const lost = threats.lost_confirmed_threats
+        ? '<div class="text-warning mt-1">No confirmed threats from this rule since the change ('
+          + threats.before_count + ' in the matched window before) — check it has not silenced a real detection.</div>'
+        : '';
+
+    return '<div class="bg-base-300 rounded p-2 mt-2 text-sm">Noise drop <strong>' + c.drop_pct + '%</strong> — '
+        + c.before_count + ' FP before vs ' + c.after_count + ' after, matched '
+        + c.window_days_exact + 'd windows ('
+        + c.before_per_day + '/d → ' + c.after_per_day + '/d)'
+        + lost
+        + '</div>';
 }
 
 function dpRender(items){
@@ -268,8 +299,10 @@ async function dpMeasure(id){
         const r = await fetch(DP_API + '/' + id + '/measure-outcome', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({days:30})});
         if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
         const o = await r.json();
-        const drop = (o.drop_pct === null || o.drop_pct === undefined) ? 'n/a' : (o.drop_pct + '%');
-        dpToast('Measured: ' + drop + ' drop (' + o.before_count + '→' + o.after_count + ' FP)','success');
+        const c = o.comparable || {};
+        const drop = (c.drop_pct === null || c.drop_pct === undefined) ? 'n/a' : (c.drop_pct + '%');
+        dpToast('Measured: ' + drop + ' drop over matched ' + c.window_days_exact
+                + 'd windows (' + c.before_count + '→' + c.after_count + ' FP)','success');
         dpLoad();
     } catch(e){ dpToast('Measure failed: ' + (e.message||e),'error'); }
 }
