@@ -59,6 +59,12 @@ class PinSourceType(str, Enum):
     # the rows the analyst selected. source_ref = "query:<uuid>" so a rerun
     # becomes a second pin instead of overwriting the original evidence.
     QUERY = "query"
+    # A finding from a PCAP analysis job. pin_metadata carries the
+    # capture provenance (filename, sha256, parser version, job id),
+    # the finding itself, the traffic that supports it, and its
+    # evidential basis -- a heuristic inference is not a confirmed
+    # threat and the pin must not read as one.
+    PCAP = "pcap"
 
 
 class FindingStatus(str, Enum):

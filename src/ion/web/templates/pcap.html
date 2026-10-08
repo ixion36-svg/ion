@@ -73,6 +73,16 @@
     white-space: nowrap; transition: color .15s, border-color .15s;
 }
 .pcap-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.pcap-attach-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+    padding: .6rem .75rem; margin-bottom: .75rem; border-radius: .5rem;
+    background: var(--bg-elevated, rgba(255,255,255,.03)); }
+.pcap-attach-hint { flex: 1 1 18rem; font-size: .78rem; color: var(--text-secondary); }
+.pcap-pick { display: inline-flex; align-items: center; margin-right: .4rem; }
+.pcap-history-row { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem;
+    padding: .55rem .7rem; border-bottom: 1px solid var(--border, rgba(255,255,255,.08));
+    font-size: .82rem; }
+.pcap-history-row:last-child { border-bottom: 0; }
+.pcap-history-row .mono { font-family: ui-monospace, monospace; opacity: .65; }
 .pcap-tab:hover { color: var(--text-primary); }
 
 /* Tab panels */
@@ -283,6 +293,7 @@
             <button class="pcap-tab hidden" data-panel="email" id="tab-email">Email <span id="email-count-badge" class="badge hidden"></span></button>
             <button class="pcap-tab" data-panel="graph" id="tab-graph">Network Graph</button>
             <button class="pcap-tab" data-panel="findings">Findings <span id="findings-count-badge" class="badge hidden"></span></button>
+            <button class="pcap-tab" data-panel="history">History</button>
             <button class="pcap-tab" data-panel="threatintel">Threat Intel <span id="ti-count-badge" class="badge hidden"></span></button>
         </div>
 
@@ -312,6 +323,7 @@
         <div class="pcap-panel" id="panel-email"></div>
         <div class="pcap-panel" id="panel-graph"></div>
         <div class="pcap-panel" id="panel-findings"></div>
+        <div class="pcap-panel" id="panel-history"></div>
         <div class="pcap-panel" id="panel-threatintel"></div>
     </div>
 </div>
@@ -398,7 +410,11 @@
             progressBar.style.width = '60%';
             progressText.textContent = 'Analyzing network traffic...';
 
-            const resp = await fetch('/api/pcap/analyze', { method: 'POST', body: formData });
+            // The durable job endpoint, not /analyze: the analysis is
+            // recorded so it can be reopened without re-uploading, and an
+            // identical capture already parsed is served from the stored
+            // result (review 2026-10-08 s13).
+            const resp = await fetch('/api/pcap/jobs', { method: 'POST', body: formData });
             if (!resp.ok) {
                 const err = await resp.json().catch(() => ({ detail: resp.statusText }));
                 throw new Error(err.detail || 'Analysis failed');
@@ -406,8 +422,16 @@
             progressBar.style.width = '100%';
             progressText.textContent = 'Rendering results...';
 
-            const data = await resp.json();
-            renderResults(data);
+            const payload = await resp.json();
+            const job = payload.job || {};
+            _currentJobId = job.id || null;
+            if (job.status === 'failed') throw new Error(job.error || 'Analysis failed');
+            if (job.reused_from_id) {
+                showToast('Identical capture already analysed - showing the stored result (job #'
+                          + job.reused_from_id + ')', 'info');
+            }
+            renderResults(job.result || {});
+            loadPcapHistory();
 
             progress.style.display = 'none';
             resultsDiv.classList.add('visible');
@@ -1125,9 +1149,132 @@
         if (none) none.style.display = shown ? 'none' : 'block';
     }
 
+    /* Durable jobs (review 2026-10-08 s13). The analysis is recorded, so it
+       can be reopened without re-uploading and its findings can be moved
+       onto a case as evidence. */
+    let _currentJobId = null;
+    let _pcapCases = null;
+
+    async function loadPcapCaseOptions() {
+        const select = document.getElementById('pcap-attach-case');
+        if (!select) return;
+        if (_pcapCases === null) {
+            try {
+                const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN');
+                _pcapCases = r.ok ? ((await r.json()).cases || []) : [];
+            } catch (e) {
+                _pcapCases = [];
+            }
+        }
+        select.innerHTML = _pcapCases.length
+            ? '<option value="">Select a case...</option>' + _pcapCases.map(c =>
+                  '<option value="' + esc(String(c.id)) + '">'
+                  + esc((c.case_number ? c.case_number + ' - ' : '') + (c.title || ('Case ' + c.id)))
+                  + '</option>').join('')
+            : '<option value="">No open cases</option>';
+    }
+
+    async function attachSelectedFindings() {
+        if (!_currentJobId) {
+            showToast('Analyse a capture first', 'info');
+            return;
+        }
+        const picked = [...document.querySelectorAll('.pcap-finding-pick:checked')]
+            .map(cb => parseInt(cb.dataset.findingIndex, 10))
+            .filter(n => !isNaN(n));
+        if (!picked.length) {
+            showToast('Tick the findings you want to attach', 'error');
+            return;
+        }
+        const caseEl = document.getElementById('pcap-attach-case');
+        const caseId = caseEl ? caseEl.value : '';
+        if (!caseId) {
+            showToast('Pick the case this evidence belongs to', 'error');
+            return;
+        }
+        try {
+            const r = await fetch('/api/pcap/jobs/' + _currentJobId + '/attach', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ case_id: parseInt(caseId, 10),
+                                       finding_indexes: picked }),
+            });
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.detail || ('HTTP ' + r.status));
+            // Zero created with no error means they were already on the case,
+            // which is the end state the analyst wanted.
+            const parts = [];
+            if (d.attached_count) parts.push(d.attached_count + ' attached');
+            if (d.already_attached) parts.push(d.already_attached + ' already on the case');
+            showToast(parts.join(', ') || 'Nothing to do', 'success');
+            document.querySelectorAll('.pcap-finding-pick:checked')
+                .forEach(cb => { cb.checked = false; });
+        } catch (e) {
+            showToast('Could not attach: ' + (e.message || e), 'error');
+        }
+    }
+
+    async function loadPcapHistory() {
+        const panel = document.getElementById('panel-history');
+        if (!panel) return;
+        try {
+            const r = await fetch('/api/pcap/jobs?limit=50');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const rows = (await r.json()).jobs || [];
+            if (!rows.length) {
+                panel.innerHTML = '<div class="text-center p-10"><p class="text-[var(--text-secondary)] text-[.9rem]">No captures analysed yet.</p></div>';
+                return;
+            }
+            panel.innerHTML = rows.map(j => {
+                const tone = j.status === 'completed' ? 'badge-success'
+                           : j.status === 'failed' ? 'badge-error'
+                           : j.status === 'cancelled' ? 'badge-ghost' : 'badge-warning';
+                const verdictLabel = (j.verdict && typeof j.verdict === 'object')
+                    ? (j.verdict.label || '') : (j.verdict || '');
+                return '<div class="pcap-history-row">'
+                    + '<span class="badge ' + tone + '">' + esc(j.status) + '</span>'
+                    + '<span>' + esc(j.filename) + '</span>'
+                    + '<span class="mono">' + esc((j.content_sha256 || '').slice(0, 12)) + '</span>'
+                    + '<span class="mono">' + fmtBytes(j.file_size || 0) + '</span>'
+                    + (verdictLabel ? '<span>' + esc(String(verdictLabel)) + '</span>' : '')
+                    + '<span>' + (j.finding_count || 0) + ' finding' + (j.finding_count === 1 ? '' : 's') + '</span>'
+                    + (j.reused_from_id ? '<span class="mono">reused from #' + j.reused_from_id + '</span>' : '')
+                    + '<span class="mono">parser ' + esc(j.parser_version) + '</span>'
+                    + '<span class="mono">' + esc(j.requested_by || 'unknown') + '</span>'
+                    + (j.status === 'completed'
+                        ? '<button type="button" class="btn btn-xs pcap-reopen" data-job-id="' + j.id + '">Reopen</button>'
+                        : '')
+                    + '</div>';
+            }).join('');
+            panel.querySelectorAll('.pcap-reopen').forEach(btn => {
+                btn.addEventListener('click', () => reopenPcapJob(parseInt(btn.dataset.jobId, 10)));
+            });
+        } catch (e) {
+            panel.innerHTML = '<div class="p-6 text-[var(--text-secondary)]">Could not load the analysis history.</div>';
+        }
+    }
+
+    async function reopenPcapJob(jobId) {
+        try {
+            const r = await fetch('/api/pcap/jobs/' + jobId);
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            const job = await r.json();
+            _currentJobId = job.id;
+            renderResults(job.result || {});
+            dropZone.style.display = 'none';
+            resultsDiv.classList.add('visible');
+            showToast('Reopened job #' + job.id + ' without re-uploading', 'success');
+        } catch (e) {
+            showToast('Could not reopen that analysis: ' + (e.message || e), 'error');
+        }
+    }
+
     function renderFindings(d) {
         const panel = document.getElementById('panel-findings');
-        const items = (d.findings || []).slice();
+        // _idx is the finding's index in the stored result. The cards are
+        // sorted by severity below, so display order is not stored order --
+        // attaching by display position would pin the wrong finding.
+        const items = (d.findings || []).map((f, i) => Object.assign({ _idx: i }, f));
         _findingsFilter = null;
         if (!items.length) {
             panel.innerHTML =
@@ -1159,6 +1306,9 @@
                 : '';
             return `<div class="finding-card ${esc(f.severity)}" data-sev="${esc(f.severity)}">
                 <div class="finding-header">
+                    <label class="pcap-pick" title="Select to attach to a case">
+                        <input type="checkbox" class="pcap-finding-pick" data-finding-index="${f._idx}">
+                    </label>
                     <span class="finding-sev ${esc(f.severity)}">${esc(f.severity)}</span>
                     <span class="finding-cat">${esc(f.category)}</span>
                 </div>
@@ -1177,8 +1327,17 @@
                 ${chip('total', 'All')}${chip('critical', 'Critical')}${chip('high', 'High')}${chip('medium', 'Medium')}${chip('low', 'Low')}
             </div>
             ${rollup}
+            <div class="pcap-attach-bar">
+                <span class="pcap-attach-hint">Tick findings to attach them to a case as evidence. Each pin records whether it is an observation, a signature match, an indicator match or an inference.</span>
+                <select id="pcap-attach-case" class="select select-sm"><option value="">Loading cases...</option></select>
+                <button type="button" class="btn btn-sm btn-primary" id="pcap-attach-btn">Attach selected</button>
+            </div>
             <div id="findings-list">${cards}</div>
             <div class="findings-empty-filter ion-u-hidden">No findings at this severity.</div>`;
+
+        loadPcapCaseOptions();
+        const attachBtn = panel.querySelector('#pcap-attach-btn');
+        if (attachBtn) attachBtn.addEventListener('click', attachSelectedFindings);
 
         panel.querySelectorAll('.triage-chip').forEach(ch => {
             if (ch.classList.contains('zero')) return;

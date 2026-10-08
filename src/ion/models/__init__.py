@@ -194,6 +194,10 @@ from ion.models.sla import (
     # with the services that were their only callers.
 )
 
+from ion.models.pcap_job import (  # noqa: F401
+    PcapJob,
+    PcapJobStatus,
+)
 from ion.models.integration_sync import (  # noqa: F401
     SyncAttempt,
     SyncStatus,
@@ -260,6 +264,8 @@ from ion.models.worklog import (  # noqa: F401
 
 __all__ = [
     "Base",
+    "PcapJob",
+    "PcapJobStatus",
     "SyncAttempt",
     "SyncStatus",
     "ShiftHandover",

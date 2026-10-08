@@ -1186,6 +1186,45 @@ def _run_migrations(engine: Engine) -> None:
             if col_name not in existing:
                 _add_column_tolerant(engine, "journey_requirements", col_name, col_type)
 
+    # Durable PCAP analysis jobs (review 2026-10-08 §13). The standalone
+    # upload used to parse and return without persisting anything.
+    if not insp.has_table("pcap_jobs"):
+        ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+        bool_false = "FALSE" if _is_postgres(engine) else "0"
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE pcap_jobs (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    filename VARCHAR(500) NOT NULL,
+                    file_size INTEGER NOT NULL,
+                    content_sha256 VARCHAR(64) NOT NULL,
+                    parser_version VARCHAR(32) NOT NULL,
+                    status VARCHAR(16) NOT NULL DEFAULT 'queued',
+                    result {'JSONB' if _is_postgres(engine) else 'JSON'},
+                    error TEXT,
+                    requested_by_id INTEGER NOT NULL REFERENCES users(id),
+                    case_id INTEGER REFERENCES alert_cases(id) ON DELETE SET NULL,
+                    started_at {ts_type},
+                    completed_at {ts_type},
+                    duration_ms INTEGER,
+                    cancel_requested BOOLEAN NOT NULL DEFAULT {bool_false},
+                    cancelled_by_id INTEGER REFERENCES users(id),
+                    reused_from_id INTEGER REFERENCES pcap_jobs(id) ON DELETE SET NULL,
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            for stmt in (
+                "CREATE INDEX ix_pcap_jobs_status ON pcap_jobs (status)",
+                "CREATE INDEX ix_pcap_jobs_case ON pcap_jobs (case_id)",
+                "CREATE INDEX ix_pcap_jobs_reuse "
+                "ON pcap_jobs (content_sha256, parser_version, status)",
+                "CREATE INDEX ix_pcap_jobs_requester "
+                "ON pcap_jobs (requested_by_id)",
+            ):
+                conn.execute(text(stmt))
+            logger.info("Migrated: CREATE TABLE pcap_jobs")
+
     # Durable outbound-sync journal (review 2026-10-08, stage 3). Replaces
     # fire-and-forget logging, so a failed Kibana/IRIS mirror becomes a row
     # that can be shown beside the case and retried.
