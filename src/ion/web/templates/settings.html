@@ -608,8 +608,15 @@
             <!-- Backup Actions -->
             <div class="mb-8 pb-6 border-b border-base-300 last:mb-0 last:pb-0 last:border-b-0">
                 <h3 class="text-base font-medium mb-4">Backup & Restore</h3>
+
+                <!-- What these controls actually cover on THIS deployment.
+                     The buttons below copy a SQLite file, which protects
+                     nothing on a PostgreSQL stack, so say so before an
+                     operator trusts a green result. -->
+                <div id="recovery-capability" class="mb-4"></div>
+
                 <div class="flex gap-3 mb-4">
-                    <button class="btn btn-primary" data-click-action="createBackup">Create Backup</button>
+                    <button class="btn btn-primary" id="btn-create-backup" data-click-action="createBackup">Create Backup</button>
                     <button class="btn btn-secondary" data-click-action="loadBackups">Refresh List</button>
                 </div>
 
@@ -2389,7 +2396,49 @@ async function loadDatabaseStats() {
     }
 }
 
+async function loadRecoveryCapability() {
+    const container = document.getElementById('recovery-capability');
+    if (!container) return;
+
+    try {
+        const response = await fetch('/api/admin/database/recovery-capability', {
+            credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Failed to load recovery capability');
+
+        const cap = await response.json();
+        const supported = cap.file_copy_supported;
+        const btn = document.getElementById('btn-create-backup');
+        if (btn) btn.disabled = !supported;
+
+        const guidance = (cap.guidance || [])
+            .map(g => `<li>${escapeHtml(g)}</li>`).join('');
+        const notCovered = (cap.not_covered || [])
+            .map(n => `<li>${escapeHtml(n)}</li>`).join('');
+
+        container.innerHTML = `
+            <div class="alert ${supported ? 'alert-info' : 'alert-warning'} flex-col items-start gap-2 text-left">
+                <div class="font-medium">
+                    ${supported
+                        ? 'Built-in file copy applies to this deployment'
+                        : 'Built-in file copy does not apply to this deployment'}
+                </div>
+                <div class="text-sm opacity-80">
+                    Backend: <code>${escapeHtml(cap.backend || 'unknown')}</code>
+                    &middot; Target: <code>${escapeHtml(cap.target || 'unknown')}</code>
+                </div>
+                <ul class="text-sm list-disc ml-5">${guidance}</ul>
+                <div class="text-sm font-medium mt-1">Not covered by a database backup</div>
+                <ul class="text-sm list-disc ml-5 opacity-80">${notCovered}</ul>
+            </div>`;
+    } catch (error) {
+        container.innerHTML =
+            `<div class="alert alert-warning text-sm">Could not determine backup coverage: ${escapeHtml(error.message)}</div>`;
+    }
+}
+
 async function loadBackups() {
+    loadRecoveryCapability();
     const container = document.getElementById('backups-list');
     container.innerHTML = '<div class="loading">Loading backups...</div>';
 

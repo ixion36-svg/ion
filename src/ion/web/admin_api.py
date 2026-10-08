@@ -1035,6 +1035,129 @@ async def revoke_user_session(
 # Database Management Endpoints
 # =============================================================================
 
+# ---------------------------------------------------------------------------
+# Backend-aware recovery
+#
+# Review 2026-10-08 §22: the backup/restore handlers copied a local SQLite
+# file unconditionally, while the shipped Compose stack runs PostgreSQL. On
+# such a deployment a missing file made Backup 404 with no explanation,
+# and — worse — a stale .db file left from an earlier SQLite run made it
+# report success and a plausible size while protecting nothing. Restore
+# then overwrote that unused file and reported success while PostgreSQL
+# carried on serving the real, unrestored data.
+#
+# A control that reports success without doing anything is worse than one
+# that errors, so these helpers identify the active backend first and the
+# handlers refuse rather than mislead.
+# ---------------------------------------------------------------------------
+
+#: What a database artefact does *not* protect, whatever the backend. The
+#: review asked for an exact manifest rather than an implied one.
+_RECOVERY_NOT_COVERED = [
+    "Forensic evidence files and custody artefacts on disk",
+    "Uploaded documents, PCAPs and chat attachments",
+    "Configuration files and the secrets they hold",
+    "Elasticsearch and Kibana state (indices, cases, saved objects)",
+]
+
+
+def _configured_db_path():
+    """The configured SQLite path. Indirection so tests can point it elsewhere."""
+    return get_config().db_path
+
+
+def _active_db_backend() -> str:
+    """Name the backend ION is actually using right now.
+
+    Mirrors ``get_engine``: ``ION_DATABASE_URL`` wins, otherwise SQLite at
+    the configured ``db_path``. Reported by scheme rather than guessed, so
+    an unrecognised external database is never silently treated as a local
+    file we may copy.
+    """
+    import os
+
+    url = (os.environ.get("ION_DATABASE_URL") or "").strip()
+    if not url:
+        return "sqlite"
+    scheme = url.split("://", 1)[0].split("+", 1)[0].lower()
+    if scheme in ("postgresql", "postgres"):
+        return "postgresql"
+    if scheme == "sqlite":
+        return "sqlite"
+    return scheme or "external"
+
+
+def _safe_db_target() -> str:
+    """A describable backup target with any credentials stripped."""
+    import os
+
+    backend = _active_db_backend()
+    if backend == "sqlite":
+        return str(_configured_db_path())
+
+    url = (os.environ.get("ION_DATABASE_URL") or "").strip()
+    # Keep only what is safe to show: everything after the last '@' is
+    # host/port/database; the userinfo before it holds the password.
+    tail = url.split("@")[-1] if "@" in url else ""
+    return f"{backend}://{tail}" if tail else backend
+
+
+def _recovery_capability() -> dict:
+    """Describe what the built-in recovery controls can and cannot do."""
+    backend = _active_db_backend()
+    file_copy = backend == "sqlite"
+
+    if file_copy:
+        guidance = [
+            "Backup copies the SQLite database file in full.",
+            "Restore replaces it and needs a server restart to take effect.",
+            "Back up evidence, uploads and configuration separately.",
+        ]
+    elif backend == "postgresql":
+        guidance = [
+            "The built-in file copy does not apply to PostgreSQL and is disabled.",
+            "Use pg_dump (or pg_basebackup for a physical copy) against the "
+            "configured server, and store the dump with the evidence and "
+            "configuration archives.",
+            "Verify by restoring into a scratch database and recording the result.",
+        ]
+    else:
+        guidance = [
+            f"ION is using an external {backend} database; the built-in file "
+            "copy does not apply and is disabled.",
+            "Use that engine's own backup tooling and record a restore test.",
+        ]
+
+    return {
+        "backend": backend,
+        "target": _safe_db_target(),
+        "file_copy_supported": file_copy,
+        "guidance": guidance,
+        "not_covered": list(_RECOVERY_NOT_COVERED),
+    }
+
+
+def _assert_file_copy_backend() -> None:
+    """Refuse a file-copy backup/restore on a backend it cannot protect."""
+    capability = _recovery_capability()
+    if capability["file_copy_supported"]:
+        return
+    raise HTTPException(
+        400,
+        detail=(
+            f"Database backend is {capability['backend']}, not a local SQLite "
+            "file, so the built-in file copy would not protect the active "
+            "database. " + " ".join(capability["guidance"])
+        ),
+    )
+
+
+@router.get("/database/recovery-capability")
+async def get_recovery_capability(current_user: User = Depends(require_admin)):
+    """What the built-in backup/restore controls cover on this deployment."""
+    return _recovery_capability()
+
+
 @router.get("/database/stats")
 async def get_database_stats(current_user: User = Depends(require_admin)):
     """Get database statistics."""
@@ -1089,6 +1212,10 @@ async def create_database_backup(request: Request, current_user: User = Depends(
 
     config = get_config()
 
+    # Before touching any file: is a file copy even the right operation
+    # for the database ION is actually serving?
+    _assert_file_copy_backend()
+
     if not config.db_path.exists():
         raise HTTPException(404, "Database file not found")
 
@@ -1127,6 +1254,11 @@ async def create_database_backup(request: Request, current_user: User = Depends(
             "backup_path": str(backup_path),
             "backup_size_mb": round(backup_path.stat().st_size / (1024**2), 2),
             "timestamp": timestamp,
+            # Say what this artefact is and what it leaves out, so a green
+            # result is not mistaken for a protected deployment.
+            "backend": _active_db_backend(),
+            "covers": "SQLite database file only",
+            "not_covered": list(_RECOVERY_NOT_COVERED),
         }
     except Exception as e:
         raise HTTPException(500, f"Backup failed: {safe_error(e, 'backup')}")
@@ -1195,6 +1327,10 @@ async def restore_database_backup(
     if not re.match(r'^ion_backup_\d{8}_\d{6}\.db$', filename):
         raise HTTPException(400, "Invalid backup filename format")
 
+    # Restoring a .db file over a PostgreSQL deployment changes nothing
+    # that ION is serving, so refuse instead of reporting success.
+    _assert_file_copy_backend()
+
     config = get_config()
     backup_path = config.db_path.parent / "backups" / filename
 
@@ -1218,6 +1354,9 @@ async def restore_database_backup(
             "status": "restored",
             "restored_from": filename,
             "pre_restore_backup": str(pre_restore_backup),
+            "backend": _active_db_backend(),
+            "covers": "SQLite database file only",
+            "not_covered": list(_RECOVERY_NOT_COVERED),
             "message": "Database restored successfully. Please restart the server for changes to take effect.",
         }
     except Exception as e:
