@@ -4,10 +4,12 @@ These replace the scattered inline Kibana sync blocks in api.py with
 clean, reusable function calls.
 """
 
+import hashlib
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
 from ion.core.config import get_config
+from ion.services import integration_sync_journal_service as sync_journal
 from ion.services.case_description import build_case_description
 from ion.services.kibana_cases_service import (
     build_ion_custom_fields,
@@ -15,6 +17,16 @@ from ion.services.kibana_cases_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _content_key(content: str) -> str:
+    """Stable short digest of a note's text, for a dedupe key.
+
+    ``hash()`` is salted per process in CPython, so a dedupe key built from
+    it would change across restarts and the same note would get a second
+    journal row. sha256 is stable.
+    """
+    return hashlib.sha256((content or "").encode("utf-8")).hexdigest()[:16]
 
 
 def sync_new_case_to_kibana(
@@ -98,24 +110,83 @@ def sync_new_case_to_kibana(
         return None
 
 
+def _add_comment(kibana_case_id: str, username: str, content: str) -> bool:
+    """Post one comment to a Kibana case. True when Kibana took it.
+
+    Shared by the live path and the journal's retry handler, so a replay
+    sends exactly what the original attempt sent.
+    """
+    service = get_kibana_cases_service()
+    if not service.enabled:
+        # Nothing to sync. Distinct from a failure, and the caller must not
+        # record it as either outcome.
+        return False
+    service.add_comment(kibana_case_id, f"**{username}:** {content}")
+    return True
+
+
+def _retry_note_add(payload: dict) -> bool:
+    """Journal retry handler for a note comment."""
+    return _add_comment(
+        payload.get("kibana_case_id", ""),
+        payload.get("username", "ion"),
+        payload.get("content", ""),
+    )
+
+
 def sync_note_to_kibana(
     kibana_case_id: Optional[str],
     username: str,
     content: str,
+    session=None,
+    case_id: Optional[int] = None,
+    note_id: Optional[int] = None,
 ) -> None:
-    """Sync a note to Kibana as a comment. Fire-and-forget."""
+    """Sync a note to Kibana as a comment. Never raises.
+
+    With a ``session`` the outcome lands in the sync journal, so a failure
+    becomes a durable row that can be shown beside the case and retried
+    instead of only a log line (review 2026-10-08, stage 3). Without one the
+    behaviour is exactly as before, so call sites with no session keep
+    working untouched.
+
+    Nothing is journalled when Kibana is not configured: nothing was
+    attempted and nothing failed, and recording a success would assert a
+    mirror that does not exist.
+    """
     if not kibana_case_id:
         return
 
     try:
-        service = get_kibana_cases_service()
-        if not service.enabled:
+        if not get_kibana_cases_service().enabled:
             return
+    except Exception as e:  # noqa: BLE001 — cannot even tell whether it is on
+        logger.warning("Could not reach the Kibana cases service: %s", e)
+        return
 
-        comment_text = f"**{username}:** {content}"
-        service.add_comment(kibana_case_id, comment_text)
-    except Exception as e:
-        logger.warning("Failed to sync note to Kibana: %s", e)
+    dedupe = (
+        f"kibana:note_add:{note_id}" if note_id is not None
+        # No note id (several callers post a synthesised note). Key on the
+        # case and the content so a repeat of the same text reuses its row
+        # while a different note gets its own.
+        else f"kibana:note_add:case{case_id}:{_content_key(content)}"
+    )
+
+    runner = sync_journal.journalled(
+        session,
+        target="kibana",
+        operation="note_add",
+        entity_type="note",
+        entity_id=note_id if note_id is not None else "unkeyed",
+        dedupe_key=dedupe,
+        payload={
+            "kibana_case_id": kibana_case_id,
+            "username": username,
+            "content": content,
+        },
+        case_id=case_id,
+    )
+    runner(lambda: _add_comment(kibana_case_id, username, content))
 
 
 def sync_case_update_to_kibana(
@@ -236,3 +307,9 @@ def get_kibana_case_url(kibana_case_id: Optional[str]) -> Optional[str]:
         return service.get_case_url(kibana_case_id)
     except Exception:
         return None
+
+
+# Register the journal's retry handlers at import time. The journal has no
+# dependency on this module, so the arrow points this way: the sync helper
+# teaches the journal how to replay its own work.
+sync_journal.register_retry_handler("kibana", "note_add", _retry_note_add)

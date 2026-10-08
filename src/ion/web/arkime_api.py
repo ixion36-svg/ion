@@ -627,7 +627,9 @@ async def arkime_commit(
     if note_id and case.kibana_case_id:
         try:
             from ion.services.kibana_sync_helpers import sync_note_to_kibana
-            sync_note_to_kibana(case.kibana_case_id, current_user.username, note.content)
+            sync_note_to_kibana(case.kibana_case_id, current_user.username,
+                                note.content, session=session,
+                                case_id=case.id, note_id=note_id)
         except Exception as e:
             logger.warning("Failed to sync Arkime note to Kibana: %s", e)
 

@@ -194,6 +194,10 @@ from ion.models.sla import (
     # with the services that were their only callers.
 )
 
+from ion.models.integration_sync import (  # noqa: F401
+    SyncAttempt,
+    SyncStatus,
+)
 from ion.models.shift_handover import (  # noqa: F401
     HandoverActionStatus,
     HandoverStatus,
@@ -256,6 +260,8 @@ from ion.models.worklog import (  # noqa: F401
 
 __all__ = [
     "Base",
+    "SyncAttempt",
+    "SyncStatus",
     "ShiftHandover",
     "ShiftHandoverAction",
     "HandoverStatus",

@@ -121,6 +121,9 @@ class TestDeferredEnrichmentJob:
         import ion.web.case_lifecycle_api as api
 
         note = SimpleNamespace(
+            # id: the sync journal keys its row on the note, so the stub
+            # case's note needs one (review 2026-10-08, stage 3).
+            id=91,
             content="**Auto-closed as Known False Positive**",
             user=SimpleNamespace(username="admin"),
         )
@@ -146,9 +149,12 @@ class TestDeferredEnrichmentJob:
                     "kibana_url": "http://kb/1"}
 
         monkeypatch.setattr(api, "sync_new_case_to_kibana", fake_sync)
+        # **kw absorbs the journalling arguments (session, case_id, note_id).
+        # Without it the TypeError is swallowed by the call site's own
+        # non-raising wrapper and the mirror just silently never happens.
         monkeypatch.setattr(
             api, "sync_note_to_kibana",
-            lambda cid, user, content: mirrored.append((cid, user, content)),
+            lambda cid, user, content, **kw: mirrored.append((cid, user, content)),
         )
 
         api._kibana_create_for_deferred_case(session, case)

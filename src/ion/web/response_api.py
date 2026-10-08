@@ -70,16 +70,18 @@ def _post_execution_note(session: Session, result: dict, username: str) -> None:
         # simulated action can no longer produce a note that reads like
         # real containment (review 2026-10-08 finding 6).
         content = actions.format_action_note(result, username)
-        session.add(
-            Note(
-                entity_type=NoteEntityType.CASE,
-                entity_id=str(case_id),
-                user_id=case.created_by_id,
-                content=content,
-            )
+        note = Note(
+            entity_type=NoteEntityType.CASE,
+            entity_id=str(case_id),
+            user_id=case.created_by_id,
+            content=content,
         )
+        session.add(note)
         session.commit()
-        sync_note_to_kibana(case.kibana_case_id, username, content)
+        # Journalled, so a Kibana outage leaves a retryable row against the
+        # case rather than a containment note that only exists in ION.
+        sync_note_to_kibana(case.kibana_case_id, username, content,
+                            session=session, case_id=case_id, note_id=note.id)
     except Exception as exc:  # never fail the request on the note
         logger.warning("response action note failed for case %s: %s", case_id, exc)
 

@@ -3980,7 +3980,9 @@ async def close_alert(
 
             # Sync note to Kibana
             if case.kibana_case_id:
-                sync_note_to_kibana(case.kibana_case_id, current_user.username, note_content)
+                sync_note_to_kibana(case.kibana_case_id, current_user.username,
+                                    note_content, session=session,
+                                    case_id=case.id)
 
     # For false positives, optionally create KFP entry
     if data.closure_type == "false_positive" and data.create_kfp:

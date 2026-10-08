@@ -315,7 +315,9 @@ def _kibana_create_for_deferred_case(session, case) -> None:
                 if note.content.startswith("[From Kibana"):
                     continue
                 username = note.user.username if note.user else "unknown"
-                sync_note_to_kibana(case.kibana_case_id, username, note.content)
+                sync_note_to_kibana(case.kibana_case_id, username, note.content,
+                                    session=session, case_id=case.id,
+                                    note_id=note.id)
         elif case.source_alert_ids and kb_svc.config.get("case_owner") == "securitySolution":
             space_id = kb_svc.config.get("space_id", "default")
             kb_svc.attach_alerts_to_case(
@@ -592,7 +594,8 @@ async def post_enrichment_note(session, case_id: int, user_id: int, username: st
 
         # Replicate the auto-note side-effects (best-effort, non-raising).
         await _sync_case_to_es(case, session)
-        sync_note_to_kibana(case.kibana_case_id, username, content)
+        sync_note_to_kibana(case.kibana_case_id, username, content,
+                            session=session, case_id=case_id, note_id=note.id)
         return note
     except Exception as e:
         logger.warning("post_enrichment_note failed for case %s: %s", case_id, e)
@@ -1193,7 +1196,9 @@ async def create_case(
             session.commit()
 
             if new_case.kibana_case_id:
-                sync_note_to_kibana(new_case.kibana_case_id, current_user.username, auto_note.content)
+                sync_note_to_kibana(new_case.kibana_case_id, current_user.username,
+                                    auto_note.content, session=session,
+                                    case_id=new_case.id, note_id=auto_note.id)
                 # Mirror the close to Kibana here, as every close path must —
                 # otherwise the Kibana case stays open with only the note and
                 # waits on the periodic reconciler.
@@ -1276,7 +1281,8 @@ async def add_case_note(
     await _sync_case_to_es(case, session)
 
     # Sync note to Kibana as comment
-    sync_note_to_kibana(case.kibana_case_id, current_user.username, data.content)
+    sync_note_to_kibana(case.kibana_case_id, current_user.username, data.content,
+                        session=session, case_id=case_id, note_id=note.id)
 
     return {
         "id": note.id,
@@ -1991,8 +1997,13 @@ async def update_case(
                 content=f"**Case closed as {reason_label}**\n\nNotes: {data.closure_notes or 'N/A'}",
             )
             session.add(closure_note)
+            # Flush for the id the sync journal keys its row on; the
+            # surrounding transaction still commits where it did before.
+            session.flush()
             if case.kibana_case_id:
-                sync_note_to_kibana(case.kibana_case_id, current_user.username, closure_note.content)
+                sync_note_to_kibana(case.kibana_case_id, current_user.username,
+                                    closure_note.content, session=session,
+                                    case_id=case_id, note_id=closure_note.id)
 
             # --- Auto-FP suppression: create KFP + investigation memory ---
             if data.closure_reason == "false_positive":

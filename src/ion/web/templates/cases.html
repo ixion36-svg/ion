@@ -2750,6 +2750,58 @@ function cancelClosure() {
 // =============================================================================
 // Case Detail Panel
 // =============================================================================
+/* Outbound sync health for one case.
+
+   Every Kibana/IRIS mirror used to fail into a log line, so this panel
+   showed a case whose notes ION believed were mirrored and were not. The
+   journal makes each failure a durable row; this surfaces it where the
+   analyst is already looking. "Still retrying" and "given up" are shown
+   separately because they call for different actions. */
+async function loadCaseSyncStatus(caseId) {
+    const host = document.getElementById('case-sync-status');
+    if (!host) return;
+    try {
+        const r = await fetch('/api/integrations/sync-journal/cases/' + encodeURIComponent(caseId));
+        if (!r.ok) { host.innerHTML = ''; return; }
+        const d = await r.json();
+        if (!d.has_problems) { host.innerHTML = ''; return; }
+
+        const rows = (d.unresolved || []).map(a => {
+            const gaveUp = a.status === 'abandoned';
+            const when = gaveUp
+                ? 'not retrying any more'
+                : (a.next_retry_at ? 'next attempt ' + new Date(a.next_retry_at).toLocaleString()
+                                   : 'queued');
+            return '<li>'
+                + '<strong>' + escapeHtml(a.target) + '</strong> '
+                + escapeHtml(a.operation.replace(/_/g, ' '))
+                + ' &mdash; ' + escapeHtml(a.last_error || 'no error recorded')
+                + ' <span class="opacity-60">(' + escapeHtml(when)
+                + ', ' + a.attempt_count + ' attempt' + (a.attempt_count === 1 ? '' : 's')
+                + (gaveUp ? '' : ', ' + a.attempts_remaining + ' left') + ')</span>'
+                + '</li>';
+        }).join('');
+
+        const headline = d.abandoned_count
+            ? d.abandoned_count + ' sync' + (d.abandoned_count === 1 ? '' : 's')
+              + ' to external systems gave up'
+              + (d.retrying_count ? ', ' + d.retrying_count + ' still retrying' : '')
+            : d.retrying_count + ' sync' + (d.retrying_count === 1 ? '' : 's')
+              + ' to external systems ' + (d.retrying_count === 1 ? 'is' : 'are') + ' retrying';
+
+        host.innerHTML = '<div class="alert ' + (d.abandoned_count ? 'alert-error' : 'alert-warning') + '">'
+            + '<div>'
+            + '<div class="font-semibold">' + escapeHtml(headline) + '</div>'
+            + '<div class="text-sm opacity-80 mt-1">This case may not match what the external system shows.</div>'
+            + '<ul class="text-sm mt-2 list-disc ml-5">' + rows + '</ul>'
+            + '</div></div>';
+    } catch (e) {
+        // Diagnostics for a problem elsewhere. Failing to fetch them must
+        // not take a working case panel down with it.
+        host.innerHTML = '';
+    }
+}
+
 async function openCaseDetail(caseId) {
     // The case view lives at its own URL. Outside page mode this function is
     // reached from list cards, attention rows, SLA rows and related-case
@@ -2820,6 +2872,9 @@ async function openCaseDetail(caseId) {
         loadWorkbench(c.id);
         // Timeline annotations
         loadAnnotations(c.id);
+        // Failed outbound sync, shown beside the case it affects rather
+        // than left in a log line (review 2026-10-08, stage 3).
+        loadCaseSyncStatus(c.id);
     } catch (e) {
         // Name the failure. Everything above runs inside one try, so a throw
         // in any of renderPanelContent / applyConfidenceMeters /
@@ -3269,6 +3324,11 @@ function renderPanelContent(c) {
         + '<span class="cpanel-sev-text">' + esc(sev) + ' severity</span>'
         + '<span class="cpanel-sev-detail">' + alertCount + ' alert' + (alertCount !== 1 ? 's' : '') + ' &middot; ' + obsCount + ' observable' + (obsCount !== 1 ? 's' : '') + ' &middot; ' + ageLabel(c.created_at) + ' old</span>'
         + '</div>';
+
+    // Filled asynchronously by loadCaseSyncStatus(), and left empty when
+    // nothing has drifted. Above the tabs on purpose: a case whose Kibana
+    // mirror is behind is misleading on every tab, not just one.
+    html += '<div id="case-sync-status"></div>';
 
     // tab nav. Sections below carry data-tab="…" attributes
     // so switchPanelTab(tabName) can show/hide them. Default tab is

@@ -1186,6 +1186,46 @@ def _run_migrations(engine: Engine) -> None:
             if col_name not in existing:
                 _add_column_tolerant(engine, "journey_requirements", col_name, col_type)
 
+    # Durable outbound-sync journal (review 2026-10-08, stage 3). Replaces
+    # fire-and-forget logging, so a failed Kibana/IRIS mirror becomes a row
+    # that can be shown beside the case and retried.
+    if not insp.has_table("integration_sync_attempts"):
+        ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+        with engine.begin() as conn:
+            conn.execute(text(f"""
+                CREATE TABLE integration_sync_attempts (
+                    id INTEGER PRIMARY KEY {'GENERATED ALWAYS AS IDENTITY' if _is_postgres(engine) else 'AUTOINCREMENT'},
+                    target VARCHAR(32) NOT NULL,
+                    operation VARCHAR(48) NOT NULL,
+                    entity_type VARCHAR(32) NOT NULL,
+                    entity_id VARCHAR(128) NOT NULL,
+                    case_id INTEGER REFERENCES alert_cases(id) ON DELETE CASCADE,
+                    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+                    payload {'JSONB' if _is_postgres(engine) else 'JSON'},
+                    attempt_count INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT,
+                    last_attempt_at {ts_type},
+                    next_retry_at {ts_type},
+                    resolved_at {ts_type},
+                    dedupe_key VARCHAR(255) NOT NULL,
+                    created_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    updated_at {ts_type} DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT uq_integration_sync_dedupe UNIQUE (dedupe_key)
+                )
+            """))
+            for stmt in (
+                "CREATE INDEX ix_integration_sync_status "
+                "ON integration_sync_attempts (status)",
+                "CREATE INDEX ix_integration_sync_case "
+                "ON integration_sync_attempts (case_id)",
+                "CREATE INDEX ix_integration_sync_retry "
+                "ON integration_sync_attempts (status, next_retry_at)",
+                "CREATE INDEX ix_integration_sync_target "
+                "ON integration_sync_attempts (target)",
+            ):
+                conn.execute(text(stmt))
+            logger.info("Migrated: CREATE TABLE integration_sync_attempts")
+
     # Shift handover as an accountable transfer (review 2026-10-08 §17).
     # Base.metadata.create_all makes these on a fresh database; the blocks
     # below add them to an existing deployment. Both FK targets (users,

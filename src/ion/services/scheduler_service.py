@@ -951,3 +951,36 @@ def get_scheduler_service() -> _SchedulerService:
     if _scheduler_service is None:
         _scheduler_service = _SchedulerService()
     return _scheduler_service
+
+
+@register_handler(
+    "sync_retry",
+    label="Retry failed integration syncs",
+    description=(
+        "Replay outbound Kibana/DFIR-IRIS syncs that failed, once their "
+        "backoff has elapsed. A sync whose retry budget is spent is left "
+        "abandoned for an operator to requeue, not retried forever."
+    ),
+    parameters=[
+        {
+            "name": "limit",
+            "label": "Maximum syncs per run",
+            "type": "integer",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 500,
+            "help": (
+                "A cap, so one run cannot spend the whole interval hammering "
+                "an integration that is still down."
+            ),
+        },
+    ],
+)
+async def _sync_retry_handler(params: dict, db: Session) -> dict:
+    """Drain the durable outbound-sync journal."""
+    from ion.services import integration_sync_journal_service as sync_journal
+
+    limit = _int_param(params, "limit", 50, minimum=1, maximum=500)
+    summary = sync_journal.drain_retries(db, limit=limit)
+    summary["limit"] = limit
+    return summary

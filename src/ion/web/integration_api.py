@@ -953,3 +953,78 @@ async def get_data_flow_metrics(
         "webhooks": webhook_stats,
         "elasticsearch": es_flow,
     }
+
+
+# ---------------------------------------------------------------------------
+# Outbound sync journal (review 2026-10-08, stage 3)
+#
+# Outbound syncs used to fail into a log line. These endpoints expose the
+# durable journal that replaced it: what has drifted, for how long, and a
+# requeue for the operator who has just fixed the integration.
+# ---------------------------------------------------------------------------
+
+
+@router.get("/sync-journal", dependencies=[Depends(require_integration_access)])
+def get_sync_journal(
+    limit: int = Query(50, ge=1, le=200),
+    session: Session = Depends(get_db_session),
+):
+    """Estate-wide outbound sync health, with the unresolved rows."""
+    from ion.services import integration_sync_journal_service as sync_journal
+
+    return sync_journal.journal_summary(session, limit=limit)
+
+
+@router.get(
+    "/sync-journal/cases/{case_id}",
+    dependencies=[Depends(require_integration_access)],
+)
+def get_case_sync_journal(
+    case_id: int,
+    session: Session = Depends(get_db_session),
+):
+    """Unresolved syncs for one case, for display beside the case itself."""
+    from ion.services import integration_sync_journal_service as sync_journal
+
+    return sync_journal.case_sync_status(session, case_id)
+
+
+@router.post(
+    "/sync-journal/{attempt_id}/requeue",
+    dependencies=[Depends(require_permission("integration:manage"))],
+)
+def requeue_sync_attempt(
+    attempt_id: int,
+    request: Request,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Put a failed or abandoned sync back at the front of the queue.
+
+    A mutation that talks to an external system, so it takes
+    integration:manage rather than the read dependency — the distinction
+    ION-02 was about.
+    """
+    from ion.services import integration_sync_journal_service as sync_journal
+    from ion.services.integration_sync_journal_service import SyncJournalError
+
+    try:
+        attempt = sync_journal.requeue(session, attempt_id=attempt_id,
+                                       actor_id=user.id)
+    except SyncJournalError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return {"attempt": attempt.to_dict(max_attempts=sync_journal.MAX_ATTEMPTS)}
+
+
+@router.post(
+    "/sync-journal/drain",
+    dependencies=[Depends(require_permission("integration:manage"))],
+)
+def drain_sync_journal(
+    limit: int = Query(50, ge=1, le=200),
+    session: Session = Depends(get_db_session),
+):
+    """Attempt every due sync now, rather than waiting for the scheduled job."""
+    from ion.services import integration_sync_journal_service as sync_journal
+
+    return sync_journal.drain_retries(session, limit=limit)
