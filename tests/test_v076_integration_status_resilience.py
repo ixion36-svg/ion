@@ -117,8 +117,15 @@ def test_mapping_details_still_merges_normally(client):
     assert es["status"] == "healthy"
 
 
-def test_absent_health_check_leaves_status_unset(client):
-    """No health check yet is not an error — the card renders as un-checked."""
+def test_absent_health_check_reports_unknown(client):
+    """No health check yet is not an error, and it is not health either.
+
+    This asserted ``status is None`` until 2026-10-08. The full-stack run
+    that day showed why that was not enough: an unset status rendered the
+    same as a good one, and the same code path served a month-old check
+    as current health. "No measurement" now says so in the status itself
+    rather than leaving the caller to infer it from a null.
+    """
     session = get_session_factory()()
     try:
         session.query(IntegrationEvent).filter(
@@ -130,8 +137,12 @@ def test_absent_health_check_leaves_status_unset(client):
 
     rows = client.get("/api/integrations/status").json()
     es = next(r for r in rows if r["type"] == "elasticsearch")
-    assert es["status"] is None
+    assert es["status"] == "unknown"
     assert es["last_check"] is None
+    assert es["is_stale"] is True
+    # None, not 0: a zero age would read as "checked just now".
+    assert es["check_age_seconds"] is None
+    assert "never" in es["error"].lower()
 
 
 # ── fault 2: one connector must not sink the rest ────────────────────────
@@ -161,7 +172,12 @@ def test_one_broken_connector_does_not_break_the_page(client):
         assert "Status unavailable" in broken["error"]
 
         healthy = [r for r in rows if r["type"] != victim.CONNECTOR_TYPE]
-        assert all(r["error"] is None for r in healthy), \
+        # Checks the *status*, not the error text: a connector that has
+        # simply never been checked now carries an explanatory message,
+        # and conflating "has a message" with "is errored" would hide
+        # the regression this test exists to catch.
+        assert all(r["status"] != IntegrationStatus.ERROR.value
+                   for r in healthy), \
             "a fault in one connector must not mark the others errored"
     finally:
         victim.get_status_info = original

@@ -4,7 +4,8 @@ Provides endpoints for the integration dashboard, webhooks, and integration logs
 """
 
 import logging
-from datetime import datetime
+import os
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -127,6 +128,11 @@ class IntegrationStatusResponse(BaseModel):
     last_check: Optional[str] = None
     error: Optional[str] = None
     metadata: Optional[dict] = None
+    # How old the stored check is, and whether it is too old to be a health
+    # verdict. Always present, not only when the news is bad -- an age that
+    # appears only on failure is an age nobody learns to look for.
+    check_age_seconds: Optional[float] = None
+    is_stale: bool = False
 
 
 class IntegrationLogResponse(BaseModel):
@@ -200,6 +206,85 @@ async def get_integration_status(
     return results
 
 
+#: How old a stored health check may be before it stops counting as a health
+#: verdict. Health checks are written only by POST /healthcheck -- there is no
+#: background sweep -- so without this an estate nobody has probed reports
+#: itself healthy indefinitely. Found on 2026-10-08: the page showed every
+#: integration healthy from a check dated 2026-09-06, against a Kibana that
+#: had been replaced in the meantime.
+STALE_HEALTH_CHECK_SECONDS = int(
+    os.environ.get("ION_INTEGRATION_STALE_AFTER_SECONDS", 15 * 60)
+)
+
+#: Reported instead of a decayed verdict. Deliberately not one of the
+#: IntegrationStatus values: "we do not know" is a different claim from
+#: healthy, degraded or error, and collapsing it into any of them is how the
+#: original defect read as reassurance.
+UNKNOWN_STATUS = "unknown"
+
+
+def _apply_check_freshness(
+    response: IntegrationStatusResponse,
+    checked_at,
+) -> IntegrationStatusResponse:
+    """Age a stored health check, and refuse to serve a stale one as health.
+
+    Not by hiding the row -- that is its own kind of lying -- and not by
+    probing on page load, which turns a dashboard into a load generator.
+    The row keeps its timestamp and gains its age; past the threshold the
+    *verdict* is withdrawn.
+
+    ``disabled`` is exempt: "switched off" is a statement about
+    configuration rather than a measurement, so it does not decay.
+    """
+    if checked_at is None:
+        # A fresh install has no stored row. Defaulting to healthy would be
+        # the same lie with no data behind it at all.
+        response.is_stale = True
+        response.check_age_seconds = None
+        if response.status != IntegrationStatus.DISABLED.value:
+            response.status = UNKNOWN_STATUS
+            response.response_time_ms = None
+            response.error = (
+                "Never checked. Run POST /api/integrations/healthcheck to "
+                "measure this integration."
+            )
+        return response
+
+    # checked_at comes back naive from the database; comparing it against an
+    # aware now() raises, and treating it as local time would mis-age every
+    # row by the host's offset.
+    when = checked_at if checked_at.tzinfo else checked_at.replace(tzinfo=timezone.utc)
+    # max(0, ...) so clock skew between ION and its database cannot report a
+    # negative age or make a row look impossibly fresh.
+    age = max(0.0, (datetime.now(timezone.utc) - when).total_seconds())
+
+    response.check_age_seconds = age
+    response.is_stale = age > STALE_HEALTH_CHECK_SECONDS
+
+    if response.is_stale and response.status != IntegrationStatus.DISABLED.value:
+        # A stale failure is withdrawn too, not just a stale success: the
+        # integration may well have been fixed since the check ran.
+        response.status = UNKNOWN_STATUS
+        response.response_time_ms = None
+        response.error = (
+            f"Last checked {_describe_age(age)} ago, which is stale "
+            f"(threshold {STALE_HEALTH_CHECK_SECONDS // 60} min). "
+            "Run POST /api/integrations/healthcheck for current health."
+        )
+    return response
+
+
+def _describe_age(seconds: float) -> str:
+    if seconds < 90:
+        return f"{int(seconds)}s"
+    if seconds < 5400:
+        return f"{int(seconds // 60)}m"
+    if seconds < 172800:
+        return f"{int(seconds // 3600)}h"
+    return f"{int(seconds // 86400)}d"
+
+
 def _status_for(connector, latest_checks) -> IntegrationStatusResponse:
     """Build one integration's status row. Raises only for that connector."""
     status_info = connector.get_status_info() or {}
@@ -214,7 +299,10 @@ def _status_for(connector, latest_checks) -> IntegrationStatusResponse:
 
     latest_check = latest_checks.get(connector.CONNECTOR_TYPE)
     if not latest_check:
-        return response
+        # Still goes through the freshness rule: "no check" must report
+        # unknown rather than inheriting whatever the connector's own
+        # describe-yourself call implied.
+        return _apply_check_freshness(response, None)
 
     health = latest_check.health_status
     response.status = health.value if hasattr(health, "value") else str(health)
@@ -232,6 +320,8 @@ def _status_for(connector, latest_checks) -> IntegrationStatusResponse:
     # `TypeError: 'X' object is not a mapping`, which surfaced as a bare 500 on
     # the endpoint backing the whole page. Confirmed by reproduction against
     # each shape. Guard the type rather than trust the annotation.
+    response = _apply_check_freshness(response, latest_check.checked_at)
+
     meta = latest_check.check_metadata
     if isinstance(meta, dict):
         response.metadata = {**(response.metadata or {}), **meta}
