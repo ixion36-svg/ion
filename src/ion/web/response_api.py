@@ -125,8 +125,31 @@ def pending_response_actions(
     _user: User = Depends(require_permission("response:approve")),
     session: Session = Depends(get_db_session),
 ):
-    """The approver queue — actions awaiting a decision."""
+    """The approver queue — actions awaiting a decision.
+
+    Raw log rows. ``/actions/inbox`` is the one to render a decision from.
+    """
     return {"pending": actions.get_action_log(session, status="pending_approval", limit=200)}
+
+
+@router.get("/actions/inbox", dependencies=[Depends(_require_enabled)])
+def response_approval_inbox(
+    decided_limit: int = 50,
+    _user: User = Depends(require_permission("response:approve")),
+    session: Session = Depends(get_db_session),
+):
+    """The approval inbox: pending decisions plus recent decision history.
+
+    ``/actions/pending`` returns the bare log rows — numeric requester and
+    case ids and a status — which is not enough to decide from. This resolves
+    everything a decision needs (requester, case, risk, whether a second
+    person is required, adapter readiness, the mode an approval would
+    actually execute in, and the dispatch idempotency key) and classifies
+    each outcome, so a dry run is never presented as containment.
+    """
+    return actions.get_approval_inbox(
+        session, decided_limit=max(1, min(decided_limit, 200))
+    )
 
 
 @router.post("/actions/{log_id}/approve", dependencies=[Depends(_require_enabled)])

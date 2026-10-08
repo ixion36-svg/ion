@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block title %}Response Approvals - ION{% endblock %}
+
+{% block content %}
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
+<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
+
+<section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
+  <div class="basis-full md:basis-auto md:flex-1">
+    <div class="flex items-center gap-3 mb-4">
+      <svg class="w-4 h-4 text-warning"><use href="#i-shield"/></svg>
+      <span class="label-tiny text-warning">Response</span>
+    </div>
+    <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Response Approvals</h1>
+    <p class="mt-3 max-w-3xl text-[15px] text-base-content/60">Every containment action waits here for a human decision. Each entry states the resolved target, who asked, which case it belongs to, whether the adapter is actually configured, and the mode the dispatch would run in.</p>
+  </div>
+  <div class="flex items-center gap-2 flex-wrap">
+    <button class="btn btn-ghost" data-click-action="rapRefresh">Refresh</button>
+  </div>
+</section>
+
+<div id="rap-mode" class="mb-6"></div>
+
+<div id="rap-content">
+  <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading approvals...</div>
+</div>
+
+</div>
+</div>
+
+<script>
+const RAP_API = '/response';
+
+/* The inbox is rendered from server-resolved fields. Nothing here derives a
+   label from `status` directly: a successful dry run and a real dispatch are
+   both stored `completed`, so the server's classify_outcome() is the only
+   thing allowed to say what happened. */
+
+function rapEsc(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function rapFmtTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return rapEsc(iso);
+  return d.toLocaleString();
+}
+
+const RAP_RISK_BADGE = {
+  critical: 'badge-error',
+  high: 'badge-error',
+  medium: 'badge-warning',
+  low: 'badge-info',
+};
+
+const RAP_STAGE_BADGE = {
+  requested: 'badge-warning',
+  approved: 'badge-info',
+  dispatched: 'badge-success',
+  simulated: 'badge-ghost',
+  rejected: 'badge-ghost',
+  failed: 'badge-error',
+  unknown: 'badge-ghost',
+};
+
+/* Wording for how much ION actually knows about the target. "Acknowledged" is
+   not "verified" -- the adapter returning 200 means it took the call. */
+const RAP_CONFIRMATION = {
+  none: { label: 'No external confirmation', cls: 'text-base-content/50' },
+  acknowledged: { label: 'Adapter acknowledged the call', cls: 'text-info' },
+  verified: { label: 'Adapter verified the target changed', cls: 'text-success' },
+};
+
+const RAP_READINESS = {
+  ready: { label: 'Adapter ready', cls: 'badge-success' },
+  not_configured: { label: 'Adapter not configured', cls: 'badge-warning' },
+  no_adapter: { label: 'No adapter registered', cls: 'badge-error' },
+};
+
+function rapModeBanner(mode) {
+  if (!mode) return '';
+  const live = mode.effective_mode === 'live';
+  // A single wrapper child: .alert is a CSS grid, so sibling children become
+  // columns instead of stacking.
+  return `<div class="alert ${live ? 'alert-warning' : 'alert-info'}">
+    <div>
+      <div class="font-semibold">${live ? 'Live mode — approving changes the target' : 'Dry-run mode — approving changes nothing'}</div>
+      <div class="text-sm opacity-80 mt-1">${rapEsc(mode.reason)}</div>
+    </div>
+  </div>`;
+}
+
+function rapOutcomeBadge(outcome) {
+  if (!outcome) return '';
+  const cls = RAP_STAGE_BADGE[outcome.stage] || 'badge-ghost';
+  return `<span class="badge ${cls}">${rapEsc(outcome.label)}</span>`;
+}
+
+function rapMeta(label, value, mono) {
+  return `<div>
+    <div class="label-tiny opacity-50">${rapEsc(label)}</div>
+    <div class="${mono ? 'font-mono text-xs' : 'text-sm'} break-words">${rapEsc(value == null || value === '' ? '—' : value)}</div>
+  </div>`;
+}
+
+function rapCaseCell(e) {
+  if (e.case_id == null) {
+    return `<div>
+      <div class="label-tiny opacity-50">Case</div>
+      <div class="text-sm text-warning">Not linked to a case</div>
+    </div>`;
+  }
+  const title = e.case_title == null ? ('Case ' + e.case_id) : e.case_title;
+  return `<div>
+    <div class="label-tiny opacity-50">Case</div>
+    <div class="text-sm break-words"><a class="link link-hover" href="/cases/${encodeURIComponent(e.case_id)}">${rapEsc(title)}</a>${e.case_severity ? ' <span class="opacity-50">· ' + rapEsc(e.case_severity) + '</span>' : ''}</div>
+  </div>`;
+}
+
+function rapPendingCard(e) {
+  const riskCls = RAP_RISK_BADGE[(e.risk_level || '').toLowerCase()] || 'badge-ghost';
+  const readiness = RAP_READINESS[e.adapter_readiness] || RAP_READINESS.no_adapter;
+  const blocked = e.adapter_readiness !== 'ready' && e.effective_mode === 'live';
+
+  return `<div class="card bg-base-200 shadow mb-4">
+    <div class="card-body p-4 gap-3">
+
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-semibold text-[15px]">${rapEsc(e.action_name || ('Action ' + e.action_id))}</span>
+            <span class="badge ${riskCls}">${rapEsc(e.risk_level || 'unrated')} risk</span>
+            <span class="badge ${readiness.cls}">${rapEsc(readiness.label)}</span>
+            <span class="badge ${e.effective_mode === 'live' ? 'badge-warning' : 'badge-ghost'}">${e.effective_mode === 'live' ? 'would run live' : 'would simulate'}</span>
+          </div>
+          ${e.action_description ? `<div class="text-sm opacity-60 mt-1">${rapEsc(e.action_description)}</div>` : ''}
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-sm btn-error btn-outline" data-click-action="rapReject" data-args='[${e.id}]'>Reject</button>
+          <button class="btn btn-sm btn-primary" data-click-action="rapApprove" data-args='[${e.id}]'>Approve${e.effective_mode === 'live' ? ' &amp; dispatch' : ' (simulate)'}</button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        ${rapMeta('Target', e.target, true)}
+        ${rapCaseCell(e)}
+        ${rapMeta('Requested by', e.requested_by == null ? ('user ' + e.requested_by_id + ' (deleted)') : e.requested_by)}
+        ${rapMeta('Requested at', rapFmtTime(e.requested_at))}
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        ${rapMeta('Adapter', (e.adapter_name || '—') + ' · ' + (e.adapter_detail || ''))}
+        ${rapMeta('Dispatch key', e.idempotency_key, true)}
+      </div>
+
+      ${e.requires_second_person ? `<div class="text-xs text-warning">Separation of duty: this action is high-risk, so it cannot be approved by user ${rapEsc(e.requested_by == null ? e.requested_by_id : e.requested_by)} who requested it.</div>` : ''}
+      ${blocked ? `<div class="text-xs text-error">${rapEsc(e.adapter_detail)}</div>` : ''}
+    </div>
+  </div>`;
+}
+
+function rapDecidedRow(e) {
+  const outcome = e.outcome || {};
+  const conf = RAP_CONFIRMATION[outcome.external_confirmation] || RAP_CONFIRMATION.none;
+  const showConf = outcome.stage === 'dispatched';
+
+  return `<div class="card bg-base-200 shadow mb-2">
+    <div class="card-body p-3 gap-2 text-sm">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          ${rapOutcomeBadge(outcome)}
+          <span class="font-semibold">${rapEsc(e.action_name || ('Action ' + e.action_id))}</span>
+          <span class="font-mono text-xs opacity-60">${rapEsc(e.target)}</span>
+        </div>
+        <span class="font-mono text-xs opacity-60">${rapFmtTime(e.updated_at || e.created_at)}</span>
+      </div>
+      <div class="opacity-70">${rapEsc(outcome.detail || '')}</div>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-60">
+        <span>requested by ${rapEsc(e.requested_by == null ? ('user ' + e.requested_by_id) : e.requested_by)}</span>
+        <span>decided by ${rapEsc(e.decided_by == null ? (e.decided_by_id == null ? 'nobody' : ('user ' + e.decided_by_id)) : e.decided_by)}</span>
+        ${e.case_id != null ? `<span>case <a class="link link-hover" href="/cases/${encodeURIComponent(e.case_id)}">${rapEsc(e.case_title || e.case_id)}</a></span>` : '<span class="text-warning">no case</span>'}
+        ${showConf ? `<span class="${conf.cls}">${rapEsc(conf.label)}</span>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+
+function rapEmpty(title, body) {
+  return `<div class="card bg-base-200 shadow">
+    <div class="card-body items-center text-center py-10">
+      <h3 class="card-title">${rapEsc(title)}</h3>
+      <p class="opacity-70">${rapEsc(body)}</p>
+    </div>
+  </div>`;
+}
+
+function rapRender(data) {
+  document.getElementById('rap-mode').innerHTML = rapModeBanner(data.mode);
+
+  const pending = data.pending || [];
+  const decided = data.decided || [];
+
+  const pendingHtml = pending.length
+    ? pending.map(rapPendingCard).join('')
+    : rapEmpty('Nothing waiting', 'No response action is awaiting a decision.');
+
+  const decidedHtml = decided.length
+    ? decided.map(rapDecidedRow).join('')
+    : rapEmpty('No decisions yet', 'Approved and rejected actions appear here with what actually happened.');
+
+  document.getElementById('rap-content').innerHTML = `
+    <section class="mb-10">
+      <div class="flex items-center gap-3 mb-4">
+        <h2 class="font-semibold text-[20px]">Awaiting decision</h2>
+        <span class="badge ${pending.length ? 'badge-warning' : 'badge-ghost'}">${data.pending_count == null ? pending.length : data.pending_count}</span>
+      </div>
+      ${pendingHtml}
+    </section>
+    <section>
+      <div class="flex items-center gap-3 mb-4">
+        <h2 class="font-semibold text-[20px]">Decision history</h2>
+      </div>
+      ${decidedHtml}
+    </section>`;
+}
+
+async function rapLoad() {
+  const content = document.getElementById('rap-content');
+  try {
+    const r = await fetch(`${RAP_API}/actions/inbox`);
+    if (r.status === 404) {
+      document.getElementById('rap-mode').innerHTML = '';
+      content.innerHTML = rapEmpty(
+        'Response actions are disabled',
+        'Set ION_RESPONSE_ACTIONS_ENABLED to expose the response-action surface. While it is off nothing can be requested, approved or dispatched.');
+      return;
+    }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    rapRender(await r.json());
+  } catch (e) {
+    content.innerHTML = `<div class="alert alert-error"><div>${rapEsc(e.message || 'Failed to load the approval inbox')}</div></div>`;
+  }
+}
+
+function rapRefresh() { rapLoad(); }
+
+async function rapDecide(id, verb) {
+  try {
+    const r = await fetch(`${RAP_API}/actions/${id}/${verb}`, { method: 'POST' });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.detail || ('HTTP ' + r.status));
+    // Re-read rather than patch in place: the decision may have raced another
+    // approver, and the server is the only thing that knows who won.
+    await rapLoad();
+  } catch (e) {
+    alert((verb === 'approve' ? 'Approve' : 'Reject') + ' failed: ' + (e.message || e));
+    await rapLoad();
+  }
+}
+
+function rapApprove(id) {
+  if (!confirm('Approve this response action?')) return;
+  rapDecide(id, 'approve');
+}
+
+function rapReject(id) {
+  if (!confirm('Reject this response action?')) return;
+  rapDecide(id, 'reject');
+}
+
+document.addEventListener('DOMContentLoaded', rapLoad);
+</script>
+{% endblock %}

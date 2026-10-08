@@ -502,6 +502,295 @@ def execute_action(session: Session, log_id: int) -> dict:
     return _log_to_dict(log_entry)
 
 
+#: Statuses that are still waiting for a human decision.
+PENDING_STATUSES = ("pending_approval",)
+
+#: Statuses that mean a decision has been made, whatever came of it.
+DECIDED_STATUSES = ("approved", "executing", "completed", "failed", "rejected")
+
+
+def classify_outcome(entry: dict) -> dict:
+    """Describe what actually happened to an action, in separate stages.
+
+    The stored ``status`` column collapses too much. ``completed`` is written
+    for a successful dry run and for a real dispatch alike, and the adapter's
+    HTTP 200 was being read as proof the target changed. Those are three
+    different facts and an approver needs them apart:
+
+    ``requested``
+        A human asked. Nothing has been decided or sent.
+    ``approved``
+        A human decided yes. The dispatch may be in flight (``executing``)
+        but no adapter has confirmed anything.
+    ``simulated``
+        The adapter ran with ``dry_run`` set. Nothing outside ION changed.
+        This is the case whenever ``ION_RESPONSE_ACTIONS_LIVE`` is off, which
+        is the default, so it is the common outcome rather than the exotic one.
+    ``dispatched``
+        The adapter was called for real and reported success.
+
+    ``external_confirmation`` is kept separate from the stage on purpose:
+
+    ``none``
+        ION has no response body to point at.
+    ``acknowledged``
+        The adapter returned something. It accepted the call; that is all
+        it proves.
+    ``verified``
+        The adapter explicitly reported verification — it read the target
+        back. Only an adapter that does so may claim this.
+
+    Args:
+        entry: A log dict as produced by :func:`_log_to_dict` (``result`` may
+            be ``None``, a dict, or — if the column holds something odd — any
+            other JSON value).
+
+    Returns:
+        ``{"stage", "label", "external_confirmation", "changed_anything",
+        "detail"}``.
+    """
+    status = (entry.get("status") or "").strip()
+    result = entry.get("result")
+    if not isinstance(result, dict):
+        # The column is free JSON text. A non-object here means the row was
+        # not written through ExecutorResult, so nothing can be concluded
+        # about the target.
+        result = {}
+
+    error = entry.get("error") or result.get("error") or ""
+
+    def _out(stage, label, *, changed=False, confirmation="none", detail=""):
+        return {
+            "stage": stage,
+            "label": label,
+            "external_confirmation": confirmation,
+            "changed_anything": changed,
+            "detail": detail,
+        }
+
+    if status in PENDING_STATUSES:
+        return _out("requested", "Awaiting approval",
+                    detail="Requested by a human; no decision yet.")
+
+    if status == "rejected":
+        return _out("rejected", "Rejected",
+                    detail="An approver declined. Nothing was sent.")
+
+    if status == "approved":
+        return _out("approved", "Approved, not yet dispatched",
+                    detail="Decision recorded. The adapter has not run.")
+
+    if status == "executing":
+        # Deliberately the same stage as `approved`: the dispatch is in
+        # flight and no outcome has been observed. Calling it dispatched
+        # would be claiming an outcome ION does not have.
+        return _out("approved", "Dispatch in flight",
+                    detail="Claimed for execution. No adapter result yet.")
+
+    if status == "failed":
+        return _out("failed", "Failed",
+                    detail=error or "The adapter reported a failure.")
+
+    if status == "completed":
+        if result.get("success") is False:
+            # Written completed but the adapter said no. Trust the adapter.
+            return _out("failed", "Failed",
+                        detail=error or "The adapter did not report success.")
+
+        if result.get("dry_run"):
+            return _out(
+                "simulated", "Simulated (dry run)",
+                detail=(
+                    result.get("message")
+                    or "Ran in dry-run mode. Nothing outside ION changed."
+                ),
+            )
+
+        if not result:
+            # `completed` with no adapter result at all. The row claims an
+            # outcome it has no evidence for; say so rather than pick one.
+            return _out("unknown", "Completed with no recorded result",
+                        detail="No adapter result was stored for this action.")
+
+        response = result.get("response")
+        response = response if isinstance(response, dict) else {}
+        if response.get("verified") is True or response.get("verification"):
+            confirmation = "verified"
+        elif response:
+            confirmation = "acknowledged"
+        else:
+            confirmation = "none"
+
+        return _out(
+            "dispatched", "Dispatched", changed=True, confirmation=confirmation,
+            detail=result.get("message") or "The adapter accepted the call.",
+        )
+
+    return _out("unknown", f"Unrecognised status '{status or 'empty'}'",
+                detail="No outcome can be derived from this row.")
+
+
+# ---------------------------------------------------------------------------
+# Approval inbox
+# ---------------------------------------------------------------------------
+
+def _effective_mode() -> tuple[str, str]:
+    """The mode an approval would actually execute in, and why.
+
+    Returns ``("live"|"dry_run", reason)``. The reason is written for an
+    approver about to click a button, not for a log line.
+    """
+    if get_config().response_actions_live:
+        return (
+            "live",
+            "Live mode (ION_RESPONSE_ACTIONS_LIVE is on): approving dispatches "
+            "to the real adapter and changes the target.",
+        )
+    return (
+        "dry_run",
+        "Dry-run mode (ION_RESPONSE_ACTIONS_LIVE is off): approving simulates "
+        "the action and changes nothing outside ION.",
+    )
+
+
+def _adapter_readiness(action: PlaybookAction | None) -> dict:
+    """Whether the adapter behind an action could do anything if approved.
+
+    Knowable before the decision, and the difference between "approve" and
+    "go configure the integration first".
+    """
+    if action is None:
+        return {"adapter_name": "unknown", "adapter_ready": False,
+                "adapter_readiness": "no_adapter",
+                "adapter_detail": "The action row this log points at is gone."}
+
+    from ion.services.playbook_executors import registry
+
+    action_type = action.action_type or ""
+    integration = action.target_integration or ""
+    known = action_type in registry.EXECUTORS or integration.lower() == "webhook"
+
+    if not known:
+        return {
+            "adapter_name": integration or "none",
+            "adapter_ready": False,
+            "adapter_readiness": "no_adapter",
+            "adapter_detail": (
+                f"No adapter is registered for action_type '{action_type}'. "
+                "Approving cannot dispatch anything."
+            ),
+        }
+
+    configured = registry.is_adapter_configured(action_type, get_config())
+    return {
+        "adapter_name": integration or action_type,
+        "adapter_ready": bool(configured),
+        "adapter_readiness": "ready" if configured else "not_configured",
+        "adapter_detail": (
+            "Adapter configuration is present."
+            if configured
+            else (
+                f"The {integration or action_type} adapter has no credentials "
+                "configured, so a live dispatch would fail."
+            )
+        ),
+    }
+
+
+def _inbox_entry(session: Session, log: PlaybookActionLog,
+                 mode: tuple[str, str]) -> dict:
+    """One inbox row: the log dict plus everything a decision needs."""
+    from ion.models.alert_triage import AlertCase
+    from ion.models.user import User
+
+    entry = _log_to_dict(log)
+    action = log.action or session.get(PlaybookAction, log.action_id)
+
+    requester = session.get(User, log.executed_by_id) if log.executed_by_id else None
+    decider = session.get(User, log.approved_by_id) if log.approved_by_id else None
+    case = session.get(AlertCase, log.case_id) if log.case_id else None
+
+    effective_mode, mode_reason = mode
+
+    entry.update(
+        {
+            "risk_level": action.risk_level if action else None,
+            "requires_second_person": bool(action.requires_approval) if action else False,
+            "action_description": action.description if action else None,
+            "target_integration": action.target_integration if action else None,
+            "requested_by": requester.username if requester else None,
+            "requested_by_id": log.executed_by_id,
+            "requested_at": entry["created_at"],
+            "decided_by": decider.username if decider else None,
+            "decided_by_id": log.approved_by_id,
+            "case_title": case.title if case else None,
+            "case_severity": case.severity if case else None,
+            "effective_mode": effective_mode,
+            "mode_reason": mode_reason,
+            "idempotency_key": dispatch_idempotency_key(session, log.id),
+        }
+    )
+    entry.update(_adapter_readiness(action))
+    entry["outcome"] = classify_outcome(entry)
+    return entry
+
+
+def get_approval_inbox(
+    session: Session,
+    pending_limit: int = 200,
+    decided_limit: int = 50,
+) -> dict:
+    """The approver's queue, with everything a decision needs in one payload.
+
+    ``GET /response/actions/pending`` returned the bare log row — numeric
+    requester and case ids, the target string, and the status. That is not
+    enough to decide from, so the decision was being made outside ION and
+    typed in afterwards. This returns the resolved requester, the case it
+    belongs to, the action's risk, whether a second person is required,
+    whether the adapter is even configured, which mode an approval would
+    execute in, and the dispatch key that makes a duplicate recognisable.
+
+    ``pending`` is oldest-first — a queue is worked front to back, unlike the
+    action log, which reads newest-first.
+
+    Args:
+        session: Database session.
+        pending_limit: Cap on undecided entries returned.
+        decided_limit: Cap on recently decided entries returned.
+
+    Returns:
+        ``{"mode", "pending", "pending_count", "decided"}``.
+    """
+    mode = _effective_mode()
+    effective_mode, mode_reason = mode
+
+    pending_rows = session.execute(
+        select(PlaybookActionLog)
+        .where(PlaybookActionLog.status.in_(PENDING_STATUSES))
+        .order_by(PlaybookActionLog.id.asc())
+        .limit(pending_limit)
+    ).scalars().all()
+
+    decided_rows = session.execute(
+        select(PlaybookActionLog)
+        .where(PlaybookActionLog.status.in_(DECIDED_STATUSES))
+        .order_by(PlaybookActionLog.id.desc())
+        .limit(decided_limit)
+    ).scalars().all()
+
+    pending_count = session.execute(
+        select(func.count(PlaybookActionLog.id))
+        .where(PlaybookActionLog.status.in_(PENDING_STATUSES))
+    ).scalar() or 0
+
+    return {
+        "mode": {"effective_mode": effective_mode, "reason": mode_reason},
+        "pending": [_inbox_entry(session, r, mode) for r in pending_rows],
+        "pending_count": int(pending_count),
+        "decided": [_inbox_entry(session, r, mode) for r in decided_rows],
+    }
+
+
 # ---------------------------------------------------------------------------
 # Action log query
 # ---------------------------------------------------------------------------

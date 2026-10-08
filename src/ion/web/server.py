@@ -1284,6 +1284,7 @@ _PAGES: list[tuple[str, str, str]] = [
     ("/integrations",           "integrations.html",               "alert:read"),
     ("/settings",               "settings.html",                   "system:settings"),
     ("/playbooks",              "playbooks.html",                  "playbook:read"),
+    ("/response-approvals",     "response_approvals.html",         "response:approve"),
     ("/chat",                   "chat.html",                       "ai:chat"),
     ("/training",               "training.html",                   "alert:read"),
     ("/daily-work",             "daily_work.html",                 "alert:read"),
