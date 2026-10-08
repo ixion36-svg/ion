@@ -11,7 +11,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional, Tuple
 
 from sqlalchemy import desc, select
@@ -406,6 +406,26 @@ def recent_sightings_for_host(
 # False Positive Signatures
 # =========================================================================
 
+# ---------------------------------------------------------------------------
+# Governance (review 2026-10-08 §8)
+#
+# A quirk needs a second person's verification and a review date after which
+# it stops matching. An FP signature made the same "this is benign" claim
+# with neither, despite suppressing alerts rather than merely annotating
+# them. These constants and helpers close that asymmetry.
+# ---------------------------------------------------------------------------
+
+#: Review window applied to a new signature when the caller gives no date.
+#: Mirrors the quirk discipline: an assumption about benign-ness expires and
+#: has to be re-confirmed rather than standing forever.
+FP_DEFAULT_REVIEW_DAYS = 90
+
+#: How close to its review date a signature must be before the review inbox
+#: starts chasing it, so the work arrives before the suppression lapses
+#: rather than after.
+FP_REVIEW_WARNING_DAYS = 7
+
+
 def record_fp(
     db: Session,
     reason: str,
@@ -416,8 +436,29 @@ def record_fp(
     alert_signature: Optional[str] = None,
     host_pattern: Optional[str] = None,
     user_pattern: Optional[str] = None,
+    review_date: Optional[datetime] = None,
 ) -> FalsePositiveSignature:
-    """Create a new FP signature. Any of the match fields may be None."""
+    """Create a new FP signature. Any of the match fields may be None.
+
+    ``review_date`` defaults to :data:`FP_DEFAULT_REVIEW_DAYS` out, so a new
+    signature is governed by construction rather than depending on every
+    caller to remember. A date already in the past is refused: a signature
+    born lapsed would suppress nothing, which is a mistake rather than a
+    state worth storing.
+    """
+    if review_date is None:
+        review_date = _utcnow() + timedelta(days=FP_DEFAULT_REVIEW_DAYS)
+    else:
+        candidate = review_date
+        if candidate.tzinfo is None:
+            candidate = candidate.replace(tzinfo=timezone.utc)
+        if candidate <= _utcnow():
+            raise ValueError(
+                "review_date must be in the future; a signature created "
+                "already lapsed would suppress nothing"
+            )
+        review_date = candidate
+
     fp = FalsePositiveSignature(
         rule_id=rule_id,
         rule_name=rule_name,
@@ -429,10 +470,148 @@ def record_fp(
         recorded_by=recorded_by,
         recorded_at=_utcnow(),
         enabled=True,
+        review_date=review_date,
     )
     db.add(fp)
     db.flush()
     return fp
+
+
+def _require_fp(db: Session, fp_id: int) -> FalsePositiveSignature:
+    fp = db.get(FalsePositiveSignature, fp_id)
+    if fp is None:
+        raise ValueError(f"FP signature {fp_id} not found")
+    return fp
+
+
+def verify_fp(
+    db: Session,
+    fp_id: int,
+    actor_id: int,
+    note: Optional[str] = None,
+) -> FalsePositiveSignature:
+    """Record a second person's verification of an FP signature.
+
+    Separation of duty is enforced here rather than by permission, exactly as
+    for quirks: the point is that somebody *other than the author* agreed,
+    and holding the right permission does not make you a second pair of eyes.
+    A signature with no recorded author (imported or system-created) has
+    nobody to be distinct from, so any verifier is accepted.
+    """
+    fp = _require_fp(db, fp_id)
+    if fp.recorded_by is not None and fp.recorded_by == actor_id:
+        raise ValueError(
+            "an FP signature must be verified by someone other than the "
+            "person who recorded it"
+        )
+    fp.verified_by_id = actor_id
+    fp.verified_at = _utcnow()
+    if note and note.strip():
+        fp.verification_note = note.strip()
+    db.flush()
+    return fp
+
+
+def review_fp(
+    db: Session,
+    fp_id: int,
+    actor_id: int,
+    extend_days: int = FP_DEFAULT_REVIEW_DAYS,
+    note: Optional[str] = None,
+) -> FalsePositiveSignature:
+    """Confirm a signature is still true and push its review date out.
+
+    The new date is measured from **now**, not from the old review date.
+    Extending a date that lapsed a year ago by thirty days would leave the
+    signature still lapsed, which looks like the review did nothing.
+
+    This is also the route out of the ``ungoverned`` state for signatures
+    recorded before governance existed: reviewing one gives it both a date
+    and a verifier.
+    """
+    if extend_days <= 0:
+        raise ValueError("extend_days must be a positive number of days")
+    fp = _require_fp(db, fp_id)
+    fp.review_date = _utcnow() + timedelta(days=int(extend_days))
+    fp.verified_by_id = actor_id
+    fp.verified_at = _utcnow()
+    if note and note.strip():
+        fp.verification_note = note.strip()
+    db.flush()
+    return fp
+
+
+#: Why a signature is in the review inbox. The rank orders the queue so the
+#: ones that have already stopped working come before the ones that are only
+#: approaching their date.
+_FP_REVIEW_REASONS = {
+    "lapsed": (
+        0,
+        "The review date has passed, so this signature has stopped "
+        "suppressing anything. Re-confirm it or delete it.",
+    ),
+    "ungoverned": (
+        1,
+        "Recorded before FP signatures had review dates. It is still "
+        "suppressing alerts with no date at which anyone has to look again.",
+    ),
+    "unverified": (
+        2,
+        "Suppressing alerts on one person's judgement. A second pair of "
+        "eyes has not confirmed it.",
+    ),
+    "due_soon": (
+        3,
+        "The review date is close. Confirming it now avoids the "
+        "suppression lapsing unnoticed.",
+    ),
+}
+
+
+def list_fps_needing_review(
+    db: Session, limit: int = 100, now: Optional[datetime] = None
+) -> list[dict]:
+    """FP signatures that need a human decision, worst first.
+
+    Feeds the knowledge review inbox. A disabled signature is excluded: it
+    is suppressing nothing, so nobody needs to review it.
+    """
+    reference = now or _utcnow()
+    warn_after = reference + timedelta(days=FP_REVIEW_WARNING_DAYS)
+
+    rows = db.execute(
+        select(FalsePositiveSignature)
+        .where(FalsePositiveSignature.enabled.is_(True))
+    ).scalars().all()
+
+    out = []
+    for fp in rows:
+        state = fp.governance_state(reference)
+        if state in ("lapsed", "ungoverned", "unverified"):
+            key = state
+        elif state == "active":
+            review = fp.review_date
+            if review is None:
+                continue
+            if review.tzinfo is None:
+                review = review.replace(tzinfo=timezone.utc)
+            if review > warn_after:
+                continue
+            key = "due_soon"
+        else:
+            continue
+
+        rank, explanation = _FP_REVIEW_REASONS[key]
+        entry = fp.to_dict(reference)
+        entry["review_category"] = key
+        entry["reason_for_review"] = explanation
+        entry["_rank"] = rank
+        out.append(entry)
+
+    out.sort(key=lambda e: (e["_rank"], e["review_date"] or "", e["id"]))
+    for entry in out:
+        entry.pop("_rank", None)
+    return out[:limit]
 
 
 def _extract_alert_fields(alert: dict) -> tuple[str, str, str, str, str]:
@@ -450,7 +629,7 @@ def _extract_alert_fields(alert: dict) -> tuple[str, str, str, str, str]:
 def is_likely_fp(
     alert: dict, db: Session
 ) -> Tuple[bool, Optional[FalsePositiveSignature]]:
-    """Check if this alert matches any enabled FP signature.
+    """Check if this alert matches any enabled, in-date FP signature.
 
     Match precedence:
       1. ``rule_id`` exact
@@ -460,11 +639,29 @@ def is_likely_fp(
     using fnmatch (if set). An FP signature with no host/user constraint
     matches any host/user.
 
+    A signature whose ``review_date`` has passed is skipped — the parity with
+    quirks the 2026-10-08 review asked for, since both make the same
+    "this is benign" claim and an expired assumption should stop acting.
+    Expiry is evaluated here on read rather than by a sweeper, so there is no
+    worker whose failure would leave a stale suppression live. The skip is a
+    ``continue``, not a stop: a lapsed high-confidence row is considered
+    first by the confidence ordering and must not shadow a valid one behind
+    it.
+
+    An *ungoverned* signature (no review date at all, recorded before this
+    existed) still matches. Making every pre-upgrade signature inert would
+    silently switch off a SOC's accumulated FP memory, which is a worse
+    surprise than the governance gap; ``list_fps_needing_review`` chases
+    them instead.
+
     Returns (matched, signature). When matched, ``hit_count`` and
     ``last_matched_at`` on the signature are bumped as a side effect so
-    analysts can see which rules are earning their keep.
+    analysts can see which rules are earning their keep. A skipped lapsed
+    signature is deliberately not bumped: it took no part in the decision,
+    so it earned no credit.
     """
     rule_id, rule_name, signature, host, user = _extract_alert_fields(alert)
+    now = _utcnow()
 
     stmt = (
         select(FalsePositiveSignature)
@@ -474,6 +671,10 @@ def is_likely_fp(
     candidates = db.execute(stmt).scalars().all()
 
     for fp in candidates:
+        # Lapsed: the SOC set this date and it has passed.
+        if fp.is_expired(now):
+            continue
+
         # At least ONE of rule_id/rule_name/alert_signature must be set and match.
         id_match = fp.rule_id and rule_id and fp.rule_id == rule_id
         name_match = fp.rule_name and rule_name and fp.rule_name == rule_name

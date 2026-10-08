@@ -110,6 +110,14 @@ class FPSignatureResponse(BaseModel):
     hit_count: int
     last_matched_at: Optional[str] = None
     enabled: bool
+    # Governance (review 2026-10-08 s8). `governance_state` is the one word
+    # a caller should render; the rest is there to explain it.
+    review_date: Optional[str] = None
+    expired: bool = False
+    governance_state: str = "ungoverned"
+    verified_by_id: Optional[int] = None
+    verified_at: Optional[str] = None
+    verification_note: Optional[str] = None
 
 
 class FPSignatureCreate(BaseModel):
@@ -120,6 +128,23 @@ class FPSignatureCreate(BaseModel):
     alert_signature: Optional[str] = None
     host_pattern: Optional[str] = None
     user_pattern: Optional[str] = None
+    # Omitted means the default review window, not "never review".
+    review_date: Optional[str] = Field(None, description="ISO-8601 review date")
+
+
+def _parse_review_date(raw: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO-8601 review date, accepting the trailing Z browsers send."""
+    if raw is None or not str(raw).strip():
+        return None
+    text = str(raw).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail="review_date is not a valid ISO-8601 date"
+        ) from exc
 
 
 # =========================================================================
@@ -204,6 +229,12 @@ def _fp_to_response(fp: FalsePositiveSignature) -> FPSignatureResponse:
         hit_count=fp.hit_count,
         last_matched_at=_iso(fp.last_matched_at),
         enabled=fp.enabled,
+        review_date=_iso(fp.review_date),
+        expired=fp.is_expired(),
+        governance_state=fp.governance_state(),
+        verified_by_id=fp.verified_by_id,
+        verified_at=_iso(fp.verified_at),
+        verification_note=fp.verification_note,
     )
 
 
@@ -335,17 +366,21 @@ def create_fp_endpoint(
             status_code=400,
             detail="Supply at least one of rule_id, rule_name, or alert_signature",
         )
-    fp = repo.record_fp(
-        db=db,
-        reason=data.reason,
-        confidence=data.confidence,
-        recorded_by=user.id,
-        rule_id=data.rule_id,
-        rule_name=data.rule_name,
-        alert_signature=data.alert_signature,
-        host_pattern=data.host_pattern,
-        user_pattern=data.user_pattern,
-    )
+    try:
+        fp = repo.record_fp(
+            db=db,
+            reason=data.reason,
+            confidence=data.confidence,
+            recorded_by=user.id,
+            rule_id=data.rule_id,
+            rule_name=data.rule_name,
+            alert_signature=data.alert_signature,
+            host_pattern=data.host_pattern,
+            user_pattern=data.user_pattern,
+            review_date=_parse_review_date(data.review_date),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     db.commit()
     return _fp_to_response(fp)
 
@@ -374,6 +409,81 @@ def toggle_fp_endpoint(
     if fp is None:
         raise HTTPException(status_code=404, detail="FP signature not found")
     db.commit()
+    return _fp_to_response(fp)
+
+
+class FPVerify(BaseModel):
+    note: Optional[str] = Field(None, max_length=2000)
+
+
+class FPReview(BaseModel):
+    extend_days: int = Field(repo.FP_DEFAULT_REVIEW_DAYS, ge=1, le=3650)
+    note: Optional[str] = Field(None, max_length=2000)
+
+
+@router.get("/api/fps/needing-review")
+def fps_needing_review_endpoint(
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("alert:read")),
+) -> dict:
+    """FP signatures that need a human decision, worst first.
+
+    Lapsed ones come before ungoverned, then unverified, then merely due
+    soon: the first group has already stopped suppressing anything, so it is
+    the group whose absence is changing what analysts see today.
+    """
+    rows = repo.list_fps_needing_review(db, limit=limit)
+    return {"fps": rows, "count": len(rows)}
+
+
+@router.post("/api/fps/{fp_id}/verify")
+def verify_fp_endpoint(
+    fp_id: int,
+    data: FPVerify,
+    db: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("alert:read")),
+) -> FPSignatureResponse:
+    """Record a second person's verification of an FP signature.
+
+    Refused for the person who recorded it. That is a separation-of-duty
+    check, not a permission check: holding the right permission does not
+    make you a second pair of eyes.
+    """
+    try:
+        fp = repo.verify_fp(db, fp_id, actor_id=user.id, note=data.note)
+    except ValueError as exc:
+        # "not found" and "cannot verify your own" are both ValueError from
+        # the repo; the text distinguishes them for the caller.
+        status = 404 if "not found" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(fp)
+    return _fp_to_response(fp)
+
+
+@router.post("/api/fps/{fp_id}/review")
+def review_fp_endpoint(
+    fp_id: int,
+    data: FPReview,
+    db: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("alert:read")),
+) -> FPSignatureResponse:
+    """Confirm a signature is still true and push its review date out.
+
+    Measured from now, so reviewing a long-lapsed signature actually brings
+    it back into date instead of leaving it lapsed.
+    """
+    try:
+        fp = repo.review_fp(
+            db, fp_id, actor_id=user.id,
+            extend_days=data.extend_days, note=data.note,
+        )
+    except ValueError as exc:
+        status = 404 if "not found" in str(exc) else 400
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
+    db.commit()
+    db.refresh(fp)
     return _fp_to_response(fp)
 
 

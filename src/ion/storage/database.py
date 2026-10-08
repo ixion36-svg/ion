@@ -1186,6 +1186,25 @@ def _run_migrations(engine: Engine) -> None:
             if col_name not in existing:
                 _add_column_tolerant(engine, "journey_requirements", col_name, col_type)
 
+    # FP-signature governance (review 2026-10-08 §8). Quirks require a
+    # different verifier and a review date after which they stop matching;
+    # FP signatures made the same claim with neither, despite suppressing
+    # alerts rather than merely annotating them. Nullable throughout: rows
+    # recorded before this existed have no honest value to backfill, and
+    # NULL review_date means "never reviewed", which the review inbox
+    # chases rather than a date being invented for it.
+    if insp.has_table("fp_signatures"):
+        existing = {c["name"] for c in insp.get_columns("fp_signatures")}
+        ts_type = "TIMESTAMPTZ" if _is_postgres(engine) else "DATETIME"
+        for col_name, col_type in {
+            "review_date": ts_type,
+            "verified_by_id": "INTEGER",
+            "verified_at": ts_type,
+            "verification_note": "TEXT",
+        }.items():
+            if col_name not in existing:
+                _add_column_tolerant(engine, "fp_signatures", col_name, col_type)
+
     # Durable PCAP analysis jobs (review 2026-10-08 §13). The standalone
     # upload used to parse and return without persisting anything.
     if not insp.has_table("pcap_jobs"):

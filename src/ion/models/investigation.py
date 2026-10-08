@@ -191,6 +191,27 @@ class FalsePositiveSignature(Base):
     host/user wildcard patterns (``*`` glob via fnmatch). When a match
     fires, ``hit_count`` and ``last_matched_at`` are bumped so analysts
     can see which FP rules are actually pulling weight.
+
+    **Governance** (review 2026-10-08 §8). A quirk — the other way ION
+    records "this is benign" — needs a different person to verify it and
+    carries a mandatory review date, after which it stops having any effect.
+    An FP signature makes the same class of claim and is fed to Bob as
+    known-benign context, but had only ``enabled`` and a confidence number:
+    recorded once, applied forever, on one person's judgement. That is the
+    more dangerous of the two, because this suppresses alerts rather than
+    annotating them.
+
+    So it now carries ``review_date``, ``verified_by_id``, ``verified_at``
+    and ``verification_note``, and expiry is computed on read exactly as for
+    quirks — no background worker, so nothing can fail and leave a stale
+    assumption live.
+
+    One asymmetry is deliberate: a signature with **no** review date
+    (recorded before this existed) keeps matching, labelled ``ungoverned``
+    and listed for review. Making every pre-upgrade signature inert would
+    silently switch off a SOC's accumulated FP memory, which is a worse
+    surprise than the gap it fixes. A signature whose review date has
+    *passed* does stop matching — the SOC chose that date.
     """
 
     __tablename__ = "fp_signatures"
@@ -227,8 +248,94 @@ class FalsePositiveSignature(Base):
 
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
+    # ── Governance (review 2026-10-08 §8) ───────────────────────────────
+    # Nullable because rows recorded before this existed have no honest
+    # value to backfill. NULL means "never reviewed", which is a state the
+    # review inbox chases, not a date to invent.
+    review_date: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    verified_by_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
+    )
+    verified_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    verification_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    def is_expired(self, now: Optional[datetime] = None) -> bool:
+        """Whether the review date has passed. Computed on read.
+
+        A signature with no review date is not expired — it is ungoverned,
+        which :meth:`governance_state` reports separately.
+        """
+        if self.review_date is None:
+            return False
+        ref = now or _utcnow()
+        review = self.review_date
+        # Stored naive in SQLite; comparing naive against aware raises, and
+        # assuming local time would move every review date by the offset.
+        if review.tzinfo is None:
+            review = review.replace(tzinfo=timezone.utc)
+        if ref.tzinfo is None:
+            ref = ref.replace(tzinfo=timezone.utc)
+        return review <= ref
+
+    def governance_state(self, now: Optional[datetime] = None) -> str:
+        """One word for how much this signature can be relied on.
+
+        ``disabled``
+            Switched off. Suppressing nothing, so nothing to review.
+        ``lapsed``
+            Its review date has passed. Stops matching — the parity with
+            quirks. Checked before ``unverified`` because when both are
+            true, this is the one that changes behaviour.
+        ``ungoverned``
+            No review date at all. Recorded before governance existed; it
+            still matches, and is listed for review.
+        ``unverified``
+            Dated but on one person's judgement only.
+        ``active``
+            Verified by a second person and in date.
+        """
+        if not self.enabled:
+            return "disabled"
+        if self.is_expired(now):
+            return "lapsed"
+        if self.review_date is None:
+            return "ungoverned"
+        if self.verified_by_id is None:
+            return "unverified"
+        return "active"
+
+    def to_dict(self, now: Optional[datetime] = None) -> dict:
+        return {
+            "id": self.id,
+            "rule_id": self.rule_id,
+            "rule_name": self.rule_name,
+            "alert_signature": self.alert_signature,
+            "host_pattern": self.host_pattern,
+            "user_pattern": self.user_pattern,
+            "reason": self.reason,
+            "confidence": self.confidence,
+            "recorded_by": self.recorded_by,
+            "recorded_at": self.recorded_at.isoformat() if self.recorded_at else None,
+            "hit_count": self.hit_count,
+            "last_matched_at": (
+                self.last_matched_at.isoformat() if self.last_matched_at else None
+            ),
+            "enabled": self.enabled,
+            "review_date": self.review_date.isoformat() if self.review_date else None,
+            "expired": self.is_expired(now),
+            "governance_state": self.governance_state(now),
+            "verified_by_id": self.verified_by_id,
+            "verified_at": self.verified_at.isoformat() if self.verified_at else None,
+            "verification_note": self.verification_note,
+        }
+
     def __repr__(self) -> str:
         return (
             f"<FalsePositiveSignature(id={self.id}, rule='{self.rule_name}', "
-            f"enabled={self.enabled}, hits={self.hit_count})>"
+            f"enabled={self.enabled}, hits={self.hit_count}, "
+            f"governance={self.governance_state()})>"
         )

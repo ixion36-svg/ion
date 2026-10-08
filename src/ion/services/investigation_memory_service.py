@@ -199,6 +199,42 @@ class InvestigationMemoryService:
         with self._session() as db:
             return repo.toggle_fp(fp_id, db)
 
+    # -- Governance (review 2026-10-08 §8) ----------------------------- #
+    # An FP signature makes the same "this is benign" claim as a quirk and
+    # suppresses alerts rather than annotating them, but had no verifier and
+    # no review date. These bring it to parity.
+
+    def verify_fp(
+        self, fp_id: int, actor_id: int, note: Optional[str] = None
+    ) -> FalsePositiveSignature:
+        """Record a second person's verification. Never the author's own."""
+        with self._session() as db:
+            fp = repo.verify_fp(db, fp_id, actor_id=actor_id, note=note)
+            db.commit()
+            db.refresh(fp)
+            return fp
+
+    def review_fp(
+        self,
+        fp_id: int,
+        actor_id: int,
+        extend_days: int = repo.FP_DEFAULT_REVIEW_DAYS,
+        note: Optional[str] = None,
+    ) -> FalsePositiveSignature:
+        """Confirm a signature is still true and push its review date out."""
+        with self._session() as db:
+            fp = repo.review_fp(
+                db, fp_id, actor_id=actor_id, extend_days=extend_days, note=note
+            )
+            db.commit()
+            db.refresh(fp)
+            return fp
+
+    def fps_needing_review(self, limit: int = 100) -> list[dict]:
+        """Signatures that need a human decision, worst first."""
+        with self._session() as db:
+            return repo.list_fps_needing_review(db, limit=limit)
+
     # ------------------------------------------------------------------ #
     # Context block for LLM prompts
     # ------------------------------------------------------------------ #
