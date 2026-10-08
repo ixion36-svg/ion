@@ -1169,7 +1169,7 @@ class AllowlistCreate(BaseModel):
     )
 
 
-@router.get("/observables/allowlist")
+@router.get("/observable-allowlist")
 def list_allowlist(
     include_inactive: bool = Query(True),
     session: Session = Depends(get_db_session),
@@ -1185,7 +1185,7 @@ def list_allowlist(
     }
 
 
-@router.post("/observables/allowlist", status_code=201)
+@router.post("/observable-allowlist", status_code=201)
 def create_allowlist_entry(
     body: AllowlistCreate,
     session: Session = Depends(get_db_session),
@@ -1217,11 +1217,11 @@ def create_allowlist_entry(
     except allowlist.AllowlistError as exc:
         raise HTTPException(400, str(exc)) from None
 
-    AuditLogRepository(session).log(
+    AuditLogRepository(session).create(
         user_id=user.id,
         action="observable_allowlist_add",
         resource_type="observable_allowlist",
-        resource_id=str(entry.id),
+        resource_id=entry.id,
         details={
             "match_type": entry.match_type,
             "pattern": entry.pattern,
@@ -1233,7 +1233,7 @@ def create_allowlist_entry(
     return entry.to_dict()
 
 
-@router.post("/observables/allowlist/{entry_id}/disable")
+@router.post("/observable-allowlist/{entry_id}/disable")
 def disable_allowlist_entry(
     entry_id: int,
     session: Session = Depends(get_db_session),
@@ -1246,16 +1246,16 @@ def disable_allowlist_entry(
         entry = allowlist.set_active(session, entry_id, False)
     except allowlist.AllowlistError as exc:
         raise HTTPException(404, str(exc)) from None
-    AuditLogRepository(session).log(
+    AuditLogRepository(session).create(
         user_id=user.id, action="observable_allowlist_disable",
-        resource_type="observable_allowlist", resource_id=str(entry_id),
+        resource_type="observable_allowlist", resource_id=entry_id,
         details={"pattern": entry.pattern},
     )
     session.commit()
     return entry.to_dict()
 
 
-@router.post("/observables/allowlist/{entry_id}/enable")
+@router.post("/observable-allowlist/{entry_id}/enable")
 def enable_allowlist_entry(
     entry_id: int,
     session: Session = Depends(get_db_session),
@@ -1268,16 +1268,16 @@ def enable_allowlist_entry(
         entry = allowlist.set_active(session, entry_id, True)
     except allowlist.AllowlistError as exc:
         raise HTTPException(404, str(exc)) from None
-    AuditLogRepository(session).log(
+    AuditLogRepository(session).create(
         user_id=user.id, action="observable_allowlist_enable",
-        resource_type="observable_allowlist", resource_id=str(entry_id),
+        resource_type="observable_allowlist", resource_id=entry_id,
         details={"pattern": entry.pattern},
     )
     session.commit()
     return entry.to_dict()
 
 
-@router.delete("/observables/allowlist/{entry_id}")
+@router.delete("/observable-allowlist/{entry_id}")
 def delete_allowlist_entry(
     entry_id: int,
     session: Session = Depends(get_db_session),
@@ -1294,16 +1294,16 @@ def delete_allowlist_entry(
         allowlist.delete_entry(session, entry_id)
     except allowlist.AllowlistError as exc:
         raise HTTPException(404, str(exc)) from None
-    AuditLogRepository(session).log(
+    AuditLogRepository(session).create(
         user_id=user.id, action="observable_allowlist_delete",
-        resource_type="observable_allowlist", resource_id=str(entry_id),
+        resource_type="observable_allowlist", resource_id=entry_id,
         details={},
     )
     session.commit()
     return {"success": True, "deleted": entry_id}
 
 
-@router.post("/observables/allowlist/preview")
+@router.post("/observable-allowlist/preview")
 def preview_allowlist_entry(
     body: AllowlistCreate,
     session: Session = Depends(get_db_session),
