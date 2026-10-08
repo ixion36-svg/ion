@@ -299,6 +299,30 @@ def delete_requirement(
     return {"status": "deleted"}
 
 
+@router.post("/versions/{version_id}/inherit-gate",
+             dependencies=[Depends(require_workforce_module)])
+def inherit_baseline_gate(
+    version_id: int,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(require_permission("workforce:manage")),
+) -> dict:
+    """Copy the baseline's mandatory items into this draft.
+
+    Asked for rather than applied automatically: which mandatory items a
+    role carries is a decision, and a profile that quietly acquired
+    requirements would be worse than one that has none.
+    """
+    version = session.get(RoleProfileVersion, version_id)
+    if version is None:
+        raise HTTPException(status_code=404, detail="Version not found")
+    try:
+        added = wf.apply_baseline_gate(session, version, actor=user)
+    except wf.WorkforceError as exc:
+        raise _err(exc) from exc
+    return {"added": added, "version_id": version_id,
+            "requirements": len(version.requirements)}
+
+
 @router.post("/versions/{version_id}/publish", dependencies=[Depends(require_workforce_module)])
 def publish(
     version_id: int,

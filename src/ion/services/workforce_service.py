@@ -128,6 +128,84 @@ def create_profile(session: Session, *, name: str, description: str = "",
     return profile
 
 
+def apply_baseline_gate(session: Session, version: RoleProfileVersion, *,
+                        actor: User) -> int:
+    """Copy the baseline's gate requirements into a draft. Returns how many.
+
+    Adopting a role from the catalogue leaves it with no gate, because the
+    catalogue describes a role and not an organisation's vetting. But a
+    profile granting an ION role cannot publish without one -- an empty
+    gate never clears, so the role could never be conferred -- which would
+    leave a lead retyping the same mandatory items once per role.
+
+    Retyping them is not merely tedious, it is how they drift. Gate items
+    are carried across journeys BY NAME (see ``verified_gate_names``), so
+    "Security awareness induction" on one profile and "Security Awareness
+    Induction" on another are two different requirements: somebody who
+    cleared one is asked to do the other again, and the carry-across that
+    makes the gate person-level quietly stops working. Copying from one
+    definition keeps the names, and the validity periods, identical.
+
+    The lead has to ask for this; it does not happen on adopt. Which
+    mandatory items a role carries is a decision, and a profile that
+    quietly acquired requirements would be worse than one that has none.
+
+    Only the gate travels. A baseline may carry readiness items of its
+    own, and those are the baseline's.
+    """
+    if not actor.has_permission("workforce:manage"):
+        raise WorkforceError("Permission denied")
+    if version.is_published:
+        raise WorkforceError(
+            "This version is published and cannot be edited; start a new draft"
+        )
+
+    baseline = (
+        session.query(RoleProfile)
+        .filter(RoleProfile.is_baseline.is_(True),
+                RoleProfile.is_active.is_(True))
+        .order_by(RoleProfile.id.asc())
+        .first()
+    )
+    if baseline is None:
+        raise WorkforceError(
+            "No baseline profile is defined, so there are no mandatory items "
+            "to inherit. Create one and publish it first."
+        )
+    source = latest_published(session, baseline.id)
+    if source is None:
+        raise WorkforceError(
+            f"The baseline profile {baseline.name!r} has no published "
+            f"version, so its mandatory items are not settled yet."
+        )
+
+    have = {r.name for r in version.requirements}
+    ordering = len(version.requirements)
+    added = 0
+    for src in source.requirements:
+        if src.phase != PHASE_GATE or src.name in have:
+            continue
+        session.add(ProfileRequirement(
+            version_id=version.id,
+            name=src.name, kind=src.kind, phase=src.phase,
+            validity_months=src.validity_months, course_id=src.course_id,
+            cost=src.cost, ordering=ordering,
+        ))
+        ordering += 1
+        added += 1
+
+    if added:
+        session.add(AuditLog(
+            user_id=actor.id, action="workforce_baseline_gate_applied",
+            resource_type="role_profile_version", resource_id=version.id,
+            details=f"{actor.username} inherited {added} mandatory item(s) "
+                    f"from {baseline.name!r} into "
+                    f"{version.profile.name!r} v{version.version}",
+        ))
+    session.commit()
+    return added
+
+
 def adopt_catalogue_role(session: Session, role_id: str, *,
                          adopter: User) -> RoleProfile:
     """Build a role profile from the SOC role catalogue.
