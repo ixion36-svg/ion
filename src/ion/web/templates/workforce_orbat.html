@@ -31,6 +31,11 @@
     content: ''; position: absolute; top: 0; left: 50%;
     border-left: 2px solid var(--wf-line); width: 0; height: 26px;
 }
+/* A real establishment is wider than a laptop. Scroll the tree inside its
+   own box rather than letting it push the page sideways, which hides the
+   right-hand functions behind a scrollbar nobody notices. */
+.wf-tree { overflow-x: auto; padding-bottom: 8px; }
+.wf-tree > ul { min-width: max-content; }
 /* Roots: no connectors above the top card. */
 .wf-tree > ul { padding-top: 0; }
 .wf-tree > ul > li { padding-top: 0; }
@@ -141,8 +146,9 @@
           : 'border-base-300 bg-base-100');
 
     const title = document.createElement('span');
-    title.className = 'text-sm font-medium shrink-0';
+    title.className = 'text-sm font-medium truncate min-w-0';
     title.textContent = post.title;
+    title.title = post.title;
     row.appendChild(title);
 
     if (post.occupant) {
@@ -172,7 +178,7 @@
     if (CAN_MANAGE) {
       if (post.state === 'gapped') {
         const sel = document.createElement('select');
-        sel.className = 'select select-xs select-bordered max-w-[180px]';
+        sel.className = 'select select-xs select-bordered w-full basis-full min-w-0';
         const opt0 = document.createElement('option');
         opt0.value = '';
         opt0.textContent = 'Seat someone…';
@@ -218,9 +224,65 @@
     return row;
   }
 
+  function roleLabel(post) {
+    // Posts are numbered "SOC Analyst (L1) #3"; the group is the role.
+    return String(post.title).replace(/\s*#\d+\s*$/, '');
+  }
+
+  function groupRow(group) {
+    const filled = group.posts.filter(function (p) { return p.state === 'filled'; }).length;
+    const filling = group.posts.filter(function (p) { return p.state === 'filling'; }).length;
+    const total = group.posts.length;
+
+    const wrap = document.createElement('div');
+    const summary = document.createElement('button');
+    summary.type = 'button';
+    summary.className = 'w-full flex items-center gap-2 text-left rounded-lg ' +
+      'border border-base-300 px-2 py-1.5 hover:bg-base-200/60';
+
+    const caret = document.createElement('span');
+    caret.className = 'text-[0.65rem] text-base-content/40 w-3';
+    caret.textContent = '\u25B8';
+    summary.appendChild(caret);
+
+    const name = document.createElement('span');
+    name.className = 'text-xs grow truncate';
+    name.textContent = group.label;
+    summary.appendChild(name);
+
+    // Three numbers, never two. Somebody in a post but still in training
+    // is not cover, so folding them into "filled" would overstate the
+    // establishment on the one screen people trust for it.
+    const count = document.createElement('span');
+    count.className = 'badge badge-xs ' +
+      (filled === total ? 'badge-success'
+        : filled + filling === 0 ? 'badge-error' : 'badge-warning');
+    count.textContent = filled + '/' + total;
+    summary.appendChild(count);
+    if (filling) {
+      const t = document.createElement('span');
+      t.className = 'badge badge-xs badge-warning';
+      t.textContent = '+' + filling + ' training';
+      summary.appendChild(t);
+    }
+
+    const detail = document.createElement('div');
+    detail.className = 'hidden flex-col gap-1.5 pl-3 pt-1.5';
+    group.posts.forEach(function (p) { detail.appendChild(postRow(p)); });
+
+    summary.addEventListener('click', function () {
+      const open = detail.classList.toggle('hidden');
+      caret.textContent = open ? '\u25B8' : '\u25BE';
+    });
+
+    wrap.appendChild(summary);
+    wrap.appendChild(detail);
+    return wrap;
+  }
+
   function unitNode(unit) {
     const card = document.createElement('div');
-    card.className = 'w-[250px] rounded-xl border border-base-300 bg-base-100 shadow-sm overflow-hidden';
+    card.className = 'w-[272px] shrink-0 rounded-xl border border-base-300 bg-base-100 shadow-sm overflow-hidden';
 
     const head = document.createElement('div');
     head.className = 'flex items-center gap-2 px-3 py-2 bg-base-300/40 border-b border-base-300';
@@ -251,15 +313,60 @@
     }
     card.appendChild(head);
 
+    // The lead sits above the members, set apart. "Nobody answers for
+    // detection engineering" is a different problem from being one
+    // analyst short, and it disappears when the lead is one row in a list.
+    if (unit.lead) {
+      const lead = document.createElement('div');
+      lead.className = 'px-2 pt-2';
+      const inner = document.createElement('div');
+      inner.className = 'rounded-lg border px-2 py-1.5 ' +
+        (unit.lead.state === 'gapped'
+          ? 'border-error/60 bg-error/10'
+          : 'border-primary/40 bg-primary/5');
+      const label = document.createElement('div');
+      label.className = 'text-[0.6rem] uppercase tracking-widest ' +
+        (unit.lead.state === 'gapped' ? 'text-error' : 'text-primary');
+      label.textContent = unit.lead.state === 'gapped'
+        ? 'Leads this function \u2014 vacant' : 'Leads this function';
+      inner.appendChild(label);
+      inner.appendChild(postRow(unit.lead));
+      lead.appendChild(inner);
+      card.appendChild(lead);
+    }
+
     const posts = document.createElement('div');
     posts.className = 'flex flex-col gap-1.5 p-2';
-    if (!unit.posts.length) {
+    if (!unit.posts.length && !unit.lead) {
       const none = document.createElement('div');
       none.className = 'text-xs text-base-content/40 px-1 py-0.5';
       none.textContent = 'No established posts';
       posts.appendChild(none);
     }
-    unit.posts.forEach(function (p) { posts.appendChild(postRow(p)); });
+
+    // Grouped by role. Nineteen individual rows in one card is a column
+    // nobody can read; the count and the fill state are what a lead is
+    // looking for, and the individual posts are one click away for when
+    // they want to seat somebody.
+    const groups = [];
+    const byRole = {};
+    unit.posts.forEach(function (p) {
+      const key = p.profile_id === null || p.profile_id === undefined
+        ? 'free:' + p.title : 'role:' + p.profile_id;
+      if (!byRole[key]) {
+        byRole[key] = { key: key, label: roleLabel(p), posts: [] };
+        groups.push(byRole[key]);
+      }
+      byRole[key].posts.push(p);
+    });
+
+    groups.forEach(function (g) {
+      if (g.posts.length === 1) {
+        posts.appendChild(postRow(g.posts[0]));
+        return;
+      }
+      posts.appendChild(groupRow(g));
+    });
     card.appendChild(posts);
 
     if (CAN_MANAGE) {
@@ -321,6 +428,9 @@
         u.posts.forEach(function (p) {
           if (p.occupant) { seated[p.occupant.journey_id] = true; }
         });
+        // The lead is no longer in u.posts, so it has to be counted here
+        // or whoever holds it stays offered in every "seat someone" list.
+        if (u.lead && u.lead.occupant) { seated[u.lead.occupant.journey_id] = true; }
         walk(u.children);
       });
     })(data.units);
@@ -340,7 +450,13 @@
 
     const gaps = document.getElementById('wf-gap-summary');
     if (data.gaps > 0) {
-      gaps.textContent = data.gaps + ' gapped post' + (data.gaps === 1 ? '' : 's');
+      let text = data.gaps + ' gapped post' + (data.gaps === 1 ? '' : 's');
+      if (data.leads_gapped) {
+        // Counted separately because it is a different kind of short:
+        // a function with nobody answering for it, not a headcount.
+        text += ' \u00b7 ' + data.leads_gapped + ' with no lead';
+      }
+      gaps.textContent = text;
       gaps.classList.remove('hidden');
     } else {
       gaps.classList.add('hidden');
