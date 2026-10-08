@@ -663,7 +663,9 @@ def verify_requirement(session: Session, *, requirement: JourneyRequirement,
 
 def record_equivalence(session: Session, *, requirement: JourneyRequirement,
                        assessor: User, basis: str,
-                       expires_on: Optional[date] = None) -> JourneyRequirement:
+                       expires_on: Optional[date] = None,
+                       assessment_id: Optional[int] = None
+                       ) -> JourneyRequirement:
     """Satisfy a requirement by assessed proficiency instead of the item itself.
 
     "CompTIA Security+ (or equivalent)" is routinely met by somebody who
@@ -683,6 +685,21 @@ def record_equivalence(session: Session, *, requirement: JourneyRequirement,
     It expires like the thing it stands in for. Demonstrated proficiency
     goes stale exactly as a certificate does, and an equivalence that
     never expires is a permanent exemption wearing a different name.
+
+    ``assessment_id`` cites a RoleAssessment as supporting evidence. It is
+    evidence and never the decision: a RoleAssessment is, in its own
+    model's words, "a user's self-assessment", so letting a score clear a
+    requirement would mean somebody gets a role because they rated
+    themselves highly -- the exact thing the submit/verify split exists to
+    prevent. There is deliberately no score threshold either; a cutoff
+    would make the number the decision again, just with extra steps. The
+    basis stays mandatory with or without a citation.
+
+    What citing one adds is that the basis becomes checkable: the record
+    carries which assessment was considered, what it scored and when it
+    was taken, and says the score was self-rated -- because six months on
+    "scored 86%" reads as a measurement unless something says who did the
+    rating.
     """
     journey = session.get(UserJourney, requirement.journey_id)
     if journey is None:
@@ -699,6 +716,29 @@ def record_equivalence(session: Session, *, requirement: JourneyRequirement,
             "waiving the requirement."
         )
 
+    # Resolve the citation BEFORE touching the requirement, so a refusal
+    # leaves it exactly as it was rather than half-set.
+    cited = ""
+    if assessment_id is not None:
+        from ion.models.skills import RoleAssessment
+
+        assessment = session.get(RoleAssessment, assessment_id)
+        if assessment is None:
+            raise WorkforceError(f"No skills assessment {assessment_id}")
+        if assessment.user_id != journey.user_id:
+            # Otherwise a strong assessment could be cited for anybody and
+            # the evidence trail would point at the wrong person.
+            raise WorkforceError(
+                f"Skills assessment {assessment_id} belongs to a different "
+                f"person, so it is not evidence about this one."
+            )
+        cited = (
+            f" Supporting evidence: self-rated skills assessment "
+            f"{assessment.id} ({assessment.role_name}), "
+            f"{assessment.overall_match_pct}% match, taken "
+            f"{assessment.taken_at:%Y-%m-%d}."
+        )
+
     now = datetime.utcnow()
     requirement.status = STATUS_EQUIVALENT
     requirement.verified_by_id = assessor.id
@@ -708,7 +748,7 @@ def record_equivalence(session: Session, *, requirement: JourneyRequirement,
         requirement.validity_months, now)
     note = (f"Met by assessed proficiency, not by holding "
             f"{requirement.name!r}. Assessed by {assessor.username} on "
-            f"{now:%Y-%m-%d}: {basis.strip()}")
+            f"{now:%Y-%m-%d}: {basis.strip()}{cited}")
     requirement.notes = (
         f"{requirement.notes}\n{note}" if requirement.notes else note)
 
@@ -716,7 +756,9 @@ def record_equivalence(session: Session, *, requirement: JourneyRequirement,
         user_id=assessor.id, action="workforce_requirement_equivalence",
         resource_type="journey_requirement", resource_id=requirement.id,
         details=f"user {journey.user_id}: {requirement.name} met by assessed "
-                f"proficiency - {basis.strip()[:200]}",
+                f"proficiency - {basis.strip()[:200]}"
+                + (f" [cited assessment {assessment_id}]"
+                   if assessment_id is not None else ""),
     ))
     session.flush()
     _sync_roles_for(session, journey)

@@ -98,6 +98,10 @@ class EquivalenceIn(BaseModel):
     # write down what they assessed and how.
     basis: str = Field(..., min_length=1, max_length=2000)
     expires_on: Optional[date] = None
+    # A RoleAssessment to cite as supporting evidence. Evidence, not the
+    # decision: the assessment is self-rated, so a score can never clear a
+    # requirement on its own and the basis above stays mandatory.
+    assessment_id: Optional[int] = None
 
 
 class SubmitIn(BaseModel):
@@ -372,7 +376,8 @@ def record_equivalent(
     try:
         wf.record_equivalence(session, requirement=req, assessor=user,
                               basis=payload.basis,
-                              expires_on=payload.expires_on)
+                              expires_on=payload.expires_on,
+                              assessment_id=payload.assessment_id)
     except wf.WorkforceError as exc:
         raise _err(exc) from exc
     return _jreq_out(req)
