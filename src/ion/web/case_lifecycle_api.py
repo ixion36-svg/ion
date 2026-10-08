@@ -90,10 +90,18 @@ class CaseCreate(BaseModel):
 
 class CaseUpdate(BaseModel):
     title: Optional[str] = None
-    status: Optional[str] = None
+    # Typed as the enum so an unknown status is rejected with 422 by
+    # Pydantic before it can reach the SQLEnum column. Review 2026-10-08
+    # finding 1: a bare `str` let `status="banana"` commit, after which
+    # every ORM read of alert_cases raised LookupError — one malformed
+    # PATCH took the case board down for everyone.
+    status: Optional[AlertCaseStatus] = None
     assigned_to_id: Optional[int] = None
     description: Optional[str] = None
     severity: Optional[str] = None
+    # Deliberately still `str`: an invalid closure_reason must stay a 400
+    # carrying a "closure_reason" message (the contract pinned by
+    # tests/test_v023_2_case_close.py), not Pydantic's 422.
     closure_reason: Optional[str] = None
     closure_notes: Optional[str] = None
 
@@ -394,6 +402,7 @@ async def _background_kibana_case_sync(
     kibana_case_id: str,
     fields: dict,
     assignee_user_id: int | None,
+    clear_assignee: bool = False,
 ) -> None:
     """Push a Kibana case update + optional assignee resolution.
 
@@ -434,6 +443,7 @@ async def _background_kibana_case_sync(
             status=fields.get("status"),
             severity=fields.get("severity"),
             assignee_elastic_uid=assignee_elastic_uid,
+            clear_assignee=clear_assignee,
         )
         if new_version:
             _case_row = _session.query(AlertCase).filter_by(id=case_id).first()
@@ -1880,34 +1890,53 @@ async def update_case(
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    # ── Phase 1: validate the whole transition. Nothing below mutates the
+    # case. Review 2026-10-08 finding 5: title/description/severity were
+    # applied — and the assignment *committed* — before closure validation
+    # ran, so a patch rejected for a missing closure_reason still saved the
+    # new title and owner. Validate first, mutate once, commit once.
+    #
+    # `model_fields_set` is what makes finding 4 fixable: it distinguishes
+    # "assigned_to_id was omitted" from "assigned_to_id was sent as null".
+    # The Unassigned option in the UI sends an explicit null, which the old
+    # `is not None` guard silently treated as "no change" while still
+    # reporting success.
+    _assignee_requested = "assigned_to_id" in data.model_fields_set
+
+    old_status = case.status.value if hasattr(case.status, "value") else case.status
+    # Pydantic has already guaranteed this is a real AlertCaseStatus.
+    new_status = data.status.value if data.status is not None else None
+    _closing = new_status == "closed" and old_status != "closed"
+    _reopening = new_status is not None and new_status != "closed" and old_status == "closed"
+
+    if _closing:
+        if not data.closure_reason:
+            raise HTTPException(
+                status_code=400,
+                detail="closure_reason is required when closing a case",
+            )
+        valid_reasons = {r.value for r in CaseClosureReason}
+        if data.closure_reason not in valid_reasons:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid closure_reason. Must be one of: {', '.join(sorted(valid_reasons))}",
+            )
+
+    # ── Phase 2: mutate. Validation passed, so every field lands together
+    # and a single commit at the end makes the update atomic.
     if data.title is not None:
         case.title = data.title
     if data.description is not None:
         case.description = data.description
     if data.severity is not None:
         case.severity = data.severity
-    if data.assigned_to_id is not None:
+    if _assignee_requested:
         case.assigned_to_id = data.assigned_to_id
-        # Commit the assignment immediately so it persists even if Kibana sync fails
-        session.commit()
+
     _synced_alert_ids = []
     _mapped_triage = None
-    if data.status is not None:
-        old_status = case.status.value if hasattr(case.status, "value") else case.status
-        new_status = data.status
-        # Closing: require closure_reason
-        if new_status == "closed" and old_status != "closed":
-            if not data.closure_reason:
-                raise HTTPException(
-                    status_code=400,
-                    detail="closure_reason is required when closing a case",
-                )
-            valid_reasons = {r.value for r in CaseClosureReason}
-            if data.closure_reason not in valid_reasons:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Invalid closure_reason. Must be one of: {', '.join(sorted(valid_reasons))}",
-                )
+    if new_status is not None:
+        if _closing:
             case.closure_reason = data.closure_reason
             case.closure_notes = data.closure_notes
             case.closed_by_id = current_user.id
@@ -2045,7 +2074,7 @@ async def update_case(
                     logger.warning("Auto-FP creation failed for case %s: %s", case.case_number, _fp_err)
 
         # Reopening: clear closure fields
-        elif new_status != "closed" and old_status == "closed":
+        elif _reopening:
             case.closure_reason = None
             case.closure_notes = None
             case.closed_by_id = None
@@ -2076,19 +2105,21 @@ async def update_case(
     _kibana_touches = {
         "title": data.title,
         "description": data.description,
-        "status": data.status,
+        # The plain value, not the enum member — sync_case_update_to_kibana
+        # maps it through a string-keyed dict.
+        "status": new_status,
         "severity": data.severity,
     }
     _kibana_relevant_change = (
         data.title is not None
         or data.description is not None
-        or data.status is not None
+        or new_status is not None
         or data.severity is not None
-        or data.assigned_to_id is not None
+        or _assignee_requested
     )
-    _assignee_changed = data.assigned_to_id is not None
+    _assignee_changed = _assignee_requested
     _assignee_id = data.assigned_to_id
-    _status_changed = data.status is not None
+    _status_changed = new_status is not None
     _alert_ids_to_sync = list(_synced_alert_ids)
     _mapped_triage_status = _mapped_triage
     _dfir_iris_case_id = case.dfir_iris_case_id
@@ -2111,6 +2142,9 @@ async def update_case(
             _kibana_case_id,
             _kibana_touches,
             _assignee_id if _assignee_changed else None,
+            # An explicit unassignment has to reach Kibana as an empty
+            # assignees list; a bare None there means "leave it alone".
+            _assignee_changed and _assignee_id is None,
         )
 
     # Build Kibana URL locally without an external call (it's just a

@@ -126,12 +126,17 @@ def sync_case_update_to_kibana(
     status: Optional[str] = None,
     severity: Optional[str] = None,
     assignee_elastic_uid: Optional[str] = None,
+    clear_assignee: bool = False,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Sync case updates to Kibana.
 
     Args:
         assignee_elastic_uid: Elastic user profile UID for the assignee.
             If provided, the Kibana case assignees list will be set to this user.
+        clear_assignee: Set the Kibana assignees list to empty. Needed
+            because a bare ``assignee_elastic_uid=None`` means "leave the
+            Kibana assignee alone", so an ION unassignment would otherwise
+            never propagate (review 2026-10-08 finding 4).
 
     Returns (kibana_case_version, kibana_url) or (None, None) if skipped/failed.
     """
@@ -153,10 +158,13 @@ def sync_case_update_to_kibana(
             }
             kibana_status = status_map.get(status)
 
-        # Build assignees payload if UID provided
+        # Build assignees payload if UID provided. `[]` is a real
+        # instruction to Kibana (unassign); `None` leaves it untouched.
         assignees = None
         if assignee_elastic_uid is not None:
             assignees = [{"uid": assignee_elastic_uid}]
+        elif clear_assignee:
+            assignees = []
 
         # Get current version from Kibana
         kibana_case = service.get_case(kibana_case_id)
