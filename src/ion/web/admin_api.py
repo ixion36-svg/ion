@@ -7,7 +7,8 @@ import sys
 from datetime import datetime
 from pathlib import Path
 import re
-from typing import List, Optional
+from dataclasses import fields as dataclass_fields
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -239,6 +240,121 @@ def _is_secret_field(field: str) -> bool:
     return any(hint in field for hint in _SECRET_HINTS)
 
 
+#: Settings that must not be writable through the generic field endpoint,
+#: whatever the inventory shows.
+#:
+#: db_path repoints the running application at a different database with no
+#: migration and no way back through the same screen. The rest is open: the
+#: inventory exists so an operator can see and change what ION runs on, and
+#: a field nobody can edit just sends them back to editing .env by hand.
+_NEVER_WRITABLE = frozenset({"db_path"})
+
+_TRUE = {"true", "1", "yes", "on"}
+_FALSE = {"false", "0", "no", "off"}
+
+
+def _field_kind(field: str) -> str:
+    """Which control the settings page should render for this field.
+
+    Taken from the default value's type rather than the annotation, so it
+    agrees with what ``coerce_config_value`` will accept. bool is checked
+    before int because bool subclasses int, and an int control on a boolean
+    field would offer 0 and 1 for something the operator thinks of as on
+    and off.
+    """
+    current = getattr(Config(), field, None)
+    if isinstance(current, bool):
+        return "bool"
+    if isinstance(current, int):
+        return "int"
+    if isinstance(current, float):
+        return "float"
+    return "secret" if _is_secret_field(field) else "text"
+
+
+def config_field_names() -> tuple:
+    """Every setting ION reads, from the dataclass itself.
+
+    Not ENV_FIELD_MAP: eleven fields have no environment variable --
+    max_versions_to_keep among them -- and keying off the map left them
+    out of the inventory and unwritable through the generic endpoint while
+    a section form could still change them. The dataclass is the only list
+    that cannot be behind.
+    """
+    return tuple(f.name for f in dataclass_fields(Config))
+
+
+def is_field_editable_via_api(field: str) -> bool:
+    """Whether the generic config endpoint may write ``field`` at all.
+
+    Separate from whether it is writable *right now* -- see
+    ``env_blocks_write`` -- because the two refuse for different reasons
+    and the operator needs to be told which.
+    """
+    if field in _NEVER_WRITABLE:
+        return False
+    return field in config_field_names()
+
+
+def env_blocks_write(field: str) -> bool:
+    """Whether the environment currently holds ``field``.
+
+    ``get_config()`` ranks the environment above config.json, so persisting
+    one of these stores a value that never takes effect: a save that
+    reports success and changes nothing. Refusing is the honest answer.
+    """
+    return field in env_held_fields()
+
+
+def coerce_config_value(field: str, raw):
+    """Coerce a submitted value to the type ``Config`` declares, or raise.
+
+    The form sends strings. Assigning "false" to a boolean leaves it
+    truthy, which is how a feature someone just disabled stays on, and
+    assigning "" to an int breaks the next caller that does arithmetic on
+    it. So the declared type decides, and anything that does not convert is
+    an error rather than a best guess -- a wrong setting that saved cleanly
+    is worse than one that refused.
+    """
+    if field not in config_field_names():
+        raise ValueError(f"Unknown setting: {field}")
+
+    current = getattr(Config(), field, None)
+
+    # bool before int: bool is a subclass of int, so the int branch would
+    # swallow every boolean field and store 0/1.
+    if isinstance(current, bool):
+        if isinstance(raw, bool):
+            return raw
+        text = str(raw).strip().lower()
+        if text in _TRUE:
+            return True
+        if text in _FALSE:
+            return False
+        raise ValueError(
+            f"{field} is a true/false setting; got {raw!r}"
+        )
+
+    if isinstance(current, int):
+        if isinstance(raw, bool):
+            raise ValueError(f"{field} is a number; got a true/false value")
+        try:
+            return int(str(raw).strip())
+        except (TypeError, ValueError):
+            raise ValueError(f"{field} is a whole number; got {raw!r}") from None
+
+    if isinstance(current, float):
+        try:
+            return float(str(raw).strip())
+        except (TypeError, ValueError):
+            raise ValueError(f"{field} is a number; got {raw!r}") from None
+
+    # Strings and anything else render and store as text. An empty string
+    # is a legitimate edit for a non-secret: clearing an index pattern or a
+    # realm name is something an operator may well mean.
+    return "" if raw is None else str(raw)
+
+
 def _is_editable_in_settings(field: str) -> bool:
     if field in _NOT_EDITABLE:
         return False
@@ -267,7 +383,7 @@ def build_config_inventory() -> List[dict]:
     config = get_config()
     sources = config_field_sources()
     rows: List[dict] = []
-    for field in sorted(ENV_FIELD_MAP):
+    for field in sorted(config_field_names()):
         secret = _is_secret_field(field)
         available = hasattr(config, field)
         if available:
@@ -287,12 +403,25 @@ def build_config_inventory() -> List[dict]:
             value = None
         rows.append({
             "field": field,
-            "env_var": ENV_FIELD_MAP[field],
+            # None, not a guess: eleven settings have no environment
+            # variable, and naming one that does not exist sends an
+            # operator looking for it in .env.
+            "env_var": ENV_FIELD_MAP.get(field),
             "source": sources.get(field, "default"),
             "value": value,
             "is_secret": secret,
             "available": available,
             "editable": _is_editable_in_settings(field),
+            # Whether the generic endpoint will accept a write now, and if
+            # not, which of the two reasons applies.
+            "writable": (
+                is_field_editable_via_api(field) and not env_blocks_write(field)
+            ),
+            "write_blocked_by": (
+                "environment" if env_blocks_write(field)
+                else ("policy" if not is_field_editable_via_api(field) else None)
+            ),
+            "kind": _field_kind(field),
         })
     return rows
 
@@ -517,6 +646,152 @@ async def get_configuration(current_user: User = Depends(require_permission("sys
         # in any of them, so there was no way to see from the UI what the
         # application was actually running with.
         "inventory": build_config_inventory(),
+    }
+
+
+#: Settings read once while the application is starting, so a save takes
+#: effect only after a restart.
+#:
+#: debug_mode and cookie_secure are read at module scope in server.py to
+#: decide whether /docs is mounted and to warn about the Secure flag.
+#: csrf_enabled and multi_tenant are bound into middleware when it is
+#: added. Saying so matters: an operator who turns CSRF back on and sees
+#: "updated" is entitled to think the application is protected.
+#:
+#: Conservative on purpose. Listing a field that does in fact apply live
+#: costs one unnecessary restart; omitting one that does not costs a
+#: setting the operator believes is in force and is not.
+_RESTART_REQUIRED = frozenset({
+    "debug_mode",
+    "dev_mode",
+    "cookie_secure",
+    "csrf_enabled",
+    "multi_tenant",
+    "base_url",
+    "de_module_enabled",
+    "workforce_enabled",
+})
+
+
+class ConfigFieldUpdate(BaseModel):
+    """One setting, by its config field name."""
+
+    field: str
+    value: Any = None
+
+
+class ConfigFieldsUpdate(BaseModel):
+    """A batch, applied all-or-nothing.
+
+    All-or-nothing because a half-applied batch is the worst outcome: the
+    page would show some of what the operator typed and some of what was
+    there before, with no indication which is which.
+    """
+
+    updates: List[ConfigFieldUpdate]
+
+
+@router.put("/config/field")
+async def update_config_fields(
+    body: ConfigFieldsUpdate,
+    request: Request,
+    current_user: User = Depends(require_permission("system:settings")),
+):
+    """Write settings by field name, for the Settings inventory.
+
+    The per-section endpoints above cover the integrations. This one
+    reaches the rest -- the settings that had no form at all, so the only
+    way to change them was to edit .env and restart.
+
+    Every write is validated before any is applied:
+
+    * the name must be a real ``Config`` field, or it would attach to the
+      object, read back fine for the life of the process, and never persist;
+    * the value must convert to the field's declared type, because "false"
+      in a boolean is how a feature someone just disabled stays on;
+    * the environment must not be holding it, since ``get_config()`` ranks
+      the environment above the file and the write would be a no-op that
+      reported success;
+    * ``db_path`` is refused outright: repointing the database from a
+      settings form detaches the running application from its own data,
+      mid-request, with no migration and no way back through that screen.
+
+    A blank value for a secret means "keep the current one", matching every
+    other form on this page, so saving does not wipe a credential the
+    operator could not see in order to retype it.
+    """
+    if not body.updates:
+        raise HTTPException(400, "No settings submitted")
+
+    config = get_config()
+    staged: dict = {}
+    rejected: list = []
+
+    for item in body.updates:
+        name = (item.field or "").strip()
+        if not is_field_editable_via_api(name):
+            rejected.append({
+                "field": name,
+                "reason": (
+                    "This setting cannot be changed here."
+                    if name in _NEVER_WRITABLE
+                    else f"Unknown setting: {name}"
+                ),
+            })
+            continue
+        if env_blocks_write(name):
+            rejected.append({
+                "field": name,
+                "reason": (
+                    f"Held by {ENV_FIELD_MAP.get(name, 'an environment variable')}. "
+                    f"The environment outranks saved settings, so this would "
+                    f"not take effect."
+                ),
+            })
+            continue
+        # A blank secret means keep what is stored; the operator never saw
+        # the value, so they cannot retype it.
+        if _is_secret_field(name) and (item.value is None or item.value == ""):
+            continue
+        try:
+            staged[name] = coerce_config_value(name, item.value)
+        except ValueError as exc:
+            rejected.append({"field": name, "reason": str(exc)})
+
+    if rejected:
+        raise HTTPException(400, {
+            "message": "No settings were changed.",
+            "rejected": rejected,
+        })
+
+    changed = []
+    for name, value in staged.items():
+        before = getattr(config, name, None)
+        if before == value:
+            continue
+        setattr(config, name, value)
+        changed.append(name)
+
+    if not changed:
+        return {"status": "unchanged", "changed": [], "requires_restart": []}
+
+    config.to_file(get_config_path())
+
+    # Names only. The audit log is readable by more people than the
+    # settings page, and half these fields are credentials.
+    logger.info(
+        "Settings changed by %s: %s",
+        current_user.username, ", ".join(sorted(changed)),
+    )
+
+    return {
+        "status": "updated",
+        "changed": sorted(changed),
+        # Honest about reach: the config object is live, but anything read
+        # once at startup keeps the old value until ION is restarted.
+        "requires_restart": sorted(
+            n for n in changed if n in _RESTART_REQUIRED
+        ),
     }
 
 

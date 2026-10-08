@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -499,185 +499,38 @@ class Config:
     def to_file(self, path: Path) -> None:
         """Save configuration to a JSON file.
 
-        Written 0600. Since v0.99.7 this file — not `.env` — is where the
+        Serialised from the dataclass rather than a hand-written dict. The
+        hand-written one had fallen twenty fields behind: ``Config`` carried
+        162, ``from_file`` read 162 back, and this wrote 141, so
+        ``response_actions_enabled``, ``response_actions_live``,
+        ``csrf_enabled``, ``multi_tenant``, ``ca_bundle``,
+        ``workforce_enabled`` and fourteen others could be set in memory,
+        reported as saved, and lost on the next start. That is the "a save
+        that reports success and changes nothing" failure this file's
+        _drop_env_held docstring says v0.99.7 exists to close, still live
+        for those twenty. Deriving it means a field added to Config is
+        persisted without anyone having to remember.
+
+        Written 0600. Since v0.99.7 this file -- not `.env` -- is where the
         Elasticsearch, Kibana, Arkime, GitLab, OpenCTI, TIDE, SMTP, OIDC and
-        response-action credentials live, in plaintext. It is created with the
-        mode rather than chmod'd afterwards so the secrets never exist
+        response-action credentials live, in plaintext. It is created with
+        the mode rather than chmod'd afterwards so the secrets never exist
         world-readable, not even briefly; the mode argument only applies on
         creation, so an inherited 0644 file from an earlier version is also
         tightened below.
         """
+        payload = {}
+        for f in fields(self):
+            value = getattr(self, f.name)
+            # Path and the role-mapping dict are the only non-scalars.
+            # str() on a Path keeps the round trip, since from_file passes
+            # db_path back through Path(). Everything else json handles.
+            payload[f.name] = str(value) if isinstance(value, Path) else value
+
         path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w", encoding="utf-8") as f:
-            json.dump(
-                {
-                    "db_path": str(self.db_path),
-                    "default_format": self.default_format,
-                    "auto_save": self.auto_save,
-                    "max_versions_to_keep": self.max_versions_to_keep,
-                    # Base URL
-                    "base_url": self.base_url,
-                    # OIDC configuration
-                    "oidc_enabled": self.oidc_enabled,
-                    "oidc_keycloak_url": self.oidc_keycloak_url,
-                    "oidc_realm": self.oidc_realm,
-                    "oidc_client_id": self.oidc_client_id,
-                    "oidc_client_secret": self.oidc_client_secret,
-                    "oidc_auto_create_users": self.oidc_auto_create_users,
-                    "oidc_role_claim": self.oidc_role_claim,
-                    "oidc_role_mapping": self.oidc_role_mapping,
-                    "oidc_verify_ssl": self.oidc_verify_ssl,
-                    # TLS
-                    "ssl_cert": self.ssl_cert,
-                    "ssl_key": self.ssl_key,
-                    # Security settings
-                    "dev_mode": self.dev_mode,
-                    "cookie_secure": self.cookie_secure,
-                    "debug_mode": self.debug_mode,
-                    "account_lockout_enabled": self.account_lockout_enabled,
-                    "ip_blocking_enabled": self.ip_blocking_enabled,
-                    "webhook_require_signature": self.webhook_require_signature,
-                    "enforce_password_change": self.enforce_password_change,
-                    "password_min_length": self.password_min_length,
-                    # GitLab integration
-                    "gitlab_enabled": self.gitlab_enabled,
-                    "gitlab_url": self.gitlab_url,
-                    "gitlab_token": self.gitlab_token,
-                    "gitlab_project_id": self.gitlab_project_id,
-                    "gitlab_verify_ssl": self.gitlab_verify_ssl,
-                    "gitlab_sudo_enabled": self.gitlab_sudo_enabled,
-                    # OpenCTI integration
-                    "opencti_enabled": self.opencti_enabled,
-                    "opencti_url": self.opencti_url,
-                    "opencti_token": self.opencti_token,
-                    "opencti_verify_ssl": self.opencti_verify_ssl,
-                    "arkime_enabled": self.arkime_enabled,
-                    "arkime_url": self.arkime_url,
-                    "arkime_username": self.arkime_username,
-                    "arkime_password": self.arkime_password,
-                    "arkime_verify_ssl": self.arkime_verify_ssl,
-                    # Elasticsearch integration
-                    "elasticsearch_enabled": self.elasticsearch_enabled,
-                    "elasticsearch_url": self.elasticsearch_url,
-                    "elasticsearch_api_key": self.elasticsearch_api_key,
-                    "elasticsearch_username": self.elasticsearch_username,
-                    "elasticsearch_password": self.elasticsearch_password,
-                    "elasticsearch_alert_index": self.elasticsearch_alert_index,
-                    "elasticsearch_case_index": self.elasticsearch_case_index,
-                    "elasticsearch_verify_ssl": self.elasticsearch_verify_ssl,
-                    "elasticsearch_user_index": self.elasticsearch_user_index,
-                    "elasticsearch_user_field": self.elasticsearch_user_field,
-                    "elasticsearch_assignment_field": self.elasticsearch_assignment_field,
-                    # Ollama AI integration
-                    "ollama_enabled": self.ollama_enabled,
-                    "ollama_url": self.ollama_url,
-                    "ollama_model": self.ollama_model,
-                    "ollama_timeout": self.ollama_timeout,
-                    "ollama_verify_ssl": self.ollama_verify_ssl,
-                    # Kibana Cases integration
-                    "kibana_cases_enabled": self.kibana_cases_enabled,
-                    "kibana_url": self.kibana_url,
-                    "kibana_username": self.kibana_username,
-                    "kibana_password": self.kibana_password,
-                    "kibana_space_id": self.kibana_space_id,
-                    "kibana_case_owner": self.kibana_case_owner,
-                    "kibana_verify_ssl": self.kibana_verify_ssl,
-                    # DFIR-IRIS integration
-                    "dfir_iris_enabled": self.dfir_iris_enabled,
-                    "dfir_iris_url": self.dfir_iris_url,
-                    "dfir_iris_api_key": self.dfir_iris_api_key,
-                    "dfir_iris_verify_ssl": self.dfir_iris_verify_ssl,
-                    "dfir_iris_default_customer": self.dfir_iris_default_customer,
-                    # VirusTotal integration
-                    "virustotal_enabled": self.virustotal_enabled,
-                    "virustotal_api_key": self.virustotal_api_key,
-                    "virustotal_url": self.virustotal_url,
-                    "virustotal_verify_ssl": self.virustotal_verify_ssl,
-                    "virustotal_timeout": self.virustotal_timeout,
-                    "virustotal_rate_limit": self.virustotal_rate_limit,
-                    # Shodan integration
-                    "shodan_enabled": self.shodan_enabled,
-                    "shodan_api_key": self.shodan_api_key,
-                    "shodan_url": self.shodan_url,
-                    "shodan_verify_ssl": self.shodan_verify_ssl,
-                    "shodan_timeout": self.shodan_timeout,
-                    # AbuseIPDB integration
-                    "abuseipdb_enabled": self.abuseipdb_enabled,
-                    "abuseipdb_api_key": self.abuseipdb_api_key,
-                    # TIDE integration
-                    "tide_enabled": self.tide_enabled,
-                    "tide_url": self.tide_url,
-                    "tide_api_key": self.tide_api_key,
-                    "tide_verify_ssl": self.tide_verify_ssl,
-                    "tide_space": self.tide_space,
-                    "tide_client_id": self.tide_client_id,
-                    "de_license_enforced": self.de_license_enforced,
-                    "de_module_enabled": self.de_module_enabled,
-                    "de_license": self.de_license,
-                    # Generic scheduler
-                    "scheduler_enabled": self.scheduler_enabled,
-                    "scheduler_interval_s": self.scheduler_interval_s,
-                    # Case grouper
-                    "case_grouper_enabled": self.case_grouper_enabled,
-                    "case_grouper_interval_s": self.case_grouper_interval_s,
-                    "case_grouper_window_minutes": self.case_grouper_window_minutes,
-                    "case_grouper_push_to_kibana": self.case_grouper_push_to_kibana,
-                    "case_grouper_auto_investigate": self.case_grouper_auto_investigate,
-                    "case_grouper_stagger_s": self.case_grouper_stagger_s,
-                    "case_grouper_min_cluster_size": self.case_grouper_min_cluster_size,
-                    "case_grouper_max_alerts_per_case": self.case_grouper_max_alerts_per_case,
-                    "case_grouper_investigate_per_case": self.case_grouper_investigate_per_case,
-                    # PII anonymising proxy
-                    "pii_anon_enabled": self.pii_anon_enabled,
-                    "pii_fields_file": self.pii_fields_file,
-                    # Investigation loop
-                    "investigation_loop_enabled": self.investigation_loop_enabled,
-                    "investigation_sweep_interval_s": self.investigation_sweep_interval_s,
-                    "investigation_max_per_sweep": self.investigation_max_per_sweep,
-                    "investigation_llm_timeout_s": self.investigation_llm_timeout_s,
-                    # Attack Path + Bob escalation tier
-                    "attack_path_enabled": self.attack_path_enabled,
-                    "bob_escalation_tier_enabled": self.bob_escalation_tier_enabled,
-                    "bob_escalation_samples": self.bob_escalation_samples,
-                    "bob_escalation_model": self.bob_escalation_model,
-                    # Active response executors
-                    "exec_dry_run": self.exec_dry_run,
-                    "exec_default_timeout_s": self.exec_default_timeout_s,
-                    "exec_firewall_url": self.exec_firewall_url,
-                    "exec_firewall_api_key": self.exec_firewall_api_key,
-                    "exec_firewall_verify_ssl": self.exec_firewall_verify_ssl,
-                    "exec_dns_sinkhole_url": self.exec_dns_sinkhole_url,
-                    "exec_dns_sinkhole_api_key": self.exec_dns_sinkhole_api_key,
-                    "exec_dns_sinkhole_verify_ssl": self.exec_dns_sinkhole_verify_ssl,
-                    "exec_edr_url": self.exec_edr_url,
-                    "exec_edr_api_key": self.exec_edr_api_key,
-                    "exec_edr_verify_ssl": self.exec_edr_verify_ssl,
-                    "exec_email_gateway_url": self.exec_email_gateway_url,
-                    "exec_email_gateway_api_key": self.exec_email_gateway_api_key,
-                    "exec_email_gateway_verify_ssl": self.exec_email_gateway_verify_ssl,
-                    "exec_ad_ldap_uri": self.exec_ad_ldap_uri,
-                    "exec_ad_bind_dn": self.exec_ad_bind_dn,
-                    "exec_ad_bind_password": self.exec_ad_bind_password,
-                    "exec_ad_user_search_base": self.exec_ad_user_search_base,
-                    "exec_ad_verify_ssl": self.exec_ad_verify_ssl,
-                    "exec_generic_webhook_api_key": self.exec_generic_webhook_api_key,
-                    # SMTP integration
-                    "smtp_enabled": self.smtp_enabled,
-                    "smtp_host": self.smtp_host,
-                    "smtp_port": self.smtp_port,
-                    "smtp_username": self.smtp_username,
-                    "smtp_password": self.smtp_password,
-                    "smtp_from_address": self.smtp_from_address,
-                    "smtp_from_name": self.smtp_from_name,
-                    "smtp_use_tls": self.smtp_use_tls,
-                    "smtp_use_starttls": self.smtp_use_starttls,
-                    "smtp_timeout": self.smtp_timeout,
-                    "smtp_verify_ssl": self.smtp_verify_ssl,
-                },
-                f,
-                indent=2,
-            )
+            json.dump(payload, f, indent=2)
         try:
             os.chmod(path, 0o600)
         except OSError:

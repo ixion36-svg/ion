@@ -667,9 +667,12 @@
             <h3 class="mt-8">All Settings</h3>
             <p class="text-base-content/60 mb-4 text-[0.9rem]">
                 Every setting ION reads, with the value in force and where it came
-                from. The sections above cover the integrations; most of the rest
-                are deliberately not editable here, but nothing ION runs on should
-                be invisible. Secrets are masked.
+                from. Editable here, including the ones with no form of their own.
+                A value the environment holds is shown read-only, because the
+                environment outranks saved settings and a change here would not
+                take effect. Secrets are masked; leave one blank to keep it.
+                Settings marked <span class="text-warning">restart</span> are read
+                while ION starts.
             </p>
             <div class="flex items-center gap-3 mb-3 flex-wrap">
                 <input type="text" id="inventory-filter" class="input input-bordered input-sm flex-1 min-w-[200px]"
@@ -681,6 +684,8 @@
                     Only values not left at the default
                 </label>
                 <span id="inventory-count" class="text-[0.8rem] text-base-content/60"></span>
+                <button class="btn btn-primary btn-sm" id="inventory-save"
+                        data-click-action="saveInventoryChanges" disabled>Save Changes</button>
             </div>
             <div class="bg-base-100 border border-base-300 rounded max-h-[420px] overflow-y-auto">
                 <table class="table table-sm w-full">
@@ -2097,34 +2102,156 @@ function filterConfigInventory() {
 
     body.innerHTML = rows.map(r => {
         const [label, badge] = SOURCE_LABEL[r.source] || ['Unknown', 'badge-ghost'];
-        // Distinguish the three ways a value can be empty, because they
-        // mean different things: not set at all, set to an empty string,
-        // and a name the running config does not expose.
-        let value;
-        if (!r.available) {
-            value = '<span class="text-warning">not available in this build</span>';
-        } else if (r.value === null || r.value === undefined) {
-            value = '<span class="text-base-content/50">not set</span>';
-        } else if (r.value === '') {
-            value = r.is_secret
-                ? '<span class="text-base-content/50">no secret set</span>'
-                : '<span class="text-base-content/50">empty</span>';
-        } else if (typeof r.value === 'boolean') {
-            value = r.value ? 'true' : 'false';
+        const id = `inv-${r.field}`;
+        let control;
+
+        if (!r.writable) {
+            // Read-only, and say which of the two reasons applies. An
+            // environment-held value can be freed by removing it from .env;
+            // a policy-blocked one cannot be changed here at all. A disabled
+            // box with no explanation just looks broken.
+            control = '<span class="font-mono text-[0.8rem] break-all">'
+                + inventoryDisplayValue(r) + '</span>'
+                + (r.write_blocked_by === 'environment'
+                    ? ` <span class="cfg-env-badge" title="Held by ${escapeHtml(r.env_var || 'an environment variable')}. The environment outranks saved settings, so a change here would not take effect. Remove it from .env to manage it from this page.">set by environment</span>`
+                    : ' <span class="text-[0.72rem] text-base-content/50">(not editable here)</span>');
+        } else if (!r.available) {
+            control = '<span class="text-warning">not available in this build</span>';
+        } else if (r.kind === 'bool') {
+            control = `<input type="checkbox" class="checkbox w-[16px] h-[16px]" id="${id}"
+                        data-inv-field="${escapeHtml(r.field)}" data-inv-kind="bool"
+                        ${r.value ? 'checked' : ''}
+                        data-change-action="markInventoryDirty">`;
+        } else if (r.kind === 'secret') {
+            // Blank means keep the stored secret, the same contract as every
+            // other credential field on this page. The placeholder has to say
+            // so, or a save looks like it wiped the value.
+            control = `<input type="password" class="input input-bordered input-xs w-full font-mono" id="${id}"
+                        data-inv-field="${escapeHtml(r.field)}" data-inv-kind="secret"
+                        placeholder="${r.value ? 'set — leave blank to keep' : 'not set'}"
+                        data-input-action="markInventoryDirty">`;
         } else {
-            value = escapeHtml(String(r.value));
+            const type = (r.kind === 'int' || r.kind === 'float') ? 'number' : 'text';
+            const step = r.kind === 'float' ? ' step="any"' : '';
+            const shown = (r.value === null || r.value === undefined) ? '' : String(r.value);
+            control = `<input type="${type}"${step} class="input input-bordered input-xs w-full font-mono" id="${id}"
+                        data-inv-field="${escapeHtml(r.field)}" data-inv-kind="${r.kind}"
+                        value="${escapeHtml(shown)}"
+                        data-input-action="markInventoryDirty">`;
         }
-        const editable = r.editable
-            ? ' <span class="text-[0.72rem] text-base-content/50">(editable above)</span>'
+
+        const restart = INVENTORY_RESTART.has(r.field)
+            ? ' <span class="text-[0.72rem] text-warning" title="Read once while ION starts, so a change takes effect after a restart.">restart</span>'
             : '';
-        return `<tr>
-            <td class="font-mono text-[0.8rem]">${escapeHtml(r.field)}${editable}</td>
-            <td class="font-mono text-[0.8rem] break-all">${value}</td>
+        return `<tr data-inv-row="${escapeHtml(r.field)}">
+            <td class="font-mono text-[0.8rem]">${escapeHtml(r.field)}${restart}</td>
+            <td class="text-[0.8rem] break-all">${control}</td>
             <td><span class="badge badge-sm ${badge}">${label}</span></td>
-            <td class="font-mono text-[0.75rem] text-base-content/60">${escapeHtml(r.env_var)}</td>
+            <td class="font-mono text-[0.75rem] text-base-content/60">${escapeHtml(r.env_var || '-')}</td>
         </tr>`;
     }).join('');
+    updateInventoryDirtyCount();
 }
+
+// The three ways a value can be empty mean different things, so they read
+// differently: never set, set to an empty string, and a name the running
+// config does not expose at all.
+function inventoryDisplayValue(r) {
+    if (!r.available) return '<span class="text-warning">not available in this build</span>';
+    if (r.value === null || r.value === undefined) return '<span class="text-base-content/50">not set</span>';
+    if (r.value === '') {
+        return r.is_secret
+            ? '<span class="text-base-content/50">no secret set</span>'
+            : '<span class="text-base-content/50">empty</span>';
+    }
+    if (typeof r.value === 'boolean') return r.value ? 'true' : 'false';
+    return escapeHtml(String(r.value));
+}
+
+// Settings bound while ION starts. Mirrors _RESTART_REQUIRED in
+// admin_api.py; the server is the authority and repeats it in the save
+// response, this is only the hint beside the field so the operator knows
+// before they save rather than after.
+const INVENTORY_RESTART = new Set([
+    'debug_mode', 'dev_mode', 'cookie_secure', 'csrf_enabled',
+    'multi_tenant', 'base_url', 'de_module_enabled', 'workforce_enabled',
+]);
+
+function inventoryEdits() {
+    // Only what actually changed. Posting the whole table back would write
+    // 162 settings on every save, turning every untouched default into a
+    // stored value and burying the one real change in the audit line.
+    const edits = [];
+    for (const el of document.querySelectorAll('[data-inv-field]')) {
+        const name = el.dataset.invField;
+        const row = configInventory.find(r => r.field === name);
+        if (!row) continue;
+        if (el.dataset.invKind === 'bool') {
+            if (el.checked !== !!row.value) edits.push({field: name, value: el.checked});
+        } else if (el.dataset.invKind === 'secret') {
+            if (el.value !== '') edits.push({field: name, value: el.value});
+        } else {
+            const before = (row.value === null || row.value === undefined) ? '' : String(row.value);
+            if (el.value !== before) edits.push({field: name, value: el.value});
+        }
+    }
+    return edits;
+}
+
+function markInventoryDirty() {
+    updateInventoryDirtyCount();
+}
+
+function updateInventoryDirtyCount() {
+    const n = inventoryEdits().length;
+    const btn = document.getElementById('inventory-save');
+    if (!btn) return;
+    btn.disabled = n === 0;
+    btn.textContent = n === 0 ? 'Save Changes' : `Save ${n} Change${n === 1 ? '' : 's'}`;
+}
+
+async function saveInventoryChanges() {
+    const edits = inventoryEdits();
+    if (!edits.length) return;
+    const btn = document.getElementById('inventory-save');
+    if (btn) btn.disabled = true;
+    try {
+        const response = await fetch('/api/admin/config/field', {
+            method: 'PUT',
+            credentials: 'include',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({updates: edits}),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            // The server applies the batch all-or-nothing, so name every
+            // field it refused rather than printing one summary line: the
+            // operator has to know which of their edits to correct.
+            const detail = data.detail;
+            const lines = (detail && detail.rejected)
+                ? detail.rejected.map(x => `${x.field}: ${x.reason}`)
+                : [typeof detail === 'string' ? detail : 'Save failed'];
+            showToast('Nothing was saved. ' + lines.join(' | '), 'error');
+            return;
+        }
+        if (data.status === 'unchanged') {
+            showToast('No changes to save', 'info');
+        } else {
+            let msg = `Saved ${data.changed.length} setting${data.changed.length === 1 ? '' : 's'}`;
+            if (data.requires_restart && data.requires_restart.length) {
+                msg += `. ${data.requires_restart.join(', ')} ${data.requires_restart.length === 1 ? 'is' : 'are'} read while ION starts, so ${data.requires_restart.length === 1 ? 'it takes' : 'they take'} effect after a restart.`;
+            }
+            showToast(msg, 'success');
+        }
+        await loadAllSettings();
+    } catch (error) {
+        showToast('Save failed: ' + error.message, 'error');
+    } finally {
+        updateInventoryDirtyCount();
+    }
+}
+window.markInventoryDirty = markInventoryDirty;
+window.saveInventoryChanges = saveInventoryChanges;
 window.filterConfigInventory = filterConfigInventory;
 window.renderConfigInventory = renderConfigInventory;
 

@@ -77,13 +77,31 @@ class TestCoverage:
 
     def test_nothing_extra_is_invented(self, by_field):
         """The inventory reports what ION reads, not a wish list."""
-        extra = sorted(set(by_field) - set(ENV_FIELD_MAP))
+        import dataclasses
+
+        from ion.core.config import Config
+
+        known = {f.name for f in dataclasses.fields(Config)}
+        extra = sorted(set(by_field) - known)
         assert not extra, f"inventory reports unknown fields: {extra}"
 
-    def test_it_is_not_a_hand_maintained_list(self, inventory):
-        """Derived from ENV_FIELD_MAP, so it cannot drift. 151 today; the
-        assertion is on the relationship, not the number."""
-        assert len(inventory) == len(ENV_FIELD_MAP)
+    def test_it_covers_the_whole_dataclass_not_just_the_env_map(self, by_field):
+        """ENV_FIELD_MAP is a subset: eleven settings have no environment
+        variable -- max_versions_to_keep among them -- and keying the
+        inventory off the map left those out while a section form could
+        still change them."""
+        import dataclasses
+
+        from ion.core.config import Config
+
+        known = {f.name for f in dataclasses.fields(Config)}
+        assert set(by_field) == known
+        assert len(known) > len(ENV_FIELD_MAP)
+
+    def test_a_field_with_no_environment_variable_says_so(self, by_field):
+        """None rather than a guessed name: inventing ION_MAX_VERSIONS_TO_KEEP
+        sends an operator looking for a variable that does not exist."""
+        assert by_field["max_versions_to_keep"]["env_var"] is None
 
     @pytest.mark.parametrize("field", [
         "response_actions_enabled",
