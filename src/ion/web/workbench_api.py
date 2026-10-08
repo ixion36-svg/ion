@@ -11,6 +11,7 @@ mutation. v0.20.1 will add a parallel set of endpoints under
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,8 +20,15 @@ from sqlalchemy.orm import Session
 
 from ion.auth.dependencies import get_current_user, require_permission
 from ion.core.safe_errors import safe_error
+from ion.models.case_evidence import CaseEvidencePin
 from ion.models.user import User
-from ion.services import annotation_service, case_ledger_service, case_pin_service
+from ion.services import (
+    annotation_service,
+    case_ledger_service,
+    case_pin_service,
+    query_evidence_service,
+)
+from ion.services.query_evidence_service import QueryEvidenceError
 from ion.services.annotation_service import (
     AnnotationError,
     AnnotationForbiddenError,
@@ -168,6 +176,154 @@ def dismiss_pin_endpoint(
     return {"pin": pin.to_dict()}
 
 
+# ---------------------------------------------------------------------------
+# Query evidence
+#
+# A captured Discover search, stored as a `query` pin so it joins the same
+# hash-chained ledger as every other piece of case evidence. See
+# ion.services.query_evidence_service for why a rerun is a new pin rather
+# than an update of the original.
+# ---------------------------------------------------------------------------
+
+
+class QueryEvidenceCreate(BaseModel):
+    query: str = Field(..., min_length=1, description="The search text, exactly as it ran")
+    index: str = Field(..., min_length=1, description="Index or index pattern searched")
+    language: Optional[str] = Field(None, description="kql | lucene | dsl")
+    time_from: Optional[str] = Field(None, description="ISO-8601 window start")
+    time_to: Optional[str] = Field(None, description="ISO-8601 window end")
+    time_expression: Optional[dict[str, Any]] = Field(
+        None, description='The relative form picked, e.g. {"from": "now-24h", "to": "now"}'
+    )
+    executed_at: Optional[str] = Field(None, description="ISO-8601; when the search ran")
+    duration_ms: Optional[int] = Field(None, ge=0)
+    returned_count: int = Field(0, ge=0)
+    total_hits: Optional[int] = Field(None, ge=0)
+    truncated: Optional[bool] = None
+    selected_results: Optional[list[Any]] = None
+    title: Optional[str] = Field(None, max_length=500)
+    note: Optional[str] = None
+    severity: Optional[str] = None
+    tags: Optional[list[str]] = None
+
+
+class QueryEvidenceRerun(BaseModel):
+    returned_count: int = Field(..., ge=0)
+    total_hits: Optional[int] = Field(None, ge=0)
+    truncated: Optional[bool] = None
+    selected_results: Optional[list[Any]] = None
+    duration_ms: Optional[int] = Field(None, ge=0)
+    executed_at: Optional[str] = None
+    time_from: Optional[str] = None
+    time_to: Optional[str] = None
+    note: Optional[str] = None
+
+
+def _parse_ts(raw: Optional[str], field: str) -> Optional[datetime]:
+    """Parse an ISO-8601 string, accepting the trailing ``Z`` browsers send."""
+    if raw is None or not str(raw).strip():
+        return None
+    text = str(raw).strip()
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        return datetime.fromisoformat(text)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400, detail=f"{field} is not a valid ISO-8601 timestamp"
+        ) from exc
+
+
+@router.get(
+    "/{case_id}/query-evidence",
+    dependencies=[Depends(require_permission("case:read"))],
+)
+def list_query_evidence_endpoint(
+    case_id: int,
+    limit: int = 100,
+    session: Session = Depends(get_db_session),
+):
+    """Every captured search on this case, newest first."""
+    return {
+        "query_evidence": query_evidence_service.list_query_evidence(
+            session, case_id, limit=max(1, min(limit, 500))
+        )
+    }
+
+
+@router.post(
+    "/{case_id}/query-evidence",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def capture_query_evidence_endpoint(
+    case_id: int,
+    body: QueryEvidenceCreate,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Capture a search as case evidence with its full provenance."""
+    try:
+        pin = query_evidence_service.capture_query_evidence(
+            session,
+            alert_case_id=case_id,
+            actor_id=user.id,
+            query=body.query,
+            index=body.index,
+            language=body.language,
+            time_from=_parse_ts(body.time_from, "time_from"),
+            time_to=_parse_ts(body.time_to, "time_to"),
+            time_expression=body.time_expression,
+            executed_at=_parse_ts(body.executed_at, "executed_at"),
+            duration_ms=body.duration_ms,
+            returned_count=body.returned_count,
+            total_hits=body.total_hits,
+            truncated=body.truncated,
+            selected_results=body.selected_results,
+            title=body.title,
+            note=body.note,
+            severity=body.severity,
+            tags=body.tags,
+        )
+    except CaseNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=safe_error(exc)) from exc
+    except (QueryEvidenceError, PinError) as exc:
+        raise HTTPException(status_code=400, detail=safe_error(exc)) from exc
+    return {"pin": pin.to_dict()}
+
+
+@router.post(
+    "/{case_id}/query-evidence/{pin_id}/rerun",
+    dependencies=[Depends(require_permission("case:update"))],
+)
+def rerun_query_evidence_endpoint(
+    case_id: int,
+    pin_id: int,
+    body: QueryEvidenceRerun,
+    session: Session = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+):
+    """Re-capture an earlier search as a *new* pin. The original is untouched."""
+    original = session.get(CaseEvidencePin, pin_id)
+    if original is None or original.alert_case_id != case_id:
+        raise HTTPException(status_code=404, detail="query evidence not found on this case")
+    try:
+        pin = query_evidence_service.rerun_query_evidence(
+            session,
+            pin_id=pin_id,
+            actor_id=user.id,
+            returned_count=body.returned_count,
+            total_hits=body.total_hits,
+            truncated=body.truncated,
+            selected_results=body.selected_results,
+            duration_ms=body.duration_ms,
+            executed_at=_parse_ts(body.executed_at, "executed_at"),
+            time_from=_parse_ts(body.time_from, "time_from"),
+            time_to=_parse_ts(body.time_to, "time_to"),
+            note=body.note,
+        )
+    except (QueryEvidenceError, PinError) as exc:
+        raise HTTPException(status_code=400, detail=safe_error(exc)) from exc
+    return {"pin": pin.to_dict()}
 
 
 # ---------------------------------------------------------------------------

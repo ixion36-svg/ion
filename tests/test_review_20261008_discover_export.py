@@ -283,3 +283,98 @@ class TestExportHousekeeping:
     def test_rows_use_crlf_per_rfc4180(self, tmp_path):
         out = _run_export(tmp_path, _state())
         assert "\r\n" in out["csv"]
+
+
+# ── Resolving the picked window for a query-evidence capture ─────────────
+#
+# Stage 3 adds "Pin to Case", which turns the search into a `query` evidence
+# pin. The picker holds a relative expression ("now-24h"), but evidence has
+# to record an absolute window or it cannot be reproduced. Two things matter
+# and neither is obvious:
+#
+# * The reference point is when the *search* ran, not when the analyst got
+#   round to pinning it. Elasticsearch resolved `now` at search time; using
+#   the pin time instead would silently slide the whole window by however
+#   long they spent reading the results.
+# * An expression the resolver does not understand must come back null, so
+#   the capture records an unbounded window rather than a confidently wrong
+#   one.
+
+
+def _resolve(tmp_path: Path, expr, reference: str):
+    harness = textwrap.dedent(
+        """
+        globalThis.document = {
+            getElementById: () => ({ value: '', checked: false,
+                                     classList: { add() {}, remove() {} } }),
+            createElement: () => ({ href: '', click() {} }),
+            body: { appendChild() {}, removeChild() {} },
+            addEventListener() {}, querySelectorAll: () => [],
+        };
+        globalThis.window = { location: { search: '' }, addEventListener() {} };
+        globalThis.URLSearchParams = class { get() { return null; } };
+        globalThis.fetch = () => Promise.reject(new Error('no network in test'));
+        globalThis.Blob = class { constructor() {} };
+        globalThis.URL = { createObjectURL: () => '', revokeObjectURL() {} };
+
+        __PAGE_JS__
+
+        process.stdout.write(JSON.stringify({
+            value: dscResolveTimeExpr(__EXPR__, __REF__),
+        }));
+        """
+    )
+    script = (harness
+              .replace("__PAGE_JS__", _script_body())
+              .replace("__EXPR__", json.dumps(expr))
+              .replace("__REF__", json.dumps(reference)))
+    path = tmp_path / "resolve.js"
+    path.write_text(script, encoding="utf-8")
+    proc = subprocess.run([_NODE, str(path)], capture_output=True, text=True,
+                          encoding="utf-8", timeout=60)
+    assert proc.returncode == 0, f"node failed:\n{proc.stderr}"
+    return json.loads(proc.stdout)["value"]
+
+
+_REF = "2026-10-08T12:00:00.000Z"
+
+
+class TestResolveTimeExpression:
+    def test_now_resolves_to_the_search_time_not_the_pin_time(self, tmp_path):
+        assert _resolve(tmp_path, "now", _REF) == "2026-10-08T12:00:00.000Z"
+
+    def test_hours_are_subtracted_from_the_search_time(self, tmp_path):
+        assert _resolve(tmp_path, "now-24h", _REF) == "2026-10-07T12:00:00.000Z"
+
+    def test_minutes(self, tmp_path):
+        assert _resolve(tmp_path, "now-15m", _REF) == "2026-10-08T11:45:00.000Z"
+
+    def test_days(self, tmp_path):
+        assert _resolve(tmp_path, "now-7d", _REF) == "2026-10-01T12:00:00.000Z"
+
+    def test_every_option_the_picker_offers_resolves(self, tmp_path):
+        # The picker's own values, so a new option cannot be added without
+        # this noticing that the resolver does not understand it.
+        page = _TEMPLATE.read_text(encoding="utf-8")
+        offered = sorted(set(re.findall(r'<option value="(now-[^"]+)"', page)))
+        assert offered, "the time-range picker has no relative options"
+        for expr in offered:
+            assert _resolve(tmp_path, expr, _REF) is not None, expr
+
+    def test_an_absolute_timestamp_passes_through(self, tmp_path):
+        got = _resolve(tmp_path, "2026-10-05T00:00:00Z", _REF)
+        assert got.startswith("2026-10-05T00:00:00")
+
+    def test_an_unparseable_expression_is_null_not_a_guess(self, tmp_path):
+        """A wrong window is worse evidence than an admittedly absent one."""
+        assert _resolve(tmp_path, "whenever", _REF) is None
+
+    def test_an_unknown_unit_is_null(self, tmp_path):
+        assert _resolve(tmp_path, "now-5y", _REF) is None
+
+    def test_an_empty_expression_is_null(self, tmp_path):
+        assert _resolve(tmp_path, "", _REF) is None
+        assert _resolve(tmp_path, None, _REF) is None
+
+    def test_an_unusable_reference_is_null(self, tmp_path):
+        assert _resolve(tmp_path, "now-1h", "not a date") is None

@@ -54,6 +54,11 @@ class PinSourceType(str, Enum):
     NOTE = "note"             # free-form analyst observation, no external ref
     FILE = "file"             # uploaded artifact id
     HOST = "host"             # affected host name
+    # A captured Discover/Elasticsearch search. pin_metadata carries the query
+    # text, index scope, time window, execution time, counts/truncation and
+    # the rows the analyst selected. source_ref = "query:<uuid>" so a rerun
+    # becomes a second pin instead of overwriting the original evidence.
+    QUERY = "query"
 
 
 class FindingStatus(str, Enum):

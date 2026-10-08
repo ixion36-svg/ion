@@ -76,6 +76,7 @@
                 <button class="btn btn-primary" data-click-action="executeDiscoverSearch">Search</button>
                 <button class="btn" data-click-action="getHistogram">Show Histogram</button>
                 <button class="btn" data-click-action="exportSearchResults">Export CSV</button>
+                <button class="btn" data-click-action="openPinQueryModal" title="Keep this search as case evidence">Pin to Case</button>
                 <div class="flex gap-2 ml-auto">
                     <button class="btn" data-click-action="openSaveSearchModal">Save Search</button>
                     <button class="btn" data-click-action="toggleSavedSearchesPanel">Saved Searches</button>
@@ -132,6 +133,44 @@
             <div class="modal-footer">
                 <button class="btn" data-click-action="closeSaveSearchModal">Cancel</button>
                 <button class="btn btn-primary" data-click-action="saveSearch">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pin query as case evidence.
+         The provenance panel is not decoration: the analyst is about to
+         commit this to the case's append-only ledger, so they see exactly
+         what will be stored, including whether ION can tell the result set
+         was complete. -->
+    <div class="modal-overlay hidden" id="pin-query-modal">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3>Pin this search as case evidence</h3>
+                <button class="modal-close" data-click-action="closePinQueryModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="flex flex-col gap-1">
+                    <label for="pin-query-case" class="text-sm text-slate-400">Case</label>
+                    <select id="pin-query-case" class="select w-full">
+                        <option value="">Loading open cases...</option>
+                    </select>
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label for="pin-query-title" class="text-sm text-slate-400">Title (optional)</label>
+                    <input type="text" id="pin-query-title" class="input w-full" placeholder="What this search showed">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label for="pin-query-note" class="text-sm text-slate-400">Note (optional)</label>
+                    <textarea id="pin-query-note" class="textarea w-full" rows="2" placeholder="Why this matters to the case"></textarea>
+                </div>
+                <div class="flex flex-col gap-1 mt-2">
+                    <span class="text-sm text-slate-400">Provenance that will be stored</span>
+                    <div id="pin-query-provenance" class="text-xs font-mono whitespace-pre-wrap break-words opacity-80"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" data-click-action="closePinQueryModal">Cancel</button>
+                <button class="btn btn-primary" data-click-action="pinQueryEvidence">Pin evidence</button>
             </div>
         </div>
     </div>
@@ -932,6 +971,158 @@ function exportSearchResults() {
               (s.returned_hits === 1 ? '' : 's') +
               (truncated ? ' (truncated from ' + s.total_hits + ')' : ''),
               'success');
+}
+
+// ==================== PIN QUERY AS CASE EVIDENCE ====================
+//
+// The search becomes a `query` evidence pin on the case, which puts it in
+// the same append-only hash-chained ledger as every other piece of case
+// evidence. See ion/services/query_evidence_service.py.
+
+// The picker stores a relative expression ("now-24h"). Elasticsearch
+// resolved that against the moment the search ran, so that is the reference
+// point used here -- not "now", which would drift by however long the
+// analyst spent reading the results before pinning.
+function dscResolveTimeExpr(expr, referenceISO) {
+    if (!expr) return null;
+    const ref = new Date(referenceISO);
+    if (isNaN(ref.getTime())) return null;
+    const text = String(expr).trim();
+    if (text === 'now') return ref.toISOString();
+
+    const m = /^now-(\d+)([smhdwM])$/.exec(text);
+    if (m) {
+        const n = parseInt(m[1], 10);
+        const unit = m[2];
+        const seconds = { s: 1, m: 60, h: 3600, d: 86400, w: 604800, M: 2592000 }[unit];
+        if (!seconds) return null;
+        return new Date(ref.getTime() - n * seconds * 1000).toISOString();
+    }
+
+    // An absolute value the analyst typed, or something this parser does not
+    // understand. Returning null is the honest answer: the capture then
+    // records an unbounded window rather than a wrong one.
+    const parsed = new Date(text);
+    return isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function dscQueryCaptureFields() {
+    const s = _lastDiscoverSearch;
+    if (!s) return null;
+    return {
+        query: s.query,
+        index: s.index_pattern,
+        language: 'kql',
+        time_from: dscResolveTimeExpr(s.time_from, s.executed_at),
+        time_to: dscResolveTimeExpr(s.time_to, s.executed_at),
+        time_expression: { from: s.time_from, to: s.time_to,
+                           time_field: s.time_field },
+        executed_at: s.executed_at,
+        duration_ms: s.took_ms,
+        returned_count: s.returned_hits,
+        // `total` may legitimately be absent. Passing undefined leaves the
+        // capture's truncation state unknown rather than claiming the
+        // result set was complete.
+        total_hits: (typeof s.total_hits === 'number') ? s.total_hits : undefined,
+    };
+}
+
+function dscRenderProvenance(fields) {
+    const el = document.getElementById('pin-query-provenance');
+    if (!el) return;
+    const unknownTotal = typeof fields.total_hits !== 'number';
+    const truncated = unknownTotal ? 'unknown (the search did not report a total)'
+                                   : (fields.total_hits > fields.returned_count ? 'yes' : 'no');
+    const window = (fields.time_from && fields.time_to)
+        ? (fields.time_from + '  ->  ' + fields.time_to)
+        : 'unbounded (no resolvable window)';
+    const rows = [
+        ['query', fields.query],
+        ['index', fields.index],
+        ['language', fields.language + ' (assumed)'],
+        ['time field', (fields.time_expression || {}).time_field || '—'],
+        ['picked window', (fields.time_expression || {}).from + ' -> ' + (fields.time_expression || {}).to],
+        ['resolved window', window],
+        ['executed at', fields.executed_at],
+        ['took', (fields.duration_ms == null ? '—' : fields.duration_ms + ' ms')],
+        ['returned', String(fields.returned_count)],
+        ['total hits', unknownTotal ? 'not reported' : String(fields.total_hits)],
+        ['truncated', truncated],
+    ];
+    el.innerHTML = rows
+        .map(([k, v]) => escapeHtml(k.padEnd(16, ' ')) + escapeHtml(String(v == null ? '—' : v)))
+        .join('\n');
+}
+
+async function dscLoadCaseOptions() {
+    const select = document.getElementById('pin-query-case');
+    if (!select) return;
+    try {
+        const r = await fetch('/api/elasticsearch/alerts/cases?status=OPEN');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const data = await r.json();
+        const cases = data.cases || data || [];
+        if (!cases.length) {
+            select.innerHTML = '<option value="">No open cases</option>';
+            return;
+        }
+        select.innerHTML = '<option value="">Select a case...</option>' +
+            cases.map(c => '<option value="' + escapeHtml(String(c.id)) + '">' +
+                escapeHtml((c.case_number ? c.case_number + ' — ' : '') + (c.title || ('Case ' + c.id))) +
+                '</option>').join('');
+    } catch (e) {
+        select.innerHTML = '<option value="">Could not load cases</option>';
+    }
+}
+
+function openPinQueryModal() {
+    const fields = dscQueryCaptureFields();
+    if (!fields) {
+        showToast('Run a search first — there is nothing to pin', 'info');
+        return;
+    }
+    document.getElementById('pin-query-title').value = '';
+    document.getElementById('pin-query-note').value = '';
+    dscRenderProvenance(fields);
+    document.getElementById('pin-query-modal').classList.remove('hidden');
+    dscLoadCaseOptions();
+}
+
+function closePinQueryModal() {
+    document.getElementById('pin-query-modal').classList.add('hidden');
+}
+
+async function pinQueryEvidence() {
+    const fields = dscQueryCaptureFields();
+    if (!fields) {
+        showToast('Run a search first — there is nothing to pin', 'info');
+        return;
+    }
+    const caseId = document.getElementById('pin-query-case').value;
+    if (!caseId) {
+        showToast('Pick the case this evidence belongs to', 'error');
+        return;
+    }
+
+    const title = document.getElementById('pin-query-title').value.trim();
+    const note = document.getElementById('pin-query-note').value.trim();
+    const body = Object.assign({}, fields);
+    if (title) body.title = title;
+    if (note) body.note = note;
+
+    try {
+        const r = await fetch('/api/alert-cases/' + encodeURIComponent(caseId) + '/query-evidence', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.detail || ('HTTP ' + r.status));
+        closePinQueryModal();
+        showToast('Pinned to case ' + caseId + ' as evidence #' + (data.pin || {}).id, 'success');
+    } catch (e) {
+        showToast('Could not pin the search: ' + (e.message || e), 'error');
+    }
 }
 
 // ==================== INDEX BROWSER ====================
