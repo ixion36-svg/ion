@@ -724,6 +724,33 @@ class AuthService:
                     "document:read", "document:create", "document:update",
                     "security:read", "de:read", "de:propose", "de:verify", "de:approve",
                     "response:approve",
+                    # Running their team's onboarding is the job. Without
+                    # these the lead could not open their own verification
+                    # queue, so every verification in the SOC fell to the
+                    # ION administrator. Read and verify only: defining
+                    # role profiles is a change to the establishment rather
+                    # than to one person's progress through it, so that
+                    # stays with the administrator.
+                    "workforce:read", "workforce:verify",
+                ],
+            ),
+            (
+                "grc",
+                "Governance, Risk and Compliance - verifies onboarding evidence and reads the record",
+                True,
+                [
+                    # GRC signs off vetting, agreements and training
+                    # evidence, and an assessor needs an account that can
+                    # read and verify the record without being able to
+                    # rewrite the role profiles it was measured against, so
+                    # profile editing is deliberately excluded.
+                    "workforce:read", "workforce:verify",
+                    # Verifying somebody's onboarding without being able to
+                    # read the audit trail is signing for something you
+                    # cannot check.
+                    "security:read",
+                    "document:read", "template:read",
+                    "ai:chat",
                 ],
             ),
             (
