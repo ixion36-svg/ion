@@ -157,6 +157,26 @@ def publish_version(session: Session, version: RoleProfileVersion, publisher: Us
         raise WorkforceError("Already published")
     if not version.requirements:
         raise WorkforceError("A version needs at least one requirement before it can be published")
+
+    # A profile that grants an ION role but has no gate items can never
+    # confer it. gate_cleared() is `bool(items) and all(satisfied)`, so an
+    # empty gate is False rather than vacuously True -- which is the safe
+    # direction, since a role must never be granted by having no
+    # requirements. The cost is that such a profile is permanently inert:
+    # the person completes everything asked of them, nothing is conferred,
+    # and nothing on screen says why. Refuse it here, where the author can
+    # still do something about it.
+    profile = session.get(RoleProfile, version.profile_id)
+    if profile is not None and profile.grants_role_id is not None:
+        if not any(r.phase == PHASE_GATE for r in version.requirements):
+            raise WorkforceError(
+                "This profile grants a role but has no gate requirements, so "
+                "the role could never be conferred: the gate is what releases "
+                "it, and an empty gate never clears. Add at least one gate "
+                "item, or clear the granted role to make this a training "
+                "track that confers nothing."
+            )
+
     version.published_at = datetime.utcnow()
     version.published_by_id = publisher.id
     session.commit()
@@ -217,6 +237,53 @@ def _baseline_version(session: Session) -> Optional[RoleProfileVersion]:
     # mandatory list is worse than enrolling them onto none, because it
     # looks deliberate.
     return latest_published(session, profile.id)
+
+
+def enrol_on_role(session: Session, user: User, *, profile_id: int,
+                  assigner: User) -> Optional[UserJourney]:
+    """Open the journey for the role this person is being onboarded into.
+
+    Called when an admin creates the account and says which role it is
+    for, so the person can see their role training from day one and work
+    it while the vetting and paperwork run in parallel. Before this the
+    role had to be assigned separately at some later point, and until
+    somebody did, "Role readiness" on the joiner's own page was empty and
+    they had no way to know what they were training for.
+
+    Choosing the role here chooses which training to issue, not which
+    permissions to hand over: the journey opens at pre_access with every
+    item pending, and sync_granted_roles still decides what a cleared gate
+    confers. Gate items the person already holds are carried across by
+    assign_profile, so somebody who cleared the induction on the baseline
+    is not asked for it twice.
+
+    Returns None rather than raising, on the same reasoning as
+    enrol_on_baseline: an account must still be created when the workforce
+    module has a problem.
+    """
+    try:
+        profile = session.get(RoleProfile, profile_id)
+        if profile is None:
+            logger.warning("No role profile %s; %s enrolled on no role",
+                           profile_id, user.username)
+            return None
+        version = latest_published(session, profile.id)
+        if version is None:
+            logger.warning(
+                "Role profile %s has no published version; %s enrolled on "
+                "no role", profile.name, user.username)
+            return None
+        return assign_profile(session, user=user, version=version,
+                              assigner=assigner)
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Role enrolment failed for %s; the account still exists",
+            getattr(user, "username", "?"))
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return None
 
 
 def enrol_on_baseline(session: Session,

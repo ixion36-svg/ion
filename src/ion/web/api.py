@@ -207,6 +207,10 @@ class UserCreate(BaseModel):
     display_name: Optional[str] = None
     roles: Optional[List[str]] = None
     employment_type: Optional[str] = "cs"  # cs, contractor, military, other
+    # The workforce role profile this person is being onboarded into.
+    # Opens their role journey at creation so they can see what they are
+    # training for; confers nothing on its own.
+    role_profile_id: Optional[int] = None
 
 
 class UserUpdate(BaseModel):
@@ -914,6 +918,7 @@ def create_user(
         must_change_password=True,
         admin_user_id=current_user.id,
         ip_address=ip_address,
+        role_profile_id=user_create.role_profile_id,
     )
 
     if error:

@@ -427,6 +427,7 @@ class AuthService:
         must_change_password: bool = False,
         admin_user_id: int | None = None,
         ip_address: str | None = None,
+        role_profile_id: int | None = None,
     ) -> Tuple[Optional[User], Optional[str]]:
         """Create a new user.
 
@@ -494,9 +495,22 @@ class AuthService:
         # be gated. Returns None and never raises when no baseline profile
         # is published: a deployment that cannot add users because of this
         # would be a worse failure than one with no journeys.
-        from ion.services.workforce_service import enrol_on_baseline
+        from ion.services.workforce_service import (
+            enrol_on_baseline,
+            enrol_on_role,
+        )
 
         enrol_on_baseline(self.db_session, user)
+
+        # The role the account is being onboarded into, chosen now so the
+        # person can see their role training from day one and work it while
+        # the vetting and paperwork run in parallel. It grants nothing: the
+        # journey opens pre_access with everything pending.
+        if role_profile_id and admin_user_id:
+            assigner = self.user_repo.get_by_id(admin_user_id)
+            if assigner is not None:
+                enrol_on_role(self.db_session, user,
+                              profile_id=role_profile_id, assigner=assigner)
 
         return user, None
 
