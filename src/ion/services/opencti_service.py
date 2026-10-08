@@ -5,6 +5,7 @@ indicators, and threat actors associated with given IOC values.
 """
 
 import asyncio
+import threading
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -15,22 +16,79 @@ from ion.core.config import get_opencti_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
 from ion.services.country_mapper import country_code_to_flag, get_country_code, get_country_name
 
+from ion.core.async_http import current_loop, dispose_client, is_usable_on
+
 logger = logging.getLogger(__name__)
 
 # Shared persistent httpx client — avoids per-request connection overhead.
+#
+# Bound to the event loop that created it: an httpx.AsyncClient cannot be
+# reused across loops. ION's background services run work through
+# asyncio.run(), a fresh short-lived loop each cycle, so a client cached from
+# inside one of those cycles was later handed to the long-lived web loop and
+# raised "RuntimeError: Event loop is closed". That is exactly what the
+# integrations page reported for OpenCTI on 2026-10-08 while the platform
+# itself was up and serving.
+#
+# The previous guard could not catch it:
+#
+#     if _opencti_client is None or _opencti_client.is_closed:
+#
+# is_closed reports whether aclose() was called. A client whose *loop* died
+# was never closed, so it read as perfectly good.
+#
+# One slot rather than elasticsearch_service's pool, because OpenCTI is
+# deliberately estate-wide rather than per-tenant: there is only ever one
+# connection to displace, so a pool would add eviction rules for a dimension
+# that does not exist here.
 _opencti_client: Optional[httpx.AsyncClient] = None
+_opencti_client_loop: Optional[asyncio.AbstractEventLoop] = None
+
+# Guards the whole read-check-create-assign. Without it a background
+# thread's asyncio.run() cycle can rebind the slot between a web-loop
+# caller's check and its return, handing that caller a client bound to a
+# throwaway loop — the very crash this is meant to close.
+_opencti_client_lock = threading.Lock()
 
 
 def _get_opencti_client(verify_ssl, timeout) -> httpx.AsyncClient:
-    """Return (and lazily create) the module-level shared async client."""
-    global _opencti_client
-    if _opencti_client is None or _opencti_client.is_closed:
+    """Return the shared async client for the *currently running* loop.
+
+    Rebuilds whenever the running loop differs from the one the cached
+    client was bound to, and disposes the displaced client rather than
+    dropping it: asyncio.run() teardown does not close httpx pools, so a
+    dropped reference leaks keepalive sockets.
+    """
+    global _opencti_client, _opencti_client_loop
+
+    loop = current_loop()
+    with _opencti_client_lock:
+        if is_usable_on(_opencti_client, _opencti_client_loop, loop):
+            return _opencti_client
+
+        displaced, displaced_loop = _opencti_client, _opencti_client_loop
         _opencti_client = httpx.AsyncClient(
             verify=verify_ssl,
             timeout=timeout,
             limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
         )
-    return _opencti_client
+        _opencti_client_loop = loop
+        created = _opencti_client
+
+    # Outside the lock: disposal may schedule work on another loop, and
+    # holding the lock across that invites a stall on a thread we do not own.
+    dispose_client(displaced, displaced_loop, loop)
+    return created
+
+
+def _reset_opencti_client() -> None:
+    """Drop the cached client. For tests and for a credential change."""
+    global _opencti_client, _opencti_client_loop
+    with _opencti_client_lock:
+        displaced, displaced_loop = _opencti_client, _opencti_client_loop
+        _opencti_client = None
+        _opencti_client_loop = None
+    dispose_client(displaced, displaced_loop, current_loop())
 
 
 class OpenCTIError(Exception):

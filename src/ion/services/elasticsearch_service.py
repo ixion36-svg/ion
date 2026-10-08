@@ -21,6 +21,8 @@ from ion.core.concurrency import map_bounded
 from ion.core.config import get_config, get_elasticsearch_config, get_ssl_verify
 from ion.core.safe_errors import safe_error
 
+from ion.core.async_http import dispose_client as _shared_dispose_client
+
 logger = logging.getLogger(__name__)
 
 # Shared persistent httpx client — avoids per-request connection overhead.
@@ -127,24 +129,11 @@ def _dispose_client(
 ) -> None:
     """Best-effort aclose of a displaced client. Never raises.
 
-    asyncio.run() teardown does NOT close httpx connection pools, so simply
-    dropping the reference leaks keepalive sockets. Closing cross-loop is
-    safe via run_coroutine_threadsafe as long as the owning loop still runs;
-    only when it is already dead do we fall back to dropping the reference
-    (GC finalizers reclaim the sockets).
+    The reasoning moved to ion.core.async_http when OpenCTI hit the same
+    "Event loop is closed" crash and needed the same disposal. Kept as a
+    thin delegation so this module's callers and its tests are unchanged.
     """
-    if client is None or client.is_closed:
-        return
-    try:
-        if current_loop is not None and current_loop is bound_loop:
-            current_loop.create_task(client.aclose())
-        elif bound_loop is not None and not bound_loop.is_closed():
-            asyncio.run_coroutine_threadsafe(client.aclose(), bound_loop)
-        elif bound_loop is None and current_loop is None:
-            asyncio.run(client.aclose())
-        # else: owning loop already dead — nothing can run its aclose; drop.
-    except Exception:  # noqa: BLE001 — disposal must never break a request
-        pass
+    _shared_dispose_client(client, bound_loop, current_loop)
 
 
 def _get_es_client(headers, auth, verify_ssl, timeout) -> httpx.AsyncClient:
