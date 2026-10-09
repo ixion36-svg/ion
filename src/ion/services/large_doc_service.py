@@ -362,7 +362,15 @@ def start_analysis(session, user_id: Optional[int], filename: str, content: byte
 
     threading.Thread(
         target=_worker, args=(job_id, text, task, custom_prompt),
-        daemon=True, name=f"large-doc-{job_id[:8]}",
+        # The uuid tail, not the head. job_id starts with sixteen hex
+        # digits of microsecond timestamp, so job_id[:8] is the top half
+        # of that clock -- it only changes about every 71 minutes, and
+        # every job started inside the same window got an identical
+        # thread name. A thread dump showed N threads all called the
+        # same thing, and anything matching on the name could join the
+        # wrong worker. Uniqueness lives in the tail, as the comment
+        # above job_id already says.
+        daemon=True, name=f"large-doc-{job_id[-8:]}",
     ).start()
     return job_id
 
@@ -373,9 +381,33 @@ def _worker(job_id: str, text: str, task: str, custom_prompt: Optional[str]) -> 
     import asyncio
 
     from ion.models.service_desk import DocAnalysisJob
-    from ion.storage.database import get_engine, get_session_factory
+    from sqlalchemy.orm import sessionmaker
 
-    session = get_session_factory(get_engine())()
+    from ion.storage.database import get_engine
+
+    def _own_session():
+        """A session bound to the engine THIS worker resolved.
+
+        Not get_session_factory(get_engine()). That helper ignores
+        its engine argument once the process-global factory is set:
+
+            if _session_factory is None:
+                _session_factory = sessionmaker(bind=engine, ...)
+            return _session_factory
+
+        So the first caller in the process decides the engine for
+        every caller after it. A worker thread then wrote the job's
+        terminal status into somebody else's database, found no row,
+        and returned in silence -- the job left reading 'running'
+        for ever with no error and no finish time. One database in
+        production makes that invisible; it is still the wrong
+        binding, and it is why this was only ever caught by a test.
+
+        A sessionmaker is cheap. The engine and its pool are shared.
+        """
+        return sessionmaker(bind=get_engine(), expire_on_commit=False)()
+
+    session = None
 
     def _update(**kw) -> None:
         job = session.get(DocAnalysisJob, job_id)
@@ -389,6 +421,15 @@ def _worker(job_id: str, text: str, task: str, custom_prompt: Optional[str]) -> 
         _update(phase=phase, done=done, total=total)
 
     try:
+        # Inside the guard. This was the line above the try, so any
+        # failure building the engine or the session killed the thread
+        # before the handler existed: the row stayed status='running',
+        # done=0, for ever, with no error and no finish time -- a job
+        # that had died looking exactly like one still working. It
+        # surfaced as a "flaky" test, but the timing only decided
+        # whether the window was hit.
+        session = _own_session()
+
         from ion.services.ollama_service import get_ollama_service
         svc = get_ollama_service()
 
@@ -407,9 +448,39 @@ def _worker(job_id: str, text: str, task: str, custom_prompt: Optional[str]) -> 
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("large-doc analysis failed: %s", exc)
-        try:
-            _update(status="error", error=f"{type(exc).__name__}: {exc}"[:500], finished_at=_now())
-        except Exception:  # noqa: BLE001
-            pass
+        detail = f"{type(exc).__name__}: {exc}"[:500]
+        if session is not None:
+            try:
+                _update(status="error", error=detail, finished_at=_now())
+            except Exception:  # noqa: BLE001
+                session = None      # unusable; fall through to a fresh one
+        if session is None:
+            # The failure was opening the session, or the session it did
+            # open is now unusable. Try once more with a brand new one,
+            # because the common cause is transient contention and a
+            # second attempt a moment later usually lands.
+            try:
+                recovery = _own_session()
+                try:
+                    job = recovery.get(DocAnalysisJob, job_id)
+                    if job is not None:
+                        job.status = "error"
+                        job.error = detail
+                        job.finished_at = _now()
+                        recovery.commit()
+                finally:
+                    recovery.close()
+            except Exception:  # noqa: BLE001
+                # Nothing left to try: the database is unreachable, so
+                # the job cannot be marked in it. Say so here rather
+                # than let the thread raise into a traceback nobody
+                # owns -- the row stays 'running' and only a sweep or a
+                # human can resolve it.
+                logger.error(
+                    "large-doc job %s died and could not be marked failed; "
+                    "it will read as running until something clears it",
+                    job_id, exc_info=True,
+                )
     finally:
-        session.close()
+        if session is not None:
+            session.close()

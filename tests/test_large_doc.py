@@ -6,11 +6,40 @@ lifecycle without needing a real Ollama.
 """
 
 import asyncio
-import threading
+import time
 
+import pytest
 from sqlalchemy.orm import sessionmaker
 
 from ion.services import large_doc_service as lds
+
+
+@pytest.fixture(autouse=True)
+def _isolate_session_factory():
+    """Make the worker's session bind to THIS test's database.
+
+    get_session_factory(engine) ignores its engine argument once the
+    module-level _session_factory is set:
+
+        if _session_factory is None:
+            _session_factory = sessionmaker(bind=engine, ...)
+        return _session_factory
+
+    So the first caller in the process decides the engine for everyone
+    afterwards. A worker thread here would then write the job's status
+    into whichever database some earlier test bound, find no row, and
+    skip in silence -- status left at 'running', error None, nothing
+    logged. Outside pytest this reproduced 11 times in 12; the one that
+    passed was the first, which is the only run that populates the
+    cache. Under --dist loadfile the file-to-worker assignment moves
+    between runs, which is what made it look like a timing flake.
+    """
+    import ion.storage.database as db
+
+    engine, factory = db._engine, db._session_factory
+    db._engine, db._session_factory = None, None
+    yield
+    db._engine, db._session_factory = engine, factory
 
 
 # ── toggle ───────────────────────────────────────────────────────────────────
@@ -163,29 +192,35 @@ def test_start_analysis_runs_to_completion(session, temp_db, monkeypatch):
     job_id = lds.start_analysis(
         session, 1, "notes.txt", b"This is a real document with content to analyse.", "summary", None
     )
-    # Wait on the worker itself, not on a wall clock. start_analysis does not
-    # hand the thread back, but it names it after the job, so it can be found
-    # and joined; _worker commits the terminal status before it returns, so a
-    # finished join means the row is readable. join() returns the moment the
-    # thread ends, and the timeout only bounds a genuinely stuck worker.
+    # Wait for a TERMINAL STATUS, not for a thread.
     #
-    # This replaced an 80 x 0.1s poll. That gave the thread a fixed 8-second
-    # budget, which was ample in isolation (the work takes ~2s) but flaked
-    # under full-suite load — the test failed once in a full run and passed on
-    # a re-run of the same tree.
-    worker = next(
-        (t for t in threading.enumerate() if t.name == f"large-doc-{job_id[:8]}"),
-        None,
-    )
-    if worker is not None:  # None means it already finished
-        worker.join(timeout=60)
-        assert not worker.is_alive(), "analysis worker still running after 60s"
-
-    # Read from a fresh session so we see the worker's commits.
+    # Two earlier attempts both keyed off the worker thread. The first
+    # polled 80 x 0.1s, a fixed 8-second budget that was ample in isolation
+    # and short under load. The second looked the thread up by name and
+    # joined it, treating "not found" as "already finished" -- but
+    # not-found also covers "died", and dying is what it was doing:
+    # _worker opened its session on the line ABOVE its try block, so a
+    # failure there killed the thread before any handler existed and left
+    # the row at 'running' for ever. The test was called flaky; the timing
+    # only decided whether the window was hit.
+    #
+    # The service is fixed (see test_large_doc_worker_startup.py) and this
+    # no longer depends on catching a thread. Polling the row is what the
+    # application itself does: it finishes the moment the job does, and
+    # when it does not, it reports the status the job actually reached.
     Sess = sessionmaker(bind=temp_db)
-    s2 = Sess()
-    job = lds.get_job(s2, job_id, 1)
-    s2.close()
+    deadline = time.monotonic() + 60
+    job = None
+    while True:
+        s2 = Sess()
+        job = lds.get_job(s2, job_id, 1)
+        s2.close()
+        if job is not None and job["status"] in ("done", "error"):
+            break
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(0.05)
+
     assert job is not None and job["status"] == "done", job
     assert job["result"]["result"]
     assert job["result"]["map_hits"] >= 1
