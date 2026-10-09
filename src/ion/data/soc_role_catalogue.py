@@ -184,18 +184,25 @@ SOC_ROLE_CATALOGUE: List[Dict[str, Any]] = [
         "common": True,
         "typical_establishment": 1,
         "description": (
-            "Keeps the SOC running as a service: process, metrics, "
-            "reporting and the day-to-day friction nobody else owns."
+            "Runs the SOC as a service rather than as a queue. Owns the "
+            "process, the metrics and the reporting, and carries the "
+            "work that falls between the other roles -- which is most of "
+            "the reason a SOC either improves or just keeps up."
         ),
         "skills_role_id": None,
         "typical_certifications": [
             "GIAC GSOM", "CompTIA CySA+", "ITIL Foundation",
+            "ISACA CISM",
         ],
         "core_skills": [
-            "Process definition and the discipline to keep it current",
-            "Service metrics and reporting that drive a decision",
-            "Shift pattern and cover planning",
-            "Chasing the things that fall between roles",
+            "Writing process people actually follow, and retiring the "
+            "parts they do not",
+            "Metrics that change a decision, not metrics that fill a slide",
+            "Shift patterns, cover and leave planned against real demand",
+            "Running the standup, the handover and the weekly rhythm",
+            "Owning the audit trail: what was agreed, by whom, and when",
+            "Chasing the work that belongs to nobody until somebody "
+            "names it",
         ],
     },
     {
@@ -206,19 +213,26 @@ SOC_ROLE_CATALOGUE: List[Dict[str, Any]] = [
         "common": True,
         "typical_establishment": 1,
         "description": (
-            "The deep technical hand on the floor: the hard investigation, "
-            "the tooling nobody else can make work, the question that "
+            "The deep technical hand on the floor. Takes the "
+            "investigation the tiers cannot close, makes the tooling "
+            "work, and answers the question that has no runbook and "
             "needs an answer today."
         ),
         "skills_role_id": None,
         "typical_certifications": [
-            "GIAC GCIA", "GIAC GCFA", "Offensive Security OSCP",
+            "GIAC GCIA", "GIAC GCFA", "GIAC GCIH",
+            "Offensive Security OSCP",
         ],
         "core_skills": [
-            "Deep host and network analysis",
-            "Scripting and tooling to answer a one-off question",
-            "Reverse engineering a problem nobody has documented",
-            "Supporting the tiers on what they cannot resolve",
+            "Host and network analysis past the point the runbook stops",
+            "Scripting to answer a one-off question faster than arguing "
+            "about it",
+            "Reading a system nobody has documented and explaining it back",
+            "Taking the escalation the tiers cannot close, and saying so "
+            "when it is not a security problem",
+            "Turning a one-off investigation into a detection or a "
+            "runbook so it is not one-off twice",
+            "Being the person who says the tool is wrong, with evidence",
         ],
     },
     {

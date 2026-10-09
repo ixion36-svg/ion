@@ -417,7 +417,43 @@ class OIDCUserSync:
         # Update last login immediately
         self.user_repo.update_last_login(user)
 
+        self._enrol_on_workforce(user)
+
         return user
+
+    def _enrol_on_workforce(self, user: User) -> None:
+        """Open the induction record for somebody arriving via Keycloak.
+
+        ``AuthService.create_user`` does this for local accounts. This
+        path builds its user through the repository instead, so in a
+        deployment that signs in exclusively through Keycloak -- the
+        normal case -- nobody had an onboarding record at all: no
+        induction, no certificate tracking, invisible to the ORBAT.
+
+        It is a RECORD, not a gate. Roles are assigned by hand for the
+        moment and nothing here touches them. The journey opens at
+        pre_access granting nothing, and ``sync_granted_roles`` -- the
+        only thing that withholds a role -- runs on verification and
+        offboarding, never on login. A baseline profile that grants no
+        role cannot take away a role an admin assigned by hand.
+
+        Never raises. Somebody locked out of the console because the
+        workforce module has a problem is a far worse failure than a
+        missing journey, so this logs and lets the login continue.
+        """
+        try:
+            from ion.services.workforce_service import enrol_on_baseline
+
+            if enrol_on_baseline(self.session, user) is not None:
+                logger.info(
+                    "Enrolled OIDC user %s on the baseline journey",
+                    user.username,
+                )
+        except Exception:
+            logger.exception(
+                "Could not enrol OIDC user %s on the baseline journey; "
+                "the login continues without one", user.username,
+            )
 
     def _sync_roles(self, user: User, keycloak_roles: List[str]) -> None:
         """Synchronize user roles from Keycloak to ION.
