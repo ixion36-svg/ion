@@ -365,10 +365,19 @@
         <h2 class="font-sans font-semibold text-[18px] text-white flex items-center gap-2 mb-4">
           <svg class="w-4 h-4 text-ion-lime"><use href="#i-lock"/></svg> Sign-Off
         </h2>
+        <!-- Who the rota says runs this standup. Above the signature
+             box on purpose: the question "should I be doing this?" is
+             answered before somebody types their name, not after. -->
+        <div id="duty-line" class="mb-4 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[13px] text-slate-300">
+          <span class="text-slate-500">Checking the duty rota&hellip;</span>
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div class="flex flex-col gap-1.5">
-            <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold" for="signoff-analyst">Duty Analyst</label>
-            <input id="signoff-analyst" type="text" placeholder="Analyst name" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition">
+            <!-- "Signed off by", not "Duty Analyst". This box is free
+                 text; it records who signed, which is not the same fact
+                 as who the rota had on duty. -->
+            <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold" for="signoff-analyst">Signed off by</label>
+            <input id="signoff-analyst" type="text" placeholder="Your name" class="h-9 px-3 rounded-md bg-white/5 border border-white/10 text-[13px] text-white placeholder:text-slate-500 focus:border-ion-cyan/50 transition">
           </div>
           <div class="flex flex-col gap-1.5">
             <label class="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Sign-Off Timestamp</label>
@@ -502,6 +511,36 @@ function hoursClass(h) {
 function spinner(cols) { return `<tr><td colspan="${cols}" class="px-3 py-8 text-center text-slate-500"><span class="ds-spinner"></span> Loading...</td></tr>`; }
 
 /* ── S1: ES Cluster ── */
+// Who the rota has on duty this week.
+//
+// Three states, kept apart because each sends somebody somewhere
+// different: a name (get on with it), nobody rostered (the rota has a
+// hole this week), and unavailable (the lookup failed, which must not
+// read as "nobody").
+function renderDuty(duty) {
+  const el = document.getElementById('duty-line');
+  if (!el) { return; }
+  if (!duty) {
+    el.innerHTML = '<span class="text-slate-500">Duty rota unavailable.</span>';
+    return;
+  }
+  if (!duty.assigned) {
+    el.innerHTML = '<span class="text-amber-400 font-semibold">Nobody is on duty this week.</span>' +
+      ' <span class="text-slate-500">The standup still needs running — put your name below.</span>';
+    return;
+  }
+  // An unacknowledged entry is a plan rather than a fact, and the
+  // Monday somebody is off sick is exactly when that matters.
+  const ack = duty.acknowledged
+    ? '<span class="text-ion-lime">acknowledged</span>'
+    : '<span class="text-amber-400">not acknowledged</span>';
+  el.innerHTML = '<span class="text-slate-500">On duty this week:</span> ' +
+    '<span class="text-white font-semibold" id="duty-who"></span> · ' + ack;
+  // textContent, not interpolation: the name comes from the database.
+  el.querySelector('#duty-who').textContent =
+    (duty.user && duty.user.name) ? duty.user.name : 'someone';
+}
+
 function renderCluster(es) {
   if (!es) return;
   const badge = document.getElementById('es-status-badge');
@@ -853,6 +892,7 @@ async function loadChecks() {
     if (!r.ok) throw new Error('Failed to load checks');
     const data = await r.json();
     DS.checksData = data;
+    renderDuty(data.duty);
     renderCluster(data.cluster_health);
     renderAlerts(data.critical_alerts);
     renderStaleCases(data.stale_cases);
@@ -1186,6 +1226,23 @@ document.addEventListener('input', markDirty);
 document.addEventListener('change', markDirty);
 
 /* ── Init: populate analyst name from session ── */
+// The rota loads on its own, not via runChecks.
+//
+// runChecks sweeps Elasticsearch and only runs when an operator presses
+// the button. Who is on duty is one local row, and it is most worth
+// knowing on the mornings when Elasticsearch is the thing that broke.
+async function loadDuty() {
+  try {
+    const r = await fetch('/api/daily-standup/duty', { cache: 'no-store' });
+    if (!r.ok) { renderDuty(null); return; }
+    renderDuty(await r.json());
+  } catch (e) {
+    // null renders "unavailable", which is not the same as "nobody".
+    renderDuty(null);
+  }
+}
+document.addEventListener('DOMContentLoaded', loadDuty);
+
 document.addEventListener('DOMContentLoaded', () => {
   const nameEl = document.getElementById('user-name');
   if (nameEl && nameEl.textContent && nameEl.textContent !== 'Loading\u2026') {

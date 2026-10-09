@@ -72,6 +72,48 @@
   /* JS toggles .hidden on a flex slide; equal-specificity utilities fight. */
   .deck-slide.hidden { display: none; }
 
+  /* Slide geometry lives here, NOT in Tailwind arbitrary values.
+     This project serves a prebuilt stylesheet, so an arbitrary utility
+     that is not already compiled into it silently resolves to nothing.
+     pt-[14vh] exists in the build and pt-[12vh] does not, so changing
+     the number in the class name set the padding to 0 and dropped the
+     slide title behind the ION header. Failing silently like that is
+     worth avoiding on the one screen a room is reading, hence plain
+     CSS for anything load-bearing. */
+  .deck-slide {
+    /* Centre the column vertically. This is a no-op on slides that
+       contain a .deck-body, because that child is flex:1 and already
+       eats the free space -- so tables stay top-aligned and grow, while
+       KPI-only slides (backlog, case status, log sources) stop sitting
+       in the top third above two-thirds of dead screen. */
+    justify-content: center;
+    padding: 12vh 6vw;
+    /* Reserve the footer chrome (progress dots, counter, controls) so a
+       long table can never run underneath it. */
+    padding-bottom: 13vh;
+  }
+  .deck-slide.title-slide { padding: 0; }
+  /* The body region takes whatever the heading leaves. min-h-0 is what
+     lets a flex child shrink rather than forcing its parent taller. */
+  .deck-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  .deck-tablebox { min-height: 0; flex: 1 1 auto; overflow: auto; }
+  .deck-more { margin-top: 1.2vh; }
+  .deck-h-gap { height: 2.5vh; flex-shrink: 0; }
+  .deck-h-title { margin-bottom: 2.5vh; flex-shrink: 0; }
+  .deck-h-row {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 4vw; flex-shrink: 0;
+  }
+  .deck-h-row .deck-h-title { margin-bottom: 0; }
+  .deck-kpi { text-align: right; flex-shrink: 0; }
+  .deck-kpi-value {
+    font-size: clamp(40px, 6vw, 80px); line-height: 1; font-weight: 600;
+  }
+  .deck-kpi-label {
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--deck-dim); margin-top: 0.4vh;
+  }
+
   /* Title-slide wordmark uses background-clip text. */
   .deck-slide.title-slide .deck-title {
     background: linear-gradient(180deg, #f8fafc 0%, #94a3b8 100%);
@@ -157,8 +199,19 @@
     : kind === 'brand' ? 'text-primary'
     : 'text-base-content';
 
+  // The slide is a flex column with a real height budget: the head
+  // block sizes to its content, the body takes what is left, and
+  // nothing is allowed to grow past the footer chrome.
+  //
+  // It used to be one overflow-hidden box with padding. Padding does not
+  // stop overflow, so a table longer than the slide ran underneath the
+  // .pptx / fullscreen / Exit controls and was then clipped mid-row --
+  // on the one screen a room full of people is reading.
   const slideShell = (attrs, body) =>
-    `<div class="deck-slide relative flex flex-1 flex-col overflow-hidden px-[6vw] pb-[10vh] pt-[14vh]" ${attrs}>${body}</div>`;
+    `<div class="deck-slide relative flex flex-1 flex-col overflow-hidden" ${attrs}>${body}</div>`;
+  // Wraps whatever a slide puts below its heading. min-h-0 is what lets
+  // a flex child actually shrink instead of forcing its parent taller.
+  const slideBody = (inner) => `<div class="deck-body">${inner}</div>`;
   const titleShell = (attrs, body) =>
     `<div class="deck-slide title-slide relative flex flex-1 flex-col items-center justify-center overflow-hidden p-0 text-center" ${attrs}>${body}</div>`;
   const eyebrow = (text) =>
@@ -166,9 +219,47 @@
   const titleEyebrow = (text) =>
     `<div class="mb-[1.6vh] flex items-center justify-center gap-2.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary">${text}</div>`;
   const hTitle = (text) =>
-    `<div class="mb-[4vh] text-[clamp(32px,5vw,64px)] font-semibold leading-[1.05] tracking-tight">${text}</div>`;
+    `<div class="deck-h-title text-[clamp(32px,5vw,64px)] font-semibold leading-[1.05] tracking-tight">${text}</div>`;
+  // Heading with the headline figure beside it rather than stacked in a
+  // stat card above the content.
+  //
+  // The card was ~120px of a 720px screen, which on the alerts slide
+  // left room for three rows of seven and a scrollbar. Nobody scrolls a
+  // projector, so those four alerts were simply not in the briefing. The
+  // number is still the biggest thing on the slide; it just shares the
+  // line with the title instead of pushing the table off the bottom.
+  const hTitleWithKpi = (text, value, label, tone) =>
+    `<div class="deck-h-row">
+       <div class="deck-h-title text-[clamp(32px,5vw,64px)] font-semibold leading-[1.05] tracking-tight">${text}</div>
+       <div class="deck-kpi">
+         <div class="deck-kpi-value tabular-nums ${kpiTone(tone)}">${value}</div>
+         <div class="deck-kpi-label">${label}</div>
+       </div>
+     </div>`;
   const statVal = (tone, extra, inner) =>
     `<div class="stat-value tabular-nums text-[clamp(40px,6vw,80px)] leading-none ${kpiTone(tone)} ${extra}">${inner}</div>`;
+
+  // How many rows a slide shows, and what it says about the rest.
+  //
+  // The cap used to be a bare .slice(10): alert eleven simply was not in
+  // the briefing and nothing on the slide said so. A deck that quietly
+  // drops rows is worse than one that admits it ran out of room, because
+  // the room believes it has seen everything.
+  function capRows(list, cap) {
+    const shown = list.slice(0, cap);
+    return { shown: shown, hidden: Math.max(0, list.length - shown.length) };
+  }
+  const moreNote = (hidden, noun) => hidden
+    ? `<div class="deck-more text-xs text-base-content/50">
+         + ${hidden} more ${noun} not shown &mdash; see the full list on
+         the standup page or in the .pptx.
+       </div>`
+    : '';
+  // Tables scroll inside their own box rather than pushing the slide
+  // taller. On a projector nobody scrolls, which is exactly why the
+  // count above has to be truthful.
+  const tableBox = (inner) =>
+    `<div class="card deck-tablebox bg-base-200 shadow">${inner}</div>`;
 
   // --- slide builders --------------------------------------------
   function slideTitle(d) {
@@ -230,33 +321,32 @@
     } else {
       // final fallback to alert id so the Rule cell is
       // never blank on the slide — matches the standup page change.
-      const rows = list.slice(0, 10).map(r => {
+      const cut = capRows(list, 8);
+      const rows = cut.shown.map(r => {
         const ruleLabel = r.rule_name || r.title || r.id || '(unnamed)';
         return `<tr>
-        <td class="font-mono">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
+        <td class="font-mono whitespace-nowrap">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
         <td>${sevPill(r.severity)}</td>
         <td class="max-w-[30vw] truncate" title="${esc(ruleLabel)}">${esc(ruleLabel)}</td>
-        <td class="font-mono">${esc(r.host || '')}</td>
+        <td class="font-mono whitespace-nowrap">${esc(r.host || '\u2014')}</td>
       </tr>`;
       }).join('');
-      body = `<div class="card bg-base-200 shadow"><div class="overflow-x-auto"><table class="table table-sm"><thead><tr>
+      body = tableBox(`<table class="table table-sm"><thead class="sticky top-0 bg-base-200"><tr>
         <th>Time</th><th>Severity</th><th>Rule</th><th>Host</th>
-      </tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      </tr></thead><tbody>${rows}</tbody></table>`) + moreNote(cut.hidden, 'alerts');
     }
     return {
       name: 'Critical Alerts',
       html: slideShell('data-slide="criticals"', `
         ${eyebrow('Section 2 · ' + (isFallback ? 'ION-Tracked Alerts' : 'Critical Alerts') + ' (Last 24h)')}
-        ${hTitle(isFallback ? 'Recent Alerts' : 'Critical Alerts')}
-        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] grid-cols-[minmax(220px,_320px)]">
-          <div class="stats w-full bg-base-200 shadow">
-            <div class="stat"><div class="stat-title">${isFallback ? 'Open (ION)' : 'Critical'}</div>
-            ${statVal('crit', '', esc(a.critical_count ?? 0))}
-            <div class="stat-desc">in last 24 hours</div></div>
-          </div>
-        </div>
+        ${hTitleWithKpi(
+          isFallback ? 'Recent Alerts' : 'Critical Alerts',
+          esc(a.critical_count ?? 0),
+          (isFallback ? 'open in ION' : 'critical') + ' · last 24h',
+          'crit')}
+        <div class="deck-h-gap"></div>
         ${fallback}
-        ${body}
+        ${slideBody(body)}
       `)
     };
   }
@@ -285,24 +375,20 @@
           <td class="font-mono">${esc(r.hours_open ?? 0)}h</td>
         </tr>`;
       }).join('');
-      body = `<div class="card bg-base-200 shadow max-h-[56vh] overflow-y-auto rounded-[12px]">
-        <table class="table table-sm"><thead><tr>
+      body = tableBox(`<table class="table table-sm">
+        <thead class="sticky top-0 bg-base-200"><tr>
           <th>Case</th><th>Title</th><th>Triggered Rules</th><th>Severity</th><th>Open</th>
-        </tr></thead><tbody>${rows}</tbody></table>
-      </div>`;
+        </tr></thead><tbody>${rows}</tbody></table>`);
     }
     return {
       name: 'Stale Cases',
       html: slideShell('data-slide="stale-cases"', `
         ${eyebrow('Section 3 · Stale Cases (Open &gt; 24h, all)')}
-        ${hTitle('Stale Cases')}
-        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] grid-cols-[minmax(220px,_320px)]">
-          <div class="stats w-full bg-base-200 shadow">
-            <div class="stat"><div class="stat-title">Open beyond threshold</div>
-            ${statVal(list.length ? 'warn' : 'ok', '', esc(c.count ?? list.length))}</div>
-          </div>
-        </div>
-        ${body}
+        ${hTitleWithKpi('Stale Cases', esc(c.count ?? list.length),
+                        'open beyond threshold',
+                        list.length ? 'warn' : 'ok')}
+        <div class="deck-h-gap"></div>
+        ${slideBody(body)}
       `)
     };
   }

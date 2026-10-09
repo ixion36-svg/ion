@@ -94,6 +94,55 @@ async def _check_cluster_health() -> Dict[str, Any]:
         return {"status": "error", "error": str(e)[:100]}
 
 
+#: Observable types that name a machine, best first.
+_HOSTISH = ("hostname", "host", "computer", "fqdn", "dns")
+
+
+def _fallback_alert_row(row: Any) -> Dict[str, Any]:
+    """One AlertTriage row as the standup renders it, without ES.
+
+    This used to hardcode ``severity: "(unknown)"`` and ``host: "—"``
+    while the row carried ``priority``, ``source_system`` and
+    ``observables``. The deck then said "(unknown)" against every alert
+    at exactly the moment the SOC had nothing but local state to brief
+    from -- a fallback that discards what it knows is worse than none,
+    because it still looks like an answer.
+
+    What is genuinely unknown stays "—". The job is to stop throwing
+    away what is on the row, not to invent a host.
+    """
+    host = "—"
+    observables = row.observables if isinstance(row.observables, list) else []
+    for kind in _HOSTISH:
+        for obs in observables:
+            if not isinstance(obs, dict):
+                continue
+            if str(obs.get("type", "")).lower() == kind and obs.get("value"):
+                host = str(obs["value"])
+                break
+        if host != "—":
+            break
+    if host == "—" and row.source_system:
+        # Not the host, but it tells the room which estate this came
+        # from, which beats an em-dash on a meeting screen.
+        host = str(row.source_system)
+
+    status = row.status
+    return {
+        "id": row.es_alert_id,
+        # Never the raw es_alert_id: an opaque uuid on a wall tells
+        # nobody anything. Analyst notes are not promoted here either --
+        # they are somebody's prose about the alert, and putting them in
+        # a Rule column misattributes them to the ruleset.
+        "title": row.rule_name or "(rule unknown)",
+        "severity": row.priority or "(unknown)",
+        "status": status.value if hasattr(status, "value") else str(status),
+        "host": host,
+        "timestamp": row.created_at.isoformat() if row.created_at else None,
+        "rule_name": row.rule_name or "(rule unknown)",
+    }
+
+
 async def _check_critical_alerts() -> Dict[str, Any]:
     """Critical alerts in the last 24 h, with ION-local fallback.
 
@@ -169,19 +218,7 @@ async def _check_critical_alerts() -> Dict[str, Any]:
                 f"ES error: {es_error}" if es_error
                 else "ES not configured"
             ),
-            "alerts": [
-                {
-                    "id": r.es_alert_id,
-                    # Never expose the raw es_alert_id UUID as a display name.
-                    "title": r.rule_name or "(rule unknown)",
-                    "severity": "(unknown)",
-                    "status": r.status.value if hasattr(r.status, "value") else str(r.status),
-                    "host": "—",
-                    "timestamp": r.created_at.isoformat() if r.created_at else None,
-                    "rule_name": r.rule_name or "(rule unknown)",
-                }
-                for r in rows
-            ],
+            "alerts": [_fallback_alert_row(r) for r in rows],
         }
     finally:
         session.close()
@@ -791,6 +828,50 @@ async def _check_rule_failures() -> Dict[str, Any]:
 # ── Endpoints ─────────────────────────────────────────────────────────────
 
 
+def _duty_today() -> dict:
+    """This week's duty analyst, for the standup page header.
+
+    Never raises and never returns an empty dict: the panel has to render
+    something, and a blank line reads as "not loaded" rather than
+    "nobody is on duty", which are opposite instructions to whoever is
+    looking at it.
+    """
+    fallback = {
+        "assigned": False, "user": None, "acknowledged": False,
+        "summary": "Duty rota unavailable.",
+    }
+    try:
+        from ion.core.config import get_config
+        from ion.services import duty_roster_service as duty
+        from ion.storage.database import get_engine, get_session_factory
+
+        session = get_session_factory(get_engine(get_config().db_path))()
+        try:
+            return duty.current(session)
+        finally:
+            session.close()
+    except Exception:
+        logger.exception("duty rota unavailable for the standup page")
+        return fallback
+
+
+@router.get("/duty")
+async def standup_duty(
+    _user: User = Depends(require_permission("alert:read")),
+) -> dict:
+    """Who is on duty analyst this week.
+
+    Its own endpoint rather than a field on /checks, because /checks is
+    operator-triggered and sweeps Elasticsearch for cluster health,
+    alerts and log sources. The rota is one local row. Hanging it off
+    that sweep meant the page said "checking the duty rota" until
+    somebody pressed a button, and said nothing at all when
+    Elasticsearch was down -- which is when knowing who to call matters
+    most. /checks still carries it so a refresh updates the line.
+    """
+    return _duty_today()
+
+
 @router.get("/checks")
 async def get_daily_checks(
     current_user: User = Depends(require_permission("alert:read")),
@@ -835,6 +916,10 @@ async def get_daily_checks(
         # standup page. 30d data above stays in the response because
         # the pptx export still references it.
         "alerts_24h":         _safe(alerts_24h),
+        # Who the rota says runs this standup. Shown before anybody
+        # signs, so the question "should I be doing this?" has an answer
+        # on the page rather than in somebody's memory of the rota.
+        "duty":               _duty_today(),
     }
     # standup is a real-time operator panel — never let a
     # browser or proxy show stale numbers. The "critical alerts from
@@ -898,12 +983,20 @@ def _esc(s: Any) -> str:
     return _html.escape("" if s is None else str(s))
 
 
-def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> str:
+def _render_standup_html(data: "StandupSaveRequest", current_user: "User",
+                         attribution: Optional[dict] = None) -> str:
     """Render the standup as standalone HTML.
 
     Used by both ``/save`` (stored as the document's ``rendered_content``
     so the document-export-PDF flow produces a sensible report) and
     ``/pdf`` (sent through WeasyPrint inline). v0.15.2.
+
+    ``attribution`` comes from ``duty_roster_service.standup_attribution``
+    and says who the rota had on duty. Without it the footer names the
+    signatory only: this block used to label whoever typed their name as
+    "Duty Analyst", which asserts the one fact a free-text box cannot
+    know. The saved document is what somebody reads a week later, so a
+    standup run by whoever was around must not read as the rota holding.
     """
     today = datetime.now(timezone.utc).strftime("%d %b %Y")
     analyst = data.analyst_name or current_user.display_name or current_user.username
@@ -946,11 +1039,12 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
         "</style></head><body>"
     )
     out.append("<h1>Daily SOC Standup Report</h1>")
-    signed = "Yes" if data.signed_off else "No"
-    out.append(
-        f'<div class="meta">Date: {_esc(today)} &nbsp;|&nbsp; '
-        f"Duty Analyst: {_esc(analyst)} &nbsp;|&nbsp; Signed Off: {signed}</div>"
-    )
+    # Date only. The signatory and the sign-off state live in the
+    # sign-off block at the foot, next to who the rota had on duty --
+    # repeating them up here in the same words just stutters, and when
+    # this header said "Duty Analyst" it actively contradicted the block
+    # below it.
+    out.append(f'<div class="meta">Date: {_esc(today)}</div>')
 
     # -- Cluster Health --------------------------------------------------------
     cluster = checks.get("cluster_health") or {}
@@ -1167,17 +1261,61 @@ def _render_standup_html(data: "StandupSaveRequest", current_user: "User") -> st
                    f'<div class="section-notes">{_esc(data.additional_notes)}</div>')
 
     # -- Sign-off block --------------------------------------------------------
-    out.append(
-        f'<div class="signoff"><strong>Duty Analyst:</strong> {_esc(analyst)}<br>'
-        f'<strong>Signed Off:</strong> {"Yes" if data.signed_off else "No"}<br>'
-        f"<strong>Date:</strong> {_esc(today)}</div>"
-    )
+    #
+    # Two separate facts, never merged into one line: who signed this
+    # standup, and who the rota had on duty. They usually agree, and the
+    # days they do not are the only reason to record either.
+    signoff = [
+        f'<strong>Signed off by:</strong> {_esc(analyst)}<br>',
+        f'<strong>Signed Off:</strong> {"Yes" if data.signed_off else "No"}<br>',
+    ]
+    if attribution:
+        holder = (attribution.get("duty") or {}).get("user") or {}
+        if holder.get("name"):
+            line = _esc(holder["name"])
+            if attribution.get("matches_rota") is False:
+                # Stated plainly rather than flagged in red: somebody
+                # covering is normal and useful, and only becomes a
+                # problem if it is every day and nobody can tell.
+                line += " (did not sign this standup)"
+            signoff.append(f'<strong>On duty this week:</strong> {line}<br>')
+        else:
+            signoff.append(
+                '<strong>On duty this week:</strong> nobody was rostered<br>')
+        if attribution.get("note"):
+            signoff.append(
+                f'<div class="meta">{_esc(attribution["note"])}</div>')
+    signoff.append(f"<strong>Date:</strong> {_esc(today)}")
+    out.append('<div class="signoff">' + "".join(signoff) + "</div>")
     out.append(
         f'<div class="footer">Generated by ION &middot; '
         f"Intelligent Operating Network &middot; {_esc(today)}</div>"
     )
     out.append("</body></html>")
     return "".join(out)
+
+
+def _standup_attribution(session, data: "StandupSaveRequest",
+                         current_user: "User") -> Optional[dict]:
+    """Who the rota had on duty, for the saved record. None if unavailable.
+
+    Never raises. A deployment whose duty table predates the rota, or a
+    rota lookup that fails for any reason, must not stop somebody saving
+    their standup -- the report is the point, the attribution is context
+    on it.
+    """
+    try:
+        from ion.services import duty_roster_service as duty
+
+        name = (data.analyst_name
+                or current_user.display_name
+                or current_user.username)
+        return duty.standup_attribution(
+            session, signatory_name=name,
+            signatory_user_id=getattr(current_user, "id", None))
+    except Exception:
+        logger.exception("duty attribution unavailable for this standup")
+        return None
 
 
 @router.post("/save")
@@ -1199,7 +1337,10 @@ async def save_daily_standup(
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         doc = Document(
             name=f"Daily Standup \u2014 {today}",
-            rendered_content=_render_standup_html(data, current_user),
+            rendered_content=_render_standup_html(
+                data, current_user,
+                attribution=_standup_attribution(session, data, current_user),
+            ),
             status="active",
             output_format="html",
         )
@@ -1228,9 +1369,19 @@ async def export_standup_pdf(
     """Export the daily standup report as a PDF (falls back to HTML without WeasyPrint).
 
     v0.15.2: HTML body comes from the shared ``_render_standup_html``
-    helper, identical to what ``/save`` writes into the document store.
+    helper, identical to what ``/save`` writes into the document store --
+    including the duty attribution, so a printed standup and a saved one
+    cannot disagree about who was on the rota.
     """
-    html = _render_standup_html(data, current_user)
+    from ion.core.config import get_config
+    from ion.storage.database import get_engine, get_session_factory
+
+    session = get_session_factory(get_engine(get_config().db_path))()
+    try:
+        attribution = _standup_attribution(session, data, current_user)
+    finally:
+        session.close()
+    html = _render_standup_html(data, current_user, attribution=attribution)
 
     try:
         from weasyprint import HTML as WeasyHTML

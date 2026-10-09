@@ -137,6 +137,81 @@ def rota_summary(session: Session, *, duty: str = DUTY_ANALYST,
     }
 
 
+def _same_person(a: str, b: str) -> bool:
+    """Tolerant comparison of two typed names."""
+    return " ".join((a or "").split()).casefold() == \
+           " ".join((b or "").split()).casefold()
+
+
+def standup_attribution(session: Session, *, signatory_name: str,
+                        signatory_user_id: Optional[int] = None,
+                        duty: str = DUTY_ANALYST,
+                        today: Optional[date] = None) -> dict:
+    """Who was on the rota for the standup, and who actually signed it.
+
+    Reports rather than enforces. A duty holder off sick must not block
+    the standup, so anybody may run it -- but the record names both
+    people and says when they differ, because a rota nobody follows is
+    not a rota, and writing it down each day is the only way anybody
+    finds that out.
+
+    ``matches_rota`` is deliberately three-valued:
+
+    * ``None``  nobody is on the rota this week. Not a mismatch -- there
+                is nothing to match against, and calling it a breach
+                would blame whoever did step up.
+    * ``True``  the person on the rota signed it.
+    * ``False`` somebody else signed, or nobody did.
+
+    Matching prefers the signed-in user id over the typed name, because
+    the name is a free-text box and a typo in it is not a rota breach.
+    """
+    today = today or date.today()
+    week = _week_view(session, duty, today)
+    signed_by = (signatory_name or "").strip() or None
+
+    holder = week.get("user") or {}
+    label = duty.replace("_", " ")
+
+    if not week["assigned"]:
+        note = (
+            f"Nobody was on {label} duty for the week of "
+            f"{week['week_start']}"
+            + (f"; {signed_by} signed the standup." if signed_by
+               else ", and the standup is not signed.")
+        )
+        matches = None
+    elif signed_by is None:
+        # An empty signature box must not read as "the duty holder did
+        # it" merely because nobody contradicted the rota.
+        note = (
+            f"{holder.get('name')} is on {label} duty, but the standup "
+            f"is not signed."
+        )
+        matches = False
+    else:
+        matches = bool(
+            (signatory_user_id is not None
+             and signatory_user_id == holder.get("id"))
+            or _same_person(signed_by, holder.get("name") or "")
+        )
+        note = (
+            f"{holder.get('name')} is on {label} duty and signed the "
+            f"standup."
+            if matches else
+            f"{signed_by} ran the standup; {holder.get('name')} is on "
+            f"{label} duty this week."
+        )
+
+    return {
+        "duty": week,
+        "signed_by": signed_by,
+        "signed_by_user_id": signatory_user_id,
+        "matches_rota": matches,
+        "note": note,
+    }
+
+
 def assign(session: Session, *, duty: str = DUTY_ANALYST, week_start: date,
            user: User, actor: User, notes: str = "") -> DutyAssignment:
     """Put somebody on duty for a week, replacing whoever was on it.
