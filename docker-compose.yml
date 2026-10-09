@@ -111,7 +111,7 @@ services:
     # build: .  # Uncomment to build from source instead of pulling
 
 
-    image: fubsxploitapps/ion:${ION_VERSION:-0.99.10}
+    image: fubsxploitapps/ion:${ION_VERSION:-0.99.11}
 
     container_name: ion
     restart: unless-stopped
@@ -294,7 +294,7 @@ services:
   seeder:
 
 
-    image: fubsxploitapps/ion:${ION_VERSION:-0.99.10}
+    image: fubsxploitapps/ion:${ION_VERSION:-0.99.11}
 
     container_name: ion-seeder
     entrypoint: ["python", "/app/seed_all.py"]

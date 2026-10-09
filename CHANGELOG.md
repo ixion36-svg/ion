@@ -1,13 +1,59 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.10 -->
-<!-- ion-doc:version=0.99.10 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.11 -->
+<!-- ion-doc:version=0.99.11 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
 <!-- ion-doc:date=2026-10-09 -->
 
 # Changelog
+
+## v0.99.11 — 2026-10-09
+
+A patch release for one defect in v0.99.10: a large-document analysis
+job that failed at startup stayed readable as "running" for ever, with
+no way to tell it from a job still working.
+
+### Fixed
+
+* **A dead analysis worker now says so.** `_worker` opened its database
+  session on the line above its own `try`, so any failure building the
+  engine or the session killed the thread before the handler existed.
+  The row kept `status='running'`, `phase='map'`, `done=0` -- all three
+  column defaults, so the row had never been touched -- with no error
+  and no finish time, and the traceback went to `threading.excepthook`
+  where nobody owns it. Session construction moved inside the guard,
+  with a second attempt on a fresh session because the usual cause is
+  transient contention. When the database is genuinely unreachable the
+  job cannot be marked in it, so it logs at error level and states that
+  the row will read as running until something clears it.
+
+* **The worker binds to the engine it resolved.** It called
+  `get_session_factory(get_engine())`, and that helper ignores its
+  `engine` argument once the module-level factory is set -- the first
+  caller in a process decides the engine for every caller after it. The
+  worker therefore wrote a job's terminal status into a different
+  database, found no row, and returned in silence. One database in
+  production is why this stayed invisible; the binding was still wrong.
+
+* **Worker threads have distinguishable names.** `job_id` opens with
+  sixteen hex digits of microsecond timestamp and the thread was named
+  from `job_id[:8]` -- the top half of that clock, which turns over
+  about every 71 minutes. Every job started inside one window shared a
+  thread name, so a thread dump showed several workers called the same
+  thing. The name now uses the uuid tail, which is where the uniqueness
+  always was.
+
+### Notes
+
+No schema change, no configuration change, no API change. Upgrading
+from v0.99.10 is a straight image swap.
+
+The flaky `test_large_doc` failure that had been attributed to timing
+twice was this bug, not timing. It is covered now by
+`tests/test_large_doc_worker_startup.py`, and the completion test waits
+on a terminal status rather than on a worker thread.
 
 ## v0.99.10 — 2026-10-09
 
