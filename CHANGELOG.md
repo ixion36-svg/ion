@@ -1,13 +1,94 @@
 <!-- ion-doc:type=CHANGELOG -->
 <!-- ion-doc:title=ION Changelog -->
-<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.9 -->
-<!-- ion-doc:version=0.99.9 -->
+<!-- ion-doc:subtitle=Per-release change history from v0.9.43 to v0.99.10 -->
+<!-- ion-doc:version=0.99.10 -->
 <!-- ion-doc:classification=PUBLIC -->
 <!-- ion-doc:owner=ION Maintainer (ixion36) -->
 <!-- ion-doc:audience=Customer security, architects, anyone evaluating release content -->
-<!-- ion-doc:date=2026-10-05 -->
+<!-- ion-doc:date=2026-10-09 -->
 
 # Changelog
+
+## v0.99.10 — 2026-10-09
+
+Sixty commits. The workforce lifecycle becomes usable rather than present,
+an external review of v0.99.9 is worked through, and a number of screens
+stop asserting things they cannot know.
+
+### Workforce
+
+The module is on by default. A deployment that does not run the lifecycle
+still gets a 404 it cannot tell from "feature absent"; being on grants
+nobody anything, because a journey still has to be assigned and verified
+before a role is conferred.
+
+* **A catalogue of 24 SOC roles** a lead adopts rather than types. The
+  certificates are what the role is usually advertised with, not what
+  somebody needs to do the job, and any of them can be met by assessed
+  proficiency instead.
+* **The ORBAT is a hierarchy.** SOC Lead and SOC Manager both head the
+  root; Lead Analyst and Lead Engineer head their functions. Incident
+  response, threat intelligence and governance carry no lead post on
+  purpose — at one or two people each, inventing one would put permanent
+  vacancies on the chart no SOC this size intends to fill.
+* **Pillar coverage from three kinds of evidence**, never summed into one
+  number: whoever owns the pillar (1.0), assessed proficiency outside
+  their role (0.5), a current certificate (0.25), capped at one person.
+  Three analysts who rated themselves 4 out of 5 is not three forensics
+  analysts, and the page says which it is.
+* **A weekly duty analyst**, acknowledged only by the holder, because an
+  entry nobody picked up is a plan rather than a fact.
+* **Staffing on the wallboard**: who is on duty, posts filled, functions
+  with no lead, pillars uncovered.
+* **The skills matrix moved server side.** It was JavaScript in one
+  template and nothing could read it, which is why coverage could be
+  drawn as a heatmap and never compared against who is in post.
+
+### Honesty fixes
+
+Each of these was a screen stating something it had no way of knowing.
+
+* The standup called whoever typed their name the "Duty Analyst". It now
+  records who signed and who the rota had on duty, and says when they
+  differ.
+* `unknown` health was rendering as healthy; a dry run was reading as
+  containment; the case-age panel was labelled an SLA; health scores did
+  not mean what their labels said.
+* OpenCTI counted a fuzzy search hit as an indicator match without
+  checking the STIX pattern asserts that value.
+* The ION-local standup fallback hardcoded "(unknown)" severity and "—"
+  host while the row carried both — so with Elasticsearch down, every
+  alert read unknown at exactly the moment local state was all there was.
+* The Present deck silently dropped alert eleven onward. It now states
+  how many it could not fit.
+
+### Security and correctness
+
+* Keycloak role sync is **additive**: it grants, it never replaces. The
+  previous behaviour would have wiped every hand-assigned role the day a
+  realm role matched an ION role name, with no error and no audit entry.
+  A grant from an SSO claim is now audited.
+* A Keycloak first login enrols the person on the baseline journey. Under
+  SSO-only login nobody previously had an onboarding record at all.
+* An AD response target can no longer resolve to the wrong account.
+* Response decisions are atomic; refused requests are recorded in the
+  audit log.
+* Settings stopped silently dropping 20 values on save, and stopped
+  printing DSN passwords on an admin page.
+* IOCs are no longer extracted from a rule's own documentation, and
+  observables can be allowlisted with a mandatory reason.
+* Migrations no longer reference the dropped `lessons` table, which broke
+  bootstrapping a fresh PostgreSQL deployment.
+
+### Developer experience
+
+* `pytest-xdist` is pinned. The suite is ~5,300 tests and ran on one core
+  of thirty-two: 90 minutes. With `-n auto --dist loadfile` it is under
+  12. `loadfile` keeps each file on one worker, which matters for the
+  tests sharing an on-disk config or database.
+* Known flake: `test_large_doc.py::test_start_analysis_runs_to_completion`
+  asserts a background job has left `running` and loses that race under
+  load. It passes 20/20 in isolation.
 
 ## v0.99.9 — 2026-10-05
 

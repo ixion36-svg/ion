@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ion"
-version = "0.99.9"
+version = "0.99.10"
 description = "Intelligent Operating Network - Security Operations Portal for Guarded Glass"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -104,6 +104,11 @@ dependencies = [
 dev = [
     "pytest>=9.0.3",  # CVE-2025-71176: /tmp race (Unix)
     "pytest-cov",
+    # The suite is ~5,300 tests and ran serially: 90 minutes on a
+    # 32-core box. With -n auto --dist loadfile it is under 12.
+    # loadfile keeps each file on one worker, which matters for the
+    # tests that share an on-disk config or a database file.
+    "pytest-xdist",
     "diff-cover",     # v0.100.0: gates coverage on CHANGED lines, not the total
     "ruff",
     "mypy",
