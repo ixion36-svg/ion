@@ -456,17 +456,51 @@ class OIDCUserSync:
             )
 
     def _sync_roles(self, user: User, keycloak_roles: List[str]) -> None:
-        """Synchronize user roles from Keycloak to ION.
+        """Grant the ION roles this token claims. Never revoke.
 
-        Uses direct name matching first, then falls back to configured mapping.
+        Uses direct name matching first, then the configured mapping.
+
+        This used to call ``set_roles``, which replaces the list. With
+        login exclusively through Keycloak and roles still assigned by
+        hand, that was a trap with a delay on it: today no realm role
+        matches an ION role name so nothing is lost, and the day
+        somebody adds a realm role called ``analyst`` or ``lead``, every
+        manual assignment for everyone holding it vanishes on their next
+        login -- no error, no audit entry, and the symptom (people
+        losing access overnight) pointing nowhere near Keycloak.
+
+        The trade this makes, deliberately:
+
+            removing a role in Keycloak does NOT revoke it in ION.
+
+        That is the right way round while ION is where roles are
+        decided -- an admin revokes by hand, the same way they granted.
+        It is the wrong way round if Keycloak ever becomes
+        authoritative, and
+        tests/test_oidc_role_sync_additive.py says so, so that change
+        gets made on purpose rather than by accident.
         """
-        ion_roles = self.map_roles(keycloak_roles)
+        from ion.models.user import AuditLog
 
-        if ion_roles:
-            self.user_repo.set_roles(user, ion_roles)
-            logger.debug(
-                f"Synced roles for {user.username}: {[r.name for r in ion_roles]}"
-            )
+        held = {r.id for r in user.roles}
+        granted = [r for r in self.map_roles(keycloak_roles)
+                   if r.id not in held]
+        if not granted:
+            return
+
+        for role in granted:
+            user.roles.append(role)
+        self.session.flush()
+
+        names = ", ".join(r.name for r in granted)
+        # Written down because a role appearing out of an SSO claim
+        # should be traceable later without reading Keycloak's logs.
+        self.session.add(AuditLog(
+            user_id=user.id, action="oidc_role_granted",
+            resource_type="user", resource_id=user.id,
+            details=f"Keycloak claim granted {names} to {user.username}",
+        ))
+        logger.info("OIDC granted %s to %s", names, user.username)
 
     def map_roles(self, keycloak_roles: List[str]) -> List[Role]:
         """Map Keycloak roles to ION roles.
