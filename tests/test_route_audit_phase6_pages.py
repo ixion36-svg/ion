@@ -38,7 +38,10 @@ def paths():
 
 @pytest.fixture(scope="module")
 def base_html():
-    return (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    """Rendered, not the template source: the nav is built from nav.py."""
+    from tests.nav_render import render
+
+    return render()
 
 
 # ── renames + redirects ──────────────────────────────────────────────────

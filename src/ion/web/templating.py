@@ -21,6 +21,7 @@ from jinja2 import FileSystemBytecodeCache
 import ion
 from ion.core.config import get_config
 from ion.licensing.gating import de_module_available
+from ion.web import nav
 from ion.web._csp_nonce import _CSPNonceProxy
 from ion.web._csrf_token import _CSRFTokenProxy
 
@@ -30,6 +31,15 @@ _BYTECODE_CACHE_DIR = Path("/tmp/ion-jinja2-cache")
 
 def _workforce_available() -> bool:
     return bool(getattr(get_config(), "workforce_enabled", False))
+
+
+def _nav_visible(item: nav.Item) -> bool:
+    """Whether a nav entry's licence gate is open, read per render."""
+    if item.gate == "de":
+        return de_module_available()
+    if item.gate == "workforce":
+        return _workforce_available()
+    return True
 
 
 def make_templates(directory: Path | None = None) -> Jinja2Templates:
@@ -49,14 +59,15 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
         pass
     templates.env.auto_reload = bool(getattr(get_config(), "debug_mode", False))
     templates.env.globals["ion_version"] = ion.__version__
-    # base.html gates the DE nav on `{% if de_module_available() %}`, so every
-    # env needs it or any page extending base.html raises UndefinedError.
-    # Callable, not a value, so a runtime licence change is picked up without
-    # a template reload.
-    templates.env.globals["de_module_available"] = de_module_available
-    # Same contract for the workforce nav entry: callable, so the flag is
-    # read per render and the entry vanishes the moment the module is off.
-    templates.env.globals["workforce_available"] = _workforce_available
+    # base.html renders the whole navigation from this registry: the desktop
+    # dropdowns, the mobile panel and the `g` key table. Every env needs these
+    # or any page extending base.html raises UndefinedError. The helpers are
+    # callables, not values, so a licence change is read per render without a
+    # template reload.
+    templates.env.globals["nav_items"] = nav.NAV
+    templates.env.globals["nav_mobile_items"] = nav.mobile_items
+    templates.env.globals["nav_shortcuts"] = nav.shortcuts
+    templates.env.globals["nav_visible"] = _nav_visible
     templates.env.globals["csp_nonce"] = _CSPNonceProxy()
     templates.env.globals["csrf_token"] = _CSRFTokenProxy()
     return templates

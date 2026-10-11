@@ -84,7 +84,27 @@ class TestTheGate:
         assert "get_config().workforce_enabled" in source
 
     def test_the_nav_still_asks_before_showing_the_link(self):
-        base = (
-            _SRC / "ion" / "web" / "templates" / "base.html"
-        ).read_text(encoding="utf-8")
-        assert "workforce_available()" in base
+        """The entry carries the gate, and the header drops a gated entry
+        whose gate is shut. Delete either half and the link shows to a
+        deployment that turned the module off."""
+        from ion.web import nav
+        from tests.nav_render import render
+
+        item = next(
+            i
+            for entry in nav.NAV
+            if entry.is_group
+            for i in entry.items
+            if i.href == "/workforce"
+        )
+        assert item.gate == "workforce"
+
+        from ion.core.config import get_config
+        from ion.web.templating import _nav_visible
+
+        assert _nav_visible(item) is bool(get_config().workforce_enabled)
+
+        shut = render(nav_visible=lambda i: i.gate != "workforce")
+        assert 'href="/workforce"' not in shut
+        assert 'href="/daily-work"' in shut, "the gate closed the whole menu"
+        assert 'href="/workforce"' in render()

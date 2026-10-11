@@ -426,6 +426,6 @@ class TestInboxEndpoint:
         assert "outcome" in tpl
 
     def test_the_page_is_reachable_from_the_navigation(self):
-        base = (_SRC / "ion" / "web" / "templates" / "base.html"
-                ).read_text(encoding="utf-8")
-        assert "/response-approvals" in base
+        from tests.nav_render import render
+
+        assert 'href="/response-approvals"' in render()

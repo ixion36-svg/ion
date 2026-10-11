@@ -38,7 +38,11 @@ STATIC = Path("src/ion/web/static")
 
 @pytest.fixture(scope="module")
 def base() -> str:
-    return (TEMPLATES / "base.html").read_text(encoding="utf-8")
+    """The header as rendered. The nav comes from the registry in nav.py now,
+    so the template source no longer contains any of these hrefs."""
+    from tests.nav_render import render
+
+    return render()
 
 
 @pytest.fixture(scope="module")
