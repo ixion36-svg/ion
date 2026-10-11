@@ -104,31 +104,31 @@
     /* Sev-1: Critical (Red) */
     --sev-critical:      #f85149;
     --sev-critical-bg:   rgba(248, 81, 73, 0.12);
-    --sev-critical-dim:  rgba(248, 81, 73, 0.2);
+    --sev-critical-dim:  rgba(248, 81, 73, 0.18);
     --sev-critical-glow: rgba(248, 81, 73, 0.18);
 
     /* Sev-2: High (Orange/Amber) */
     --sev-high:      #f0883e;
     --sev-high-bg:   rgba(240, 136, 62, 0.12);
-    --sev-high-dim:  rgba(240, 136, 62, 0.2);
+    --sev-high-dim:  rgba(240, 136, 62, 0.18);
     --sev-high-glow: rgba(240, 136, 62, 0.18);
 
     /* Sev-3: Medium (Yellow) */
     --sev-medium:      #d29922;
     --sev-medium-bg:   rgba(210, 153, 34, 0.12);
-    --sev-medium-dim:  rgba(210, 153, 34, 0.2);
+    --sev-medium-dim:  rgba(210, 153, 34, 0.18);
     --sev-medium-glow: rgba(210, 153, 34, 0.18);
 
     /* Sev-4: Low (Muted gray) */
     --sev-low:      #8b949e;
     --sev-low-bg:   rgba(139, 148, 158, 0.12);
-    --sev-low-dim:  rgba(139, 148, 158, 0.2);
+    --sev-low-dim:  rgba(139, 148, 158, 0.18);
     --sev-low-glow: rgba(139, 148, 158, 0.18);
 
     /* Sev-5: Info (Purple) */
     --sev-info:      #bc8cff;
     --sev-info-bg:   rgba(188, 140, 255, 0.12);
-    --sev-info-dim:  rgba(188, 140, 255, 0.2);
+    --sev-info-dim:  rgba(188, 140, 255, 0.18);
     --sev-info-glow: rgba(188, 140, 255, 0.18);
 
     /* ── MITRE Coverage Status ──────────────────────────── */
@@ -261,6 +261,40 @@
     --neon-yellow: #d97706;
     --neon-red: #dc2626;
     --neon-purple: #7c3aed;
+
+    /* ── 5-Severity System, light mode ──────────────────── */
+    /* The dark ramp on a white page measured 2.12:1 to 2.63:1 for badge
+       text on its own tint, against the 4.5:1 requirement, because no
+       light-mode block redefined these. Each value below keeps its hue
+       and is darkened until the badge clears 4.5:1 on its own tint and
+       the solid colour clears 3:1 as a stripe. Checked by
+       tests/test_severity_contrast.py, which recomputes rather than
+       trusting these comments. */
+    --sev-critical:      #c21007;
+    --sev-critical-bg:   rgba(194, 16, 7, 0.12);
+    --sev-critical-dim:  rgba(194, 16, 7, 0.18);
+    --sev-critical-glow: rgba(194, 16, 7, 0.18);
+
+    --sev-high:      #a14a0d;
+    --sev-high-bg:   rgba(161, 74, 13, 0.12);
+    --sev-high-dim:  rgba(161, 74, 13, 0.18);
+    --sev-high-glow: rgba(161, 74, 13, 0.18);
+
+    --sev-medium:      #815e15;
+    --sev-medium-bg:   rgba(129, 94, 21, 0.12);
+    --sev-medium-dim:  rgba(129, 94, 21, 0.18);
+    --sev-medium-glow: rgba(129, 94, 21, 0.18);
+
+    --sev-low:      #5e6770;
+    --sev-low-bg:   rgba(94, 103, 112, 0.12);
+    --sev-low-dim:  rgba(94, 103, 112, 0.18);
+    --sev-low-glow: rgba(94, 103, 112, 0.18);
+
+    --sev-info:      #791aff;
+    --sev-info-bg:   rgba(121, 26, 255, 0.12);
+    --sev-info-dim:  rgba(121, 26, 255, 0.18);
+    --sev-info-glow: rgba(121, 26, 255, 0.18);
+
 }
 
 /* Light mode removes grid pattern glow */
