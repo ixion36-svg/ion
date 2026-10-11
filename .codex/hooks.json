@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python 'C:\\Users\\lyndo\\projects\\ION\\.codex\\hooks\\sensitive_paths_guard.py'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python 'C:\\Users\\lyndo\\projects\\ION\\.codex\\hooks\\ruff_check.py'"
+          }
+        ]
+      }
+    ]
+  }
+}
