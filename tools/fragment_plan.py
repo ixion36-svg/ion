@@ -203,11 +203,17 @@ def _fetch_urls(js: str) -> list[str]:
         r"""(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*['"]([^'"]+)['"]""", js))
 
     urls: list[str] = []
+    # Two call sites, not one. Six templates use ION's own `api.get(...)`
+    # helper from static/js/app.js rather than the global fetch, and a tool
+    # that only knew `fetch(` reported "0 fetches" for every one of them,
+    # which is the worst answer available: no help, silently.
+    #
     # A lookbehind rather than a consumed character, so a script that opens
     # with the call still matches. `prefetch(` and `this.fetch(` are not the
     # global fetch, and attributing a permission to a call that never
     # happens is the same kind of wrong answer as resolving the wrong route.
-    for m in re.finditer(r"(?<![\w.$])fetch\s*\(", js):
+    pattern = r"(?<![\w.$])fetch\s*\(|(?<![\w$])api\.(?:get|post|put|patch|delete)\s*\("
+    for m in re.finditer(pattern, js):
         i = m.end()
         depth, arg = 1, []
         while i < len(js) and depth:

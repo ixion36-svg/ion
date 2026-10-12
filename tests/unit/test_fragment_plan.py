@@ -123,3 +123,17 @@ def test_a_word_ending_in_fetch_is_not_the_global_fetch():
     """`prefetch(` is not fetch, and attributing a permission to a call
     that never happens is the same kind of wrong answer as the rest."""
     assert fragment_plan._fetch_urls("prefetch('/api/x')") == []
+
+
+def test_the_projects_own_api_helper_is_found_too():
+    """Six templates call ION's api.get from static/js/app.js rather than
+    the global fetch, and a tool that only knew `fetch(` reported "0
+    fetches" for all six: no help, silently."""
+    js = "api.get('/api/templates/' + templateId + '/versions')"
+    assert fragment_plan._fetch_urls(js) == [
+        "/api/templates/${templateId}/versions"
+    ]
+
+
+def test_an_unrelated_dot_api_call_is_not_treated_as_a_request():
+    assert fragment_plan._fetch_urls("this.api.getName('/not/a/url')") == []
