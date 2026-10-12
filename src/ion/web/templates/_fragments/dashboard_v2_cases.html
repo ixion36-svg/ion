@@ -1,0 +1,122 @@
+{# The caller's open cases, their count and the severity breakdown.
+
+   Replaces the two `feed.innerHTML` writes, the "Cases unavailable" write
+   and the two `breakdownEl.innerHTML` writes in loadDashboard().
+
+   A viewer without `case:read` never reaches this template: GET
+   /ui/dashboard-v2/my-cases answers 403 and static/js/htmx-errors.js words
+   it as "You do not have permission to view this. Nothing is missing from
+   the system: this account cannot read it." That is the one sentence this
+   panel must say instead of "No open cases assigned to you", and it is
+   deliberately not duplicated here.
+
+   Four outcomes:
+
+     read failed   say so. The old code printed "Cases unavailable
+                   (permission required)." for every failure including a
+                   500, asserting a cause it did not know. Worse, a
+                   /api/dashboard failure took this panel out too, because
+                   the username it filtered on came from that read and
+                   neither branch then fired: the panel kept reading
+                   "Loading cases..." and the tile kept its placeholder.
+     none assigned the empty state, which is a real finding.
+     rows          the list.
+     partial       rows came back but not all of them, so the breakdown is a
+                   composition of part of the set and says so. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% set SEV = {
+  'critical': {'pill': 'bg-ion-coral/10 text-ion-coral border-ion-coral/20', 'bar': 'bg-ion-coral', 'label': 'Critical', 'short': 'crit'},
+  'high':     {'pill': 'bg-ion-amber/10 text-ion-amber border-ion-amber/20', 'bar': 'bg-ion-amber', 'label': 'High',     'short': 'high'},
+  'medium':   {'pill': 'bg-ion-iris/10 text-ion-iris border-ion-iris/20',    'bar': 'bg-ion-iris',  'label': 'Medium',   'short': 'med'},
+  'low':      {'pill': 'bg-slate-400/10 text-slate-400 border-slate-400/20', 'bar': 'bg-slate-400', 'label': 'Low',      'short': 'low'},
+  'info':     {'pill': 'bg-slate-500/10 text-slate-500 border-slate-500/20', 'bar': 'bg-slate-500', 'label': 'Info',     'short': 'info'}
+} %}
+
+{# ─── MAIN TARGET: the case list ─── #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    Your open cases could not be read. This is not an empty queue: the query
+    failed, so how many cases are assigned to you is unknown rather than
+    zero. Refresh to try again.
+  </div>
+{% elif not view.rows %}
+  <div class="py-10 text-center text-[12px] text-base-content/50">No open cases assigned to you.</div>
+{% else %}
+  {% for c in view.rows %}
+    {% set s = SEV.get(c.severity) or SEV['info'] %}
+    {% set href = '/cases?id=' ~ (c.id | string | urlencode) if c.id is not none else '/cases' %}
+    <a href="{{ href }}" class="row-hover flex items-center gap-4 p-4 -mx-4 rounded-lg">
+      <div class="font-mono text-[11px] text-slate-500 w-16 shrink-0">{{ c.reference if c.reference else '—' }}</div>
+      <div class="flex-1 min-w-0">
+        <div class="text-[14px] truncate">{{ c.title if c.title else 'Untitled case' }}</div>
+        {# A gap on both axes, not a column-only one: the row wraps on a
+           narrow viewport and a column-only gap would butt the wrapped line
+           against the one above. `gap-2` already has a rule in the shipped
+           ion.css, so this conversion needs no stylesheet rebuild. #}
+        <div class="text-[11px] text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
+          {# The age as a duration and the instant through the macro. A case
+             with neither updated_at nor created_at says so: `relativeTime`
+             on a missing value returned "" and the row read "Updated " with
+             nothing after it. #}
+          <span>{% if c.age_text is not none %}Updated {{ c.age_text }}{% else %}Update time not recorded{% endif %}</span>
+          <span>{{ ts(c.updated_at, 'datetime', fallback='no timestamp') }}</span>
+          {# Gated on the raw number: a case linked to zero alerts is a
+             measurement, and `if (c.alert_count)` hid exactly that row. #}
+          {% if c.alert_count is not none %}<span>· {{ c.alert_count }} alert{{ '' if c.alert_count == 1 else 's' }}</span>{% endif %}
+        </div>
+      </div>
+      {% if c.severity is not none %}
+        <span class="label-tiny px-2 py-1 rounded-md border {{ s.pill }}">{{ s.label }}</span>
+      {% else %}
+        <span class="label-tiny px-2 py-1 rounded-md border bg-slate-500/10 text-slate-500 border-slate-500/20">No severity</span>
+      {% endif %}
+    </a>
+  {% endfor %}
+{% endif %}
+
+{# ─── OUT OF BAND: the my-open-cases tile and its breakdown ─── #}
+
+<div id="kpi-my-cases" hx-swap-oob="true" class="stat">
+  <div class="stat-figure flex flex-col items-end gap-1 text-[10px] text-base-content/50">
+    {% if failed %}
+      <span class="font-mono text-[10px] text-slate-500">not read</span>
+    {% elif view.bars %}
+      {% for b in view.bars %}
+        {% set s = SEV.get(b.severity) or SEV['info'] %}
+        <div class="flex items-center gap-1">
+          {# A computed width cannot be an inline style attribute: ION serves
+             style-src-attr 'none', so the browser drops it. #}
+          <span class="h-1 rounded-full {{ s.bar }}" data-ion-style="width:{{ b.width_px }}px"></span>
+          <span class="font-mono text-[10px] text-slate-400">{{ b.count }} {{ s.short }}</span>
+        </div>
+      {% endfor %}
+      {% if not view.breakdown_complete %}
+        <span class="font-mono text-[10px] text-warning">of {{ view.breakdown_over }} read</span>
+      {% endif %}
+    {% elif view.any_cases %}
+      {# Cases assigned, none of them critical, high or medium. The old code
+         printed "all clear" here and printed the same words when the analyst
+         had no cases at all, which are not the same shift. #}
+      <span class="font-mono text-[10px] text-slate-500">none above medium</span>
+    {% else %}
+      <span class="font-mono text-[10px] text-slate-500">none assigned</span>
+    {% endif %}
+  </div>
+  <div class="stat-title">My open cases</div>
+  {# Gated on the raw count. Zero open cases is the measurement an analyst
+     most wants to trust, so it has to be distinguishable from a read that
+     did not happen, which is what the old shared em-dash could not do. #}
+  {% if not failed and view.count is not none %}
+    <div class="stat-value">{{ view.count }}</div>
+    <div class="stat-desc flex items-center gap-1">
+      <svg class="w-3 h-3"><use href="#i-clock"/></svg>
+      assigned to you, not closed
+    </div>
+  {% else %}
+    <div class="stat-value text-base-content/40">—</div>
+    <div class="stat-desc">read failed, not counted</div>
+  {% endif %}
+</div>

@@ -1,0 +1,314 @@
+{# The landing page's welcome row, alert feed, status pills and alerts tile.
+
+   Replaces the `switcher.innerHTML`, two `feed.innerHTML` writes and the
+   `$('welcome-message').innerHTML` in loadDashboard(), plus the four
+   `className` assignments that recoloured the two status dots.
+
+   One read feeds five places on this page, so four of them come back as
+   out-of-band swaps beside the one swapped panel. A separate request per
+   place would mean a second and third Elasticsearch round trip on the page
+   every user lands on, and would let the tile disagree with the feed under
+   it.
+
+   Four outcomes, and the JavaScript had one:
+
+     read failed    every figure says so and none is drawn. The old code
+                    left #alerts-feed reading "Loading alerts..." for ever,
+                    because the feed was only written inside `if (es)`.
+     off            Elasticsearch is not configured. Nothing was asked, so
+                    there is nothing to report and no zero to print.
+     unreachable    configured and it did not answer. `|| 0` printed this
+                    as "0 critical" and "No active alerts.", which is the
+                    sentence that ends a shift.
+     live           the counts are measurements.
+
+   The severity tables are literal class names in this file rather than a
+   lookup in the Python module. Tailwind's `@source` list reaches
+   src/ion/web/templates and src/ion/web/ui/*.py, so either would be
+   scanned, but every one of these is a bespoke ION utility rather than a
+   daisyUI component class, and a bespoke utility belongs where the scan has
+   always found it. The page shell's hidden safelist div existed only because
+   these names lived in JavaScript strings; it is gone. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{# The triage sentence, reached from two branches below: once when the 24-hour
+   total is known and once when it is not, because the severity counts are a
+   separate measurement from the histogram and either can be missing.
+   Pluralised on the two counts together: `alert${high === 1 ? '' : 's'}`
+   pluralised on the second number only, so one critical and one high read
+   "1 critical and 1 high alert pending triage". #}
+{% macro pending(view) -%}
+Your queue has <span class="font-medium text-base-content">{{ view.critical }} critical</span>
+and <span class="font-medium text-base-content">{{ view.high }} high</span>
+alert{{ '' if view.critical + view.high == 1 else 's' }} among the {{ view.sampled }} most recent, pending triage.
+{%- endmacro %}
+
+{% set SEV = {
+  'critical': {'bar': 'bg-ion-coral', 'text': 'text-ion-coral', 'label': 'CRIT',
+               'glow': 'shadow-[0_0_12px_rgba(255,108,108,0.6)]'},
+  'high':     {'bar': 'bg-ion-amber', 'text': 'text-ion-amber', 'label': 'HIGH', 'glow': ''},
+  'medium':   {'bar': 'bg-ion-iris',  'text': 'text-ion-iris',  'label': 'MED',  'glow': ''},
+  'low':      {'bar': 'bg-slate-400', 'text': 'text-slate-400', 'label': 'LOW',  'glow': ''},
+  'info':     {'bar': 'bg-slate-500', 'text': 'text-slate-500', 'label': 'INFO', 'glow': ''}
+} %}
+
+{# ─── MAIN TARGET: the hero counts, the feed and the footer count ─── #}
+
+<div class="flex flex-wrap items-baseline gap-x-4 gap-y-2 mb-4">
+  {% if failed %}
+    <span class="text-[15px] text-error">Alert counts could not be read.</span>
+  {% elif view.es_state == 'off' %}
+    <span class="text-[15px] text-base-content/50">Elasticsearch is not configured.</span>
+  {% elif view.es_state == 'unreachable' %}
+    <span class="text-[15px] text-warning">Elasticsearch did not answer, so nothing here is counted.</span>
+  {% elif view.critical is not none %}
+    {# Gated on the raw number. Zero critical alerts is a measurement and the
+       one the analyst most wants, so truthiness here would blank the good
+       news. The three counts are set together or not at all, so this one
+       gate covers the whole line. #}
+    <span class="font-sans font-semibold text-[26px] tracking-tight leading-none">{{ view.critical }} critical</span>
+    <span class="text-[15px] text-base-content/50">· {{ view.high }} high</span>
+    {# Says what the counts are over. They are computed from the rows the
+       read returned, behind a limit of ten, so calling them a 24-hour total
+       is the lie this conversion exists to remove. #}
+    <span class="text-[12px] text-base-content/40">in the {{ view.sampled }} most recent</span>
+  {% else %}
+    <span class="text-[15px] text-base-content/50">Alert counts were not reported by this read.</span>
+  {% endif %}
+</div>
+
+<div class="divide-y divide-base-300 -mx-2">
+  {% if failed %}
+    <div role="alert" class="alert alert-error my-4">
+      The alert feed could not be read. This is not a quiet queue: the read
+      failed, so how many alerts are waiting is unknown rather than zero.
+      Refresh to try again.
+    </div>
+  {% elif view.es_state == 'off' %}
+    <div role="alert" class="alert my-4">
+      Elasticsearch is not configured on this deployment, so there is no
+      alert feed to show. This is not an empty queue.
+    </div>
+  {% elif view.es_state == 'unreachable' %}
+    <div role="alert" class="alert alert-warning my-4">
+      Elasticsearch is configured but did not answer{% if view.es_error %} ({{ view.es_error }}){% endif %}.
+      Nothing here has been measured, so this is not a quiet queue.
+    </div>
+  {% elif not view.alerts %}
+    <div class="py-10 text-center text-[12px] text-base-content/50">No active alerts.</div>
+  {% else %}
+    {% for a in view.alerts %}
+      {% set s = SEV.get(a.severity) or SEV['info'] %}
+      {# One value, built in full before it is used, so the query string
+         cannot come out half-escaped. Only the id is a variable and there is
+         no second parameter, so there is no literal ampersand beside an
+         escaped one. #}
+      {% set href = '/alerts?id=' ~ (a.id | string | urlencode) if a.id is not none else '/alerts' %}
+      <a href="{{ href }}" class="row-hover flex items-start gap-4 py-6 px-2">
+        <div class="sev-bar self-stretch {{ s.bar }} {{ s.glow }}"></div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1.5">
+            {# An alert with no severity says so. `SEV_MAP[a.severity] || SEV_MAP.info`
+               filed it as info, which is a severity somebody assigned. #}
+            {% if a.severity is not none %}
+              <span class="label-tiny {{ s.text }}">{{ s.label }}</span>
+            {% else %}
+              <span class="label-tiny text-slate-500">NO SEV</span>
+            {% endif %}
+            <span class="text-[10px] text-slate-600">·</span>
+            <span class="label-tiny text-slate-500">{{ a.tactic }}{% if a.technique %} · {{ a.technique }}{% endif %}</span>
+          </div>
+          <div class="text-[15px] font-medium truncate">{{ a.title if a.title else 'Untitled alert' }}</div>
+          {% if a.host or a.user or a.rule_name %}
+            <div class="mt-1 flex items-center gap-3 text-[12px] text-slate-500 min-w-0 overflow-hidden whitespace-nowrap text-ellipsis">
+              {% if a.host %}<span class="font-mono text-ion-amber">{{ a.host }}</span>{% endif %}
+              {% if a.user %}<span>user <span class="font-mono text-slate-300">{{ a.user }}</span></span>{% endif %}
+              {% if a.rule_name %}<span class="truncate">{{ a.rule_name }}</span>{% endif %}
+            </div>
+          {% endif %}
+        </div>
+        {# The instant through the macro, because the server's clock is not
+           the viewer's, and the age beside it because a duration carries no
+           timezone. `hhmmss(null)` and `relativeTime(null)` both returned the
+           empty string, so a document with no timestamp rendered two blank
+           lines that read as a row with no age. #}
+        <div class="text-right shrink-0">
+          <div class="font-mono text-[11px] text-slate-500">{{ ts(a.timestamp_raw, 'time', fallback='no time') }}</div>
+          <div class="text-[11px] text-slate-600 mt-0.5">{% if a.age_text is not none %}{{ a.age_text }}{% else %}age unknown{% endif %}</div>
+        </div>
+      </a>
+    {% endfor %}
+  {% endif %}
+</div>
+
+<div class="mt-5 pt-4 border-t border-base-300 flex flex-wrap items-center justify-between gap-2 text-xs">
+  <span class="text-base-content/50">
+    {% if failed or view.es_state != 'live' %}
+      Not measured
+    {% elif view.total_24h is not none %}
+      Showing <span class="font-mono text-base-content">{{ view.shown }}</span> of
+      <span class="font-mono text-base-content">{{ view.total_24h }}</span> open in the last 24h
+    {% else %}
+      Showing <span class="font-mono text-base-content">{{ view.shown }}</span>; the 24h total was not counted
+    {% endif %}
+  </span>
+  {# This footer link pointed at the current page and went nowhere. The
+     attribute is not quoted here on purpose: the contract records a CSS guard
+     that flagged a Jinja comment for naming what it had removed. #}
+  <a href="/alerts" class="link link-primary flex items-center gap-1">
+    Open alert queue
+    <svg class="w-3 h-3"><use href="#i-arrow-up-right"/></svg>
+  </a>
+</div>
+
+{# ─── OUT OF BAND: the welcome name and the queue sentence ─── #}
+
+{# Two small targets rather than one block around the whole heading, because
+   the heading also holds #greeting, which a one-shot script sets from the
+   viewer's local hour. Swapping a container that held it would reset
+   "Good morning" to "Welcome" on every refresh, and the fix would be a
+   listener re-running the script after each swap. The name renders as the
+   em-dash the shell already shows when the account carries neither a display
+   name nor a username, rather than the word "there".
+
+   `viewer` is built from the get_current_user dependency and not from the
+   read, so it is present in both states. A store that did not answer is not a
+   reason to stop knowing who is signed in. #}
+<span id="welcome-name" hx-swap-oob="true" class="text-primary">{{ viewer.name if viewer.name else '—' }}</span>
+
+<p id="welcome-message" hx-swap-oob="true" class="mt-5 max-w-xl text-[17px] text-base-content/60 leading-relaxed">
+    {% if failed %}
+      The dashboard read failed. How many alerts are waiting is unknown, not zero.
+    {% elif view.es_state == 'off' %}
+      Elasticsearch is not configured here, so this page has no alert queue to show.
+    {% elif view.es_state == 'unreachable' %}
+      Elasticsearch could not be reached. How many alerts are waiting is unknown, not zero.
+    {% elif view.total_24h is not none %}
+      {# One gate on whether the total was counted, then the split on its
+         value, rather than a flat chain testing `is not none` again further
+         down. In a flat chain the zero branch takes every falsy value a
+         number can have, so a second `is not none` below it cannot fail and
+         no test can tell it from truthiness. A mutation pass found that: a
+         gate that cannot fail is worse than no gate, because it reads as one
+         somebody checked. #}
+      {% if view.total_24h == 0 %}
+        Your queue is clear. No open alerts in the last 24h.
+      {% elif view.critical is not none and view.critical > 0 %}
+        {{ pending(view) }}
+      {% else %}
+        <span class="font-medium text-base-content">{{ view.total_24h }}</span>
+        {# The clause about the sample is gated on the sample's own count.
+           The branch above gates on the counts and this one does not, so
+           without this the sentence can print the word None mid-prose, which
+           is the exact thing the module's all-or-none counts are for. #}
+        open alert{{ '' if view.total_24h == 1 else 's' }} in the last 24h{% if view.sampled is not none %}, nothing critical among the {{ view.sampled }} most recent{% endif %}.
+      {% endif %}
+    {% elif view.critical is not none and view.critical > 0 %}
+      {# The histogram was not usable but the severity counts were, so the
+         sentence reports what it has and claims no 24-hour total. #}
+      {{ pending(view) }}
+    {% else %}
+      The 24h alert total was not counted by this read. The most recent alerts are listed below.
+    {% endif %}
+</p>
+
+{# ─── OUT OF BAND: the system status pill and the roles held ─── #}
+
+<div id="dash-status" hx-swap-oob="true" class="flex flex-col items-end gap-3">
+  <div class="badge badge-ghost gap-2 h-auto py-2 px-3">
+    {% if failed %}
+      <span class="h-1.5 w-1.5 rounded-full bg-ion-coral"></span>
+      <span class="label-tiny">Status not read</span>
+    {% elif view.es_state == 'live' %}
+      <span class="h-1.5 w-1.5 rounded-full bg-ion-lime"></span>
+      <span class="label-tiny">Elasticsearch live</span>
+    {% elif view.es_state == 'off' %}
+      <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+      <span class="label-tiny">Elasticsearch not configured</span>
+    {% else %}
+      <span class="h-1.5 w-1.5 rounded-full bg-ion-amber"></span>
+      <span class="label-tiny">Elasticsearch unreachable</span>
+    {% endif %}
+  </div>
+  {# Badges, not buttons. The JavaScript rendered a <button> per role with no
+     handler and no data-click-action, so the control that looks like the way
+     to change focus role did nothing at all. POST /api/auth/focus-mode is the
+     endpoint it would need; wiring it is a feature rather than a port, so
+     these say what they are. #}
+  <div class="flex items-center gap-1 p-1 rounded-lg bg-base-200 border border-base-300">
+    {% if viewer.has_roles %}
+      {% for r in viewer.roles %}
+        {% if r.active %}
+          <span class="px-3 py-1.5 rounded-md label-tiny text-ink-950 bg-ion-cyan shadow-[0_0_18px_-4px_rgba(109,228,255,0.8)]" title="Focus role">{{ r.label }}</span>
+        {% else %}
+          <span class="px-3 py-1.5 rounded-md label-tiny text-slate-400">{{ r.label }}</span>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <span class="px-3 py-1.5 rounded-md label-tiny text-slate-400">No role assigned</span>
+    {% endif %}
+  </div>
+</div>
+
+{# ─── OUT OF BAND: the open-alerts tile and its sparkline ─── #}
+
+<div id="kpi-open-alerts" hx-swap-oob="true" class="stat">
+  <div class="stat-figure text-primary">
+    {# Drawn only from a real aggregation. A one-point or empty histogram gets
+       no SVG at all rather than a flat line along the floor, which is where
+       an unmeasured window would also sit. #}
+    {% if view and view.spark %}
+      <svg viewBox="0 0 140 44" preserveAspectRatio="none" class="w-[140px] h-11 text-primary shrink-0" aria-hidden="true">
+        <defs>
+          <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stop-color="currentColor" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path fill="url(#g1)" d="{{ view.spark.fill }}"/>
+        <path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="{{ view.spark.line }}"/>
+      </svg>
+    {% endif %}
+  </div>
+  <div class="stat-title">Open alerts · 24h</div>
+  {# Gated on the raw number: a genuine zero open alerts is the measurement
+     worth showing, and truthiness would report it as unknown. #}
+  {% if not failed and view.total_24h is not none %}
+    <div class="stat-value">{{ view.total_24h }}</div>
+    <div class="stat-desc flex items-center gap-1">
+      <svg class="w-3 h-3"><use href="#i-clock"/></svg>
+      counted over the last 24h
+    </div>
+  {% else %}
+    <div class="stat-value text-base-content/40">—</div>
+    <div class="stat-desc">
+      {% if failed %}read failed, not counted
+      {% elif view.es_state == 'off' %}Elasticsearch not configured
+      {% elif view.es_state == 'unreachable' %}Elasticsearch unreachable
+      {% else %}no histogram in this read{% endif %}
+    </div>
+  {% endif %}
+</div>
+
+{# ─── OUT OF BAND: the integration status footer ─── #}
+
+<div id="es-footer" hx-swap-oob="true" class="flex items-center gap-2">
+  {% if failed %}
+    <span class="h-1.5 w-1.5 rounded-full bg-ion-coral"></span>
+    <span class="label-tiny text-base-content/50">Elasticsearch</span>
+    <span class="font-mono text-base-content/70">not read</span>
+  {% elif view.es_state == 'live' %}
+    <span class="h-1.5 w-1.5 rounded-full bg-ion-lime"></span>
+    <span class="label-tiny text-base-content/50">Elasticsearch</span>
+    <span class="font-mono text-base-content/70">{{ view.cluster_name if view.cluster_name else 'connected' }}</span>
+  {% elif view.es_state == 'off' %}
+    <span class="h-1.5 w-1.5 rounded-full bg-slate-500"></span>
+    <span class="label-tiny text-base-content/50">Elasticsearch</span>
+    <span class="font-mono text-base-content/70">not configured</span>
+  {% else %}
+    <span class="h-1.5 w-1.5 rounded-full bg-ion-coral"></span>
+    <span class="label-tiny text-base-content/50">Elasticsearch</span>
+    <span class="font-mono text-base-content/70">{{ view.es_error if view.es_error else 'unreachable' }}</span>
+  {% endif %}
+</div>

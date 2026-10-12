@@ -200,8 +200,25 @@ def _fragment_routes() -> list:
 #                     is the caller's own. A named permission would make the
 #                     fragments stricter than the API rather than equal to
 #                     it, which is the other half of the rule.
+#
+#   /ui/dashboard-v2/ GET /api/dashboard takes get_current_user and no named
+#     overview        permission, and this fragment mirrors it. The landing
+#                     page's other three regions are each gated
+#                     (alert:read twice, case:read once), so this is the one
+#                     route of the four that drops the permission, and it
+#                     drops it because the endpoint it mirrors has none.
+#
+#                     Said out loud, because it is a claim and not a
+#                     formality: /api/dashboard serves Elasticsearch alert
+#                     documents under bare authentication, while every other
+#                     alert read in ION, GET /api/elasticsearch/alerts
+#                     included, requires alert:read. Mirroring the endpoint
+#                     is right for the fragment and makes the discrepancy no
+#                     worse, but the discrepancy is real and belongs to
+#                     /api/dashboard rather than to this conversion.
 BARE_AUTH_FRAGMENTS = {
     "/ui/bug-reports",
+    "/ui/dashboard-v2/overview",
     "/ui/profile",
     "/ui/profile/resolve-elastic",
 }

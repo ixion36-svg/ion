@@ -15,160 +15,94 @@
   <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Top-level risk and threat posture.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <button class="btn btn-primary" data-click-action="refreshDashboard">Refresh</button>
-        <button class="btn btn-ghost" data-click-action="exportEvents">Export Events</button>
+        {# The filters and Refresh are the request. They live out here, not
+           in the swapped region: an error render must not be able to remove
+           the control that retries it. htmx sends each select's own value.
+           The severity select also sends the window, and the window sends
+           the severity, so changing one does not reset the other.
+
+           The stat cards are not filtered by these. They are the 24-hour
+           figures, whichever window the table is on. #}
+        <select id="sd-severity" name="severity" class="select select-sm w-auto"
+                hx-get="/ui/security-dashboard"
+                hx-include="#sd-hours"
+                hx-target="#sd-content"
+                hx-swap="innerHTML">
+            <option value="" selected>All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+            <option value="info">Info</option>
+        </select>
+        <select id="sd-hours" name="hours" class="select select-sm w-auto"
+                hx-get="/ui/security-dashboard"
+                hx-include="#sd-severity"
+                hx-target="#sd-content"
+                hx-swap="innerHTML">
+            <option value="1">Last Hour</option>
+            <option value="24" selected>Last 24 Hours</option>
+            <option value="72">Last 3 Days</option>
+            <option value="168">Last 7 Days</option>
+        </select>
+        <button class="btn btn-primary" id="sd-refresh" type="button"
+                hx-get="/ui/security-dashboard"
+                hx-include="#sd-severity,#sd-hours"
+                hx-target="#sd-content"
+                hx-swap="innerHTML">Refresh</button>
+        <button class="btn btn-ghost" type="button" data-click-action="exportEvents">Export Events</button>
     </div>
 </section>
 
-<!-- Threat Summary Banner -->
-<div class="alert alert-info mb-6 flex flex-wrap items-center justify-between gap-4" id="threat-banner" role="alert">
-    <div class="threat-level flex items-center gap-4" id="threat-level">
-        <span class="threat-icon text-2xl"><i class="icon-shield-alert"></i></span>
-        <span class="threat-text text-xl font-semibold">Loading threat assessment...</span>
-    </div>
-    <div class="stats stats-horizontal bg-transparent shadow-none" id="threat-stats">
-        <!-- Populated by JS -->
-    </div>
-</div>
+{# The banner, the cards, the event table and the three lists are rendered
+   whole by ion.web.ui.security_dashboard. They used to be strings written
+   in with innerHTML, which no stylesheet sweep could reach.
 
-<!-- Statistics Cards -->
-<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
-    <div class="stat">
-        <div class="stat-figure text-primary"><i class="icon-chart-bar"></i></div>
-        <div class="stat-title">Events (24h)</div>
-        <div class="stat-value" id="stat-total">-</div>
-    </div>
-    <div class="stat">
-        <div class="stat-figure text-error"><i class="icon-alert-triangle"></i></div>
-        <div class="stat-title">Critical</div>
-        <div class="stat-value text-error" id="stat-critical">-</div>
-    </div>
-    <div class="stat">
-        <div class="stat-figure text-warning"><i class="icon-alert-triangle"></i></div>
-        <div class="stat-title">High</div>
-        <div class="stat-value text-warning" id="stat-high">-</div>
-    </div>
-    <div class="stat">
-        <div class="stat-figure text-secondary"><i class="icon-ban"></i></div>
-        <div class="stat-title">Blocked</div>
-        <div class="stat-value text-secondary" id="stat-blocked">-</div>
-    </div>
-</div>
+   hx-trigger="load" keeps the shell's first paint immediate and the data
+   arriving in its own request, which is what the four fetches it replaces
+   did. hx-include is on this request too, not only on Refresh: Firefox
+   restores a select across a reload, so without it the first paint would
+   show every severity while the select read "critical". #}
+<div id="sd-content"
+     hx-get="/ui/security-dashboard"
+     hx-trigger="load"
+     hx-include="#sd-severity,#sd-hours"
+     hx-swap="innerHTML"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading security dashboard...</div></div>
 
-<!-- Main Content Grid -->
-<div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_22rem] gap-6">
-    <!-- Events Table -->
-    <div class="card bg-base-200 shadow min-w-0">
-        <div class="card-body p-0">
-            <div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 border-b border-base-300">
-            <h2 class="card-title text-base basis-full md:basis-auto">Recent Security Events</h2>
-            <div class="flex items-center gap-2 flex-wrap">
-                <select id="filter-severity" class="select select-sm w-auto" data-change-action="loadEvents">
-                    <option value="">All Severities</option>
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                    <option value="info">Info</option>
-                </select>
-                <select id="filter-hours" class="select select-sm w-auto" data-change-action="loadEvents">
-                    <option value="1">Last Hour</option>
-                    <option value="24" selected>Last 24 Hours</option>
-                    <option value="72">Last 3 Days</option>
-                    <option value="168">Last 7 Days</option>
-                </select>
-            </div>
-            </div>
-            <div class="overflow-x-auto">
-            <table class="table table-sm table-zebra min-w-[1100px] whitespace-nowrap" id="events-table">
-                <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Severity</th>
-                        <th>Type</th>
-                        <th>Source IP</th>
-                        <th class="max-w-[200px]">Title</th>
-                        <th class="min-w-[150px] max-w-[300px]">Matched Content</th>
-                        <th>Count</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="events-tbody">
-                    <tr><td colspan="9"><div class="flex justify-center items-center gap-2 py-8 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading security events...</div></td></tr>
-                </tbody>
-            </table>
-            </div>
-        </div>
-    </div>
+</div><!-- /ion-tw inner -->
+</div><!-- /ion-tw -->
 
-    <!-- Side Panel -->
-    <div class="flex flex-col gap-4">
-        <!-- Top Attackers -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="card-title text-base">Top Source IPs</h3>
-                <div id="top-ips-list" class="flex flex-col gap-2">
-                    <div class="flex justify-center items-center gap-2 py-4 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Top Threats -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <h3 class="card-title text-base">Threat Types</h3>
-                <div id="threat-types-list" class="flex flex-col gap-2">
-                    <div class="flex justify-center items-center gap-2 py-4 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Blocked IPs -->
-        <div class="card bg-base-200 shadow">
-            <div class="card-body">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                <h3 class="card-title text-base basis-full md:basis-auto">Blocked IPs</h3>
-                <button class="btn btn-sm btn-primary" data-click-action="showBlockIPModal">+ Block IP</button>
-                </div>
-                <div id="blocked-ips-list" class="flex flex-col gap-2">
-                    <div class="flex justify-center items-center gap-2 py-4 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading...</div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Event Detail Modal -->
+<!-- Event Detail Modal. Close stays outside #event-detail-content, so a
+     failed detail render cannot remove the way out of the dialog. The
+     status select is inside the fragment: only the loaded event knows
+     which option is current. -->
 <div class="modal" id="event-modal">
     <div class="modal-box max-w-3xl w-11/12">
         <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">Event Details</h2>
-            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["event-modal"]'>&times;</button>
+            <button class="btn btn-ghost btn-sm btn-circle" type="button" data-click-action="closeModal" data-args='["event-modal"]'>&times;</button>
         </div>
         <div class="py-4" id="event-detail-content">
-            <!-- Populated by JS -->
+            <p class="opacity-50">Open an event to see its details.</p>
         </div>
         <div class="modal-action">
-            <select id="event-status-select" class="select select-sm w-auto" data-change-action="updateEventStatus">
-                <option value="new">New</option>
-                <option value="investigating">Investigating</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="false_positive">False Positive</option>
-                <option value="mitigated">Mitigated</option>
-                <option value="resolved">Resolved</option>
-            </select>
-            <button class="btn btn-ghost" data-click-action="closeModal" data-args='["event-modal"]'>Close</button>
+            <button class="btn btn-ghost" type="button" data-click-action="closeModal" data-args='["event-modal"]'>Close</button>
         </div>
     </div>
 </div>
 
-<!-- Block IP Modal -->
+<!-- Block IP Modal. Its only opener is the + Block IP button, which the
+     fragment renders only for a viewer holding security:manage, so this
+     dialog is unreachable without that permission. It is not itself gated:
+     server.py renders every static page from one table with no per-page
+     context, so the shell cannot know the viewer's permissions, and giving
+     it one would be an edit to a file this conversion does not own. The
+     form posts to an endpoint that answers 403 without the permission. -->
 <div class="modal" id="block-ip-modal">
     <div class="modal-box">
         <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">Block IP Address</h2>
-            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["block-ip-modal"]'>&times;</button>
+            <button class="btn btn-ghost btn-sm btn-circle" type="button" data-click-action="closeModal" data-args='["block-ip-modal"]'>&times;</button>
         </div>
         <div class="py-4">
             <form id="block-ip-form" class="flex flex-col gap-4" data-submit-action="blockIP" data-args='["$event"]'>
@@ -187,7 +121,15 @@
                     <legend class="fieldset-legend">Duration (minutes)</legend>
                     <input type="number" class="input w-full" id="block-duration" name="duration_minutes"
                            value="60" min="1" max="525600">
-                    <p class="label">Set to 0 for permanent block</p>
+                    {# The old hint here read "Set to 0 for permanent block",
+                       which was false twice over: min="1" makes the browser
+                       reject 0 before submit, and blockIP's
+                       `parseInt(...) || 60` would read a 0 that got through
+                       as sixty minutes. An analyst following the hint asked
+                       for a permanent block and got one hour. Permanent is
+                       the checkbox below, which is what the request field
+                       actually carries. #}
+                    <p class="label">Ignored when Permanent Block is ticked</p>
                 </fieldset>
                 <label class="label cursor-pointer justify-start gap-3">
                         <input type="checkbox" class="checkbox checkbox-primary" id="block-permanent" name="permanent">
@@ -196,7 +138,7 @@
             </form>
         </div>
         <div class="modal-action">
-            <button class="btn btn-ghost" data-click-action="closeModal" data-args='["block-ip-modal"]'>Cancel</button>
+            <button class="btn btn-ghost" type="button" data-click-action="closeModal" data-args='["block-ip-modal"]'>Cancel</button>
             <button class="btn btn-error" type="submit" form="block-ip-form">Block IP</button>
         </div>
     </div>
@@ -207,7 +149,7 @@
     <div class="modal-box">
         <div class="flex flex-wrap items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">Export Security Events</h2>
-            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" data-args='["export-modal"]'>&times;</button>
+            <button class="btn btn-ghost btn-sm btn-circle" type="button" data-click-action="closeModal" data-args='["export-modal"]'>&times;</button>
         </div>
         <div class="py-4 flex flex-col gap-4">
             <fieldset class="fieldset p-0">
@@ -228,14 +170,11 @@
             </fieldset>
         </div>
         <div class="modal-action">
-            <button class="btn btn-ghost" data-click-action="closeModal" data-args='["export-modal"]'>Cancel</button>
-            <button class="btn btn-primary" data-click-action="downloadExport">Download</button>
+            <button class="btn btn-ghost" type="button" data-click-action="closeModal" data-args='["export-modal"]'>Cancel</button>
+            <button class="btn btn-primary" type="button" data-click-action="downloadExport">Download</button>
         </div>
     </div>
 </div>
-
-</div><!-- /ion-tw inner -->
-</div><!-- /ion-tw -->
 {% endblock %}
 
 {% block scripts %}
@@ -255,7 +194,7 @@
     translate: 0;
 }
 
-/* JS overwrites #threat-level className to "threat-level <level>". */
+/* The fragment sets .threat-level plus the level name. */
 .threat-level {
     display: flex;
     align-items: center;
@@ -267,7 +206,7 @@
 .threat-level.low { color: var(--color-success); }
 .threat-level.normal { color: var(--color-info); }
 
-/* JS interpolates severity-${event.severity} — no daisyUI class on those nodes */
+/* The fragment emits severity-<value>. There is no daisyUI class on those nodes. */
 .severity-badge {
     display: inline-flex;
     align-items: center;
@@ -283,7 +222,8 @@
 .severity-low { background: var(--color-success); color: var(--color-success-content); }
 .severity-info { background: var(--color-info); color: var(--color-info-content); }
 
-/* JS interpolates status-${event.status} — new uses neon-blue (no daisyUI slot) */
+/* The fragment emits status-<value> with underscores rewritten as hyphens.
+   new uses neon-blue, which has no daisyUI slot. */
 .status-badge {
     display: inline-flex;
     align-items: center;
@@ -298,7 +238,7 @@
 .status-mitigated { background: color-mix(in oklab, var(--color-success) 12%, transparent); color: var(--color-success); }
 .status-resolved { background: var(--color-base-300); color: var(--color-base-content); opacity: 0.7; }
 
-/* JS-generated table cells: nowrap + column constraints */
+/* Table cells: nowrap + column constraints. The table is swapped in. */
 #events-table th,
 #events-table td {
     white-space: nowrap;
@@ -331,339 +271,57 @@
 </style>
 
 <script nonce="{{ csp_nonce }}">
-let currentEventId = null;
-
-// Initialize dashboard
+// The first paint is hx-trigger="load" on #sd-content. This only reconnects
+// the live stream the page already had, and the 30s poll it falls back to.
 document.addEventListener('DOMContentLoaded', function() {
-    refreshDashboard();
-    // SSE-backed live updates (single connection) with a 30s polling
-    // fallback when SSE is unavailable.
     ionLiveUpdates('dashboard', refreshDashboard, 30000);
 });
 
-async function refreshDashboard() {
-    await Promise.all([
-        loadThreatSummary(),
-        loadStatistics(),
-        loadEvents(),
-        loadBlockedIPs()
-    ]);
+// Re-request the dashboard. Block, unblock and status call this instead of
+// rebuilding rows, so a row has one definition and it is the fragment. The
+// selects and Refresh do the same thing declaratively. Reading the selects
+// back keeps a refresh after a write on the filter the user set.
+function refreshDashboard() {
+    const severity = document.getElementById('sd-severity').value;
+    const hours = document.getElementById('sd-hours').value;
+    const params = new URLSearchParams();
+    params.set('hours', hours);
+    if (severity) params.set('severity', severity);
+    return htmx.ajax('GET', '/ui/security-dashboard?' + params.toString(),
+                     {target: '#sd-content', swap: 'innerHTML'});
 }
 
-async function loadThreatSummary() {
-    try {
-        const response = await fetch('/api/security/threat-summary');
-        if (!response.ok) {
-            if (response.status === 401) {
-                window.location.href = '/login?redirect=/security';
-                return;
-            }
-            throw new Error('Failed to load threat summary');
-        }
-
-        const data = await response.json();
-
-        // Update threat level banner
-        const banner = document.getElementById('threat-banner');
-        const levelEl = document.getElementById('threat-level');
-        levelEl.className = `threat-level ${data.threat_level}`;
-        levelEl.querySelector('.threat-text').textContent =
-            `Threat Level: ${data.threat_level.toUpperCase()}`;
-
-        // Update threat stats
-        document.getElementById('threat-stats').innerHTML = `
-            <div class="stat py-0">
-                <div class="stat-value text-2xl">${data.last_hour.total}</div>
-                <div class="stat-desc">Last Hour</div>
-            </div>
-            <div class="stat py-0">
-                <div class="stat-value text-2xl">${data.active_blocks}</div>
-                <div class="stat-desc">Active Blocks</div>
-            </div>
-        `;
-
-        // Update top threats
-        const threatsList = document.getElementById('threat-types-list');
-        if (data.top_threats.length === 0) {
-            threatsList.innerHTML = '<div class="text-sm opacity-50 py-2">No threats detected</div>';
-        } else {
-            threatsList.innerHTML = data.top_threats.map(t => `
-                <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
-                    <span>${formatEventType(t.type)}</span>
-                    <span class="badge badge-primary badge-sm">${t.count}</span>
-                </div>
-            `).join('');
-        }
-
-        // Update top IPs
-        const ipsList = document.getElementById('top-ips-list');
-        if (data.top_attackers.length === 0) {
-            ipsList.innerHTML = '<div class="text-sm opacity-50 py-2">No source IPs</div>';
-        } else {
-            ipsList.innerHTML = data.top_attackers.map(ip => `
-                <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
-                    <span class="font-mono">${escapeHtml(ip.ip)}</span>
-                    <div class="flex items-center gap-2">
-                        <span class="badge badge-primary badge-sm">${ip.count}</span>
-                        <button class="btn btn-sm btn-error" data-click-action="quickBlockIP" data-args='["${escapeHtml(ip.ip)}"]' title="Block IP"><i class="icon-ban"></i></button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-    } catch (error) {
-        console.error('Error loading threat summary:', error);
-    }
+// The detail body is /ui/security-dashboard/events/<id>. Opening the modal
+// first means a slow read still has the Close button, which is outside the
+// swap. The previous body stays put until the response arrives; htmx-busy
+// dims it, so it is not replaced with a spinner that throws away the last
+// thing that was actually read.
+function showEventDetail(eventId) {
+    openModal('event-modal');
+    return htmx.ajax('GET', '/ui/security-dashboard/events/' + encodeURIComponent(eventId),
+                     {target: '#event-detail-content', swap: 'innerHTML'});
 }
 
-async function loadStatistics() {
-    try {
-        const response = await fetch('/api/security/statistics?hours=24');
-        if (!response.ok) return;
-
-        const stats = await response.json();
-
-        document.getElementById('stat-total').textContent = stats.total_events;
-        document.getElementById('stat-critical').textContent = stats.by_severity.critical || 0;
-        document.getElementById('stat-high').textContent = stats.by_severity.high || 0;
-        document.getElementById('stat-blocked').textContent = stats.blocked_count;
-
-    } catch (error) {
-        console.error('Error loading statistics:', error);
-    }
-}
-
-async function loadEvents() {
-    const severity = document.getElementById('filter-severity').value;
-    const hours = document.getElementById('filter-hours').value;
-    const tbody = document.getElementById('events-tbody');
-
-    tbody.innerHTML = '<tr><td colspan="8" class="loading">Loading security events...</td></tr>';
-
-    try {
-        const params = new URLSearchParams({ hours, limit: 100 });
-        if (severity) params.append('severity', severity);
-
-        const response = await fetch(`/api/security/events?${params}`);
-        if (!response.ok) throw new Error('Failed to load events');
-
-        const events = await response.json();
-
-        if (events.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center opacity-50 py-8">No security events found</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = events.map(event => {
-            // Extract matched content from raw_data
-            let matchedContent = '-';
-            if (event.raw_data) {
-                if (event.raw_data.matched_content) {
-                    matchedContent = event.raw_data.matched_content;
-                } else if (event.raw_data.query_string) {
-                    try {
-                        matchedContent = decodeURIComponent(event.raw_data.query_string);
-                    } catch(e) {
-                        matchedContent = event.raw_data.query_string;
-                    }
-                    if (matchedContent.length > 100) matchedContent = matchedContent.substring(0, 100) + '...';
-                } else if (event.raw_data.body) {
-                    matchedContent = event.raw_data.body.substring(0, 100) + '...';
-                }
-            }
-            return `
-            <tr class="cursor-pointer" data-click-action="showEventDetail" data-args='[${event.id}]'>
-                <td>${formatDateTime(event.created_at)}</td>
-                <td><span class="severity-badge severity-${event.severity}">${event.severity}</span></td>
-                <td>${formatEventType(event.event_type)}</td>
-                <td class="font-mono">${escapeHtml(event.source_ip)}</td>
-                <td>${escapeHtml(event.title)}</td>
-                <td class="matched-content" title="${escapeHtml(matchedContent)}"><code>${escapeHtml(matchedContent)}</code></td>
-                <td>${event.event_count}</td>
-                <td><span class="status-badge status-${event.status.replace(/_/g, '-')}">${formatStatus(event.status)}</span></td>
-                <td>
-                    <button class="btn btn-sm" data-click-action="quickBlockIP" data-stop-propagation data-args='["${escapeHtml(event.source_ip)}"]' title="Block IP"><i class="icon-ban"></i></button>
-                </td>
-            </tr>
-        `}).join('');
-
-    } catch (error) {
-        tbody.innerHTML = '<tr><td colspan="9"><div role="alert" class="alert alert-error m-4">Error loading security events</div></td></tr>';
-    }
-}
-
-async function loadBlockedIPs() {
-    const container = document.getElementById('blocked-ips-list');
-
-    try {
-        const response = await fetch('/api/security/blocked-ips');
-        if (!response.ok) throw new Error('Failed to load blocked IPs');
-
-        const blocked = await response.json();
-
-        if (blocked.length === 0) {
-            container.innerHTML = '<div class="text-sm opacity-50 py-2">No blocked IPs</div>';
-            return;
-        }
-
-        container.innerHTML = blocked.map(b => `
-            <div class="flex items-center justify-between gap-2 py-2 border-b border-base-300 last:border-0">
-                <div>
-                    <span class="font-mono">${escapeHtml(b.ip_address)}</span>
-                    <small class="block text-[var(--text-muted)]">
-                        ${b.permanent ? 'Permanent' : (b.blocked_until ? 'Until ' + formatDateTime(b.blocked_until) : 'Indefinite')}
-                    </small>
-                </div>
-                <button class="btn btn-sm btn-ghost" data-click-action="unblockIP" data-args='["${escapeHtml(b.ip_address)}"]' title="Unblock">&#10006;</button>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        container.innerHTML = '<div role="alert" class="alert alert-error">Error loading blocked IPs</div>';
-    }
-}
-
-async function showEventDetail(eventId) {
-    currentEventId = eventId;
-
-    try {
-        const response = await fetch(`/api/security/events/${eventId}`);
-        if (!response.ok) throw new Error('Failed to load event');
-
-        const event = await response.json();
-
-        // Build raw_data section for modal
-        let rawDataHtml = '';
-        if (event.raw_data) {
-            let payloadSections = '';
-            if (event.raw_data.matched_content) {
-                payloadSections += `
-                    <div class="bg-base-content/5 p-3 rounded">
-                        <div class="text-xs uppercase opacity-70 mb-2">MATCHED MALICIOUS CONTENT:</div>
-                        <pre class="bg-error/10 text-error border border-error p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(event.raw_data.matched_content)}</pre>
-                    </div>`;
-            }
-            if (event.raw_data.query_string) {
-                let decoded = event.raw_data.query_string;
-                try { decoded = decodeURIComponent(decoded); } catch(e) {}
-                payloadSections += `
-                    <div class="bg-base-content/5 p-3 rounded">
-                        <div class="text-xs uppercase opacity-70 mb-2">Query String:</div>
-                        <pre class="bg-base-100 p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(decoded)}</pre>
-                    </div>`;
-            }
-            if (event.raw_data.body) {
-                payloadSections += `
-                    <div class="bg-base-content/5 p-3 rounded">
-                        <div class="text-xs uppercase opacity-70 mb-2">Request Body:</div>
-                        <pre class="bg-base-100 p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(event.raw_data.body)}</pre>
-                    </div>`;
-            }
-            if (event.raw_data.path) {
-                payloadSections += `
-                    <div class="bg-base-content/5 p-3 rounded">
-                        <div class="text-xs uppercase opacity-70 mb-2">Request Path:</div>
-                        <pre class="bg-base-100 p-3 rounded font-mono text-xs overflow-auto whitespace-pre-wrap break-all max-h-[200px] m-0">${escapeHtml(event.raw_data.path)}</pre>
-                    </div>`;
-            }
-            if (payloadSections) {
-                rawDataHtml = `
-                <div role="alert" class="alert alert-error mb-4">
-                    <div class="w-full">
-                    <div class="font-semibold mb-3"><i class="icon-alert-triangle"></i> Detected Payload / Trigger Data</div>
-                    <div class="flex flex-col gap-3">${payloadSections}</div>
-                    </div>
-                </div>`;
-            }
-        }
-
-        document.getElementById('event-detail-content').innerHTML = `
-            ${rawDataHtml}
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Event Type</div>
-                    <div class="font-medium break-all">${formatEventType(event.event_type)}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Severity</div>
-                    <div class="font-medium break-all"><span class="severity-badge severity-${event.severity}">${event.severity}</span></div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Source IP</div>
-                    <div class="font-medium break-all font-mono">${escapeHtml(event.source_ip)}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Username</div>
-                    <div class="font-medium break-all">${event.username ? escapeHtml(event.username) : '-'}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Request Path</div>
-                    <div class="font-medium break-all">${event.request_path ? escapeHtml(event.request_path) : '-'}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Request Method</div>
-                    <div class="font-medium break-all">${event.request_method || '-'}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">First Seen</div>
-                    <div class="font-medium break-all">${formatDateTime(event.first_seen)}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Last Seen</div>
-                    <div class="font-medium break-all">${formatDateTime(event.last_seen)}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Event Count</div>
-                    <div class="font-medium break-all">${event.event_count}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded">
-                    <div class="text-xs uppercase opacity-70">Confidence Score</div>
-                    <div class="font-medium break-all">${event.confidence_score}%</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded col-span-2">
-                    <div class="text-xs uppercase opacity-70">User Agent</div>
-                    <div class="font-medium break-all">${event.user_agent ? escapeHtml(event.user_agent) : '-'}</div>
-                </div>
-                <div class="p-2 bg-base-200 rounded col-span-2">
-                    <div class="text-xs uppercase opacity-70">Description</div>
-                    <div class="font-medium break-all">${escapeHtml(event.description)}</div>
-                </div>
-            </div>
-            ${event.matched_patterns && event.matched_patterns.length > 0 ? `
-            <div class="mt-4 p-4 bg-base-200 rounded">
-                <div class="font-semibold mb-2">Matched Detection Patterns</div>
-                <ul class="font-mono text-sm list-none p-0">
-                    ${event.matched_patterns.map(p => `<li class="py-1 border-b border-base-content/10">${escapeHtml(p)}</li>`).join('')}
-                </ul>
-            </div>
-            ` : ''}
-        `;
-
-        document.getElementById('event-status-select').value = event.status;
-        openModal('event-modal');
-
-    } catch (error) {
-        showToast('Error loading event details', 'error');
-    }
-}
-
+// The id comes off the select, which the fragment rendered with the event it
+// belongs to. A module-level "current event" set by the opener would be the
+// new event's id while the select on screen is still the previous event's,
+// for as long as the detail request is in flight, and a change inside that
+// window would patch one event with another's status.
 async function updateEventStatus() {
-    if (!currentEventId) return;
-
-    const status = document.getElementById('event-status-select').value;
-
+    const select = document.getElementById('event-status-select');
+    if (!select) return;
+    const eventId = select.dataset.eventId;
+    if (!eventId) return;
+    const status = select.value;
     try {
-        const response = await fetch(`/api/security/events/${currentEventId}/status`, {
+        const response = await fetch('/api/security/events/' + encodeURIComponent(eventId) + '/status', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status })
+            body: JSON.stringify({ status: status })
         });
-
         if (!response.ok) throw new Error('Failed to update status');
-
         showToast('Status updated', 'success');
-        loadEvents();
-
+        refreshDashboard();
     } catch (error) {
         showToast('Error updating status', 'error');
     }
@@ -676,37 +334,30 @@ function showBlockIPModal() {
 
 async function blockIP(e) {
     e.preventDefault();
-
     const form = document.getElementById('block-ip-form');
     const data = {
         ip_address: form.ip_address.value,
         reason: form.reason.value,
-        duration_minutes: parseInt(form.duration_minutes.value) || 60,
+        duration_minutes: parseInt(form.duration_minutes.value, 10) || 60,
         permanent: form.permanent.checked
     };
-
     try {
         const response = await fetch('/api/security/blocked-ips', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-
         if (!response.ok) throw new Error('Failed to block IP');
-
         showToast('IP blocked successfully', 'success');
         closeModal('block-ip-modal');
-        loadBlockedIPs();
-        loadThreatSummary();
-
+        refreshDashboard();
     } catch (error) {
         showToast('Error blocking IP', 'error');
     }
 }
 
 async function quickBlockIP(ip) {
-    if (!confirm(`Block IP address ${ip}?`)) return;
-
+    if (!confirm('Block IP address ' + ip + '?')) return;
     try {
         const response = await fetch('/api/security/blocked-ips', {
             method: 'POST',
@@ -718,32 +369,23 @@ async function quickBlockIP(ip) {
                 permanent: false
             })
         });
-
         if (!response.ok) throw new Error('Failed to block IP');
-
         showToast('IP blocked for 1 hour', 'success');
-        loadBlockedIPs();
-        loadThreatSummary();
-
+        refreshDashboard();
     } catch (error) {
         showToast('Error blocking IP', 'error');
     }
 }
 
 async function unblockIP(ip) {
-    if (!confirm(`Unblock IP address ${ip}?`)) return;
-
+    if (!confirm('Unblock IP address ' + ip + '?')) return;
     try {
-        const response = await fetch(`/api/security/blocked-ips/${encodeURIComponent(ip)}`, {
+        const response = await fetch('/api/security/blocked-ips/' + encodeURIComponent(ip), {
             method: 'DELETE'
         });
-
         if (!response.ok) throw new Error('Failed to unblock IP');
-
         showToast('IP unblocked', 'success');
-        loadBlockedIPs();
-        loadThreatSummary();
-
+        refreshDashboard();
     } catch (error) {
         showToast('Error unblocking IP', 'error');
     }
@@ -754,34 +396,17 @@ function exportEvents() {
 }
 
 async function downloadExport() {
-    // Strict whitelists — values come from <select> elements but we still
-    // validate before putting them into a URL to prevent any injected text
-    // from reaching the browser via window.location.href.
+    // Strict whitelists. Values come from select elements, and are checked
+    // again before they are put on a URL.
     const ALLOWED_HOURS = new Set(['1', '6', '24', '72', '168', '720']);
     const ALLOWED_FORMATS = new Set(['json', 'csv', 'ndjson']);
-
     const hoursRaw = document.getElementById('export-hours').value;
     const formatRaw = document.getElementById('export-format').value;
     const hours = ALLOWED_HOURS.has(hoursRaw) ? hoursRaw : '24';
     const format = ALLOWED_FORMATS.has(formatRaw) ? formatRaw : 'json';
-
-    const params = new URLSearchParams({ hours, format });
+    const params = new URLSearchParams({ hours: hours, format: format });
     window.location.href = '/api/security/export/download?' + params.toString();
     closeModal('export-modal');
-}
-
-// Utility functions
-function formatEventType(type) {
-    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function formatStatus(status) {
-    return status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-}
-
-function formatDateTime(isoString) {
-    if (!isoString) return '-';
-    return new Date(isoString).toLocaleString();
 }
 
 function openModal(id) {

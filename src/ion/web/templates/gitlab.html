@@ -16,17 +16,24 @@
 </div>
 <div class="flex items-center gap-2 flex-wrap">
         <a class="btn btn-ghost hidden" href="/settings#gitlab" id="config-btn">Configure</a>
-        <button class="btn btn-primary hidden" data-click-action="showCreateIssueModal" id="new-issue-btn">New Issue</button>
+        <button class="btn btn-primary hidden" data-click-action="showCreateIssueModal" id="new-issue-btn" type="button">New Issue</button>
     </div>
 </section>
 
-<!-- Connection Status -->
-<div id="connection-status" role="alert" class="connection-status alert alert-info mb-4">
-    <span class="loading loading-spinner loading-sm"></span>
-    <div class="status-checking">Checking GitLab connection...</div>
+{# Retry sits outside #connection-status. A failed banner swap must not
+   take the button that asks again. #}
+<div class="mb-4">
+    <button type="button" id="gl-status-retry" class="btn btn-ghost btn-sm mb-2"
+            hx-get="/ui/gitlab/status" hx-target="#connection-status" hx-swap="innerHTML">Retry</button>
+    <div id="connection-status"
+         hx-get="/ui/gitlab/status" hx-trigger="load" hx-swap="innerHTML">
+        <div role="alert" class="connection-status alert alert-info mb-4">
+            <span class="loading loading-spinner loading-sm"></span>
+            <div>Checking GitLab connection...</div>
+        </div>
+    </div>
 </div>
 
-<!-- Not Configured State -->
 <div id="not-configured" class="card bg-base-200 shadow hidden">
     <div class="card-body items-center text-center py-14">
     <h2 class="card-title">GitLab Not Configured</h2>
@@ -35,48 +42,71 @@
     </div>
 </div>
 
-<!-- Issues Section -->
 <div class="card bg-base-200 shadow hidden" id="issues-section">
     <div class="card-body">
-    <!-- Toolbar -->
-    <div class="flex flex-wrap items-center gap-3">
-        <input type="text" id="search-input" placeholder="Search issues..." class="input input-sm flex-1 min-w-[12rem]">
-        <select id="scope-filter" class="select select-sm min-w-[9rem]" data-change-action="loadIssues">
+    {# The form is the one definition of "load issues": Refresh submits it,
+       Enter in the search box submits it, and a select change bubbles to
+       it. No keyup filter — htmx would compile that and the CSP would
+       throw it away. The list below is not inside the form, so a failed
+       card render cannot remove the filters. #}
+    <form id="gl-filters" class="flex flex-wrap items-center gap-3"
+          hx-get="/ui/gitlab/issues" hx-target="#issues-list"
+          hx-swap="innerHTML" hx-trigger="change, submit">
+        <input type="text" id="search-input" name="search" placeholder="Search issues..." class="input input-sm flex-1 min-w-[12rem]">
+        <select id="scope-filter" name="scope" class="select select-sm min-w-[9rem]">
             <option value="my">My Issues</option>
             <option value="all">All Issues</option>
         </select>
-        <select id="state-filter" class="select select-sm min-w-[9rem]" data-change-action="loadIssues">
+        <select id="state-filter" name="state" class="select select-sm min-w-[9rem]">
             <option value="all">All States</option>
             <option value="opened">Open</option>
             <option value="closed">Closed</option>
         </select>
-        <select id="label-filter" class="select select-sm min-w-[9rem]" data-change-action="loadIssues">
+        <select id="label-filter" name="labels" class="select select-sm min-w-[9rem]">
             <option value="">All Labels</option>
         </select>
-        <button class="btn btn-ghost btn-sm" data-click-action="loadIssues">Refresh</button>
+        <button class="btn btn-ghost btn-sm" type="submit">Refresh</button>
+    </form>
+
+    {# Catalog note only. The selects are replaced out of band by the
+       response, including label-filter above and the three in the create
+       modal, so this slot can say a read failed without deleting them.
+       Reload is outside the slot for the same reason Retry is. #}
+    <div class="mt-2 flex flex-wrap items-start gap-2">
+        <div id="gl-catalog" class="text-sm flex-1"
+             hx-get="/ui/gitlab/catalog"
+             hx-trigger="gitlab-ready from:body"
+             hx-include="#label-filter, #issue-labels, #issue-assignee, #issue-milestone"
+             hx-swap="innerHTML"></div>
+        <button type="button" id="gl-catalog-reload" class="btn btn-ghost btn-sm"
+                hx-get="/ui/gitlab/catalog" hx-target="#gl-catalog"
+                hx-include="#label-filter, #issue-labels, #issue-assignee, #issue-milestone"
+                hx-swap="innerHTML">Reload catalog</button>
     </div>
 
-    <!-- Issues List -->
-    <div id="issues-list" class="mt-4">
+    {# hx-include is on this request and not only on the form. Firefox
+       restores select values after a reload, and the first fetch has to
+       see them. The form does not also include itself: that would send
+       every field twice. Cards rendered inside this div inherit the
+       include; their routes do not declare those parameters. #}
+    <div id="issues-list" class="mt-4"
+         hx-get="/ui/gitlab/issues"
+         hx-trigger="gitlab-ready from:body"
+         hx-include="#gl-filters"
+         hx-swap="innerHTML">
         <p class="loading">Loading issues...</p>
     </div>
     </div>
 </div>
 
-<!-- Configuration Modal -->
-{# Route audit phase 6: the GitLab config modal wrote the SAME
-   config.gitlab_url / _token / _project_id on the shared Config object as
-   /settings#gitlab — two UIs, one .ion/config.json, no cross-linking. It was
-   also a second surface handling the raw PAT, while /settings masks it on
-   read. Configuration now lives only on the Settings page; this page keeps
-   the issue browser. #}
+{# Configuration lives only on /settings#gitlab. This page does not collect
+   the token. #}
 
-<!-- Create Issue Modal -->
 <div id="create-issue-modal" class="modal hidden">
     <div class="modal-box w-11/12 max-w-3xl max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">Create Issue</h2>
-            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeCreateIssueModal" aria-label="Close">&times;</button>
+            <button class="btn btn-ghost btn-sm btn-circle" type="button" data-click-action="closeCreateIssueModal" aria-label="Close">&times;</button>
         </div>
         <div class="pt-4 flex flex-col gap-4">
             <fieldset class="fieldset p-0">
@@ -90,13 +120,13 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <fieldset class="fieldset p-0">
                     <legend class="fieldset-legend">Labels</legend>
-                    <select id="issue-labels" class="select w-full h-auto" multiple size="4">
+                    <select id="issue-labels" name="issue_labels" class="select w-full h-auto" multiple size="4">
                     </select>
                     <p class="label text-xs opacity-60">Hold Ctrl/Cmd to select multiple</p>
                 </fieldset>
                 <fieldset class="fieldset p-0">
                     <legend class="fieldset-legend">Assignee</legend>
-                    <select id="issue-assignee" class="select w-full">
+                    <select id="issue-assignee" name="assignee_id" class="select w-full">
                         <option value="">Unassigned</option>
                     </select>
                 </fieldset>
@@ -104,7 +134,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <fieldset class="fieldset p-0">
                     <legend class="fieldset-legend">Milestone</legend>
-                    <select id="issue-milestone" class="select w-full">
+                    <select id="issue-milestone" name="milestone_id" class="select w-full">
                         <option value="">No Milestone</option>
                     </select>
                 </fieldset>
@@ -114,63 +144,21 @@
                 </fieldset>
             </div>
             <div class="modal-action">
-                <button class="btn btn-ghost" data-click-action="closeCreateIssueModal">Cancel</button>
-                <button class="btn btn-primary" data-click-action="createIssue">Create Issue</button>
+                <button class="btn btn-ghost" type="button" data-click-action="closeCreateIssueModal">Cancel</button>
+                <button class="btn btn-primary" type="button" data-click-action="createIssue">Create Issue</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Issue Detail Modal -->
 <div id="issue-detail-modal" class="modal hidden">
     <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between gap-4">
-            <h2 class="text-lg font-semibold" id="issue-detail-title">Issue #</h2>
-            <button class="btn btn-ghost btn-sm btn-circle" data-click-action="closeIssueDetailModal" aria-label="Close">&times;</button>
+            <h2 class="text-lg font-semibold" id="issue-detail-title">Issue</h2>
+            <button class="btn btn-ghost btn-sm btn-circle" type="button" data-click-action="closeIssueDetailModal" aria-label="Close">&times;</button>
         </div>
-        <div class="pt-4">
-            <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_16rem] gap-8">
-                <div class="min-w-0">
-                    <div class="flex flex-wrap gap-4 text-sm opacity-70 mb-6 pb-4 border-b border-base-300" id="issue-detail-meta"></div>
-                    <div class="p-4 bg-base-200 rounded-box min-h-[100px]" id="issue-detail-description"></div>
-
-                    <div class="mt-8">
-                        <h3 class="text-base font-semibold mb-4">Comments</h3>
-                        <div id="issue-comments-list" class="mb-4"></div>
-
-                        <div class="flex flex-col gap-2">
-                            <textarea id="new-comment" class="textarea w-full" rows="3" placeholder="Add a comment..."></textarea>
-                            <button class="btn btn-primary self-end" data-click-action="addComment">Add Comment</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="lg:border-l lg:border-base-300 lg:pl-6">
-                    <div class="mb-6">
-                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Status</h4>
-                        <span id="issue-detail-state" class="issue-state"></span>
-                        <button id="toggle-state-btn" class="btn btn-sm mt-2" data-click-action="toggleIssueState"></button>
-                    </div>
-                    <div class="mb-6">
-                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Labels</h4>
-                        <div id="issue-detail-labels" class="flex flex-wrap gap-1"></div>
-                    </div>
-                    <div class="mb-6">
-                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Assignees</h4>
-                        <div id="issue-detail-assignees"></div>
-                    </div>
-                    <div class="mb-6">
-                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Milestone</h4>
-                        <div id="issue-detail-milestone"></div>
-                    </div>
-                    <div class="mb-6">
-                        <h4 class="text-xs uppercase tracking-wide opacity-60 mb-2">Due Date</h4>
-                        <div id="issue-detail-due-date"></div>
-                    </div>
-                    <div class="mb-6">
-                        <a id="issue-gitlab-link" href="#" target="_blank" class="btn btn-ghost">View in GitLab</a>
-                    </div>
-                </div>
-            </div>
+        <div class="pt-4" id="issue-detail-body">
+            <p class="loading">Open an issue to read it.</p>
         </div>
     </div>
 </div>
@@ -202,7 +190,7 @@
 #create-issue-modal[style*="flex"] > .modal-box { max-width: 700px; }
 #issue-detail-modal[style*="flex"] > .modal-box { max-width: 900px; }
 
-/* JS overwrites className to "connection-status connected|error". */
+/* The status fragment adds .connected or .error on the banner. */
 .connection-status.connected {
     background: color-mix(in oklab, var(--color-success) 15%, transparent);
     border: 1px solid var(--color-success);
@@ -214,7 +202,7 @@
     color: var(--color-error);
 }
 
-/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
+/* The loading placeholder is text, not daisyUI's spinner. */
 #issues-list .loading,
 #issue-comments-list .loading {
     display: block;
@@ -229,7 +217,6 @@
     opacity: 0.6;
 }
 
-/* JS innerHTML: issue cards. Hover lift has no daisyUI card equivalent. */
 .issue-card {
     background: var(--color-base-200);
     border: 1px solid var(--color-base-300);
@@ -256,7 +243,6 @@
     font-weight: 500;
 }
 
-/* JS sets className to "issue-state opened|closed" — not badge-success. */
 .issue-state {
     padding: 0.25rem 0.75rem;
     border-radius: 20px;
@@ -294,7 +280,6 @@
     opacity: 0.6;
 }
 
-/* JS innerHTML: comment threads. */
 .comment-item {
     background: var(--color-base-200);
     padding: 1rem;
@@ -330,178 +315,118 @@
 </style>
 
 <script nonce="{{ csp_nonce }}">
-let currentIssue = null;
-let isAdmin = false;
-let gitlabConfigured = false;
-
-async function checkConnection() {
-    const statusDiv = document.getElementById('connection-status');
-
-    try {
-        const response = await fetch('/api/gitlab/config');
-        const config = await response.json();
-
-        if (!config.enabled || !config.has_token) {
-            statusDiv.style.display = 'none';
-            document.getElementById('not-configured').style.display = 'block';
-            document.getElementById('issues-section').style.display = 'none';
-            return;
-        }
-
-        // Test connection
-        const testResponse = await fetch('/api/gitlab/test');
-        const testResult = await testResponse.json();
-
-        if (testResult.connected) {
-            statusDiv.className = 'connection-status connected';
-            statusDiv.innerHTML = `
-                <strong>Connected to GitLab</strong><br>
-                Project: <a href="${testResult.web_url}" target="_blank">${testResult.project_path}</a>
-            `;
-            gitlabConfigured = true;
-            document.getElementById('issues-section').style.display = 'block';
-            document.getElementById('not-configured').style.display = 'none';
-            document.getElementById('new-issue-btn').style.display = 'inline-block';
-
-            // Load data
-            await Promise.all([loadIssues(), loadLabels(), loadMembers(), loadMilestones()]);
-        } else {
-            statusDiv.className = 'connection-status error';
-            statusDiv.innerHTML = `
-                <strong>Connection Failed</strong><br>
-                ${testResult.error}
-            `;
-            document.getElementById('not-configured').style.display = 'block';
-            document.getElementById('issues-section').style.display = 'none';
-        }
-    } catch (error) {
-        statusDiv.className = 'connection-status error';
-        statusDiv.innerHTML = `<strong>Error:</strong> ${escapeHtml(error.message)}`;
-    }
+function glToast(message, kind) {
+    if (typeof showToast === 'function') showToast(message, kind);
 }
 
-async function loadIssues() {
-    const listDiv = document.getElementById('issues-list');
-    const state = document.getElementById('state-filter').value;
-    const label = document.getElementById('label-filter').value;
-    const search = document.getElementById('search-input').value;
-    const scope = document.getElementById('scope-filter').value;
-
-    listDiv.innerHTML = '<p class="loading">Loading issues...</p>';
-
-    try {
-        let url = `/api/gitlab/issues?state=${state}&per_page=50`;
-        if (scope === 'my') url += '&my_issues=true';
-        if (label) url += `&labels=${encodeURIComponent(label)}`;
-        if (search) url += `&search=${encodeURIComponent(search)}`;
-
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!response.ok || data.error || data.detail) {
-            listDiv.innerHTML = `<p class="error-message">Error: ${data.error || data.detail || 'Failed to load issues'}</p>`;
-            return;
-        }
-
-        if (!data.issues || data.issues.length === 0) {
-            listDiv.innerHTML = '<p class="empty-message">No issues found.</p>';
-            return;
-        }
-
-        listDiv.innerHTML = data.issues.map(issue => `
-            <div class="issue-card" data-click-action="showIssueDetail" data-args='[${issue.iid}]'>
-                <div class="issue-header">
-                    <span class="issue-id">#${issue.iid}</span>
-                    <span class="issue-title-text">${escapeHtml(issue.title)}</span>
-                    <span class="issue-state ${issue.state}">${issue.state}</span>
-                </div>
-                ${issue.labels.length > 0 ? `
-                    <div class="issue-labels">
-                        ${issue.labels.map(label => `<span class="issue-label" data-ion-style="background: ${getLabelColor(label)}">${escapeHtml(label)}</span>`).join('')}
-                    </div>
-                ` : ''}
-                <div class="issue-footer">
-                    <span>Created by ${escapeHtml(issue.author)} on ${formatDate(issue.created_at)}</span>
-                    ${issue.assignees.length > 0 ? `<span>Assigned to: ${issue.assignees.map(escapeHtml).join(', ')}</span>` : ''}
-                </div>
-            </div>
-        `).join('');
-    } catch (error) {
-        listDiv.innerHTML = `<p class="error-message">Error: ${escapeHtml(error.message)}</p>`;
-    }
+function showIssuesSection() {
+    var section = document.getElementById('issues-section');
+    var missing = document.getElementById('not-configured');
+    var create = document.getElementById('new-issue-btn');
+    if (section) section.classList.remove('hidden');
+    if (missing) missing.classList.add('hidden');
+    if (create) create.classList.remove('hidden');
 }
 
-let labelsCache = [];
+function showUnconfigured() {
+    var section = document.getElementById('issues-section');
+    var missing = document.getElementById('not-configured');
+    var create = document.getElementById('new-issue-btn');
+    if (section) section.classList.add('hidden');
+    if (missing) missing.classList.remove('hidden');
+    if (create) create.classList.add('hidden');
+}
 
-async function loadLabels() {
-    try {
-        const response = await fetch('/api/gitlab/labels');
-        const data = await response.json();
+document.body.addEventListener('gitlab-ready', showIssuesSection);
+document.body.addEventListener('gitlab-unconfigured', showUnconfigured);
 
-        if (!response.ok || !data.labels) {
-            console.error('Failed to load labels:', data.error || data.detail);
-            return;
+function refreshIssues() {
+    var form = document.getElementById('gl-filters');
+    if (form && window.htmx) htmx.trigger(form, 'submit');
+}
+
+function refreshComments(iid) {
+    if (!window.htmx || iid === null || iid === '') return;
+    htmx.ajax('GET', '/ui/gitlab/issues/' + encodeURIComponent(iid) + '/comments', {
+        target: '#issue-comments-list',
+        swap: 'innerHTML'
+    });
+}
+
+function openIssueShell(iid) {
+    var body = document.getElementById('issue-detail-body');
+    if (body) body.textContent = 'Loading issue...';
+    var title = document.getElementById('issue-detail-title');
+    if (title) title.textContent = 'Issue #' + iid;
+    var modal = document.getElementById('issue-detail-modal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function refreshDetail(iid) {
+    if (!window.htmx || iid === null || iid === '') return;
+    openIssueShell(iid);
+    htmx.ajax('GET', '/ui/gitlab/issues/' + encodeURIComponent(iid), {
+        target: '#issue-detail-body',
+        swap: 'innerHTML'
+    });
+}
+
+function currentIssueIid() {
+    var root = document.getElementById('issue-detail-body');
+    if (!root) return null;
+    var holder = root.querySelector('[data-issue-iid]');
+    if (!holder) return null;
+    var iid = holder.getAttribute('data-issue-iid');
+    if (iid === null || iid === '') return null;
+    return iid;
+}
+
+function paintGitlabMarkdown(root) {
+    if (!root || !root.querySelectorAll) return;
+    var sources = root.querySelectorAll('textarea[data-md-source]');
+    Array.prototype.forEach.call(sources, function (source) {
+        var target = source.nextElementSibling;
+        if (!target) return;
+        var text = source.value;
+        try {
+            if (typeof safeMarkdown !== 'function') {
+                target.textContent = text;
+                return;
+            }
+            var html = safeMarkdown(text);
+            var parsed = new DOMParser().parseFromString(html, 'text/html');
+            var nodes = [];
+            while (parsed.body.firstChild) {
+                nodes.push(parsed.body.removeChild(parsed.body.firstChild));
+            }
+            if (typeof target.replaceChildren === 'function') {
+                target.replaceChildren.apply(target, nodes);
+            } else {
+                target.textContent = text;
+            }
+        } catch (err) {
+            target.textContent = text;
         }
-
-        labelsCache = data.labels;
-
-        // Populate filter dropdown
-        const filterSelect = document.getElementById('label-filter');
-        filterSelect.innerHTML = '<option value="">All Labels</option>' +
-            data.labels.map(l => `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`).join('');
-
-        // Populate create issue labels
-        const labelsSelect = document.getElementById('issue-labels');
-        labelsSelect.innerHTML = data.labels.map(l =>
-            `<option value="${escapeHtml(l.name)}">${escapeHtml(l.name)}</option>`
-        ).join('');
-    } catch (error) {
-        console.error('Failed to load labels:', error);
-    }
+    });
 }
 
-async function loadMembers() {
-    try {
-        const response = await fetch('/api/gitlab/members');
-        const data = await response.json();
+document.body.addEventListener('htmx:afterSwap', function (evt) {
+    var target = evt.target;
+    if (evt.detail && evt.detail.target) target = evt.detail.target;
+    paintGitlabMarkdown(target);
+});
 
-        if (!response.ok || !data.members) {
-            console.error('Failed to load members:', data.error || data.detail);
-            return;
-        }
-
-        const assigneeSelect = document.getElementById('issue-assignee');
-        assigneeSelect.innerHTML = '<option value="">Unassigned</option>' +
-            data.members.map(m => `<option value="${m.id}">${escapeHtml(m.name)} (@${escapeHtml(m.username)})</option>`).join('');
-    } catch (error) {
-        console.error('Failed to load members:', error);
-    }
+var issuesList = document.getElementById('issues-list');
+if (issuesList) {
+    issuesList.addEventListener('click', function (event) {
+        var card = event.target.closest('[data-issue-iid]');
+        if (!card || !issuesList.contains(card)) return;
+        var iid = card.getAttribute('data-issue-iid');
+        if (iid === null || iid === '') return;
+        openIssueShell(iid);
+    });
 }
 
-async function loadMilestones() {
-    try {
-        const response = await fetch('/api/gitlab/milestones');
-        const data = await response.json();
-
-        if (!response.ok || !data.milestones) {
-            console.error('Failed to load milestones:', data.error || data.detail);
-            return;
-        }
-
-        const milestoneSelect = document.getElementById('issue-milestone');
-        milestoneSelect.innerHTML = '<option value="">No Milestone</option>' +
-            data.milestones.map(m => `<option value="${m.id}">${escapeHtml(m.title)}</option>`).join('');
-    } catch (error) {
-        console.error('Failed to load milestones:', error);
-    }
-}
-
-function getLabelColor(labelName) {
-    const label = labelsCache.find(l => l.name === labelName);
-    return label ? label.color : '#6c757d';
-}
-
-// Modal functions
 function showCreateIssueModal() {
     document.getElementById('issue-title').value = '';
     document.getElementById('issue-description').value = '';
@@ -517,245 +442,146 @@ function closeCreateIssueModal() {
 }
 
 async function createIssue() {
-    const title = document.getElementById('issue-title').value.trim();
-    const description = document.getElementById('issue-description').value;
-    const labelsSelect = document.getElementById('issue-labels');
-    const labels = Array.from(labelsSelect.selectedOptions).map(o => o.value);
-    const assigneeId = document.getElementById('issue-assignee').value;
-    const milestoneId = document.getElementById('issue-milestone').value;
-    const dueDate = document.getElementById('issue-due-date').value;
+    var title = document.getElementById('issue-title').value.trim();
+    var description = document.getElementById('issue-description').value;
+    var labelsSelect = document.getElementById('issue-labels');
+    var labels = [];
+    Array.prototype.forEach.call(labelsSelect.selectedOptions, function (option) {
+        labels.push(option.value);
+    });
+    var assigneeId = document.getElementById('issue-assignee').value;
+    var milestoneId = document.getElementById('issue-milestone').value;
+    var dueDate = document.getElementById('issue-due-date').value;
 
     if (!title) {
-        showToast('Title is required', 'error');
+        glToast('Title is required', 'error');
         return;
     }
 
-    const payload = { title };
+    var payload = { title: title };
     if (description) payload.description = description;
     if (labels.length > 0) payload.labels = labels;
-    if (assigneeId) payload.assignee_ids = [parseInt(assigneeId)];
-    if (milestoneId) payload.milestone_id = parseInt(milestoneId);
-    if (dueDate) payload.due_date = dueDate;
+    // "" is unassigned. "0" is a member id, and parseInt of it is 0,
+    // which JSON keeps. A truthiness check on the parsed number would drop it.
+    if (assigneeId !== '') {
+        var assigneeNum = parseInt(assigneeId, 10);
+        if (!isNaN(assigneeNum)) payload.assignee_ids = [assigneeNum];
+    }
+    if (milestoneId !== '') {
+        var milestoneNum = parseInt(milestoneId, 10);
+        if (!isNaN(milestoneNum)) payload.milestone_id = milestoneNum;
+    }
+    if (dueDate !== '') payload.due_date = dueDate;
 
     try {
-        const response = await fetch('/api/gitlab/issues', {
+        var response = await fetch('/api/gitlab/issues', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-
+        var body = await response.json().catch(function () { return {}; });
         if (response.ok) {
-            const issue = await response.json();
-            showToast(`Issue #${issue.iid} created successfully`, 'success');
+            var created = body.iid;
+            var shown = (created === undefined || created === null) ? '' : created;
+            glToast('Issue #' + shown + ' created successfully', 'success');
             closeCreateIssueModal();
-            loadIssues();
+            refreshIssues();
         } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to create issue', 'error');
+            glToast(body.detail || 'Failed to create issue', 'error');
         }
     } catch (error) {
-        showToast(`Error: ${error.message}`, 'error');
-    }
-}
-
-async function showIssueDetail(iid) {
-    try {
-        const response = await fetch(`/api/gitlab/issues/${iid}`);
-        const issue = await response.json();
-        currentIssue = issue;
-
-        document.getElementById('issue-detail-title').textContent = `#${issue.iid}: ${issue.title}`;
-        document.getElementById('issue-detail-meta').innerHTML = `
-            <span>Created by <strong>${escapeHtml(issue.author)}</strong></span>
-            <span>on ${formatDate(issue.created_at)}</span>
-            <span>Updated ${formatDate(issue.updated_at)}</span>
-        `;
-
-        // Render description as markdown
-        document.getElementById('issue-detail-description').innerHTML =
-            issue.description ? safeMarkdown(issue.description) : '<em>No description</em>';
-
-        // State
-        const stateSpan = document.getElementById('issue-detail-state');
-        stateSpan.textContent = issue.state;
-        stateSpan.className = `issue-state ${issue.state}`;
-
-        const toggleBtn = document.getElementById('toggle-state-btn');
-        toggleBtn.textContent = issue.state === 'opened' ? 'Close Issue' : 'Reopen Issue';
-
-        // Labels
-        document.getElementById('issue-detail-labels').innerHTML = issue.labels.length > 0
-            ? issue.labels.map(l => `<span class="issue-label" data-ion-style="background: ${getLabelColor(l)}">${escapeHtml(l)}</span>`).join('')
-            : '<em>None</em>';
-
-        // Assignees
-        document.getElementById('issue-detail-assignees').innerHTML = issue.assignees.length > 0
-            ? issue.assignees.map(a => escapeHtml(a)).join(', ')
-            : '<em>Unassigned</em>';
-
-        // Milestone
-        document.getElementById('issue-detail-milestone').innerHTML = issue.milestone
-            ? escapeHtml(issue.milestone)
-            : '<em>None</em>';
-
-        // Due date
-        document.getElementById('issue-detail-due-date').innerHTML = issue.due_date
-            ? issue.due_date
-            : '<em>None</em>';
-
-        // GitLab link
-        document.getElementById('issue-gitlab-link').href = issue.web_url;
-
-        // Load comments
-        loadComments(iid);
-
-        document.getElementById('issue-detail-modal').style.display = 'flex';
-    } catch (error) {
-        showToast(`Error loading issue: ${error.message}`, 'error');
+        glToast('Error: ' + error.message, 'error');
     }
 }
 
 function closeIssueDetailModal() {
     document.getElementById('issue-detail-modal').style.display = 'none';
-    currentIssue = null;
-}
-
-async function loadComments(iid) {
-    const listDiv = document.getElementById('issue-comments-list');
-    listDiv.innerHTML = '<p class="loading">Loading comments...</p>';
-
-    try {
-        const response = await fetch(`/api/gitlab/issues/${iid}/comments`);
-        const data = await response.json();
-
-        if (!response.ok || data.error || data.detail) {
-            listDiv.innerHTML = `<p class="error-message">Error: ${data.error || data.detail || 'Failed to load comments'}</p>`;
-            return;
-        }
-
-        if (!data.comments || data.comments.length === 0) {
-            listDiv.innerHTML = '<p class="empty-message">No comments yet.</p>';
-            return;
-        }
-
-        listDiv.innerHTML = data.comments.map(c => `
-            <div class="comment-item">
-                <div class="comment-header">
-                    <span class="comment-author">${escapeHtml(c.author)}</span>
-                    <span class="comment-date">${formatDate(c.created_at)}</span>
-                </div>
-                <div class="comment-body">${safeMarkdown(c.body)}</div>
-            </div>
-        `).join('');
-    } catch (error) {
-        listDiv.innerHTML = `<p class="error-message">Error: ${escapeHtml(error.message)}</p>`;
-    }
 }
 
 async function addComment() {
-    if (!currentIssue) return;
+    var iid = currentIssueIid();
+    if (iid === null) return;
 
-    const body = document.getElementById('new-comment').value.trim();
-    if (!body) {
-        showToast('Comment cannot be empty', 'error');
+    var box = document.getElementById('new-comment');
+    var text = box ? box.value.trim() : '';
+    if (!text) {
+        glToast('Comment cannot be empty', 'error');
         return;
     }
 
     try {
-        const response = await fetch(`/api/gitlab/issues/${currentIssue.iid}/comments`, {
+        var response = await fetch('/api/gitlab/issues/' + encodeURIComponent(iid) + '/comments', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ body })
+            body: JSON.stringify({ body: text })
         });
-
         if (response.ok) {
-            document.getElementById('new-comment').value = '';
-            loadComments(currentIssue.iid);
-            showToast('Comment added', 'success');
+            if (box) box.value = '';
+            refreshComments(iid);
+            glToast('Comment added', 'success');
         } else {
-            const error = await response.json();
-            showToast(error.detail || 'Failed to add comment', 'error');
+            var error = await response.json().catch(function () { return {}; });
+            glToast(error.detail || 'Failed to add comment', 'error');
         }
     } catch (error) {
-        showToast(`Error: ${error.message}`, 'error');
+        glToast('Error: ' + error.message, 'error');
     }
 }
 
 async function toggleIssueState() {
-    if (!currentIssue) return;
-
-    const action = currentIssue.state === 'opened' ? 'close' : 'reopen';
+    var iid = currentIssueIid();
+    if (iid === null) {
+        glToast('No issue is open.', 'error');
+        return;
+    }
+    var root = document.getElementById('issue-detail-body');
+    var holder = root ? root.querySelector('[data-issue-iid]') : null;
+    var state = holder ? holder.getAttribute('data-issue-state') : null;
+    var action = null;
+    if (state === 'opened') action = 'close';
+    else if (state === 'closed') action = 'reopen';
+    else {
+        glToast('Issue state is not opened or closed, so it was not changed.', 'error');
+        return;
+    }
 
     try {
-        const response = await fetch(`/api/gitlab/issues/${currentIssue.iid}/${action}`, {
+        var response = await fetch('/api/gitlab/issues/' + encodeURIComponent(iid) + '/' + action, {
             method: 'POST'
         });
-
         if (response.ok) {
-            const issue = await response.json();
-            currentIssue = issue;
-
-            // Update UI
-            const stateSpan = document.getElementById('issue-detail-state');
-            stateSpan.textContent = issue.state;
-            stateSpan.className = `issue-state ${issue.state}`;
-
-            const toggleBtn = document.getElementById('toggle-state-btn');
-            toggleBtn.textContent = issue.state === 'opened' ? 'Close Issue' : 'Reopen Issue';
-
-            showToast(`Issue ${action === 'close' ? 'closed' : 'reopened'}`, 'success');
-            loadIssues();
+            glToast(action === 'close' ? 'Issue closed' : 'Issue reopened', 'success');
+            refreshDetail(iid);
+            refreshIssues();
         } else {
-            const error = await response.json();
-            showToast(error.detail || `Failed to ${action} issue`, 'error');
+            var error = await response.json().catch(function () { return {}; });
+            glToast(error.detail || 'Failed to change the issue', 'error');
         }
     } catch (error) {
-        showToast(`Error: ${error.message}`, 'error');
+        glToast('Error: ' + error.message, 'error');
     }
 }
 
-// Helper functions
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-function formatDate(isoString) {
-    return new Date(isoString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-// Check admin status for config button
 async function checkAdminStatus() {
     try {
-        const response = await fetch('/api/auth/me');
-        if (response.ok) {
-            const user = await response.json();
-            isAdmin = user.roles && user.roles.some(r => r.name === 'admin');
-            if (isAdmin) {
-                document.getElementById('config-btn').style.display = 'inline-block';
-            }
+        var response = await fetch('/api/auth/me');
+        if (!response.ok) return;
+        var user = await response.json();
+        var roles = user && user.roles;
+        var admin = false;
+        if (roles && roles.some) {
+            admin = roles.some(function (role) { return role && role.name === 'admin'; });
+        }
+        if (admin) {
+            var button = document.getElementById('config-btn');
+            if (button) button.classList.remove('hidden');
         }
     } catch (error) {
-        console.error('Failed to check admin status:', error);
+        // The Configure link is an admin affordance. A failed identity
+        // read leaves it hidden, which is the safer of the two.
     }
 }
 
-// Search on enter
-document.getElementById('search-input').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        loadIssues();
-    }
-});
-
-// Initialize
 checkAdminStatus();
-checkConnection();
 </script>
 {% endblock %}
