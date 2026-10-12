@@ -1,0 +1,249 @@
+{# The morning briefing, rendered whole by ion.web.ui.briefing_fragment.
+
+   Replaces three innerHTML writes and 150 lines of inline JavaScript in
+   briefing.html, where brfRender built the meta line, the AI narrative card,
+   six headline tiles and four source cards out of concatenated strings with a
+   hand-rolled brfEsc. Jinja escapes, so brfEsc is gone, and a restyle of a
+   tile or a source card now reaches it from the stylesheet.
+
+   The page keeps the window select and the three buttons in its own shell,
+   outside the swap target, so no response from here can swap away the
+   controls that request the next one. That is why this fragment carries no
+   card chrome of its own: the chrome it would carry is the chrome that must
+   survive an error swap. #}
+
+{% macro sev_badge(sev) %}{% set s = (sev or '')|lower %}{% if s == 'critical' %}badge-error{% elif s == 'high' %}badge-warning{% elif s == 'medium' %}badge-info{% elif s == 'low' %}badge-success{% else %}badge-ghost{% endif %}{% endmacro %}
+
+{# Three states, not two. A source that is configured but whose read raised is
+   neither live nor offline, and _collect_es, _collect_opencti and
+   _collect_tide all swallow their exception and return an `error` key beside
+   a zero. The old badge ignored `error`, so it printed a green "live" next to
+   that zero. "We could not look" and "nothing happened" lead to opposite
+   actions. #}
+{% macro source_badge(src, offline_label) %}{% if src.get('error') %}<span class="badge badge-sm badge-error" title="{{ src.get('error') }}">read failed</span>{% elif src.get('enabled') is true %}<span class="badge badge-sm badge-success">live</span>{% else %}<span class="badge badge-sm badge-error">{{ offline_label }}</span>{% endif %}{% endmacro %}
+
+{# `value is not none`, never truthiness. brfRender wrote
+   `h.tide_rules_enabled || '-'`, so a detection estate with zero rules
+   enabled, the worst reading that tile can take, displayed as "not reported".
+   `unknown` is a separate glyph for a separate state: the source errored, so
+   the figure is unmeasured rather than absent.
+
+   `data-stat` names each tile. A test asserting on a bare `>0<` cannot tell
+   which of six tiles rendered it, and nor can a stylesheet rule. #}
+{% macro stat(title, value, tone='text-primary', unknown='') %}
+<div class="stat bg-base-200 shadow rounded-box" data-stat="{{ title|lower|replace(' ', '-') }}">
+  <div class="stat-title">{{ title }}</div>
+  {% if unknown %}
+  <div class="stat-value text-2xl font-mono text-base-content/50" title="{{ unknown }}">?</div>
+  {% else %}
+  <div class="stat-value text-2xl font-mono {{ tone }}">{{ value if value is not none else '-' }}</div>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{# A row of the posture table. Same `is not none` guard, because a quality
+   average of 0 and an unreported one are different readings. #}
+{% macro posture_row(label, value) %}
+<tr>
+  <td>{{ label }}</td>
+  <td class="font-mono font-semibold text-primary text-right">{{ value if value is not none else '-' }}</td>
+</tr>
+{% endmacro %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <div>
+      <div class="text-xs font-bold uppercase tracking-wider">Briefing</div>
+      <div>
+        The briefing for the last {{ hours }}h could not be composed. This is
+        not a quiet shift: the snapshot failed, so overnight activity is
+        unknown rather than zero. Use Refresh above to try again.
+      </div>
+    </div>
+  </div>
+{% else %}
+
+{% set h = b.get('headlines') or {} %}
+{% set es = b.get('es') or {} %}
+{% set cases = b.get('cases') or {} %}
+{% set octi = b.get('opencti') or {} %}
+{% set tide = b.get('tide') or {} %}
+{% set sources = b.get('sources_reached') or [] %}
+
+<div class="text-sm opacity-70 mb-4">
+  Generated {{ generated_at }} &middot;
+  Window: last {{ b.get('window_hours') if b.get('window_hours') is not none else 0 }}h &middot;
+  Sources reached: {% if sources %}{{ sources|join(', ') }}{% else %}<em>none</em>{% endif %}
+</div>
+
+{% if b.get('narrative') %}
+  <div class="card bg-base-200 shadow mb-4 border-l-4 border-primary">
+    <div class="card-body py-4">
+      <div class="text-xs font-bold uppercase tracking-wider text-primary">AI Briefing</div>
+      <div class="whitespace-pre-wrap leading-relaxed">{{ b.get('narrative') }}</div>
+    </div>
+  </div>
+{% endif %}
+
+<div class="brf-headlines">
+  {{ stat('Alerts', h.get('alerts_total'), 'text-primary',
+          'Elasticsearch read failed, so this is unmeasured' if es.get('error') else '') }}
+  {{ stat('Cases Opened', h.get('cases_opened')) }}
+  {{ stat('Cases Closed', h.get('cases_closed')) }}
+  {{ stat('Open Backlog', h.get('open_backlog'), 'text-warning') }}
+  {{ stat('Actors Tracked', h.get('actors_tracked'), 'text-base-content/50',
+          'OpenCTI read failed, so this is unmeasured' if octi.get('error') else '') }}
+  {{ stat('TIDE Rules Live', h.get('tide_rules_enabled'), 'text-base-content/50',
+          'TIDE read failed, so this is unmeasured' if tide.get('error') else '') }}
+</div>
+
+<div class="brf-grid">
+
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70 justify-between">Alert Activity {{ source_badge(es, 'es offline') }}</h3>
+      {% if es.get('by_severity') %}
+        <div class="flex flex-wrap gap-1.5 mb-3">
+          {% for sev, cnt in es.get('by_severity').items() %}
+            <span class="badge badge-sm {{ sev_badge(sev) }}">{{ sev }}: {{ cnt if cnt is not none else '-' }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if es.get('error') %}
+        <div role="alert" class="alert alert-error text-sm">
+          Elasticsearch could not be read ({{ es.get('error') }}). The alert
+          figures are unknown, not zero.
+        </div>
+      {% elif top_rules %}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Rule</th><th>Count</th></tr></thead>
+            <tbody>
+              {% for r in top_rules %}
+                <tr>
+                  <td>{{ r.get('name') }}</td>
+                  {# A count of 0 is a count. The JavaScript's `|| ''` blanked
+                     it, which read as "the aggregation returned nothing". #}
+                  <td class="font-mono font-semibold text-primary">{{ r.get('count') if r.get('count') is not none else '' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-sm opacity-50 p-3 text-center italic">No firing rules in window.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70">Case Activity</h3>
+      {% set notable = cases.get('notable') or [] %}
+      {% if notable %}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <thead><tr><th>Case</th><th>Title</th><th>Severity</th></tr></thead>
+            <tbody>
+              {% for c in notable %}
+                <tr>
+                  <td class="font-mono">{{ c.get('case_number') or '' }}</td>
+                  <td>{{ c.get('title') or '' }}</td>
+                  <td><span class="badge badge-sm {{ sev_badge(c.get('severity')) }}">{{ c.get('severity') or '-' }}</span></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-sm opacity-50 p-3 text-center italic">No notable cases in window.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70 justify-between">Threat Actors {{ source_badge(octi, 'opencti offline') }}</h3>
+      {% set actors = octi.get('actors') or [] %}
+      {% if octi.get('error') %}
+        <div role="alert" class="alert alert-error text-sm">
+          OpenCTI could not be read ({{ octi.get('error') }}). Actor coverage
+          is unknown, not absent.
+        </div>
+      {% elif actors %}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <tbody>
+              {% for a in actors %}
+                <tr>
+                  <td>
+                    {{ a.get('name') or '-' }}
+                    {% set aliases = a.get('aliases') or [] %}
+                    {% if aliases %}
+                      <em class="text-[var(--text-secondary)] text-[.7rem]">({{ aliases|join(', ') }})</em>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-sm opacity-50 p-3 text-center italic">No actor data available.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h3 class="card-title text-xs uppercase tracking-wider opacity-70 justify-between">Detection Posture {{ source_badge(tide, 'tide offline') }}</h3>
+      {% if tide.get('error') %}
+        <div role="alert" class="alert alert-error text-sm">
+          TIDE could not be read ({{ tide.get('error') }}). Detection coverage
+          is unknown, not missing.
+        </div>
+      {% elif tide.get('enabled') is true %}
+        <div class="overflow-x-auto">
+          <table class="table table-sm">
+            <tbody>
+              {{ posture_row('Total rules', tide.get('total_rules')) }}
+              {{ posture_row('Enabled', tide.get('enabled_rules')) }}
+              {{ posture_row('MITRE techniques covered', tide.get('mitre_techniques_covered')) }}
+              {{ posture_row('Avg quality score', tide.get('quality_avg')) }}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="text-sm opacity-50 p-3 text-center italic">
+          TIDE not configured. Add it in
+          <a class="link link-primary text-[var(--primary)]" href="/settings#tide">Settings</a>.
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+{% if not b.get('narrative') and b.get('_ai_requested') %}
+  <div role="alert" class="alert alert-warning mb-4">
+    <div>
+      <div class="text-xs font-bold uppercase tracking-wider">AI Briefing</div>
+      <div class="text-[var(--sev-medium,#d29922)]">
+        AI summary unavailable. Ollama is not configured or not reachable.
+        Check Settings &rarr; AI to configure.
+      </div>
+    </div>
+  </div>
+{% elif not b.get('narrative') %}
+  <div role="alert" class="alert alert-info mb-4">
+    <div>
+      <div class="text-xs font-bold uppercase tracking-wider">AI Briefing</div>
+      <div class="italic">
+        Click "Generate AI Summary" above to have Ollama write an executive
+        narrative from this snapshot.
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% endif %}

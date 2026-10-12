@@ -69,6 +69,11 @@
            and the pager used to be built from template literals, with the
            secret filter running in a browser that already held the values
            it was hiding. #}
+        {# A failed request is handled by static/js/htmx-errors.js, which
+           clones the alert template in base.html into this container. It used
+           to be a page-local htmx:responseError listener plus two hidden
+           divs, which is one copy per page of a decision about what an
+           expired session means. #}
         <div id="logs-panel"
              hx-get="/ui/audit-logs"
              hx-trigger="load"
@@ -80,21 +85,6 @@
           </div>
         </div>
 
-        {# The failure states the fetch used to handle. htmx does not swap a
-           non-2xx response, so without these the panel keeps its spinner
-           and the page claims to be loading forever. Both are markup here
-           and only revealed by script, so nothing is built in JavaScript. #}
-        <div id="logs-denied" class="hidden" role="alert">
-          <div class="alert alert-warning m-4">
-            Access denied. Viewing the audit log requires the audit
-            permission.
-          </div>
-        </div>
-        <div id="logs-error" class="hidden" role="alert">
-          <div class="alert alert-error m-4">
-            The audit log could not be loaded. This is not an empty journal.
-          </div>
-        </div>
     </div>
 </div>
 
@@ -102,26 +92,3 @@
 </div><!-- /ion-tw -->
 {% endblock %}
 
-{% block scripts %}
-<script nonce="{{ csp_nonce }}">
-// An expired session returns 401, and htmx leaves the stale panel alone
-// rather than swapping a login form into the page. Sending the user to
-// /login is what the fetch did, and it is still the honest response: the
-// alternative is a table that silently stops updating.
-document.body.addEventListener('htmx:responseError', function (evt) {
-    if (evt.detail.target && evt.detail.target.id !== 'logs-panel') return;
-
-    var status = evt.detail.xhr.status;
-    if (status === 401) {
-        window.location.href = '/login?redirect=/audit-logs';
-        return;
-    }
-    // Reveal the matching static block and clear the spinner, which would
-    // otherwise keep claiming the page is still loading.
-    var panel = document.getElementById('logs-panel');
-    if (panel) panel.replaceChildren();
-    var id = status === 403 ? 'logs-denied' : 'logs-error';
-    document.getElementById(id).classList.remove('hidden');
-});
-</script>
-{% endblock %}

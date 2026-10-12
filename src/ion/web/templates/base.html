@@ -79,6 +79,12 @@
          textContent, so a page using it still has no markup built in JS.
          See templates/_fragments/_time.html for the macro that emits it. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/local-time.js?v={{ ion_version }}"></script>
+    <!-- htmx does not swap a non-2xx response, which is correct, but leaves
+         every fragment placeholder spinning on a 403, a 500 or an expired
+         session. The JavaScript the fragments replace said "Failed to load",
+         so without this the conversion is a regression in exactly the case
+         the user needs to be told about. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/htmx-errors.js?v={{ ion_version }}"></script>
     <!-- Restores styling the v0.31.21 inline-style migration broke: it hashed
          `style="width:${pct}%"` into a STATIC class containing the literal
          ${pct}, which browsers drop as invalid CSS. See the file header. -->
@@ -513,6 +519,16 @@
     <script nonce="{{ csp_nonce }}" src="/static/js/ai-chat.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/quill.js"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/notepad.js?v={{ ion_version }}"></script>
+    <!-- Cloned by static/js/htmx-errors.js when a fragment request fails.
+         It lives here, as markup, rather than as a string in JavaScript, so
+         the stylesheet reaches it like any other alert and so no page is
+         building markup in script. -->
+    <template id="htmx-error-template">
+      <div role="alert" class="alert alert-error m-4">
+        <span data-error-message></span>
+      </div>
+    </template>
+
     {% block scripts %}{% endblock %}
 
 <!-- Keyboard shortcuts overlay -->

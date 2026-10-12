@@ -17,6 +17,7 @@ import pkgutil
 import sys
 
 import pytest
+from fastapi import APIRouter
 
 import ion.web.ui as ui
 
@@ -64,34 +65,62 @@ def test_every_module_route_is_actually_mounted():
     assert declared <= mounted, f"declared but not mounted: {declared - mounted}"
 
 
-def _drop_package_from_sys_modules() -> None:
-    for name in [m for m in sys.modules if m == "ion.web.ui"
-                 or m.startswith("ion.web.ui.")]:
-        del sys.modules[name]
+def _throwaway_package(tmp_path, name, body):
+    """A real, importable package holding one module, outside the live tree.
 
-
-def test_a_module_without_a_router_is_an_error_not_a_skip():
-    """A silent skip is the whole hazard, so prove the loader refuses.
-
-    The probe is planted in the real package directory. Appending to the
-    imported package's `__path__` does not work: dropping the package from
-    sys.modules to force a reimport discards that `__path__` with it, so the
-    reimport searches the original directory and never sees the probe. That
-    version of this test passed a broken loader.
+    The loader is exercised against this rather than against ion/web/ui. An
+    earlier version of these tests planted the probe in the live package and
+    reimported it, which is a race: a sibling process starting a server
+    inside that window imports a package containing a deliberately broken
+    module and dies at startup. A guard that breaks the thing it guards
+    during a parallel run is not a guard, and one of the conversions skipped
+    running this file for exactly that reason.
     """
-    probe = pathlib.Path(ui.__path__[0]) / "zzprobe_no_router.py"
-    probe.write_text("# deliberately defines no router\n", encoding="utf-8")
-    try:
-        _drop_package_from_sys_modules()
-        with pytest.raises(ImportError, match="defines no `router`"):
-            importlib.import_module("ion.web.ui")
-    finally:
-        probe.unlink(missing_ok=True)
-        # The bytecode would be rediscovered as a module on the next run.
-        for cached in (probe.parent / "__pycache__").glob("zzprobe_no_router.*"):
-            cached.unlink(missing_ok=True)
-        _drop_package_from_sys_modules()
-        importlib.import_module("ion.web.ui")
+    # The package name has to be unique per call. Reusing one meant the
+    # second test imported the first test's cached package out of
+    # sys.modules, found no module of its own in it, and failed with a
+    # ModuleNotFoundError that looked like the loader's fault.
+    pkg_name = "zztmp_ui_pkg_" + name
+    pkg = tmp_path / pkg_name
+    pkg.mkdir()
+    (pkg / "__init__.py").write_text("", encoding="utf-8")
+    (pkg / (name + ".py")).write_text(body, encoding="utf-8")
+    sys.path.insert(0, str(tmp_path))
+    return pkg_name, [str(pkg)]
+
+
+def test_a_module_without_a_router_is_an_error_not_a_skip(tmp_path):
+    """A silent skip is the whole hazard, so prove the loader refuses."""
+    package, search_path = _throwaway_package(
+        tmp_path, "no_router", "# deliberately defines no router\n"
+    )
+    with pytest.raises(ImportError, match="defines no `router`"):
+        ui.mount_page_modules(APIRouter(), search_path, package)
+
+
+def test_a_module_that_cannot_be_imported_is_not_swallowed(tmp_path):
+    """A fragment module with a broken import must take startup down, not
+    leave one page quietly serving 404s into an empty panel."""
+    package, search_path = _throwaway_package(
+        tmp_path, "broken", "import ion_module_that_does_not_exist\n"
+    )
+    with pytest.raises(ModuleNotFoundError):
+        ui.mount_page_modules(APIRouter(), search_path, package)
+
+
+def test_the_loader_mounts_what_it_discovers(tmp_path):
+    """Positive control for the loader, not just for the live package."""
+    module = (
+        "from fastapi import APIRouter\n"
+        "router = APIRouter()\n"
+        "@router.get('/probe')\n"
+        "def probe():\n"
+        "    return 'ok'\n"
+    )
+    package, search_path = _throwaway_package(tmp_path, "good", module)
+    target = APIRouter()
+    assert ui.mount_page_modules(target, search_path, package) == ["good"]
+    assert "/probe" in {r.path for r in target.routes}
 
 
 # ---------------------------------------------------------------------------

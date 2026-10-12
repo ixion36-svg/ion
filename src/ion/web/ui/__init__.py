@@ -46,27 +46,52 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/ui", tags=["ui-fragments"])
 
 
-def _page_modules() -> list[str]:
-    """Every fragment module in this package, underscore names excluded.
+def _page_modules(search_path: list[str] | None = None) -> list[str]:
+    """Every fragment module in a package directory, underscore names excluded.
 
-    `_shared` and any other helper are private by that convention. Sorted
-    so the mounted route order does not depend on filesystem order.
+    `_shared` and any other helper are private by that convention. Sorted so
+    the mounted route order does not depend on filesystem order.
     """
     return sorted(
         m.name
-        for m in pkgutil.iter_modules(__path__)
+        for m in pkgutil.iter_modules(search_path or __path__)
         if not m.name.startswith("_")
     )
 
 
-for _name in _page_modules():
-    _mod = importlib.import_module(f"{__name__}.{_name}")
-    _page_router = getattr(_mod, "router", None)
-    if _page_router is None:
-        raise ImportError(
-            f"ion.web.ui.{_name} defines no `router`. Every fragment module "
-            "must expose one, or its endpoints are silently unreachable."
-        )
-    router.include_router(_page_router)
+def mount_page_modules(
+    target: APIRouter,
+    search_path: list[str] | None = None,
+    package: str | None = None,
+) -> list[str]:
+    """Import each page module and include its router. Returns the names.
 
-__all__ = ["router", "_page_modules"]
+    The arguments exist so this can be tested against a throwaway package
+    rather than against the live one. The first version of its test planted
+    a probe module in ion/web/ui itself and reimported, which is a race:
+    another process starting a server inside that window imports a package
+    containing a deliberately broken module and dies at startup. A guard
+    that breaks the thing it guards during a parallel run is not a guard.
+
+    It refuses rather than skips. A module that cannot be imported, or that
+    defines no `router`, takes the app down at startup instead of quietly
+    serving nothing, because a 404 on a fragment renders an empty panel that
+    reads to the user as "no data" rather than "not wired up".
+    """
+    package = package or __name__
+    names = _page_modules(search_path)
+    for name in names:
+        mod = importlib.import_module(f"{package}.{name}")
+        page_router = getattr(mod, "router", None)
+        if page_router is None:
+            raise ImportError(
+                f"{package}.{name} defines no `router`. Every fragment module "
+                "must expose one, or its endpoints are silently unreachable."
+            )
+        target.include_router(page_router)
+    return names
+
+
+mount_page_modules(router)
+
+__all__ = ["router", "mount_page_modules", "_page_modules"]
