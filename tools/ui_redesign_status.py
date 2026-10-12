@@ -38,8 +38,48 @@ PARTIALS = {"_components.html", "_icons.html", "_nav_tabs.html", "_queue_rows.ht
 SHELL = {"base.html", "login.html"}
 
 LIGHT_LITERAL = re.compile(
-    r"color\s*:\s*(#fff\b|#ffffff\b|white\b|rgba?\(\s*255\s*,\s*255\s*,\s*255)", re.I
+    r"(?<![-\w])color\s*:\s*(#fff\b|#ffffff\b|white\b|rgba?\(\s*255\s*,\s*255\s*,\s*255)",
+    re.I,
 )
+
+#: A rule that paints its own background. `var()` counts: the value is
+#: unknown here, but what matters is that the rule sets colour AND
+#: background together, so a light-mode flip of the token moves both halves
+#: or neither. A rule that sets only `color` is text against whatever the
+#: page happens to provide, and that is the one that goes invisible.
+OWN_BACKGROUND = re.compile(
+    r"(?<![-\w])background(?:-color|-image)?\s*:\s*"
+    r"(?!\s*(?:transparent|none|inherit|initial|unset)\s*[;}])",
+    re.I,
+)
+
+RULE_BLOCK = re.compile(r"([^{}]+)\{([^{}]*)\}")
+
+
+def _invisible_light_rules(style: str) -> list[str]:
+    """Selectors whose light `color` has no fill of its own to sit on.
+
+    The first version of this counted every `color: #fff` in the sheet, which
+    cannot tell `.case-badge{color:white}` on a coloured fill (correct) from
+    `.np-note-title{color:#fff}` on the page (invisible in light mode).
+    Measured on 2026-10-12 it reported 133 literals across 24 templates, of
+    which `.notification-success{background:var(--success); color:white}` and
+    13 others were perfectly correct toasts and badges. Driving that number
+    to zero would have rewritten working rules and broken them, which is the
+    trap this file's own cleanup section warns about one table lower.
+
+    Comments are stripped first, because a commented-out rule is not a rule.
+    """
+    style = re.sub(r"/\*.*?\*/", "", style, flags=re.S)
+    out: list[str] = []
+    for m in RULE_BLOCK.finditer(style):
+        decls = m.group(2)
+        if not LIGHT_LITERAL.search(decls):
+            continue
+        if OWN_BACKGROUND.search(decls):
+            continue
+        out.append(" ".join(m.group(1).split())[:60])
+    return out
 
 
 def measure(path: Path) -> dict:
@@ -49,9 +89,11 @@ def measure(path: Path) -> dict:
         m.group(1) for m in re.finditer(r"<script(?![^>]*src=)[^>]*>(.*?)</script>", s, re.S)
     )
     writes = len(re.findall(r"innerHTML\s*=|insertAdjacentHTML|outerHTML\s*=", js))
-    light = len(LIGHT_LITERAL.findall(style))
+    invisible = _invisible_light_rules(style)
+    light = len(invisible)
     return {
         "name": path.name,
+        "invisible_selectors": invisible,
         "lines": s.count("\n"),
         "css": style.count("\n"),
         "js": js.count("\n"),
@@ -102,7 +144,10 @@ def main() -> int:
     w("")
     w("| column | passes when | why it matters |")
     w("|---|---|---|")
-    w("| light | no literal light-on-dark colour in its `<style>` | those render invisibly on the light page and no variable flip reaches them |")
+    w("| light | no light `color` in its `<style>` on a rule with no fill of its own | "
+      "a rule setting colour and background together flips as a pair, so only "
+      "colour-without-fill goes invisible on the light page. Counting both "
+      "reported 133 across 24 templates when 13 across 9 were real |")
     w("| styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |")
     w("| server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |")
     w("")
