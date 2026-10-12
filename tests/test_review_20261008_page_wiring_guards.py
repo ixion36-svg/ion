@@ -172,3 +172,58 @@ class TestFetchPaths:
         """Proves the check has teeth rather than matching everything."""
         assert not _is_served("/response/actions/inbox", served_paths)
         assert _is_served("/api/response/actions/inbox", served_paths)
+
+
+class TestHtmxNeedsNoEval:
+    """htmx features that compile a string are dead under ION's CSP.
+
+    ION serves `script-src 'self' 'nonce-...'` with no `unsafe-eval`, so
+    anything htmx hands to `Function()` throws an EvalError and the feature
+    silently does not work. Three htmx attributes do that: an `hx-trigger`
+    event filter, the `js:` form of `hx-vals` or `hx-headers`, and `hx-on`.
+
+    This is invisible everywhere except a browser console. The markup looks
+    right, the fragment the server returns is right, and the page works in
+    every respect except the one the attribute was added for. A smoke crawl
+    found `hx-trigger="keyup[key=='Enter']"` on the knowledge graph page,
+    where it meant the Enter key did nothing.
+
+    The replacement for an Enter-key trigger is a real `<form>` carrying
+    the `hx-get`, which submits natively, needs no expression, and still
+    works with htmx disabled.
+    """
+
+    def test_no_template_uses_an_hx_trigger_event_filter(self):
+        offenders = []
+        for path in _template_files():
+            text = re.sub(r"\{#.*?#\}", "", path.read_text(encoding="utf-8"), flags=re.S)
+            for match in re.finditer(r'hx-trigger="([^"]*\[[^]"]*\][^"]*)"', text):
+                line = text[: match.start()].count("\n") + 1
+                offenders.append(f"{path.name}:{line} {match.group(1)}")
+        assert not offenders, (
+            "htmx compiles an event filter with Function(), which ION's CSP "
+            f"blocks, so the trigger never fires: {offenders}"
+        )
+
+    def test_no_template_uses_the_js_form_of_hx_vals_or_hx_headers(self):
+        offenders = []
+        for path in _template_files():
+            text = re.sub(r"\{#.*?#\}", "", path.read_text(encoding="utf-8"), flags=re.S)
+            for match in re.finditer(r'hx-(?:vals|headers)="\s*js:', text):
+                line = text[: match.start()].count("\n") + 1
+                offenders.append(f"{path.name}:{line}")
+        assert not offenders, (
+            f"the js: form is evaluated and ION's CSP blocks it: {offenders}"
+        )
+
+    def test_no_template_uses_hx_on(self):
+        offenders = []
+        for path in _template_files():
+            text = re.sub(r"\{#.*?#\}", "", path.read_text(encoding="utf-8"), flags=re.S)
+            for match in re.finditer(r"\bhx-on[a-z:-]*\s*=", text):
+                line = text[: match.start()].count("\n") + 1
+                offenders.append(f"{path.name}:{line}")
+        assert not offenders, (
+            "hx-on evaluates its body and ION's CSP blocks it; use "
+            f"data-click-action and event-delegation.js instead: {offenders}"
+        )
