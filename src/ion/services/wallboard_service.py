@@ -322,7 +322,16 @@ def _collect_rules(session: Session) -> Dict[str, Any]:
         "quality": posture.get("quality") or {},
         "unmapped_rules": int(posture.get("unmapped_rules") or 0),
         "covered_techniques": int(posture.get("covered_techniques") or 0),
-        "total_techniques": int(posture.get("total_techniques") or 0),
+        # None stays None. `or 0` turns "TIDE would not give us the ATT&CK
+        # catalogue" into "there are no ATT&CK techniques", and a wallboard is
+        # the worst place to publish a confident zero: it hangs on a wall and
+        # nobody clicks into it to discover the figure was never counted.
+        # TIDE 6 does not serve this table to the external query API.
+        "total_techniques": (
+            int(posture["total_techniques"])
+            if posture.get("total_techniques") is not None
+            else None
+        ),
         "total_systems": int(posture.get("total_systems") or 0),
         "tide_unavailable": False,
     }

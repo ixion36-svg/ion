@@ -7916,7 +7916,7 @@ function renderMitreHeatmap() {
                 <span>Blind spot</span>
             </div>
             <div class="mitre-tide-summary">
-                <span><strong>${cov.covered_techniques}</strong>/${cov.total_techniques} covered</span>
+                <span><strong>${cov.covered_techniques}</strong>${(cov.total_techniques != null && cov.total_techniques > 0) ? `/${cov.total_techniques}` : ''} covered</span>
                 <span><strong>${(cov.inactive_techniques || []).length}</strong> written, not enabled</span>
                 <span><strong>${(cov.blind_spots || []).length}</strong> blind spots</span>
                 <span><strong>${cov.total_rules}</strong> rules</span>

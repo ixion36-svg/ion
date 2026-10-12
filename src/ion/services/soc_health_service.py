@@ -70,13 +70,20 @@ def _label(score: int) -> str:
 
 def _detection_coverage() -> dict[str, Any]:
     """Score detection coverage using TIDE posture stats."""
+    # Seeded as None, not 0. These are percentages and counts nobody has
+    # measured yet, and every early return below carries this dict out intact.
+    # Seeded at 0 they left `technique_coverage_pct: 0` sitting beside
+    # `score: None`, so a consumer reading the details rather than the score
+    # still saw a confident zero, and _build_recommendations' `< 50` gate
+    # fired on it, reporting poor coverage for a dimension that was never
+    # measured.
     details: dict[str, Any] = {
         "tide_available": False,
-        "technique_coverage_pct": 0,
-        "rule_quality_pct": 0,
-        "covered_techniques": 0,
-        "total_techniques": 0,
-        "avg_quality": 0,
+        "technique_coverage_pct": None,
+        "rule_quality_pct": None,
+        "covered_techniques": None,
+        "total_techniques": None,
+        "avg_quality": None,
     }
 
     try:
@@ -96,25 +103,75 @@ def _detection_coverage() -> dict[str, Any]:
             return {"score": None, "label": "Unavailable", "details": details}
 
         details["tide_available"] = True
-        total_tech = stats.get("total_techniques", 0)
+        total_tech = stats.get("total_techniques")
         covered_tech = stats.get("covered_techniques", 0)
         quality = stats.get("quality", {})
-        avg_quality = quality.get("avg_quality", 0) or 0
+        # No `or 0`. That coercion made "TIDE returned no quality figure"
+        # identical to "the rules average zero", and only one of those is a
+        # measurement. They take different branches below.
+        avg_quality = quality.get("avg_quality")
 
         details["covered_techniques"] = covered_tech
         details["total_techniques"] = total_tech
         details["avg_quality"] = avg_quality
 
+        # No denominator, no percentage.
+        #
+        # TIDE 6 will not serve the ATT&CK technique count to the external
+        # query API at all (see get_posture_stats), so this is the ordinary
+        # case against a current TIDE, not an edge case. The previous code
+        # read a missing total as 0, took the `else 0` branch, and published
+        # technique_coverage_pct = 0.0 beside tide_available = True. That is a
+        # refused query presented as measured coverage of nothing, and with
+        # rule quality weighted at 40% it graded the dimension F without
+        # anything on the page saying the count was never obtained.
+        if not total_tech or total_tech <= 0:
+            details["reason"] = (
+                "TIDE did not return a MITRE technique count, so there is no "
+                "denominator for coverage. TIDE 6 keeps the ATT&CK catalogue "
+                "in a reference database its external query API will not "
+                "serve."
+            )
+            return {"score": None, "label": "Unavailable", "details": details}
+
         # Technique coverage: covered / total * 100
-        tech_pct = (covered_tech / total_tech * 100) if total_tech > 0 else 0
+        tech_pct = covered_tech / total_tech * 100
         details["technique_coverage_pct"] = round(tech_pct, 1)
 
-        # Rule quality: avg_quality / 40 * 100 (TIDE scores range 0-40)
-        quality_pct = (avg_quality / 40 * 100) if avg_quality > 0 else 0
-        details["rule_quality_pct"] = round(quality_pct, 1)
-
-        # Combined: 60% technique coverage + 40% quality
-        score = _clamp(tech_pct * 0.6 + quality_pct * 0.4)
+        # Rule quality is a modifier on coverage, and an absent modifier is
+        # not a zero one.
+        #
+        # This is the same rule the scorecard already applies one level up,
+        # where an unavailable dimension is dropped from the weighting and
+        # weight_basis records what is left, rather than scored as 0. Applied
+        # here because quality can be missing while coverage is known.
+        #
+        # Note the asymmetry with the technique total above, which returns
+        # Unavailable outright. The dimension IS detection coverage: without a
+        # coverage figure there is nothing for quality to modify, so there is
+        # no dimension. Without quality there is still coverage, measured, and
+        # reporting it on a stated narrower basis beats reporting nothing.
+        #
+        # avg_quality is NOT recalibrated here. ION divides by 40 while TIDE's
+        # quality group maxes at 57 by default (mapping 37, field type 12,
+        # search time 8), and ION's 30/20/10 buckets sit against TIDE's own
+        # 80/70/50 out of 100. Both are wrong and both change the grade, so
+        # they are a separate decision; this change only stops an absent
+        # figure being scored as a bad one.
+        if avg_quality is None:
+            details["rule_quality_pct"] = None
+            details["score_basis"] = "technique coverage only"
+            details["quality_unmeasured_reason"] = (
+                "TIDE returned no average rule quality, so the quality half "
+                "of this dimension is excluded rather than scored as zero."
+            )
+            score = _clamp(tech_pct)
+        else:
+            quality_pct = avg_quality / 40 * 100 if avg_quality > 0 else 0
+            details["rule_quality_pct"] = round(quality_pct, 1)
+            details["score_basis"] = "technique coverage and rule quality"
+            # Combined: 60% technique coverage + 40% quality
+            score = _clamp(tech_pct * 0.6 + quality_pct * 0.4)
 
     except Exception:
         # A TIDE that throws is the same epistemic state as a TIDE with no
@@ -512,24 +569,48 @@ def _build_recommendations(dimensions: dict[str, dict]) -> list[dict[str, str]]:
                 "priority": "high",
             })
         else:
-            if details.get("technique_coverage_pct", 0) < 50:
+            # `pct is not None` rather than a `.get(..., 0)` default. The
+            # details now seed these as None, so a default of 0 would compare
+            # None < 50 (a TypeError in Python 3) and, before that, would
+            # report "0 of 0 techniques covered" for a dimension nobody
+            # measured. An unavailable dimension gets its own visibility
+            # recommendation at the end of this function instead.
+            pct = details.get("technique_coverage_pct")
+            total = details.get("total_techniques")
+            if pct is not None and pct < 50 and total:
                 recs.append({
                     "area": "Detection Coverage",
                     "message": (
-                        f"Only {details.get('covered_techniques', 0)} of "
-                        f"{details.get('total_techniques', 0)} MITRE techniques are covered. "
+                        f"Only {details.get('covered_techniques') or 0} of "
+                        f"{total} MITRE techniques have an enabled rule. "
                         "Review blind spots and deploy additional detection rules."
                     ),
                     "priority": "high",
                 })
-            if details.get("rule_quality_pct", 0) < 50:
+            # `is not None` rather than a 0 default, which would both compare
+            # None < 50 (a TypeError) and advise tuning rules on the strength
+            # of a figure TIDE never returned.
+            quality_pct = details.get("rule_quality_pct")
+            if quality_pct is not None and quality_pct < 50:
                 recs.append({
                     "area": "Detection Coverage",
                     "message": (
-                        f"Average rule quality score is {details.get('avg_quality', 0)}/40. "
+                        f"Average rule quality score is "
+                        f"{details.get('avg_quality')}/40. "
                         "Tune low-quality rules to reduce false positives and improve fidelity."
                     ),
                     "priority": "medium",
+                })
+            elif quality_pct is None and details.get("tide_available"):
+                recs.append({
+                    "area": "Detection Coverage",
+                    "message": (
+                        "TIDE returned no average rule quality, so the quality "
+                        "half of this dimension is excluded and the score "
+                        "rests on technique coverage alone. It covers less "
+                        "than it appears to."
+                    ),
+                    "priority": "visibility",
                 })
 
     if score_map["operational_efficiency"] < threshold:

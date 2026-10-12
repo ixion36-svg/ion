@@ -568,12 +568,20 @@ function renderRules(r) {
   $('wb-rules-enabled').textContent = fmtN(r.enabled_rules || 0);
   $('wb-rules-of-total').textContent = `of ${fmtN(r.total_rules || 0)} total`;
 
-  const coveredPct = r.total_techniques
-    ? Math.round((r.covered_techniques / r.total_techniques) * 100)
-    : 0;
   const avgQ = (r.quality && r.quality.avg_quality != null) ? r.quality.avg_quality : '—';
+  // No denominator, no percentage. TIDE 6 keeps the ATT&CK catalogue in a
+  // reference database its external query API will not serve, so an absent
+  // total is the ordinary case against a current TIDE. "0 / 0 (0%)" on a wall
+  // display publishes a measurement nobody took, and a wallboard is the worst
+  // place for that: it hangs there and nobody clicks in to find out.
+  const haveTotal = r.total_techniques != null && r.total_techniques > 0;
+  const coverage = haveTotal
+    ? `<span class="text-ion-cyan tabular-nums font-semibold">${r.covered_techniques || 0} / ${r.total_techniques} ` +
+      `(${Math.round((r.covered_techniques / r.total_techniques) * 100)}%)</span>`
+    : `<span class="text-ion-cyan tabular-nums font-semibold">${r.covered_techniques || 0}</span> ` +
+      `<span class="text-slate-400">with an enabled rule, share of ATT&amp;CK not reported</span>`;
   $('wb-rules-coverage').innerHTML =
-    `MITRE coverage <span class="text-ion-cyan tabular-nums font-semibold">${r.covered_techniques || 0} / ${r.total_techniques || 0} (${coveredPct}%)</span> · ` +
+    `MITRE coverage ${coverage} · ` +
     `avg quality <span class="text-ion-lime tabular-nums font-semibold">${avgQ}</span>`;
 
   // Severity bars — total per severity, and the enabled fraction renders

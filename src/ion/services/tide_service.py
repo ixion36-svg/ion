@@ -720,14 +720,32 @@ class TideService:
 
         # Round-trip 2: counts from mitre_techniques + systems (small, fast tables).
         counts = self._query(
-            "SELECT (SELECT count(*) FROM mitre_techniques) AS total_techniques, "
-            "(SELECT count(*) FROM systems) AS total_systems"
+            "SELECT (SELECT count(*) FROM systems) AS total_systems"
         )
-        total_techniques = 0
         total_systems = 0
         if counts and counts["rows"]:
-            total_techniques = counts["rows"][0].get("total_techniques", 0)
             total_systems = counts["rows"][0].get("total_systems", 0)
+
+        # Asked separately, and allowed to be unavailable.
+        #
+        # TIDE 6 moved the ATT&CK catalogue into a shared reference database
+        # attached as `ref`, and dropped the per-tenant copy. The external
+        # query API's allow-list is built from the tenant's own tables, so
+        # `FROM mitre_techniques` is refused in every form: bare, `ref.` and
+        # `ref.main.`. ATTACH and SET are both blocklisted, so there is no way
+        # to reach it from here. Verified against 6.0.2 on 2026-10-12.
+        #
+        # This used to share one statement with the systems count, so the
+        # refusal took a figure that is perfectly readable down with it, and
+        # then total_techniques was defaulted to 0. A technique total of zero
+        # makes SOC Health compute covered/0 as 0% and present it as measured
+        # detection coverage. None says what is true: nobody counted.
+        techniques = self._query(
+            "SELECT count(*) AS total_techniques FROM mitre_techniques"
+        )
+        total_techniques = None
+        if techniques and techniques["rows"]:
+            total_techniques = techniques["rows"][0].get("total_techniques")
 
         return {
             "total_rules": r["total_rules"],
