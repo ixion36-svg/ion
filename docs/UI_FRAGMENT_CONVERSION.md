@@ -115,6 +115,13 @@ Put them in the page shell and send their values with `hx-include`. If a
 control must be in the fragment because only the fragment knows its state,
 re-render it with its state and say so in a comment.
 
+**Put any stored URL through `|safe_url`.** Jinja escapes characters, not
+schemes, so `href="{{ row.url }}"` with `javascript:alert(1)` in that
+column renders a link that executes on click. The filter allows http,
+https, mailto and a site-relative path, and drops everything else including
+protocol-relative `//host`, stripping the ASCII whitespace and control
+characters a browser strips before reading the scheme.
+
 **Delete the hand-rolled `esc()`.** Jinja autoescapes. Assert it with a
 test that feeds `<script>`.
 

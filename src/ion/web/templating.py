@@ -104,6 +104,50 @@ def _ts_parts(value: object) -> dict | None:
     }
 
 
+def _safe_url(value: object, fallback: str = "") -> str:
+    """A stored URL, or the fallback if its scheme is not one a link may use.
+
+    Jinja escapes characters, not schemes. `href="{{ row.url }}"` with
+    `javascript:alert(1)` in that column renders a link that executes on
+    click, and the hand-rolled `esc()` helpers the fragments replaced had
+    exactly the same hole, so it is not a regression but it is still a hole.
+    Two fragments render a GitLab issue URL straight out of the database.
+
+    Allowed: http, https, mailto, and a site-relative path. Everything else
+    returns the fallback, so the template renders plain text rather than a
+    link that does something other than navigate.
+
+    ASCII whitespace and control characters are stripped before the scheme
+    is read, because a browser strips them too: `java	script:alert(1)` and a
+    leading newline both navigate, so a naive `startswith` check passes
+    something the browser then executes.
+    """
+    if not value:
+        return fallback
+
+    text = str(value)
+    # The same characters a browser ignores when parsing the scheme.
+    stripped = "".join(c for c in text if ord(c) > 0x20)
+    lowered = stripped.lower()
+
+    if lowered.startswith(("http://", "https://", "mailto:")):
+        return text
+    # Protocol-relative. A valid URL, but it changes origin, which a stored
+    # link has no business doing. Rejected before the bare-path check below,
+    # which otherwise accepts it: "//evil.example/x".split("/")[0] is the
+    # empty string, which contains no colon and looks like a relative path.
+    if stripped.startswith("//"):
+        return fallback
+    # A site-relative path.
+    if stripped.startswith("/"):
+        return text
+    # No scheme and no leading slash: a bare path such as "docs/x". Safe,
+    # and rejecting it would break ordinary relative links.
+    if ":" not in lowered.split("/")[0]:
+        return text
+    return fallback
+
+
 def make_templates(directory: Path | None = None) -> Jinja2Templates:
     """Return a Jinja2Templates env configured identically across the app.
 
@@ -127,6 +171,7 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
     # callables, not values, so a licence change is read per render without a
     # template reload.
     templates.env.globals["ts_parts"] = _ts_parts
+    templates.env.filters["safe_url"] = _safe_url
     templates.env.globals["nav_items"] = nav.NAV
     templates.env.globals["nav_mobile_items"] = nav.mobile_items
     templates.env.globals["nav_shortcuts"] = nav.shortcuts

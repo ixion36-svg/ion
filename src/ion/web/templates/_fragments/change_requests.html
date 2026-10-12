@@ -57,7 +57,7 @@
               {% if c.get('gitlab_issue_url') %}
                 {# `is not none`: issue 0 is a number, and a truthiness test
                    would print the fallback for it. #}
-                <a class="ion-link" href="{{ c.get('gitlab_issue_url') }}"
+                <a class="ion-link" href="{{ c.get('gitlab_issue_url')|safe_url }}"
                    target="_blank" rel="noopener">#{{ c.get('gitlab_issue_iid') if c.get('gitlab_issue_iid') is not none else '?' }}</a>
               {% else %}
                 <small class="ion-muted">{{ c.get('gitlab_error') or '—' }}</small>

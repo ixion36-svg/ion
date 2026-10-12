@@ -85,7 +85,7 @@
               <td><span class="ion-pill {{ st_color.get(b.get('status'), 'ion-c-muted') }}">{{ b.get('status') }}</span></td>
               <td>
                 {% if b.get('gitlab_issue_url') %}
-                  <a class="ion-link" href="{{ b.get('gitlab_issue_url') }}" target="_blank" rel="noopener">#{{ iid }}</a>
+                  <a class="ion-link" href="{{ b.get('gitlab_issue_url')|safe_url }}" target="_blank" rel="noopener">#{{ iid }}</a>
                   <small class="ion-muted">{{ b.get('gitlab_state') or '' }}</small>
                 {% else %}
                   <small class="ion-muted">{{ b.get('gitlab_error') or '—' }}</small>
