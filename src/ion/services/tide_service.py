@@ -473,12 +473,15 @@ class TideService:
         # system_id is user-controlled; escape the single-quote break-out.
         safe_id = system_id.replace("'", "''")
         # Techniques covered by this system's detections
+        # dr.enabled = 1: a rule applied to this system but switched off is
+        # not covering anything on it. Applied and running are different
+        # facts, and only the second one detects an intrusion.
         covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM applied_detections ad
             JOIN detection_rules dr ON dr.rule_id = ad.detection_id AND dr.space = '{self.space}',
             LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-            WHERE ad.system_id = '{safe_id}'
+            WHERE ad.system_id = '{safe_id}' AND dr.enabled = 1
         """)
         covered_ids = {r["technique_id"] for r in (covered["rows"] if covered else [])}
 
@@ -574,9 +577,23 @@ class TideService:
                 if entry not in sys_map[parent]:
                     sys_map[parent].append(entry)
 
-        # 4. Build result
+        # 4. Build result.
+        #
+        # Three states, not two. A technique whose rules are all switched off
+        # is neither covered nor untouched: someone wrote the detection and
+        # nothing is running it. That is a different problem from having no
+        # rule at all, and a cheaper one, because enabling beats authoring.
+        # Collapsing it into either bucket destroys the only fact that tells
+        # them apart.
+        #
+        # Measured on the live tenant 2026-10-12: 164 techniques had a rule
+        # and 94 had an enabled one. The previous test counted a technique as
+        # covered the moment any rule mentioned it, so 70 techniques were
+        # reported as covered by rules nothing was running, and none of them
+        # appeared as a gap anywhere.
         result_techs = {}
         covered_ids = set()
+        inactive_ids = []
         blind_spots = []
         for tid, info in tech_catalog.items():
             entry = {
@@ -590,10 +607,14 @@ class TideService:
             }
             if tid in stats_map:
                 entry.update(stats_map[tid])
-                covered_ids.add(tid)
             if tid in sys_map:
                 entry["systems"] = sys_map[tid]
-            if entry["rule_count"] == 0:
+
+            if (entry.get("enabled_rules") or 0) > 0:
+                covered_ids.add(tid)
+            elif (entry.get("rule_count") or 0) > 0:
+                inactive_ids.append(tid)
+            else:
                 blind_spots.append(tid)
             result_techs[tid] = entry
 
@@ -607,7 +628,13 @@ class TideService:
             "techniques": result_techs,
             "total_techniques": len(tech_catalog),
             "covered_techniques": len(covered_ids),
+            # Rules written, none switched on. Kept apart from blind_spots so
+            # a reader can tell "nobody built this" from "nobody turned it on".
+            "inactive_techniques": inactive_ids,
             "blind_spots": blind_spots,
+            # Stated rather than left to be inferred from the name. "Covered"
+            # here means something is actually running, not that a rule exists.
+            "coverage_basis": "at least one enabled rule",
             "total_rules": total_rules,
         }
 
@@ -655,9 +682,14 @@ class TideService:
                 GROUP BY severity
             ),
             coverage AS (
+                -- enabled = 1 is load-bearing. This figure reaches SOC
+                -- Health as technique_coverage_pct and then the detection
+                -- coverage grade; without it a technique counted as covered
+                -- because a disabled rule mentioned it. Measured on the live
+                -- tenant: 164 techniques had a rule, 94 had an enabled one.
                 SELECT count(DISTINCT t.technique_id) AS covered
                 FROM rules r, LATERAL unnest(r.mitre_ids) AS t(technique_id)
-                WHERE r.mitre_ids IS NOT NULL
+                WHERE r.mitre_ids IS NOT NULL AND r.enabled = 1
             )
             SELECT
                 t.*,
@@ -902,11 +934,15 @@ class TideService:
             return None
         techniques = all_tech["rows"]
 
-        # 2. Covered techniques
+        # 2. Covered techniques. enabled = 1, so a gap analysis cannot clear a
+        # tactic on the strength of rules nobody switched on. This function
+        # reports total_blind_spots, which is exactly the number that must not
+        # be flattered.
         covered = self._query(f"""
             SELECT DISTINCT t.technique_id
             FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
             WHERE dr.space = '{self.space}' AND dr.mitre_ids IS NOT NULL
+              AND dr.enabled = 1
         """)
         covered_set: set[str] = set()
         if covered:

@@ -2229,6 +2229,20 @@ kbd {
     font-size: 0.5625rem;
     opacity: 0.7;
 }
+/* Rules written, none switched on. Deliberately neither green nor red: the
+   detection exists, so this is not a blind spot, and nothing is running it,
+   so it is not coverage. Amber with a dotted edge, so the state survives
+   greyscale and colour blindness instead of relying on hue alone. */
+.mitre-heatmap-cell.tide-inactive {
+    background: rgba(210, 153, 34, 0.10);
+    color: var(--sev-medium, #d29922);
+    border: 1px dotted rgba(210, 153, 34, 0.55);
+}
+.mitre-heatmap-cell.tide-inactive .tech-count {
+    font-size: 0.5625rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
 .mitre-heatmap-cell.tide-blind {
     background: rgba(244, 67, 54, 0.06);
     color: rgba(244, 67, 54, 0.6);
@@ -7894,11 +7908,16 @@ function renderMitreHeatmap() {
                 <span>Covered (silent)</span>
             </div>
             <div class="mitre-legend-item">
+                <div class="mitre-legend-swatch bg-[rgba(210,153,34,0.12)] border border-dotted border-[rgba(210,153,34,0.55)]"></div>
+                <span>Written, not enabled</span>
+            </div>
+            <div class="mitre-legend-item">
                 <div class="mitre-legend-swatch _ion-s-170c9817b7"></div>
                 <span>Blind spot</span>
             </div>
             <div class="mitre-tide-summary">
                 <span><strong>${cov.covered_techniques}</strong>/${cov.total_techniques} covered</span>
+                <span><strong>${(cov.inactive_techniques || []).length}</strong> written, not enabled</span>
                 <span><strong>${(cov.blind_spots || []).length}</strong> blind spots</span>
                 <span><strong>${cov.total_rules}</strong> rules</span>
             </div>
@@ -7914,8 +7933,13 @@ function renderMitreHeatmap() {
         const techniques = tacticData[tactic]
             .filter(t => t.count > 0 || t.tideRules > 0 || tideTechs)  // show all if TIDE loaded
             .sort((a, b) => {
-                const stateA = a.count > 0 ? 2 : ((a.tideRules || 0) > 0 ? 1 : 0);
-                const stateB = b.count > 0 ? 2 : ((b.tideRules || 0) > 0 ? 1 : 0);
+                // Four states now, so a written-but-disabled technique sorts
+                // between a running one and one nothing covers at all.
+                const state = t => t.count > 0 ? 3
+                    : ((t.tideEnabled || 0) > 0 ? 2
+                    : ((t.tideRules || 0) > 0 ? 1 : 0));
+                const stateA = state(a);
+                const stateB = state(b);
                 if (stateA !== stateB) return stateB - stateA;
                 return (b.count || 0) - (a.count || 0);
             });
@@ -7948,15 +7972,28 @@ function renderMitreHeatmap() {
                         titleParts.push(`${tech.tideRules} detection rule(s), avg quality: ${tech.tideQuality}`);
                         titleParts.push(`${(tech.tideSystems || []).length} system(s) covered`);
                     }
-                } else if ((tech.tideRules || 0) > 0) {
-                    // COVERED: has TIDE rules but no current alerts
+                } else if ((tech.tideEnabled || 0) > 0) {
+                    // COVERED: at least one rule is actually running.
+                    // The count shows enabled rules, not rules written: this
+                    // cell used to read "41r" for a technique with 41 rules
+                    // and none switched on.
                     cellClass = 'tide-covered';
-                    countDisplay = `${tech.tideRules}r`;
+                    countDisplay = `${tech.tideEnabled}r`;
                     titleParts.push('No active alerts');
-                    titleParts.push(`${tech.tideRules} detection rule(s), ${tech.tideEnabled || 0} enabled`);
+                    titleParts.push(`${tech.tideEnabled} of ${tech.tideRules} detection rule(s) enabled`);
                     titleParts.push(`Avg quality: ${tech.tideQuality}`);
                     const sysNames = (tech.tideSystems || []).map(s => s.name).join(', ');
                     if (sysNames) titleParts.push(`Systems: ${sysNames}`);
+                } else if ((tech.tideRules || 0) > 0) {
+                    // INACTIVE: rules exist, none enabled. Someone built the
+                    // detection and nothing runs it. Not coverage, and not a
+                    // blind spot either, because enabling beats authoring.
+                    cellClass = 'tide-inactive';
+                    countDisplay = 'off';
+                    titleParts.push('NOT RUNNING');
+                    titleParts.push(`${tech.tideRules} detection rule(s) written, none enabled`);
+                    titleParts.push('Nothing is detecting this technique');
+                    titleParts.push(`Avg quality: ${tech.tideQuality}`);
                 } else {
                     // BLIND SPOT: no TIDE rules, no alerts
                     cellClass = 'tide-blind';

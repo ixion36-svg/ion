@@ -369,7 +369,7 @@ function renderPosture(d, disabledCrit) {
         <div class="de-stat"><div class="de-stat-label">Total Rules</div><div class="de-stat-val">${d.total_rules.toLocaleString()}</div><div class="de-stat-sub">in default space</div></div>
         <div class="de-stat green"><div class="de-stat-label">Enabled</div><div class="de-stat-val">${d.enabled_rules.toLocaleString()}</div><div class="de-stat-sub">${enabledPct}% of total</div></div>
         <div class="de-stat warn"><div class="de-stat-label">Disabled</div><div class="de-stat-val">${d.disabled_rules.toLocaleString()}</div><div class="de-stat-sub">${100-enabledPct}% of total</div></div>
-        <div class="de-stat"><div class="de-stat-label">MITRE Coverage</div><div class="de-stat-val">${d.covered_techniques}/${d.total_techniques}</div><div class="de-stat-sub">${covPct}% techniques</div></div>
+        <div class="de-stat"><div class="de-stat-label">MITRE Coverage</div><div class="de-stat-val">${d.covered_techniques}/${d.total_techniques}</div><div class="de-stat-sub">${covPct}% with an enabled rule</div></div>
         <div class="de-stat"><div class="de-stat-label">Unmapped Rules</div><div class="de-stat-val">${d.unmapped_rules}</div><div class="de-stat-sub">no MITRE mapping</div></div>
         <div class="de-stat"><div class="de-stat-label">Systems</div><div class="de-stat-val">${d.total_systems}</div><div class="de-stat-sub">monitored</div></div>
     </div>
