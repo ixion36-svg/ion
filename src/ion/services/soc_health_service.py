@@ -479,6 +479,17 @@ def _integration_health() -> dict[str, Any]:
 # Recommendations
 # ---------------------------------------------------------------------------
 
+# The names the cards use, so a recommendation points at a heading the
+# reader can actually find on the page.
+_DIMENSION_LABELS = {
+    "detection_coverage": "Detection Coverage",
+    "operational_efficiency": "Operational Efficiency",
+    "team_readiness": "Team Readiness",
+    "knowledge_completeness": "Knowledge Completeness",
+    "integration_health": "Integration Health",
+}
+
+
 def _build_recommendations(dimensions: dict[str, dict]) -> list[dict[str, str]]:
     """Generate actionable recommendations for dimensions scoring below 60."""
     recs: list[dict[str, str]] = []
@@ -603,6 +614,24 @@ def _build_recommendations(dimensions: dict[str, dict]) -> list[dict[str, str]]:
                         "message": f"{label} is configured but not responding. Check connectivity and credentials.",
                         "priority": "high",
                     })
+
+    # A dimension that could not be measured gets its own entry, because
+    # `score is None` maps to the threshold above and so reaches none of the
+    # branches that recommend an improvement. Without this the scorecard
+    # states "1 dimension could not be measured" and offers no way to change
+    # that, which is a dead end: the reader is told what ION does not know
+    # and not what would let it know. The advice is to restore visibility,
+    # never to improve a figure that does not exist.
+    for name, dim in dimensions.items():
+        if dim.get("score") is not None:
+            continue
+        reason = (dim.get("details") or {}).get("reason") or "No input was available."
+        recs.append({
+            "area": _DIMENSION_LABELS.get(name, name.replace("_", " ").title()),
+            "message": f"{reason} Until that is fixed this dimension is excluded from the score, "
+                       f"so the grade covers less of the SOC than it appears to.",
+            "priority": "visibility",
+        })
 
     return recs
 

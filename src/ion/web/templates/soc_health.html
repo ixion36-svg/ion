@@ -119,6 +119,20 @@
     border-bottom: 1px dashed currentColor;
 }
 
+/* A recommendation about something ION cannot see. Dashed, matching the
+   unmeasured card, so it is not read as a ranked finding alongside the
+   ones measured against real data. */
+.sh-rec-unseen {
+    background: transparent;
+    border: 1px dashed var(--sev-medium);
+    color: var(--ion-text);
+}
+.sh-badge-unseen {
+    background: transparent;
+    border: 1px dashed var(--sev-medium);
+    color: var(--sev-medium);
+}
+
 /* Permanent furniture, not a tooltip. A reader should not have to hover
    to learn that hatching means nobody checked. */
 .sh-legend {
@@ -277,9 +291,15 @@ function renderScorecard(d) {
     if (recs.length) {
         html += '<div class="card bg-base-200 shadow"><div class="card-body"><h2 class="card-title text-sm uppercase tracking-wide opacity-60"><i class="icon-zap"></i> Improvement Recommendations</h2>';
         for (const rec of recs) {
-            const recKind = rec.priority === 'high' ? 'error' : rec.priority === 'medium' ? 'warning' : 'info';
-            html += `<div role="alert" class="alert alert-${recKind}">
-                <span class="badge badge-sm badge-${recKind}">${esc(rec.area)}</span>
+            // A visibility gap is not a low-priority improvement. It says ION
+            // cannot see the thing at all, so it carries the same dashed
+            // treatment as the unmeasured card rather than a severity colour
+            // that would rank it against findings ION actually measured.
+            const unseen = rec.priority === 'visibility';
+            const recKind = rec.priority === 'high' ? 'error'
+                          : rec.priority === 'medium' ? 'warning' : 'info';
+            html += `<div role="alert" class="alert ${unseen ? 'sh-rec-unseen' : 'alert-' + recKind}">
+                <span class="badge badge-sm ${unseen ? 'sh-badge-unseen' : 'badge-' + recKind}">${esc(rec.area)}</span>
                 <span>${esc(rec.message)}</span>
             </div>`;
         }
