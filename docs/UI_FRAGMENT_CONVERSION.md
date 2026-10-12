@@ -166,13 +166,19 @@ browser smoke crawl across the converted pages is what found the one
 instance. `tests/test_review_20261008_page_wiring_guards.py` now guards
 all three.
 
-**A swap target that carries `hx-include` must disinherit it.** `hx-include`
-is inherited, so every element your fragment renders inside that container
-inherits it and sends the control's value on its own requests too. Where the
-inner request already carries that parameter, baked in server-side, the
-request goes out with it twice and FastAPI reads the last one, which is the
-appended inherited copy. The control then decides the parameter and the baked
-value is ignored, which is the reverse of what the markup says.
+**A nested request must not send a parameter twice.** `hx-include` is
+inherited, so every element your fragment renders inside a container that
+carries one sends that control's value on its own requests too. Where the
+inner request also bakes that same parameter in server-side, it goes out
+twice and FastAPI reads the last copy, which is the appended inherited one.
+The control then decides the parameter and the baked value is ignored, which
+is the reverse of what the markup says.
+
+The defect is the duplicate, not the inheritance. Inheritance is often the
+mechanism you want: a nested control that needs the page's current filters
+is how it gets them. Do not strip a container's `hx-include` to stop a
+duplicate, and do not add `hx-disinherit` reflexively. Work out which of
+the two is sending the parameter and remove that one:
 
     <div id="x-content"
          hx-get="/ui/x/panel"
@@ -182,18 +188,30 @@ value is ignored, which is the reverse of what the markup says.
          hx-swap="innerHTML">
 
 `hx-disinherit` governs only what children inherit, so the container's own
-request still sends the control. Both halves need a guard, because deleting
-the `hx-include` to stop the duplicate breaks the restored-select case it
-was added for.
+request still sends the control, and an element with its own `hx-include`
+uses that rather than the inherited one either way. Guard both halves,
+because deleting the container's `hx-include` to stop a duplicate breaks the
+restored-select case it was added for.
 
-Two pages were found doing this independently, `detection_health` through
-its drill-down and `stories` through its nested run table, and in both the
-two copies agreed, so nothing looked wrong. `stories` was one disagreement
-away from a 422. This is not visible in the markup and not visible in an
-HTTP check: only the request the browser actually sends shows it, so
-measure it with a request listener rather than reasoning about the
-attributes. Fourteen containers of this shape exist across the converted
-pages and only those two are known to be safe.
+Two pages had it, found independently: `detection_health` through its
+drill-down, where `drill_url` baked `days` and the panel sent `days`, and
+`stories` through its nested run table, which was one disagreement away
+from a 422. In both the two copies agreed, so nothing looked wrong.
+
+All fourteen containers of this shape have now been checked. Ten render no
+nested request at all, so nothing inherits. `audit_logs` and
+`entity_timeline` both render one and are clean, measured in a browser:
+`audit_logs` pagination declares its own `hx-include`, and
+`entity_timeline` bakes `sources`, which its container does not send, so it
+is clean whether the pill declares an include or inherits one. Both were
+measured rather than read, including by injecting a control into the real
+container where the dev data rendered none.
+
+None of this is visible in the markup or in an HTTP check, and a static
+scan cannot see it: a request URL built from a Jinja expression such as
+`hx-get="{{ row.drill_url }}"` has no literal query string to find, which
+is exactly the shape that carries the duplicate. Measure the request the
+browser sends, with a listener on `page.on("request")`.
 
 **Delete the hand-rolled `esc()`.** Jinja autoescapes. Assert it with a
 test that feeds `<script>`.
