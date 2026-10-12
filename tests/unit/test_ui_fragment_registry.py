@@ -259,6 +259,11 @@ def test_every_template_a_fragment_names_exists():
     conversion landed. Nothing else would have caught it: the module
     imports, the route mounts, and every other guard here passes. Only a
     request fails.
+
+    In a work tree where conversions are in progress this fails honestly
+    and transiently, naming a module whose template has not been written
+    yet. That is the guard doing its job, not a defect in it: check the
+    committed tree rather than the working one before concluding anything.
     """
     templates_dir = pathlib.Path(ui.__file__).parent.parent / "templates"
     checked, missing = 0, []
