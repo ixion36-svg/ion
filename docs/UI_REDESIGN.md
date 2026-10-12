@@ -17,14 +17,14 @@ page cannot be forgotten. Status is measured, never set by hand.
 | styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |
 | server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |
 
-**11 of 80 templates complete.**
+**12 of 80 templates complete.**
 
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 78,262 |
+| total lines | 78,217 |
 | inline `<style>` lines | 15,544 |
-| runtime DOM writes | 1,033 |
+| runtime DOM writes | 1,029 |
 | literal light-on-dark colours | 11 |
 
 ## Shell and partials
@@ -55,8 +55,9 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `briefings.html` | 153 | 0 | 55 | 0 | yes | yes | yes | **done** |
 | `notes.html` | 137 | 0 | 31 | 0 | yes | yes | yes | **done** |
 | `soc_roles.html` | 56 | 0 | 0 | 0 | yes | yes | yes | **done** |
+| `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 9 templates, 3,221 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 10 templates, 3,271 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Tier B, 1 to 10 runtime writes
 
@@ -100,9 +101,8 @@ Markup plus a short list of class strings in inline JS.
 | `case_grouper.html` | 175 | 0 | 137 | 4 | yes | yes | no |  |
 | `compliance.html` | 173 | 0 | 142 | 4 | yes | yes | no |  |
 | `knowledge_graph.html` | 169 | 0 | 118 | 6 | yes | yes | no |  |
-| `service_accounts.html` | 95 | 0 | 64 | 4 | yes | yes | no |  |
 
-Subtotal: 37 templates, 11,799 lines, 0 inline css lines, 176 runtime writes, 0 light-mode literals.
+Subtotal: 36 templates, 11,704 lines, 0 inline css lines, 172 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 

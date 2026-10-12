@@ -412,6 +412,13 @@ app.include_router(arkime_router, prefix="/api")
 # ION_WISE_TOKEN is set)
 from ion.web.wise_api import router as wise_router  # noqa: E402, I001
 app.include_router(wise_router, prefix="/api")
+
+# Server-rendered htmx fragments. The router carries its own /ui prefix, so
+# no prefix is passed here: /api is a JSON contract and a fragment is a view
+# versioned with its template, not with the API. See ion/web/ui.py.
+from ion.web.ui import router as ui_router  # noqa: E402
+
+app.include_router(ui_router)
 app.include_router(forensics_router, prefix="/api/forensics")
 # ForensicCase Workbench — pinned evidence + tamper-evident ledger
 app.include_router(forensic_workbench_router, prefix="/api/forensics")
