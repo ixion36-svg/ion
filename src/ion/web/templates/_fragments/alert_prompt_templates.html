@@ -48,7 +48,7 @@
           </div>
         {% endif %}
       </td>
-      <td>{% if t.enabled %}<span class="badge badge-success badge-sm">Enabled</span>{% elif t.enabled is false %}<span class="badge badge-ghost badge-sm">Disabled</span>{% else %}<span class="badge badge-ghost badge-sm">Unknown</span>{% endif %}</td>
+      <td>{% if t.enabled is true %}<span class="badge badge-success badge-sm">Enabled</span>{% elif t.enabled is false %}<span class="badge badge-ghost badge-sm">Disabled</span>{% else %}<span class="badge badge-ghost badge-sm">Unknown</span>{% endif %}</td>
       <td>
         <button class="btn btn-ghost btn-sm" data-click-action="editTemplate" data-args='{{ [t.id]|tojson }}'>Edit</button>
         <button class="btn btn-ghost btn-sm btn-error" data-click-action="deleteTemplate" data-args='{{ [t.id, t.name]|tojson }}'>Delete</button>
