@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-from enum import Enum
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -12,7 +11,7 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import require_permission
 from ion.storage.database import get_db_session
 from ion.web.change_request_api import _PERM
-from ion.web.ui._shared import templates
+from ion.web.ui._shared import plain, templates
 
 logger = logging.getLogger(__name__)
 
@@ -44,20 +43,6 @@ _STATUS_COLOUR = {
 }
 
 
-def _value(raw: object) -> str:
-    """A SQLEnum column's value as a plain string.
-
-    `ChangeRequest.status` and `.risk_level` are SQLEnum columns, so
-    `to_dict()` returns the enum member. FastAPI serialised that to its value
-    for the JSON the JavaScript consumed; Jinja would render str(member),
-    which on Python 3.12 is "ChangeRequestStatus.SUBMITTED". That reads as the
-    repr in the pill and matches no colour key.
-    """
-    if isinstance(raw, Enum):
-        return str(raw.value)
-    return "" if raw is None else str(raw)
-
-
 def _created_display(raw: object) -> str:
     """`2026-10-12T08:30:11.123456` as `2026-10-12 08:30`.
 
@@ -72,6 +57,17 @@ def _created_display(raw: object) -> str:
     return str(raw)[:16].replace("T", " ")
 
 
+def _as_text(raw: object) -> str:
+    """A SQLEnum column's value as a plain string.
+
+    ui._shared.plain does the unwrapping, shared with the other
+    conversions that hit the same trap. The str() is local, because the
+    transition table and the colour maps here are keyed by string and a
+    comparison against an enum member would silently match nothing.
+    """
+    return str(plain(raw))
+
+
 def _next_actions(status: object) -> list[dict[str, str]]:
     """The transitions legal from `status`, in the service's own order.
 
@@ -83,7 +79,7 @@ def _next_actions(status: object) -> list[dict[str, str]]:
     """
     from ion.services.service_desk_service import _TRANSITIONS
 
-    current = _value(status)
+    current = _as_text(status)
     out: list[dict[str, str]] = []
     for action, (allowed_from, _new) in _TRANSITIONS.items():
         if current not in allowed_from:
@@ -96,8 +92,8 @@ def _next_actions(status: object) -> list[dict[str, str]]:
 def _row_view(cr: dict[str, Any]) -> dict[str, Any]:
     """One change request with the derived fields the table needs."""
     row = dict(cr)
-    status = _value(cr.get("status"))
-    risk = _value(cr.get("risk_level"))
+    status = _as_text(cr.get("status"))
+    risk = _as_text(cr.get("risk_level"))
     row["status"] = status
     row["risk_level"] = risk
     row["status_css"] = _STATUS_COLOUR.get(status, "ion-c-muted")

@@ -1,0 +1,80 @@
+{# The architecture diagram's nodes, ring labels and workflow links.
+
+   Replaces the single `innerHTML` write in architecture.html, which built
+   every node card from strings, plus the three JavaScript array constants
+   that described the topology and the icon map that turned a Lucide name
+   into an `icon-*` class. `.arch-node`, `.node-card`, `.node-icon`,
+   `.node-name` and `.ring-label` all have rules in frontend/ion-pages.css
+   that no stylesheet sweep could reach while the markup was built in the
+   browser.
+
+   Geometry stays in the page: the radii depend on the container's measured
+   size, so the JavaScript reads each ring's constants off its label here and
+   positions the elements this fragment already rendered. Nothing is created
+   in the browser except the SVG lines, which use createElementNS.
+
+   The three ring labels are visible here for the first time. The function
+   that was meant to insert them, `updateLabels`, wrote
+   `container.replaceChildren() + '<div class="ring-label" ...>'`, which adds
+   a string to `undefined` and discards the result, so `#labels-container`
+   stayed empty for every release and `.ring-label` was a dead selector in
+   frontend/ion-pages.css. #}
+
+{% if payload is none %}
+  {# A failed build is not an empty system. An empty container on this page
+     reads as "ION has no modules and nothing is connected", which is the
+     opposite conclusion from "we could not describe the topology".
+
+     The retry is the escape hatch. The page's status badge sits outside this
+     swap, so without a control in here a failed first paint leaves a blank
+     diagram whose only remedy is a reload. The marker attribute is what the
+     page reads to stop the badge claiming "Ready". #}
+  <div class="text-center p-10" data-arch-topology-failed="true">
+    <div role="alert" class="alert alert-error">
+      <span>The architecture topology could not be read, so no diagram is
+        shown. This is not an empty system: nothing about it was measured.</span>
+      <button class="btn btn-sm"
+              hx-get="/ui/architecture/diagram"
+              hx-target="#arch-diagram-nodes"
+              hx-swap="innerHTML">Retry</button>
+    </div>
+  </div>
+{% else %}
+  {% for ring in payload.rings %}
+    {# Every geometry number is guarded with `is not none`, never truthiness.
+       The core ring's angle offset IS 0, so a truthiness test would drop the
+       attribute for the one ring that has a measured zero, and the page would
+       then place its four nodes at NaN. #}
+    <div class="ring-label"
+         data-ring="{{ ring.index }}"
+         {%- if ring.min_radius is not none %} data-ring-min-radius="{{ ring.min_radius }}"{% endif %}
+         {%- if ring.radius_factor is not none %} data-ring-radius-factor="{{ ring.radius_factor }}"{% endif %}
+         {%- if ring.angle_offset is not none %} data-ring-angle-offset="{{ ring.angle_offset }}"{% endif %}
+         >{{ ring.label }}</div>
+
+    {% for node in ring.nodes %}
+      <div class="arch-node" data-id="{{ node.id }}" data-ring="{{ ring.index }}">
+        <div class="node-card">
+          <div class="node-icon"><i class="{{ node.icon }}"></i></div>
+          <div class="node-name">{{ node.name }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  {% endfor %}
+
+  {# The workflow edges as elements rather than a JSON blob. An element per
+     edge is inspectable in devtools, needs no parse step, and carries no
+     question about whether htmx or the CSP treats a <script> data block as
+     a script. DOM order is the order the page staggers packet animations
+     in, so it is load-bearing. #}
+  <div id="arch-workflow-links" class="hidden" hidden>
+    {% for workflow, links in payload.workflows.items() %}
+      {% for link in links %}
+        <span class="arch-path"
+              data-workflow="{{ workflow }}"
+              data-from="{{ link.source }}"
+              data-to="{{ link.target }}"></span>
+      {% endfor %}
+    {% endfor %}
+  </div>
+{% endif %}

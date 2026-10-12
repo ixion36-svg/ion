@@ -91,6 +91,30 @@ It emits `<time datetime>` with a UTC-labelled fallback, and
 htmx swap. That assignment is `textContent`, so the `server` column still
 passes. A missing timestamp renders the fallback, never the epoch.
 
+**Unwrap SQLEnum columns with `ui._shared.plain`.** ION's status, severity
+and risk columns are `SQLEnum`, so a row read through the ORM carries the
+enum member. The JSON endpoints got the string for free because FastAPI
+serialises a str-mixin enum by value. A template does not: on Python 3.12
+`str(ChangeRequestStatus.SUBMITTED)` is `"ChangeRequestStatus.SUBMITTED"`,
+which is what the pill renders. Value equality still holds, so a colour map
+keyed by the string keeps working and only the visible text is wrong, which
+is why it survives a glance. Two conversions hit this independently.
+
+**Do not write your own failure handler.** `static/js/htmx-errors.js` is
+the one definition: a 401 redirects with a way back, and everything else
+clones an alert out of a template in base.html into the failed target. A
+per-page listener is one copy per page of a decision about what an expired
+session means. Your route should still catch what it can and return a 200
+fragment that says the read failed, because that is the case you can word
+properly.
+
+**Keep the controls outside the swap target.** A filter, a window select or
+a Refresh button inside the fragment is removed by any render that does not
+include it, so a failed read can take away the control that would retry.
+Put them in the page shell and send their values with `hx-include`. If a
+control must be in the fragment because only the fragment knows its state,
+re-render it with its state and say so in a comment.
+
 **Delete the hand-rolled `esc()`.** Jinja autoescapes. Assert it with a
 test that feeds `<script>`.
 

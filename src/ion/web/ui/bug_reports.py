@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from ion.auth.dependencies import get_current_user
 from ion.models.user import User
 from ion.storage.database import get_db_session
-from ion.web.ui._shared import templates
+from ion.web.ui._shared import plain, templates
 
 logger = logging.getLogger(__name__)
 
@@ -36,27 +36,13 @@ def _fmt_dt(iso: Optional[str]) -> str:
         return str(iso)
 
 
-def _plain(value: object) -> object:
-    """An enum member's value, or the value unchanged.
-
-    `severity` and `status` are SQLEnum columns, so a row read through the
-    ORM carries the enum member. The JSON endpoint got the string for free
-    because FastAPI serialises a str-mixin enum by value; a template does
-    not. On Python 3.11+ `str(BugReportSeverity.HIGH)` is
-    "BugReportSeverity.HIGH", which is what the pill would have printed.
-    Value equality still works, so the colour lookup kept working and only
-    the visible text was wrong, which is the kind of thing that ships.
-    """
-    return getattr(value, "value", value)
-
-
 def _rows(reports: list[dict]) -> list[dict]:
     """The report dicts with their display-only fields added."""
     out = []
     for r in reports:
         row = dict(r)
-        row["severity"] = _plain(r.get("severity"))
-        row["status"] = _plain(r.get("status"))
+        row["severity"] = plain(r.get("severity"))
+        row["status"] = plain(r.get("status"))
         row["created_display"] = _fmt_dt(r.get("created_at"))
         out.append(row)
     return out
