@@ -2535,3 +2535,36 @@ h1, h2, h3, h4, h5, h6 {
 .htmx-indicator { display: none; }
 .htmx-request .htmx-indicator { display: inline-flex; }
 .htmx-request.htmx-indicator { display: inline-flex; }
+
+/* The in-flight state of a fragment swap, applied by static/js/htmx-busy.js
+ * to the element htmx is about to replace.
+ *
+ * htmx leaves the old content on screen until the response arrives, so on a
+ * slow query a filter change or a Refresh click looks like a click that did
+ * nothing, and the user clicks again. The JavaScript these fragments replace
+ * wrote a spinner into the container before every fetch, so the conversion
+ * lost a cue rather than never having had one.
+ *
+ * Dimmed rather than hidden or blanked, deliberately: the figures on screen
+ * are still the last ones that were actually read, and replacing them with a
+ * spinner throws away true information in order to show that newer
+ * information is coming. Fading says "this is being refreshed" while leaving
+ * it readable.
+ *
+ * pointer-events stays on. A control inside the region, including the one
+ * that retries, must not stop working because a request is in flight.
+ */
+.ion-busy {
+    opacity: 0.55;
+    transition: opacity 120ms ease-out;
+    cursor: progress;
+}
+
+/* The control the user actually touched, so a click registers visibly even
+ * when the region being replaced is elsewhere on the page. */
+button.htmx-request,
+select.htmx-request,
+input.htmx-request {
+    opacity: 0.6;
+    cursor: progress;
+}

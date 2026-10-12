@@ -138,6 +138,18 @@ https, mailto and a site-relative path, and drops everything else including
 protocol-relative `//host`, stripping the ASCII whitespace and control
 characters a browser strips before reading the scheme.
 
+**You get the in-flight cue for free, so do not build one.**
+`static/js/htmx-busy.js` marks the element htmx is about to replace with
+`.ion-busy` for the duration of the request, and the stylesheet fades it.
+htmx leaves the old content on screen until the response arrives, so
+without that a filter change on a slow query reads as a click that did
+nothing and the user clicks again. The content is dimmed rather than
+blanked on purpose: the figures on screen are still the last ones that
+were really read, and replacing them with a spinner throws away true
+information to announce that newer information is coming. A page wanting a
+stronger cue can still declare `hx-indicator`, which now works, because
+the `.htmx-indicator` pair is defined in `frontend/ion-legacy.css`.
+
 **Delete the hand-rolled `esc()`.** Jinja autoescapes. Assert it with a
 test that feeds `<script>`.
 

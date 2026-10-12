@@ -89,6 +89,12 @@
          so without this the conversion is a regression in exactly the case
          the user needs to be told about. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/htmx-errors.js?v={{ ion_version }}"></script>
+    <!-- htmx leaves the old content in place until the response arrives, so
+         a filter change or a Refresh click on a slow query reads as a click
+         that did nothing and the user clicks again. The JavaScript these
+         fragments replace wrote a spinner before every fetch. This marks the
+         element being replaced for the duration instead. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/htmx-busy.js?v={{ ion_version }}"></script>
     <!-- Restores styling the v0.31.21 inline-style migration broke: it hashed
          `style="width:${pct}%"` into a STATIC class containing the literal
          ${pct}, which browsers drop as invalid CSS. See the file header. -->
