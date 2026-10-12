@@ -84,7 +84,16 @@
     /* Text colors — slate-* family */
     --text-primary: #cbd5e1;
     --text-secondary: #94a3b8;
-    --text-muted: #64748b;
+    /* Was #64748b, the same value the light block uses. Nobody had tuned
+       the dark one, and a single mid-grey cannot clear AA against both a
+       near-black and a near-white page. Measured on #0a0c12 it was
+       **4.11:1** against a 4.5 floor, so every `--text-muted` body string
+       in dark mode was marginally unreadable, including the footer line on
+       56 of 57 pages (the widest dark-mode failure the crawl found).
+       #7c8ba1 measures 5.65:1 there and is the smallest lift that clears
+       with headroom. The light block keeps #64748b, which is 5.0:1 on
+       white and already correct. */
+    --text-muted: #7c8ba1;
     --text-bright: #ffffff;
 
     /* Border colors */
@@ -2144,12 +2153,91 @@ h1, h2, h3, h4, h5, h6 {
 /* Mode / toggle switches */
 
 
-/* Notepad panel (if visible during mode flip) */
+/* ── Notes panel, light mode ──────────────────────────────────────────────
+   The rule below used to be the whole light treatment, with the comment
+   "if visible during mode flip". It turned the panel surface white and
+   left all 38 of its child rules on the dark literals base.html sets
+   inline, so in light mode the panel was light-background with light text.
+
+   Measured by tools/contrast_crawl.py on 2026-10-12: `.np-tab.active` at
+   #6de4ff on the whitened panel is **1.48:1 on 56 of 57 pages**, the single
+   worst and most widespread failure in the app. The panel is in the shell,
+   so one component broke every page at once.
+
+   Fixed here rather than in base.html's inline <style> because this is
+   where the other light treatments live, it compiles into ion.css so it is
+   themed and cached, and it leaves the markup of 56 pages untouched. Every
+   selector below beats base.html's by one attribute selector, so none of
+   this needs !important. */
 [data-mode="light"] .notepad-panel,
 [data-mode="light"] #notepad-panel {
   background: var(--bg-card) !important;
   border-color: var(--ion-border) !important;
   color: var(--text-primary) !important;
+}
+
+/* Tabs. The active tab carried the dark-mode cyan literal; the token flips
+   to #0b7c99 in light mode and clears AA on white. */
+[data-mode="light"] .np-tab.active {
+  color: var(--color-ion-cyan);
+  border-bottom-color: var(--color-ion-cyan);
+}
+[data-mode="light"] .np-tab:hover { color: var(--text-primary); }
+[data-mode="light"] .np-tabs,
+[data-mode="light"] .np-list-header,
+[data-mode="light"] .np-clip-header,
+[data-mode="light"] .np-editor-toolbar { border-color: var(--ion-border); }
+
+/* Inputs. `color:#fff` on a white panel is invisible, not low-contrast. */
+[data-mode="light"] .np-search,
+[data-mode="light"] .np-title-input {
+  color: var(--text-primary);
+  border-color: var(--ion-border);
+}
+[data-mode="light"] .np-search { background: rgba(15, 23, 42, 0.04); }
+[data-mode="light"] .np-search:focus { background: rgba(15, 23, 42, 0.06); }
+[data-mode="light"] .np-search::placeholder,
+[data-mode="light"] .np-title-input::placeholder { color: var(--text-muted); }
+
+/* Note list and clipboard */
+[data-mode="light"] .np-note-title,
+[data-mode="light"] .np-clip-text { color: var(--text-primary); }
+[data-mode="light"] .np-note-item:hover { background: rgba(15, 23, 42, 0.04); }
+[data-mode="light"] .np-clip-item {
+  background: rgba(15, 23, 42, 0.03);
+  border-color: var(--ion-border);
+}
+
+/* Secondary buttons. Their hover state set `color:#fff`. */
+[data-mode="light"] .np-btn-sm,
+[data-mode="light"] .np-btn-xs {
+  color: var(--text-secondary);
+  border-color: var(--ion-border);
+}
+[data-mode="light"] .np-btn-sm { background: rgba(15, 23, 42, 0.04); }
+[data-mode="light"] .np-btn-sm:hover,
+[data-mode="light"] .np-btn-xs:hover {
+  color: var(--text-primary);
+  background: rgba(15, 23, 42, 0.07);
+}
+
+/* Quill, whose toolbar and editor inherit nothing useful from the theme. */
+[data-mode="light"] .np-quill-wrap .ql-editor,
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-item { color: var(--text-primary); }
+[data-mode="light"] .np-quill-wrap .ql-toolbar.ql-snow {
+  background: rgba(15, 23, 42, 0.02);
+  border-bottom-color: var(--ion-border);
+}
+[data-mode="light"] .np-quill-wrap .ql-editor.ql-blank::before,
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-label { color: var(--text-muted); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-stroke { stroke: var(--text-muted); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-fill { fill: var(--text-muted); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--color-ion-cyan); }
+[data-mode="light"] .np-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--color-ion-cyan); }
+[data-mode="light"] .np-quill-wrap .ql-snow .ql-picker-options {
+  background: var(--bg-card);
+  border-color: var(--ion-border);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
 }
 
 /* ── Markdown rendering inside note cards (v0.16.0)
