@@ -1,0 +1,1 @@
+{% if types is none %}<div class="alert alert-error">Document types could not be read. Retry types.</div>{% else %}<select id="doctype-filter" class="select select-sm"><option value="">All Types</option>{% for key,label in types.items() %}<option value="{{ key }}"{% if key == selected %} selected{% endif %}>{{ key }} - {{ label }}</option>{% endfor %}</select>{% endif %}
