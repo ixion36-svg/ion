@@ -50,6 +50,7 @@ MAPPING = {
     "#2dd4bf": ("var(--neon-teal)", "teal-400, 1.86:1 on white"),
     "#a5b4cb": ("var(--text-secondary)", "slate-ish, 2.10:1 on white"),
     "#f472b6": ("var(--neon-pink)", "pink-400, 2.65:1 on white"),
+    "#fb7185": ("var(--neon-rose)", "rose-400, 2.69:1 on a card"),
 }
 
 RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")

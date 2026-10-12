@@ -76,6 +76,7 @@
     --neon-teal: #2dd4bf;
     --neon-pink: #f472b6;
     --neon-sky:  #93c5fd;
+    --neon-rose: #fb7185;
     --neon-red: #ff6c6c;
 
     /* Primary color */
@@ -374,6 +375,8 @@
     --neon-teal: #0f766e;
     --neon-pink: #be185d;
     --neon-sky:  #1d4ed8;
+    /* rose: #fb7185 measured 2.69:1 on /soc-roles' cards. */
+    --neon-rose: #be123c;
 
     /* ── 5-Severity System, light mode ──────────────────── */
     /* The dark ramp on a white page measured 2.12:1 to 2.63:1 for badge
