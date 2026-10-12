@@ -71,6 +71,14 @@
          `data-click-action="foo"` and the helper dispatches. See
          static/js/event-delegation.js for the supported attributes. -->
     <script nonce="{{ csp_nonce }}" src="/static/js/event-delegation.js?v={{ ion_version }}"></script>
+    <!-- Puts server-rendered timestamps back on the viewer's clock. The
+         fragments that replace innerHTML tables cannot call toLocaleString
+         the way the JavaScript they replace did, so they emit the instant
+         in `<time datetime>` with a UTC-labelled fallback and this rewrites
+         the text, after load and after every htmx swap. It assigns
+         textContent, so a page using it still has no markup built in JS.
+         See templates/_fragments/_time.html for the macro that emits it. -->
+    <script nonce="{{ csp_nonce }}" src="/static/js/local-time.js?v={{ ion_version }}"></script>
     <!-- Restores styling the v0.31.21 inline-style migration broke: it hashed
          `style="width:${pct}%"` into a STATIC class containing the literal
          ${pct}, which browsers drop as invalid CSS. See the file header. -->

@@ -128,20 +128,55 @@ def _fragment_routes() -> list:
     return [r for r in ui.router.routes if getattr(r, "dependant", None)]
 
 
-def test_every_fragment_requires_a_permission():
+# Fragments whose JSON counterpart gates on bare authentication rather than
+# a named permission. The list is explicit so that dropping from a named
+# permission to "any logged-in user" cannot happen quietly: it fails here
+# and someone has to say why.
+#
+#   /ui/bug-reports   /api/bug-reports takes get_current_user. Filing and
+#                     reading bug reports is open to every user by design.
+BARE_AUTH_FRAGMENTS = {"/ui/bug-reports"}
+
+
+def test_every_fragment_requires_authentication():
     """No fragment is an unauthenticated way to read data.
 
     Written once here rather than trusted 35 times. A conversion that
-    forgets the dependencies argument produces an endpoint that serves the
-    same rows to anyone who can reach the port, and nothing about the page
-    it came from would look different.
+    forgets the dependency produces an endpoint serving the same rows to
+    anyone who can reach the port, and nothing about the page it came from
+    would look different.
+
+    The check is `get_current_user` being reachable, not require_permission
+    being present, because require_permission depends on it and because a
+    fragment mirroring an endpoint that gates on bare authentication is
+    correct. The first version of this test asserted a named permission and
+    failed a conversion that had matched its API exactly.
     """
     routes = _fragment_routes()
     assert routes, "no fragment routes found, so this proves nothing"
     for route in routes:
-        perms = [p for p in (_required_permission(c)
-                             for c in _dependency_calls(route)) if p]
-        assert perms, f"{route.path} requires no permission"
+        names = [getattr(c, "__qualname__", "") for c in _dependency_calls(route)]
+        assert any(n.startswith("get_current_user") for n in names), (
+            f"{route.path} requires no authentication"
+        )
+
+
+def test_only_the_listed_fragments_skip_a_named_permission():
+    """A fragment must never be a softer way in than the API it mirrors.
+
+    Authentication alone is the right gate for a few endpoints and the
+    wrong one for most, and the difference is invisible in a diff. Keeping
+    the exceptions in a list turns "this one is open to all users" into a
+    claim somebody made on purpose.
+    """
+    bare = {
+        route.path for route in _fragment_routes()
+        if not any(_required_permission(c) for c in _dependency_calls(route))
+    }
+    assert bare == BARE_AUTH_FRAGMENTS, (
+        f"newly on bare authentication: {bare - BARE_AUTH_FRAGMENTS}; "
+        f"listed but now permissioned: {BARE_AUTH_FRAGMENTS - bare}"
+    )
 
 
 def test_no_fragment_uses_a_redirecting_page_dependency():

@@ -1,0 +1,36 @@
+{# The one way a server-rendered fragment emits a timestamp.
+
+   Import it, do not hand-roll a `<time>` tag:
+
+     {% from "_fragments/_time.html" import ts %}
+     <td>{{ ts(log.timestamp) }}</td>
+     <td>{{ ts(run.started_at, 'time') }}</td>
+     <td>{{ ts(row.due, fallback='Not scheduled') }}</td>
+
+   `value` may be a datetime or an ISO string. The macro emits the machine
+   instant in `datetime=` and a UTC-labelled fallback as the text, and
+   static/js/local-time.js rewrites the text to the viewer's clock after
+   load and after every htmx swap.
+
+   Why not just format it on the server: the fragments replace JavaScript
+   that called `toLocaleString()`, which is the viewer's clock. A server
+   knows only its own, so rendering the string server-side would have shown
+   an analyst in another timezone the wrong time on every row. The fallback
+   is correct rather than merely present, because it names its zone.
+
+   A missing timestamp renders `fallback`, never an empty cell and never
+   the epoch. "No timestamp recorded" and "midnight on 1 January 1970" are
+   not the same claim. #}
+
+{% macro ts(value, format='datetime', fallback='-') -%}
+{%- if value is none or value == '' -%}
+<span class="opacity-60">{{ fallback }}</span>
+{%- else -%}
+{#- A datetime has .isoformat(); a string is already one. Both reach here,
+    because some repositories hand back parsed objects and some hand back
+    the stored text. -#}
+{%- set iso = value.isoformat() if value.isoformat is defined else value|string -%}
+{%- set shown = value.strftime('%Y-%m-%d %H:%M UTC') if value.strftime is defined else iso -%}
+<time datetime="{{ iso }}" data-ts-format="{{ format }}" class="whitespace-nowrap">{{ shown }}</time>
+{%- endif -%}
+{%- endmacro %}
