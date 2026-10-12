@@ -77,8 +77,20 @@
         <input class="input w-full" type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
       </fieldset>
 
+      {# Both labels ship in the markup and the handler toggles `hidden`.
+         The button used to save its own innerHTML, replace it with the
+         string "Signing in…" and put it back, which reaches into the
+         markup from script for a word. It also meant the busy label was
+         the one piece of text on this page that no stylesheet, and nobody
+         reading the template, could see.
+
+         textContent is not the fix here: the arrow below is inside the
+         button, so assigning text to it would delete the icon and the
+         restore would put it back, which is a flicker on the one page
+         that must look dependable. #}
       <button type="submit" class="btn btn-primary w-full" id="login-btn">
-        Sign In
+        <span data-login-label>Sign In</span>
+        <span data-login-busy hidden>Signing in&hellip;</span>
         <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
       </button>
     </form>
@@ -102,7 +114,14 @@
   const errorBox = document.getElementById('error-message');
   const errorText = errorBox.querySelector('span');
   const loginBtn = document.getElementById('login-btn');
-  const origLabel = loginBtn.innerHTML;
+  const btnLabel = loginBtn.querySelector('[data-login-label]');
+  const btnBusy = loginBtn.querySelector('[data-login-busy]');
+
+  function setBusy(busy) {
+    loginBtn.disabled = busy;
+    btnLabel.hidden = busy;
+    btnBusy.hidden = !busy;
+  }
 
   function showError(msg) {
     errorText.textContent = msg;
@@ -115,8 +134,7 @@
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
 
-    loginBtn.disabled = true;
-    loginBtn.innerHTML = 'Signing in…';
+    setBusy(true);
     clearError();
 
     try {
@@ -146,8 +164,7 @@
     } catch (error) {
       showError('Unable to connect to server. Please try again.');
     } finally {
-      loginBtn.disabled = false;
-      loginBtn.innerHTML = origLabel;
+      setBusy(false);
     }
   });
 
