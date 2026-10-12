@@ -2,45 +2,6 @@
 {% block title %}ORBAT - ION{% endblock %}
 
 {% block content %}
-<style nonce="{{ csp_nonce }}">
-/* Org-chart connectors. The tree is nested ul/li; each li draws the two
-   halves of the line above itself, and each child ul draws the drop from its
-   parent. Only-children keep just the vertical stub. */
-.wf-tree { --wf-line: color-mix(in srgb, currentColor 22%, transparent); }
-.wf-tree ul {
-    display: flex; align-items: flex-start; justify-content: center;
-    padding: 26px 0 0; margin: 0; position: relative;
-}
-.wf-tree li {
-    list-style: none; position: relative;
-    display: flex; flex-direction: column; align-items: center;
-    padding: 26px 10px 0;
-}
-.wf-tree li::before, .wf-tree li::after {
-    content: ''; position: absolute; top: 0; right: 50%;
-    border-top: 2px solid var(--wf-line); width: 50%; height: 26px;
-}
-.wf-tree li::after { right: auto; left: 50%; border-left: 2px solid var(--wf-line); }
-.wf-tree li:only-child::before, .wf-tree li:only-child::after { display: none; }
-.wf-tree li:first-child::before, .wf-tree li:last-child::after { border: 0 none; }
-.wf-tree li:last-child::before {
-    border-right: 2px solid var(--wf-line); border-radius: 0 8px 0 0;
-}
-.wf-tree li:first-child::after { border-radius: 8px 0 0 0; }
-.wf-tree ul ul::before {
-    content: ''; position: absolute; top: 0; left: 50%;
-    border-left: 2px solid var(--wf-line); width: 0; height: 26px;
-}
-/* A real establishment is wider than a laptop. Scroll the tree inside its
-   own box rather than letting it push the page sideways, which hides the
-   right-hand functions behind a scrollbar nobody notices. */
-.wf-tree { overflow-x: auto; padding-bottom: 8px; }
-.wf-tree > ul { min-width: max-content; }
-/* Roots: no connectors above the top card. */
-.wf-tree > ul { padding-top: 0; }
-.wf-tree > ul > li { padding-top: 0; }
-.wf-tree > ul > li::before, .wf-tree > ul > li::after { display: none; }
-</style>
 <div class="p-6 max-w-[1400px] mx-auto">
 
   <div class="flex items-end gap-4 mb-5">

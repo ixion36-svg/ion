@@ -17,13 +17,13 @@ page cannot be forgotten. Status is measured, never set by hand.
 | styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |
 | server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |
 
-**7 of 82 templates complete.**
+**13 of 82 templates complete.**
 
 | measure | remaining |
 |---|---|
 | templates | 82 |
-| total lines | 81,140 |
-| inline `<style>` lines | 18,119 |
+| total lines | 80,615 |
+| inline `<style>` lines | 17,600 |
 | runtime DOM writes | 1,119 |
 | literal light-on-dark colours | 11 |
 
@@ -48,17 +48,17 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `guide.html` | 972 | 37 | 27 | 0 | yes | no | yes |  |
-| `workforce_orbat.html` | 762 | 38 | 634 | 0 | yes | no | yes |  |
-| `notes.html` | 422 | 285 | 31 | 0 | yes | no | yes |  |
+| `guide.html` | 934 | 0 | 27 | 0 | yes | yes | yes | **done** |
+| `workforce_orbat.html` | 723 | 0 | 634 | 0 | yes | yes | yes | **done** |
 | `workforce_journey.html` | 376 | 0 | 309 | 0 | yes | yes | yes | **done** |
 | `workforce_people.html` | 370 | 0 | 295 | 0 | yes | yes | yes | **done** |
 | `workforce_profiles.html` | 312 | 0 | 202 | 0 | yes | yes | yes | **done** |
-| `soc_roles.html` | 201 | 145 | 0 | 0 | yes | no | yes |  |
-| `document_analysis.html` | 166 | 8 | 76 | 0 | yes | no | yes |  |
-| `briefings.html` | 159 | 6 | 55 | 0 | yes | no | yes |  |
+| `document_analysis.html` | 157 | 0 | 76 | 0 | yes | yes | yes | **done** |
+| `briefings.html` | 152 | 0 | 55 | 0 | yes | yes | yes | **done** |
+| `notes.html` | 136 | 0 | 31 | 0 | yes | yes | yes | **done** |
+| `soc_roles.html` | 55 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 9 templates, 3,740 lines, 519 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 9 templates, 3,215 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Tier B, 1 to 10 runtime writes
 

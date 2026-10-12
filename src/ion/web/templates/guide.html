@@ -903,44 +903,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .active on .g-role-btn — daisyUI btn-active is a different class. */
-.g-role-btn.active {
-    background: color-mix(in oklab, var(--color-primary) 18%, transparent);
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-/* JS sets data-hidden on .g-section — not a daisyUI visibility slot. */
-.g-section[data-hidden="true"] { display: none; }
-
-/* Hidden until JS sets element.style.display. JS matches .g-role-note and .lead/.engineer. */
-.g-role-note { display: none; }
-
-/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
-.g-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; }
-.g-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
-.g-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
-.g-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
-
-/* no daisyUI <code> component */
-#g-content code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 0.72rem;
-    background: var(--color-base-300);
-    padding: 1px 5px;
-    border-radius: 0.25rem;
-}
-
-/* Print: hide chrome. No daisyUI print primitive. */
-@media print {
-    .navbar, .g-role-bar, .g-quicknav, .header-actions, .chat-widget, .chat-toggle { display: none !important; }
-    body { background: #fff !important; color: #333 !important; }
-    .g-section { break-inside: avoid; border-color: #ddd; background: #fff; }
-    .card-title { color: #000; }
-    .card-title i { color: #0969da; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 let currentRole = 'all';
 
