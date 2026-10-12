@@ -74,6 +74,23 @@ the variable's ampersand and a bare `&` for the literal one, because
 template text is not escaped and a variable is. Use
 `{% set u = '...?a=' ~ x ~ '&b=' ~ y %}` and then `{{ u ~ '&page=' ~ n }}`.
 
+**Never format a timestamp on the server.** The JavaScript called
+`toLocaleString()`, which is the viewer's clock. A server knows only its
+own, so a server-formatted timestamp shows an analyst in another timezone
+the wrong time on every row. Use the macro:
+
+```jinja
+{% from "_fragments/_time.html" import ts %}
+<td>{{ ts(log.timestamp) }}</td>
+<td>{{ ts(run.started_at, 'time') }}</td>
+<td>{{ ts(row.due, fallback='Not scheduled') }}</td>
+```
+
+It emits `<time datetime>` with a UTC-labelled fallback, and
+`static/js/local-time.js` rewrites the text after load and after every
+htmx swap. That assignment is `textContent`, so the `server` column still
+passes. A missing timestamp renders the fallback, never the epoch.
+
 **Delete the hand-rolled `esc()`.** Jinja autoescapes. Assert it with a
 test that feeds `<script>`.
 
@@ -94,6 +111,18 @@ Registration is discovery, so there is no list to add to. Do not touch
 page's files. Import the shared Jinja env with
 `from ion.web.ui._shared import templates`; never call `make_templates()`
 in a page module.
+
+## Guards you will be measured against
+
+`tests/unit/test_ui_fragment_registry.py` holds the invariants that apply
+to every fragment, so they are a check rather than a line in 35 briefs.
+Run it with your own tests. It asserts that your module is discovered and
+mounted, that your route requires authentication, that it declares
+`response_class=HTMLResponse`, and that it uses no redirecting page
+dependency. If your endpoint mirrors a JSON endpoint that gates on bare
+`get_current_user` rather than a named permission, add its path to
+`BARE_AUTH_FRAGMENTS` with a comment saying why, which is the point: that
+drop has to be a claim somebody made on purpose.
 
 ## Verifying
 
