@@ -1,0 +1,317 @@
+{# The template view: meta, body, variables, history, and one version.
+
+   Replaces the innerHTML sites in template_view.html. Tags, the variables
+   table, the version table, the version modal's meta line, the diff and
+   the section cards were string-built. escapeHtml() and formatDiff() went
+   with them. Jinja escapes, and the diff is spans around escaped lines.
+
+   The meta card is the swap target. The heading, the body, the variables
+   and the history are swapped out of band into slots that stay in the page
+   shell, so a failed read replaces what was asked for and cannot take the
+   tabs or Refresh with it. Every branch below emits all four out-of-band
+   nodes. A branch that omitted one would leave that slot on its spinner,
+   which reads as a load that has not finished.
+
+   The version panel is the whole modal, because the modal is not on the
+   page until a version is requested. Close is in every state: an error
+   swap that returned only the alert would leave it open with no way out.
+
+   Rollback is rendered here, not in the shell, because only this response
+   knows whether the version is the current one and whether the viewer may
+   roll back. It is re-rendered with that state on every open.
+
+   No stored URL is rendered as a link. A section caption is text. The
+   Render and Edit links live in the page shell and are built from the
+   template id. #}
+
+{% from "_fragments/_time.html" import ts %}
+{# versions.py landed earlier today over the same TemplateVersion rows, and
+   _fragments/versions_meta.html is where its three per-field rules live: a
+   checkpoint badge that survives a round trip as 1 and names itself
+   "Checkpoint" when it was saved without a name, a message that tells an
+   absent one from an empty one, and a created stamp that goes through `ts`.
+   Those decisions are reused here rather than written a second time.
+
+   The row LAYOUT is not reused. versions_list.html emits .version-item /
+   .version-header / .version-meta / .version-actions, and in the compiled
+   stylesheet all but .version-item are scoped to body[data-page="versions"],
+   so that markup renders unstyled on this page. This page shows a table with
+   a Current column and a per-row rollback, which that card list has neither
+   of. Two layouts, one set of field rules.
+
+   .checkpoint-badge is the class the macro emits, and the page's own <style>
+   block redefines it so it matches the badge-current chip beside it in the
+   same cell instead of the legacy neon gradient the global rule carries. #}
+{% import "_fragments/versions_meta.html" as meta %}
+
+{% if panel == 'version' %}
+<div class="modal show" id="version-modal" data-remove-self-on-self-click>
+  <div class="modal-box w-11/12 max-w-5xl max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="text-lg font-semibold">{% if version_number is not none %}Version {{ version_number }} Preview{% else %}Version Preview{% endif %}</h2>
+      <button type="button" class="btn btn-ghost btn-sm btn-circle" data-remove-closest=".modal" aria-label="Close">&times;</button>
+    </div>
+    <div class="py-4">
+      {% if state == 'failed' %}
+        <div role="alert" class="alert alert-error">
+          This version could not be read. This is a failure to look, not an
+          empty version. Close this and open it again to retry.
+        </div>
+      {% elif state == 'missing' %}
+        <div role="alert" class="alert alert-warning">
+          Version {% if version_number is not none %}{{ version_number }}{% endif %}
+          of template {{ template_id }} does not exist. It may have been
+          deleted since the history was loaded. That is not a failed read.
+        </div>
+      {% else %}
+        <div id="version-meta" class="meta-bar flex flex-wrap items-center gap-3 text-sm mb-4">
+          {{ meta.checkpoint_badge(version) }}
+          {# The labels stay. versions_detail.html drops them because its bar
+             carries three fields and nothing else; this one adds Author, and
+             an unlabelled name beside an unlabelled message reads as two
+             messages. There is no author macro to reuse: versions.py's list
+             does not show one. #}
+          <span><strong>Message:</strong> {{ meta.message(version) }}</span>
+          <span><strong>Author:</strong> {% if version.author is not none %}{{ version.author }}{% else %}<span class="opacity-60">-</span>{% endif %}</span>
+          <span><strong>Date:</strong> {{ meta.created(version) }}</span>
+        </div>
+        <div role="tablist" class="tabs tabs-border mb-4">
+          <button type="button" role="tab" class="tab version-tab-btn active" data-vtab="content" data-click-action="switchVersionTab" data-args='["content"]'>Content</button>
+          <button type="button" role="tab" class="tab version-tab-btn" data-vtab="diff" data-click-action="switchVersionTab" data-args='["diff"]'>Diff</button>
+        </div>
+        {# No `version-tab-content` class: nothing styles it and nothing
+           selects it. switchVersionTab() toggles `hidden` by id. #}
+        <div id="version-content-tab">
+          <pre id="version-content" class="code-block ion-mono bg-base-300 p-4 rounded-box overflow-x-auto text-sm whitespace-pre-wrap">{% if content is not none and content != '' %}{{ content }}{% else %}(empty){% endif %}</pre>
+        </div>
+        <div id="version-diff-tab" class="hidden">
+          {% if diff_lines is none %}
+            <pre id="version-diff" class="code-block diff-view font-mono whitespace-pre-wrap bg-base-300 p-4 rounded-box overflow-x-auto text-sm">(No diff available for this version)</pre>
+          {% elif diff_lines == 'unreadable' %}
+            <pre id="version-diff" class="code-block diff-view font-mono whitespace-pre-wrap bg-base-300 p-4 rounded-box overflow-x-auto text-sm">The diff could not be shown. It was not a text diff, which is not the same as a diff that is empty.</pre>
+          {% elif diff_lines|length == 0 %}
+            <pre id="version-diff" class="code-block diff-view font-mono whitespace-pre-wrap bg-base-300 p-4 rounded-box overflow-x-auto text-sm">The stored diff is empty.</pre>
+          {% else %}
+            <pre id="version-diff" class="code-block diff-view font-mono whitespace-pre-wrap bg-base-300 p-4 rounded-box overflow-x-auto text-sm">{% for line in diff_lines -%}
+{%- if line.kind == 'add' %}<span class="diff-add">{{ line.text }}</span>{%- elif line.kind == 'del' %}<span class="diff-del">{{ line.text }}</span>{%- else %}{{ line.text }}{% endif %}
+{% endfor %}</pre>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="modal-action">
+      {% if state == 'ok' and version.offer_rollback %}
+        <button type="button" id="rollback-btn" class="btn btn-warning" data-click-action="rollbackToVersion" data-args='[{{ version.version_number }}]'>Rollback to This Version</button>
+      {% endif %}
+      <button type="button" class="btn btn-ghost" data-remove-closest=".modal">Close</button>
+    </div>
+  </div>
+</div>
+{% else %}
+{# The meta card is what #template-meta's innerHTML swap receives. The
+   other four regions carry hx-swap-oob="innerHTML" so the shell elements
+   keep their ids and the tabs around them stay put. #}
+{% if template_state == 'failed' %}
+  <div class="card-body">
+    <div role="alert" class="alert alert-error">
+      This template could not be read. This is not an empty template: the
+      name, the section count and the tags are unknown rather than blank,
+      zero or absent. Refresh to try again.
+    </div>
+  </div>
+{% elif template_state == 'missing' %}
+  <div class="card-body">
+    <div role="alert" class="alert alert-warning">
+      There is no template {{ template_id }}. The read succeeded and found
+      nothing, which is different from a read that failed. It may have been
+      deleted.
+    </div>
+  </div>
+{% else %}
+  <div class="card-body py-4 gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+      {% if format is not none %}<span class="badge badge-info" id="template-format">{{ format }}</span>{% endif %}
+      {% if document_type %}
+        <span class="doc-type-badge{% if document_type.css %} {{ document_type.css }}{% endif %}" id="template-doctype-badge">{{ document_type.label }}</span>
+      {% endif %}
+      {# `is not none`, so version 0 still reads as v0. A missing version
+         says it is unknown rather than rendering v0, which would be a
+         version nobody reported. #}
+      <span class="badge badge-ghost" id="template-version">{% if current_version is not none %}v{{ current_version }}{% else %}version unknown{% endif %}</span>
+      <span class="text-sm text-base-content/60" id="template-updated">Updated: {{ ts(updated_at, fallback='-') }}</span>
+    </div>
+    <div id="template-tags" class="flex flex-wrap gap-2">
+      {% if tags is none %}
+        <span class="muted">Tags could not be read. That is not the same as no tags.</span>
+      {% elif tags|length == 0 %}
+        <span class="muted">No tags</span>
+      {% else %}
+        {% for tag in tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+<h1 id="template-name" hx-swap-oob="innerHTML">{% if template_state == 'failed' %}could not be read{% elif template_state == 'missing' %}no such template{% elif name is not none %}{{ name }}{% else %}Unnamed{% endif %}</h1>
+
+<div id="template-body" hx-swap-oob="innerHTML">
+{% if template_state == 'failed' %}
+  <div role="alert" class="alert alert-error">
+    The template body could not be read. This is not a template with no
+    sections and not an empty document: nothing here was loaded, so the
+    section count is unknown rather than zero.
+  </div>
+{% elif template_state == 'missing' %}
+  <div role="alert" class="alert alert-warning">
+    There is no template {{ template_id }}, so there is no body to show.
+  </div>
+{% else %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body">
+      <h3 class="card-title">Description</h3>
+      {# 0 is a description. None and "" are the absence of one, which is
+         what the page's `description || 'No description'` collapsed, and
+         what must not also swallow a description whose text is "0". #}
+      <p id="template-description" class="description text-base-content/80">{% if description is not none and description != '' %}{{ description }}{% else %}No description{% endif %}</p>
+    </div>
+  </div>
+  {% if body_mode == 'sections' %}
+    <div id="sections-view" class="section">
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title">Sections
+            {# The badge is the count, including 0. A template with no
+               sections has a count of 0; a body that could not be read
+               takes the branch below and does not print 0. #}
+            {% if section_count is not none %}<span class="badge badge-info" id="section-count-badge">{{ section_count }}</span>{% endif %}
+          </h3>
+          <div id="section-cards-container" class="flex flex-col gap-2">
+            {% for card in cards %}
+              <div class="sv-card">
+                <div class="sv-card-icon">{{ card.icon }}</div>
+                <div class="sv-card-body">
+                  <div class="sv-card-header">
+                    <span class="sv-card-type">{{ card.label }}</span>
+                    {% if card.title is not none and card.title != '' %}<span class="sv-card-title">{{ card.title }}</span>{% endif %}
+                  </div>
+                  {% if card.details is not none %}
+                    <div class="sv-card-details">
+                      {% if card.details.kind == 'badge' %}<span class="sv-var-badge">&#123;&#123; {{ card.details.text }} &#125;&#125;</span>
+                      {% elif card.details.kind == 'code' %}<code>&#123;&#123; {{ card.details.text }} &#125;&#125;</code>
+                      {% else %}{{ card.details.text }}{% endif %}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% elif body_mode == 'raw' %}
+    <div id="raw-content-view" class="section">
+      <div class="card bg-base-200 shadow">
+        <div class="card-body">
+          <h3 class="card-title">Template Content</h3>
+          <pre id="template-content" class="code-block ion-mono bg-base-300 p-4 rounded-box overflow-x-auto text-sm whitespace-pre-wrap">{% if content is not none and content != '' %}{{ content }}{% else %}(empty){% endif %}</pre>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div role="alert" class="alert alert-warning">
+      Whether this template is sectioned was not a yes or a no, so neither
+      the section cards nor the raw body are shown. That is not zero
+      sections and not an empty document.
+    </div>
+  {% endif %}
+{% endif %}
+</div>
+
+<div id="template-variables" hx-swap-oob="innerHTML">
+{% if variables_state == 'failed' %}
+  <p class="error">Variables could not be read. This is not an empty list: nothing here says the template has no variables.</p>
+{% elif variables_state == 'missing' %}
+  <p class="error">There is no template {{ template_id }}, so its variables are unknown rather than absent.</p>
+{% elif variables_state == 'unreadable' %}
+  <p class="error">Variables came back in a shape that is not a list. That is not an empty list and not a failed request.</p>
+{% elif variables_state == 'empty' %}
+  <p class="muted">No variables detected</p>
+{% elif variables_state == 'ok' %}
+  <table class="table">
+    <thead><tr><th>Variable</th><th>Type</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for row in variables %}
+        <tr>
+          <td><code>&#123;&#123; {{ row.name }} &#125;&#125;</code></td>
+          {% if row.defined is true %}
+            {# 0 is a type. None is a defined variable that named no type,
+               which is a dash and not the word None. #}
+            <td>{% if row.var_type is not none %}{{ row.var_type }}{% else %}-{% endif %}</td>
+            <td><span class="badge badge-success">Defined</span></td>
+          {% elif row.defined is false %}
+            <td>-</td>
+            <td><span class="muted">Not defined</span></td>
+          {% else %}
+            <td>-</td>
+            <td><span class="muted">Unknown</span></td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="error">Variables could not be read.</p>
+{% endif %}
+</div>
+
+<div id="versions-list" hx-swap-oob="innerHTML">
+{% if versions_state == 'failed' %}
+  <p class="error">Version history could not be read. This is not an empty history.</p>
+{% elif versions_state == 'missing' %}
+  <p class="error">There is no template {{ template_id }}, so its history is unknown rather than empty.</p>
+{% elif versions_state == 'empty' %}
+  <p class="empty-state">No version history available</p>
+{% elif versions_state == 'ok' %}
+  <table class="table versions-table">
+    <thead><tr><th>Version</th><th>Message</th><th>Author</th><th>Date</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for row in versions %}
+        {# The pair is built once. A literal "&amp;" next to a variable's
+           "&" is how a URL ends up with one of each, and this one has no
+           query string to disagree with a control. #}
+        {% set view_url = '/ui/template-view/' ~ template_id ~ '/versions/' ~ row.version_number %}
+        <tr{% if row.is_current is true %} class="current-version"{% endif %}>
+          <td>
+            {% if row.version_number is not none %}v{{ row.version_number }}{% else %}unnumbered{% endif %}
+            {% if row.is_current is true %}
+              <span class="badge badge-current">Current</span>
+            {% elif row.is_current is false %}
+            {% else %}
+              <span class="badge badge-ghost">current unknown</span>
+            {% endif %}
+            {{ meta.checkpoint_badge(row) }}
+          </td>
+          {# "No message" rather than the "-" this cell used to print, because
+             that is what versions.py says about the same column of the same
+             row and the two pages should not word it differently. Both forms
+             tell an absent message from an empty one; only the wording moved. #}
+          <td class="version-message">{{ meta.message(row) }}</td>
+          <td class="version-author">{%- if row.author is not none -%}{{ row.author }}{%- else -%}-{% endif %}</td>
+          <td>{{ meta.created(row) }}</td>
+          <td>
+            {% if row.version_number is not none %}
+              <button type="button" class="btn btn-sm" hx-get="{{ view_url }}" hx-target="#version-modal-host" hx-swap="innerHTML">View</button>
+            {% endif %}
+            {% if row.offer_rollback %}
+              <button type="button" class="btn btn-sm btn-warning" data-click-action="rollbackToVersion" data-args='[{{ row.version_number }}]'>Rollback</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p class="error">Version history could not be read.</p>
+{% endif %}
+</div>
+{% endif %}
