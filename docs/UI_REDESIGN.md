@@ -17,14 +17,14 @@ page cannot be forgotten. Status is measured, never set by hand.
 | styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |
 | server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |
 
-**13 of 80 templates complete.**
+**24 of 80 templates complete.**
 
 | measure | remaining |
 |---|---|
 | templates | 80 |
-| total lines | 78,172 |
-| inline `<style>` lines | 15,544 |
-| runtime DOM writes | 1,032 |
+| total lines | 77,464 |
+| inline `<style>` lines | 15,562 |
+| runtime DOM writes | 995 |
 | literal light-on-dark colours | 11 |
 
 ## Shell and partials
@@ -33,12 +33,12 @@ Rendered by or into every page, so these move first or last, never mid-tranche.
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `base.html` | 565 | 309 | 116 | 0 | no | no | yes |  |
+| `base.html` | 593 | 327 | 116 | 0 | no | no | yes |  |
 | `login.html` | 206 | 20 | 112 | 2 | yes | no | no |  |
 | `_icons.html` | 69 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `_nav_tabs.html` | 33 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 4 templates, 873 lines, 329 inline css lines, 2 runtime writes, 2 light-mode literals.
+Subtotal: 4 templates, 901 lines, 347 inline css lines, 2 runtime writes, 2 light-mode literals.
 
 ## Tier A, no runtime DOM building
 
@@ -50,15 +50,26 @@ A restyle here is a markup edit and is fully visible in a screenshot.
 | `workforce_orbat.html` | 724 | 0 | 634 | 0 | yes | yes | yes | **done** |
 | `workforce_journey.html` | 376 | 0 | 309 | 0 | yes | yes | yes | **done** |
 | `workforce_people.html` | 370 | 0 | 295 | 0 | yes | yes | yes | **done** |
+| `architecture.html` | 339 | 0 | 221 | 0 | yes | yes | yes | **done** |
 | `workforce_profiles.html` | 312 | 0 | 202 | 0 | yes | yes | yes | **done** |
+| `change_requests.html` | 274 | 0 | 89 | 0 | yes | yes | yes | **done** |
+| `canaries.html` | 241 | 0 | 131 | 0 | yes | yes | yes | **done** |
 | `bob_eval.html` | 208 | 0 | 50 | 0 | yes | yes | yes | **done** |
+| `de_quirks.html` | 184 | 0 | 66 | 0 | yes | yes | yes | **done** |
 | `document_analysis.html` | 158 | 0 | 76 | 0 | yes | yes | yes | **done** |
 | `briefings.html` | 153 | 0 | 55 | 0 | yes | yes | yes | **done** |
+| `bug_reports.html` | 146 | 0 | 37 | 0 | yes | yes | yes | **done** |
 | `notes.html` | 137 | 0 | 31 | 0 | yes | yes | yes | **done** |
+| `case_grouper.html` | 119 | 0 | 49 | 0 | yes | yes | yes | **done** |
+| `briefing.html` | 95 | 0 | 0 | 0 | yes | yes | yes | **done** |
+| `audit_logs.html` | 94 | 0 | 0 | 0 | yes | yes | yes | **done** |
+| `entity_timeline.html` | 89 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `soc_roles.html` | 56 | 0 | 0 | 0 | yes | yes | yes | **done** |
+| `compliance.html` | 54 | 0 | 0 | 0 | yes | yes | yes | **done** |
+| `soc_health.html` | 51 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `service_accounts.html` | 50 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 11 templates, 3,479 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
+Subtotal: 22 templates, 5,165 lines, 0 inline css lines, 0 runtime writes, 0 light-mode literals.
 
 ## Tier B, 1 to 10 runtime writes
 
@@ -77,32 +88,21 @@ Markup plus a short list of class strings in inline JS.
 | `de_workbench.html` | 425 | 0 | 262 | 4 | yes | yes | no |  |
 | `daily_work.html` | 424 | 0 | 295 | 8 | yes | yes | no |  |
 | `profile.html` | 398 | 0 | 238 | 4 | yes | yes | no |  |
-| `architecture.html` | 379 | 0 | 281 | 1 | yes | yes | no |  |
 | `stories.html` | 347 | 0 | 297 | 9 | yes | yes | no |  |
 | `de_proposals.html` | 305 | 0 | 198 | 4 | yes | yes | no |  |
 | `log_sources.html` | 295 | 0 | 191 | 6 | yes | yes | no |  |
-| `change_requests.html` | 281 | 0 | 113 | 3 | yes | yes | no |  |
-| `canaries.html` | 280 | 0 | 189 | 3 | yes | yes | no |  |
 | `response_approvals.html` | 279 | 0 | 246 | 4 | yes | yes | no |  |
 | `maturity.html` | 254 | 0 | 220 | 8 | yes | yes | no |  |
 | `executive_report.html` | 239 | 0 | 188 | 5 | yes | yes | no |  |
 | `de_bob.html` | 233 | 0 | 157 | 10 | yes | yes | no |  |
 | `detection_health.html` | 208 | 0 | 133 | 4 | yes | yes | no |  |
 | `de_metrics.html` | 203 | 0 | 147 | 4 | yes | yes | no |  |
-| `briefing.html` | 201 | 0 | 150 | 3 | yes | yes | no |  |
-| `de_quirks.html` | 201 | 0 | 109 | 4 | yes | yes | no |  |
 | `verdict_review.html` | 201 | 0 | 172 | 5 | yes | yes | no |  |
-| `audit_logs.html` | 192 | 0 | 116 | 5 | yes | yes | no |  |
 | `versions.html` | 190 | 0 | 127 | 5 | yes | yes | no |  |
-| `soc_health.html` | 182 | 0 | 151 | 3 | yes | yes | no |  |
-| `entity_timeline.html` | 180 | 0 | 119 | 4 | yes | yes | no |  |
-| `bug_reports.html` | 178 | 0 | 64 | 3 | yes | yes | no |  |
 | `threat_intel_actor.html` | 176 | 0 | 91 | 10 | yes | yes | no |  |
-| `case_grouper.html` | 175 | 0 | 137 | 4 | yes | yes | no |  |
-| `compliance.html` | 173 | 0 | 142 | 4 | yes | yes | no |  |
 | `knowledge_graph.html` | 169 | 0 | 118 | 6 | yes | yes | no |  |
 
-Subtotal: 35 templates, 11,451 lines, 0 inline css lines, 172 runtime writes, 0 light-mode literals.
+Subtotal: 24 templates, 9,029 lines, 0 inline css lines, 135 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 
