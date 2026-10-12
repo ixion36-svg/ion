@@ -199,6 +199,28 @@ dependency. If your endpoint mirrors a JSON endpoint that gates on bare
 `BARE_AUTH_FRAGMENTS` with a comment saying why, which is the point: that
 drop has to be a claim somebody made on purpose.
 
+## Two ways a test of yours will lie to you
+
+Both were found by mutation passes, not by reading, and both are likely
+rather than unlikely on these conversions.
+
+**A page-level substring assertion passes on your own comment.** One
+conversion asserted `'hx-params="none"' in src` over the whole page, and
+removing the attribute from the button left it green, because the comment
+two lines above the button quotes the attribute by name. These conversions
+carry a lot of explanatory comments, so every whole-file substring
+assertion is exposed. Extract the element first and assert inside it, or
+strip comments before matching. The same shape has bitten three times now:
+a test asserting a deleted helper was gone matched the comment explaining
+its deletion, a CSS guard flagged a Jinja comment that mentioned
+`<script>`, and Tailwind emitted a utility because a comment named it.
+
+**A three-state test that only arranges `None` is vacuous.** `None`
+behaves identically under `is true`, truthiness and `is not None`, so no
+plausible mutation can fail it. Parametrise over a non-boolean too, and
+mutate by deleting the middle branch rather than weakening the first
+condition, which changes nothing while the `elif` still catches `None`.
+
 ## Verifying
 
 Jinja `auto_reload` is off outside debug, so a template edit needs a server
