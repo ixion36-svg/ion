@@ -214,7 +214,12 @@ class _FakeTide:
         self._covered = covered
 
     def get_global_mitre_coverage(self):
-        return {"techniques": {t: {"rule_count": 1} for t in self._covered}}
+        # enabled_rules, not rule_count alone: coverage now means a rule that
+        # is actually running, so a fake omitting it reports no coverage and
+        # get_compliance_posture correctly takes its degraded path.
+        return {"techniques": {
+            t: {"rule_count": 1, "enabled_rules": 1} for t in self._covered
+        }}
 
 
 class TestComplianceLabelling:
