@@ -84,7 +84,16 @@ def _detection_coverage() -> dict[str, Any]:
         tide = get_tide_service()
         stats = tide.get_posture_stats()
         if stats is None:
-            return {"score": 0, "label": _label(0), "details": details}
+            # No TIDE posture means ION does not know what this SOC covers.
+            # Scoring that 0 reads as "covers nothing" and graded the whole
+            # SOC Critical for an unconfigured integration. The aggregate in
+            # get_soc_health() already renormalises its weights over the
+            # dimensions that returned a number, and _knowledge_completeness
+            # has reported None for an unseeded registry since it was
+            # written, so this is the contract catching up with the one
+            # dimension that was still inventing a figure.
+            details["reason"] = "TIDE posture is unavailable, so coverage is unmeasured."
+            return {"score": None, "label": "Unavailable", "details": details}
 
         details["tide_available"] = True
         total_tech = stats.get("total_techniques", 0)
@@ -108,8 +117,14 @@ def _detection_coverage() -> dict[str, Any]:
         score = _clamp(tech_pct * 0.6 + quality_pct * 0.4)
 
     except Exception:
+        # A TIDE that throws is the same epistemic state as a TIDE with no
+        # posture: ION could not look, so it does not know. Scoring 0 here
+        # reported "this SOC covers nothing" on the strength of a failed
+        # read, which is the same defect as the branch above and would have
+        # survived fixing only that one.
         logger.exception("Failed to compute detection coverage from TIDE")
-        score = 0
+        details["reason"] = "TIDE could not be read, so coverage is unmeasured."
+        return {"score": None, "label": "Unavailable", "details": details}
 
     return {"score": score, "label": _label(score), "details": details}
 

@@ -226,6 +226,25 @@
     .tw-drop-item { display: block; padding: 8px 12px; border-radius: 6px; color: rgb(148 163 184); font-size: 13px; transition: background .18s, color .18s; }
     .tw-drop-item:hover { color: #fff; background: rgba(255,255,255,0.05); }
     .tw-drop-item.is-active { color: #6de4ff; background: rgba(109, 228, 255, 0.08); }
+
+    /* The header in light mode.
+       Every colour above was picked against a near-black bar, and this
+       file had no [data-mode="light"] rule at all, so on the light page
+       all six measured between 1.07:1 and 2.39:1 against the required
+       4.5. The two `is-active` rules were the worst of it: #fff on a 6%
+       white tint is 1.07:1, so the entry for the page you were currently
+       on was the single entry you could not read.
+       Each value below is the same hue darkened until it clears 4.5:1 on
+       #f6f7f9, and the tints flip from a white wash to an ink one.
+       tests/test_nav_contrast.py recomputes these rather than trusting
+       the numbers in this comment. */
+    [data-mode="light"] .tw-nav-link,
+    [data-mode="light"] .tw-drop-item { color: #5f738f; }
+    [data-mode="light"] .tw-nav-link:hover,
+    [data-mode="light"] .tw-drop-item:hover { color: #0f1729; background: rgba(15, 23, 42, 0.05); }
+    [data-mode="light"] .tw-nav-link.is-active { color: #0f1729; background: rgba(15, 23, 42, 0.06); }
+    [data-mode="light"] .tw-drop-item.is-active { color: #00708a; background: rgba(15, 23, 42, 0.08); }
+
     /* legacy text decoration reset for header anchors */
     .ion-tw a { text-decoration: none; }
 

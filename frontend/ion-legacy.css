@@ -1711,7 +1711,12 @@ select option {
     font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
     font-size: 1.75rem;
     font-weight: 600;
-    color: #fff;
+    /* Was a literal #fff, which beat the `color: var(--primary)` rule at
+       line 741 and could not be reached by the light-mode variable flip.
+       On the light page the SOC maturity score rendered white on white,
+       measured 1.00:1, so the headline number of the page was invisible.
+       --ion-text is defined per mode, so this follows the theme. */
+    color: var(--ion-text, #fff);
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
     line-height: 1;

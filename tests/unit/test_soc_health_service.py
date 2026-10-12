@@ -100,16 +100,29 @@ class TestWeightsAndGrading:
 # --- detection coverage ----------------------------------------------------
 
 class TestDetectionCoverage:
-    def test_no_posture_stats_scores_zero(self, tide):
-        """Unknown coverage is scored as none, not as neutral."""
+    def test_no_posture_stats_is_unmeasured(self, tide):
+        """Unknown coverage is scored as none, not as neutral.
+
+        That first line is the original docstring and it was right. The
+        assertion under it was `score == 0`, which is a number, so the
+        aggregate counted the dimension as measured and graded the SOC on
+        it. On an instance with no TIDE that produced 30/100 Grade F and
+        the claim "All five dimensions measured". None is what the
+        docstring meant all along.
+        """
         tide(posture=None)
         out = svc._detection_coverage()
-        assert out["score"] == 0
+        assert out["score"] is None
+        assert out["label"] == "Unavailable"
         assert out["details"]["tide_available"] is False
+        assert out["details"]["reason"]
 
-    def test_a_tide_failure_scores_zero_without_raising(self, tide):
+    def test_a_tide_failure_is_unmeasured_without_raising(self, tide):
+        """A failed read is the same state as no data: ION could not look."""
         tide(raises=True)
-        assert svc._detection_coverage()["score"] == 0
+        out = svc._detection_coverage()
+        assert out["score"] is None
+        assert out["label"] == "Unavailable"
 
     def test_full_coverage_and_quality_scores_one_hundred(self, tide):
         tide(posture={"total_techniques": 100, "covered_techniques": 100,

@@ -64,6 +64,86 @@
     border-radius: 3px;
     transition: width .5s;
 }
+
+/* An unmeasured dimension used to render as a bar at width 0, which is
+   the same picture as a dimension measured at zero. Hatching is the one
+   thing on this card that a real score can never produce, so the two
+   cannot be confused at a glance or in a screenshot. Full width on
+   purpose: the track is not "none of it", it is "nobody looked". */
+.sh-dim-bar-unmeasured {
+    width: 100%;
+    height: 100%;
+    border-radius: 3px;
+    background: repeating-linear-gradient(
+        135deg,
+        rgba(145, 158, 171, 0.55) 0 4px,
+        transparent 4px 9px
+    );
+}
+
+/* daisyUI sets `.stat-desc{white-space:nowrap}` because its stat
+   component expects a short one-line caption. ION puts a key/value list
+   in there instead, so every line ran off the card and was cut by the
+   card's overflow-hidden. Four of the five cards were losing the end of
+   their detail text, including "reason:", which is the field that says
+   WHY a dimension scored what it did. */
+.sh-dims .stat-desc,
+.sh-dims .stat-title {
+    white-space: normal;
+}
+.sh-dims .stat-desc > div {
+    overflow-wrap: anywhere;
+}
+
+/* stat-value is sized for a two or three digit score. The words that
+   replace a missing score overflow it, so they get their own size rather
+   than being abbreviated to something ambiguous like "n/a". */
+.sh-value-text {
+    font-size: 20px;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+/* Basis stated per card, rather than left to be inferred from a colour.
+   The dashed rule survives greyscale and colour blindness. */
+.sh-basis {
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+.sh-basis-measured { color: var(--sev-low); }
+.sh-basis-unmeasured {
+    color: var(--sev-medium);
+    border-bottom: 1px dashed currentColor;
+}
+
+/* Permanent furniture, not a tooltip. A reader should not have to hover
+   to learn that hatching means nobody checked. */
+.sh-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: center;
+    margin-bottom: 14px;
+    font-size: 12px;
+}
+.sh-legend-swatch {
+    display: inline-block;
+    width: 22px;
+    height: 8px;
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-right: 7px;
+}
+.sh-legend-hatch {
+    background: repeating-linear-gradient(
+        135deg,
+        rgba(145, 158, 171, 0.55) 0 4px,
+        transparent 4px 9px
+    );
+}
 </style>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/soc-health';
@@ -142,6 +222,10 @@ function renderScorecard(d) {
         integration_health: 'plug'
     };
 
+    html += `<div class="sh-legend">
+        <span><span class="sh-legend-swatch" data-ion-style="background:${gradeColor(100)}"></span>measured</span>
+        <span><span class="sh-legend-swatch sh-legend-hatch"></span>not measured, which is not the same as zero</span>
+    </div>`;
     html += '<div class="sh-dims">';
     for (const key of dimOrder) {
         const dim = dims[key];
@@ -164,12 +248,24 @@ function renderScorecard(d) {
             }
             detailHtml += `<div><strong>${esc(k.replace(/_/g,' '))}:</strong> ${shown}</div>`;
         }
-        html += `<div class="card bg-base-200 shadow relative overflow-hidden" data-ion-data-ion-style="--dim-color:${dc}">
+        // A measured zero and an unmeasured dimension must not render the
+        // same. The score reads "not measured" rather than "n/a", which is
+        // ambiguous, and the bar is hatched across its full width rather
+        // than filled to 0%, which was indistinguishable from a real zero.
+        const bar = dimScored
+            ? `<div class="sh-dim-bar-fill" data-ion-style="width:${dim.score}%; background:${dc}"></div>`
+            : '<div class="sh-dim-bar-unmeasured"></div>';
+        const basis = dimScored
+            ? '<div class="sh-basis sh-basis-measured">measured</div>'
+            : '<div class="sh-basis sh-basis-unmeasured">not measured</div>';
+
+        html += `<div class="card bg-base-200 shadow relative overflow-hidden" data-ion-style="--dim-color:${dc}">
             <div class="absolute top-0 left-0 right-0 h-[3px]" data-ion-style="background:${dc}"></div>
             <div class="stat">
                 <div class="stat-title"><i class="icon-${dimIcons[key] || 'circle'}"></i> ${esc(dim.label)}</div>
-                <div class="stat-value font-mono" data-ion-style="color:${dc}">${dimScored ? dim.score : 'n/a'}</div>
-                <div class="h-1.5 bg-base-300 rounded overflow-hidden my-2"><div class="sh-dim-bar-fill" data-ion-style="width:${dimScored ? dim.score : 0}%; background:${dc}"></div></div>
+                <div class="stat-value font-mono${dimScored ? '' : ' sh-value-text'}" data-ion-style="color:${dc}">${dimScored ? dim.score : 'not measured'}</div>
+                ${basis}
+                <div class="h-1.5 bg-base-300 rounded overflow-hidden my-2">${bar}</div>
                 <div class="stat-desc">${detailHtml}</div>
             </div>
         </div>`;
