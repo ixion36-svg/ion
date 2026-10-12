@@ -1,0 +1,113 @@
+{# One story's recent runs.
+
+   Replaces two innerHTML sites in stories.html, the run table and the
+   "No runs yet." line, and the esc() that ran over the status, the started
+   timestamp, the alert id, the serialised step outputs and the error text.
+
+   Three states, because a story that has never run and a story whose run
+   history could not be read are opposite findings and the JavaScript
+   rendered them identically: its `catch (e) { /* non-fatal */ }` left the
+   container holding whatever was there, which on first load was nothing.
+   A story that had failed a hundred times looked like a story nobody had
+   ever run. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  {# The Retry button is inside the failure branch, not outside it. This
+     panel's only other trigger is `stories:ran`, which fires after a
+     successful run, so without a control here the way back would be
+     re-requesting the editor, and that replaces the DAG textarea above and
+     discards an edit that has not been saved. A failed render carrying its
+     own recovery cannot have that recovery swapped away. #}
+  {% set retry_url = '/ui/stories/runs?story_id=' ~ story_id %}
+  <div role="alert" class="alert alert-error text-sm mt-3 flex items-start gap-3">
+    <span>
+      The run history for this story could not be read. This is not a story
+      that has never run: nothing here says how many times it ran or how any
+      of them ended.
+    </span>
+    <button class="btn btn-ghost btn-xs shrink-0"
+            hx-get="{{ retry_url }}"
+            hx-target="#story-runs"
+            hx-swap="innerHTML">Retry</button>
+  </div>
+{% elif not rows %}
+  <div class="text-sm opacity-50 mt-3">No runs yet.</div>
+{% else %}
+  <h3 class="text-xs font-semibold uppercase tracking-wider mt-4 mb-2 opacity-60">
+    Recent runs ({{ rows | length }})
+  </h3>
+  {# The JavaScript asked for ?limit=10 and said nothing about it, so a full
+     table read as the story's whole history. A reader counting failures
+     needs to know the count is a floor, not a total. #}
+  {% if rows | length == limit %}
+    <p class="text-xs opacity-60 mb-2">
+      Capped at {{ limit }}. Older runs exist and are not shown here.
+    </p>
+  {% endif %}
+  <div class="overflow-x-auto">
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Status</th>
+          <th>Started</th>
+          <th>Case</th>
+          <th>Alert</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td class="font-mono opacity-60">#{{ r.id if r.id is not none else '?' }}</td>
+            <td>
+              {# `status` is a plain String column, not an SQLEnum, so it
+                 needs no unwrapping. The badge comes from a table with a
+                 neutral default, so "cancelled" and "pending" get a styled
+                 pill rather than no class at all. #}
+              <span class="badge badge-sm {{ r.badge }}">{{ r.status or 'unrecorded' }}</span>
+            </td>
+            <td class="text-xs opacity-60">
+              {# Never formatted on the server. `StoryRun.started_at` is a
+                 naive column, so the macro marks it data-ts-local="no" and
+                 local-time.js leaves the digits alone: a zoneless value
+                 cannot honestly be moved to another clock, and JavaScript
+                 would read it as the viewer's own and shift it by their
+                 offset. What the macro adds over the JavaScript's bare
+                 string is the title saying whose clock it is. #}
+              {{ ts(r.started_at, fallback='no start time') }}
+            </td>
+            {# `is not none`, not truthiness. Case 0 is a case, and a blank
+               cell reads as a run with no case bound at all. #}
+            <td>{{ r.case_id if r.case_id is not none else '' }}</td>
+            <td class="font-mono text-xs">
+              {% if r.alert_id is not none %}
+                {% if r.alert_id_clipped %}
+                  {# The full value in a title, because an id truncated with
+                     no sign of it lets two alerts render identically. #}
+                  <span title="{{ r.alert_id }}">{{ r.alert_id_short }}&hellip;</span>
+                {% else %}
+                  {{ r.alert_id_short }}
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td colspan="5">
+              <details class="collapse collapse-arrow bg-base-300">
+                <summary class="collapse-title min-h-0 py-2 text-xs">Step outputs</summary>
+                <div class="collapse-content">
+                  <pre class="text-xs bg-base-100 px-3 py-2 overflow-x-auto m-0">{{ r.step_outputs }}</pre>
+                  {% if r.error %}
+                    <div role="alert" class="alert alert-error mt-2 text-sm">{{ r.error }}</div>
+                  {% endif %}
+                </div>
+              </details>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}

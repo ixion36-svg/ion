@@ -102,6 +102,88 @@ def _serialise_run(run: StoryRun) -> dict:
     }
 
 
+# ── Payloads shared with the /ui fragments ───────────────────────────────
+#
+# The ordering, the enabled_only filter and the runs limit cap used to sit
+# inline in the two JSON routes below. ion/web/ui/stories.py renders the same
+# two reads as HTML, and a second copy of a query is the pair that drifts:
+# one side would keep showing disabled stories, or stop capping the run
+# limit, after the other was changed.
+
+#: Most runs any caller can ask for in one request.
+RUNS_LIMIT_CAP = 200
+
+
+def list_payload(session: Session, *, enabled_only: bool = False) -> dict:
+    """Every story, newest first, without its DAG.
+
+    `include_dag=False` matches what the list has always returned: the rail
+    shows a name and a badge, and a page carrying every story's full DAG
+    would grow with the estate for no reader.
+    """
+    q = session.query(Story).order_by(Story.id.desc())
+    if enabled_only:
+        q = q.filter(Story.enabled.is_(True))
+    items = q.all()
+    return {
+        "stories": [_serialise(s, include_dag=False) for s in items],
+        "count": len(items),
+    }
+
+
+def dag_is_readable(dag_json: str | None) -> bool:
+    """Whether the stored DAG text parses as JSON.
+
+    `_serialise` turns an unparseable `dag_json` into `{}` and says nothing,
+    which is the same swallow the fragments exist to remove: an empty object
+    is a story with no steps, and a story whose text will not parse is a
+    story whose steps are unknown. A JSON client got `{}` too, so this is
+    reported rather than only shown.
+    """
+    try:
+        json.loads(dag_json or "{}")
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def story_payload(session: Session, story_id: int) -> dict | None:
+    """One story with its DAG, or None when there is no such row.
+
+    None rather than a raised 404 because the two callers want opposite
+    things from a missing story: the JSON endpoint owes a client a 404, and
+    the editor fragment owes a reader a pane that says the story is gone.
+    Returning the absence lets each say its own thing about it.
+
+    `dag_readable` is additive: every existing key keeps its name, type and
+    value, and a caller that ignores it sees exactly what it saw before.
+    """
+    row = session.get(Story, story_id)
+    if row is None:
+        return None
+    payload = _serialise(row)
+    payload["dag_readable"] = dag_is_readable(row.dag_json)
+    return payload
+
+
+def runs_payload(session: Session, story_id: int, *, limit: int = 50) -> dict:
+    """One story's most recent runs, newest first.
+
+    The cap is here rather than at each caller. A fragment asking for its
+    own limit would be a second answer to "how many runs will this endpoint
+    ever return", and the heading that says how many are shown reads this
+    list rather than the request.
+    """
+    rows = (
+        session.query(StoryRun)
+        .filter(StoryRun.story_id == story_id)
+        .order_by(StoryRun.id.desc())
+        .limit(min(limit, RUNS_LIMIT_CAP))
+        .all()
+    )
+    return {"runs": [_serialise_run(r) for r in rows], "count": len(rows)}
+
+
 # ── List + CRUD ──────────────────────────────────────────────────────────
 
 
@@ -111,14 +193,7 @@ def list_stories(
     current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
 ):
-    q = session.query(Story).order_by(Story.id.desc())
-    if enabled_only:
-        q = q.filter(Story.enabled.is_(True))
-    items = q.all()
-    return {
-        "stories": [_serialise(s, include_dag=False) for s in items],
-        "count": len(items),
-    }
+    return list_payload(session, enabled_only=enabled_only)
 
 
 @router.get("/api/stories/step-types")
@@ -135,10 +210,10 @@ def get_story(
     current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
 ):
-    s = session.get(Story, story_id)
-    if not s:
+    payload = story_payload(session, story_id)
+    if payload is None:
         raise HTTPException(status_code=404, detail="Story not found")
-    return _serialise(s)
+    return payload
 
 
 @router.post("/api/stories")
@@ -268,14 +343,7 @@ def list_story_runs(
     current_user: User = Depends(require_permission("playbook:read")),
     session: Session = Depends(get_db_session),
 ):
-    rows = (
-        session.query(StoryRun)
-        .filter(StoryRun.story_id == story_id)
-        .order_by(StoryRun.id.desc())
-        .limit(min(limit, 200))
-        .all()
-    )
-    return {"runs": [_serialise_run(r) for r in rows], "count": len(rows)}
+    return runs_payload(session, story_id, limit=limit)
 
 
 @router.get("/api/story-runs/{run_id}")
