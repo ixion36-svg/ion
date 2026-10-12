@@ -29,9 +29,13 @@ The one number that cannot come from the stylesheet is each metric bar's
 width. `style-src-attr 'none'` forbids an inline `style=`, so the fragment
 emits `data-ion-style="width:NN%"` and static/js/ion-dynamic-styles.js
 applies it with `setProperty` after every swap. That is ION's one
-definition for a computed style, and it is why the `w-[0%]` and `w-[80%]`
-classes the old markup carried were decoration: no `w-[N%]` rule exists in
-the compiled stylesheet, so the widths only ever came from JavaScript.
+definition for a computed style, and it is why the percentage-width classes
+the old markup carried were decoration: the compiled stylesheet carries no
+rule for any of them, so the widths only ever came from JavaScript.
+
+Those class names are described rather than quoted on purpose. Tailwind's
+content scan now reaches this directory, so naming one as a literal here
+would generate a rule for it and make the sentence above untrue.
 
 There is no JSON endpoint to share a service function with. The page's
 script fetched nothing at all; both pipelines were hardcoded. So the

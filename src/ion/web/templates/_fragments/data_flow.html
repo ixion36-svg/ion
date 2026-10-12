@@ -212,8 +212,13 @@
                literally 0, and a truthiness test would emit no width for
                exactly the two bars reporting a total loss. An empty track
                reads as "not measured", which is the opposite of a measured
-               zero, and the old `w-[0%]` class could not say it either
-               because no `w-[N%]` rule exists in the compiled stylesheet. #}
+               zero, and the percentage-width classes the old markup carried
+               could not say it either, because the stylesheet carries no
+               rule for any of them.
+
+               That sentence used to name one of those classes as a literal.
+               Tailwind scans this file, so naming it generated a rule for
+               it, and writing the sentence made the sentence false. #}
             <div class="df-bar-fill {{ metric.bar_class }}"
                  {%- if metric.bar_percent is not none %} data-ion-style="width:{{ metric.bar_percent }}%" data-df-bar-percent="{{ metric.bar_percent }}"{% endif %}></div>
           </div>
