@@ -1,0 +1,45 @@
+{# The one definition of how a version's metadata reads.
+
+   The row in the list and the detail modal show the same three fields, and
+   the JavaScript they replace had a copy of each in a different place:
+   loadVersions() built one and viewVersion() built the other. The copies
+   had already drifted. loadVersions escaped nothing, viewVersion escaped
+   the checkpoint name but not the message, and both folded an empty message
+   into "No message". A macro is why the modal cannot disagree with the row
+   it was opened from.
+
+   This is also why the modal body is a fragment rather than client-side DOM
+   work: a timestamp has exactly one honest rendering, the `ts` macro, and
+   JavaScript cannot reach it. A client-side modal would have had to keep
+   formatDate and so keep a second answer to "what time is this" on a page
+   whose list had already moved to the first one. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% macro checkpoint_badge(v) -%}
+{#- Truthiness on purpose: is_checkpoint is a non-nullable Boolean column,
+    so it is two-state, and a raw row or a round trip through JSON hands
+    back 1 rather than True. `is true` would drop the badge for those.
+
+    The name is guarded separately because the JavaScript was not: it put
+    escapeHtml(v.checkpoint_name) in the badge under `if (v.is_checkpoint)`
+    alone, so a checkpoint saved without a name rendered a badge reading
+    "null". A badge naming nothing still says truthfully that this version
+    is a checkpoint. -#}
+{% if v.is_checkpoint %}<span class="checkpoint-badge">{% if v.checkpoint_name is not none %}{{ v.checkpoint_name }}{% else %}Checkpoint{% endif %}</span>{% endif %}
+{%- endmacro %}
+
+{% macro message(v) -%}
+{#- `v.message || 'No message'` could not tell an absent message from an
+    empty one. A version saved with an empty message had one; a version with
+    none never carried one, and only that is worth labelling. -#}
+{% if v.message is not none %}<span>{{ v.message }}</span>{% else %}<span class="opacity-60">No message</span>{% endif %}
+{%- endmacro %}
+
+{% macro created(v) -%}
+{#- formatDate() was toLocaleDateString over a naive stamp, which reads the
+    stored digits as the viewer's clock and labels them as nobody's. The
+    macro emits the stored value and static/js/local-time.js decides, after
+    this swap as after any other. -#}
+<span>{{ ts(v.created_at) }}</span>
+{%- endmacro %}

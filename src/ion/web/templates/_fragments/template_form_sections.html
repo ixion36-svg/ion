@@ -1,0 +1,236 @@
+{# The section editor's cards, the empty state, and the input that carries
+   the editor's unsaved state.
+
+   Replaces three of template_form.html's four innerHTML sites: the card
+   header, the card body (nine field builders, six of them list builders)
+   and the inline Add Section button between cards. The fourth, the library
+   tile, is in template_form_library.html.
+
+   This fragment holds a control on purpose, against the usual rule that
+   controls live in the page shell. `#sections-state` is the editor's
+   unsaved state, and only a render knows what the state is after the edit
+   it just applied, so it has to be re-emitted here. It is therefore
+   re-emitted on every branch, including both failure branches: a render
+   that dropped it would delete sections the user had written and not saved.
+
+   The controls that recover from a failure are in the shell. "+ Add
+   Section" sits in the card header above this target and the form's buttons
+   sit below it, so no render here can remove the way out.
+
+   Each card's own buttons are inside the target, which is correct: they act
+   on a specific card and a render that removes the card should remove them.
+
+   The `safe_url` filter has no site here. The editor renders no URL: every
+   value on this fragment is either the user's own unsaved text or a label
+   out of ion.services.section_types, and the only href on the page is the
+   static /templates Cancel link in the shell. Nothing is read out of a
+   column that stores a link. #}
+
+<input type="hidden" name="sections" id="sections-state" value="{{ sections_json }}">
+
+{% if state_failed %}
+  <div role="alert" class="alert alert-error mb-4">
+    The editor state could not be read, so these sections could not be
+    rendered. This is not an empty template: the sections may still be
+    there. Reload the page to read them again from the server rather than
+    saving, because saving now would store a template with no sections.
+  </div>
+{% endif %}
+
+{% if edit_failed %}
+  <div role="alert" class="alert alert-warning mb-4">
+    That change was not applied, so the sections below are exactly as they
+    were. Nothing has been lost and nothing has been saved. Try it again.
+  </div>
+{% endif %}
+
+{% if legacy and not sections %}
+  {# Shown while the template still holds a raw body and the editor holds no
+     sections, which is the condition that makes the offer true rather than
+     a flag the page turned off with a style assignment after converting
+     once. Delete the converted section and the offer is correctly back. #}
+  <div role="alert" class="alert alert-warning se-legacy-notice mb-4">
+    <div>
+      <p class="mb-2">This template was created with the raw editor. To use the section editor, the existing content will be placed in a single Text section.</p>
+      <button type="button" class="btn btn-sm"
+              hx-post="/ui/template-form/sections"
+              hx-vals='{"op": "convert_legacy"}'
+              hx-target="#sections-container"
+              hx-swap="innerHTML">Convert to Sections</button>
+    </div>
+  </div>
+{% endif %}
+
+{% if not sections %}
+  {% if not state_failed %}
+    <div class="se-empty border-2 border-dashed border-base-300 rounded-box p-8 text-center text-base-content/60">
+      <p>No sections yet. Click "Add Section" to get started.</p>
+    </div>
+  {% endif %}
+{% else %}
+  {% for section in sections %}
+    <div class="se-card" data-idx="{{ section.idx }}">
+      {# data-stop-propagation on the actions group, so a click on Move or
+         Delete does not also collapse the card. The page did this with
+         `if (e.target.closest('.se-card-actions')) return;` inside the
+         header's own handler; event-delegation.js honours the attribute
+         on an element between the click and the action element. #}
+      <div class="se-card-header" data-click-action="toggleCardBody"
+           data-args='[{{ section.idx }}]'>
+        <div class="se-card-icon">{{ section.icon }}</div>
+        <span class="se-card-title">{{ section.title }}</span>
+        <span class="se-card-type">{{ section.type_label }}</span>
+        <div class="se-card-actions" data-stop-propagation>
+          <button type="button" title="Move up"
+                  hx-post="/ui/template-form/sections"
+                  hx-vals='{"op": "move", "index": {{ section.idx }}, "direction": -1}'
+                  hx-target="#sections-container"
+                  hx-swap="innerHTML"><i class="icon-chevron-up"></i></button>
+          <button type="button" title="Move down"
+                  hx-post="/ui/template-form/sections"
+                  hx-vals='{"op": "move", "index": {{ section.idx }}, "direction": 1}'
+                  hx-target="#sections-container"
+                  hx-swap="innerHTML"><i class="icon-chevron-down"></i></button>
+          <button type="button" class="se-delete" title="Delete"
+                  hx-post="/ui/template-form/sections"
+                  hx-vals='{"op": "remove", "index": {{ section.idx }}}'
+                  hx-target="#sections-container"
+                  hx-swap="innerHTML"><i class="icon-x"></i></button>
+        </div>
+      </div>
+
+      <div class="se-card-body" id="se-body-{{ section.idx }}">
+        {% if not section.known %}
+          {# The page rendered an unrecognised type as a card with no
+             controls, which looks like a section that has nothing to
+             configure. It is still assembled into the saved content, so
+             silence here is the one answer that cannot be acted on. #}
+          <div role="alert" class="alert alert-warning text-sm">
+            This section's type, <code>{{ section.type }}</code>, is not in
+            the section library, so its settings cannot be shown. It is
+            still part of the template and will still be saved as it is.
+            Delete it if it should not be.
+          </div>
+        {% endif %}
+
+        {% for field in section.fields %}
+          {% if field.type == 'text' %}
+            <div class="se-field">
+              <label>{{ field.label }}</label>
+              <input type="text" data-idx="{{ field.idx }}" data-field="{{ field.name }}"
+                     value="{{ field.value }}" placeholder="{{ field.label }}">
+            </div>
+          {% elif field.type == 'textarea' %}
+            <div class="se-field">
+              <label>{{ field.label }}</label>
+              <textarea data-idx="{{ field.idx }}" data-field="{{ field.name }}"
+                        placeholder="{{ field.label }}">{{ field.value }}</textarea>
+            </div>
+          {% elif field.type == 'select' %}
+            <div class="se-field">
+              <label>{{ field.label }}</label>
+              <select data-idx="{{ field.idx }}" data-field="{{ field.name }}">
+                {% for option in field.options %}
+                  <option value="{{ option.value }}"
+                          {% if option.selected %}selected{% endif %}>{{ option.label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% elif field.type == 'checkbox' %}
+            <div class="se-checkbox">
+              <label>
+                <input type="checkbox" data-idx="{{ field.idx }}" data-field="{{ field.name }}"
+                       {% if field.checked %}checked{% endif %}>
+                {{ field.label }}
+              </label>
+            </div>
+          {% elif field.list_kind %}
+            <div class="se-field">
+              <label>{{ field.label }}</label>
+              <div class="se-list-field" data-idx="{{ field.idx }}"
+                   data-field="{{ field.name }}" data-list-type="{{ field.list_kind }}">
+                {% for row in field.rows %}
+                  <div class="se-list-item">
+                    {% if field.list_kind == 'pairs' %}
+                      <input type="text" value="{{ row.label }}" placeholder="Label"
+                             data-list-idx="{{ loop.index0 }}" data-pair="label">
+                      <input type="text" value="{{ row.value }}" placeholder="Value"
+                             data-list-idx="{{ loop.index0 }}" data-pair="value">
+                    {% elif field.list_kind == 'columns' %}
+                      <input type="text" value="{{ row.name }}" placeholder="Column name"
+                             data-list-idx="{{ loop.index0 }}">
+                    {% elif field.list_kind == 'metadata' %}
+                      <input type="text" value="{{ row.label }}" placeholder="Label"
+                             data-list-idx="{{ loop.index0 }}" data-pair="label">
+                      <input class="font-mono" type="text" value="{{ row.variable_name }}"
+                             placeholder="variable_name"
+                             data-list-idx="{{ loop.index0 }}" data-pair="variable_name">
+                    {% elif field.list_kind == 'signatures' %}
+                      <input type="text" value="{{ row.role_name }}" placeholder="Role"
+                             data-list-idx="{{ loop.index0 }}" data-pair="role_name">
+                      <input class="font-mono" type="text" value="{{ row.variable_name }}"
+                             placeholder="variable_name"
+                             data-list-idx="{{ loop.index0 }}" data-pair="variable_name">
+                    {% elif field.list_kind == 'checklist' %}
+                      <input type="checkbox" {% if row.checked %}checked{% endif %}
+                             data-list-idx="{{ loop.index0 }}" data-check="true">
+                      <input type="text" value="{{ row.text }}"
+                             data-list-idx="{{ loop.index0 }}">
+                    {% else %}
+                      <input type="text" value="{{ row.text }}"
+                             data-list-idx="{{ loop.index0 }}">
+                    {% endif %}
+                    <button type="button"
+                            hx-post="/ui/template-form/sections"
+                            hx-vals='{"op": "remove_item", "index": {{ field.idx }},
+                                      "field": {{ field.name | tojson }},
+                                      "item_index": {{ loop.index0 }}}'
+                            hx-target="#sections-container"
+                            hx-swap="innerHTML">&#10005;</button>
+                  </div>
+                {% endfor %}
+                <button type="button" class="se-list-add"
+                        hx-post="/ui/template-form/sections"
+                        hx-vals='{"op": "add_item", "index": {{ field.idx }},
+                                  "field": {{ field.name | tojson }},
+                                  "list_kind": {{ field.list_kind | tojson }}}'
+                        hx-target="#sections-container"
+                        hx-swap="innerHTML">+ Add
+                  {%- if field.list_kind == 'pairs' %} Pair
+                  {%- elif field.list_kind == 'columns' %} Column
+                  {%- elif field.list_kind == 'metadata' %} Field
+                  {%- elif field.list_kind == 'signatures' %} Role
+                  {%- else %} Item{% endif %}</button>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        {% if section.supports_variable %}
+          <div class="se-variable-toggle">
+            <label>
+              <input type="checkbox" data-idx="{{ section.idx }}" data-field="variable"
+                     data-change-action="toggleVariableName"
+                     {% if section.is_variable %}checked{% endif %}>
+              Make variable
+            </label>
+            {# The suggested name is computed on the server now. The page
+               rendered the input empty and then filled it in from
+               suggestVarName() in a pass after the render, which meant the
+               value the user saw and the value collectFieldData() read
+               could differ for one frame. #}
+            <input type="text" data-idx="{{ section.idx }}" data-field="variable_name"
+                   value="{{ section.variable_name }}" placeholder="variable_name"
+                   class="{% if not section.is_variable %}hidden{% endif %}">
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="se-add-inline">
+      <button type="button"
+              data-click-action="openLibrary"
+              data-args='[{{ section.idx }}]'>+ Add Section</button>
+    </div>
+  {% endfor %}
+{% endif %}

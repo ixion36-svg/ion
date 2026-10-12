@@ -12,58 +12,105 @@
             <svg class="w-4 h-4 text-primary"><use href="#i-file-text"/></svg>
             <span class="label-tiny text-primary">Template render</span>
         </div>
+        <!-- The variables fragment swaps this out of band on every branch,
+             so it never keeps saying "Loading..." after a read that will
+             not finish. -->
         <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Render: <span id="template-name">Loading...</span></h1>
     </div>
     <div class="flex items-center gap-2 flex-wrap">
-        <button type="button" id="settings-btn" class="btn btn-ghost" title="User Preferences">
+        <button type="button" id="settings-btn" class="btn btn-ghost" title="User Preferences"
+                data-click-action="openSettingsModal">
             <svg class="w-4 h-4"><use href="#i-settings"/></svg>
             Settings
         </button>
+        <!-- Reload is the way out of a variables panel that says the read
+             failed, so it sits outside every swap target on the page. -->
+        <button type="button" class="btn btn-ghost"
+                hx-get="/ui/template-render/variables?template_id={{ template_id }}"
+                hx-target="#variables-form"
+                hx-swap="innerHTML">Reload</button>
         <a href="/templates/{{ template_id }}" class="btn btn-ghost">Back to Template</a>
     </div>
 </section>
+
+<!-- Which template is being rendered. No form wraps this page, so the two
+     POST fragments cannot pick it up from an enclosing form the way the
+     editor's do; it travels by hx-include instead. -->
+<input type="hidden" id="render-template-id" name="template_id" value="{{ template_id }}">
 
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="card bg-base-200 shadow">
         <div class="card-body">
             <div role="tablist" class="tabs tabs-box mb-4">
-                <button type="button" role="tab" class="tab tab-btn active" data-tab="form">Form View</button>
-                <button type="button" role="tab" class="tab tab-btn" data-tab="json">JSON View</button>
+                <button type="button" role="tab" class="tab tab-btn active" data-tab="form"
+                        data-click-action="switchTab" data-args='["form"]'>Form View</button>
+                <button type="button" role="tab" class="tab tab-btn" data-tab="json"
+                        data-click-action="switchTab" data-args='["json"]'>JSON View</button>
             </div>
 
-            <div id="form-tab" class="tab-content active">
+            <!-- No `tab-content` class, and the visible pane is the one
+                 without `hidden`. daisyUI 5's `.tab-content` is
+                 `display: none` until an adjacent `.tab-active` tab says
+                 otherwise, and this page drives a hand-rolled `.active`
+                 class on buttons that are not even siblings of these
+                 panes, so the rule never lifted. The pane was therefore
+                 `display: none` on first paint and only became visible
+                 once switchTab() assigned a display: the variables form
+                 and the section cards were invisible until the user
+                 clicked the tab they were already on.
+                 playbooks.html, template_view.html and training.html carry
+                 the same pairing and are outside this conversion. -->
+            <div id="form-tab">
                 <h3 class="card-title text-base">Template Variables</h3>
-                <div id="variables-form" class="variables-form">
+                <!-- The form, its three action buttons and the "no
+                     variables" state are server-rendered into here. -->
+                <div id="variables-form" class="variables-form"
+                     hx-get="/ui/template-render/variables?template_id={{ template_id }}"
+                     hx-trigger="load"
+                     hx-swap="innerHTML">
                     <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
                         <span class="loading loading-spinner loading-sm text-primary"></span>
                         Loading template variables...
                     </div>
                 </div>
 
-                <div class="hidden border-t-2 border-base-300 pt-4 mt-4" id="sections-area">
+                <div class="border-t-2 border-base-300 pt-4 mt-4" id="sections-area">
                     <div class="flex items-center justify-between mt-6 mr-0 mb-3 ml-0 flex-wrap gap-2">
                         <h3 class="m-0 card-title text-base">Document Sections</h3>
+                        <!-- Outside the swap target, so no render of the
+                             cards can remove them. -->
                         <div class="flex gap-2">
-                            <button type="button" class="btn btn-ghost btn-sm" id="expand-all-btn" title="Expand all sections">Expand All</button>
-                            <button type="button" class="btn btn-ghost btn-sm" id="collapse-all-btn" title="Collapse all sections">Collapse All</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="expand-all-btn"
+                                    title="Expand all sections"
+                                    data-click-action="expandAllSections">Expand All</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="collapse-all-btn"
+                                    title="Collapse all sections"
+                                    data-click-action="collapseAllSections">Collapse All</button>
                         </div>
                     </div>
                     <p class="text-sm text-base-content/50 mt-[-0.5rem] mr-0 mb-3 ml-0 text-[0.8rem]">Click any section to expand it. Use the Edit tab to modify content before saving.</p>
-                    <div id="section-cards"></div>
+                    <!-- Loaded once the variables form has arrived, rather
+                         than on its own `load` trigger: the first render
+                         has to use the values the form was filled in with,
+                         and two independent load triggers race. -->
+                    <div id="section-cards"
+                         hx-post="/ui/template-render/sections"
+                         hx-trigger="variablesReady"
+                         hx-include="#render-template-id"
+                         hx-swap="innerHTML">
+                        <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
+                            <span class="loading loading-spinner loading-sm text-primary"></span>
+                            Loading document sections...
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div id="json-tab" class="tab-content hidden">
+            <div id="json-tab" class="hidden">
                 <h3 class="card-title text-base mb-3">Input Data (JSON)</h3>
                 <fieldset class="fieldset p-0">
-                    <textarea id="data-input" rows="15" placeholder='{"name": "John", "company": "Acme"}' class="textarea w-full font-mono text-sm">{}</textarea>
+                    <textarea id="data-input" name="data_json" rows="15" placeholder='{"name": "John", "company": "Acme"}' class="textarea w-full font-mono text-sm">{}</textarea>
                 </fieldset>
-            </div>
-
-            <div class="flex flex-wrap gap-2 mt-6">
-                <button type="button" id="autofill-btn" class="btn btn-ghost">Auto-fill Defaults</button>
-                <button type="button" id="preview-btn" class="btn btn-primary">Preview</button>
-                <button type="button" id="render-btn" class="btn btn-success">Save as Document</button>
             </div>
         </div>
     </div>
@@ -79,7 +126,7 @@
 </div>
 
 <!-- Settings Modal -->
-<div id="settings-modal" class="modal hidden">
+<div id="settings-modal" class="modal hidden" data-close-on-self-click>
     <div class="modal-box max-w-[500px]">
         <div class="flex items-center justify-between gap-4">
             <h2 class="text-lg font-semibold">User Preferences</h2>
@@ -121,11 +168,30 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 {% raw %}
-const templateId = {% endraw %}{{ template_id }}{% raw %};
-let templateVariables = [];
-let templateInfo = null;
+// What is left in this file is the four things a server cannot do: paint
+// markdown with the browser's own sanitiser, show and hide the two
+// overlays and the two tabs, apply the viewer's stored preferences, and
+// send the save.
+//
+// The markdown step is the one part of this page's markup still assembled
+// in the browser, and it is deliberate. ION ships no HTML sanitiser, and
+// the content is a template filled in with values a user typed, so
+// rendering it server-side and marking it safe would be a cross-site
+// scripting hole. safeMarkdown() in static/js/app.js is marked plus
+// DOMPurify, which is the sanitiser this page already relied on. The
+// result is written as parsed nodes rather than with innerHTML.
 
-// User preferences stored in localStorage
+function templateId() {
+    return document.getElementById('render-template-id').value;
+}
+
+function templateName() {
+    const el = document.getElementById('template-name');
+    return el ? el.textContent.trim() : '';
+}
+
+// ---------- preferences, which only the browser holds ----------
+
 const PREFS_KEY = 'ion_user_prefs';
 
 function getPreferences() {
@@ -136,291 +202,13 @@ function getPreferences() {
     }
 }
 
-function savePreferencesToStorage(prefs) {
-    localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        templateInfo = await api.get('/api/templates/' + templateId);
-        document.getElementById('template-name').textContent = templateInfo.name;
-
-        const varsData = await api.get('/api/templates/' + templateId + '/variables');
-        templateVariables = varsData.extracted;
-
-        buildVariablesForm(templateVariables, varsData.defined);
-        autoFillDefaults();
-
-        // Auto-load sections into form view
-        await loadSections();
-    } catch (e) {
-        showToast('Failed to load template', 'error');
-    }
-
-    // Load preferences into settings form
-    loadPreferencesIntoForm();
-});
-
-function buildVariablesForm(variables, definedVars) {
-    const form = document.getElementById('variables-form');
-
-    if (variables.length === 0) {
-        form.innerHTML = '<p class="muted">This template has no variables. The content will render as-is.</p>';
-        return;
-    }
-
-    const varMeta = {};
-    definedVars.forEach(function(v) {
-        varMeta[v.name] = v;
-    });
-
-    let html = '';
-    variables.forEach(function(varName) {
-        const meta = varMeta[varName] || {};
-        const fieldType = detectFieldType(varName);
-        const label = formatLabel(varName);
-
-        html += '<div class="form-group variable-field" data-field-type="' + fieldType.type + '">';
-        html += '<label for="var-' + varName + '">' + escapeHtml(label);
-        if (meta.required) {
-            html += ' <span class="required">*</span>';
-        }
-        if (fieldType.autoFill) {
-            html += ' <span class="auto-badge">Auto</span>';
-        }
-        html += '</label>';
-
-        html += buildInputForField(varName, fieldType, meta);
-
-        if (fieldType.hint) {
-            html += '<span class="field-hint">' + fieldType.hint + '</span>';
-        }
-        html += '</div>';
-    });
-
-    form.innerHTML = html;
-
-    // Sync form to JSON on input
-    form.querySelectorAll('.variable-input').forEach(function(input) {
-        input.addEventListener('input', syncFormToJson);
-        input.addEventListener('change', syncFormToJson);
-    });
-}
-
-function detectFieldType(varName) {
-    const lower = varName.toLowerCase();
-
-    // Date fields
-    if (lower.match(/(^date$|_date$|^effective|^last_updated|_datetime$|^created|^updated|^completion|^assessment_date|^detection)/)) {
-        return { type: 'date', inputType: 'date', autoFill: true, hint: 'Auto-filled with today\'s date' };
-    }
-
-    // Version fields
-    if (lower.match(/(^version$|_version$)/)) {
-        return { type: 'version', inputType: 'text', autoFill: true, hint: 'Auto-filled with 1.0' };
-    }
-
-    // Author/preparer fields
-    if (lower.match(/(^author$|^prepared_by$|^completed_by$|^assessor$|^reported_by$|^approved_by$)/)) {
-        return { type: 'author', inputType: 'text', autoFill: true, hint: 'Auto-filled from preferences' };
-    }
-
-    // Classification fields
-    if (lower.match(/(^classification$|^security_classification$)/)) {
-        return { type: 'classification', inputType: 'select', autoFill: true, hint: 'Auto-filled from preferences' };
-    }
-
-    // Severity fields
-    if (lower.match(/(^severity$|^priority$|^risk_level$)/)) {
-        return { type: 'severity', inputType: 'select', autoFill: false };
-    }
-
-    // Count/number fields
-    if (lower.match(/(_count$|_number$|^count_|^num_)/)) {
-        return { type: 'number', inputType: 'number', autoFill: false };
-    }
-
-    // Review cycle
-    if (lower.match(/(^review_cycle$)/)) {
-        return { type: 'review_cycle', inputType: 'select', autoFill: true, hint: 'Common review periods' };
-    }
-
-    // Multi-line text fields
-    if (shouldUseTextarea(varName)) {
-        return { type: 'textarea', inputType: 'textarea', autoFill: false };
-    }
-
-    // Default text field
-    return { type: 'text', inputType: 'text', autoFill: false };
-}
-
-function buildInputForField(varName, fieldType, meta) {
-    const placeholder = meta.default_value || 'Enter ' + formatLabel(varName).toLowerCase() + '...';
-
-    // If variable definition has options array, always render as select
-    if (meta.options && Array.isArray(meta.options) && meta.options.length > 0) {
-        return buildOptionsSelect(varName, meta.options, meta.default_value);
-    }
-
-    switch (fieldType.inputType) {
-        case 'date':
-            return '<input type="date" id="var-' + varName + '" name="' + varName + '" class="variable-input">';
-
-        case 'select':
-            return buildSelectField(varName, fieldType.type);
-
-        case 'number':
-            return '<input type="number" id="var-' + varName + '" name="' + varName + '" min="0" class="variable-input" placeholder="0">';
-
-        case 'textarea':
-            return '<textarea id="var-' + varName + '" name="' + varName + '" rows="6" placeholder="' + escapeHtml(placeholder) + '" class="variable-input"></textarea>';
-
-        default:
-            return '<input type="text" id="var-' + varName + '" name="' + varName + '" placeholder="' + escapeHtml(placeholder) + '" class="variable-input">';
-    }
-}
-
-function buildOptionsSelect(varName, options, defaultVal) {
-    const label = formatLabel(varName);
-    let html = '<select id="var-' + varName + '" name="' + varName + '" class="variable-input">';
-    html += '<option value="">-- Select ' + escapeHtml(label) + ' --</option>';
-    options.forEach(function(opt) {
-        const selected = (opt === defaultVal) ? ' selected' : '';
-        html += '<option value="' + escapeHtml(opt) + '"' + selected + '>' + escapeHtml(opt) + '</option>';
-    });
-    html += '</select>';
-    return html;
-}
-
-function buildSelectField(varName, type) {
-    let options = '';
-
-    if (type === 'classification') {
-        options = '<option value="">-- Select Classification --</option>' +
-            '<option value="UNCLASSIFIED">UNCLASSIFIED</option>' +
-            '<option value="FOR OFFICIAL USE ONLY">FOR OFFICIAL USE ONLY</option>' +
-            '<option value="CONFIDENTIAL">CONFIDENTIAL</option>' +
-            '<option value="SECRET">SECRET</option>' +
-            '<option value="TOP SECRET">TOP SECRET</option>';
-    } else if (type === 'severity') {
-        options = '<option value="">-- Select Severity --</option>' +
-            '<option value="Critical">Critical</option>' +
-            '<option value="High">High</option>' +
-            '<option value="Medium">Medium</option>' +
-            '<option value="Low">Low</option>' +
-            '<option value="Informational">Informational</option>';
-    } else if (type === 'review_cycle') {
-        options = '<option value="">-- Select Review Cycle --</option>' +
-            '<option value="Monthly">Monthly</option>' +
-            '<option value="Quarterly">Quarterly</option>' +
-            '<option value="Semi-Annual">Semi-Annual</option>' +
-            '<option value="Annual">Annual</option>' +
-            '<option value="As Needed">As Needed</option>';
-    }
-
-    return '<select id="var-' + varName + '" name="' + varName + '" class="variable-input">' + options + '</select>';
-}
-
-function shouldUseTextarea(varName) {
-    const multilinePatterns = [
-        'description', 'content', 'body', 'text', 'notes', 'details',
-        'summary', 'overview', 'purpose', 'scope', 'procedure', 'steps',
-        'instructions', 'responsibilities', 'requirements', 'narrative',
-        'background', 'situation', 'mission', 'execution', 'assessment',
-        'findings', 'analysis', 'recommendations', 'checklist', 'matrix',
-        'impact', 'remediation', 'lessons', 'appendices', 'references',
-        'definitions', 'timeline', 'iocs', 'resources', 'considerations'
-    ];
-    const lowerName = varName.toLowerCase();
-    for (var i = 0; i < multilinePatterns.length; i++) {
-        if (lowerName.indexOf(multilinePatterns[i]) !== -1) {
-            return true;
-        }
-    }
-    return false;
-}
-
-function autoFillDefaults() {
+function loadPreferencesIntoForm() {
     const prefs = getPreferences();
-    const today = new Date().toISOString().split('T')[0];
-
-    templateVariables.forEach(function(varName) {
-        const input = document.getElementById('var-' + varName);
-        if (!input) return;
-
-        const fieldType = detectFieldType(varName);
-
-        // Only auto-fill if field is empty
-        if (input.value) return;
-
-        switch (fieldType.type) {
-            case 'date':
-                input.value = today;
-                break;
-
-            case 'version':
-                input.value = '1.0';
-                break;
-
-            case 'author':
-                if (prefs.author) {
-                    input.value = prefs.author;
-                }
-                break;
-
-            case 'classification':
-                if (prefs.classification) {
-                    input.value = prefs.classification;
-                }
-                break;
-
-            case 'review_cycle':
-                input.value = 'Annual';
-                break;
-        }
-    });
-
-    syncFormToJson();
+    document.getElementById('pref-author').value = prefs.author || '';
+    document.getElementById('pref-organization').value = prefs.organization || '';
+    document.getElementById('pref-classification').value = prefs.classification || '';
 }
 
-function formatLabel(varName) {
-    return varName
-        .replace(/_/g, ' ')
-        .replace(/([a-z])([A-Z])/g, '$1 $2')
-        .replace(/\b\w/g, function(c) { return c.toUpperCase(); });
-}
-
-function syncFormToJson() {
-    const data = getFormData();
-    document.getElementById('data-input').value = JSON.stringify(data, null, 2);
-}
-
-function syncJsonToForm() {
-    try {
-        const data = JSON.parse(document.getElementById('data-input').value);
-        templateVariables.forEach(function(varName) {
-            const input = document.getElementById('var-' + varName);
-            if (input && data[varName] !== undefined) {
-                input.value = data[varName];
-            }
-        });
-    } catch (e) {
-        // Invalid JSON, ignore
-    }
-}
-
-function getFormData() {
-    const data = {};
-    templateVariables.forEach(function(varName) {
-        const input = document.getElementById('var-' + varName);
-        if (input) {
-            data[varName] = input.value;
-        }
-    });
-    return data;
-}
-
-// Settings modal functions
 function openSettingsModal() {
     loadPreferencesIntoForm();
     document.getElementById('settings-modal').style.display = 'flex';
@@ -430,176 +218,147 @@ function closeSettingsModal() {
     document.getElementById('settings-modal').style.display = 'none';
 }
 
-function loadPreferencesIntoForm() {
-    const prefs = getPreferences();
-    document.getElementById('pref-author').value = prefs.author || '';
-    document.getElementById('pref-organization').value = prefs.organization || '';
-    document.getElementById('pref-classification').value = prefs.classification || '';
-}
-
 function savePreferences() {
-    const prefs = {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({
         author: document.getElementById('pref-author').value,
         organization: document.getElementById('pref-organization').value,
         classification: document.getElementById('pref-classification').value
-    };
-    savePreferencesToStorage(prefs);
+    }));
     showToast('Preferences saved', 'success');
     closeSettingsModal();
-
-    // Re-apply auto-fill with new preferences
-    autoFillDefaults();
+    applyDefaults();
+    syncFormToJson();
 }
 
-document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
-
-document.getElementById('settings-modal').addEventListener('click', function(e) {
-    if (e.target.id === 'settings-modal') closeSettingsModal();
-});
-
-document.getElementById('autofill-btn').addEventListener('click', function() {
-    // Clear and re-fill
-    templateVariables.forEach(function(varName) {
-        const input = document.getElementById('var-' + varName);
-        const fieldType = detectFieldType(varName);
-        if (input && fieldType.autoFill) {
-            input.value = '';
-        }
+// The two defaults the server cannot know, because they are this viewer's
+// own stored preferences and never leave the browser. Every other default
+// is rendered into the field by the server and read back from
+// data-autofill-default, so the button restores the value the first paint
+// showed rather than recomputing it.
+function fillFromPreferences() {
+    const prefs = getPreferences();
+    [['author', prefs.author], ['classification', prefs.classification]].forEach(pair => {
+        if (!pair[1]) return;
+        document.querySelectorAll('#variables-form [data-field-type="' + pair[0] + '"] .variable-input')
+            .forEach(el => { if (!el.value) el.value = pair[1]; });
     });
-    autoFillDefaults();
+}
+
+function applyDefaults() {
+    document.querySelectorAll('#variables-form [data-autofill-default]').forEach(el => {
+        if (!el.value) el.value = el.getAttribute('data-autofill-default');
+    });
+    fillFromPreferences();
+}
+
+function autoFillDefaults() {
+    document.querySelectorAll('#variables-form [data-autofill] .variable-input')
+        .forEach(el => { el.value = ''; });
+    applyDefaults();
+    syncFormToJson();
     showToast('Auto-filled default values', 'success');
-});
+}
 
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        const tab = this.getAttribute('data-tab');
+// ---------- the data the render runs on ----------
 
-        document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-        this.classList.add('active');
-
-        document.getElementById('form-tab').style.display = tab === 'form' ? 'block' : 'none';
-        document.getElementById('json-tab').style.display = tab === 'json' ? 'block' : 'none';
-
-        if (tab === 'json') {
-            syncFormToJson();
-        } else {
-            syncJsonToForm();
-        }
+function getFormData() {
+    const data = {};
+    document.querySelectorAll('#variables-form .variable-input').forEach(el => {
+        data[el.name] = el.value;
     });
-});
+    return data;
+}
 
-document.getElementById('preview-btn').addEventListener('click', async () => {
-    await renderTemplate(false);
-});
+function syncFormToJson() {
+    document.getElementById('data-input').value = JSON.stringify(getFormData(), null, 2);
+}
 
-document.getElementById('render-btn').addEventListener('click', async () => {
-    const today = new Date().toISOString().split('T')[0];
-    const defaultName = templateInfo ? templateInfo.name.replace(/\s+/g, '_') + '_' + today : 'document';
-    const name = prompt('Document name:', defaultName);
-    if (name) {
-        await renderTemplate(true, name);
+function syncJsonToForm() {
+    let data;
+    try {
+        data = JSON.parse(document.getElementById('data-input').value);
+    } catch (e) {
+        return;  // Invalid JSON: leave the form alone rather than clearing it.
     }
+    if (!data || typeof data !== 'object') return;
+    Object.keys(data).forEach(name => {
+        const el = document.querySelector('#variables-form [name="' + name + '"]');
+        if (el) el.value = data[name];
+    });
+}
+
+// One definition of "which data is being rendered", matching the tab check
+// the page's renderTemplate() made. Every fragment request that renders the
+// document gets it from here, so the output pane and the section cards can
+// never be rendered from different data.
+function currentDataJson() {
+    const active = document.querySelector('.tab-btn.active');
+    if (active && active.getAttribute('data-tab') === 'json') {
+        return document.getElementById('data-input').value;
+    }
+    return JSON.stringify(getFormData(), null, 2);
+}
+
+const RENDER_PATHS = ['/ui/template-render/sections', '/ui/template-render/output'];
+document.addEventListener('htmx:configRequest', function (evt) {
+    if (!evt.detail || RENDER_PATHS.indexOf(evt.detail.path) === -1) return;
+    if (evt.detail.parameters.content !== undefined) return;  // already-saved content
+    evt.detail.parameters.data_json = currentDataJson();
 });
 
-// ---------- Section editing (in form view) ----------
-let renderedSections = [];   // [{title, num, md, html}]
-let lastRenderedMarkdown = '';
-let sectionsLoaded = false;
+// ---------- markdown, painted by the browser's own sanitiser ----------
 
-function splitMarkdownSections(md) {
-    const parts = [];
-    const lines = md.split('\n');
-    let current = { title: 'Document Header', num: '', lines: [] };
-
-    for (let i = 0; i < lines.length; i++) {
-        const m = lines[i].match(/^## (\d+)\.\s+(.+)/);
-        if (m) {
-            parts.push(current);
-            current = { title: m[2].trim(), num: m[1], lines: [lines[i]] };
-        } else {
-            current.lines.push(lines[i]);
-        }
-    }
-    parts.push(current);
-
-    return parts.map(function(p) {
-        const md = p.lines.join('\n').trim();
-        return {
-            title: p.title,
-            num: p.num,
-            md: md,
-            html: (typeof safeMarkdown === 'function') ? safeMarkdown(md) : '<pre>' + escapeHtml(md) + '</pre>'
-        };
-    }).filter(function(s) { return s.md.length > 0; });
+function paintPane(pane) {
+    // The textarea beside it, found by position rather than by id. An id on
+    // the textarea made htmx copy the old element's attributes onto the new
+    // one on every swap, and toggleEdit's auto-height had left a `style`
+    // attribute there, which this page's `style-src-attr 'none'` refuses.
+    const source = pane.parentElement
+        ? pane.parentElement.querySelector('textarea') : null;
+    if (!source) return;
+    // DOMParser, not innerHTML: the nodes are inserted rather than the page
+    // re-parsing a string into itself. safeMarkdown has already run the
+    // content through DOMPurify.
+    const parsed = new DOMParser().parseFromString(safeMarkdown(source.value), 'text/html');
+    pane.replaceChildren.apply(pane, Array.prototype.slice.call(parsed.body.childNodes));
 }
 
-function buildSectionCards(sections) {
-    renderedSections = sections;
-    const container = document.getElementById('section-cards');
-    let html = '';
-
-    sections.forEach(function(sec, idx) {
-        const label = sec.num ? ('S' + sec.num) : 'HDR';
-        const isHeader = !sec.num;
-        const openClass = isHeader ? ' se-open' : '';
-        html += '<div class="se-card' + openClass + '" data-idx="' + idx + '">';
-        html += `<div class="se-header" data-click-action="toggleSection" data-args='["$target"]'>`;
-        html += '<span class="se-num">' + label + '</span>';
-        html += '<span class="se-title">' + escapeHtml(sec.title) + '</span>';
-        // Edit pencil icon
-        html += `<button type="button" class="se-edit-btn" data-click-action="toggleEdit" data-stop-propagation data-args='["$target"]' title="Edit section">&#9998;</button>`;
-        html += '<svg class="se-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>';
-        html += '</div>';
-        html += '<div class="se-body">';
-        // Preview (default visible)
-        html += '<div class="se-rendered rendered-content" data-pane="rendered">' + sec.html + '</div>';
-        // Edit textarea (hidden by default)
-        html += '<div class="se-edit-area" data-pane="edit"><textarea data-idx="' + idx + '">' + escapeHtml(sec.md) + '</textarea></div>';
-        html += '</div></div>';
-    });
-
-    container.innerHTML = html;
-    document.getElementById('sections-area').style.display = 'block';
-    sectionsLoaded = true;
-
-    // Wire up textarea → live preview sync
-    container.querySelectorAll('textarea').forEach(function(ta) {
-        ta.addEventListener('input', function() {
-            const i = parseInt(this.getAttribute('data-idx'));
-            renderedSections[i].md = this.value;
-            const card = this.closest('.se-card');
-            const rendered = card.querySelector('[data-pane="rendered"]');
-            if (rendered) {
-                renderedSections[i].html = safeMarkdown(this.value);
-                rendered.innerHTML = renderedSections[i].html;
-            }
-        });
-    });
+function paintMarkdown() {
+    document.querySelectorAll('[data-md-pane]').forEach(paintPane);
 }
 
-function toggleSection(header) {
-    header.closest('.se-card').classList.toggle('se-open');
+function paintSectionPreview() {
+    const card = this.closest('.se-card');
+    if (!card) return;
+    const pane = card.querySelector('[data-md-pane]');
+    if (pane) paintPane(pane);
 }
 
-function toggleEdit(btn) {
-    const card = btn.closest('.se-card');
+// ---------- section cards ----------
+
+function toggleSection(target) {
+    const card = target.closest('.se-card');
+    if (card) card.classList.toggle('se-open');
+}
+
+function toggleEdit(target) {
+    const card = target.closest('.se-card');
+    if (!card) return;
     const rendered = card.querySelector('[data-pane="rendered"]');
     const edit = card.querySelector('[data-pane="edit"]');
     const isEditing = card.classList.toggle('se-editing');
 
-    // Ensure card is open
     if (!card.classList.contains('se-open')) card.classList.add('se-open');
 
     if (isEditing) {
         if (rendered) rendered.style.display = 'none';
         if (edit) {
             edit.style.display = 'block';
-            const ta = edit.querySelector('textarea');
-            if (ta) {
-                ta.style.height = 'auto';
-                ta.style.height = Math.min(Math.max(ta.scrollHeight, 200), 600) + 'px';
-                ta.focus();
+            const area = edit.querySelector('textarea');
+            if (area) {
+                area.style.height = 'auto';
+                area.style.height = Math.min(Math.max(area.scrollHeight, 200), 600) + 'px';
+                area.focus();
             }
         }
     } else {
@@ -608,78 +367,104 @@ function toggleEdit(btn) {
     }
 }
 
-function getAssembledMarkdown() {
-    if (!renderedSections.length) return lastRenderedMarkdown;
-    return renderedSections.map(function(s) { return s.md; }).join('\n\n');
+function expandAllSections() {
+    document.querySelectorAll('#section-cards .se-card').forEach(c => c.classList.add('se-open'));
 }
 
-// Expand / Collapse all
-document.getElementById('expand-all-btn').addEventListener('click', function() {
-    document.querySelectorAll('#section-cards .se-card').forEach(function(c) { c.classList.add('se-open'); });
-});
-document.getElementById('collapse-all-btn').addEventListener('click', function() {
-    document.querySelectorAll('#section-cards .se-card').forEach(function(c) { c.classList.remove('se-open'); });
-});
-
-async function loadSections() {
-    const data = getFormData();
-    try {
-        const result = await api.post('/api/templates/' + templateId + '/preview', { data: data });
-        lastRenderedMarkdown = result.rendered || '';
-        const sections = splitMarkdownSections(result.rendered);
-        buildSectionCards(sections);
-    } catch (e) {
-        document.getElementById('section-cards').innerHTML = '<p class="muted">Could not load sections. Click Preview to try again.</p>';
-        document.getElementById('sections-area').style.display = 'block';
-    }
+function collapseAllSections() {
+    document.querySelectorAll('#section-cards .se-card').forEach(c => c.classList.remove('se-open'));
 }
 
-async function renderTemplate(save, documentName) {
-    const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
-    let data;
+// null when there are no section cards, so the save sends no override
+// rather than an empty document. The page kept a fallback to the last
+// render's markdown here, which was unreachable: the only caller already
+// required a non-empty card list.
+function assembledMarkdown() {
+    const areas = Array.prototype.slice.call(
+        document.querySelectorAll('#section-cards textarea[data-idx]'));
+    if (!areas.length) return null;
+    areas.sort((a, b) => parseInt(a.dataset.idx, 10) - parseInt(b.dataset.idx, 10));
+    return areas.map(a => a.value).join('\n\n');
+}
 
-    if (activeTab === 'form') {
-        data = getFormData();
+// ---------- tabs ----------
+
+function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    const chosen = document.querySelector('.tab-btn[data-tab="' + name + '"]');
+    if (chosen) chosen.classList.add('active');
+    // The `hidden` class rather than a style assignment, so the markup and
+    // this function agree about which pane is showing. An assignment wins
+    // over the stylesheet, which is how the pane being hidden on first
+    // paint stayed invisible: nothing had assigned anything yet.
+    document.getElementById('form-tab').classList.toggle('hidden', name !== 'form');
+    document.getElementById('json-tab').classList.toggle('hidden', name !== 'json');
+    if (name === 'json') {
+        syncFormToJson();
     } else {
-        try {
-            data = JSON.parse(document.getElementById('data-input').value);
-        } catch (e) {
-            showToast('Invalid JSON data', 'error');
-            return;
-        }
-    }
-
-    try {
-        let result;
-        if (save && sectionsLoaded && renderedSections.length) {
-            // Always use assembled markdown from section cards when saving
-            const assembled = getAssembledMarkdown();
-            result = await api.post('/api/templates/' + templateId + '/render?document_name=' + encodeURIComponent(documentName), { data: data, content_override: assembled });
-            showToast('Document saved (ID: ' + result.document_id + ')', 'success');
-        } else if (save) {
-            result = await api.post('/api/templates/' + templateId + '/render?document_name=' + encodeURIComponent(documentName), { data: data });
-            showToast('Document saved (ID: ' + result.document_id + ')', 'success');
-        } else {
-            result = await api.post('/api/templates/' + templateId + '/preview', { data: data });
-        }
-
-        lastRenderedMarkdown = result.rendered || '';
-
-        // Update output preview
-        if (typeof marked !== 'undefined' && templateInfo && templateInfo.format === 'markdown') {
-            document.getElementById('output-container').innerHTML = '<div class="rendered-content">' + safeMarkdown(result.rendered) + '</div>';
-        } else {
-            document.getElementById('output-container').innerHTML = '<pre class="rendered-output">' + escapeHtml(result.rendered) + '</pre>';
-        }
-
-        // Refresh section cards in form view
-        const sections = splitMarkdownSections(result.rendered);
-        buildSectionCards(sections);
-    } catch (e) {
-        showToast(e.message || 'Render failed', 'error');
-        document.getElementById('output-container').innerHTML = '<p class="error">' + escapeHtml(e.message || 'Render failed') + '</p>';
+        syncJsonToForm();
     }
 }
+
+// ---------- the save, which is still a mutation against the JSON API ----------
+
+async function saveAsDocument() {
+    const today = new Date().toISOString().split('T')[0];
+    const name = prompt('Document name:',
+        (templateName() || 'document').replace(/\s+/g, '_') + '_' + today);
+    if (!name) return;
+
+    let data;
+    try {
+        data = JSON.parse(currentDataJson());
+    } catch (e) {
+        showToast('Invalid JSON data', 'error');
+        return;
+    }
+
+    const body = { data: data };
+    const assembled = assembledMarkdown();
+    if (assembled !== null) body.content_override = assembled;
+
+    try {
+        const result = await api.post(
+            '/api/templates/' + templateId() + '/render?document_name=' +
+            encodeURIComponent(name), body);
+        showToast('Document saved (ID: ' + result.document_id + ')', 'success');
+        // The aftermath, not the mutation: ask the server to present what it
+        // stored. A fresh preview would re-render from the template and drop
+        // the section edits the save just kept.
+        htmx.ajax('POST', '/ui/template-render/output', {
+            target: '#output-container',
+            swap: 'innerHTML',
+            values: {
+                template_id: templateId(),
+                content: result.rendered == null ? '' : result.rendered
+            }
+        });
+    } catch (err) {
+        showToast(err.message || 'Render failed', 'error');
+    }
+}
+
+// ---------- wiring ----------
+
+// The variables form arriving is what makes the first render possible, so
+// it is what triggers it. Every branch of that fragment triggers it,
+// including the ones that say the read failed, because the sections request
+// will then say the same thing rather than leaving a spinner spinning.
+document.addEventListener('htmx:afterSwap', function (evt) {
+    if (evt.detail && evt.detail.target && evt.detail.target.id === 'variables-form') {
+        applyDefaults();
+        syncFormToJson();
+        htmx.trigger('#section-cards', 'variablesReady');
+    }
+    paintMarkdown();
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    loadPreferencesIntoForm();
+});
 {% endraw %}
 </script>
 {% endblock %}

@@ -1,0 +1,54 @@
+{# The output pane, and the section cards with it.
+
+   Replaces the last three of template_render.html's innerHTML sites: the
+   rendered-markdown output, the preformatted output for a non-markdown
+   template, and the error written into the pane.
+
+   One response paints both panes, the output by swap and the cards out of
+   band, which is what the page's renderTemplate() did from one fetch. Two
+   separate requests could land in either order and leave an output pane and
+   a set of cards that describe different renders.
+
+   The out-of-band swap is `innerHTML` rather than the default, so the
+   `#section-cards` element keeps the hx-post that loads it on page load.
+   An outerHTML swap would replace that element with this one and the first
+   paint's loader would be gone.
+
+   `format` comes from the template rather than from a variable the page
+   held: `templateInfo` was null until the first load finished and null
+   again if that load failed, and the page's
+   `templateInfo && templateInfo.format === 'markdown'` then chose the
+   preformatted branch for a markdown template. #}
+
+{% if data_invalid %}
+  <p class="text-error">The data in the JSON view is not valid JSON, so
+  nothing was rendered.</p>
+{% elif not_found %}
+  <p class="text-warning">This template no longer exists, so there is
+  nothing to render.</p>
+{% elif render_error %}
+  <p class="text-error">{{ render_error }}</p>
+{% elif failed %}
+  <p class="text-error">The render could not be read. This is not an empty
+  document: nothing here says what the template would produce.</p>
+{% elif rendered is none %}
+  <p class="text-base-content/50">Fill in the fields and click "Preview" to
+  see the rendered output</p>
+{% elif format == 'markdown' %}
+  {# `is not none`, not truthiness: a template that renders to the empty
+     string has rendered, and showing the "click Preview" prompt for it
+     would say no render had happened. #}
+  <div class="rendered-content" data-md-pane></div>
+  {# The markdown as text, for the browser's own sanitiser to paint. No id:
+     htmx copies an existing element's attributes onto an incoming one of
+     the same id, and `style-src-attr 'none'` refuses the copy when that
+     attribute is a style. #}
+  <textarea class="hidden" readonly aria-hidden="true"
+            tabindex="-1">{{ rendered }}</textarea>
+{% else %}
+  <pre class="rendered-output">{{ rendered }}</pre>
+{% endif %}
+
+<div id="section-cards" hx-swap-oob="innerHTML">
+  {% include "_fragments/template_render_sections.html" %}
+</div>

@@ -15,15 +15,32 @@
   <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Versions</h1>
   <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Changelog and deployment history.</p>
 </div>
+{# Checkpoint, Refresh and Back stay out here, outside the swap target, so a
+   failed read cannot take away the control that retries it. #}
 <div class="flex items-center gap-2 flex-wrap">
         <button id="checkpoint-btn" class="btn btn-primary">Create Checkpoint</button>
+        <button id="versions-refresh" type="button" class="btn btn-ghost">Refresh</button>
         <a href="/templates/{{ template_id }}" class="btn btn-ghost">Back to Template</a>
     </div>
 </section>
 
 <div class="card bg-base-200 shadow">
     <div class="card-body">
-        <div id="versions-list" class="versions-container flex flex-col gap-3">
+        {# The list is rendered whole by ion.web.ui.versions_list_fragment. It
+           used to be three innerHTML writes built by 30 lines of string
+           concatenation, with the version message going in unescaped.
+
+           hx-trigger="load" keeps the shell's first paint immediate and the
+           data arriving in its own request, which is what the fetch it
+           replaces already did. Refresh and `versions:changed` (fired after
+           a checkpoint or a rollback) are triggers on the same hx-get, so
+           "reload the list" has one definition. None of the three is an
+           event filter, so nothing here is handed to Function(), which ION's
+           CSP serves no unsafe-eval to compile. #}
+        <div id="versions-list" class="versions-container flex flex-col gap-3"
+             hx-get="/ui/templates/{{ template_id }}/versions"
+             hx-trigger="load, click from:#versions-refresh, versions:changed from:body"
+             hx-swap="innerHTML">
             <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
                 <span class="loading loading-spinner loading-sm text-primary"></span> Loading...
             </div>
@@ -31,28 +48,13 @@
     </div>
 </div>
 
-<!-- Version Detail Modal -->
-<div id="version-modal" class="modal hidden">
-    <div class="modal-box w-11/12 max-w-5xl max-h-[90vh]">
-        <div class="flex items-center justify-between gap-4">
-            <h2 class="text-lg font-semibold">Version <span id="modal-version-num"></span></h2>
-            <button type="button" class="btn btn-ghost btn-sm btn-circle" data-click-action="closeModal" aria-label="Close">&times;</button>
-        </div>
-        <div class="py-4">
-            <div id="modal-meta" class="meta-bar flex flex-wrap items-center gap-3 text-sm mb-4"></div>
-            <h4 class="font-semibold mb-2">Content</h4>
-            <pre id="modal-content" class="code-block ion-mono bg-base-300 p-4 rounded-box overflow-x-auto text-sm whitespace-pre-wrap"></pre>
-            <div class="hidden mt-4" id="modal-diff-section">
-                <h4 class="font-semibold mb-2">Changes (Diff)</h4>
-                <pre id="modal-diff" class="code-block diff ion-mono bg-base-300 p-4 rounded-box overflow-x-auto text-sm whitespace-pre-wrap"></pre>
-            </div>
-        </div>
-        <div class="modal-action">
-            <button id="rollback-btn" class="btn btn-error">Rollback to This Version</button>
-            <button type="button" class="btn btn-ghost" data-click-action="closeModal">Close</button>
-        </div>
-    </div>
-</div>
+{# The detail modal arrives whole from ion.web.ui.version_detail_fragment or
+   version_diff_fragment, which is why this is empty: nothing requested means
+   nothing shown, so there is no hidden/reveal dance and no second place that
+   decides what the modal looks like. Close and the backdrop are the
+   data-remove-closest and data-remove-self-on-self-click delegations in
+   static/js/event-delegation.js, which is why neither has a handler below. #}
+<div id="version-modal-host"></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -62,95 +64,38 @@
 <script nonce="{{ csp_nonce }}">
 {% raw %}
 const templateId = {% endraw %}{{ template_id }}{% raw %};
-let currentVersionNum = null;
+
+// escapeHtml() and formatDate() are gone with the markup they served: Jinja
+// autoescapes, and the fragments emit <time> for static/js/local-time.js to
+// put on the viewer's clock rather than formatting on the server's. What is
+// left here changes state, or reads the one field the page route does not
+// pass through.
+//
+// There is no htmx failure handler here either: static/js/htmx-errors.js is
+// the one definition of what a failed swap means, an expired session
+// included.
+
+// The list has one definition of "reload", the hx-get on #versions-list, so
+// a checkpoint and a rollback both say the same thing rather than each
+// re-fetching and re-rendering.
+function reloadVersions() {
+    document.body.dispatchEvent(new CustomEvent('versions:changed'));
+}
+
+function closeVersionModal() {
+    document.getElementById('version-modal-host').replaceChildren();
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
+    // Only the name, for the eyebrow. The list itself arrives from
+    // /ui/templates/<id>/versions on load.
     try {
         const template = await api.get('/api/templates/' + templateId);
         document.getElementById('template-name').textContent = template.name;
-        loadVersions();
     } catch (e) {
         showToast('Failed to load template', 'error');
     }
 });
-
-async function loadVersions() {
-    try {
-        const versions = await api.get('/api/templates/' + templateId + '/versions');
-        const container = document.getElementById('versions-list');
-
-        if (versions.length === 0) {
-            container.innerHTML = '<p class="empty-state">No versions found</p>';
-            return;
-        }
-
-        let html = '';
-        versions.forEach(function(v) {
-            html += '<div class="version-item ' + (v.is_checkpoint ? 'checkpoint' : '') + '">';
-            html += '<div class="version-header">';
-            html += '<span class="version-number">v' + v.version_number + '</span>';
-            if (v.is_checkpoint) {
-                html += '<span class="checkpoint-badge">' + escapeHtml(v.checkpoint_name) + '</span>';
-            }
-            html += '</div>';
-            html += '<div class="version-meta">';
-            html += '<span>' + (v.message || 'No message') + '</span>';
-            html += '<span>' + formatDate(v.created_at) + '</span>';
-            html += '</div>';
-            html += '<div class="version-actions">';
-            html += `<button class="ion-btn btn-sm" data-click-action="viewVersion" data-args='[${v.version_number}]'>View</button>`;
-            if (v.version_number > 1) {
-                html += `<button class="ion-btn btn-sm" data-click-action="showDiff" data-args='[${v.version_number - 1}, ${v.version_number}]'>Diff</button>`;
-            }
-            html += '</div>';
-            html += '</div>';
-        });
-        container.innerHTML = html;
-    } catch (e) {
-        document.getElementById('versions-list').innerHTML = '<p class="error">Failed to load versions</p>';
-    }
-}
-
-async function viewVersion(versionNum) {
-    try {
-        const version = await api.get('/api/templates/' + templateId + '/versions/' + versionNum);
-        currentVersionNum = versionNum;
-
-        document.getElementById('modal-version-num').textContent = versionNum;
-        let metaHtml = '';
-        if (version.is_checkpoint) {
-            metaHtml += '<span class="checkpoint-badge">' + escapeHtml(version.checkpoint_name) + '</span>';
-        }
-        metaHtml += '<span>' + (version.message || 'No message') + '</span>';
-        metaHtml += '<span>' + formatDate(version.created_at) + '</span>';
-        document.getElementById('modal-meta').innerHTML = metaHtml;
-        document.getElementById('modal-content').textContent = version.content;
-        document.getElementById('modal-diff-section').style.display = 'none';
-        document.getElementById('version-modal').style.display = 'flex';
-    } catch (e) {
-        showToast('Failed to load version', 'error');
-    }
-}
-
-async function showDiff(fromVersion, toVersion) {
-    try {
-        const diff = await api.get('/api/templates/' + templateId + '/diff/' + fromVersion + '/' + toVersion);
-        currentVersionNum = toVersion;
-
-        document.getElementById('modal-version-num').textContent = fromVersion + ' -> ' + toVersion;
-        document.getElementById('modal-meta').innerHTML = '<span>Comparing versions</span>';
-        document.getElementById('modal-content').textContent = '';
-        document.getElementById('modal-diff').textContent = diff.diff || 'No changes';
-        document.getElementById('modal-diff-section').style.display = 'block';
-        document.getElementById('version-modal').style.display = 'flex';
-    } catch (e) {
-        showToast('Failed to load diff', 'error');
-    }
-}
-
-function closeModal() {
-    document.getElementById('version-modal').style.display = 'none';
-}
 
 document.getElementById('checkpoint-btn').addEventListener('click', async () => {
     const name = prompt('Checkpoint name (e.g., v1.0):');
@@ -161,30 +106,39 @@ document.getElementById('checkpoint-btn').addEventListener('click', async () => 
     try {
         await api.post('/api/templates/' + templateId + '/checkpoint', { name: name, message: message });
         showToast('Checkpoint created', 'success');
-        loadVersions();
+        reloadVersions();
     } catch (e) {
         showToast(e.message || 'Failed to create checkpoint', 'error');
     }
 });
 
-document.getElementById('rollback-btn').addEventListener('click', async () => {
-    if (!currentVersionNum) return;
-    if (!confirm('Rollback to version ' + currentVersionNum + '? This will create a new version with that content.')) return;
+// The version number comes from the button's data-args, which the fragment
+// renders from the row the modal was opened for. It used to come from a
+// `currentVersionNum` global that viewVersion() and showDiff() both wrote
+// and that the Rollback handler then tested for truthiness, so a modal that
+// failed to open could leave the previous value behind for Rollback to act
+// on, and version 0 would have been refused outright.
+async function rollbackToVersion(versionNum) {
+    if (versionNum === null || versionNum === undefined) return;
+    if (!confirm('Rollback to version ' + versionNum + '? This will create a new version with that content.')) return;
 
     try {
-        await api.post('/api/templates/' + templateId + '/rollback/' + currentVersionNum);
+        await api.post('/api/templates/' + templateId + '/rollback/' + versionNum);
         showToast('Rollback successful', 'success');
-        closeModal();
-        loadVersions();
+        closeVersionModal();
+        reloadVersions();
     } catch (e) {
         showToast(e.message || 'Rollback failed', 'error');
     }
-});
+}
 
-// Close modal on outside click
-document.getElementById('version-modal').addEventListener('click', (e) => {
-    if (e.target.id === 'version-modal') closeModal();
-});
+// event-delegation.js resolves a data-click-action name through window[], so
+// the binding the fragment depends on is stated rather than left to the
+// implicit global that a function declaration happens to create.
+window.rollbackToVersion = rollbackToVersion;
+window.closeVersionModal = closeVersionModal;
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeVersionModal(); });
 {% endraw %}
 </script>
 {% endblock %}

@@ -897,35 +897,69 @@ async def list_assignable_users(
     return await asyncio.to_thread(_query_assignable)
 
 
+def users_list_payload(
+    session: Session, include_inactive: bool = False
+) -> list[dict]:
+    """The user list both `GET /api/users` and `/ui/users` are built from.
+
+    Extracted so the fragment cannot grow a second copy of the row shape or
+    of `list_all`'s inactive filter. There is no per-caller scoping to
+    reimplement here either: `UserRepository.list_all` returns every row and
+    the only thing it filters on is `is_active`.
+
+    `last_login` stays an ISO string rather than a datetime because the
+    fragment's `ts` macro and FastAPI's serialiser both want the same value,
+    and a naive datetime leaving this function would let one of them format
+    it on the server's clock.
+    """
+    user_repo = UserRepository(session)
+    users = user_repo.list_all(include_inactive=include_inactive)
+    return [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "display_name": u.display_name,
+            "is_active": u.is_active,
+            "last_login": u.last_login.isoformat() if u.last_login else None,
+            "roles": [r.name for r in u.roles],
+            "employment_type": getattr(u, "employment_type", None) or "cs",
+            "elastic_username": getattr(u, "elastic_username", None),
+            "elastic_uid": getattr(u, "elastic_uid", None),
+            "keycloak_sub": getattr(u, "keycloak_sub", None),
+            "gitlab_username": getattr(u, "gitlab_username", None),
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        }
+        for u in users
+    ]
+
+
+def user_delete_refusal(target_user_id, actor_user_id) -> str | None:
+    """Why `DELETE /api/users/{user_id}` would refuse, or None to proceed.
+
+    One definition, so the Delete button on /users can be derived from the
+    rule rather than restating it. The page used to render Delete on every
+    row including the viewer's own, and clicking was the only way to find
+    out that the server refuses it.
+
+    `is not None` on both ids rather than a bare equality: a row with no id
+    and a viewer with no id would otherwise compare equal and withhold the
+    button for a reason that does not exist.
+    """
+    if target_user_id is None or actor_user_id is None:
+        return None
+    if target_user_id == actor_user_id:
+        return "Cannot delete your own account"
+    return None
+
+
 @router.get("/users", dependencies=[Depends(require_permission("user:read"))])
 async def list_users(
     include_inactive: bool = False,
     session: Session = Depends(get_db_session),
 ):
     """List all users (admin only)."""
-    def _query_users():
-        user_repo = UserRepository(session)
-        users = user_repo.list_all(include_inactive=include_inactive)
-        return [
-            {
-                "id": u.id,
-                "username": u.username,
-                "email": u.email,
-                "display_name": u.display_name,
-                "is_active": u.is_active,
-                "last_login": u.last_login.isoformat() if u.last_login else None,
-                "roles": [r.name for r in u.roles],
-                "employment_type": getattr(u, "employment_type", None) or "cs",
-                "elastic_username": getattr(u, "elastic_username", None),
-                "elastic_uid": getattr(u, "elastic_uid", None),
-                "keycloak_sub": getattr(u, "keycloak_sub", None),
-                "gitlab_username": getattr(u, "gitlab_username", None),
-                "created_at": u.created_at.isoformat() if u.created_at else None,
-            }
-            for u in users
-        ]
-
-    return await asyncio.to_thread(_query_users)
+    return await asyncio.to_thread(users_list_payload, session, include_inactive)
 
 
 @router.post("/users", dependencies=[Depends(require_permission("user:create"))])
@@ -1070,8 +1104,12 @@ def delete_user(
     session: Session = Depends(get_db_session),
 ):
     """Delete a user (admin only)."""
-    if user_id == current_user.id:
-        raise HTTPException(status_code=400, detail="Cannot delete your own account")
+    # The predicate rather than the comparison, so the Delete button the
+    # /users fragment renders is derived from this rule instead of restating
+    # it. Same status and same detail string as before.
+    refusal = user_delete_refusal(user_id, current_user.id)
+    if refusal is not None:
+        raise HTTPException(status_code=400, detail=refusal)
 
     user_repo = UserRepository(session)
     audit_repo = AuditLogRepository(session)
@@ -1166,6 +1204,31 @@ def reset_user_password(
 # Roles endpoint
 # =============================================================================
 
+def roles_list_payload(session: Session) -> list[dict]:
+    """The role list both `GET /api/roles` and `/ui/users/role-options` use.
+
+    Extracted for the same reason as `users_list_payload`: the role picker on
+    /users is server-rendered now, and a second copy of this row shape would
+    let the picker and the API disagree about what a role is.
+
+    `permissions` is always a list here, even when empty. A role with no
+    permissions is a real measurement, and the picker it feeds counts that
+    list, so a missing key arriving as a confident "0 permissions" is the
+    one thing this shape must not allow.
+    """
+    role_repo = RoleRepository(session)
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "description": r.description,
+            "is_system": r.is_system,
+            "permissions": [p.name for p in r.permissions],
+        }
+        for r in role_repo.list_all()
+    ]
+
+
 @router.get("/roles", dependencies=[Depends(require_permission("user:read"))])
 def list_roles(
     current_user: User = Depends(get_current_user),
@@ -1179,19 +1242,7 @@ def list_roles(
     analysts have no legitimate reason to enumerate roles; admins
     and team leads who do will already have user:read.
     """
-    role_repo = RoleRepository(session)
-    roles = role_repo.list_all()
-
-    return [
-        {
-            "id": r.id,
-            "name": r.name,
-            "description": r.description,
-            "is_system": r.is_system,
-            "permissions": [p.name for p in r.permissions],
-        }
-        for r in roles
-    ]
+    return roles_list_payload(session)
 
 
 # =============================================================================
@@ -1521,43 +1572,60 @@ async def get_section_types():
     return SECTION_TYPES
 
 
+def template_payload(services: Services, template_id: int) -> dict:
+    """One template as GET /api/templates/{id} returns it.
+
+    Extracted so the /ui/template-form and /ui/template-render fragments read
+    the template through the same function the JSON endpoint does. Both pages
+    drive this one endpoint, so without this there would be three definitions
+    of what a template row is, and `has_sections` is the one field a fragment
+    cannot afford to get wrong: it decides whether the section editor opens on
+    the stored sections or offers to convert a legacy raw template.
+
+    Raises TemplateNotFoundError, which the JSON route turns into a 404 and a
+    fragment turns into a "no such template" render. Those are different
+    answers to different questions, so the translation stays at each caller.
+    """
+    t = services.template.get_template(template_id)
+    sections_json = None
+    has_sections = False
+    if t.sections_json:
+        try:
+            sections_json = json.loads(t.sections_json)
+            has_sections = True
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return {
+        "id": t.id,
+        "name": t.name,
+        "content": t.content,
+        "format": t.format,
+        "description": t.description,
+        "document_type": t.document_type,
+        "current_version": t.current_version,
+        "tags": [tag.name for tag in t.tags],
+        "variables": [
+            {
+                "name": v.name,
+                "var_type": v.var_type,
+                "required": v.required,
+                "default_value": v.default_value,
+                "description": v.description,
+            }
+            for v in t.variables
+        ],
+        "sections": sections_json,
+        "has_sections": has_sections,
+        "created_at": t.created_at.isoformat() if t.created_at else None,
+        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+    }
+
+
 @router.get("/templates/{template_id}", dependencies=[Depends(require_permission("template:read"))])
 async def get_template(template_id: int, services: Services = Depends(get_services)):
     """Get a template by ID."""
     try:
-        t = services.template.get_template(template_id)
-        sections_json = None
-        has_sections = False
-        if t.sections_json:
-            try:
-                sections_json = json.loads(t.sections_json)
-                has_sections = True
-            except (json.JSONDecodeError, TypeError):
-                pass
-        return {
-            "id": t.id,
-            "name": t.name,
-            "content": t.content,
-            "format": t.format,
-            "description": t.description,
-            "document_type": t.document_type,
-            "current_version": t.current_version,
-            "tags": [tag.name for tag in t.tags],
-            "variables": [
-                {
-                    "name": v.name,
-                    "var_type": v.var_type,
-                    "required": v.required,
-                    "default_value": v.default_value,
-                    "description": v.description,
-                }
-                for v in t.variables
-            ],
-            "sections": sections_json,
-            "has_sections": has_sections,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-            "updated_at": t.updated_at.isoformat() if t.updated_at else None,
-        }
+        return template_payload(services, template_id)
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
 
@@ -1874,36 +1942,50 @@ async def batch_render_template(
         raise HTTPException(status_code=400, detail=safe_error(e))
 
 
+def template_variables_payload(services: Services, template_id: int) -> dict:
+    """A template's variables as GET /api/templates/{id}/variables returns them.
+
+    Extracted for /ui/template-render, whose variables form is built from
+    exactly this pair of lists. `extracted` is what the content actually
+    references and `defined` is what the template declares about those names,
+    and the form needs both: a name in `extracted` with no entry in `defined`
+    is a variable nobody described, not a variable that is optional.
+
+    Raises TemplateNotFoundError, translated by each caller.
+    """
+    t = services.template.get_template(template_id)
+
+    from ion.engine.renderer import TemplateRenderer
+    renderer = TemplateRenderer()
+    extracted = renderer.extract_variables(t.content)
+
+    import json as _json
+    defined = []
+    for v in t.variables:
+        d = {
+            "name": v.name,
+            "var_type": v.var_type,
+            "required": v.required,
+            "default_value": v.default_value,
+        }
+        if v.options:
+            try:
+                d["options"] = _json.loads(v.options)
+            except (ValueError, TypeError):
+                pass
+        defined.append(d)
+
+    return {
+        "extracted": list(extracted),
+        "defined": defined,
+    }
+
+
 @router.get("/templates/{template_id}/variables", dependencies=[Depends(require_permission("template:read"))])
 async def get_template_variables(template_id: int, services: Services = Depends(get_services)):
     """Get variables used in a template."""
     try:
-        t = services.template.get_template(template_id)
-
-        from ion.engine.renderer import TemplateRenderer
-        renderer = TemplateRenderer()
-        extracted = renderer.extract_variables(t.content)
-
-        import json as _json
-        defined = []
-        for v in t.variables:
-            d = {
-                "name": v.name,
-                "var_type": v.var_type,
-                "required": v.required,
-                "default_value": v.default_value,
-            }
-            if v.options:
-                try:
-                    d["options"] = _json.loads(v.options)
-                except (ValueError, TypeError):
-                    pass
-            defined.append(d)
-
-        return {
-            "extracted": list(extracted),
-            "defined": defined,
-        }
+        return template_variables_payload(services, template_id)
     except TemplateNotFoundError:
         raise HTTPException(status_code=404, detail="Template not found")
 
