@@ -1407,8 +1407,11 @@
 [data-mode="light"] .nav-tab {
   color: var(--text-secondary) !important;
 }
+/* .tab-btn.active used to be in this list. Its colour now comes from
+   --color-ion-cyan, which already flips per mode, so the !important here
+   only served to beat the page that owns the component and make the light
+   failure unfixable from there. */
 [data-mode="light"] .section-nav a.active,
-[data-mode="light"] .tab-btn.active,
 [data-mode="light"] .nav-tab.active {
   color: var(--primary) !important;
 }
@@ -1705,11 +1708,16 @@
     color: var(--text-primary);
     background: var(--bg-card);
 }
-.tab-btn.active {
-    color: var(--bg-deep);
-    background: var(--primary);
-    box-shadow: 0 2px 8px var(--primary-glow);
-}
+/* The pill treatment of an active tab used to live here: a --primary fill
+   with --bg-deep text. Its `color` was already dead, because the underline
+   rule further down this file sets `color` and wins on document order, but
+   its `background` survived. So the underline's accent text sat on the
+   pill's accent fill: measured 1.00:1 on /playbooks in BOTH modes, the only
+   element in the app equally unreadable light and dark.
+   Underline is the intended design. base.html's .np-tab and
+   playbooks.html's own `.tab-btn { border-bottom: 2px solid transparent }`
+   are both built for it, and no page ever rendered a correct pill because
+   the colour never belonged to this rule. Removed rather than repaired. */
 .list-item-title:hover {
     color: var(--primary);
 }
@@ -1827,10 +1835,13 @@
 }
 .data-table tbody tr:last-child td { border-bottom: 0; }
 .modal-close:hover { color: #fff; }
-.tab-btn:hover { color: #cbd5e1; }
+/* Tokens, not dark-mode literals: #cbd5e1 and #6de4ff are invisible and
+   1.4:1 respectively on the light page, and this is the surviving active-tab
+   treatment for every page that uses .tab-btn. */
+.tab-btn:hover { color: var(--text-primary); }
 .tab-btn.active {
-    color: #6de4ff;
-    border-bottom-color: #6de4ff;
+    color: var(--color-ion-cyan);
+    border-bottom-color: var(--color-ion-cyan);
 }
 .metric-card:hover { border-color: rgba(255, 255, 255, 0.12); }
 .role-card:hover { border-color: rgba(255, 255, 255, 0.12); }

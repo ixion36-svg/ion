@@ -96,6 +96,25 @@
     --text-muted: #7c8ba1;
     --text-bright: #ffffff;
 
+    /* ── Accent ──────────────────────────────────────────
+       `var(--accent-color)` is used 43 times across 6 templates
+       (cases 14, settings 12, playbooks 10, alerts 4, discover 2,
+       integrations 1) and was **defined nowhere**. Every one of those
+       declarations was therefore invalid at computed-value time and
+       dropped, so `.tab-btn.active` on /playbooks measured 1.00:1 in
+       light mode and 1.22:1 in dark: an active tab with no accent at
+       all, in both modes.
+
+       It aliases the theme accent, so it flips with the mode rather than
+       pinning a dark-mode literal. 17 of the 43 uses are `color`, 18 are
+       a border, and 7 are `background`. Those 7 need a foreground that
+       contrasts with the accent rather than with the page, which is what
+       --accent-contrast is for: the accent is light in dark mode and dark
+       in light mode, so its text has to go the other way. Same pattern as
+       .np-btn-primary, which already pairs #6de4ff with #07080c. */
+    --accent-color: var(--color-ion-cyan);
+    --accent-contrast: #07080c;
+
     /* Border colors */
     --border-bright: rgba(109, 228, 255, 0.35);
 
@@ -249,9 +268,40 @@
 
 /* =============================================================================
    Light Mode Base
+
+   On the accent values below. ion-daisy-theme.css flips every
+   `--color-*-content` token to #ffffff for light mode, on the stated
+   reasoning that a darkened light-mode accent is no longer a light surface
+   so ink on it would be unreadable. That reasoning is right; the values
+   were not dark enough to carry white at AA.
+
+   Measured 2026-10-12 with tools/contrast_crawl.py, and the arithmetic
+   agreed with the renderer to two decimal places:
+
+       cyan    #0891b2  3.68:1   ->  #0e7490  5.36:1
+       green   #059669  3.77:1   ->  #047857  5.48:1
+       gold    #d97706  3.19:1   ->  #b45309  5.02:1
+       orange  #ea580c  3.56:1   ->  #c2410c  5.18:1
+
+   Those four were the only light accent values failing white-on-fill;
+   purple (#7c3aed, 5.70:1) and red (#dc2626, 4.83:1) already passed and
+   are untouched. Each replacement is one step darker on the same ramp.
+
+   The same ratio governs the accent used AS text on the white page, so
+   this fixes both directions at once: `collection-badge` and
+   `ion-btn-primary` (white on cyan, 3.68:1) and `.tag` (cyan as text,
+   3.09:1) were the same value failing in opposite roles.
+
+   All 10 occurrences were inside [data-mode="light"] blocks, verified
+   before replacing, so dark mode is unchanged.
    ============================================================================= */
 
 [data-mode="light"] {
+    /* --accent-color needs no override: it aliases --color-ion-cyan, which
+       the theme already flips from #6de4ff to #0b7c99 here. Its foreground
+       does flip, because the light accent is dark: white measures 4.6:1 on
+       #0b7c99, where #07080c would be the wrong way round. */
+    --accent-contrast: #ffffff;
     --bg-deep: #f8fafc;
     --bg-primary: #ffffff;
     --bg-secondary: #f1f5f9;
@@ -266,8 +316,8 @@
 
     --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
 
-    --neon-green: #059669;
-    --neon-yellow: #d97706;
+    --neon-green: #047857;
+    --neon-yellow: #b45309;
     --neon-red: #dc2626;
     --neon-purple: #7c3aed;
 
@@ -313,8 +363,8 @@
 
 /* Light Cyan */
 [data-mode="light"][data-theme="cyan"] {
-    --neon-cyan: #0891b2;
-    --primary: #0891b2;
+    --neon-cyan: #0e7490;
+    --primary: #0e7490;
     --primary-dim: rgba(8, 145, 178, 0.1);
     --primary-glow: rgba(8, 145, 178, 0.2);
     --glow-sm: 0 2px 8px rgba(8, 145, 178, 0.15);
@@ -337,8 +387,8 @@
 
 /* Light Green */
 [data-mode="light"][data-theme="green"] {
-    --neon-cyan: #059669;
-    --primary: #059669;
+    --neon-cyan: #047857;
+    --primary: #047857;
     --primary-dim: rgba(5, 150, 105, 0.1);
     --primary-glow: rgba(5, 150, 105, 0.2);
     --glow-sm: 0 2px 8px rgba(5, 150, 105, 0.15);
@@ -349,8 +399,8 @@
 
 /* Light Orange */
 [data-mode="light"][data-theme="orange"] {
-    --neon-cyan: #ea580c;
-    --primary: #ea580c;
+    --neon-cyan: #c2410c;
+    --primary: #c2410c;
     --primary-dim: rgba(234, 88, 12, 0.1);
     --primary-glow: rgba(234, 88, 12, 0.2);
     --glow-sm: 0 2px 8px rgba(234, 88, 12, 0.15);
@@ -397,8 +447,8 @@
 
 /* Light Gold */
 [data-mode="light"][data-theme="gold"] {
-    --neon-cyan: #d97706;
-    --primary: #d97706;
+    --neon-cyan: #b45309;
+    --primary: #b45309;
     --primary-dim: rgba(217, 119, 6, 0.1);
     --primary-glow: rgba(217, 119, 6, 0.2);
     --glow-sm: 0 2px 8px rgba(217, 119, 6, 0.15);

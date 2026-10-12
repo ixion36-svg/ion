@@ -185,7 +185,16 @@
     border-radius: var(--radius-selector, 0.25rem);
     font-size: 0.7rem;
     font-weight: 600;
-    color: #fff;
+    /* A neutral chip by default, because the type-specific class is
+       assembled at runtime from the document's own type
+       (`'doc-type-' + t.document_type`). A type with no rule of its own,
+       SAL and SLA among them today, used to get this `color` with no
+       background at all: measured 1.00:1, white text on the page, 38
+       instances on /templates. The typed rules below each set their own
+       colour, so this one only has to be legible when none of them
+       matches. */
+    background: var(--bg-elevated);
+    color: var(--text-primary);
     margin-left: 0.5rem;
 }
 .doc-type-SOP { background: var(--color-info); color: var(--color-info-content); }
