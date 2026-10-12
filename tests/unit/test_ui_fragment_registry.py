@@ -140,18 +140,41 @@ def _dependency_calls(route) -> list:
     return out
 
 
-def _required_permission(fn) -> str | None:
-    """The permission string closed over by a require_permission dependency.
+def _required_permissions(fn) -> set[str]:
+    """Every permission a dependency factory closed over.
 
-    require_permission returns a closure, so the name it checks is only in
-    the closure cell. Reading it is what lets a test see the permission
-    rather than merely see that some dependency exists.
+    Both factories, not just one. ION has `require_permission("x")` and
+    `require_any_permission(["x", "y"])`, and several endpoints use the
+    second: /api/alert-prompts gates its read on
+    `require_any_permission(['playbook:read'])`.
+
+    Recognising only the first was a real blind spot, found by an
+    independent review of a conversion and reproduced here. A fragment
+    correctly mirroring a `require_any_permission` endpoint read as having
+    no named permission at all, so it would have failed the
+    BARE_AUTH_FRAGMENTS list and invited somebody to "fix" it by declaring
+    an open endpoint open. Worse in the other direction: a fragment that
+    copied a write endpoint's `require_any_permission` gate would have
+    passed every check while locking a read behind a write permission.
+
+    Both factories keep the name in a closure cell, so reading the cell is
+    what lets a test see the permission rather than merely see that some
+    dependency exists.
     """
-    if not getattr(fn, "__qualname__", "").startswith("require_permission."):
-        return None
+    qualname = getattr(fn, "__qualname__", "")
+    base = qualname.split(".")[0]
+    if base not in ("require_permission", "require_any_permission"):
+        return set()
     cells = dict(zip(fn.__code__.co_freevars,
                      (c.cell_contents for c in (fn.__closure__ or ()))))
-    return cells.get("permission_name")
+    one = cells.get("permission_name")
+    many = cells.get("permission_names")
+    found = set()
+    if isinstance(one, str):
+        found.add(one)
+    if isinstance(many, (list, tuple, set)):
+        found.update(str(p) for p in many)
+    return found
 
 
 def _fragment_routes() -> list:
@@ -165,7 +188,23 @@ def _fragment_routes() -> list:
 #
 #   /ui/bug-reports   /api/bug-reports takes get_current_user. Filing and
 #                     reading bug reports is open to every user by design.
-BARE_AUTH_FRAGMENTS = {"/ui/bug-reports"}
+#
+#   /ui/profile       All five endpoints /profile talks to take
+#   /ui/profile/      get_current_user and no named permission: reading and
+#     resolve-elastic editing your own account, and resolving your own
+#                     Elastic identity, needs nothing beyond being signed
+#                     in. There is also no object here to permit or refuse.
+#                     Neither route declares a path or query parameter, and
+#                     both read the User that get_current_user resolved from
+#                     the session cookie, so the only row either can reach
+#                     is the caller's own. A named permission would make the
+#                     fragments stricter than the API rather than equal to
+#                     it, which is the other half of the rule.
+BARE_AUTH_FRAGMENTS = {
+    "/ui/bug-reports",
+    "/ui/profile",
+    "/ui/profile/resolve-elastic",
+}
 
 
 def test_every_fragment_requires_authentication():
@@ -201,7 +240,8 @@ def test_only_the_listed_fragments_skip_a_named_permission():
     """
     bare = {
         route.path for route in _fragment_routes()
-        if not any(_required_permission(c) for c in _dependency_calls(route))
+        if not set().union(*(_required_permissions(c)
+                             for c in _dependency_calls(route)) or [set()])
     }
     assert bare == BARE_AUTH_FRAGMENTS, (
         f"newly on bare authentication: {bare - BARE_AUTH_FRAGMENTS}; "
