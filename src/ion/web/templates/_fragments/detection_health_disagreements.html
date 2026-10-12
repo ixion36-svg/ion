@@ -1,0 +1,47 @@
+{# One rule's Bob-vs-analyst disagreements: the drill-down panel.
+
+   Replaces the fourth innerHTML site in detection_health.html, inside
+   dhDrill(), and the `dhEsc()` it used on three fields that come straight
+   out of the database.
+
+   The Hide control is in all three states, not only the populated one. The
+   row this swaps into starts hidden and is un-hidden by the click that
+   requests it, so a panel that rendered empty or failed without a Hide
+   would leave a row open with no way to close it but a page reload. That
+   defect is invisible in a template and only shows up when the panel is
+   driven in a browser. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+<div class="dh-drill-panel text-sm opacity-70 p-2 bg-base-300 rounded mt-1">
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0">
+      {% if failed %}
+        <span role="alert">
+          The disagreements for <span class="font-mono">{{ rule }}</span>
+          could not be read. This is not a record of Bob and the analyst
+          agreeing on every alert the rule fired: the read failed, so
+          nothing about their agreement is known here.
+        </span>
+      {% elif not disagreements %}
+        No Bob-vs-analyst disagreements recorded for this rule.
+      {% else %}
+        <strong>{{ disagreements | length }} disagreement(s)</strong>, Bob vs analyst:
+        <ul class="list-disc ml-5 mt-1">
+          {% for row in disagreements %}
+            <li class="font-mono text-xs">
+              {{ row.alert_id }}:
+              Bob said <em>{{ row.bob_suggested_verdict or 'nothing recorded' }}</em>,
+              analyst closed <em>{{ row.human_verdict or 'nothing recorded' }}</em>
+              {# Never formatted on the server: the JavaScript this replaces
+                 showed no time at all, and a server that formatted one
+                 would be putting its own clock on an analyst's screen. #}
+              <span class="opacity-60">{{ ts(row.created_at, fallback='no timestamp') }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+    <button class="btn btn-ghost btn-xs shrink-0" data-click-action="dhHide">Hide</button>
+  </div>
+</div>

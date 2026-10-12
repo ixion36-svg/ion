@@ -1,0 +1,164 @@
+{# Per-rule detection health: the five summary tiles and the rule table.
+
+   Replaces three innerHTML sites in detection_health.html (the loading
+   state, the load-failure message and the whole body) plus the hand-rolled
+   `dhEsc()`, `dhStat()`, `dhPctCell()` and `dhSlug()` they needed. The
+   markup is deliberately what that JavaScript produced, so the page looks
+   unchanged and the move is verifiable rather than a redesign in disguise.
+   The one visible addition is the low-sample marker, which is argued for in
+   ion/web/ui/detection_health.py.
+
+   Every number is tested with `is not none`. This table is what an engineer
+   reads to decide whether to tune a rule, switch it off, or leave it alone,
+   and a 0% false-positive rate and a rate that could not be computed point
+   at opposite decisions. A truthiness test collapses them into the same
+   cell.
+
+   The window select and Refresh live in the page shell, outside
+   #dh-content, so no render of this fragment, success or failure, can
+   remove the control that would retry it. #}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error">
+    <span>
+      Detection health could not be read for the last {{ period_days }} days.
+      No rates are shown below rather than zeros: the read failed, so
+      nothing here is known, which is not the same as an estate where every
+      rule is behaving. Use Refresh to try again.
+    </span>
+  </div>
+{% else %}
+
+<div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
+  {# A count the summary did not carry says unknown. `s.noisy_rules || 0`
+     printed a confident zero for a key that never arrived, and on this
+     panel "no noisy rules" is a conclusion somebody acts on. #}
+  {% for tile in tiles %}
+    <div class="stat">
+      <div class="stat-title">{{ tile.label }}</div>
+      <div class="stat-value {{ tile.colour }}">
+        {%- if tile.value is not none %}{{ tile.value }}
+        {%- else %}<span class="text-base-content/60">unknown</span>{% endif -%}
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<div class="card bg-base-200 shadow">
+  <div class="card-body">
+    <h2 class="card-title text-sm uppercase tracking-wide opacity-60">Per-rule detection health (worst first &middot; {{ period_days }}d)</h2>
+    {% if not rows %}
+      <p class="opacity-60">No closed-alert feedback in this window. Detection health fills in as cases are closed with a verdict.</p>
+    {% else %}
+      <div class="overflow-x-auto">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Rule</th><th>Volume</th><th>Closed</th><th>FP rate</th>
+              <th>TP yield</th><th>Bob disagree</th><th>Flags</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td class="font-mono text-xs">{{ row.name }}</td>
+                {# Volume and Closed are counts, and 0 closed is the normal
+                   value of a rule that fires into an untouched queue. #}
+                <td class="font-mono text-xs">
+                  {%- if row.volume is not none %}{{ row.volume }}
+                  {%- else %}<span class="opacity-50">&mdash;</span>{% endif -%}
+                </td>
+                <td class="font-mono text-xs">
+                  {%- if row.closed is not none %}{{ row.closed }}
+                  {%- else %}<span class="opacity-50">&mdash;</span>{% endif -%}
+                </td>
+                {# The two bar cells. `is not none`, so a rate of 0 renders a
+                   real bar at zero width and only an uncomputed rate renders
+                   the dash. The width and colour go out as data-ion-style
+                   and are applied by static/js/ion-dynamic-styles.js, which
+                   is CSP-safe where a style= attribute is not. #}
+                {% for cell in [row.fp, row.tp] %}
+                  <td>
+                    {%- if cell.value is not none -%}
+                      <span class="dh-bar"><span class="dh-bar-fill" data-ion-style="width:{{ cell.width }}%;background:{{ cell.colour }}"></span></span><span class="font-mono text-xs">{{ cell.shown }}%</span>
+                    {%- else -%}
+                      <span class="opacity-50">&mdash;</span>
+                    {%- endif -%}
+                  </td>
+                {% endfor %}
+                {# Bob's rate opens the drill-down. The URL is built whole in
+                   the module, with the current window baked in, because a
+                   rule name is free text that has to be percent-encoded. #}
+                <td>
+                  {%- if row.bob.value is not none -%}
+                    <button class="btn btn-ghost btn-sm"
+                            data-click-action="dhReveal"
+                            data-drill="dh-drill-{{ row.index }}"
+                            hx-get="{{ row.drill_url }}"
+                            hx-target="#dh-drill-{{ row.index }} .dh-drill"
+                            hx-swap="innerHTML">{{ row.bob.shown }}%</button>
+                  {%- else -%}
+                    <span class="opacity-50">&mdash;</span>
+                  {%- endif -%}
+                </td>
+                {# Three answers, not two. Badges mean the service judged the
+                   rule and found something; the dash means it judged the
+                   rule and found nothing; the marker means it declined to
+                   judge, because under min_sample closures every flag is
+                   False by construction rather than by measurement. The
+                   dash alone cannot tell the last two apart, and they are
+                   the difference between leaving a rule alone and not yet
+                   knowing anything about it.
+
+                   min_sample is not guarded here: is_sparse() returns False
+                   when it is missing, so this branch cannot be reached
+                   without it. #}
+                <td>
+                  {%- if row.flags -%}
+                    {% for flag in row.flags %}<span class="badge {{ flag.badge }} badge-sm">{{ flag.label }}</span> {% endfor %}
+                  {%- elif row.sparse -%}
+                    <span class="badge badge-ghost badge-sm"
+                          title="Only {{ row.closed }} closed alert(s), under the {{ min_sample }} this dashboard needs before it will call a rule noisy, silent or decaying. The rates on this row come from too small a sample to act on.">low sample</span>
+                  {%- else -%}
+                    <span class="opacity-50">&mdash;</span>
+                  {%- endif -%}
+                </td>
+                {# The column exists for every reader so the table's shape
+                   does not depend on who is looking; the button inside it
+                   only for a reader whose POST would be accepted. #}
+                <td>
+                  {%- if can_propose -%}
+                    <button class="btn btn-ghost btn-sm" data-click-action="dhPropose"
+                            data-rule="{{ row.name }}">Propose tuning</button>
+                  {%- endif -%}
+                </td>
+              </tr>
+              {# The drill-down's own row, hidden until its rate is clicked.
+                 dhReveal un-hides it and htmx fills the cell in the same
+                 click, so the panel has one definition and it is on the
+                 server. #}
+              <tr id="dh-drill-{{ row.index }}" hidden>
+                <td colspan="8"><div class="dh-drill"></div></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if min_sample is not none %}
+        <p class="text-xs opacity-60 mt-2">
+          Noisy, silent and decaying are only assessed once a rule has
+          {{ min_sample }} closed alerts. Rules under that line are marked
+          <span class="badge badge-ghost badge-xs">low sample</span> and
+          their rates should not be acted on alone.
+        </p>
+      {% endif %}
+    {% endif %}
+    {# Suppressed at zero on purpose: this is a notice, not a measurement,
+       and "0 alerts lack a rule_name" is not something to tell anyone. #}
+    {% if unmapped is not none %}
+      <div role="alert" class="alert alert-info mt-3">{{ unmapped }} alert(s) lack a rule_name snapshot and are bucketed as "(unmapped)".</div>
+    {% endif %}
+  </div>
+</div>
+
+{% endif %}
