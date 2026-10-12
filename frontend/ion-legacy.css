@@ -320,6 +320,19 @@
     --neon-yellow: #b45309;
     --neon-red: #dc2626;
     --neon-purple: #7c3aed;
+    /* --neon-orange and --neon-blue had no light values at all, so both
+       stayed on the dark :root's bright versions while
+       --color-*-content flipped to white above them.
+
+           orange  #f8b33a  1.83:1 white  ->  #c2410c  5.18:1
+           blue    #60a5fa  2.54:1 white  ->  #2563eb  5.17:1
+
+       --info aliases --neon-blue, which is why .doc-type-SOP and
+       .doc-type-DETECTION_RULE were the worst two badges left on
+       /templates. Dark mode is unaffected: it puts #07080c ink on these,
+       which measures 7.87:1 and 10.96:1. */
+    --neon-orange: #c2410c;
+    --neon-blue: #2563eb;
 
     /* ── 5-Severity System, light mode ──────────────────── */
     /* The dark ramp on a white page measured 2.12:1 to 2.63:1 for badge
