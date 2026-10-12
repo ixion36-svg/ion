@@ -205,7 +205,7 @@
   cursor: pointer;
   font-family: inherit;
   font-size: 13px;
-  color: color-mix(in srgb, var(--color-base-content) 55%, transparent);
+  color: color-mix(in srgb, var(--color-base-content) 60%, transparent);
 }
 .tool-tab:hover { color: var(--color-base-content); }
 .tool-tab.active {
@@ -247,12 +247,12 @@
 
 /* Typography helpers. */
 .ion-mono  { font-family: var(--font-mono, ui-monospace, monospace); color: var(--color-primary); }
-.ion-muted { color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+.ion-muted { color: color-mix(in srgb, var(--color-base-content) 60%, transparent); }
 
 /* Page header. */
 .ion-page-header { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--color-base-300); }
 .ion-ph-title { font-size: 21px; font-weight: 500; color: var(--color-base-content); margin: 0; }
-.ion-ph-sub   { font-size: 12px; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); margin-top: 3px; }
+.ion-ph-sub   { font-size: 12px; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); margin-top: 3px; }
 
 /* Buttons. Only the ion-* names survive; .btn and friends now belong to
    daisyUI. .ion-btn-danger stays because daisyUI spells that one btn-error. */
@@ -305,17 +305,17 @@
 .ion-input:focus, .ion-select:focus, .ion-textarea:focus, .form-control:focus,
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-base-content) 6%, transparent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 10%, transparent); }
 .ion-input::placeholder, .ion-textarea::placeholder, .form-control::placeholder,
-.form-group input::placeholder, .form-group textarea::placeholder { color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+.form-group input::placeholder, .form-group textarea::placeholder { color: color-mix(in srgb, var(--color-base-content) 60%, transparent); }
 
 /* The group wrapper and its label. The label colour was a hardcoded #64748b,
    which is --text-muted; against base-content it flips for light mode without
    the patch style.css needed. */
 .form-group { margin-bottom: 1.25rem; }
-.form-group label { display: block; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
+.form-group label { display: block; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; font-size: 0.6875rem; font-weight: 600; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
 
 /* Metric card. */
 .ion-metric { background: var(--color-base-200); border-radius: var(--radius-field); padding: 11px 13px; }
-.ion-metric-label { font-size: 11px; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); }
+.ion-metric-label { font-size: 11px; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); }
 .ion-metric-value { font-size: 23px; font-weight: 500; color: var(--color-base-content); font-variant-numeric: tabular-nums; margin-top: 1px; }
 .ion-metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
 
@@ -339,12 +339,12 @@
 .ion-timeline { position: relative; padding-left: 60px; }
 .ion-timeline-rail { position: absolute; left: 52px; top: 4px; bottom: 4px; width: 1px; background: var(--color-base-300); }
 .ion-ev { position: relative; margin-bottom: 13px; }
-.ion-ev-time { position: absolute; left: -60px; width: 40px; text-align: right; font-size: 11px; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); font-family: var(--font-mono, ui-monospace, monospace); top: 1px; }
+.ion-ev-time { position: absolute; left: -60px; width: 40px; text-align: right; font-size: 11px; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); font-family: var(--font-mono, ui-monospace, monospace); top: 1px; }
 .ion-ev-dot { position: absolute; left: -12px; top: 3px; width: 9px; height: 9px; border-radius: 50%; box-shadow: 0 0 0 3px var(--color-base-100); }
 
 /* Table. .ion-table and .data-table only - .table is daisyUI's. */
 .ion-table, .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.ion-table th, .data-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: color-mix(in srgb, var(--color-base-content) 55%, transparent); font-weight: 700; padding: 9px 12px; border-bottom: 1px solid var(--color-base-300); }
+.ion-table th, .data-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: color-mix(in srgb, var(--color-base-content) 60%, transparent); font-weight: 700; padding: 9px 12px; border-bottom: 1px solid var(--color-base-300); }
 .ion-table td, .data-table td { padding: 10px 12px; border-top: 1px solid var(--color-base-300); color: var(--color-base-content); font-variant-numeric: tabular-nums; }
 .ion-table tbody tr:hover td, .data-table tbody tr:hover td { background: var(--color-base-200); }
 
@@ -369,7 +369,7 @@
    in the shared sheet and the markup that uses them is built by JS, so they
    cannot move into the page. */
 .ti-badge-ransomware { background: color-mix(in srgb, var(--color-error) 15%, transparent); color: var(--color-error); border-color: color-mix(in srgb, var(--color-error) 35%, transparent); }
-.ti-badge-unknown    { background: color-mix(in srgb, var(--color-base-content) 12%, transparent); color: color-mix(in srgb, var(--color-base-content) 60%, transparent); border-color: color-mix(in srgb, var(--color-base-content) 30%, transparent); }
+.ti-badge-unknown    { background: color-mix(in srgb, var(--color-base-content) 12%, transparent); color: color-mix(in srgb, var(--color-base-content) 60%, transparent); border-color: color-mix(in srgb, var(--color-base-content) 60%, transparent); }
 .ti-badge-cwe        { background: color-mix(in srgb, var(--color-info) 12%, transparent); color: var(--color-info); border-color: color-mix(in srgb, var(--color-info) 35%, transparent); }
 
 .ti-kev-row { cursor: pointer; }
@@ -408,13 +408,13 @@
 .loading:not([class*="loading-"]) {
   padding: 2.5rem 1rem;
   text-align: center;
-  color: color-mix(in srgb, var(--color-base-content) 55%, transparent);
+  color: color-mix(in srgb, var(--color-base-content) 60%, transparent);
   font-size: 0.8125rem;
 }
 .empty-state {
   padding: 3rem 1.5rem;
   text-align: center;
-  color: color-mix(in srgb, var(--color-base-content) 55%, transparent);
+  color: color-mix(in srgb, var(--color-base-content) 60%, transparent);
   font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
   font-size: 0.8125rem;
 }
@@ -422,7 +422,7 @@
    the ancestor if .empty-state is ever removed from an element */
 .empty-state i {
   font-size: 2.5rem;
-  color: color-mix(in srgb, var(--color-base-content) 40%, transparent);
+  color: color-mix(in srgb, var(--color-base-content) 60%, transparent);
   opacity: 0.5;
   margin-bottom: 0.75rem;
   display: block;
@@ -2006,7 +2006,7 @@
  * that pairing reads well. The problem was only ever the solid fill.
  * ============================================================ */
 .btn-secondary {
-  --btn-color: color-mix(in srgb, var(--color-base-content) 5%, transparent);
+  --btn-color: color-mix(in srgb, var(--color-base-content) 60%, transparent);
   --btn-fg: var(--color-base-content);
   --btn-border: var(--color-base-300);
 }

@@ -131,6 +131,14 @@ PROBE = r"""
       if (n.getAttribute('aria-hidden') === 'true') return true;
       const role = (n.getAttribute('role') || '').toLowerCase();
       if (role === 'presentation' || role === 'none') return true;
+      // 1.4.3 Incidental: "text or images of text that are part of an
+      // inactive user interface component" has no contrast requirement.
+      // /audit-logs' Previous button is `disabled` on the first page and
+      // daisyUI greys it to 0.2 alpha, which measured 1.55:1. Dimming a
+      // control to show it is unavailable is the intended design, so this
+      // is counted apart rather than failed.
+      if (n.disabled === true) return true;
+      if (n.getAttribute('aria-disabled') === 'true') return true;
     }
     return false;
   };

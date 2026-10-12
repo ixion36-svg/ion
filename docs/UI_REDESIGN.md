@@ -22,8 +22,8 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 82 |
-| total lines | 81,136 |
-| inline `<style>` lines | 18,114 |
+| total lines | 81,140 |
+| inline `<style>` lines | 18,119 |
 | runtime DOM writes | 1,119 |
 | literal light-on-dark colours | 11 |
 
@@ -113,7 +113,7 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
 | `alerts.html` | 10643 | 2826 | 7242 | 94 | no | no | no |  |
-| `training.html` | 9510 | 2529 | 6160 | 80 | no | no | no |  |
+| `training.html` | 9514 | 2534 | 6159 | 80 | no | no | no |  |
 | `cases.html` | 5813 | 1918 | 3610 | 69 | no | no | no |  |
 | `integrations.html` | 3063 | 1087 | 1591 | 41 | yes | no | no |  |
 | `settings.html` | 3035 | 1173 | 1111 | 29 | yes | no | no |  |
@@ -143,7 +143,7 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 | `alert_arkime.html` | 516 | 7 | 275 | 13 | yes | no | no |  |
 | `scheduler.html` | 510 | 45 | 349 | 15 | yes | no | no |  |
 
-Subtotal: 30 templates, 62,365 lines, 15,210 inline css lines, 927 runtime writes, 9 light-mode literals.
+Subtotal: 30 templates, 62,369 lines, 15,215 inline css lines, 927 runtime writes, 9 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 

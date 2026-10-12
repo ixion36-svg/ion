@@ -332,7 +332,7 @@
     --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
 
     --neon-green: #065f46;
-    --neon-yellow: #b45309;
+    --neon-yellow: #854d0e;
     --neon-red: #b91c1c;
     --neon-purple: #7c3aed;
     /* --neon-orange and --neon-blue had no light values at all, so both
@@ -504,8 +504,8 @@
 
 /* Light Gold */
 [data-mode="light"][data-theme="gold"] {
-    --neon-cyan: #b45309;
-    --primary: #b45309;
+    --neon-cyan: #854d0e;
+    --primary: #854d0e;
     --primary-dim: rgba(217, 119, 6, 0.1);
     --primary-glow: rgba(217, 119, 6, 0.2);
     --glow-sm: 0 2px 8px rgba(217, 119, 6, 0.15);
@@ -2429,7 +2429,7 @@ h1, h2, h3, h4, h5, h6 {
 :root:not([data-mode="light"]) .text-base-content\/20,
 :root:not([data-mode="light"]) .text-base-content\/30,
 :root:not([data-mode="light"]) .text-base-content\/40 {
-    color: color-mix(in oklab, var(--color-base-content) 50%, #0000);
+    color: color-mix(in oklab, var(--color-base-content) 60%, #0000);
 }
 
 /* .ion-metric-label hardcodes the same 55% mix, so it has the same ceiling
@@ -2491,5 +2491,26 @@ h1, h2, h3, h4, h5, h6 {
    flat page said 4.58. 55% restores the margin. The light side already
    clamps to 60%. */
 :root:not([data-mode="light"]) .text-base-content\/50 {
-    color: color-mix(in oklab, var(--color-base-content) 55%, #0000);
+    color: color-mix(in oklab, var(--color-base-content) 60%, #0000);
 }
+
+/* ── daisyUI's inactive tab, light mode ──────────────────────────────────
+   daisyui.trimmed.css paints an unselected tab at
+   `color-mix(in oklab, var(--color-base-content) 50%, transparent)`, which
+   measures **3.42:1** on the light page. Ten instances across /guide,
+   /investigation-memory and /executive-report, and it is vendored code, so
+   it is overridden here rather than edited.
+
+   The :not() list is daisyUI's own, copied exactly. Dropping any of it
+   would make this rule win over the ACTIVE tab too and repaint the accent
+   that marks which tab you are on. The [data-mode="light"] prefix supplies
+   the extra specificity. Dark mode already passes and is left alone. */
+[data-mode="light"] .tab:is(.tabs > .tab):not(:checked, label:has(:checked), :hover, .tab-active, [aria-selected="true"], [aria-current="true"], [aria-current="page"]) {
+    color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+}
+
+/* ── text-slate-600, the sibling of text-slate-500 ───────────────────────
+   45 uses, measured 4.41:1 on the light page. Same shape as slate-500: a
+   fixed palette value naming a swatch rather than a role, so it cannot
+   follow the mode. Dark already clears, so only light is overridden. */
+[data-mode="light"] .text-slate-600 { color: var(--text-muted); }
