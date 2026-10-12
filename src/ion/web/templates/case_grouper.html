@@ -141,7 +141,7 @@ function cgFlash(cls, msg) {
   if (!host) return;
   const kind = cls === 'err' ? 'alert-error' : 'alert-success';
   host.innerHTML = `<div class="alert ${kind} mb-4">${cgEsc(msg)}</div>`;
-  setTimeout(() => { if (host.firstChild) host.innerHTML = ''; }, 6000);
+  setTimeout(() => { if (host.firstChild) host.replaceChildren(); }, 6000);
 }
 
 async function cgRefresh() { await cgLoad(); }

@@ -567,7 +567,7 @@ const sectionMeta = {
 
 function renderSectionCards(sections) {
     const container = document.getElementById('section-cards-container');
-    container.innerHTML = '';
+    container.replaceChildren();
     sections.forEach(function(s) {
         const meta = sectionMeta[s.type] || { icon: '?', label: s.type };
         const c = s.config || {};

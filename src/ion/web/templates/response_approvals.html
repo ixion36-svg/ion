@@ -235,7 +235,7 @@ async function rapLoad() {
   try {
     const r = await fetch(`${RAP_API}/actions/inbox`);
     if (r.status === 404) {
-      document.getElementById('rap-mode').innerHTML = '';
+      document.getElementById('rap-mode').replaceChildren();
       content.innerHTML = rapEmpty(
         'Response actions are disabled',
         'Set ION_RESPONSE_ACTIONS_ENABLED to expose the response-action surface. While it is off nothing can be requested, approved or dispatched.');

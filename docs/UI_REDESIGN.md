@@ -24,7 +24,7 @@ page cannot be forgotten. Status is measured, never set by hand.
 | templates | 80 |
 | total lines | 78,262 |
 | inline `<style>` lines | 15,544 |
-| runtime DOM writes | 1,119 |
+| runtime DOM writes | 1,033 |
 | literal light-on-dark colours | 11 |
 
 ## Shell and partials
@@ -64,7 +64,7 @@ Markup plus a short list of class strings in inline JS.
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `template_form.html` | 811 | 0 | 664 | 6 | yes | yes | no |  |
+| `template_form.html` | 811 | 0 | 664 | 4 | yes | yes | no |  |
 | `template_render.html` | 685 | 0 | 562 | 8 | yes | yes | no |  |
 | `shift_handover.html` | 611 | 0 | 524 | 6 | yes | yes | no |  |
 | `daily_standup_slides.html` | 584 | 0 | 531 | 3 | yes | yes | no |  |
@@ -72,18 +72,18 @@ Markup plus a short list of class strings in inline JS.
 | `data_flow.html` | 510 | 0 | 328 | 3 | yes | yes | no |  |
 | `users.html` | 493 | 0 | 301 | 6 | yes | yes | no |  |
 | `investigation_queue.html` | 440 | 0 | 280 | 6 | yes | yes | no |  |
-| `de_workbench.html` | 425 | 0 | 262 | 6 | yes | yes | no |  |
-| `daily_work.html` | 424 | 0 | 295 | 8 | yes | yes | no |  |
+| `de_workbench.html` | 425 | 0 | 262 | 4 | yes | yes | no |  |
+| `daily_work.html` | 424 | 0 | 295 | 7 | yes | yes | no |  |
 | `profile.html` | 398 | 0 | 238 | 4 | yes | yes | no |  |
-| `architecture.html` | 379 | 0 | 281 | 3 | yes | yes | no |  |
+| `architecture.html` | 379 | 0 | 281 | 1 | yes | yes | no |  |
 | `stories.html` | 347 | 0 | 297 | 9 | yes | yes | no |  |
 | `de_proposals.html` | 305 | 0 | 198 | 4 | yes | yes | no |  |
-| `log_sources.html` | 295 | 0 | 191 | 8 | yes | yes | no |  |
+| `log_sources.html` | 295 | 0 | 191 | 6 | yes | yes | no |  |
 | `change_requests.html` | 281 | 0 | 113 | 3 | yes | yes | no |  |
-| `canaries.html` | 280 | 0 | 189 | 4 | yes | yes | no |  |
-| `response_approvals.html` | 279 | 0 | 246 | 5 | yes | yes | no |  |
+| `canaries.html` | 280 | 0 | 189 | 3 | yes | yes | no |  |
+| `response_approvals.html` | 279 | 0 | 246 | 4 | yes | yes | no |  |
 | `maturity.html` | 254 | 0 | 220 | 8 | yes | yes | no |  |
-| `bob_eval.html` | 253 | 0 | 79 | 2 | yes | yes | no |  |
+| `bob_eval.html` | 253 | 0 | 79 | 1 | yes | yes | no |  |
 | `executive_report.html` | 239 | 0 | 188 | 5 | yes | yes | no |  |
 | `de_bob.html` | 233 | 0 | 157 | 10 | yes | yes | no |  |
 | `detection_health.html` | 208 | 0 | 133 | 4 | yes | yes | no |  |
@@ -97,12 +97,12 @@ Markup plus a short list of class strings in inline JS.
 | `entity_timeline.html` | 180 | 0 | 119 | 4 | yes | yes | no |  |
 | `bug_reports.html` | 178 | 0 | 64 | 3 | yes | yes | no |  |
 | `threat_intel_actor.html` | 176 | 0 | 91 | 10 | yes | yes | no |  |
-| `case_grouper.html` | 175 | 0 | 137 | 5 | yes | yes | no |  |
+| `case_grouper.html` | 175 | 0 | 137 | 4 | yes | yes | no |  |
 | `compliance.html` | 173 | 0 | 142 | 4 | yes | yes | no |  |
-| `knowledge_graph.html` | 169 | 0 | 118 | 7 | yes | yes | no |  |
+| `knowledge_graph.html` | 169 | 0 | 118 | 6 | yes | yes | no |  |
 | `service_accounts.html` | 95 | 0 | 64 | 4 | yes | yes | no |  |
 
-Subtotal: 37 templates, 11,799 lines, 0 inline css lines, 190 runtime writes, 0 light-mode literals.
+Subtotal: 37 templates, 11,799 lines, 0 inline css lines, 176 runtime writes, 0 light-mode literals.
 
 ## Tier C, more than 10 runtime writes
 
@@ -110,38 +110,38 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
-| `alerts.html` | 10643 | 2826 | 7242 | 94 | no | no | no |  |
-| `training.html` | 9514 | 2534 | 6159 | 80 | no | no | no |  |
-| `cases.html` | 5813 | 1918 | 3610 | 69 | no | no | no |  |
-| `integrations.html` | 3063 | 1087 | 1591 | 41 | yes | no | no |  |
-| `settings.html` | 3035 | 1173 | 1111 | 29 | yes | no | no |  |
-| `observables.html` | 2591 | 824 | 1398 | 35 | yes | no | no |  |
+| `alerts.html` | 10643 | 2826 | 7242 | 93 | no | no | no |  |
+| `training.html` | 9514 | 2534 | 6159 | 70 | no | no | no |  |
+| `cases.html` | 5813 | 1918 | 3610 | 64 | no | no | no |  |
+| `integrations.html` | 3063 | 1087 | 1591 | 40 | yes | no | no |  |
+| `settings.html` | 3035 | 1173 | 1111 | 27 | yes | no | no |  |
+| `observables.html` | 2591 | 824 | 1398 | 31 | yes | no | no |  |
 | `chat.html` | 2199 | 1126 | 733 | 17 | yes | no | no |  |
 | `discover.html` | 1811 | 329 | 1078 | 24 | yes | no | no |  |
-| `forensics.html` | 1734 | 325 | 970 | 40 | yes | no | no |  |
-| `playbooks.html` | 1721 | 588 | 921 | 13 | yes | no | no |  |
+| `forensics.html` | 1734 | 325 | 970 | 27 | yes | no | no |  |
+| `playbooks.html` | 1721 | 588 | 921 | 11 | yes | no | no |  |
 | `analytics.html` | 1716 | 719 | 823 | 28 | yes | no | no |  |
-| `documents.html` | 1712 | 234 | 1163 | 30 | yes | no | no |  |
+| `documents.html` | 1712 | 234 | 1163 | 28 | yes | no | no |  |
 | `detection_engineering.html` | 1664 | 223 | 1378 | 49 | no | no | no |  |
 | `threat_intel.html` | 1539 | 116 | 1129 | 67 | no | no | no |  |
-| `pcap.html` | 1430 | 223 | 1087 | 42 | yes | no | no |  |
-| `tools.html` | 1375 | 0 | 938 | 28 | yes | yes | no |  |
-| `arkime_traffic.html` | 1335 | 62 | 973 | 17 | yes | no | no |  |
-| `daily_standup.html` | 1262 | 42 | 790 | 33 | yes | no | no |  |
-| `network_map.html` | 841 | 0 | 668 | 15 | yes | yes | no |  |
+| `pcap.html` | 1430 | 223 | 1087 | 41 | yes | no | no |  |
+| `tools.html` | 1375 | 0 | 938 | 19 | yes | yes | no |  |
+| `arkime_traffic.html` | 1335 | 62 | 973 | 12 | yes | no | no |  |
+| `daily_standup.html` | 1262 | 42 | 790 | 32 | yes | no | no |  |
+| `network_map.html` | 841 | 0 | 668 | 13 | yes | yes | no |  |
 | `investigation_memory.html` | 808 | 51 | 495 | 18 | yes | no | no |  |
-| `wallboard.html` | 801 | 19 | 486 | 24 | yes | no | no |  |
+| `wallboard.html` | 801 | 19 | 486 | 18 | yes | no | no |  |
 | `security_dashboard.html` | 795 | 89 | 461 | 13 | yes | no | no |  |
 | `gitlab.html` | 761 | 147 | 428 | 23 | no | no | no |  |
-| `dashboard_v2.html` | 714 | 0 | 412 | 15 | yes | yes | no |  |
-| `templates.html` | 696 | 166 | 406 | 12 | yes | no | no |  |
-| `template_view.html` | 646 | 164 | 350 | 13 | yes | no | no |  |
-| `network_topology.html` | 579 | 178 | 320 | 12 | yes | no | no |  |
-| `analyst.html` | 545 | 0 | 360 | 18 | yes | yes | no |  |
+| `dashboard_v2.html` | 714 | 0 | 412 | 14 | yes | yes | no |  |
+| `templates.html` | 696 | 166 | 406 | 11 | yes | no | no |  |
+| `template_view.html` | 646 | 164 | 350 | 12 | yes | no | no |  |
+| `network_topology.html` | 579 | 178 | 320 | 11 | yes | no | no |  |
+| `analyst.html` | 545 | 0 | 360 | 17 | yes | yes | no |  |
 | `alert_arkime.html` | 516 | 7 | 275 | 13 | yes | no | no |  |
-| `scheduler.html` | 510 | 45 | 349 | 15 | yes | no | no |  |
+| `scheduler.html` | 510 | 45 | 349 | 12 | yes | no | no |  |
 
-Subtotal: 30 templates, 62,369 lines, 15,215 inline css lines, 927 runtime writes, 9 light-mode literals.
+Subtotal: 30 templates, 62,369 lines, 15,215 inline css lines, 855 runtime writes, 9 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 

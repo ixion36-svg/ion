@@ -794,13 +794,13 @@ async function init() {
 function populateDropdowns() {
     const types = enums.investigation_types || [];
     for (const sel of ['filter-type','pb-filter-type']) { const el=document.getElementById(sel); if(!el)continue; el.innerHTML='<option value="">All Types</option>'; types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);el.appendChild(o)}); }
-    for (const sel of ['nc-type','pb-type']) { const el=document.getElementById(sel); if(!el)continue; if(sel==='pb-type')el.innerHTML='<option value="">Any</option>'; else el.innerHTML=''; types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);el.appendChild(o)}); }
+    for (const sel of ['nc-type','pb-type']) { const el=document.getElementById(sel); if(!el)continue; if(sel==='pb-type')el.innerHTML='<option value="">Any</option>'; else el.replaceChildren(); types.forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);el.appendChild(o)}); }
     // Playbook selector in New Case modal
     const pbSel=document.getElementById('nc-playbook'); if(pbSel){pbSel.innerHTML='<option value="">-- No Playbook (blank investigation) --</option>';allPlaybooks.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name+(p.investigation_type?' ('+fmtLabel(p.investigation_type)+')':'');pbSel.appendChild(o)})}
-    const aeType=document.getElementById('ae-type'); if(aeType){aeType.innerHTML='';(enums.evidence_types||[]).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);aeType.appendChild(o)});}
-    const custAct=document.getElementById('cust-action'); if(custAct){custAct.innerHTML='';(enums.custody_actions||[]).forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=fmtLabel(a);custAct.appendChild(o)});}
-    const cdStatus=document.getElementById('cd-status-select'); if(cdStatus){cdStatus.innerHTML='';(enums.case_statuses||[]).forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=fmtLabel(s);cdStatus.appendChild(o)});}
-    if(users.length){for(const sel of ['nc-lead','cust-received-by']){const el=document.getElementById(sel);if(!el)continue;const first=el.querySelector('option');el.innerHTML='';if(first)el.appendChild(first);users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.display_name||u.username;el.appendChild(o)});}}
+    const aeType=document.getElementById('ae-type'); if(aeType){aeType.replaceChildren();(enums.evidence_types||[]).forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=fmtLabel(t);aeType.appendChild(o)});}
+    const custAct=document.getElementById('cust-action'); if(custAct){custAct.replaceChildren();(enums.custody_actions||[]).forEach(a=>{const o=document.createElement('option');o.value=a;o.textContent=fmtLabel(a);custAct.appendChild(o)});}
+    const cdStatus=document.getElementById('cd-status-select'); if(cdStatus){cdStatus.replaceChildren();(enums.case_statuses||[]).forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=fmtLabel(s);cdStatus.appendChild(o)});}
+    if(users.length){for(const sel of ['nc-lead','cust-received-by']){const el=document.getElementById(sel);if(!el)continue;const first=el.querySelector('option');el.replaceChildren();if(first)el.appendChild(first);users.forEach(u=>{const o=document.createElement('option');o.value=u.id;o.textContent=u.display_name||u.username;el.appendChild(o)});}}
 }
 
 function fmtLabel(s){return s?s.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()):''}
@@ -881,7 +881,7 @@ function renderCasesTable(){
     const search=(document.getElementById('filter-search')?.value||'').toLowerCase();
     const filtered=allCases.filter(c=>!search||c.case_number.toLowerCase().includes(search)||c.title.toLowerCase().includes(search));
     const tbody=document.getElementById('cases-tbody'),empty=document.getElementById('cases-empty');
-    if(!filtered.length){tbody.innerHTML='';empty.style.display='';return}
+    if(!filtered.length){tbody.replaceChildren();empty.style.display='';return}
     empty.style.display='none';
     tbody.innerHTML=filtered.map(c=>`<tr data-click-action="openCaseDetail" data-args='[${c.id}]'>
         <td><strong>${esc(c.case_number)}</strong></td><td>${esc(c.title)}</td><td>${fmtLabel(c.investigation_type)}</td>
@@ -958,9 +958,9 @@ function renderCaseDetail(c){
     const lockInd=document.getElementById('cd-lock-indicator');
     const lockBtn=document.getElementById('cd-lock-btn');
     if(c.is_locked){lockInd.innerHTML='<span class="text-[#f0c000]">Locked by '+esc(c.locked_by_username||'unknown')+' ('+fmtDateTime(c.locked_at)+')</span>';lockBtn.textContent='Unlock';lockBtn.style.color='#f0c000'}
-    else{lockInd.innerHTML='';lockBtn.textContent='Lock';lockBtn.style.color=''}
+    else{lockInd.replaceChildren();lockBtn.textContent='Lock';lockBtn.style.color=''}
     // SLA
-    const slaDiv=document.getElementById('cd-sla-badges');slaDiv.innerHTML='';
+    const slaDiv=document.getElementById('cd-sla-badges');slaDiv.replaceChildren();
     if(c.sla_status&&c.sla_status.milestones){c.sla_status.milestones.forEach(m=>{const cls={met:'sla-met',on_track:'sla-on-track',at_risk:'sla-at-risk',breached:'sla-breached',breached_met:'sla-breached-met',not_set:''}[m.status]||'';slaDiv.innerHTML+=`<span class="sla-badge ${cls}" title="${m.due||''}">${fmtLabel(m.name)}: ${fmtLabel(m.status)}</span>`})}
     // Progress bar
     const steps = c.case_steps || [];
@@ -1536,12 +1536,12 @@ function copyReport(){navigator.clipboard.writeText(document.getElementById('rpt
 function populateEvidenceCaseSelect(){const sel=document.getElementById('evidence-case-select');sel.innerHTML='<option value="">Select an investigation...</option>';allCases.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.case_number+' - '+c.title;sel.appendChild(o)})}
 async function loadEvidenceForCase(){
     const caseId=document.getElementById('evidence-case-select').value;
-    if(!caseId){document.getElementById('evidence-tbody').innerHTML='';document.getElementById('evidence-empty').style.display='';return}
+    if(!caseId){document.getElementById('evidence-tbody').replaceChildren();document.getElementById('evidence-empty').style.display='';return}
     try{const r=await fetch(API+'/cases/'+caseId+'/evidence');if(!r.ok)throw 0;renderEvidenceTable(await r.json())}catch(e){showToast('Failed',true)}
 }
 function renderEvidenceTable(items){
     const tbody=document.getElementById('evidence-tbody'),empty=document.getElementById('evidence-empty');
-    if(!items.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
+    if(!items.length){tbody.replaceChildren();empty.style.display='';return}empty.style.display='none';
     tbody.innerHTML=items.map(e=>`<tr><td><strong>${esc(e.evidence_number)}</strong></td><td>${esc(e.name)}</td><td>${fmtLabel(e.evidence_type)}</td><td>${fmtLabel(e.status)}</td><td class="ev-card-hash max-w-[150px] overflow-hidden text-ellipsis">${e.hash_sha256?'SHA:'+e.hash_sha256.substring(0,12)+'...':e.hash_md5?'MD5:'+e.hash_md5:'-'}</td><td>${esc(e.storage_location||'-')}</td><td>${esc(e.collected_by_username||'-')}</td><td><a href="#" data-click-action="showCustodyLog" data-stop-propagation data-args='[${e.id}, "${esc(e.evidence_number)}"]'>${e.custody_entries||0} entries</a></td><td><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="showCustodyModal" data-stop-propagation data-args='[${e.id}]'>+ Custody</button></td></tr>`).join('');
 }
 function showAddEvidenceModal(){['ae-name','ae-source','ae-storage','ae-md5','ae-sha256','ae-description'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal-add-evidence').style.display='flex'}
@@ -1569,12 +1569,12 @@ async function loadPlaybooks(){
 }
 function renderPlaybooksTable(pbs){
     const tbody=document.getElementById('playbooks-tbody'),empty=document.getElementById('playbooks-empty');
-    if(!pbs.length){tbody.innerHTML='';empty.style.display='';return}empty.style.display='none';
+    if(!pbs.length){tbody.replaceChildren();empty.style.display='';return}empty.style.display='none';
     tbody.innerHTML=pbs.map(p=>`<tr><td><strong>${esc(p.name)}</strong></td><td>${fmtLabel(p.investigation_type||'Any')}</td><td>${p.step_count}</td><td>${p.is_active?'<span class="text-[var(--mitre-covered)]">Active</span>':'<span class="text-[#6e7681]">Inactive</span>'}</td><td>${esc(p.created_by_username||'-')}</td><td><button class="btn btn-secondary py-0.5 px-2 text-xs" data-click-action="editPlaybook" data-args='[${p.id}]'>Edit</button> <button class="btn btn-secondary py-0.5 px-2 text-xs text-[var(--sev-critical)]" data-click-action="deletePlaybook" data-args='[${p.id}]'>Delete</button></td></tr>`).join('');
 }
-function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').innerHTML='';addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
+function showNewPlaybookModal(){editingPlaybookId=null;document.getElementById('pb-modal-title').textContent='New Forensic Playbook';['pb-name','pb-desc'].forEach(id=>document.getElementById(id).value='');document.getElementById('pb-type').value='';document.getElementById('pb-active').checked=true;document.getElementById('pb-steps-list').replaceChildren();addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}
 async function editPlaybook(id){
-    try{const r=await fetch(API+'/playbooks/'+id);if(!r.ok)throw 0;const pb=await r.json();editingPlaybookId=id;document.getElementById('pb-modal-title').textContent='Edit Playbook';document.getElementById('pb-name').value=pb.name;document.getElementById('pb-desc').value=pb.description||'';document.getElementById('pb-type').value=pb.investigation_type||'';document.getElementById('pb-active').checked=pb.is_active;document.getElementById('pb-steps-list').innerHTML='';(pb.steps||[]).forEach(s=>addPlaybookStepRow(s));if(!(pb.steps||[]).length)addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}catch(e){showToast('Failed',true)}
+    try{const r=await fetch(API+'/playbooks/'+id);if(!r.ok)throw 0;const pb=await r.json();editingPlaybookId=id;document.getElementById('pb-modal-title').textContent='Edit Playbook';document.getElementById('pb-name').value=pb.name;document.getElementById('pb-desc').value=pb.description||'';document.getElementById('pb-type').value=pb.investigation_type||'';document.getElementById('pb-active').checked=pb.is_active;document.getElementById('pb-steps-list').replaceChildren();(pb.steps||[]).forEach(s=>addPlaybookStepRow(s));if(!(pb.steps||[]).length)addPlaybookStepRow();document.getElementById('modal-playbook').style.display='flex'}catch(e){showToast('Failed',true)}
 }
 function addPlaybookStepRow(data){
     const div=document.getElementById('pb-steps-list'),idx=div.children.length+1,row=document.createElement('div');row.className='pb-step-row';

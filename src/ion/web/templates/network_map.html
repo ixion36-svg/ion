@@ -328,7 +328,7 @@ function renderTable(assets) {
 function renderPagination(total, offset, limit) {
   const pages = Math.ceil(total / limit);
   const current = Math.floor(offset / limit);
-  if (pages <= 1) { $('pagination').innerHTML = ''; return; }
+  if (pages <= 1) { $('pagination').replaceChildren(); return; }
   let html = `<span>Page ${current + 1} of ${pages}</span><div class="flex gap-1">`;
   if (current > 0) html += `<button data-click-action="goPage" data-args='[${current - 1}]' class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Prev</button>`;
   if (current < pages - 1) html += `<button data-click-action="goPage" data-args='[${current + 1}]' class="px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition">Next</button>`;
@@ -660,7 +660,7 @@ async function renderGraph() {
 
   // Render
   const container = $('network-graph');
-  container.innerHTML = '';
+  container.replaceChildren();
 
   const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
   const options = {

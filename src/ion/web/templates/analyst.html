@@ -449,7 +449,7 @@ async function doKBSearch() {
   const browse = document.getElementById('kb-browse');
   if (!q || q.length < 2) {
     el.classList.add('hidden');
-    el.innerHTML = '';
+    el.replaceChildren();
     if (browse) browse.classList.remove('hidden');   // clearing the box returns you to browsing
     return;
   }

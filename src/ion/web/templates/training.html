@@ -6473,7 +6473,7 @@ function renderTeamComposition() {
     if (!container || !teamData) return;
 
     const members = teamData.members || [];
-    if (members.length === 0) { container.innerHTML = ''; return; }
+    if (members.length === 0) { container.replaceChildren(); return; }
 
     // Count by RBAC role
     const roleCounts = {};
@@ -6514,7 +6514,7 @@ function renderCapabilityCoverage() {
     if (!container || !teamData) return;
 
     const members = teamData.members || [];
-    if (members.length === 0) { container.innerHTML = ''; return; }
+    if (members.length === 0) { container.replaceChildren(); return; }
 
     let html = '';
     Object.entries(SOC_CAPABILITIES).forEach(([capName, capDef]) => {
@@ -6642,7 +6642,7 @@ async function simulateDeparture() {
     if (!sel || !container) return;
 
     const userId = sel.value;
-    if (!userId) { container.innerHTML = ''; return; }
+    if (!userId) { container.replaceChildren(); return; }
 
     try {
         const resp = await fetch(`/api/skills/team-overview/departure-impact?user_id=${userId}`);
@@ -7670,7 +7670,7 @@ function selectModalShift(btn) {
 
 function closeSchedModal(event) {
     if (event && event.target !== event.currentTarget) return;
-    document.getElementById('sched-modal-root').innerHTML = '';
+    document.getElementById('sched-modal-root').replaceChildren();
 }
 
 async function saveSchedModal(userId, dateStr) {
@@ -7825,7 +7825,7 @@ function openDayRoster(dateStr) {
 
 function closeDayRoster(event) {
     if (event && event.target !== event.currentTarget) return;
-    document.getElementById('day-roster-root').innerHTML = '';
+    document.getElementById('day-roster-root').replaceChildren();
 }
 
 // =========================================================================
@@ -7883,7 +7883,7 @@ function openMemberProfile(userId) {
 
 function closeMemberPopover(event) {
     if (event && event.target !== event.currentTarget) return;
-    document.getElementById('member-popover-root').innerHTML = '';
+    document.getElementById('member-popover-root').replaceChildren();
 }
 
 // =========================================================================
@@ -7962,7 +7962,7 @@ function computeCapScores(workingIds) {
 function renderCapCoverageGrid() {
     const container = document.getElementById('soc-cov-grid');
     if (!container || !teamData || schedMembers.length === 0) {
-        if (container) container.innerHTML = '';
+        if (container) container.replaceChildren();
         return;
     }
 
@@ -8223,7 +8223,7 @@ function openFillGap(capName, dateStr) {
 }
 function closeFillGap(event) {
     if (event && event.target !== event.currentTarget) return;
-    document.getElementById('fill-gap-root').innerHTML = '';
+    document.getElementById('fill-gap-root').replaceChildren();
 }
 
 // Threshold configuration modal.
@@ -8250,7 +8250,7 @@ function openThresholdConfig() {
 }
 function closeThresholdConfig(event) {
     if (event && event.target !== event.currentTarget) return;
-    document.getElementById('threshold-config-root').innerHTML = '';
+    document.getElementById('threshold-config-root').replaceChildren();
 }
 async function saveThresholds() {
     const caps = Object.keys(SOC_CAPABILITIES);
@@ -8271,7 +8271,7 @@ async function saveThresholds() {
         });
         if (!resp.ok) { alert('Failed to save thresholds.'); return; }
     } catch (e) { alert('Failed to save thresholds.'); return; }
-    document.getElementById('threshold-config-root').innerHTML = '';
+    document.getElementById('threshold-config-root').replaceChildren();
     await loadCovThresholds();
     renderCapCoverageGrid();
     fixGridCols();

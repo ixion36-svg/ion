@@ -184,7 +184,7 @@ function schRenderParams(handlerKey, existing) {
   if (!params.length) {
     typedWrap.style.display = 'none';
     rawWrap.style.display = '';
-    typed.innerHTML = '';
+    typed.replaceChildren();
     return;
   }
 
@@ -251,7 +251,7 @@ async function schPreviewCron() {
   const expr = document.getElementById('sch-cron').value.trim();
   const out = document.getElementById('sch-cron-preview');
   if (!out) return;
-  if (!expr) { out.innerHTML = ''; return; }
+  if (!expr) { out.replaceChildren(); return; }
 
   // Debounced: this fires on every keystroke.
   clearTimeout(schCronPreviewTimer);
@@ -276,7 +276,7 @@ async function schPreviewCron() {
       out.innerHTML = `<span class="text-success">${schEsc(p.description)}</span>`
         + `<span class="opacity-60"> — next: ${runs} (${schEsc(p.timezone)})</span>`;
     } catch (e) {
-      out.innerHTML = '';
+      out.replaceChildren();
     }
   }, 300);
 }

@@ -2323,7 +2323,7 @@ function renderCaseLoadNotice() {
     const host = document.getElementById('cases-load-notice');
     if (!host) return;
     if (!casesTruncated) {
-        host.innerHTML = '';
+        host.replaceChildren();
         return;
     }
     host.innerHTML = '<div class="alert alert-warning"><div>'
@@ -2831,9 +2831,9 @@ async function loadCaseSyncStatus(caseId) {
     if (!host) return;
     try {
         const r = await fetch('/api/integrations/sync-journal/cases/' + encodeURIComponent(caseId));
-        if (!r.ok) { host.innerHTML = ''; return; }
+        if (!r.ok) { host.replaceChildren(); return; }
         const d = await r.json();
-        if (!d.has_problems) { host.innerHTML = ''; return; }
+        if (!d.has_problems) { host.replaceChildren(); return; }
 
         const rows = (d.unresolved || []).map(a => {
             const gaveUp = a.status === 'abandoned';
@@ -2867,7 +2867,7 @@ async function loadCaseSyncStatus(caseId) {
     } catch (e) {
         // Diagnostics for a problem elsewhere. Failing to fetch them must
         // not take a working case panel down with it.
-        host.innerHTML = '';
+        host.replaceChildren();
     }
 }
 
@@ -5218,7 +5218,7 @@ function renderSummaryStrip() {
         return d.toDateString() === now.toDateString();
     }).length;
 
-    strip.innerHTML = ''
+    strip.replaceChildren()
         + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--danger)]"></span><span class="summary-chip-label">Critical/High Active</span><span class="summary-chip-value text-[var(--danger)]">' + critHigh + '</span></div>'
         + '<div class="summary-chip"><span class="summary-chip-dot bg-[var(--warning)]"></span><span class="summary-chip-label">Unassigned</span><span class="summary-chip-value text-[var(--warning)]">' + unassigned + '</span></div>'
         + '<div class="summary-chip"><span class="summary-chip-dot" data-ion-style="background:' + (oldestDays > 7 ? 'var(--danger)' : oldestDays > 3 ? 'var(--warning)' : 'var(--success)') + '"></span><span class="summary-chip-label">Oldest Active</span><span class="summary-chip-value">' + oldestDays + 'd</span></div>'

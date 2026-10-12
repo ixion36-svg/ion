@@ -1442,7 +1442,7 @@ function renderPagination() {
     const totalPages = Math.ceil(totalCount / pageSize);
 
     if (totalPages <= 1) {
-        container.innerHTML = '';
+        container.replaceChildren();
         return;
     }
 
@@ -1915,7 +1915,7 @@ async function loadGraph(centerId = null) {
 
 function renderGraph(container, data) {
     // Clear container
-    container.innerHTML = '';
+    container.replaceChildren();
 
     // Load vis.js if not already loaded
     if (typeof vis === 'undefined') {
@@ -2496,8 +2496,8 @@ async function loadTimeline(observableId) {
     const infoContainer = document.getElementById('timeline-observable-info');
 
     eventsContainer.innerHTML = '<div class="loading">Loading timeline...</div>';
-    heatmapContainer.innerHTML = '';
-    infoContainer.innerHTML = '';
+    heatmapContainer.replaceChildren();
+    infoContainer.replaceChildren();
 
     try {
         // Load observable info

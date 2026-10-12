@@ -1257,7 +1257,7 @@ function resetPlaybookForm() {
     document.querySelectorAll('.trigger-severity').forEach(cb => cb.checked = false);
 
     // Clear steps
-    document.getElementById('steps-container').innerHTML = '';
+    document.getElementById('steps-container').replaceChildren();
     stepCounter = 0;
 }
 
@@ -1351,7 +1351,7 @@ async function editPlaybook(id) {
 
     // Fill steps
     const stepsContainer = document.getElementById('steps-container');
-    stepsContainer.innerHTML = '';
+    stepsContainer.replaceChildren();
     stepCounter = 0;
 
     (playbook.steps || []).forEach(step => {

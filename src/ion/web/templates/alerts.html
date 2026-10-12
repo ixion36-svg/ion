@@ -4671,7 +4671,7 @@ function _prepopulateKFPFields(caseId) {
 function _initTagInput(containerId, initialValues) {
     const container = document.getElementById(containerId);
     if (!container) return;
-    container.innerHTML = '';
+    container.replaceChildren();
     container._tags = [...initialValues];
 
     function render() {

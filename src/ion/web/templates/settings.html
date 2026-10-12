@@ -2947,8 +2947,8 @@ async function loadSystemInfo() {
 
     } catch (error) {
         techContainer.innerHTML = `<p class="loading">Error: ${escapeHtml(error.message)}</p>`;
-        infoContainer.innerHTML = '';
-        envContainer.innerHTML = '';
+        infoContainer.replaceChildren();
+        envContainer.replaceChildren();
     }
 }
 

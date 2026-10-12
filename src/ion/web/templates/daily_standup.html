@@ -750,7 +750,7 @@ function renderArkime(countries) {
         });
         detailEl.innerHTML = html;
       } else {
-        detailEl.innerHTML = '';
+        detailEl.replaceChildren();
       }
     }
   });

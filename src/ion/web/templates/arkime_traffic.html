@@ -566,7 +566,7 @@
     const tbody = document.getElementById('talkers-body');
     const empty = document.getElementById('talkers-empty');
     if (rows.length === 0) {
-      tbody.innerHTML = '';
+      tbody.replaceChildren();
       empty.classList.remove('hidden');
       return;
     }
@@ -587,7 +587,7 @@
   function destroyWorldMap() {
     if (worldMap) { try { worldMap.destroy(); } catch (_) {} worldMap = null; }
     var c = document.getElementById('world-map');
-    if (c) c.innerHTML = '';
+    if (c) c.replaceChildren();
   }
 
   function renderWorldMap() {
@@ -958,7 +958,7 @@
     var empty = document.getElementById('hunts-empty');
     if (!body) return;
     if (!hunts || !hunts.length) {
-      body.innerHTML = '';
+      body.replaceChildren();
       if (empty) empty.classList.remove('hidden');
       return;
     }
@@ -1194,7 +1194,7 @@
   function renderTrend(trend) {
     var sd = document.getElementById('stat-sessions-delta');
     var bd = document.getElementById('stat-bytes-delta');
-    if (!trend) { if (sd) sd.innerHTML = ''; if (bd) bd.innerHTML = ''; return; }
+    if (!trend) { if (sd) sd.replaceChildren(); if (bd) bd.replaceChildren(); return; }
     if (sd) sd.innerHTML = _deltaHtml(trend.sessions_pct);
     if (bd) bd.innerHTML = _deltaHtml(trend.bytes_pct);
   }

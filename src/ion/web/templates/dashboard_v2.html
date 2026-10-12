@@ -611,7 +611,7 @@
     if (!statsEl || !hlEl) return;
 
     if (!h) {
-      statsEl.innerHTML = '';
+      statsEl.replaceChildren();
       hlEl.innerHTML = `<div class="py-6 text-center text-[12px] text-slate-500">Handover unavailable.</div>`;
       return;
     }

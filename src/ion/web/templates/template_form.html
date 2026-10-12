@@ -211,8 +211,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 function buildLibrary() {
     const genericGrid = document.getElementById('library-generic');
     const socGrid = document.getElementById('library-soc');
-    genericGrid.innerHTML = '';
-    socGrid.innerHTML = '';
+    genericGrid.replaceChildren();
+    socGrid.replaceChildren();
 
     Object.entries(sectionTypes).forEach(([key, st]) => {
         const item = document.createElement('div');

@@ -688,7 +688,7 @@ function updateFolderPath() {
     const pathEl = document.getElementById('current-folder-path');
 
     if (selectedFolderId === null) {
-        pathEl.innerHTML = '';
+        pathEl.replaceChildren();
         return;
     }
 
@@ -949,7 +949,7 @@ function renderDocRail(activeId) {
     // as the board behind the panel — not every document in the library.
     let docs = [];
     try { docs = filterDocuments() || []; } catch (e) { docs = allDocuments || []; }
-    if (!docs.length) { rail.innerHTML = ''; return; }
+    if (!docs.length) { rail.replaceChildren(); return; }
 
     // Unfiltered, the library is ~600 documents — that many rail rows is a
     // slow panel for no benefit. Cap it, keep the OPEN document in the list

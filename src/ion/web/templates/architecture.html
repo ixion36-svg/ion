@@ -254,7 +254,7 @@
 
     function drawConnections() {
         var svg = document.getElementById('connections-svg');
-        svg.innerHTML = '';
+        svg.replaceChildren();
         var paths = WORKFLOW_PATHS[activeWorkflow];
         if (!paths) return;
 
@@ -348,7 +348,7 @@
 
     function updateLabels(cx, cy, r1, r2, r3) {
         var container = document.getElementById('labels-container');
-        container.innerHTML = ''
+        container.replaceChildren()
             + '<div class="ring-label" data-ion-style="top:' + (cy - r1 - 55) + 'px">Core Cluster</div>'
             + '<div class="ring-label" data-ion-style="top:' + (cy - r2 - 55) + 'px">System Services</div>'
             + '<div class="ring-label" data-ion-style="top:' + (cy - r3 - 55) + 'px">External Integrations</div>';

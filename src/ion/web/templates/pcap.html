@@ -676,7 +676,7 @@
         const tab = document.getElementById('tab-isakmp');
         if (!items.length) {
             tab.style.display = 'none';
-            document.getElementById('panel-isakmp').innerHTML = '';
+            document.getElementById('panel-isakmp').replaceChildren();
             return;
         }
         tab.style.display = '';

@@ -466,7 +466,7 @@ function ntRender(){
   const elements = ntBuildGraph();
   const container = document.getElementById('nt-canvas');
   if (ntCy) { ntCy.destroy(); ntCy = null; }
-  container.innerHTML = '';
+  container.replaceChildren();
   ntCy = cytoscape({
     container,
     elements,

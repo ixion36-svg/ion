@@ -723,7 +723,7 @@ function getWeekNumber(d) {
 }
 
 function setCurrentTime() { updateTimestampFields(new Date(), null); }
-function clearTimestamps() { ['unix', 'unix-ms', 'iso', 'local', 'rfc', 'filetime'].forEach(id => document.getElementById('ts-' + id).value = ''); document.getElementById('timestamp-info').innerHTML = ''; }
+function clearTimestamps() { ['unix', 'unix-ms', 'iso', 'local', 'rfc', 'filetime'].forEach(id => document.getElementById('ts-' + id).value = ''); document.getElementById('timestamp-info').replaceChildren(); }
 
 // ==================== HASH IDENTIFIER ====================
 const HASH_TYPES = [
@@ -741,7 +741,7 @@ const HASH_TYPES = [
 
 function identifyHashes() {
     const input = document.getElementById('hash-input').value.trim();
-    if (!input) { document.getElementById('hash-results').innerHTML = ''; return; }
+    if (!input) { document.getElementById('hash-results').replaceChildren(); return; }
 
     const lines = input.split('\n').filter(l => l.trim());
     let html = '<table class="data-table"><tr><th>Hash</th><th>Possible Types</th><th>Length</th></tr>';
@@ -759,7 +759,7 @@ function identifyHashes() {
 // ==================== URL PARSER ====================
 function parseUrl() {
     const input = document.getElementById('url-input').value.trim();
-    if (!input) { document.getElementById('url-results').innerHTML = ''; return; }
+    if (!input) { document.getElementById('url-results').replaceChildren(); return; }
 
     try {
         const url = new URL(input);
@@ -800,7 +800,7 @@ function testRegex() {
     const flags = document.getElementById('regex-flags').value;
     const test = document.getElementById('regex-test').value;
 
-    if (!pattern || !test) { document.getElementById('regex-results').innerHTML = ''; return; }
+    if (!pattern || !test) { document.getElementById('regex-results').replaceChildren(); return; }
 
     try {
         const regex = new RegExp(pattern, flags);
@@ -845,7 +845,7 @@ function testRegex() {
 // ==================== EMAIL HEADER ANALYZER ====================
 function parseEmailHeaders() {
     const input = document.getElementById('email-headers').value.trim();
-    if (!input) { document.getElementById('email-results').innerHTML = ''; return; }
+    if (!input) { document.getElementById('email-results').replaceChildren(); return; }
 
     const headers = {};
     const receivedChain = [];
@@ -918,7 +918,7 @@ function parseEmailHeaders() {
 function parseLog() {
     const format = document.getElementById('log-format').value;
     const input = document.getElementById('log-input').value.trim();
-    if (!input) { document.getElementById('log-results').innerHTML = ''; return; }
+    if (!input) { document.getElementById('log-results').replaceChildren(); return; }
 
     let parsed = null;
     let detectedFormat = format;
@@ -1204,7 +1204,7 @@ async function loadLanguages() {
   T.langs = d.languages || [];
   const src = document.getElementById('t-source');
   const tgt = document.getElementById('t-target');
-  src.innerHTML = ''; tgt.innerHTML = '';
+  src.replaceChildren(); tgt.replaceChildren();
   T.langs.forEach(l => {
     const oS = document.createElement('option');
     oS.value = l.code; oS.textContent = l.label;
@@ -1219,7 +1219,7 @@ async function loadLanguages() {
 
 function setStatus(msg, kind) {
   const el = document.getElementById('t-status');
-  if (!msg) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  if (!msg) { el.classList.add('hidden'); el.replaceChildren(); return; }
   el.classList.remove('hidden');
   const colorMap = {
     busy:  'bg-ion-iris/10 border border-ion-iris/30 text-ion-iris',

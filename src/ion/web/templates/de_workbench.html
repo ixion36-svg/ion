@@ -204,7 +204,7 @@
       openish.length ? 'oldest ' + (oldest >= 864e5 ? Math.floor(oldest / 864e5) + 'd' : Math.round(oldest / 36e5) + 'h') : 'queue clear';
     if (!openish.length) {
       empty.classList.remove('hidden');
-      body.innerHTML = '';
+      body.replaceChildren();
       return;
     }
     empty.classList.add('hidden');
@@ -303,7 +303,7 @@
           'across ' + (summary.campaign_count != null ? summary.campaign_count : '?') + ' campaigns · 30d';
         var body = document.getElementById('camp-body');
         var empty = document.getElementById('camp-empty');
-        if (!campaigns.length) { empty.classList.remove('hidden'); body.innerHTML = ''; return; }
+        if (!campaigns.length) { empty.classList.remove('hidden'); body.replaceChildren(); return; }
         empty.classList.add('hidden');
         body.innerHTML = campaigns.map(function (c) {
           return '<tr class="border-b border-white/5">'

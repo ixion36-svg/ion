@@ -390,7 +390,7 @@ function renderTopology(t) {
   const edges = $('wb-topology-edges');
   const nodes = $('wb-topology-nodes');
   if (!edges || !nodes) return;
-  edges.innerHTML = ''; nodes.innerHTML = '';
+  edges.replaceChildren(); nodes.replaceChildren();
 
   const cx = 230, cy = 140;     // hub centre (matches viewBox 460x280)
   const rx = 175, ry = 105;     // spoke ellipse radii
@@ -479,7 +479,7 @@ function renderAlerts(a) {
   ];
   const max = Math.max(1, ...Object.values(dist));
   const bars = $('wb-alerts-bars');
-  bars.innerHTML = '';
+  bars.replaceChildren();
   if (Object.keys(dist).length === 0) {
     bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No verdicts captured in the last 7d.</div>';
     return;
@@ -520,7 +520,7 @@ function renderCases(c) {
   ];
   const max = Math.max(1, ...Object.values(sev));
   const bars = $('wb-cases-bars');
-  bars.innerHTML = '';
+  bars.replaceChildren();
   if (Object.keys(sev).length === 0) {
     bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No open cases right now.</div>';
     return;
@@ -561,7 +561,7 @@ function renderRules(r) {
   if (r.error || r.tide_unavailable) {
     $('wb-rules-enabled').textContent = '—';
     $('wb-rules-of-total').textContent = r.tide_unavailable ? 'TIDE not configured' : 'unavailable';
-    $('wb-rules-coverage').innerHTML = '';
+    $('wb-rules-coverage').replaceChildren();
     $('wb-rules-bars').innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No rule posture available.</div>';
     return;
   }
@@ -595,7 +595,7 @@ function renderRules(r) {
   const sev = r.severity || {};
   const max = Math.max(1, ...SEV_ORDER.map(s => (sev[s.key] && sev[s.key].total) || 0));
   const bars = $('wb-rules-bars');
-  bars.innerHTML = '';
+  bars.replaceChildren();
   if (Object.keys(sev).length === 0) {
     bars.innerHTML = '<div class="text-[12px] text-slate-600 italic py-2">No severity data captured.</div>';
     return;

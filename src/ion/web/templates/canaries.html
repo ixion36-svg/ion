@@ -193,7 +193,7 @@ function canOpenForm(canary) {
     const m = document.getElementById('can-modal-bg');
     document.getElementById('can-modal-title').textContent = canary ? 'Edit Canary' : 'New Canary';
     const sel = document.getElementById('can-type');
-    sel.innerHTML = '';
+    sel.replaceChildren();
     for (const t of canTypes) {
         const o = document.createElement('option');
         o.value = t.id; o.textContent = t.label;

@@ -351,7 +351,7 @@
       note.textContent = "Flags are supportive — last-active and load help the lead balance work and feed the handover.";
     }).catch(function (e) {
       var note = document.getElementById("dw-team-note");
-      if (e.code === 403) { note.textContent = "Team view requires lead access (security:read)."; document.getElementById("dw-board").innerHTML = ""; }
+      if (e.code === 403) { note.textContent = "Team view requires lead access (security:read)."; document.getElementById("dw-board").replaceChildren(); }
       else note.textContent = "Could not load team view: " + e.message;
     });
   }

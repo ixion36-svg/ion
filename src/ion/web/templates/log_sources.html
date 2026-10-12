@@ -218,14 +218,14 @@ function lsOpenForm(source) {
     const m = document.getElementById('ls-modal-bg');
     document.getElementById('ls-modal-title').textContent = source ? 'Edit Log Source' : 'New Log Source';
     const cat = document.getElementById('ls-category');
-    cat.innerHTML = '';
+    cat.replaceChildren();
     for (const c of lsCats) {
         const o = document.createElement('option');
         o.value = c.id; o.textContent = c.label;
         cat.appendChild(o);
     }
     const crit = document.getElementById('ls-crit');
-    crit.innerHTML = '';
+    crit.replaceChildren();
     for (const c of ['critical', 'high', 'medium', 'low']) {
         const o = document.createElement('option');
         o.value = c; o.textContent = c.charAt(0).toUpperCase() + c.slice(1);

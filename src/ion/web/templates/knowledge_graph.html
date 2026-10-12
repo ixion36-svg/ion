@@ -98,7 +98,7 @@ function kgRender(data) {
     }
 
     const container = document.getElementById('kg-canvas');
-    container.innerHTML = '';
+    container.replaceChildren();
 
     const nodes = new vis.DataSet(data.nodes.map(n => ({
         id: n.id,

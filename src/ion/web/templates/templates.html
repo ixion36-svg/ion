@@ -391,7 +391,7 @@ function updateFolderPath() {
     const pathEl = document.getElementById('current-folder-path');
 
     if (selectedFolderId === null) {
-        pathEl.innerHTML = '';
+        pathEl.replaceChildren();
         return;
     }
 

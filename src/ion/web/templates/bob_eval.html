@@ -222,7 +222,7 @@ async function loadSamplesPage(runId, page) {
   const data = await res.json();
 
   const tbody = document.getElementById('samples-tbody');
-  tbody.innerHTML = '';
+  tbody.replaceChildren();
   for (const s of data.samples) {
     const agr = s.agreement === true ? '<span class="badge badge-success badge-sm">Yes</span>'
                : s.agreement === false ? '<span class="badge badge-error badge-sm">No</span>'

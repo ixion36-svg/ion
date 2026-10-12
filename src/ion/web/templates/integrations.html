@@ -2796,7 +2796,7 @@ const FLOW_STEP_COLORS = [
 function createFlowSlide() {
     const diagram = document.getElementById('flow-diagram');
     if (!diagram) return;
-    diagram.innerHTML = '';
+    diagram.replaceChildren();
 
     // Helper: create a stage card element with step index
     function makeStage(stage, step, skipPipeClass) {
