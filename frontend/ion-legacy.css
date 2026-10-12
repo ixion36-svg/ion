@@ -334,6 +334,25 @@
     --neon-orange: #c2410c;
     --neon-blue: #2563eb;
 
+    /* The MITRE coverage trio had no light values either, and /guide prints
+       all three as big `text-[var(--mitre-*)]` stat numbers:
+
+           covered  #3fb950  2.54:1 on white
+           gap      #f85149  3.35:1
+           partial  #d29922  2.52:1
+
+       gap and partial alias the light severity ramp rather than inventing
+       two more values, since "no coverage" and "partial" are the judgement
+       that ramp already encodes. covered has no severity equivalent, so it
+       takes green-700 at 5.02:1.
+
+       The -bg, -dim and -glow variants stay on their dark hues on purpose:
+       they are low-alpha tints used as backgrounds, where a 12% wash of a
+       brighter green is not a contrast failure. */
+    --mitre-covered: #15803d;
+    --mitre-gap: var(--sev-critical);
+    --mitre-partial: var(--sev-medium);
+
     /* ── 5-Severity System, light mode ──────────────────── */
     /* The dark ramp on a white page measured 2.12:1 to 2.63:1 for badge
        text on its own tint, against the 4.5:1 requirement, because no

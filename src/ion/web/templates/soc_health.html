@@ -191,7 +191,7 @@ function shHasScore(v) { return v !== null && v !== undefined; }
 function renderScorecard(d) {
     let html = '';
     const scored = shHasScore(d.overall_score);
-    const color = scored ? gradeColor(d.overall_score) : 'rgba(99,110,123,.6)';
+    const color = scored ? gradeColor(d.overall_score) : 'var(--text-muted)';
     const pct = scored ? d.overall_score : 0;
     const shownOverall = scored ? (d.overall_score + '/100') : 'Not assessed';
 
@@ -245,7 +245,7 @@ function renderScorecard(d) {
         const dim = dims[key];
         if (!dim) continue;
         const dimScored = shHasScore(dim.score);
-        const dc = dimScored ? gradeColor(dim.score) : 'rgba(99,110,123,.6)';
+        const dc = dimScored ? gradeColor(dim.score) : 'var(--text-muted)';
         const details = dim.details || {};
         let detailHtml = '';
         for (const [k, v] of Object.entries(details)) {
