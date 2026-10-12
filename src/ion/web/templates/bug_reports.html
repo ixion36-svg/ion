@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Bug Reports - ION{% endblock %}
+{% block page_id %}bug_reports{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -105,21 +106,6 @@
   </div>
 </section>
 
-<style nonce="{{ csp_nonce }}">
-/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
-#bugs-table td.loading {
-    display: table-cell;
-    aspect-ratio: auto;
-    width: auto;
-    height: auto;
-    background: none;
-    mask-image: none;
-    -webkit-mask-image: none;
-    text-align: center;
-    padding: 2rem;
-    opacity: 0.6;
-}
-</style>
 
 <script nonce="{{ csp_nonce }}">
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }

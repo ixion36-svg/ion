@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Bob Improvement - ION{% endblock %}
+{% block page_id %}de_bob{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -71,22 +72,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#bb-draft-overlay.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#bb-draft-overlay.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 720px;
-    max-height: 92vh;
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const BB_API = '/api/de';
 function bb$(id){return document.getElementById(id)}

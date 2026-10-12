@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Detection Proposals - ION{% endblock %}
+{% block page_id %}de_proposals{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -102,24 +103,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#dp-edit-overlay.show,
-#dp-decide-overlay.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#dp-edit-overlay.show > .modal-box,
-#dp-decide-overlay.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 560px;
-    max-height: 90vh;
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const DP_API = '/api/de/proposals';
 function dp$(id){return document.getElementById(id)}

@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}System Quirks - ION{% endblock %}
+{% block page_id %}de_quirks{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -87,22 +88,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#qk-raise-overlay.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#qk-raise-overlay.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 600px;
-    max-height: 92vh;
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const QK_API = '/api/de/quirks';
 function qk$(id){return document.getElementById(id)}

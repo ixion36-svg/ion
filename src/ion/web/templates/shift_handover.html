@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Shift Handover - ION{% endblock %}
+{% block page_id %}shift_handover{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -82,18 +83,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* Page-specific report cap is not a daisyUI token. */
-.sh-report { max-width: 1100px; }
-
-@media print {
-    .navbar, .header-actions, .chat-widget, .chat-toggle { display: none !important; }
-    body { background: #fff; color: #000; }
-    .sh-report { max-width: 100%; }
-    .card, .stat, .alert { break-inside: avoid; border-color: #ddd; }
-    .stat-value, .card-title i { color: #333 !important; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/shift-handover';
 function $(id){return document.getElementById(id)}

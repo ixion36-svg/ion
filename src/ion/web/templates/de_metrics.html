@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}DE Metrics - ION{% endblock %}
+{% block page_id %}de_metrics{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -51,15 +52,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
-.de-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-/* Compiled ion.css has no basis-full / md:basis-auto. Wrap the copy to a full
-   row below md so it cannot shrink beside the period controls. */
-@media (max-width: 767px) {
-  .de-hero { flex-basis: 100%; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const DE_API = '/api/de';
 function de$(id){return document.getElementById(id)}

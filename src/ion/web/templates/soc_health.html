@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}SOC Health - ION{% endblock %}
+{% block page_id %}soc_health{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -26,139 +27,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* Conic-gradient score ring: daisyUI radial-progress needs a CSS custom
-   property set as a raw attribute, which CSP refuses. Geometry and inner
-   disc have no utility equivalent. */
-.sh-grade-ring {
-    width: 120px;
-    height: 120px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-}
-.sh-grade-inner {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: var(--color-base-200);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
-.sh-dims {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 20px;
-}
-
-/* JS-computed bar width; 0.5s fill is not a compiled utility. */
-.sh-dim-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    transition: width .5s;
-}
-
-/* An unmeasured dimension used to render as a bar at width 0, which is
-   the same picture as a dimension measured at zero. Hatching is the one
-   thing on this card that a real score can never produce, so the two
-   cannot be confused at a glance or in a screenshot. Full width on
-   purpose: the track is not "none of it", it is "nobody looked". */
-.sh-dim-bar-unmeasured {
-    width: 100%;
-    height: 100%;
-    border-radius: 3px;
-    background: repeating-linear-gradient(
-        135deg,
-        rgba(145, 158, 171, 0.55) 0 4px,
-        transparent 4px 9px
-    );
-}
-
-/* daisyUI sets `.stat-desc{white-space:nowrap}` because its stat
-   component expects a short one-line caption. ION puts a key/value list
-   in there instead, so every line ran off the card and was cut by the
-   card's overflow-hidden. Four of the five cards were losing the end of
-   their detail text, including "reason:", which is the field that says
-   WHY a dimension scored what it did. */
-.sh-dims .stat-desc,
-.sh-dims .stat-title {
-    white-space: normal;
-}
-.sh-dims .stat-desc > div {
-    overflow-wrap: anywhere;
-}
-
-/* stat-value is sized for a two or three digit score. The words that
-   replace a missing score overflow it, so they get their own size rather
-   than being abbreviated to something ambiguous like "n/a". */
-.sh-value-text {
-    font-size: 20px;
-    line-height: 1.2;
-    white-space: normal;
-}
-
-/* Basis stated per card, rather than left to be inferred from a colour.
-   The dashed rule survives greyscale and colour blindness. */
-.sh-basis {
-    font-family: ui-monospace, monospace;
-    font-size: 10px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    margin-top: 2px;
-}
-.sh-basis-measured { color: var(--sev-low); }
-.sh-basis-unmeasured {
-    color: var(--sev-medium);
-    border-bottom: 1px dashed currentColor;
-}
-
-/* A recommendation about something ION cannot see. Dashed, matching the
-   unmeasured card, so it is not read as a ranked finding alongside the
-   ones measured against real data. */
-.sh-rec-unseen {
-    background: transparent;
-    border: 1px dashed var(--sev-medium);
-    color: var(--ion-text);
-}
-.sh-badge-unseen {
-    background: transparent;
-    border: 1px dashed var(--sev-medium);
-    color: var(--sev-medium);
-}
-
-/* Permanent furniture, not a tooltip. A reader should not have to hover
-   to learn that hatching means nobody checked. */
-.sh-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 18px;
-    align-items: center;
-    margin-bottom: 14px;
-    font-size: 12px;
-}
-.sh-legend-swatch {
-    display: inline-block;
-    width: 22px;
-    height: 8px;
-    border-radius: 2px;
-    vertical-align: middle;
-    margin-right: 7px;
-}
-.sh-legend-hatch {
-    background: repeating-linear-gradient(
-        135deg,
-        rgba(145, 158, 171, 0.55) 0 4px,
-        transparent 4px 9px
-    );
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const API = '/api/soc-health';
 function $(id){return document.getElementById(id)}

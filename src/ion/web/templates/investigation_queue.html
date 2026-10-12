@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Investigation Queue · ION{% endblock %}
+{% block page_id %}investigation_queue{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -154,32 +155,6 @@
 </div>
 </div>
 
-<style nonce="{{ csp_nonce }}">
-  /* JS innerHTML emits .iq-pill / .iq-mono — cannot restyle those rows
-     without changing the script, which this rewrite must not touch. */
-  .iq-pill {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .iq-pill-tp       { background: rgba(255,108,108,0.15);  color: var(--danger); }
-  .iq-pill-fp       { background: rgba(100,116,139,0.2);   color: var(--text-secondary); }
-  .iq-pill-benign   { background: rgba(134,240,160,0.15);  color: var(--success); }
-  .iq-pill-inc      { background: rgba(248,179,58,0.15);   color: var(--warning); }
-  .iq-pill-pending  { background: rgba(154,140,255,0.15);  color: var(--neon-purple); }
-  .iq-pill-running  { background: rgba(96,165,250,0.15);   color: var(--neon-blue); }
-  .iq-pill-completed{ background: rgba(134,240,160,0.15);  color: var(--success); }
-  .iq-pill-failed   { background: rgba(255,108,108,0.15);  color: var(--danger); }
-  .iq-pill-sev-low     { background: rgba(148,163,184,0.15); color: var(--text-primary); }
-  .iq-pill-sev-medium  { background: rgba(248,179,58,0.15);  color: var(--warning); }
-  .iq-pill-sev-high    { background: rgba(240,136,62,0.15);  color: var(--sev-high); }
-  .iq-pill-sev-critical{ background: rgba(255,108,108,0.2);   color: var(--danger); }
-  .iq-mono { font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11px; color: var(--text-secondary); }
-</style>
 
 <script nonce="{{ csp_nonce }}">
 (function() {

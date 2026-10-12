@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Profile - ION{% endblock %}
+{% block page_id %}profile{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -155,40 +156,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .active on .mode-btn; daisyUI uses btn-active. */
-.mode-btn.active {
-    background-color: var(--color-primary);
-    color: var(--color-primary-content);
-    border-color: var(--color-primary);
-}
-
-/* JS injects .profile-field / .error; cannot add daisyUI classes without changing JS. */
-#profile-info .profile-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.75rem 0;
-    background: transparent;
-    border: 0;
-    border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
-    border-radius: 0;
-}
-#profile-info .profile-field:last-child { border-bottom: 0; }
-#profile-info .profile-field label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    opacity: 0.55;
-}
-#profile-info > .error {
-    padding: 0.75rem 1rem;
-    border-radius: var(--radius-box, 0.5rem);
-    background: color-mix(in oklab, var(--color-error) 15%, transparent);
-    color: var(--color-error);
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 let currentUser = null;
 

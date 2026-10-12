@@ -113,7 +113,13 @@
     };
     </script>
 </head>
-<body>
+{# page_id scopes a page's own CSS. Those rules live in
+   frontend/ion-pages.css, shared by every page, so without a scope the
+   last definition of a selector wins everywhere: a flat merge changed
+   .se-header padding on /templates/new and put guide.html's @media
+   print block on all 57 pages. tools/scope_page_css.py applies it.
+   Set it in any template whose CSS has moved to that sheet. #}
+<body data-page="{% block page_id %}{% endblock %}">
     <!-- ═══════════════════ TAILWIND TOP NAV ═══════════════════ -->
     {% set p = request.url.path %}
     <header class="ion-tw relative z-40 border-b border-white/10 bg-ink-950/80 backdrop-blur-md font-sans">

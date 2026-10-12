@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Canaries - ION{% endblock %}
+{% block page_id %}canaries{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -86,59 +87,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#can-modal-bg.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#can-modal-bg.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 640px;
-    max-height: 90vh;
-}
-
-/* JS adds .fired on hit rows — inset critical stripe has no daisyUI equivalent. */
-#can-content tr.fired td {
-    background: color-mix(in oklab, var(--color-error) 6%, transparent);
-}
-#can-content tr.fired td:first-child {
-    box-shadow: inset 3px 0 0 var(--color-error);
-}
-
-/* JS can-value: 280px ellipsis cap is not a daisyUI token. */
-.can-value {
-    font-family: var(--font-mono, ui-monospace, monospace);
-    font-size: 0.75rem;
-    max-width: 280px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: inline-block;
-    vertical-align: middle;
-}
-
-/* JS snippet: max-height 80px is not a compiled utility. */
-.can-hit-snippet {
-    max-height: 80px;
-    overflow: auto;
-}
-
-/* JS status classes inactive/retired — daisyUI badges have no dimmed slot. */
-.badge.inactive,
-.badge.retired {
-    opacity: 0.5;
-}
-
-@media (max-width: 768px) {
-    .can-value { max-width: 160px; font-size: 0.7rem; }
-    #can-modal-bg.show > .modal-box { max-height: 95vh; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const CAN_API = '/api/canaries';
 let canCache = [];

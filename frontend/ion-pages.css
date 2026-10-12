@@ -19,26 +19,26 @@
 
 /* ── guide.html ─────────────────────────────────── */
 /* JS toggles .active on .g-role-btn — daisyUI btn-active is a different class. */
-.g-role-btn.active {
+body[data-page="guide"] .g-role-btn.active{
     background: color-mix(in oklab, var(--color-primary) 18%, transparent);
     border-color: var(--color-primary);
     color: var(--color-primary);
 }
 
 /* JS sets data-hidden on .g-section — not a daisyUI visibility slot. */
-.g-section[data-hidden="true"] { display: none; }
+body[data-page="guide"] .g-section[data-hidden="true"]{ display: none; }
 
 /* Hidden until JS sets element.style.display. JS matches .g-role-note and .lead/.engineer. */
-.g-role-note { display: none; }
+body[data-page="guide"] .g-role-note{ display: none; }
 
 /* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
-.g-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; }
-.g-features { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
-.g-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
-.g-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
+body[data-page="guide"] .g-cards{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.875rem; }
+body[data-page="guide"] .g-features{ display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+body[data-page="guide"] .g-grid-2{ display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
+body[data-page="guide"] .g-grid-3{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin: 0.75rem 0; }
 
 /* no daisyUI <code> component */
-#g-content code {
+body[data-page="guide"] #g-content code{
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 0.72rem;
     background: var(--color-base-300);
@@ -48,69 +48,67 @@
 
 /* Print: hide chrome. No daisyUI print primitive. */
 @media print {
-    .navbar, .g-role-bar, .g-quicknav, .header-actions, .chat-widget, .chat-toggle { display: none !important; }
-    body { background: #fff !important; color: #333 !important; }
-    .g-section { break-inside: avoid; border-color: #ddd; background: #fff; }
-    .card-title { color: #000; }
-    .card-title i { color: #0969da; }
+    body[data-page="guide"] .navbar, body[data-page="guide"] .g-role-bar, body[data-page="guide"] .g-quicknav, body[data-page="guide"] .header-actions, body[data-page="guide"] .chat-widget, body[data-page="guide"] .chat-toggle{ display: none !important; }
+    body[data-page="guide"]{ background: #fff !important; color: #333 !important; }
+    body[data-page="guide"] .g-section{ break-inside: avoid; border-color: #ddd; background: #fff; }
+    body[data-page="guide"] .card-title{ color: #000; }
+    body[data-page="guide"] .card-title i{ color: #0969da; }
 }
 
 /* ── workforce_orbat.html ─────────────────────────────────── */
 /* Org-chart connectors. The tree is nested ul/li; each li draws the two
    halves of the line above itself, and each child ul draws the drop from its
    parent. Only-children keep just the vertical stub. */
-.wf-tree { --wf-line: color-mix(in srgb, currentColor 22%, transparent); }
-.wf-tree ul {
+body[data-page="workforce_orbat"] .wf-tree{ --wf-line: color-mix(in srgb, currentColor 22%, transparent); }
+body[data-page="workforce_orbat"] .wf-tree ul{
     display: flex; align-items: flex-start; justify-content: center;
     padding: 26px 0 0; margin: 0; position: relative;
 }
-.wf-tree li {
+body[data-page="workforce_orbat"] .wf-tree li{
     list-style: none; position: relative;
     display: flex; flex-direction: column; align-items: center;
     padding: 26px 10px 0;
 }
-.wf-tree li::before, .wf-tree li::after {
+body[data-page="workforce_orbat"] .wf-tree li::before, body[data-page="workforce_orbat"] .wf-tree li::after{
     content: ''; position: absolute; top: 0; right: 50%;
     border-top: 2px solid var(--wf-line); width: 50%; height: 26px;
 }
-.wf-tree li::after { right: auto; left: 50%; border-left: 2px solid var(--wf-line); }
-.wf-tree li:only-child::before, .wf-tree li:only-child::after { display: none; }
-.wf-tree li:first-child::before, .wf-tree li:last-child::after { border: 0 none; }
-.wf-tree li:last-child::before {
+body[data-page="workforce_orbat"] .wf-tree li::after{ right: auto; left: 50%; border-left: 2px solid var(--wf-line); }
+body[data-page="workforce_orbat"] .wf-tree li:only-child::before, body[data-page="workforce_orbat"] .wf-tree li:only-child::after{ display: none; }
+body[data-page="workforce_orbat"] .wf-tree li:first-child::before, body[data-page="workforce_orbat"] .wf-tree li:last-child::after{ border: 0 none; }
+body[data-page="workforce_orbat"] .wf-tree li:last-child::before{
     border-right: 2px solid var(--wf-line); border-radius: 0 8px 0 0;
 }
-.wf-tree li:first-child::after { border-radius: 8px 0 0 0; }
-.wf-tree ul ul::before {
+body[data-page="workforce_orbat"] .wf-tree li:first-child::after{ border-radius: 8px 0 0 0; }
+body[data-page="workforce_orbat"] .wf-tree ul ul::before{
     content: ''; position: absolute; top: 0; left: 50%;
     border-left: 2px solid var(--wf-line); width: 0; height: 26px;
 }
 /* A real establishment is wider than a laptop. Scroll the tree inside its
    own box rather than letting it push the page sideways, which hides the
    right-hand functions behind a scrollbar nobody notices. */
-.wf-tree { overflow-x: auto; padding-bottom: 8px; }
-.wf-tree > ul { min-width: max-content; }
+body[data-page="workforce_orbat"] .wf-tree{ overflow-x: auto; padding-bottom: 8px; }
+body[data-page="workforce_orbat"] .wf-tree > ul{ min-width: max-content; }
 /* Roots: no connectors above the top card. */
-.wf-tree > ul { padding-top: 0; }
-.wf-tree > ul > li { padding-top: 0; }
-.wf-tree > ul > li::before, .wf-tree > ul > li::after { display: none; }
+body[data-page="workforce_orbat"] .wf-tree > ul{ padding-top: 0; }
+body[data-page="workforce_orbat"] .wf-tree > ul > li{ padding-top: 0; }
+body[data-page="workforce_orbat"] .wf-tree > ul > li::before, body[data-page="workforce_orbat"] .wf-tree > ul > li::after{ display: none; }
 
 /* ── notes.html ─────────────────────────────────── */
 /* JS querySelector('.notes-page') is the page-init guard. :has() punches
    through main.container (max-width 1400px, 2rem padding) so the split
    pane can fill the viewport — a child utility cannot restyle its parent. */
-.container:has(.notes-page) { max-width: 100%; padding: 0; margin: 0; }
+body[data-page="notes"] .container:has(.notes-page){ max-width: 100%; padding: 0; margin: 0; }
 
 /* JS renderFolderTree() emits .folder-item / .folder-expand / .folder-icon /
    .folder-name / .folder-count / .folder-actions and toggles .active,
    .expanded, .empty, .drop-target. data-depth is set in innerHTML. */
-.notes-folder-tree::-webkit-scrollbar,
-.notes-list::-webkit-scrollbar { width: 6px; }
-.notes-folder-tree::-webkit-scrollbar-thumb,
-.notes-list::-webkit-scrollbar-thumb {
+body[data-page="notes"] .notes-folder-tree::-webkit-scrollbar, body[data-page="notes"] .notes-list::-webkit-scrollbar{ width: 6px; }
+body[data-page="notes"] .notes-folder-tree::-webkit-scrollbar-thumb, body[data-page="notes"] .notes-list::-webkit-scrollbar-thumb{
     background: var(--color-base-300);
     border-radius: 3px;
 }
-.folder-item {
+body[data-page="notes"] .folder-item{
     display: flex;
     align-items: center;
     padding: 4px 12px;
@@ -121,15 +119,15 @@
     user-select: none;
     position: relative;
 }
-.folder-item:hover {
+body[data-page="notes"] .folder-item:hover{
     background: var(--color-base-300);
     color: var(--color-base-content);
 }
-.folder-item.active {
+body[data-page="notes"] .folder-item.active{
     background: var(--color-base-300);
     color: var(--color-primary);
 }
-.folder-item .folder-expand {
+body[data-page="notes"] .folder-item .folder-expand{
     width: 16px;
     height: 16px;
     display: flex;
@@ -140,29 +138,29 @@
     transition: transform .15s;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
-.folder-item .folder-expand.expanded { transform: rotate(90deg); }
-.folder-item .folder-expand.empty { visibility: hidden; }
-.folder-item .folder-icon { margin: 0 4px; font-size: .82rem; flex-shrink: 0; }
-.folder-item .folder-name {
+body[data-page="notes"] .folder-item .folder-expand.expanded{ transform: rotate(90deg); }
+body[data-page="notes"] .folder-item .folder-expand.empty{ visibility: hidden; }
+body[data-page="notes"] .folder-item .folder-icon{ margin: 0 4px; font-size: .82rem; flex-shrink: 0; }
+body[data-page="notes"] .folder-item .folder-name{
     flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.folder-item .folder-count {
+body[data-page="notes"] .folder-item .folder-count{
     font-size: .7rem;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     margin-left: 4px;
     flex-shrink: 0;
 }
-.folder-item .folder-actions {
+body[data-page="notes"] .folder-item .folder-actions{
     display: none;
     gap: 2px;
     margin-left: 4px;
     flex-shrink: 0;
 }
-.folder-item:hover .folder-actions { display: flex; }
-.folder-item .folder-actions button {
+body[data-page="notes"] .folder-item:hover .folder-actions{ display: flex; }
+body[data-page="notes"] .folder-item .folder-actions button{
     background: none;
     border: none;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
@@ -172,14 +170,14 @@
     border-radius: 2px;
     line-height: 1;
 }
-.folder-item .folder-actions button:hover {
+body[data-page="notes"] .folder-item .folder-actions button:hover{
     color: var(--color-base-content);
     background: color-mix(in oklab, var(--color-base-content) 8%, transparent);
 }
-.folder-item .folder-actions button.danger:hover { color: var(--color-error); }
-.folder-children { display: none; }
-.folder-children.expanded { display: block; }
-.folder-rename-input {
+body[data-page="notes"] .folder-item .folder-actions button.danger:hover{ color: var(--color-error); }
+body[data-page="notes"] .folder-children{ display: none; }
+body[data-page="notes"] .folder-children.expanded{ display: block; }
+body[data-page="notes"] .folder-rename-input{
     background: var(--color-base-200);
     border: 1px solid var(--color-primary);
     border-radius: var(--radius-field, 0.25rem);
@@ -189,13 +187,13 @@
     width: 100%;
     outline: none;
 }
-.folder-item[data-depth="1"] { padding-left: 28px; }
-.folder-item[data-depth="2"] { padding-left: 44px; }
-.folder-item[data-depth="3"] { padding-left: 60px; }
+body[data-page="notes"] .folder-item[data-depth="1"]{ padding-left: 28px; }
+body[data-page="notes"] .folder-item[data-depth="2"]{ padding-left: 44px; }
+body[data-page="notes"] .folder-item[data-depth="3"]{ padding-left: 60px; }
 
 /* JS renderNoteList() emits .note-card and children; toggles .active,
    .dragging; writes .notes-empty when the list is vacant. */
-.note-card {
+body[data-page="notes"] .note-card{
     padding: 10px 12px;
     border-radius: var(--radius-box);
     cursor: pointer;
@@ -204,13 +202,13 @@
     border-left: 3px solid transparent;
     position: relative;
 }
-.note-card:hover { background: var(--color-base-300); }
-.note-card.active {
+body[data-page="notes"] .note-card:hover{ background: var(--color-base-300); }
+body[data-page="notes"] .note-card.active{
     background: var(--color-base-300);
     border-left-color: var(--color-primary);
 }
-.note-card-header { display: flex; align-items: center; gap: 6px; }
-.note-card-title {
+body[data-page="notes"] .note-card-header{ display: flex; align-items: center; gap: 6px; }
+body[data-page="notes"] .note-card-title{
     font-size: .85rem;
     font-weight: 600;
     color: var(--color-base-content);
@@ -219,8 +217,8 @@
     white-space: nowrap;
     flex: 1;
 }
-.note-card-pin { font-size: .7rem; flex-shrink: 0; }
-.note-card-preview {
+body[data-page="notes"] .note-card-pin{ font-size: .7rem; flex-shrink: 0; }
+body[data-page="notes"] .note-card-preview{
     font-size: .75rem;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     margin-top: 3px;
@@ -228,20 +226,20 @@
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.note-card-meta {
+body[data-page="notes"] .note-card-meta{
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-top: 4px;
 }
-.note-card-time {
+body[data-page="notes"] .note-card-time{
     font-size: .72rem;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
-.note-card-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-.note-card-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
-.note-card:hover .note-card-actions { opacity: 1; }
-.note-card-btn {
+body[data-page="notes"] .note-card-color{ width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+body[data-page="notes"] .note-card-actions{ display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+body[data-page="notes"] .note-card:hover .note-card-actions{ opacity: 1; }
+body[data-page="notes"] .note-card-btn{
     padding: 2px 6px;
     background: transparent;
     border: 1px solid var(--color-base-300);
@@ -250,13 +248,13 @@
     cursor: pointer;
     font-size: .7rem;
 }
-.note-card-btn:hover {
+body[data-page="notes"] .note-card-btn:hover{
     color: var(--color-base-content);
     border-color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
-.note-card-btn.danger { color: var(--color-error); }
-.note-card-btn.danger:hover { border-color: var(--color-error); }
-.notes-empty {
+body[data-page="notes"] .note-card-btn.danger{ color: var(--color-error); }
+body[data-page="notes"] .note-card-btn.danger:hover{ border-color: var(--color-error); }
+body[data-page="notes"] .notes-empty{
     padding: 40px 20px;
     text-align: center;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
@@ -264,9 +262,9 @@
 }
 
 /* JS dragstart/dragover add .dragging / .drop-target. */
-.note-card[draggable] { cursor: grab; }
-.note-card.dragging { opacity: .4; cursor: grabbing; }
-.folder-item.drop-target {
+body[data-page="notes"] .note-card[draggable]{ cursor: grab; }
+body[data-page="notes"] .note-card.dragging{ opacity: .4; cursor: grabbing; }
+body[data-page="notes"] .folder-item.drop-target{
     background: color-mix(in oklab, var(--color-primary) 18%, transparent);
     outline: 1px dashed var(--color-primary);
     outline-offset: -1px;
@@ -275,7 +273,7 @@
 
 /* JS showMoveDropdown() fills #fp-move-dropdown and toggles .open;
    positions it via CSSOM. */
-.move-folder-dropdown {
+body[data-page="notes"] .move-folder-dropdown{
     display: none;
     position: absolute;
     right: 8px;
@@ -288,30 +286,30 @@
     padding: 4px 0;
     box-shadow: 0 2px 8px oklch(0% 0 0 / 0.15);
 }
-.move-folder-dropdown.open { display: block; }
-.move-folder-option {
+body[data-page="notes"] .move-folder-dropdown.open{ display: block; }
+body[data-page="notes"] .move-folder-option{
     padding: 6px 12px;
     font-size: .8rem;
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     cursor: pointer;
     white-space: nowrap;
 }
-.move-folder-option:hover {
+body[data-page="notes"] .move-folder-option:hover{
     background: var(--color-base-200);
     color: var(--color-base-content);
 }
 
 /* JS classList.toggle('pinned') on #fp-btn-pin. daisyUI has no .pinned. */
-.notes-action-btn.pinned {
+body[data-page="notes"] .notes-action-btn.pinned{
     color: var(--color-primary);
     border-color: var(--color-primary);
 }
-.notes-action-btn.danger { color: var(--color-error); }
-.notes-action-btn.danger:hover { border-color: var(--color-error); }
+body[data-page="notes"] .notes-action-btn.danger{ color: var(--color-error); }
+body[data-page="notes"] .notes-action-btn.danger:hover{ border-color: var(--color-error); }
 
 /* JS initColorPicker() fills #fp-color-dropdown with .notes-color-option
    and toggles .open / .active. */
-.notes-color-dropdown {
+body[data-page="notes"] .notes-color-dropdown{
     display: none;
     position: absolute;
     top: 100%;
@@ -326,8 +324,8 @@
     gap: 6px;
     min-width: 140px;
 }
-.notes-color-dropdown.open { display: flex; }
-.notes-color-option {
+body[data-page="notes"] .notes-color-dropdown.open{ display: flex; }
+body[data-page="notes"] .notes-color-option{
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -335,54 +333,53 @@
     border: 2px solid transparent;
     transition: border-color .15s;
 }
-.notes-color-option:hover { border-color: var(--color-base-content); }
-.notes-color-option.active { border-color: var(--color-primary); }
+body[data-page="notes"] .notes-color-option:hover{ border-color: var(--color-base-content); }
+body[data-page="notes"] .notes-color-option.active{ border-color: var(--color-primary); }
 
 /* Quill injects .ql-* chrome at runtime. Theme it to daisyUI slots. */
-.notes-quill-wrap { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-.notes-quill-wrap .ql-toolbar.ql-snow {
+body[data-page="notes"] .notes-quill-wrap{ flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+body[data-page="notes"] .notes-quill-wrap .ql-toolbar.ql-snow{
     border: none;
     border-bottom: 1px solid var(--color-base-300);
     background: var(--color-base-200);
     flex-shrink: 0;
     padding: 6px 12px;
 }
-.notes-quill-wrap .ql-container.ql-snow { border: none; flex: 1; overflow-y: auto; }
-.notes-quill-wrap .ql-editor {
+body[data-page="notes"] .notes-quill-wrap .ql-container.ql-snow{ border: none; flex: 1; overflow-y: auto; }
+body[data-page="notes"] .notes-quill-wrap .ql-editor{
     color: var(--color-base-content);
     font-size: .9rem;
     line-height: 1.7;
     padding: 16px 24px;
     min-height: 200px;
 }
-.notes-quill-wrap .ql-editor.ql-blank::before {
+body[data-page="notes"] .notes-quill-wrap .ql-editor.ql-blank::before{
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
     font-style: normal;
 }
-.notes-quill-wrap .ql-snow .ql-stroke {
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-stroke{
     stroke: color-mix(in oklab, var(--color-base-content) 55%, transparent);
 }
-.notes-quill-wrap .ql-snow .ql-fill {
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-fill{
     fill: color-mix(in oklab, var(--color-base-content) 55%, transparent);
 }
-.notes-quill-wrap .ql-snow .ql-picker-label {
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-picker-label{
     color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
-.notes-quill-wrap .ql-snow .ql-picker-options {
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-picker-options{
     background: var(--color-base-100);
     border-color: var(--color-base-300);
 }
-.notes-quill-wrap .ql-snow .ql-picker-item { color: var(--color-base-content); }
-.notes-quill-wrap .ql-snow button:hover .ql-stroke,
-.notes-quill-wrap .ql-snow .ql-picker-label:hover { color: var(--color-primary); }
-.notes-quill-wrap .ql-snow button:hover .ql-stroke { stroke: var(--color-primary); }
-.notes-quill-wrap .ql-snow .ql-active .ql-stroke { stroke: var(--color-primary); }
-.notes-quill-wrap .ql-snow .ql-active .ql-fill { fill: var(--color-primary); }
-.notes-quill-wrap .ql-snow .ql-active { color: var(--color-primary); }
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-picker-item{ color: var(--color-base-content); }
+body[data-page="notes"] .notes-quill-wrap .ql-snow button:hover .ql-stroke, body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-picker-label:hover{ color: var(--color-primary); }
+body[data-page="notes"] .notes-quill-wrap .ql-snow button:hover .ql-stroke{ stroke: var(--color-primary); }
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-active .ql-stroke{ stroke: var(--color-primary); }
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-active .ql-fill{ fill: var(--color-primary); }
+body[data-page="notes"] .notes-quill-wrap .ql-snow .ql-active{ color: var(--color-primary); }
 
 /* ── soc_roles.html ─────────────────────────────────── */
 /* auto-fill minmax grid: compiled utilities are fixed column counts. */
-.sr-grid {
+body[data-page="soc_roles"] .sr-grid{
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
   gap: 16px;
@@ -391,14 +388,13 @@
 
 /* Top accent stripe, hover lift, and glow are painted with --sr-ac.
    daisyUI card has no per-instance accent slot. */
-.sr-role {
+body[data-page="soc_roles"] .sr-role{
   padding: 18px;
   transition: background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease;
   border: 1px solid var(--color-base-300);
   border-top: 3px solid var(--sr-ac);
 }
-.sr-role:hover,
-.sr-role:focus-within {
+body[data-page="soc_roles"] .sr-role:hover, body[data-page="soc_roles"] .sr-role:focus-within{
   background: var(--sr-tint);
   border-color: var(--sr-ac);
   transform: translateY(-3px);
@@ -406,7 +402,7 @@
 }
 
 /* Hover-expansion. daisyUI collapse is click, not hover. Test-locked selector. */
-.sr-detail {
+body[data-page="soc_roles"] .sr-detail{
   max-height: 0;
   opacity: 0;
   overflow: hidden;
@@ -415,26 +411,23 @@
   line-height: 1.5;
   color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
 }
-.sr-role:hover .sr-detail,
-.sr-role:focus-within .sr-detail {
+body[data-page="soc_roles"] .sr-role:hover .sr-detail, body[data-page="soc_roles"] .sr-role:focus-within .sr-detail{
   max-height: 1000px;
   opacity: 1;
   margin-top: 12px;
 }
 
-.sr-tier,
-.sr-h3,
-.sr-time {
+body[data-page="soc_roles"] .sr-tier, body[data-page="soc_roles"] .sr-h3, body[data-page="soc_roles"] .sr-time{
   font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-weight: 700;
   color: var(--sr-ac);
   text-transform: uppercase;
 }
-.sr-tier { font-size: .68rem; letter-spacing: 2px; }
-.sr-h3 { font-size: .64rem; letter-spacing: 2px; margin: 12px 0 6px; }
-.sr-time { font-size: .62rem; }
+body[data-page="soc_roles"] .sr-tier{ font-size: .68rem; letter-spacing: 2px; }
+body[data-page="soc_roles"] .sr-h3{ font-size: .64rem; letter-spacing: 2px; margin: 12px 0 6px; }
+body[data-page="soc_roles"] .sr-time{ font-size: .62rem; }
 
-.sr-mission {
+body[data-page="soc_roles"] .sr-mission{
   color: var(--color-base-content);
   font-size: .8rem;
   border-top: 1px solid var(--color-base-300);
@@ -442,9 +435,9 @@
 }
 
 /* Compact time+duty rail. daisyUI timeline is a two-column layout. */
-.sr-tl { border-left: 2px solid var(--color-base-300); padding-left: 12px; margin-left: 2px; }
-.sr-slot { position: relative; margin-bottom: 7px; }
-.sr-slot::before {
+body[data-page="soc_roles"] .sr-tl{ border-left: 2px solid var(--color-base-300); padding-left: 12px; margin-left: 2px; }
+body[data-page="soc_roles"] .sr-slot{ position: relative; margin-bottom: 7px; }
+body[data-page="soc_roles"] .sr-slot::before{
   content: "";
   position: absolute;
   left: -17px;
@@ -454,14 +447,14 @@
   border-radius: 50%;
   background: var(--sr-ac);
 }
-.sr-what { color: var(--color-base-content); font-size: .76rem; font-weight: 700; margin-left: 5px; }
+body[data-page="soc_roles"] .sr-what{ color: var(--color-base-content); font-size: .76rem; font-weight: 700; margin-left: 5px; }
 
-.sr-duty { margin-bottom: 5px; padding-left: 14px; position: relative; }
-.sr-duty::before { content: "·"; color: var(--sr-ac); position: absolute; left: 2px; font-weight: 800; }
-.sr-duty b { color: var(--color-base-content); }
+body[data-page="soc_roles"] .sr-duty{ margin-bottom: 5px; padding-left: 14px; position: relative; }
+body[data-page="soc_roles"] .sr-duty::before{ content: "·"; color: var(--sr-ac); position: absolute; left: 2px; font-weight: 800; }
+body[data-page="soc_roles"] .sr-duty b{ color: var(--color-base-content); }
 
 /* Per-role tint — not a daisyUI alert/badge/btn colour slot. */
-.sr-good {
+body[data-page="soc_roles"] .sr-good{
   background: var(--sr-tint);
   border: 1px solid var(--sr-ac);
   padding: 7px 10px;
@@ -469,7 +462,7 @@
   font-size: .72rem;
   color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
 }
-.sr-good b {
+body[data-page="soc_roles"] .sr-good b{
   color: var(--sr-ac);
   font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-size: .6rem;
@@ -479,8 +472,8 @@
 
 
 
-.sr-chips { margin-top: 10px; }
-.sr-chiplabel {
+body[data-page="soc_roles"] .sr-chips{ margin-top: 10px; }
+body[data-page="soc_roles"] .sr-chiplabel{
   font-family: 'JetBrains Mono', 'Consolas', monospace;
   font-size: .58rem;
   font-weight: 700;
@@ -488,7 +481,7 @@
   color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
   margin-right: 6px;
 }
-.sr-chip {
+body[data-page="soc_roles"] .sr-chip{
   background: var(--sr-tint);
   border: 1px solid var(--color-base-300);
   font-family: 'JetBrains Mono', 'Consolas', monospace;
@@ -496,34 +489,2098 @@
 
 /* 11 distinct seats; daisyUI has 7 semantic colours. Collapsing them
    would make adjacent cards identical. */
-.sr-c-cyan   { --sr-ac: var(--color-ion-cyan); --sr-tint: color-mix(in oklab, var(--color-ion-cyan) 8%, transparent); --sr-glow: color-mix(in oklab, var(--color-ion-cyan) 35%, transparent); }
-.sr-c-green  { --sr-ac: var(--mitre-covered); --sr-tint: color-mix(in oklab, var(--mitre-covered) 8%, transparent); --sr-glow: color-mix(in oklab, var(--mitre-covered) 35%, transparent); }
-.sr-c-amber  { --sr-ac: var(--warning); --sr-tint: color-mix(in oklab, var(--warning) 8%, transparent); --sr-glow: color-mix(in oklab, var(--warning) 35%, transparent); }
-.sr-c-violet { --sr-ac: var(--sev-info); --sr-tint: color-mix(in oklab, var(--sev-info) 9%, transparent); --sr-glow: color-mix(in oklab, var(--sev-info) 35%, transparent); }
-.sr-c-coral  { --sr-ac: var(--neon-orange); --sr-tint: color-mix(in oklab, var(--neon-orange) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-orange) 35%, transparent); }
-.sr-c-pink   { --sr-ac: var(--neon-pink); --sr-tint: color-mix(in oklab, var(--neon-pink) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-pink) 35%, transparent); }
-.sr-c-teal   { --sr-ac: var(--neon-teal); --sr-tint: color-mix(in oklab, var(--neon-teal) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-teal) 35%, transparent); }
-.sr-c-ice    { --sr-ac: var(--neon-sky); --sr-tint: color-mix(in oklab, var(--neon-sky) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-sky) 35%, transparent); }
-.sr-c-steel  { --sr-ac: var(--text-secondary); --sr-tint: color-mix(in oklab, var(--text-secondary) 8%, transparent); --sr-glow: color-mix(in oklab, var(--text-secondary) 35%, transparent); }
-.sr-c-lime   { --sr-ac: var(--neon-lime); --sr-tint: color-mix(in oklab, var(--neon-lime) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-lime) 35%, transparent); }
-.sr-c-rose   { --sr-ac: var(--neon-rose); --sr-tint: color-mix(in oklab, var(--neon-rose) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-rose) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-cyan{ --sr-ac: var(--color-ion-cyan); --sr-tint: color-mix(in oklab, var(--color-ion-cyan) 8%, transparent); --sr-glow: color-mix(in oklab, var(--color-ion-cyan) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-green{ --sr-ac: var(--mitre-covered); --sr-tint: color-mix(in oklab, var(--mitre-covered) 8%, transparent); --sr-glow: color-mix(in oklab, var(--mitre-covered) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-amber{ --sr-ac: var(--warning); --sr-tint: color-mix(in oklab, var(--warning) 8%, transparent); --sr-glow: color-mix(in oklab, var(--warning) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-violet{ --sr-ac: var(--sev-info); --sr-tint: color-mix(in oklab, var(--sev-info) 9%, transparent); --sr-glow: color-mix(in oklab, var(--sev-info) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-coral{ --sr-ac: var(--neon-orange); --sr-tint: color-mix(in oklab, var(--neon-orange) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-orange) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-pink{ --sr-ac: var(--neon-pink); --sr-tint: color-mix(in oklab, var(--neon-pink) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-pink) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-teal{ --sr-ac: var(--neon-teal); --sr-tint: color-mix(in oklab, var(--neon-teal) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-teal) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-ice{ --sr-ac: var(--neon-sky); --sr-tint: color-mix(in oklab, var(--neon-sky) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-sky) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-steel{ --sr-ac: var(--text-secondary); --sr-tint: color-mix(in oklab, var(--text-secondary) 8%, transparent); --sr-glow: color-mix(in oklab, var(--text-secondary) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-lime{ --sr-ac: var(--neon-lime); --sr-tint: color-mix(in oklab, var(--neon-lime) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-lime) 35%, transparent); }
+body[data-page="soc_roles"] .sr-c-rose{ --sr-ac: var(--neon-rose); --sr-tint: color-mix(in oklab, var(--neon-rose) 8%, transparent); --sr-glow: color-mix(in oklab, var(--neon-rose) 35%, transparent); }
 
 @media (prefers-reduced-motion: reduce) {
-  .sr-role, .sr-detail { transition: none; }
+  body[data-page="soc_roles"] .sr-role, body[data-page="soc_roles"] .sr-detail{ transition: none; }
 }
 
 /* ── document_analysis.html ─────────────────────────────────── */
 /* JS toggles .dw-hidden (not Tailwind .hidden). Combined selectors so daisyUI
    .alert / .card display values cannot win on source order. */
-.dw-hidden { display: none; }
-#disabled-banner.dw-hidden,
-#da-custom-wrap.dw-hidden,
-#da-progress-card.dw-hidden,
-#da-result-card.dw-hidden { display: none; }
+body[data-page="document_analysis"] .dw-hidden{ display: none; }
+body[data-page="document_analysis"] #disabled-banner.dw-hidden, body[data-page="document_analysis"] #da-custom-wrap.dw-hidden, body[data-page="document_analysis"] #da-progress-card.dw-hidden, body[data-page="document_analysis"] #da-result-card.dw-hidden{ display: none; }
 
 /* ── briefings.html ─────────────────────────────────── */
   /* JS toggles .present-hidden on #present-overlay and .present-active on
      body. Neither is a daisyUI state, so these rules stay. */
-  #present-overlay { display: flex; }
-  #present-overlay.present-hidden { display: none; }
-  body.present-active { overflow: hidden; }
+  body[data-page="briefings"] #present-overlay{ display: flex; }
+  body[data-page="briefings"] #present-overlay.present-hidden{ display: none; }
+  body[data-page="briefings"].present-active{ overflow: hidden; }
+
+/* ── architecture.html ─────────────────────────────────── */
+/* Full-viewport tool chrome. Not a daisyUI layout. */
+body[data-page="architecture"] .arch-page-wrap{
+    width: 100%;
+    padding: 0.75rem 1rem 1rem;
+    box-sizing: border-box;
+    height: calc(100vh - 60px);
+    display: flex;
+    flex-direction: column;
+}
+body[data-page="architecture"] .arch-main-content{
+    display: flex;
+    flex: 1;
+    gap: 1rem;
+    overflow: hidden;
+    min-height: 0;
+}
+body[data-page="architecture"] .arch-sidebar{
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+}
+
+/* JS toggles .active on .workflow-card, not a daisyUI selected state. */
+body[data-page="architecture"] .workflow-card.active{
+    border-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 6%, var(--color-base-200));
+    box-shadow: inset 0 0 10px color-mix(in oklab, var(--color-primary) 5%, transparent);
+}
+body[data-page="architecture"] .workflow-card.active .step-dot{ background: var(--color-primary); }
+body[data-page="architecture"] .step-dot{
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--color-base-300);
+}
+
+/* Diagram canvas — JS positions #main-hub / .arch-node via element.style. */
+body[data-page="architecture"] .arch-diagram-viewport{
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    min-height: 0;
+}
+body[data-page="architecture"] .arch-diagram-container{
+    position: relative;
+    min-width: 950px;
+    min-height: 850px;
+    width: 100%;
+    height: 100%;
+    background-image: radial-gradient(color-mix(in oklab, var(--color-base-content) 12%, transparent) 1px, transparent 1px);
+    background-size: 40px 40px;
+}
+body[data-page="architecture"] .arch-svg{
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+}
+body[data-page="architecture"] .arch-hub{
+    position: absolute;
+    z-index: 10;
+    width: 120px;
+    height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+body[data-page="architecture"] .hub-inner{
+    width: 84px;
+    height: 84px;
+    background: var(--color-base-100);
+    border: 2px solid var(--color-primary);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px color-mix(in oklab, var(--color-primary) 30%, transparent);
+    position: relative;
+}
+body[data-page="architecture"] .hub-title{
+    font-weight: 900;
+    color: var(--color-primary);
+    font-size: 1rem;
+    letter-spacing: 2px;
+}
+body[data-page="architecture"] .hub-pulse{
+    position: absolute;
+    inset: -8px;
+    border: 1.5px solid var(--color-primary);
+    border-radius: 50%;
+    opacity: 0;
+    animation: hub-ping 2.5s ease-out infinite;
+}
+body[data-page="architecture"] .hub-pulse.p2{ animation-delay: 1.25s; }
+@keyframes hub-ping {
+    0%   { transform: scale(0.85); opacity: 0.6; }
+    100% { transform: scale(1.4);  opacity: 0; }
+}
+
+/* JS innerHTML: .arch-node / .node-card / .node-icon / .node-name */
+body[data-page="architecture"] .arch-node{
+    position: absolute;
+    z-index: 5;
+    transition: transform 0.3s ease, left 0.6s cubic-bezier(0.4, 0, 0.2, 1), top 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s;
+    cursor: pointer;
+}
+body[data-page="architecture"] .node-card{
+    width: 106px;
+    padding: 10px 8px;
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.25rem);
+    text-align: center;
+    transition: all 0.3s;
+}
+body[data-page="architecture"] .arch-node.highlight .node-card{
+    border-color: var(--color-primary);
+    box-shadow: 0 0 15px color-mix(in oklab, var(--color-primary) 10%, transparent);
+    transform: translateY(-5px);
+}
+body[data-page="architecture"] .arch-node.dimmed{ opacity: 0.15; filter: grayscale(0.5); }
+body[data-page="architecture"] .node-icon{
+    font-size: 1.05rem;
+    margin-bottom: 4px;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+body[data-page="architecture"] .node-name{
+    font-size: 0.68rem;
+    font-weight: bold;
+    color: var(--color-base-content);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body[data-page="architecture"] .arch-node.highlight .node-icon i{ color: var(--color-primary); }
+body[data-page="architecture"] .arch-node.highlight .node-name{ color: var(--color-primary); }
+
+/* SVG connections and packets — JS sets stroke attrs and .active-line */
+body[data-page="architecture"] .arch-conn{ fill: none; stroke-linecap: round; transition: stroke 0.6s, stroke-opacity 0.6s, stroke-width 0.4s; }
+body[data-page="architecture"] .arch-conn.active-line{ stroke-dasharray: 6 4; animation: arch-dash 1.2s linear infinite; }
+@keyframes arch-dash { to { stroke-dashoffset: -20; } }
+body[data-page="architecture"] .arch-packet{ fill: var(--color-primary); filter: drop-shadow(0 0 4px var(--color-primary)); }
+
+/* JS innerHTML: .ring-label plus hashed top offsets */
+body[data-page="architecture"] .ring-label{
+    position: absolute;
+    font-size: 0.52rem;
+    font-weight: bold;
+    color: var(--color-base-content);
+    text-transform: uppercase;
+    letter-spacing: 5px;
+    opacity: 0.12;
+    pointer-events: none;
+    width: 100%;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    body[data-page="architecture"] .arch-main-content{ flex-direction: column; }
+    body[data-page="architecture"] .arch-sidebar{ width: 100%; flex-direction: row; overflow-x: auto; overflow-y: hidden; flex-shrink: 0; max-height: 120px; }
+    body[data-page="architecture"] .workflow-card{ min-width: 200px; flex-shrink: 0; }
+    body[data-page="architecture"] .arch-sidebar-footer{ display: none; }
+}
+
+/* ── briefing.html ─────────────────────────────────── */
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+body[data-page="briefing"] .brf-headlines{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:0.75rem;margin-bottom:1.25rem}
+/* 900px is not a Tailwind breakpoint. */
+body[data-page="briefing"] .brf-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+@media (max-width: 900px){body[data-page="briefing"] .brf-grid{grid-template-columns:1fr}}
+@media (max-width: 768px) {
+    body[data-page="briefing"] .brf-headlines{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 480px) {
+    body[data-page="briefing"] .brf-headlines{ gap: 0.5rem; }
+}
+
+/* ── bug_reports.html ─────────────────────────────────── */
+/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
+body[data-page="bug_reports"] #bugs-table td.loading{
+    display: table-cell;
+    aspect-ratio: auto;
+    width: auto;
+    height: auto;
+    background: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.6;
+}
+
+/* ── canaries.html ─────────────────────────────────── */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+body[data-page="canaries"] #can-modal-bg.show{
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="canaries"] #can-modal-bg.show > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 640px;
+    max-height: 90vh;
+}
+
+/* JS adds .fired on hit rows — inset critical stripe has no daisyUI equivalent. */
+body[data-page="canaries"] #can-content tr.fired td{
+    background: color-mix(in oklab, var(--color-error) 6%, transparent);
+}
+body[data-page="canaries"] #can-content tr.fired td:first-child{
+    box-shadow: inset 3px 0 0 var(--color-error);
+}
+
+/* JS can-value: 280px ellipsis cap is not a daisyUI token. */
+body[data-page="canaries"] .can-value{
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.75rem;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* JS snippet: max-height 80px is not a compiled utility. */
+body[data-page="canaries"] .can-hit-snippet{
+    max-height: 80px;
+    overflow: auto;
+}
+
+/* JS status classes inactive/retired — daisyUI badges have no dimmed slot. */
+body[data-page="canaries"] .badge.inactive, body[data-page="canaries"] .badge.retired{
+    opacity: 0.5;
+}
+
+@media (max-width: 768px) {
+    body[data-page="canaries"] .can-value{ max-width: 160px; font-size: 0.7rem; }
+    body[data-page="canaries"] #can-modal-bg.show > .modal-box{ max-height: 95vh; }
+}
+
+/* ── change_requests.html ─────────────────────────────────── */
+/* JS innerHTML uses class="loading" as a text placeholder, not daisyUI's spinner. */
+body[data-page="change_requests"] #crs-table td.loading{
+    display: table-cell;
+    aspect-ratio: auto;
+    width: auto;
+    height: auto;
+    background: none;
+    mask-image: none;
+    -webkit-mask-image: none;
+    text-align: center;
+    padding: 2rem;
+    opacity: 0.6;
+}
+
+/* JS toggles .dw-hidden on .cr-upgrade-only (not Tailwind .hidden). */
+body[data-page="change_requests"] .dw-hidden, body[data-page="change_requests"] .cr-upgrade-only.dw-hidden{ display: none; }
+
+/* JS innerHTML wraps row actions in .cr-act; no daisyUI equivalent on a JS-emitted class. */
+body[data-page="change_requests"] .cr-act{ display: flex; gap: 0.35rem; flex-wrap: wrap; }
+
+/* ── compliance.html ─────────────────────────────────── */
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+body[data-page="compliance"] .cmp-fw-list{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+/* JS toggles .selected on framework cards — daisyUI card has no selected slot.
+   Left accent stripe and hover lift have no daisyUI equivalent. */
+body[data-page="compliance"] .cmp-fw{
+    cursor: pointer;
+    border-left: 4px solid var(--color-base-300);
+    transition: transform .12s, border-color .12s;
+}
+body[data-page="compliance"] .cmp-fw:hover{
+    transform: translateY(-2px);
+    border-color: var(--color-primary);
+}
+body[data-page="compliance"] .cmp-fw.selected{
+    border-left-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 6%, var(--color-base-200));
+}
+
+/* JS-computed bar width/colour via data-ion-style; fill height is not a compiled utility. */
+body[data-page="compliance"] .cmp-fw-bar{
+    height: 4px;
+    background: color-mix(in oklab, var(--color-base-content) 12%, transparent);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+body[data-page="compliance"] .cmp-fw-bar-fill{ height: 100%; }
+
+/* ── daily_standup_slides.html ─────────────────────────────────── */
+  /* Hashed _ion-s-* rules in ion-migrated-styles.css read these tokens. */
+  body[data-page="daily_standup_slides"]{
+    --deck-bg-1: #0a0e14;
+    --deck-bg-2: #0d121b;
+    --deck-text:    #e2e8f0;
+    --deck-muted:   #94a3b8;
+    --deck-dim:     #64748b;
+    --deck-faint:   #475569;
+    --deck-line:    rgba(148, 163, 184, 0.10);
+    --deck-card:    rgba(15, 23, 42, 0.55);
+    --ion-cyan:    #6de4ff;
+    --ion-iris:    #a78bfa;
+    --ion-coral:   #f87171;
+    --ion-amber:   #fbbf24;
+    --ion-emerald: #4ade80;
+  }
+  body[data-page="daily_standup_slides"]{ background: var(--deck-bg-1); }
+  /* JS adds .presenting; daisyUI cannot hide the inherited chrome. */
+  body[data-page="daily_standup_slides"].presenting nav, body[data-page="daily_standup_slides"].presenting header{ display: none !important; }
+  body[data-page="daily_standup_slides"].presenting main, body[data-page="daily_standup_slides"].presenting [class*="ion-tw-page"]{ padding: 0 !important; }
+
+  /* Dual radial wash + masked grid. No Tailwind utility covers ::before. */
+  body[data-page="daily_standup_slides"] .deck-host{
+    background:
+      radial-gradient(circle at 15% 12%, rgba(109,228,255,0.06) 0%, transparent 45%),
+      radial-gradient(circle at 88% 90%, rgba(167,139,250,0.05) 0%, transparent 45%),
+      linear-gradient(180deg, var(--deck-bg-1) 0%, var(--deck-bg-2) 100%);
+  }
+  body[data-page="daily_standup_slides"] .deck-host::before{
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--deck-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--deck-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    opacity: 0.55;
+    mask-image: radial-gradient(circle at center, black 50%, transparent 100%);
+  }
+
+  /* Brand mark glow — gradient fill + box-shadow, not a daisyUI component. */
+  body[data-page="daily_standup_slides"] .deck-brand-mark, body[data-page="daily_standup_slides"] .deck-brand-big{
+    background: linear-gradient(135deg, var(--ion-cyan) 0%, var(--ion-iris) 100%);
+  }
+  body[data-page="daily_standup_slides"] .deck-brand-mark{ box-shadow: 0 0 24px -6px rgba(109,228,255,0.45); }
+  body[data-page="daily_standup_slides"] .deck-brand-big{
+    box-shadow:
+      0 0 80px -10px rgba(109,228,255,0.55),
+      0 0 40px -8px rgba(167,139,250,0.35);
+  }
+
+  /* JS toggles .hidden on a flex slide; equal-specificity utilities fight. */
+  body[data-page="daily_standup_slides"] .deck-slide.hidden{ display: none; }
+
+  /* Slide geometry lives here, NOT in Tailwind arbitrary values.
+     This project serves a prebuilt stylesheet, so an arbitrary utility
+     that is not already compiled into it silently resolves to nothing.
+     pt-[14vh] exists in the build and pt-[12vh] does not, so changing
+     the number in the class name set the padding to 0 and dropped the
+     slide title behind the ION header. Failing silently like that is
+     worth avoiding on the one screen a room is reading, hence plain
+     CSS for anything load-bearing. */
+  body[data-page="daily_standup_slides"] .deck-slide{
+    /* Centre the column vertically. This is a no-op on slides that
+       contain a .deck-body, because that child is flex:1 and already
+       eats the free space -- so tables stay top-aligned and grow, while
+       KPI-only slides (backlog, case status, log sources) stop sitting
+       in the top third above two-thirds of dead screen. */
+    justify-content: center;
+    padding: 12vh 6vw;
+    /* Reserve the footer chrome (progress dots, counter, controls) so a
+       long table can never run underneath it. */
+    padding-bottom: 13vh;
+  }
+  body[data-page="daily_standup_slides"] .deck-slide.title-slide{ padding: 0; }
+  /* The body region takes whatever the heading leaves. min-h-0 is what
+     lets a flex child shrink rather than forcing its parent taller. */
+  body[data-page="daily_standup_slides"] .deck-body{ display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
+  body[data-page="daily_standup_slides"] .deck-tablebox{ min-height: 0; flex: 1 1 auto; overflow: auto; }
+  body[data-page="daily_standup_slides"] .deck-more{ margin-top: 1.2vh; }
+  body[data-page="daily_standup_slides"] .deck-h-gap{ height: 2.5vh; flex-shrink: 0; }
+  body[data-page="daily_standup_slides"] .deck-h-title{ margin-bottom: 2.5vh; flex-shrink: 0; }
+  body[data-page="daily_standup_slides"] .deck-h-row{
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 4vw; flex-shrink: 0;
+  }
+  body[data-page="daily_standup_slides"] .deck-h-row .deck-h-title{ margin-bottom: 0; }
+  body[data-page="daily_standup_slides"] .deck-kpi{ text-align: right; flex-shrink: 0; }
+  body[data-page="daily_standup_slides"] .deck-kpi-value{
+    font-size: clamp(40px, 6vw, 80px); line-height: 1; font-weight: 600;
+  }
+  body[data-page="daily_standup_slides"] .deck-kpi-label{
+    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--deck-dim); margin-top: 0.4vh;
+  }
+
+  /* Title-slide wordmark uses background-clip text. */
+  body[data-page="daily_standup_slides"] .deck-slide.title-slide .deck-title{
+    background: linear-gradient(180deg, #f8fafc 0%, #94a3b8 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* JS toggles .active / .passed on these dots. */
+  body[data-page="daily_standup_slides"] .deck-progress-dot{
+    width: 24px; height: 3px; border-radius: 2px;
+    background: rgba(148, 163, 184, 0.18); transition: background 0.25s;
+  }
+  body[data-page="daily_standup_slides"] .deck-progress-dot.active{ background: linear-gradient(90deg, var(--ion-cyan), var(--ion-iris)); }
+  body[data-page="daily_standup_slides"] .deck-progress-dot.passed{ background: rgba(148, 163, 184, 0.45); }
+
+/* ── daily_work.html ─────────────────────────────────── */
+  /* JS toggles .dw-hidden (not Tailwind .hidden / daisyUI .modal-open).
+     Combined selectors so daisyUI .modal { display:grid } and .btn { display:inline-flex }
+     cannot win on source order the way .dw-modal-overlay once did. */
+  body[data-page="daily_work"] .dw-hidden{ display: none; }
+  body[data-page="daily_work"] #dw-modal.dw-hidden, body[data-page="daily_work"] #dw-edit-delete.dw-hidden{ display: none; }
+
+  /* JS openModal()/closeModal() toggle .dw-hidden, not daisyUI .modal-open. Bridge the two. */
+  body[data-page="daily_work"] #dw-modal:not(.dw-hidden){
+    display: grid;
+    place-items: center;
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+  }
+  body[data-page="daily_work"] #dw-modal:not(.dw-hidden) > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    width: 380px;
+    max-width: 92vw;
+  }
+
+  /* JS toggles .on on the join buttons, not daisyUI .btn-active. */
+  body[data-page="daily_work"] #dw-toggle button.on, body[data-page="daily_work"] #dw-modetoggle button.on{
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    font-weight: 600;
+    border-color: var(--color-primary);
+  }
+
+  /* 1fr + 300px sidebar at 880px — not a daisyUI/Tailwind breakpoint. */
+  body[data-page="daily_work"] .dw-split{ display: grid; grid-template-columns: 1fr 300px; gap: 18px; align-items: start; }
+  @media (max-width: 880px) { body[data-page="daily_work"] .dw-split{ grid-template-columns: 1fr; } }
+
+  /* JS renderMetrics() emits .ion-metric tiles, not daisyUI .stat. */
+  body[data-page="daily_work"] #dw-metrics .ion-metric{
+    display: inline-grid;
+    width: 100%;
+    padding: 1rem 1.25rem;
+    background: transparent;
+  }
+  body[data-page="daily_work"] #dw-metrics .ion-metric-label{ font-size: 0.75rem; opacity: 0.6; }
+  body[data-page="daily_work"] #dw-metrics .ion-metric-value{
+    font-size: 1.75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  body[data-page="daily_work"] .dw-v-cyan{ color: var(--color-primary); }
+  body[data-page="daily_work"] .dw-v-green{ color: var(--color-success); }
+
+  body[data-page="daily_work"] .dw-empty{ opacity: 0.6; font-size: 13px; padding: 12px 2px; }
+  body[data-page="daily_work"] .dw-src{
+    font-size: 10px;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    margin-left: 6px;
+  }
+
+  /* timeline dot colours — JS sets dw-dot-* on .ion-ev-dot */
+  body[data-page="daily_work"] .dw-dot-red{ background: var(--color-error); }
+  body[data-page="daily_work"] .dw-dot-green{ background: var(--color-success); }
+  body[data-page="daily_work"] .dw-dot-amber{ background: var(--color-warning); }
+  body[data-page="daily_work"] .dw-dot-cyan{ background: var(--color-primary); }
+  body[data-page="daily_work"] .dw-dot-purple{ background: var(--color-secondary); }
+  body[data-page="daily_work"] .dw-dot-blue{ background: var(--neon-blue, #60a5fa); }
+  body[data-page="daily_work"] .dw-dot-muted{ background: color-mix(in oklab, var(--color-base-content) 40%, transparent); }
+
+  /* team board — JS emits .dw-row divs, not <tr>, so this cannot be table/table-sm */
+  body[data-page="daily_work"] .dw-board-head, body[data-page="daily_work"] .dw-row{
+    display: grid;
+    grid-template-columns: 1.5fr 2fr 1.3fr 0.7fr;
+    gap: 10px;
+    align-items: center;
+  }
+  body[data-page="daily_work"] .dw-board-head{
+    padding: 0 13px 8px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    opacity: 0.6;
+  }
+  body[data-page="daily_work"] .dw-row{
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+    padding: 11px 13px;
+    margin-bottom: 7px;
+  }
+  body[data-page="daily_work"] .dw-ta-right{ text-align: right; }
+  body[data-page="daily_work"] .dw-who{ display: flex; align-items: center; gap: 9px; }
+  body[data-page="daily_work"] .dw-who-name{ font-size: 13px; }
+  body[data-page="daily_work"] .dw-who-sub{ font-size: 11px; }
+  body[data-page="daily_work"] .dw-now{ font-size: 12px; }
+  body[data-page="daily_work"] .dw-now-empty{ opacity: 0.6; }
+  body[data-page="daily_work"] .dw-cnt{ font-size: 12px; opacity: 0.8; }
+  body[data-page="daily_work"] .dw-num-cyan{ color: var(--color-primary); }
+  body[data-page="daily_work"] .dw-num-green{ color: var(--color-success); }
+  body[data-page="daily_work"] .dw-last{ font-size: 11px; opacity: 0.6; }
+
+  /* day calendar — custom hour grid; JS querySelector hooks .dw-hour-slot / .dw-cal-item */
+  body[data-page="daily_work"] .dw-calendar{
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+    max-height: 560px;
+    overflow-y: auto;
+    background: var(--color-base-200);
+  }
+  body[data-page="daily_work"] .dw-hour{
+    display: grid;
+    grid-template-columns: 56px 1fr;
+    border-bottom: 1px solid var(--color-base-300);
+    min-height: 38px;
+  }
+  body[data-page="daily_work"] .dw-hour:last-child{ border-bottom: none; }
+  body[data-page="daily_work"] .dw-hour-label{
+    font-size: 11px;
+    opacity: 0.6;
+    padding: 6px 8px;
+    text-align: right;
+    border-right: 1px solid var(--color-base-300);
+    font-family: var(--font-mono, ui-monospace, monospace);
+  }
+  body[data-page="daily_work"] .dw-hour-slot{ padding: 4px 6px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; }
+  body[data-page="daily_work"] .dw-hour-slot:hover{ background: var(--color-base-300); }
+  body[data-page="daily_work"] .dw-hour-now{ box-shadow: inset 2px 0 0 var(--color-primary); }
+  body[data-page="daily_work"] .dw-cal-item{
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 6px;
+    border-radius: 5px;
+    background: var(--color-base-300);
+    border: 1px solid var(--color-base-300);
+    font-size: 12.5px;
+  }
+  body[data-page="daily_work"] .dw-cal-item.dw-editable{ cursor: pointer; }
+  body[data-page="daily_work"] .dw-cal-item.dw-editable:hover{ border-color: var(--color-primary); }
+  body[data-page="daily_work"] .dw-cal-time{
+    font-size: 10.5px;
+    opacity: 0.6;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    flex: 0 0 auto;
+  }
+  body[data-page="daily_work"] .dw-cal-text{ opacity: 0.85; }
+  body[data-page="daily_work"] .dw-cal-auto{
+    margin-left: auto;
+    font-size: 9.5px;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    flex: 0 0 auto;
+  }
+  body[data-page="daily_work"] .dw-cal-edit{ margin-left: auto; font-size: 10px; opacity: 0.6; flex: 0 0 auto; }
+
+/* ── data_flow.html ─────────────────────────────────── */
+/* JS rewrites className on these controls (strips any daisyUI btn/join-item). */
+body[data-page="data_flow"] .df-toggle-btn{
+    padding: 0.5rem 1rem;
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--color-base-300);
+    cursor: pointer;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    transition: background-color .2s, color .2s, border-color .2s;
+}
+body[data-page="data_flow"] .df-toggle-btn:first-child{ border-radius: var(--radius-field, 0.25rem) 0 0 var(--radius-field, 0.25rem); }
+body[data-page="data_flow"] .df-toggle-btn:last-child{ border-radius: 0 var(--radius-field, 0.25rem) var(--radius-field, 0.25rem) 0; }
+body[data-page="data_flow"] .df-toggle-btn:not(:first-child){ margin-left: -1px; }
+body[data-page="data_flow"] .df-toggle-btn.active-legacy{
+    background: var(--color-error);
+    color: var(--color-error-content);
+    border-color: var(--color-error);
+}
+body[data-page="data_flow"] .df-toggle-btn.active-modern{
+    background: var(--color-success);
+    color: var(--color-success-content);
+    border-color: var(--color-success);
+}
+body[data-page="data_flow"] .df-toggle-btn.active-compare{
+    background: var(--color-info);
+    color: var(--color-info-content);
+    border-color: var(--color-info);
+}
+body[data-page="data_flow"] .df-toggle-btn:hover:not(.active-legacy):not(.active-modern):not(.active-compare){
+    color: var(--color-base-content);
+    background: var(--color-base-300);
+}
+
+/* JS rewrites className on pipeline nodes. Scale on the selected node is not a daisyUI state. */
+body[data-page="data_flow"] .df-node-btn{
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-box, 0.5rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-base-300);
+    cursor: pointer;
+    transition: all .2s;
+    background: var(--color-base-100);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+body[data-page="data_flow"] .df-node-btn:hover{ background: var(--color-base-300); }
+body[data-page="data_flow"] .df-node-btn.selected-legacy{
+    background: var(--color-error);
+    color: var(--color-error-content);
+    transform: scale(1.1);
+    border-color: var(--color-error);
+}
+body[data-page="data_flow"] .df-node-btn.selected-modern{
+    background: var(--color-success);
+    color: var(--color-success-content);
+    transform: scale(1.1);
+    border-color: var(--color-success);
+}
+body[data-page="data_flow"] .df-node-label{
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    transition: color .2s;
+}
+body[data-page="data_flow"] .df-node-label.selected{ color: var(--color-base-content); }
+
+/* JS innerHTML: #df-content-panel title / payload / notes. */
+body[data-page="data_flow"] .df-content-title{
+    font-size: 12px;
+    font-weight: 800;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+body[data-page="data_flow"] .df-content-title i{ color: var(--color-info); }
+body[data-page="data_flow"] .df-code-block{
+    background: var(--color-base-200);
+    border-radius: var(--radius-box, 0.5rem);
+    padding: 1.5rem;
+    border: 1px solid var(--color-base-300);
+}
+body[data-page="data_flow"] .df-code-block pre{
+    font-family: ui-monospace, monospace;
+    font-size: 11px;
+    color: var(--color-info);
+    overflow-x: auto;
+    white-space: pre;
+    line-height: 1.6;
+    margin: 0;
+}
+body[data-page="data_flow"] .df-notes{
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--color-base-200);
+    border-radius: var(--radius-box, 0.5rem);
+    border: 1px solid var(--color-base-300);
+    display: flex;
+    gap: 1rem;
+}
+body[data-page="data_flow"] .df-note-col{ flex: 1; }
+body[data-page="data_flow"] .df-note-col + .df-note-col{
+    border-left: 1px solid var(--color-base-300);
+    padding-left: 1rem;
+}
+body[data-page="data_flow"] .df-note-col h4{
+    font-size: 9px;
+    font-weight: 800;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 4px;
+}
+body[data-page="data_flow"] .df-note-col p{
+    font-size: 12px;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    margin: 0;
+    font-style: italic;
+}
+body[data-page="data_flow"] .df-note-col p.bright{
+    color: var(--color-base-content);
+    font-style: normal;
+}
+
+/* JS innerHTML: Windows Event Viewer replica — literal Windows chrome, not ION theme. */
+body[data-page="data_flow"] .df-winlog{ border: 2px solid #555; border-radius: 3px; overflow: hidden; font-size: 12px; }
+body[data-page="data_flow"] .df-winlog-titlebar{ background: #005a9e; color: #fff; padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 12px; }
+body[data-page="data_flow"] .df-winlog-titlebar .dots{ display: flex; gap: 3px; }
+body[data-page="data_flow"] .df-winlog-titlebar .dot{ width: 12px; height: 12px; background: #ccc; border: 1px solid #999; }
+body[data-page="data_flow"] .df-winlog-titlebar .dot.red{ background: #ef4444; }
+body[data-page="data_flow"] .df-winlog-body{ background: #fff; color: #000; padding: 16px; max-height: 260px; overflow-y: auto; line-height: 1.5; }
+body[data-page="data_flow"] .df-winlog-body h4{ font-size: 13px; margin: 0 0 6px; padding-bottom: 6px; border-bottom: 1px solid #ddd; }
+body[data-page="data_flow"] .df-winlog-row{ display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #f0f0f0; font-size: 12px; }
+body[data-page="data_flow"] .df-winlog-row .lbl{ color: #666; }
+body[data-page="data_flow"] .df-winlog-row .val{ font-weight: 600; }
+body[data-page="data_flow"] .df-winlog-detail{ margin-top: 12px; padding: 10px; background: #eff6ff; border: 1px solid #bfdbfe; font-size: 12px; }
+body[data-page="data_flow"] .df-winlog-detail p{ margin: 2px 0; padding-left: 10px; }
+body[data-page="data_flow"] .df-winlog-detail .hl-blue{ color: #1d4ed8; font-weight: 700; }
+body[data-page="data_flow"] .df-winlog-detail .hl-orange{ color: #c2410c; font-weight: 700; }
+body[data-page="data_flow"] .df-winlog-section{ font-weight: 700; margin: 8px 0 4px; padding-left: 0; }
+
+/* JS innerHTML: Elastic Security mock + table/JSON toggle. */
+body[data-page="data_flow"] .df-kibana{
+    background: var(--color-base-100);
+    border-radius: var(--radius-box, 0.5rem);
+    border: 1px solid var(--color-base-300);
+    overflow: hidden;
+}
+body[data-page="data_flow"] .df-kibana-header{
+    background: var(--color-base-200);
+    padding: 10px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-base-300);
+}
+body[data-page="data_flow"] .df-kibana-header span{
+    font-size: 10px;
+    font-weight: 700;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-style: italic;
+}
+body[data-page="data_flow"] .df-kibana-toggle{
+    display: flex;
+    background: var(--color-base-100);
+    border-radius: var(--radius-field, 0.25rem);
+    padding: 2px;
+    border: 1px solid var(--color-base-300);
+}
+body[data-page="data_flow"] .df-kibana-toggle button{
+    padding: 4px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    border: none;
+    border-radius: var(--radius-field, 0.25rem);
+    cursor: pointer;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+body[data-page="data_flow"] .df-kibana-toggle button.active{
+    background: var(--color-info);
+    color: var(--color-info-content);
+}
+body[data-page="data_flow"] .df-kibana-body{ padding: 16px; }
+body[data-page="data_flow"] .df-kib-table{ width: 100%; }
+body[data-page="data_flow"] .df-kib-table thead th{
+    font-size: 9px;
+    font-weight: 700;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    text-transform: uppercase;
+    text-align: left;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-base-300);
+}
+body[data-page="data_flow"] .df-kib-table tbody td{
+    font-size: 11px;
+    padding: 10px 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+    vertical-align: middle;
+}
+body[data-page="data_flow"] .df-kib-missing{
+    color: var(--color-error);
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+body[data-page="data_flow"] .df-kib-present{ color: var(--color-success); font-weight: 700; }
+body[data-page="data_flow"] .df-kib-json{
+    background: var(--color-base-200);
+    padding: 16px;
+    border-radius: var(--radius-field, 0.25rem);
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    color: var(--color-info);
+    max-height: 200px;
+    overflow-y: auto;
+    white-space: pre;
+    border: 1px solid var(--color-base-300);
+}
+body[data-page="data_flow"] .df-kib-alert{
+    margin-top: 16px;
+    padding: 10px;
+    background: color-mix(in oklab, var(--color-error) 10%, transparent);
+    border: 1px solid color-mix(in oklab, var(--color-error) 25%, transparent);
+    border-radius: var(--radius-field, 0.25rem);
+}
+body[data-page="data_flow"] .df-kib-alert p{ font-size: 10px; color: var(--color-error); margin: 0; line-height: 1.5; }
+
+/* JS rewrites className on status labels and bar fills (also sets bar width via element.style). */
+body[data-page="data_flow"] .df-metric-status{ font-weight: 700; }
+body[data-page="data_flow"] .df-metric-status.fail{ color: var(--color-error); }
+body[data-page="data_flow"] .df-metric-status.success{ color: var(--color-success); }
+body[data-page="data_flow"] .df-metric-status.warn{ color: var(--color-warning); }
+body[data-page="data_flow"] .df-metric-status.info{ color: var(--color-info); }
+body[data-page="data_flow"] .df-bar-fill{ height: 100%; border-radius: 4px; transition: width .8s ease; }
+body[data-page="data_flow"] .df-bar-fill.red{ background: var(--color-error); }
+body[data-page="data_flow"] .df-bar-fill.green{ background: var(--color-success); }
+body[data-page="data_flow"] .df-bar-fill.orange{ background: var(--color-warning); }
+body[data-page="data_flow"] .df-bar-fill.blue{ background: var(--color-info); }
+
+/* ── de_bob.html ─────────────────────────────────── */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+body[data-page="de_bob"] #bb-draft-overlay.show{
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="de_bob"] #bb-draft-overlay.show > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 720px;
+    max-height: 92vh;
+}
+
+/* ── de_metrics.html ─────────────────────────────────── */
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+body[data-page="de_metrics"] .de-stats{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+/* Compiled ion.css has no basis-full / md:basis-auto. Wrap the copy to a full
+   row below md so it cannot shrink beside the period controls. */
+@media (max-width: 767px) {
+  body[data-page="de_metrics"] .de-hero{ flex-basis: 100%; }
+}
+
+/* ── de_proposals.html ─────────────────────────────────── */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+body[data-page="de_proposals"] #dp-edit-overlay.show, body[data-page="de_proposals"] #dp-decide-overlay.show{
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="de_proposals"] #dp-edit-overlay.show > .modal-box, body[data-page="de_proposals"] #dp-decide-overlay.show > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 560px;
+    max-height: 90vh;
+}
+
+/* ── de_quirks.html ─────────────────────────────────── */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+body[data-page="de_quirks"] #qk-raise-overlay.show{
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="de_quirks"] #qk-raise-overlay.show > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 600px;
+    max-height: 92vh;
+}
+
+/* ── detection_health.html ─────────────────────────────────── */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+body[data-page="detection_health"] #dh-modal-overlay.show{
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="detection_health"] #dh-modal-overlay.show > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 520px;
+}
+
+/* JS-computed bar width/colour via data-w / data-c — no daisyUI equivalent. */
+body[data-page="detection_health"] .dh-bar{display:inline-block;height:10px;border-radius:3px;background:color-mix(in oklab, var(--color-base-content) 12%, transparent);width:70px;vertical-align:middle;overflow:hidden;margin-right:6px}
+body[data-page="detection_health"] .dh-bar-fill{display:block;height:100%;border-radius:3px}
+
+/* ── entity_timeline.html ─────────────────────────────────── */
+/* JS innerHTML: entity header after search. Not daisyUI card markup. */
+body[data-page="entity_timeline"] .et-header{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+}
+body[data-page="entity_timeline"] .et-entity-value{
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+body[data-page="entity_timeline"] .et-entity-type{
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: var(--radius-selector, 0.25rem);
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+}
+
+/* JS innerHTML: source chips. Colours map onto daisyUI slots
+   (warning = ION amber / case; error = ION coral / triage; info = ION cyan /
+   observable; success = ION lime / enrichment). */
+body[data-page="entity_timeline"] .et-source-badge{
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: var(--radius-selector, 0.25rem);
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    margin-right: 4px;
+}
+body[data-page="entity_timeline"] .et-source-case{
+    background: color-mix(in oklab, var(--color-warning) 15%, transparent);
+    color: var(--color-warning);
+}
+body[data-page="entity_timeline"] .et-source-triage{
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+}
+body[data-page="entity_timeline"] .et-source-observable{
+    background: color-mix(in oklab, var(--color-info) 15%, transparent);
+    color: var(--color-info);
+}
+body[data-page="entity_timeline"] .et-source-enrichment{
+    background: color-mix(in oklab, var(--color-success) 15%, transparent);
+    color: var(--color-success);
+}
+body[data-page="entity_timeline"] .et-source-audit{
+    background: var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+
+/* JS innerHTML: vertical rail + per-source dots via ::before. daisyUI's
+   timeline component needs its own markup, which this script does not emit. */
+body[data-page="entity_timeline"] .et-timeline{ position: relative; padding-left: 32px; }
+body[data-page="entity_timeline"] .et-timeline::before{
+    content: '';
+    position: absolute;
+    left: 11px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: var(--color-base-300);
+}
+
+body[data-page="entity_timeline"] .et-event{
+    position: relative;
+    margin-bottom: 12px;
+    padding: 12px 16px;
+    background: var(--color-base-200);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 0.5rem);
+    transition: border-color .15s;
+}
+body[data-page="entity_timeline"] .et-event:hover{ border-color: var(--color-primary); }
+body[data-page="entity_timeline"] .et-event::before{
+    content: '';
+    position: absolute;
+    left: -26px;
+    top: 16px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--color-base-200);
+    border: 2px solid var(--color-base-300);
+    z-index: 1;
+}
+body[data-page="entity_timeline"] .et-event.source-case::before{
+    border-color: var(--color-warning);
+    background: color-mix(in oklab, var(--color-warning) 15%, transparent);
+}
+body[data-page="entity_timeline"] .et-event.source-triage::before{
+    border-color: var(--color-error);
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+}
+body[data-page="entity_timeline"] .et-event.source-observable::before{
+    border-color: var(--color-info);
+    background: color-mix(in oklab, var(--color-info) 15%, transparent);
+}
+body[data-page="entity_timeline"] .et-event.source-enrichment::before{
+    border-color: var(--color-success);
+    background: color-mix(in oklab, var(--color-success) 15%, transparent);
+}
+body[data-page="entity_timeline"] .et-event.source-audit::before{
+    border-color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    background: var(--color-base-300);
+}
+
+body[data-page="entity_timeline"] .et-event-header{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+body[data-page="entity_timeline"] .et-event-title{
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--color-base-content);
+    flex: 1 1 auto;
+}
+body[data-page="entity_timeline"] .et-event-time{
+    font-size: .72rem;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    font-family: var(--font-mono, ui-monospace, monospace);
+}
+body[data-page="entity_timeline"] .et-event-detail{
+    font-size: .78rem;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    margin-top: 4px;
+    line-height: 1.5;
+}
+body[data-page="entity_timeline"] .et-event-meta{ display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+body[data-page="entity_timeline"] .et-meta-tag{
+    font-size: .68rem;
+    padding: 1px 6px;
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-selector, 0.25rem);
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+
+/* JS innerHTML: loading / error / empty states. */
+body[data-page="entity_timeline"] .et-loading{
+    text-align: center;
+    padding: 60px;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+body[data-page="entity_timeline"] .et-spinner{
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--color-base-300);
+    border-top-color: var(--color-primary);
+    border-radius: 50%;
+    animation: et-spin .8s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+@keyframes et-spin { to { transform: rotate(360deg); } }
+body[data-page="entity_timeline"] .et-empty{
+    text-align: center;
+    padding: 60px;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    font-size: .9rem;
+}
+
+/* JS querySelectorAll('.et-filter') and classList toggles .active, not daisyUI btn-active. */
+body[data-page="entity_timeline"] .et-filters{ display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+body[data-page="entity_timeline"] .et-filter{
+    padding: 4px 12px;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: transparent;
+    color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+    transition: border-color .15s, color .15s, background .15s;
+}
+body[data-page="entity_timeline"] .et-filter:hover{
+    border-color: var(--color-primary);
+    color: var(--color-base-content);
+}
+body[data-page="entity_timeline"] .et-filter.active{
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* ── executive_report.html ─────────────────────────────────── */
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+body[data-page="executive_report"] .er-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+
+@media print{body[data-page="executive_report"] .navbar, body[data-page="executive_report"] .header-actions, body[data-page="executive_report"] .chat-widget, body[data-page="executive_report"] .chat-toggle{display:none!important}body[data-page="executive_report"]{background:#fff;color:#000}body[data-page="executive_report"] .card, body[data-page="executive_report"] .stat{break-inside:avoid;border-color:#ddd}}
+
+/* JS sets .ae-activity-bar height from data-pct; hover .tip has no daisyUI equivalent. */
+body[data-page="executive_report"] .ae-activity-chart{display:flex;align-items:flex-end;gap:2px;height:80px;padding:8px 0}
+body[data-page="executive_report"] .ae-activity-bar{flex:1;min-width:3px;border-radius:2px 2px 0 0;background:var(--color-primary);opacity:.7;position:relative}
+body[data-page="executive_report"] .ae-activity-bar:hover{opacity:1}
+body[data-page="executive_report"] .ae-activity-bar .tip{display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);padding:3px 8px;background:var(--color-base-200);border:1px solid var(--color-base-300);border-radius:4px;font-size:.68rem;white-space:nowrap;z-index:10}
+body[data-page="executive_report"] .ae-activity-bar:hover .tip{display:block}
+
+/* ── investigation_queue.html ─────────────────────────────────── */
+  /* JS innerHTML emits .iq-pill / .iq-mono — cannot restyle those rows
+     without changing the script, which this rewrite must not touch. */
+  body[data-page="investigation_queue"] .iq-pill{
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  body[data-page="investigation_queue"] .iq-pill-tp{ background: rgba(255,108,108,0.15);  color: var(--danger); }
+  body[data-page="investigation_queue"] .iq-pill-fp{ background: rgba(100,116,139,0.2);   color: var(--text-secondary); }
+  body[data-page="investigation_queue"] .iq-pill-benign{ background: rgba(134,240,160,0.15);  color: var(--success); }
+  body[data-page="investigation_queue"] .iq-pill-inc{ background: rgba(248,179,58,0.15);   color: var(--warning); }
+  body[data-page="investigation_queue"] .iq-pill-pending{ background: rgba(154,140,255,0.15);  color: var(--neon-purple); }
+  body[data-page="investigation_queue"] .iq-pill-running{ background: rgba(96,165,250,0.15);   color: var(--neon-blue); }
+  body[data-page="investigation_queue"] .iq-pill-completed{ background: rgba(134,240,160,0.15);  color: var(--success); }
+  body[data-page="investigation_queue"] .iq-pill-failed{ background: rgba(255,108,108,0.15);  color: var(--danger); }
+  body[data-page="investigation_queue"] .iq-pill-sev-low{ background: rgba(148,163,184,0.15); color: var(--text-primary); }
+  body[data-page="investigation_queue"] .iq-pill-sev-medium{ background: rgba(248,179,58,0.15);  color: var(--warning); }
+  body[data-page="investigation_queue"] .iq-pill-sev-high{ background: rgba(240,136,62,0.15);  color: var(--sev-high); }
+  body[data-page="investigation_queue"] .iq-pill-sev-critical{ background: rgba(255,108,108,0.2);   color: var(--danger); }
+  body[data-page="investigation_queue"] .iq-mono{ font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 11px; color: var(--text-secondary); }
+
+/* ── knowledge_graph.html ─────────────────────────────────── */
+/* JS innerHTML: canvas loading / error / empty states. */
+body[data-page="knowledge_graph"] .kg-loading{
+  text-align: center;
+  padding: 60px;
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+body[data-page="knowledge_graph"] .kg-spinner{
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 3px solid var(--color-base-300);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: kg-spin .8s linear infinite;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+@keyframes kg-spin { to { transform: rotate(360deg); } }
+
+/* JS innerHTML: #kg-meta node/edge counts + legend. */
+body[data-page="knowledge_graph"] #kg-meta strong{
+  color: var(--color-base-content);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+body[data-page="knowledge_graph"] .kg-legend{
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+body[data-page="knowledge_graph"] .kg-legend-item{
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: .7rem;
+}
+body[data-page="knowledge_graph"] .kg-legend-dot{
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid var(--color-base-300);
+}
+
+/* JS classList toggles .empty; JS innerHTML injects h3 / .kg-detail-meta / .kg-detail-link. */
+body[data-page="knowledge_graph"] .kg-detail h3{
+  font-size: 1rem;
+  color: var(--color-base-content);
+  margin: 0 0 6px 0;
+}
+body[data-page="knowledge_graph"] .kg-detail-meta{
+  font-size: .72rem;
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+  margin-bottom: 6px;
+}
+body[data-page="knowledge_graph"] .kg-detail-link{
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--color-primary);
+  font-size: .78rem;
+  text-decoration: none;
+}
+body[data-page="knowledge_graph"] .kg-detail-link:hover{ text-decoration: underline; }
+body[data-page="knowledge_graph"] .kg-detail.empty{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: italic;
+  font-size: .82rem;
+}
+
+@media (max-width: 768px) {
+  body[data-page="knowledge_graph"] .kg-legend{ margin-left: 0; width: 100%; }
+}
+
+/* ── log_sources.html ─────────────────────────────────── */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+body[data-page="log_sources"] #ls-modal-bg.show{
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="log_sources"] #ls-modal-bg.show > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-width: 640px;
+    max-height: 90vh;
+}
+
+/* JS adds status classes — five-colour left stripe has no daisyUI equivalent. */
+body[data-page="log_sources"] #ls-content .ls-card{
+    border-left-width: 4px;
+    border-left-style: solid;
+    border-left-color: var(--color-base-300);
+}
+body[data-page="log_sources"] #ls-content .ls-card.healthy{ border-left-color: var(--color-success); }
+body[data-page="log_sources"] #ls-content .ls-card.stale{ border-left-color: var(--color-warning); }
+body[data-page="log_sources"] #ls-content .ls-card.silent{ border-left-color: var(--color-error); }
+body[data-page="log_sources"] #ls-content .ls-card.never{ border-left-color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
+body[data-page="log_sources"] #ls-content .ls-card.error{ border-left-color: var(--sev-high); }
+
+@media (max-width: 768px) {
+    body[data-page="log_sources"] #ls-modal-bg.show > .modal-box{ max-height: 95vh; }
+}
+
+/* ── maturity.html ─────────────────────────────────── */
+/* JS toggles .selected on score buttons — daisyUI btn has no selected slot. */
+body[data-page="maturity"] .mat-q-score button.selected{
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+}
+
+/* Conic-gradient score ring: daisyUI radial-progress needs a CSS custom
+   property set as a raw attribute, which CSP refuses. Geometry and inner
+   disc have no utility equivalent. */
+body[data-page="maturity"] .mat-result-ring{
+    width: 130px;
+    height: 130px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform .3s ease;
+}
+body[data-page="maturity"] .mat-result-ring:hover{ transform: scale(1.03); }
+body[data-page="maturity"] .mat-result-inner{
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: var(--color-base-200);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid color-mix(in oklab, var(--color-base-content) 12%, transparent);
+}
+
+/* JS-computed bar width; 1s cubic-bezier fill is not a compiled utility. */
+body[data-page="maturity"] .mat-bar-fill{
+    height: 100%;
+    border-radius: 4px;
+    transition: width 1s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ── profile.html ─────────────────────────────────── */
+/* JS toggles .active on .mode-btn; daisyUI uses btn-active. */
+body[data-page="profile"] .mode-btn.active{
+    background-color: var(--color-primary);
+    color: var(--color-primary-content);
+    border-color: var(--color-primary);
+}
+
+/* JS injects .profile-field / .error; cannot add daisyUI classes without changing JS. */
+body[data-page="profile"] #profile-info .profile-field{
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.75rem 0;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid color-mix(in oklab, var(--color-base-content) 10%, transparent);
+    border-radius: 0;
+}
+body[data-page="profile"] #profile-info .profile-field:last-child{ border-bottom: 0; }
+body[data-page="profile"] #profile-info .profile-field label{
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.55;
+}
+body[data-page="profile"] #profile-info > .error{
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-box, 0.5rem);
+    background: color-mix(in oklab, var(--color-error) 15%, transparent);
+    color: var(--color-error);
+}
+
+/* ── shift_handover.html ─────────────────────────────────── */
+/* Page-specific report cap is not a daisyUI token. */
+body[data-page="shift_handover"] .sh-report{ max-width: 1100px; }
+
+@media print {
+    body[data-page="shift_handover"] .navbar, body[data-page="shift_handover"] .header-actions, body[data-page="shift_handover"] .chat-widget, body[data-page="shift_handover"] .chat-toggle{ display: none !important; }
+    body[data-page="shift_handover"]{ background: #fff; color: #000; }
+    body[data-page="shift_handover"] .sh-report{ max-width: 100%; }
+    body[data-page="shift_handover"] .card, body[data-page="shift_handover"] .stat, body[data-page="shift_handover"] .alert{ break-inside: avoid; border-color: #ddd; }
+    body[data-page="shift_handover"] .stat-value, body[data-page="shift_handover"] .card-title i{ color: #333 !important; }
+}
+
+/* ── soc_health.html ─────────────────────────────────── */
+/* Conic-gradient score ring: daisyUI radial-progress needs a CSS custom
+   property set as a raw attribute, which CSP refuses. Geometry and inner
+   disc have no utility equivalent. */
+body[data-page="soc_health"] .sh-grade-ring{
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+body[data-page="soc_health"] .sh-grade-inner{
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--color-base-200);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* auto-fit minmax has no daisyUI grid equivalent; do not approximate with breakpoints. */
+body[data-page="soc_health"] .sh-dims{
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+/* JS-computed bar width; 0.5s fill is not a compiled utility. */
+body[data-page="soc_health"] .sh-dim-bar-fill{
+    height: 100%;
+    border-radius: 3px;
+    transition: width .5s;
+}
+
+/* An unmeasured dimension used to render as a bar at width 0, which is
+   the same picture as a dimension measured at zero. Hatching is the one
+   thing on this card that a real score can never produce, so the two
+   cannot be confused at a glance or in a screenshot. Full width on
+   purpose: the track is not "none of it", it is "nobody looked". */
+body[data-page="soc_health"] .sh-dim-bar-unmeasured{
+    width: 100%;
+    height: 100%;
+    border-radius: 3px;
+    background: repeating-linear-gradient(
+        135deg,
+        rgba(145, 158, 171, 0.55) 0 4px,
+        transparent 4px 9px
+    );
+}
+
+/* daisyUI sets `.stat-desc{white-space:nowrap}` because its stat
+   component expects a short one-line caption. ION puts a key/value list
+   in there instead, so every line ran off the card and was cut by the
+   card's overflow-hidden. Four of the five cards were losing the end of
+   their detail text, including "reason:", which is the field that says
+   WHY a dimension scored what it did. */
+body[data-page="soc_health"] .sh-dims .stat-desc, body[data-page="soc_health"] .sh-dims .stat-title{
+    white-space: normal;
+}
+body[data-page="soc_health"] .sh-dims .stat-desc > div{
+    overflow-wrap: anywhere;
+}
+
+/* stat-value is sized for a two or three digit score. The words that
+   replace a missing score overflow it, so they get their own size rather
+   than being abbreviated to something ambiguous like "n/a". */
+body[data-page="soc_health"] .sh-value-text{
+    font-size: 20px;
+    line-height: 1.2;
+    white-space: normal;
+}
+
+/* Basis stated per card, rather than left to be inferred from a colour.
+   The dashed rule survives greyscale and colour blindness. */
+body[data-page="soc_health"] .sh-basis{
+    font-family: ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 2px;
+}
+body[data-page="soc_health"] .sh-basis-measured{ color: var(--sev-low); }
+body[data-page="soc_health"] .sh-basis-unmeasured{
+    color: var(--sev-medium);
+    border-bottom: 1px dashed currentColor;
+}
+
+/* A recommendation about something ION cannot see. Dashed, matching the
+   unmeasured card, so it is not read as a ranked finding alongside the
+   ones measured against real data. */
+body[data-page="soc_health"] .sh-rec-unseen{
+    background: transparent;
+    border: 1px dashed var(--sev-medium);
+    color: var(--ion-text);
+}
+body[data-page="soc_health"] .sh-badge-unseen{
+    background: transparent;
+    border: 1px dashed var(--sev-medium);
+    color: var(--sev-medium);
+}
+
+/* Permanent furniture, not a tooltip. A reader should not have to hover
+   to learn that hatching means nobody checked. */
+body[data-page="soc_health"] .sh-legend{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: center;
+    margin-bottom: 14px;
+    font-size: 12px;
+}
+body[data-page="soc_health"] .sh-legend-swatch{
+    display: inline-block;
+    width: 22px;
+    height: 8px;
+    border-radius: 2px;
+    vertical-align: middle;
+    margin-right: 7px;
+}
+body[data-page="soc_health"] .sh-legend-hatch{
+    background: repeating-linear-gradient(
+        135deg,
+        rgba(145, 158, 171, 0.55) 0 4px,
+        transparent 4px 9px
+    );
+}
+
+/* ── template_form.html ─────────────────────────────────── */
+/* JS builds .se-card / .se-add-inline / .se-field* / .se-library-item at
+   runtime. Those class names are querySelector hooks — they cannot move to
+   daisyUI utilities without changing the script. Theme tokens so light mode
+   flips; sibling-hover and .collapsed have no daisyUI equivalent. */
+
+/* Section card (JS-generated) */
+body[data-page="template_form"] .se-card{
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 1rem);
+    margin-bottom: 0.5rem;
+    background: var(--color-base-100);
+    transition: box-shadow 0.15s;
+}
+body[data-page="template_form"] .se-card:hover{ box-shadow: 0 2px 8px oklch(0% 0 0 / 0.15); }
+body[data-page="template_form"] .se-card-header{
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.75rem;
+    cursor: pointer;
+    gap: 0.5rem;
+    user-select: none;
+}
+body[data-page="template_form"] .se-card-icon{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-field, 0.5rem);
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    font-weight: 700;
+    font-size: 0.65rem;
+    flex-shrink: 0;
+}
+body[data-page="template_form"] .se-card-title{ flex: 1; font-weight: 600; font-size: 0.9rem; }
+body[data-page="template_form"] .se-card-type{ color: color-mix(in oklab, var(--color-base-content) 60%, transparent); font-size: 0.75rem; }
+body[data-page="template_form"] .se-card-actions{
+    display: flex;
+    gap: 0.25rem;
+    align-items: center;
+}
+body[data-page="template_form"] .se-card-actions button{
+    background: none;
+    border: 1px solid var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    border-radius: var(--radius-field, 0.5rem);
+    font-size: 0.75rem;
+    line-height: 1;
+}
+body[data-page="template_form"] .se-card-actions button:hover{
+    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+    color: var(--color-base-content);
+}
+body[data-page="template_form"] .se-card-actions button.se-delete:hover{
+    background: var(--color-error);
+    color: var(--color-error-content);
+    border-color: var(--color-error);
+}
+body[data-page="template_form"] .se-card-body{
+    padding: 0.75rem;
+    border-top: 1px solid var(--color-base-300);
+}
+body[data-page="template_form"] .se-card-body.collapsed{ display: none; }
+
+/* Inline add: sibling-hover has no Tailwind equivalent without changing JS. */
+body[data-page="template_form"] .se-add-inline{
+    text-align: center;
+    padding: 0.25rem 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+body[data-page="template_form"] .se-card:hover + .se-add-inline, body[data-page="template_form"] .se-add-inline:hover{ opacity: 1; }
+body[data-page="template_form"] .se-add-inline button{
+    background: none;
+    border: 1px dashed var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    cursor: pointer;
+    padding: 0.15rem 0.75rem;
+    border-radius: var(--radius-field, 0.5rem);
+    font-size: 0.75rem;
+}
+body[data-page="template_form"] .se-add-inline button:hover{
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* Section fields (JS-generated, no daisyUI input/select classes) */
+body[data-page="template_form"] .se-field{ margin-bottom: 0.5rem; }
+body[data-page="template_form"] .se-field label{
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-bottom: 0.2rem;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+}
+body[data-page="template_form"] .se-field input[type="text"], body[data-page="template_form"] .se-field textarea, body[data-page="template_form"] .se-field select{
+    width: 100%;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.5rem);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    font-size: 0.85rem;
+    font-family: inherit;
+}
+body[data-page="template_form"] .se-field textarea{ min-height: 60px; resize: vertical; }
+
+/* Variable toggle */
+body[data-page="template_form"] .se-variable-toggle{
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding: 0.4rem 0.5rem;
+    background: var(--color-base-100);
+    border-radius: var(--radius-field, 0.5rem);
+    border: 1px solid var(--color-base-300);
+}
+body[data-page="template_form"] .se-variable-toggle label{
+    font-size: 0.8rem;
+    margin: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+body[data-page="template_form"] .se-variable-toggle input[type="text"]{
+    flex: 1;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.8rem;
+    font-family: monospace;
+}
+
+/* Dynamic list fields (items, pairs, columns, etc.) */
+body[data-page="template_form"] .se-list-field{ margin-bottom: 0.5rem; }
+body[data-page="template_form"] .se-list-item{
+    display: flex;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
+    align-items: center;
+}
+body[data-page="template_form"] .se-list-item input{
+    flex: 1;
+    padding: 0.3rem 0.4rem;
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.5rem);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    font-size: 0.8rem;
+}
+body[data-page="template_form"] .se-list-item button{
+    background: none;
+    border: 1px solid var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    cursor: pointer;
+    padding: 0.2rem 0.35rem;
+    border-radius: var(--radius-field, 0.5rem);
+    font-size: 0.75rem;
+}
+body[data-page="template_form"] .se-list-item button:hover{ color: var(--color-error); }
+body[data-page="template_form"] .se-list-add{
+    background: none;
+    border: 1px dashed var(--color-base-300);
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    cursor: pointer;
+    padding: 0.25rem 0.6rem;
+    border-radius: var(--radius-field, 0.5rem);
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+body[data-page="template_form"] .se-list-add:hover{ border-color: var(--color-primary); color: var(--color-primary); }
+
+/* Checkbox field */
+body[data-page="template_form"] .se-checkbox{
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+}
+body[data-page="template_form"] .se-checkbox label{ font-size: 0.8rem; cursor: pointer; margin: 0; }
+
+/* Library tiles (JS-generated in buildLibrary) */
+body[data-page="template_form"] .se-library-item{
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.5rem);
+    padding: 0.6rem;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    background: var(--color-base-100);
+}
+body[data-page="template_form"] .se-library-item:hover{
+    border-color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 12%, transparent);
+}
+body[data-page="template_form"] .se-library-item-icon{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-box, 1rem);
+    background: var(--color-primary);
+    color: var(--color-primary-content);
+    font-weight: 700;
+    font-size: 0.65rem;
+    margin-bottom: 0.35rem;
+}
+body[data-page="template_form"] .se-library-item-label{
+    font-size: 0.8rem;
+    font-weight: 500;
+    display: block;
+}
+body[data-page="template_form"] .se-library-item-desc{
+    font-size: 0.7rem;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    display: block;
+    margin-top: 0.15rem;
+}
+
+/* ── template_render.html ─────────────────────────────────── */
+/* JS toggles .active on .tab-btn, not daisyUI .tab-active. */
+body[data-page="template_render"] .tabs-box > .tab.tab-btn.active{
+    background-color: var(--color-base-100);
+    color: var(--color-base-content);
+}
+
+/* JS openSettingsModal()/closeSettingsModal() set style.display = 'flex'/'none',
+   not daisyUI .modal-open. The hashed display:none class keeps the overlay
+   hidden until then. Bridge so daisyUI .modal still presents when display is flex. */
+body[data-page="template_render"] #settings-modal.modal{
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    align-items: center;
+    justify-content: center;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="template_render"] #settings-modal > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+}
+
+/* JS buildVariablesForm() emits .form-group / .variable-input / .auto-badge /
+   .field-hint / .required — class names are fixed in script. */
+body[data-page="template_render"] #variables-form .form-group{ margin-bottom: 1rem; }
+body[data-page="template_render"] #variables-form label{
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+body[data-page="template_render"] #variables-form .variable-input{
+    width: 100%;
+    border: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    border-radius: var(--radius-field, 0.25rem);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+}
+body[data-page="template_render"] #variables-form textarea.variable-input{
+    min-height: 6rem;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    resize: vertical;
+}
+body[data-page="template_render"] #variables-form .variable-input:focus{
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-color: var(--color-primary);
+}
+body[data-page="template_render"] #variables-form .required{ color: var(--color-error); }
+body[data-page="template_render"] #variables-form .auto-badge{
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    background: color-mix(in oklab, var(--color-info) 20%, transparent);
+    color: var(--color-info);
+}
+body[data-page="template_render"] #variables-form .field-hint{
+    display: block;
+    font-size: 0.75rem;
+    opacity: 0.6;
+    margin-top: 0.25rem;
+}
+
+/* JS buildSectionCards() emits .se-card / .se-open / .se-editing / .se-header /
+   .se-title / .se-num / .se-chevron / .se-body / .se-edit-btn / .se-rendered /
+   .se-edit-area / .se-meta-header — class names are fixed in script.
+   Open/edit state, chevron rotation, 600px pane cap and textarea auto-height
+   have no daisyUI equivalent. */
+body[data-page="template_render"] .se-card{
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box);
+    margin-bottom: 0.75rem;
+    overflow: hidden;
+    transition: border-color .2s;
+}
+body[data-page="template_render"] .se-card.se-editing{ border-color: var(--color-primary); }
+body[data-page="template_render"] .se-header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.6rem 1rem;
+    cursor: pointer;
+    user-select: none;
+    gap: 0.5rem;
+}
+body[data-page="template_render"] .se-header:hover{ background: var(--color-base-200); }
+body[data-page="template_render"] .se-title{
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--color-base-content);
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+body[data-page="template_render"] .se-num{
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+    color: var(--color-primary);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    min-width: 1.8rem;
+    text-align: center;
+    flex-shrink: 0;
+}
+body[data-page="template_render"] .se-chevron{
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    transition: transform .2s;
+    flex-shrink: 0;
+}
+body[data-page="template_render"] .se-card.se-open .se-chevron{ transform: rotate(180deg); }
+body[data-page="template_render"] .se-body{ display: none; border-top: 1px solid var(--color-base-300); }
+body[data-page="template_render"] .se-card.se-open .se-body{ display: block; }
+body[data-page="template_render"] .se-edit-btn{
+    background: none;
+    border: none;
+    color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    transition: all .15s;
+    flex-shrink: 0;
+}
+body[data-page="template_render"] .se-edit-btn:hover{
+    color: var(--color-primary);
+    background: color-mix(in oklab, var(--color-primary) 15%, transparent);
+}
+body[data-page="template_render"] .se-card.se-editing .se-edit-btn{ color: var(--color-primary); }
+body[data-page="template_render"] .se-rendered{ padding: 1rem; max-height: 600px; overflow-y: auto; }
+body[data-page="template_render"] .se-rendered table{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin: 0.5rem 0;
+}
+body[data-page="template_render"] .se-rendered th, body[data-page="template_render"] .se-rendered td{
+    padding: 0.35rem 0.6rem;
+    border: 1px solid var(--color-base-300);
+    text-align: left;
+}
+body[data-page="template_render"] .se-rendered th{
+    background: var(--color-base-200);
+    font-weight: 600;
+    white-space: nowrap;
+}
+body[data-page="template_render"] .se-rendered h3, body[data-page="template_render"] .se-rendered h4{ margin: 0.8rem 0 0.4rem; color: var(--color-primary); }
+body[data-page="template_render"] .se-rendered p{ margin: 0.3rem 0; line-height: 1.5; }
+body[data-page="template_render"] .se-rendered ul, body[data-page="template_render"] .se-rendered ol{ padding-left: 1.5rem; margin: 0.3rem 0; }
+body[data-page="template_render"] .se-edit-area{ display: none; padding: 0.75rem; }
+body[data-page="template_render"] .se-edit-area textarea{
+    width: 100%;
+    min-height: 200px;
+    max-height: 600px;
+    resize: vertical;
+    font-family: var(--font-mono, 'Consolas', 'Monaco', monospace);
+    font-size: 0.82rem;
+    line-height: 1.5;
+    background: var(--color-base-200);
+    color: var(--color-base-content);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-field, 0.25rem);
+    padding: 0.75rem;
+    tab-size: 4;
+}
+body[data-page="template_render"] .se-edit-area textarea:focus{
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px color-mix(in oklab, var(--color-primary) 20%, transparent);
+}
+body[data-page="template_render"] .se-meta-header{ padding: 0; }
+body[data-page="template_render"] .se-meta-header .se-rendered{ padding: 1rem; }
+body[data-page="template_render"] .se-meta-header .rendered-content{ font-size: 0.85rem; }
+
+/* JS innerHTML injects .rendered-content / .rendered-output / .error into the preview. */
+body[data-page="template_render"] #output-container .rendered-content{
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+body[data-page="template_render"] #output-container .error{ color: var(--color-error); }
+
+/* ── users.html ─────────────────────────────────── */
+/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
+body[data-page="users"] #create-user-modal.show, body[data-page="users"] #edit-user-modal.show, body[data-page="users"] #reset-password-modal.show{
+    display: grid;
+    place-items: center;
+    pointer-events: auto;
+    visibility: visible;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="users"] #create-user-modal.show > .modal-box, body[data-page="users"] #edit-user-modal.show > .modal-box, body[data-page="users"] #reset-password-modal.show > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+    max-height: 90vh;
+}
+
+/* Role picker: per-role --role-color, hidden checkbox, :checked sibling glow.
+   No daisyUI selectable-card slot carries a CSS custom property this way. */
+body[data-page="users"] .role-widgets{ display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+body[data-page="users"] .role-widget{ display: block; cursor: pointer; }
+body[data-page="users"] .role-widget-input{ display: none; }
+body[data-page="users"] .role-widget-card{
+  border: 2px solid var(--ion-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+body[data-page="users"] .role-widget:hover .role-widget-card{ border-color: var(--border-bright); background: var(--bg-elevated); }
+body[data-page="users"] .role-widget-input:checked ~ .role-widget-card{
+  border-color: var(--role-color, var(--primary));
+  background: var(--bg-elevated);
+  box-shadow: 0 0 16px -4px var(--role-color, var(--primary));
+}
+body[data-page="users"] .role-widget-header{ display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+body[data-page="users"] .role-widget-icon{ font-size: 16px; }
+body[data-page="users"] .role-widget-tier{
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--role-color, var(--primary)); font-family: 'JetBrains Mono', monospace;
+}
+body[data-page="users"] .role-widget-check{
+  margin-left: auto; font-size: 14px; color: var(--role-color, var(--primary));
+  opacity: 0; transition: opacity 0.2s;
+}
+body[data-page="users"] .role-widget-input:checked ~ .role-widget-card .role-widget-check{ opacity: 1; }
+body[data-page="users"] .role-widget-name{
+  font-size: 13px; font-weight: 600; color: var(--text-primary); text-transform: capitalize;
+  margin-bottom: 2px;
+}
+body[data-page="users"] .role-widget-desc{ font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-bottom: 8px; }
+body[data-page="users"] .role-widget-caps{ display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
+body[data-page="users"] .role-cap-pill{
+  font-size: 9px; padding: 1px 6px; border-radius: 4px;
+  background: rgba(255,255,255,0.05); border: 1px solid var(--ion-border);
+  color: var(--text-secondary); font-weight: 500;
+}
+body[data-page="users"] .role-widget-input:checked ~ .role-widget-card .role-cap-pill{
+  background: color-mix(in srgb, var(--role-color) 10%, transparent);
+  border-color: color-mix(in srgb, var(--role-color) 20%, transparent);
+  color: var(--role-color);
+}
+body[data-page="users"] .role-widget-perms{ font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+@media (max-width: 768px) {
+    body[data-page="users"] #create-user-modal.show > .modal-box, body[data-page="users"] #edit-user-modal.show > .modal-box, body[data-page="users"] #reset-password-modal.show > .modal-box{ max-height: 95vh; }
+}
+
+/* ── versions.html ─────────────────────────────────── */
+/* JS opens/closes via CSSOM display:flex/none, not daisyUI .modal-open. Bridge. */
+body[data-page="versions"] #version-modal[style*="flex"]{
+    display: grid;
+    place-items: center;
+    align-items: center;
+    justify-content: center;
+    visibility: visible;
+    pointer-events: auto;
+    opacity: 1;
+    background-color: oklch(0% 0 0 / 0.4);
+}
+body[data-page="versions"] #version-modal[style*="flex"] > .modal-box{
+    opacity: 1;
+    scale: 1;
+    translate: 0;
+}
+
+/* JS showDiff() sets display:block on the hashed display:none section. */
+body[data-page="versions"] #modal-diff-section[style*="block"]{
+    display: block;
+}
+
+/* JS loadVersions() emits .version-item / .checkpoint / .checkpoint-badge. */
+body[data-page="versions"] .version-item{
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: var(--color-base-100);
+    border: 1px solid var(--color-base-300);
+    border-radius: var(--radius-box, 1rem);
+}
+body[data-page="versions"] .version-item.checkpoint{
+    border-left: 3px solid var(--color-primary);
+}
+body[data-page="versions"] .version-header{
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+body[data-page="versions"] .version-number{
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-primary);
+}
+body[data-page="versions"] .checkpoint-badge{
+    display: inline-flex;
+    align-items: center;
+    padding: 0.125rem 0.625rem;
+    border-radius: var(--radius-selector, 0.25rem);
+    font-size: 0.75rem;
+    font-weight: 600;
+    background: var(--color-warning);
+    color: var(--color-warning-content);
+}
+body[data-page="versions"] .version-meta{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    font-size: 0.875rem;
+    opacity: 0.6;
+}
+body[data-page="versions"] .version-actions{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+body[data-page="versions"] .version-actions .ion-btn{
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 2rem;
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: var(--radius-field, 0.5rem);
+    border: 1px solid var(--color-base-300);
+    background: var(--color-base-100);
+    color: var(--color-base-content);
+    cursor: pointer;
+}
+body[data-page="versions"] .version-actions .ion-btn:hover{
+    background: var(--color-base-300);
+}
+
+/* JS innerHTML: <p class="error"> / <p class="empty-state">. */
+body[data-page="versions"] #versions-list > .error{
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-box, 0.5rem);
+    background: color-mix(in oklab, var(--color-error) 12%, transparent);
+    color: var(--color-error);
+}
+body[data-page="versions"] #versions-list > .empty-state{
+    margin: 0;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    opacity: 0.6;
+}

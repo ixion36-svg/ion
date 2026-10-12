@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Detection Health - ION{% endblock %}
+{% block page_id %}detection_health{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -70,25 +71,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#dh-modal-overlay.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#dh-modal-overlay.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 520px;
-}
-
-/* JS-computed bar width/colour via data-w / data-c — no daisyUI equivalent. */
-.dh-bar{display:inline-block;height:10px;border-radius:3px;background:color-mix(in oklab, var(--color-base-content) 12%, transparent);width:70px;vertical-align:middle;overflow:hidden;margin-right:6px}
-.dh-bar-fill{display:block;height:100%;border-radius:3px}
-</style>
 <script nonce="{{ csp_nonce }}">
 const DH_API = '/api/detection-health';
 function dh$(id){return document.getElementById(id)}

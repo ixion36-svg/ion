@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Daily Standup — Slides{% endblock %}
+{% block page_id %}daily_standup_slides{% endblock %}
 
 {% block content %}
 {# + v0.19.10 polish: presentation-mode standup deck.
@@ -16,119 +17,6 @@
      Home/End  → first / last slide
 #}
 
-<style nonce="{{ csp_nonce }}">
-  /* Hashed _ion-s-* rules in ion-migrated-styles.css read these tokens. */
-  :root {
-    --deck-bg-1: #0a0e14;
-    --deck-bg-2: #0d121b;
-    --deck-text:    #e2e8f0;
-    --deck-muted:   #94a3b8;
-    --deck-dim:     #64748b;
-    --deck-faint:   #475569;
-    --deck-line:    rgba(148, 163, 184, 0.10);
-    --deck-card:    rgba(15, 23, 42, 0.55);
-    --ion-cyan:    #6de4ff;
-    --ion-iris:    #a78bfa;
-    --ion-coral:   #f87171;
-    --ion-amber:   #fbbf24;
-    --ion-emerald: #4ade80;
-  }
-  body { background: var(--deck-bg-1); }
-  /* JS adds .presenting; daisyUI cannot hide the inherited chrome. */
-  body.presenting nav,
-  body.presenting header { display: none !important; }
-  body.presenting main,
-  body.presenting [class*="ion-tw-page"] { padding: 0 !important; }
-
-  /* Dual radial wash + masked grid. No Tailwind utility covers ::before. */
-  .deck-host {
-    background:
-      radial-gradient(circle at 15% 12%, rgba(109,228,255,0.06) 0%, transparent 45%),
-      radial-gradient(circle at 88% 90%, rgba(167,139,250,0.05) 0%, transparent 45%),
-      linear-gradient(180deg, var(--deck-bg-1) 0%, var(--deck-bg-2) 100%);
-  }
-  .deck-host::before {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    background-image:
-      linear-gradient(var(--deck-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--deck-line) 1px, transparent 1px);
-    background-size: 64px 64px;
-    opacity: 0.55;
-    mask-image: radial-gradient(circle at center, black 50%, transparent 100%);
-  }
-
-  /* Brand mark glow — gradient fill + box-shadow, not a daisyUI component. */
-  .deck-brand-mark,
-  .deck-brand-big {
-    background: linear-gradient(135deg, var(--ion-cyan) 0%, var(--ion-iris) 100%);
-  }
-  .deck-brand-mark { box-shadow: 0 0 24px -6px rgba(109,228,255,0.45); }
-  .deck-brand-big {
-    box-shadow:
-      0 0 80px -10px rgba(109,228,255,0.55),
-      0 0 40px -8px rgba(167,139,250,0.35);
-  }
-
-  /* JS toggles .hidden on a flex slide; equal-specificity utilities fight. */
-  .deck-slide.hidden { display: none; }
-
-  /* Slide geometry lives here, NOT in Tailwind arbitrary values.
-     This project serves a prebuilt stylesheet, so an arbitrary utility
-     that is not already compiled into it silently resolves to nothing.
-     pt-[14vh] exists in the build and pt-[12vh] does not, so changing
-     the number in the class name set the padding to 0 and dropped the
-     slide title behind the ION header. Failing silently like that is
-     worth avoiding on the one screen a room is reading, hence plain
-     CSS for anything load-bearing. */
-  .deck-slide {
-    /* Centre the column vertically. This is a no-op on slides that
-       contain a .deck-body, because that child is flex:1 and already
-       eats the free space -- so tables stay top-aligned and grow, while
-       KPI-only slides (backlog, case status, log sources) stop sitting
-       in the top third above two-thirds of dead screen. */
-    justify-content: center;
-    padding: 12vh 6vw;
-    /* Reserve the footer chrome (progress dots, counter, controls) so a
-       long table can never run underneath it. */
-    padding-bottom: 13vh;
-  }
-  .deck-slide.title-slide { padding: 0; }
-  /* The body region takes whatever the heading leaves. min-h-0 is what
-     lets a flex child shrink rather than forcing its parent taller. */
-  .deck-body { display: flex; flex-direction: column; flex: 1 1 auto; min-height: 0; }
-  .deck-tablebox { min-height: 0; flex: 1 1 auto; overflow: auto; }
-  .deck-more { margin-top: 1.2vh; }
-  .deck-h-gap { height: 2.5vh; flex-shrink: 0; }
-  .deck-h-title { margin-bottom: 2.5vh; flex-shrink: 0; }
-  .deck-h-row {
-    display: flex; align-items: baseline; justify-content: space-between;
-    gap: 4vw; flex-shrink: 0;
-  }
-  .deck-h-row .deck-h-title { margin-bottom: 0; }
-  .deck-kpi { text-align: right; flex-shrink: 0; }
-  .deck-kpi-value {
-    font-size: clamp(40px, 6vw, 80px); line-height: 1; font-weight: 600;
-  }
-  .deck-kpi-label {
-    font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
-    color: var(--deck-dim); margin-top: 0.4vh;
-  }
-
-  /* Title-slide wordmark uses background-clip text. */
-  .deck-slide.title-slide .deck-title {
-    background: linear-gradient(180deg, #f8fafc 0%, #94a3b8 100%);
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-
-  /* JS toggles .active / .passed on these dots. */
-  .deck-progress-dot {
-    width: 24px; height: 3px; border-radius: 2px;
-    background: rgba(148, 163, 184, 0.18); transition: background 0.25s;
-  }
-  .deck-progress-dot.active { background: linear-gradient(90deg, var(--ion-cyan), var(--ion-iris)); }
-  .deck-progress-dot.passed { background: rgba(148, 163, 184, 0.45); }
-</style>
 
 <div class="deck-host fixed inset-0 z-50 flex flex-col font-sans text-base-content" id="deck-host">
   <div class="absolute top-[3.5vh] left-[4vw] z-[2] flex flex-wrap items-center gap-2.5">

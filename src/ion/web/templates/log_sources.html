@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Log Source Health - ION{% endblock %}
+{% block page_id %}log_sources{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
@@ -99,38 +100,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS toggles .show, not daisyUI .modal-open. Bridge the two. */
-#ls-modal-bg.show {
-    pointer-events: auto;
-    visibility: visible;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-}
-#ls-modal-bg.show > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-    max-width: 640px;
-    max-height: 90vh;
-}
-
-/* JS adds status classes — five-colour left stripe has no daisyUI equivalent. */
-#ls-content .ls-card {
-    border-left-width: 4px;
-    border-left-style: solid;
-    border-left-color: var(--color-base-300);
-}
-#ls-content .ls-card.healthy { border-left-color: var(--color-success); }
-#ls-content .ls-card.stale { border-left-color: var(--color-warning); }
-#ls-content .ls-card.silent { border-left-color: var(--color-error); }
-#ls-content .ls-card.never { border-left-color: color-mix(in oklab, var(--color-base-content) 60%, transparent); }
-#ls-content .ls-card.error { border-left-color: var(--sev-high); }
-
-@media (max-width: 768px) {
-    #ls-modal-bg.show > .modal-box { max-height: 95vh; }
-}
-</style>
 <script nonce="{{ csp_nonce }}">
 const LS_API = '/api/log-sources';
 let lsCache = [];

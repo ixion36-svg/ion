@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 
 {% block title %}Knowledge Graph - ION{% endblock %}
+{% block page_id %}knowledge_graph{% endblock %}
 
 {% block content %}
 <div class="ion-tw ion-tw-page text-base-content overflow-x-hidden">
@@ -45,83 +46,6 @@
 {% endblock %}
 
 {% block scripts %}
-<style nonce="{{ csp_nonce }}">
-/* JS innerHTML: canvas loading / error / empty states. */
-.kg-loading {
-  text-align: center;
-  padding: 60px;
-  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
-}
-.kg-spinner {
-  display: inline-block;
-  width: 20px;
-  height: 20px;
-  border: 3px solid var(--color-base-300);
-  border-top-color: var(--color-primary);
-  border-radius: 50%;
-  animation: kg-spin .8s linear infinite;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-@keyframes kg-spin { to { transform: rotate(360deg); } }
-
-/* JS innerHTML: #kg-meta node/edge counts + legend. */
-#kg-meta strong {
-  color: var(--color-base-content);
-  font-family: var(--font-mono, ui-monospace, monospace);
-}
-.kg-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 14px;
-  margin-left: auto;
-  flex-wrap: wrap;
-}
-.kg-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: .7rem;
-}
-.kg-legend-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-  border: 1px solid var(--color-base-300);
-}
-
-/* JS classList toggles .empty; JS innerHTML injects h3 / .kg-detail-meta / .kg-detail-link. */
-.kg-detail h3 {
-  font-size: 1rem;
-  color: var(--color-base-content);
-  margin: 0 0 6px 0;
-}
-.kg-detail-meta {
-  font-size: .72rem;
-  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
-  margin-bottom: 6px;
-}
-.kg-detail-link {
-  display: inline-block;
-  margin-top: 8px;
-  color: var(--color-primary);
-  font-size: .78rem;
-  text-decoration: none;
-}
-.kg-detail-link:hover { text-decoration: underline; }
-.kg-detail.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-style: italic;
-  font-size: .82rem;
-}
-
-@media (max-width: 768px) {
-  .kg-legend { margin-left: 0; width: 100%; }
-}
-</style>
 <script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
 <script nonce="{{ csp_nonce }}">
 const KG_API = '/api/knowledge-graph';
