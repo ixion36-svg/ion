@@ -76,7 +76,8 @@
       <button class="btn btn-ghost btn-sm" data-click-action="imClearInvFilters">Clear</button>
     </div>
 
-    <div class="card bg-base-200 shadow">
+    <button id="im-retry-inv" class="btn btn-ghost btn-sm" data-click-action="imLoadInvestigations">Retry / refresh</button>
+<div class="card bg-base-200 shadow">
       <div class="card-body p-0">
         <div class="overflow-x-auto">
           <table class="table table-sm w-full">
@@ -92,9 +93,7 @@
                 <th>Duration</th>
               </tr>
             </thead>
-            <tbody id="im-inv-tbody">
-              <tr><td colspan="8" class="text-center text-base-content/50 text-xs py-8">Loading investigations…</td></tr>
-            </tbody>
+            <tbody id="im-inv-tbody" hx-get="/ui/investigation-memory/investigations" hx-trigger="load" hx-target="this"><tr><td colspan="8">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -128,7 +127,8 @@
       </fieldset>
     </div>
 
-    <div class="card bg-base-200 shadow">
+    <button id="im-retry-iocs" class="btn btn-ghost btn-sm" data-click-action="imLoadIocs">Retry / refresh</button>
+<div class="card bg-base-200 shadow">
       <div class="card-body p-0">
         <div class="overflow-x-auto">
           <table class="table table-sm w-full">
@@ -143,9 +143,7 @@
                 <th>Last inv</th>
               </tr>
             </thead>
-            <tbody id="im-iocs-tbody">
-              <tr><td colspan="7" class="text-center text-base-content/50 text-xs py-8">Loading IOC sightings…</td></tr>
-            </tbody>
+            <tbody id="im-iocs-tbody" hx-get="/ui/investigation-memory/iocs" hx-trigger="load" hx-target="this"><tr><td colspan="7">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -154,7 +152,8 @@
 
   <!-- =============== False Positives Tab =============== -->
   <section id="im-pane-fps" class="im-pane hidden">
-    <div class="card bg-base-200 shadow">
+    <button id="im-retry-fps" class="btn btn-ghost btn-sm" data-click-action="imLoadFps">Retry / refresh</button>
+<div class="card bg-base-200 shadow">
       <div class="card-body p-0">
         <div class="overflow-x-auto">
           <table class="table table-sm w-full">
@@ -172,9 +171,7 @@
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="im-fps-tbody">
-              <tr><td colspan="10" class="text-center text-base-content/50 text-xs py-8">Loading FP signatures…</td></tr>
-            </tbody>
+            <tbody id="im-fps-tbody" hx-get="/ui/investigation-memory/fps" hx-trigger="load" hx-target="this"><tr><td colspan="10">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -187,7 +184,7 @@
        Bob keeps abstaining on. Every item names an owner and an action,
        because an inbox of observations nobody owns is another dashboard. -->
   <section id="im-pane-review" class="im-pane hidden">
-    <div id="im-review-content">
+    <button id="im-retry-review" class="btn btn-ghost btn-sm" data-click-action="imLoadReviewInbox">Retry / refresh</button><div id="im-review-content" hx-get="/ui/investigation-memory/review" hx-trigger="load" hx-target="this">
       <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading the review inbox...</div>
     </div>
   </section>
@@ -196,22 +193,22 @@
 </div>
 
 <!-- Investigation detail modal -->
-<div class="modal hidden" id="im-inv-modal">
-  <div class="modal-box w-11/12 max-w-5xl">
+<dialog class="ion-tw rounded-box bg-base-200 text-base-content p-6 w-11/12 max-w-5xl" id="im-inv-modal">
+  <div class="w-full">
     <div class="flex items-center justify-between gap-4">
       <h2 class="text-lg font-semibold" id="im-inv-modal-title">Investigation</h2>
       <button class="btn btn-ghost btn-sm btn-circle" data-click-action="imCloseInvModal">&times;</button>
     </div>
-    <div class="py-4" id="im-inv-modal-body">Loading…</div>
+    <button id="im-retry-detail" class="btn btn-ghost btn-sm" data-click-action="imRetryDetail">Retry</button><div class="py-4" id="im-inv-modal-body">Loading…</div>
     <div class="modal-action">
       <button class="btn btn-ghost" data-click-action="imCloseInvModal">Close</button>
     </div>
   </div>
-</div>
+</dialog>
 
 <!-- New FP modal -->
-<div class="modal hidden" id="im-fp-modal">
-  <div class="modal-box">
+<dialog class="ion-tw rounded-box bg-base-200 text-base-content p-6 w-11/12 max-w-5xl" id="im-fp-modal">
+  <div class="w-full">
     <div class="flex items-center justify-between gap-4">
       <h2 class="text-lg font-semibold">New false-positive signature</h2>
       <button class="btn btn-ghost btn-sm btn-circle" data-click-action="imCloseFpModal">&times;</button>
@@ -254,478 +251,66 @@
       <button class="btn btn-primary" data-click-action="imSubmitFp" data-args='["$event"]'>Create</button>
     </div>
   </div>
-</div>
+</dialog>
 
-<style nonce="{{ csp_nonce }}">
-  /* JS toggles .im-tab-active (and querySelector('.im-tab-active')), not daisyUI .tab-active. */
-  .tabs-border > .tab.im-tab-active {
-    color: var(--color-base-content);
-  }
-  .tabs-border > .tab.im-tab-active::before {
-    --tab-border-color: currentColor;
-    border-top: 3px solid;
-  }
-
-  /* JS imShowInv/imShowFpModal set style.display='flex'/'none', not daisyUI .modal-open.
-     The hashed display:none class on each overlay is the closed state. Overlay +
-     modal-box must still paint when JS sets display:flex. */
-  #im-inv-modal.modal,
-  #im-fp-modal.modal {
-    visibility: visible;
-    pointer-events: auto;
-    opacity: 1;
-    background-color: oklch(0% 0 0 / 0.4);
-    align-items: center;
-    justify-content: center;
-  }
-  #im-inv-modal > .modal-box,
-  #im-fp-modal > .modal-box {
-    opacity: 1;
-    scale: 1;
-    translate: 0;
-  }
-
-  /* JS innerHTML emits .pill* — cannot restyle those rows without changing the script. */
-  .pill {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .pill-tp { background: rgba(255,108,108,0.15); color: var(--danger); }
-  .pill-fp { background: rgba(100,116,139,0.2); color: var(--text-secondary); }
-  .pill-benign { background: rgba(134,240,160,0.15); color: var(--success); }
-  .pill-inc { background: rgba(248,179,58,0.15); color: var(--warning); }
-  .pill-pending { background: rgba(154,140,255,0.15); color: var(--neon-purple); }
-  .pill-running { background: rgba(96,165,250,0.15); color: var(--neon-blue); }
-  .pill-completed { background: rgba(134,240,160,0.15); color: var(--success); }
-  .pill-failed { background: rgba(255,108,108,0.15); color: var(--danger); }
-  .pill-sev-low { background: rgba(139,148,158,0.15); color: var(--text-primary); }
-  .pill-sev-medium { background: rgba(210,153,34,0.15); color: var(--sev-medium); }
-  .pill-sev-high { background: rgba(240,136,62,0.15); color: var(--sev-high); }
-  .pill-sev-critical { background: rgba(248,81,73,0.2); color: var(--sev-critical); }
-</style>
 
 <script nonce="{{ csp_nonce }}">
 (function() {
-  // ---- Tab state --------------------------------------------------------
-  /* Knowledge review inbox (review 2026-10-08 s8).
-
-     Every label here comes from the server payload. The rates carry their
-     denominators on purpose: the whole point of the thresholds block is
-     that a reader can see what bar was applied rather than trusting a
-     percentage of unknown sample size. */
-
-  const IM_REVIEW_KIND_LABEL = {
-    expired_quirk: 'Lapsed quirk',
-    contradictory_outcome: 'Contradictory closure',
-    stale_fp_signature: 'Stale FP signature',
-    repeated_uncertainty: 'Repeated uncertainty',
-  };
-
-  const IM_REVIEW_KIND_TONE = {
-    expired_quirk: 'badge-error',
-    contradictory_outcome: 'badge-error',
-    stale_fp_signature: 'badge-warning',
-    repeated_uncertainty: 'badge-info',
-  };
-
-  /* A raw ISO string is not a date to a reader. These carry an offset, so
-     the browser converts rather than guessing a zone. */
-  function imReviewDate(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return isNaN(d.getTime()) ? String(iso) : d.toLocaleString();
+  const tabs = ['inv', 'iocs', 'fps', 'review'];
+  const targets = {inv:'im-inv-tbody', iocs:'im-iocs-tbody', fps:'im-fps-tbody', review:'im-review-content'};
+  function load(name, params) {
+    const route = name === 'inv' ? 'investigations' : name;
+    const query = params && params.toString();
+    htmx.ajax('GET', '/ui/investigation-memory/' + route + (query ? '?' + query : ''), {target:'#' + targets[name], swap:'innerHTML'});
   }
-
-  function imReviewEvidenceRows(item) {
-    const e = item.evidence || {};
-    const rows = [];
-    const add = (k, v) => {
-      if (v === null || v === undefined || v === '') return;
-      rows.push('<div><span class="opacity-50">' + imEscape(k) + '</span> '
-                + imEscape(String(v)) + '</div>');
-    };
-
-    if (item.kind === 'expired_quirk') {
-      add('lapsed for', e.days_lapsed + ' day(s)');
-      add('review date', imReviewDate(e.review_date));
-      add('annotation', e.annotation);
-    } else if (item.kind === 'stale_fp_signature') {
-      add('state', e.governance_state);
-      add('suppressed', e.hit_count + ' alert(s) so far');
-      add('last match', imReviewDate(e.last_matched_at));
-      add('review date', imReviewDate(e.review_date));
-      add('reason', e.reason);
-    } else if (item.kind === 'contradictory_outcome') {
-      add('verdicts', (e.verdicts || []).join(' vs '));
-      (e.closures || []).forEach(c => {
-        add('closed', c.human_verdict + ' by ' + (c.closed_by || ('user ' + c.closed_by_id))
-            + (c.closed_at ? ' on ' + imReviewDate(c.closed_at) : ''));
-      });
-    } else if (item.kind === 'repeated_uncertainty') {
-      // The denominator is not optional.
-      add('abstentions', e.abstentions + ' of ' + e.sample_size
-          + ' (' + Math.round((e.abstention_rate || 0) * 100) + '%)');
-      add('window', e.window_days + ' day(s)');
-      add('raised above', e.min_sample_size + ' closures and '
-          + Math.round((e.threshold_rate || 0) * 100) + '%');
-    }
-    return rows.join('');
-  }
-
-  function imReviewCard(item) {
-    const tone = IM_REVIEW_KIND_TONE[item.kind] || 'badge-ghost';
-    const label = IM_REVIEW_KIND_LABEL[item.kind] || item.kind;
-    return '<div class="card bg-base-200 shadow mb-3">'
-      + '<div class="card-body p-4 gap-2">'
-      + '<div class="flex flex-wrap items-center gap-2">'
-      +   '<span class="badge ' + tone + '">' + imEscape(label) + '</span>'
-      +   '<span class="font-semibold">' + imEscape(item.title) + '</span>'
-      +   '<span class="ml-auto text-xs opacity-60">'
-      +     (item.owner ? 'owner: ' + imEscape(item.owner)
-                        : '<span class="text-warning">no owner recorded</span>')
-      +   '</span>'
-      + '</div>'
-      + '<div class="text-sm opacity-80">' + imEscape(item.why) + '</div>'
-      + '<div class="text-sm"><span class="opacity-50">Do:</span> ' + imEscape(item.action) + '</div>'
-      + '<div class="text-xs grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1 mt-1">'
-      +   imReviewEvidenceRows(item)
-      + '</div>'
-      + '<div class="mt-2"><a class="btn btn-xs" href="' + imEscape(item.link) + '">Open</a></div>'
-      + '</div></div>';
-  }
-
-  async function imLoadReviewInbox() {
-    const host = document.getElementById('im-review-content');
-    if (!host) return;
-    try {
-      const r = await fetch('/api/knowledge-review?limit=200');
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const d = await r.json();
-      const items = d.items || [];
-
-      const badge = document.getElementById('im-review-badge');
-      if (badge) {
-        if (d.total) {
-          badge.textContent = d.total;
-          badge.classList.remove('hidden');
-        } else {
-          badge.classList.add('hidden');
-        }
-      }
-
-      if (!items.length) {
-        host.innerHTML = '<div class="card bg-base-200 shadow"><div class="card-body items-center text-center py-10">'
-          + '<h3 class="card-title">Nothing needs review</h3>'
-          + '<p class="opacity-70">No lapsed quirks, stale FP signatures, contradictory closures or over-abstaining prompts.</p>'
-          + '</div></div>';
-        return;
-      }
-
-      const counts = d.by_kind || {};
-      const chips = Object.keys(IM_REVIEW_KIND_LABEL).map(k =>
-        '<span class="badge ' + (counts[k] ? (IM_REVIEW_KIND_TONE[k] || 'badge-ghost') : 'badge-ghost')
-        + '">' + (counts[k] || 0) + ' ' + imEscape(IM_REVIEW_KIND_LABEL[k]) + '</span>').join(' ');
-
-      const shown = items.length;
-      host.innerHTML = '<div class="flex flex-wrap items-center gap-2 mb-4">' + chips
-        + '<span class="text-xs opacity-60 ml-auto">'
-        + (shown < d.total ? ('showing ' + shown + ' of ' + d.total) : (d.total + ' item(s)'))
-        + ' &middot; ' + d.window_days + '-day window</span></div>'
-        + items.map(imReviewCard).join('');
-    } catch (e) {
-      host.innerHTML = '<div class="alert alert-error"><div>'
-        + imEscape(e.message || 'Could not load the review inbox') + '</div></div>';
-    }
-  }
-  window.imLoadReviewInbox = imLoadReviewInbox;
-
-  function imSwitchTab(name) {
-    const tabs = ['inv', 'iocs', 'fps', 'review'];
-    tabs.forEach(t => {
-      const tab = document.getElementById('im-tab-' + t);
-      const pane = document.getElementById('im-pane-' + t);
-      if (!tab || !pane) return;
-      if (t === name) {
-        tab.classList.add('im-tab-active');
-        pane.classList.remove('hidden');
-      } else {
-        tab.classList.remove('im-tab-active');
-        pane.classList.add('hidden');
-      }
-    });
-    if (name === 'inv')  imLoadInvestigations();
-    if (name === 'iocs') imLoadIocs();
-    if (name === 'fps')  imLoadFps();
-    if (name === 'review') imLoadReviewInbox();
-  }
-  window.imSwitchTab = imSwitchTab;
-
-  // ---- Helpers ----------------------------------------------------------
-  function imEscape(s) {
-    if (s === null || s === undefined) return '';
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-  function imFmtDate(iso) {
-    if (!iso) return '-';
-    try { return new Date(iso).toLocaleString(); } catch (e) { return iso; }
-  }
-  function imVerdictPill(v) {
-    if (!v) return '<span class="pill pill-inc">—</span>';
-    const map = {
-      true_positive: ['pill-tp', 'TP'],
-      false_positive: ['pill-fp', 'FP'],
-      benign: ['pill-benign', 'Benign'],
-      inconclusive: ['pill-inc', 'Inconclusive'],
-    };
-    const [cls, label] = map[v] || ['pill-inc', v];
-    return `<span class="pill ${cls}">${imEscape(label)}</span>`;
-  }
-  function imStatusPill(s) {
-    const map = {
-      pending: 'pill-pending',
-      running: 'pill-running',
-      completed: 'pill-completed',
-      failed: 'pill-failed',
-    };
-    return `<span class="pill ${map[s] || 'pill-pending'}">${imEscape(s)}</span>`;
-  }
-  function imSeverityPill(sev) {
-    if (!sev) return '-';
-    return `<span class="pill pill-sev-${imEscape(sev)}">${imEscape(sev)}</span>`;
-  }
-  function imDuration(ms) {
-    if (ms === null || ms === undefined) return '-';
-    if (ms < 1000) return ms + ' ms';
-    return (ms / 1000).toFixed(1) + ' s';
-  }
-
-  let imInvDebounce = null;
-  function imDebouncedLoadInv() {
-    clearTimeout(imInvDebounce);
-    imInvDebounce = setTimeout(imLoadInvestigations, 300);
-  }
-  window.imDebouncedLoadInv = imDebouncedLoadInv;
-
-  function imClearInvFilters() {
-    ['im-filter-signature', 'im-filter-verdict', 'im-filter-status',
-     'im-filter-host', 'im-filter-from', 'im-filter-to'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = '';
-    });
-    imLoadInvestigations();
-  }
-  window.imClearInvFilters = imClearInvFilters;
-
-  // ---- Investigations ---------------------------------------------------
-  async function imLoadInvestigations() {
+  window.imLoadInvestigations = function() {
     const params = new URLSearchParams();
-    const sig = document.getElementById('im-filter-signature').value.trim();
-    const ver = document.getElementById('im-filter-verdict').value;
-    const stat = document.getElementById('im-filter-status').value;
-    const host = document.getElementById('im-filter-host').value.trim();
-    const from = document.getElementById('im-filter-from').value;
-    const to = document.getElementById('im-filter-to').value;
-    if (sig)  params.set('alert_signature', sig);
-    if (ver)  params.set('verdict', ver);
-    if (stat) params.set('status', stat);
-    if (host) params.set('host', host);
-    if (from) params.set('from_date', from);
-    if (to)   params.set('to_date', to);
-
-    const tbody = document.getElementById('im-inv-tbody');
-    tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>';
-
-    try {
-      const res = await fetch('/api/investigations?' + params.toString());
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const rows = data.investigations || [];
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-slate-500 text-[12px]">No investigations found.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = rows.map(r => `
-        <tr class="cursor-pointer" data-click-action="imShowInv" data-args='[${r.id}]'>
-          <td>${imEscape(imFmtDate(r.created_at))}</td>
-          <td><span class="text-white font-medium">${imEscape(r.alert_signature)}</span></td>
-          <td>${imEscape(r.host || '-')}</td>
-          <td>${imEscape(r.user_name || '-')}</td>
-          <td>${imStatusPill(r.status)}</td>
-          <td>${imVerdictPill(r.verdict)}</td>
-          <td>${imSeverityPill(r.severity_assessment)}</td>
-          <td>${imEscape(imDuration(r.duration_ms))}</td>
-        </tr>
-      `).join('');
-    } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="8" class="px-4 py-8 text-center text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</td></tr>`;
-    }
-  }
-  window.imLoadInvestigations = imLoadInvestigations;
-
-  async function imShowInv(id) {
-    document.getElementById('im-inv-modal').style.display = 'flex';
-    document.getElementById('im-inv-modal-title').textContent = 'Investigation #' + id;
-    const body = document.getElementById('im-inv-modal-body');
-    body.innerHTML = 'Loading…';
-    try {
-      const res = await fetch('/api/investigations/' + id);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const r = await res.json();
-      const actions = r.recommended_actions ? JSON.stringify(r.recommended_actions, null, 2) : '(none)';
-      const iocs = r.ioc_snapshot ? JSON.stringify(r.ioc_snapshot, null, 2) : '(none)';
-      // grounded evidence bullets — each cites a specific field
-      // from the alert payload, so verdicts are auditable rather than
-      // opaque. Falls back to an empty state when the list is null/empty
-      // (investigations from before v0.10.11 won't have this).
-      let obsHtml = '';
-      const obs = Array.isArray(r.key_observations) ? r.key_observations : [];
-      if (obs.length > 0) {
-        obsHtml = `
-          <div class="mb-3">
-            <div class="label-tiny text-slate-500 mb-1">Key observations (grounded evidence)</div>
-            <ul class="rounded-md border border-white/5 bg-ink-900/70 p-3 space-y-2 text-[12px]">
-              ${obs.map(o => `
-                <li class="border-l-2 border-ion-cyan/40 pl-3">
-                  <div class="font-mono text-[11px] text-ion-cyan">${imEscape(o.field || '')}</div>
-                  <div class="text-slate-200 break-all"><code class="text-[11px]">${imEscape(o.value || '')}</code></div>
-                  <div class="text-slate-400 text-[11px] mt-0.5">${imEscape(o.significance || '')}</div>
-                </li>
-              `).join('')}
-            </ul>
-          </div>
-        `;
-      }
-      body.innerHTML = `
-        <div class="grid grid-cols-2 gap-3 text-[12px] text-slate-300 mb-4">
-          <div><span class="text-slate-500">Alert ref:</span> ${imEscape(r.alert_id_ref)}</div>
-          <div><span class="text-slate-500">Signature:</span> ${imEscape(r.alert_signature)}</div>
-          <div><span class="text-slate-500">Host:</span> ${imEscape(r.host || '-')}</div>
-          <div><span class="text-slate-500">User:</span> ${imEscape(r.user_name || '-')}</div>
-          <div><span class="text-slate-500">Status:</span> ${imStatusPill(r.status)}</div>
-          <div><span class="text-slate-500">Verdict:</span> ${imVerdictPill(r.verdict)}</div>
-          <div><span class="text-slate-500">Severity:</span> ${imSeverityPill(r.severity_assessment)}</div>
-          <div><span class="text-slate-500">Model:</span> ${imEscape(r.llm_model_used || '-')}</div>
-          <div><span class="text-slate-500">Tokens:</span> ${imEscape(r.tokens_used ?? '-')}</div>
-          <div><span class="text-slate-500">Duration:</span> ${imEscape(imDuration(r.duration_ms))}</div>
-          <div><span class="text-slate-500">Started:</span> ${imEscape(imFmtDate(r.created_at))}</div>
-          <div><span class="text-slate-500">Completed:</span> ${imEscape(imFmtDate(r.completed_at))}</div>
-        </div>
-        <div class="mb-3">
-          <div class="label-tiny text-slate-500 mb-1">Summary</div>
-          <div class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[12px] text-slate-200 whitespace-pre-wrap">${imEscape(r.summary_text || '(none)')}</div>
-        </div>
-        ${obsHtml}
-        <div class="mb-3">
-          <div class="label-tiny text-slate-500 mb-1">Recommended actions</div>
-          <pre class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[11px] text-slate-300 overflow-x-auto">${imEscape(actions)}</pre>
-        </div>
-        <div>
-          <div class="label-tiny text-slate-500 mb-1">IOC snapshot</div>
-          <pre class="rounded-md border border-white/5 bg-ink-900/70 p-3 text-[11px] text-slate-300 overflow-x-auto">${imEscape(iocs)}</pre>
-        </div>
-      `;
-    } catch (e) {
-      body.innerHTML = `<div class="text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</div>`;
-    }
-  }
-  window.imShowInv = imShowInv;
-
-  function imCloseInvModal() {
-    document.getElementById('im-inv-modal').style.display = 'none';
-  }
-  window.imCloseInvModal = imCloseInvModal;
-
-  // ---- IOC sightings ----------------------------------------------------
-  async function imLoadIocs() {
+    const fields = {signature:'alert_signature', verdict:'verdict', status:'status', host:'host', from:'from_date', to:'to_date'};
+    Object.entries(fields).forEach(([id,key]) => {
+      const value = document.getElementById('im-filter-' + id).value.trim();
+      if (value) params.set(key,value);
+    });
+    load('inv',params);
+  };
+  window.imLoadIocs = function() {
     const params = new URLSearchParams();
     const type = document.getElementById('im-ioc-type').value;
     const bad = document.getElementById('im-ioc-bad').value;
-    if (type) params.set('ioc_type', type);
-    if (bad === 'true')  params.set('is_known_bad', 'true');
-    if (bad === 'false') params.set('is_known_bad', 'false');
-
-    const tbody = document.getElementById('im-iocs-tbody');
-    tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>';
-
-    try {
-      const res = await fetch('/api/iocs?' + params.toString());
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const rows = data.iocs || [];
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-slate-500 text-[12px]">No IOC sightings yet.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = rows.map(r => {
-        const flags = [];
-        if (r.is_known_bad)  flags.push('<span class="pill pill-tp">bad</span>');
-        if (r.is_known_good) flags.push('<span class="pill pill-benign">good</span>');
-        return `
-          <tr>
-            <td><span class="pill pill-pending">${imEscape(r.ioc_type)}</span></td>
-            <td class="font-mono text-white">${imEscape(r.ioc_value)}</td>
-            <td>${imEscape(r.seen_count)}</td>
-            <td>${imEscape(imFmtDate(r.first_seen_at))}</td>
-            <td>${imEscape(imFmtDate(r.last_seen_at))}</td>
-            <td>${flags.join(' ') || '-'}</td>
-            <td>${r.last_investigation_id ? '#' + r.last_investigation_id : '-'}</td>
-          </tr>
-        `;
-      }).join('');
-    } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-8 text-center text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</td></tr>`;
-    }
-  }
-  window.imLoadIocs = imLoadIocs;
-
-  // ---- FP signatures ----------------------------------------------------
-  async function imLoadFps() {
-    const tbody = document.getElementById('im-fps-tbody');
-    tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-slate-500 text-[12px]">Loading…</td></tr>';
-    try {
-      const res = await fetch('/api/fps');
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const data = await res.json();
-      const rows = data.fps || [];
-      if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-slate-500 text-[12px]">No FP signatures yet. Create one with the New FP signature button.</td></tr>';
-        return;
-      }
-      tbody.innerHTML = rows.map(r => `
-        <tr>
-          <td>${r.enabled
-              ? '<span class="pill pill-benign">on</span>'
-              : '<span class="pill pill-fp">off</span>'}</td>
-          <td>${imEscape(r.rule_name || r.rule_id || '-')}</td>
-          <td>${imEscape(r.alert_signature || '-')}</td>
-          <td class="font-mono">${imEscape(r.host_pattern || '-')}</td>
-          <td class="font-mono">${imEscape(r.user_pattern || '-')}</td>
-          <td>${imEscape(r.confidence)}%</td>
-          <td>${imEscape(r.hit_count)}</td>
-          <td>${imEscape(imFmtDate(r.last_matched_at))}</td>
-          <td class="max-w-xs truncate" title="${imEscape(r.reason)}">${imEscape(r.reason)}</td>
-          <td class="whitespace-nowrap">
-            <button class="text-[11px] text-ion-cyan hover:underline" data-click-action="imToggleFp" data-args='[${r.id}]'>${r.enabled ? 'Disable' : 'Enable'}</button>
-            <button class="text-[11px] text-ion-coral hover:underline ml-2" data-click-action="imDeleteFp" data-args='[${r.id}]'>Delete</button>
-          </td>
-        </tr>
-      `).join('');
-    } catch (e) {
-      tbody.innerHTML = `<tr><td colspan="10" class="px-4 py-8 text-center text-ion-coral text-[12px]">Failed to load: ${imEscape(e.message)}</td></tr>`;
-    }
-  }
-  window.imLoadFps = imLoadFps;
-
+    if (type) params.set('ioc_type',type);
+    if (bad !== '') params.set('is_known_bad',bad);
+    load('iocs',params);
+  };
+  window.imLoadFps = () => load('fps');
+  window.imLoadReviewInbox = () => load('review');
+  const loaders = {inv:imLoadInvestigations, iocs:imLoadIocs, fps:imLoadFps, review:imLoadReviewInbox};
+  window.imSwitchTab = function(name) {
+    tabs.forEach(t => {
+      document.getElementById('im-tab-' + t).classList.toggle('im-tab-active',t === name);
+      document.getElementById('im-pane-' + t).classList.toggle('hidden',t !== name);
+    });
+    loaders[name]();
+  };
+  window.imRefresh = function() {
+    const active = document.querySelector('.im-tab-active');
+    loaders[active ? active.id.replace('im-tab-','') : 'inv']();
+  };
+  let debounce;
+  window.imDebouncedLoadInv = function() { clearTimeout(debounce); debounce = setTimeout(imLoadInvestigations,300); };
+  window.imClearInvFilters = function() {
+    document.querySelectorAll('[id^="im-filter-"]').forEach(el => { el.value = ''; });
+    imLoadInvestigations();
+  };
+  let selectedInvestigation;
+  window.imRetryDetail = function() {
+    if (selectedInvestigation !== undefined) htmx.ajax('GET','/ui/investigation-memory/detail/' + selectedInvestigation,{target:'#im-inv-modal-body',swap:'innerHTML'});
+  };
+  window.imShowInv = function(id) {
+    selectedInvestigation = id;
+    document.getElementById('im-inv-modal-title').textContent = 'Investigation #' + id;
+    document.getElementById('im-inv-modal').showModal();
+    imRetryDetail();
+  };
+  window.imCloseInvModal = () => document.getElementById('im-inv-modal').close();
   async function imToggleFp(id) {
     try {
       const res = await fetch(`/api/fps/${id}/toggle`, { method: 'PATCH' });
@@ -747,12 +332,12 @@
 
   function imShowFpModal() {
     document.getElementById('im-fp-form').reset();
-    document.getElementById('im-fp-modal').style.display = 'flex';
+    document.getElementById('im-fp-modal').showModal();
   }
   window.imShowFpModal = imShowFpModal;
 
   function imCloseFpModal() {
-    document.getElementById('im-fp-modal').style.display = 'none';
+    document.getElementById('im-fp-modal').close();
   }
   window.imCloseFpModal = imCloseFpModal;
 
@@ -764,7 +349,7 @@
     for (const [k, v] of fd.entries()) {
       if (v !== '' && v !== null) payload[k] = v;
     }
-    if (payload.confidence !== undefined) payload.confidence = parseInt(payload.confidence, 10) || 80;
+    if (payload.confidence !== undefined) payload.confidence = parseInt(payload.confidence, 10);
     if (!payload.reason) {
       alert('Reason is required.');
       return;
@@ -789,20 +374,7 @@
   }
   window.imSubmitFp = imSubmitFp;
 
-  // ---- Refresh current tab ---------------------------------------------
-  function imRefresh() {
-    const active = document.querySelector('.im-tab-active');
-    if (!active) { imLoadInvestigations(); return; }
-    if (active.id === 'im-tab-inv')  imLoadInvestigations();
-    if (active.id === 'im-tab-iocs') imLoadIocs();
-    if (active.id === 'im-tab-fps')  imLoadFps();
-  }
-  window.imRefresh = imRefresh;
 
-  // ---- Initial load ----------------------------------------------------
-  document.addEventListener('DOMContentLoaded', imLoadInvestigations);
-  // If DOMContentLoaded already fired (HTMX swap), load now.
-  if (document.readyState !== 'loading') imLoadInvestigations();
 })();
 </script>
 {% endblock %}
