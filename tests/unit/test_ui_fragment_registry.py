@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib
 import pathlib
 import pkgutil
+import re
 import sys
 
 import pytest
@@ -232,3 +233,80 @@ def test_every_fragment_declares_an_html_response():
         assert route.response_class is HTMLResponse or issubclass(
             route.response_class, HTMLResponse
         ), f"{route.path} does not declare an HTML response"
+
+
+def _html_literals(module_name: str) -> set[str]:
+    """Every template path a fragment module mentions, however it is named.
+
+    Matching `name="..."` was the obvious thing and it was wrong: six of
+    the thirteen modules assign their template to a module-level constant
+    and pass that, so the regex found nothing for them and the guard below
+    passed while proving nothing. Hiding a template by hand is what showed
+    it, not reading the code.
+    """
+    source = (pathlib.Path(ui.__path__[0]) / f"{module_name}.py").read_text(
+        encoding="utf-8"
+    )
+    return set(re.findall(r"""['"]([\w./-]+\.html)['"]""", source))
+
+
+def test_every_template_a_fragment_names_exists():
+    """A module without its template is a route that 500s on every request.
+
+    This happened. A `git add -A` while a conversion was still in progress
+    committed ui/canaries.py without _fragments/canaries.html, so that
+    route would have raised TemplateNotFound on every commit until the
+    conversion landed. Nothing else would have caught it: the module
+    imports, the route mounts, and every other guard here passes. Only a
+    request fails.
+    """
+    templates_dir = pathlib.Path(ui.__file__).parent.parent / "templates"
+    checked, missing = 0, []
+    for name in ui._page_modules():
+        for referenced in _html_literals(name):
+            checked += 1
+            if not (templates_dir / referenced).exists():
+                missing.append(f"{name}.py -> {referenced}")
+    assert checked, "no module named a template, so this proves nothing"
+    assert not missing, f"fragment templates that do not exist: {missing}"
+
+
+# Fragments that must carry a licence module gate as well as a permission.
+# ION's detection-engineering pages are a paid module: /api/de/* gets
+# require_de_module from the router mount in server.py, so a /ui fragment
+# mirroring one has to declare the gate itself or it is reachable on a
+# deployment that is not licensed for it.
+#
+# The convention is the check. Every DE page is named de_*, so the rule is
+# derivable rather than a list somebody has to remember to extend, which is
+# the point: the first DE fragment carried the gate correctly and nothing
+# here would have noticed if the second did not.
+MODULE_GATED_PREFIXES = {"de_": "require_de_module"}
+
+
+def test_a_licence_gated_fragment_carries_its_module_gate():
+    """A fragment is reachable on an unlicensed deployment without this.
+
+    The gate also has to come before the permission, because router
+    dependencies resolve first on the JSON side and the order decides what
+    an unauthenticated request to a disabled module is told: 404, meaning
+    this does not exist here, rather than 401, meaning log in and try
+    again. The second answer tells an unlicensed caller that the feature is
+    there and they are merely not signed in.
+    """
+    for name in ui._page_modules():
+        gate = next((g for p, g in MODULE_GATED_PREFIXES.items()
+                     if name.startswith(p)), None)
+        if gate is None:
+            continue
+        mod = importlib.import_module(f"ion.web.ui.{name}")
+        found = [
+            getattr(c, "__qualname__", "")
+            for route in mod.router.routes
+            for c in _dependency_calls(route)
+        ]
+        assert any(gate in n for n in found), (
+            f"ion.web.ui.{name} mirrors a licence-gated API but declares no "
+            f"{gate}, so its fragment is reachable on a deployment that is "
+            "not licensed for the module"
+        )
