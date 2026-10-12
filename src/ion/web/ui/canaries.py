@@ -212,10 +212,11 @@ def canaries_fragment(
         logger.exception("Canary list could not be read")
         # A failed read is not an empty grid. Nothing else is rendered in
         # this branch: with the list unread, "nothing has fired" is a claim
-        # about decoys ION could not even enumerate.
+        # about decoys ION could not even enumerate. `rows=None` is what the
+        # template reads as unreadable, so the two cannot disagree.
         context.update({
-            "failed": True, "rows": None, "tiles": stat_views(None),
-            "stats_failed": True, "hits": None, "hits_failed": True,
+            "rows": None, "tiles": stat_views(None),
+            "stats_failed": True, "hits": None,
         })
         return templates.TemplateResponse(
             request=request, name=FRAGMENT, context=context,
@@ -231,23 +232,22 @@ def canaries_fragment(
         logger.exception("Canary stats could not be read")
         stats, stats_failed = None, True
 
+    # None, not [], so the hits card says the log could not be read rather
+    # than "no canary hits recorded".
     hits: list[dict] | None
     try:
         hits = hit_rows(
             canary_service.list_hits(session, limit=HITS_LIMIT), canaries,
         )
-        hits_failed = False
     except Exception:
         logger.exception("Canary hits could not be read")
-        hits, hits_failed = None, True
+        hits = None
 
     context.update({
-        "failed": False,
         "rows": canary_rows(canaries),
         "tiles": stat_views(stats),
         "stats_failed": stats_failed,
         "hits": hits,
-        "hits_failed": hits_failed,
     })
     return templates.TemplateResponse(
         request=request, name=FRAGMENT, context=context,
