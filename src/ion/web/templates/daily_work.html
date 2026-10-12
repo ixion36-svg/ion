@@ -1,92 +1,22 @@
 {% extends "base.html" %}
 {% block title %}My Day · ION{% endblock %}
 {% block page_id %}daily_work{% endblock %}
-
 {% block content %}
-<div class="ion-tw ion-tw-page text-slate-200 overflow-x-hidden">
-<div class="relative z-10 mx-auto max-w-[1920px] w-full px-4 sm:px-6 lg:px-10 xl:px-14 py-10 md:py-14">
-
-  <section class="flex flex-wrap items-end justify-between gap-6 mb-8 rise d-1">
-    <div class="flex-1 min-w-0">
-      <div class="flex items-center gap-3 mb-4">
-        <span class="h-1.5 w-1.5 rounded-full bg-ion-cyan pulse-cyan"></span>
-        <span class="label-tiny text-primary">Daily operations</span>
-      </div>
-      <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] text-white tracking-[-0.02em]" id="dw-title">My Day</h1>
-      <p class="mt-3 max-w-2xl text-[15px] text-slate-400" id="dw-sub">Loading…</p>
-    </div>
-    <div class="join" id="dw-toggle">
-      <button type="button" class="btn btn-sm join-item on" data-view="me">My Day</button>
-      <button type="button" class="btn btn-sm join-item" data-view="team">Team Day</button>
-    </div>
-  </section>
-
-  <!-- ── My Day ── -->
-  <section id="dw-view-me">
-    <div class="flex flex-wrap items-center justify-between gap-3 my-1">
-      <div class="flex items-center gap-1.5">
-        <button type="button" class="btn btn-sm" id="dw-prev" title="Previous day" aria-label="Previous day">‹</button>
-        <input type="date" class="input input-sm w-auto" id="dw-date" />
-        <button type="button" class="btn btn-sm" id="dw-next" title="Next day" aria-label="Next day">›</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="dw-today">Today</button>
-      </div>
-      <div class="join" id="dw-modetoggle">
-        <button type="button" class="btn btn-sm join-item on" data-mode="calendar">Calendar</button>
-        <button type="button" class="btn btn-sm join-item" data-mode="timeline">Timeline</button>
-      </div>
-    </div>
-
-    <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow my-4" id="dw-metrics"></div>
-
-    <div class="dw-split">
-      <div>
-        <div class="flex flex-wrap gap-1.5 items-center mb-3" id="dw-presets">
-          <span class="text-[11px] uppercase tracking-wide opacity-60 mr-1">Quick add</span>
-        </div>
-        <div class="flex gap-2 items-center bg-base-200 border border-base-300 rounded-box px-2.5 py-1.5 mb-4">
-          <span class="text-primary text-base" aria-hidden="true">＋</span>
-          <input class="input input-ghost input-sm flex-1 min-w-0" id="dw-text"
-                 placeholder="Or log something custom — add detail, pick a type…" maxlength="2000" />
-          <input type="time" class="input input-sm w-auto shrink-0" id="dw-time" title="Time of day for this entry" />
-          <select class="select select-sm w-auto" id="dw-type"></select>
-          <button type="button" class="btn btn-primary btn-sm" id="dw-add">Add</button>
-        </div>
-
-        <!-- Calendar (default) -->
-        <div id="dw-mode-calendar">
-          <div class="text-[11px] uppercase tracking-wider opacity-60 mb-2.5">Day calendar — click an hour to add, an entry to edit</div>
-          <div class="dw-calendar" id="dw-calendar"></div>
-        </div>
-
-        <!-- Timeline (alternate) -->
-        <div id="dw-mode-timeline" class="dw-hidden">
-          <div class="text-[11px] uppercase tracking-wider opacity-60 mb-2.5">Activity timeline</div>
-          <div class="ion-timeline" id="dw-timeline">
-            <div class="ion-timeline-rail"></div>
-          </div>
-        </div>
-      </div>
-
-      <div>
-        {# Route audit phase 6: this card used to build a handover note client-side
-           from THIS user's timeline only — no case severity, no MTTR, no pending
-           queue, no unassigned cases. /shift-handover produces the same artefact
-           server-side for the whole SOC with all of that, so the weaker copy is
-           replaced by a link to the real one. #}
-        <div class="card bg-base-200 shadow">
-          <div class="card-body">
-            <h2 class="card-title"><span aria-hidden="true">↪</span> Shift handover</h2>
-            <p class="text-sm opacity-70">The shift handover report is compiled for the whole team — case severity, MTTR, closure reasons and the pending queue for the incoming shift.</p>
-            <div class="card-actions">
-              <a class="btn btn-primary w-full" href="/shift-handover">Open shift handover</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ── Edit / add entry modal ── -->
+<div class="ion-tw ion-tw-page text-base-content overflow-x-hidden"><div class="relative z-10 mx-auto max-w-[1920px] px-4 sm:px-6 lg:px-10 py-10">
+<section class="mb-8"><span class="label-tiny text-primary">Daily operations</span><h1 class="text-4xl font-semibold" id="dw-title">My Day</h1></section>
+<div class="flex flex-wrap gap-2 items-center mb-4">
+  <button type="button" class="btn btn-sm" id="dw-prev" aria-label="Previous day">Previous</button>
+  <input type="date" class="input input-sm w-auto" id="dw-date" name="date" />
+  <button type="button" class="btn btn-sm" id="dw-next" aria-label="Next day">Next</button>
+  <button type="button" class="btn btn-ghost btn-sm" id="dw-today">Today</button>
+  <button type="button" class="btn btn-primary btn-sm" id="dw-refresh">Refresh</button>
+  <button type="button" class="btn btn-ghost btn-sm" hx-get="/ui/daily-work/controls" hx-target="#dw-controls" hx-swap="innerHTML">Retry task types</button>
+  <div class="join" id="dw-modetoggle"><button type="button" class="btn btn-sm join-item on" data-mode="calendar">Calendar</button><button type="button" class="btn btn-sm join-item" data-mode="timeline">Timeline</button></div>
+</div>
+<div id="dw-controls" hx-get="/ui/daily-work/controls" hx-trigger="load" hx-swap="innerHTML"><span class="loading loading-spinner loading-sm"></span> Loading task types...</div>
+<section id="dw-view-me"><div id="dw-day-content" hx-get="/ui/daily-work" hx-trigger="load, dayRequested" hx-include="#dw-date" hx-swap="innerHTML"><span class="loading loading-spinner loading-sm"></span> Loading day...</div>
+<a class="btn btn-ghost mt-4" href="/shift-handover">Open shift handover</a></section>
+<section id="dw-view-team" class="dw-hidden"><div id="dw-team-content" hx-get="/ui/daily-work/team" hx-trigger="teamRequested" hx-include="#dw-date" hx-swap="innerHTML"></div></section>
   <div class="modal dw-hidden" id="dw-modal">
     <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="dw-modal-title">
       <h2 class="text-lg font-semibold" id="dw-modal-title">Edit entry</h2>
@@ -110,32 +40,13 @@
     </div>
   </div>
 
-  <!-- ── Team Day ── -->
-  <section id="dw-view-team" class="dw-hidden">
-    <div class="dw-board-head">
-      <div>Analyst</div><div>Working now</div><div>Today</div><div class="dw-ta-right">Active</div>
-    </div>
-    <div id="dw-board"></div>
-    <p class="text-xs opacity-60 mt-3.5" id="dw-team-note">Loading team…</p>
-  </section>
-
-</div>
-</div>
-
+</div></div>
 {% endblock %}
-
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
 (function () {
   "use strict";
-  // auto-event type → ion colour key (manual types come from the taxonomy)
-  var AUTO_COLORS = { triaged: "red", closed: "green", playbook: "amber", note: "purple", shift: "muted" };
-  var typeColor = {};   // slug -> colour key
-  var typeLabel = {};   // slug -> display label
-  var currentMode = "calendar";   // 'calendar' | 'timeline'
-
-  function esc(s) { return String(s == null ? "" : s).replace(/[<>&"]/g, function (c) { return ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]; }); }
-  function colorKey(t) { return typeColor[t] || AUTO_COLORS[t] || "muted"; }
+  var currentMode = "calendar";
   function pad2(n) { return (n < 10 ? "0" : "") + n; }
   function ymd2(dt) { return dt.getFullYear() + "-" + pad2(dt.getMonth() + 1) + "-" + pad2(dt.getDate()); }
   function todayYMD() { return ymd2(new Date()); }
@@ -152,73 +63,8 @@
     });
   }
 
-  // ---- task types (quick-add chips + composer select) ----
-  function loadTaskTypes() {
-    return api("/task-types").then(function (d) {
-      var presets = document.getElementById("dw-presets");
-      var sel = document.getElementById("dw-type");
-      var editSel = document.getElementById("dw-edit-type");
-      (d.task_types || []).forEach(function (t) {
-        typeColor[t.key] = t.color; typeLabel[t.key] = t.label;
-        var b = document.createElement("button");
-        b.type = "button"; b.className = "ion-chip ion-c-" + (t.color || "muted");
-        b.innerHTML = (t.glyph ? '<span aria-hidden="true">' + esc(t.glyph) + "</span>" : "") + esc(t.label);
-        b.addEventListener("click", function () { addEntry(t.key, t.label); });
-        presets.appendChild(b);
-        var o = document.createElement("option");
-        o.value = t.key; o.textContent = t.label; sel.appendChild(o);
-        var o2 = document.createElement("option");
-        o2.value = t.key; o2.textContent = t.label; editSel.appendChild(o2);
-      });
-    });
-  }
-
-  // ---- my day ----
-  var lastItems = [];
-  function loadDay() {
-    return api("/day?date=" + encodeURIComponent(selectedDate)).then(function (d) {
-      document.getElementById("dw-sub").textContent =
-        (d.user ? d.user.name : "") + " · " + d.date;
-      renderMetrics(d.summary);
-      lastItems = d.items || [];
-      renderTimeline(lastItems);
-      renderCalendar(lastItems);
-    });
-  }
-
-  function renderMetrics(s) {
-    s = s || {};
-    var cards = [
-      ["Active span", s.active_span || "—", ""],
-      ["Triaged", s.triaged || 0, "dw-v-cyan"],
-      ["Cases touched", s.cases_touched || 0, ""],
-      ["Closed", s.closed || 0, "dw-v-green"],
-      ["Logged", s.logged || 0, ""],
-    ];
-    document.getElementById("dw-metrics").innerHTML = cards.map(function (c) {
-      return '<div class="ion-metric"><div class="ion-metric-label">' + c[0] +
-        '</div><div class="ion-metric-value ' + c[2] + '">' + esc(c[1]) + "</div></div>";
-    }).join("");
-  }
-
-  function renderTimeline(items) {
-    var el = document.getElementById("dw-timeline");
-    el.innerHTML = '<div class="ion-timeline-rail"></div>';
-    if (!items.length) { el.innerHTML += '<div class="dw-empty">No activity logged yet today.</div>'; return; }
-    items.forEach(function (i) {
-      var ck = colorKey(i.type);
-      var label = typeLabel[i.type] || i.type;
-      var d = document.createElement("div");
-      d.className = "ion-ev";
-      d.innerHTML =
-        '<div class="ion-ev-time">' + esc(i.time) + "</div>" +
-        '<div class="ion-ev-dot dw-dot-' + ck + '"></div>' +
-        '<div><span class="ion-badge ion-c-' + ck + '">' + esc(label) + "</span>" +
-        esc(i.text) + ' <span class="dw-src">' + esc(i.source) + "</span></div>";
-      el.appendChild(d);
-    });
-  }
-
+  function loadDay() { htmx.trigger(document.getElementById("dw-day-content"), "dayRequested"); }
+  function loadTeam() { htmx.trigger(document.getElementById("dw-team-content"), "teamRequested"); }
   function addEntry(taskType, fallbackText) {
     var inp = document.getElementById("dw-text");
     var text = inp.value.trim() || fallbackText;
@@ -234,50 +80,6 @@
       .catch(function (e) { if (window.showToast) showToast("Log failed: " + e.message, "error"); });
   }
 
-  // ---- day calendar ----
-  function calItemHtml(i) {
-    var ck = colorKey(i.type);
-    var label = typeLabel[i.type] || i.type;
-    var editable = i.source === "logged" && i.id;
-    var attrs = editable
-      ? ' data-entry-id="' + i.id + '" data-type="' + esc(i.type) + '" data-time="' + esc(i.time) + '" data-text="' + esc(i.text) + '"'
-      : "";
-    return '<div class="dw-cal-item ' + (editable ? "dw-editable" : "") + '"' + attrs + ">" +
-      '<span class="dw-cal-time">' + esc(i.time) + "</span>" +
-      '<span class="ion-badge ion-c-' + ck + '">' + esc(label) + "</span>" +
-      '<span class="dw-cal-text">' + esc(i.text) + "</span>" +
-      (editable ? '<span class="dw-cal-edit">edit ✎</span>'
-                : '<span class="dw-cal-auto">' + esc(i.source) + "</span>") +
-      "</div>";
-  }
-
-  function renderCalendar(items) {
-    var cal = document.getElementById("dw-calendar");
-    var byHour = {};
-    (items || []).forEach(function (i) {
-      var hh = parseInt(String(i.time || "").slice(0, 2), 10);
-      if (isNaN(hh) || hh < 0 || hh > 23) hh = 0;
-      (byHour[hh] = byHour[hh] || []).push(i);
-    });
-    var nowH = (selectedDate === todayYMD()) ? (new Date()).getHours() : -1;
-    var html = "";
-    for (var h = 0; h < 24; h++) {
-      var hourItems = (byHour[h] || []).slice().sort(function (a, b) {
-        return String(a.time || "").localeCompare(String(b.time || ""));
-      });
-      var rows = hourItems.map(calItemHtml).join("");
-      var slotCls = "dw-hour-slot" + (h === nowH ? " dw-hour-now" : "");
-      html += '<div class="dw-hour"><div class="dw-hour-label">' + pad2(h) + ":00</div>" +
-        '<div class="' + slotCls + '" data-hour="' + h + '">' + rows + "</div></div>";
-    }
-    cal.innerHTML = html;
-    // Scroll a sensible working hour into view (08:00 or the first item).
-    var firstH = Object.keys(byHour).map(Number).sort(function (a, b) { return a - b; })[0];
-    var target = cal.querySelector('.dw-hour-slot[data-hour="' + (firstH != null ? firstH : 8) + '"]');
-    if (target && target.parentElement) cal.scrollTop = Math.max(0, target.parentElement.offsetTop - 40);
-  }
-
-  // ---- edit / add entry modal ----
   var editingId = null;   // entry id when editing; null when adding
   function openModal(opts) {
     editingId = opts.id || null;
@@ -310,115 +112,67 @@
       .catch(function (e) { if (window.showToast) showToast("Delete failed: " + e.message, "error"); });
   }
 
-  // ---- date nav + mode toggle ----
   function gotoDate(ymd) {
     selectedDate = ymd;
     document.getElementById("dw-date").value = ymd;
-    loadDay().catch(function () {});
-    if (!document.getElementById("dw-view-team").classList.contains("dw-hidden")) { teamLoaded = false; loadTeam(); }
+    loadDay();
+    if (!document.getElementById("dw-view-team").classList.contains("dw-hidden")) loadTeam();
   }
   function setMode(m) {
     currentMode = m;
-    document.getElementById("dw-mode-calendar").classList.toggle("dw-hidden", m !== "calendar");
-    document.getElementById("dw-mode-timeline").classList.toggle("dw-hidden", m !== "timeline");
-    document.querySelectorAll("#dw-modetoggle button").forEach(function (b) {
-      b.classList.toggle("on", b.getAttribute("data-mode") === m);
+    ["calendar", "timeline"].forEach(function (mode) {
+      var el = document.getElementById("dw-mode-" + mode);
+      if (el) el.classList.toggle("dw-hidden", mode !== m);
     });
+    document.querySelectorAll("#dw-modetoggle button").forEach(function (b) { b.classList.toggle("on", b.dataset.mode === m); });
   }
-
-  // ---- team day ----
-  var teamLoaded = false;
-  function loadTeam() {
-    if (teamLoaded) return;
-    api("/team?date=" + encodeURIComponent(selectedDate)).then(function (d) {
-      teamLoaded = true;
-      var board = document.getElementById("dw-board");
-      var note = document.getElementById("dw-team-note");
-      var team = d.team || [];
-      if (!team.length) { board.innerHTML = '<div class="dw-empty">No analyst activity recorded today.</div>'; note.textContent = ""; return; }
-      board.innerHTML = team.map(function (p) {
-        var c = p.counts || {};
-        var now = p.now ? esc(p.now) : '<span class="dw-now-empty">— no active case</span>';
-        return '<div class="dw-row"><div class="dw-who">' +
-          '<span class="ion-avatar ion-c-purple">' + esc(p.initials || "?") + "</span>" +
-          '<div><div class="dw-who-name">' + esc(p.name) + "</div>" +
-          '<div class="dw-who-sub ion-muted">' + (c.total || 0) + " items today</div></div></div>" +
-          '<div class="dw-now">' + now + "</div>" +
-          '<div class="dw-cnt"><span class="dw-num-cyan">' + (c.triaged || 0) +
-          '</span> triaged · <span class="dw-num-green">' + (c.closed || 0) + "</span> closed</div>" +
-          '<div class="dw-ta-right dw-last">' + esc(p.last_active || "—") + "</div></div>";
-      }).join("");
-      note.textContent = "Flags are supportive — last-active and load help the lead balance work and feed the handover.";
-    }).catch(function (e) {
-      var note = document.getElementById("dw-team-note");
-      if (e.code === 403) { note.textContent = "Team view requires lead access (security:read)."; document.getElementById("dw-board").replaceChildren(); }
-      else note.textContent = "Could not load team view: " + e.message;
-    });
-  }
-
-  // ---- view toggle ----
   function setView(v) {
     var me = v === "me";
     document.getElementById("dw-view-me").classList.toggle("dw-hidden", !me);
     document.getElementById("dw-view-team").classList.toggle("dw-hidden", me);
-    document.getElementById("dw-title").textContent = me ? "My Day" : "Team — Today";
-    document.querySelectorAll("#dw-toggle button").forEach(function (b) {
-      b.classList.toggle("on", b.getAttribute("data-view") === v);
-    });
+    document.querySelectorAll(".dw-my-controls").forEach(function (el) { el.classList.toggle("dw-hidden", !me); });
+    document.getElementById("dw-title").textContent = me ? "My Day" : "Team Day";
+    document.querySelectorAll("#dw-toggle button").forEach(function (b) { b.classList.toggle("on", b.dataset.view === v); });
     if (!me) loadTeam();
   }
-
-  function init() {
-    document.querySelectorAll("#dw-toggle button").forEach(function (b) {
-      b.addEventListener("click", function () { setView(b.getAttribute("data-view")); });
-    });
-    document.getElementById("dw-add").addEventListener("click", function () {
-      addEntry(document.getElementById("dw-type").value, null);
-    });
-    document.getElementById("dw-text").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") addEntry(document.getElementById("dw-type").value, null);
-    });
-
-    // date navigation
-    document.getElementById("dw-date").value = selectedDate;
-    document.getElementById("dw-time").value = nowHM();
-    document.getElementById("dw-prev").addEventListener("click", function () { gotoDate(shiftDate(selectedDate, -1)); });
-    document.getElementById("dw-next").addEventListener("click", function () { gotoDate(shiftDate(selectedDate, 1)); });
-    document.getElementById("dw-today").addEventListener("click", function () { gotoDate(todayYMD()); });
-    document.getElementById("dw-date").addEventListener("change", function (e) { if (e.target.value) gotoDate(e.target.value); });
-
-    // calendar / timeline sub-toggle
-    document.querySelectorAll("#dw-modetoggle button").forEach(function (b) {
-      b.addEventListener("click", function () { setMode(b.getAttribute("data-mode")); });
-    });
-
-    // calendar interactions (delegated): click an entry to edit, an hour to add
-    document.getElementById("dw-calendar").addEventListener("click", function (e) {
-      var item = e.target.closest(".dw-cal-item.dw-editable");
-      if (item) {
-        openModal({ id: item.getAttribute("data-entry-id"), type: item.getAttribute("data-type"),
-                    time: item.getAttribute("data-time"), text: item.getAttribute("data-text") });
-        return;
-      }
-      var slot = e.target.closest(".dw-hour-slot");
-      if (slot) openModal({ time: pad2(parseInt(slot.getAttribute("data-hour"), 10)) + ":00" });
-    });
-
-    // modal buttons
-    document.getElementById("dw-edit-save").addEventListener("click", saveModal);
-    document.getElementById("dw-edit-cancel").addEventListener("click", closeModal);
-    document.getElementById("dw-edit-delete").addEventListener("click", deleteModal);
-    document.getElementById("dw-modal").addEventListener("click", function (e) {
-      if (e.target === this) closeModal();   // click backdrop to dismiss
-    });
-
-    loadTaskTypes().then(loadDay).catch(function (e) {
-      document.getElementById("dw-sub").textContent = "Failed to load: " + e.message;
-    });
-  }
-
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
-  else init();
+  document.getElementById("dw-date").value = selectedDate;
+  document.addEventListener("click", function (e) {
+    var view = e.target.closest("[data-view]");
+    if (view && view.closest("#dw-toggle")) setView(view.dataset.view);
+    var mode = e.target.closest("[data-mode]");
+    if (mode && mode.closest("#dw-modetoggle")) setMode(mode.dataset.mode);
+    var preset = e.target.closest("[data-task-type]");
+    if (preset) addEntry(preset.dataset.taskType, preset.dataset.taskLabel);
+    var item = e.target.closest(".dw-cal-item.dw-editable");
+    if (item) { openModal({ id: item.dataset.entryId, type: item.dataset.type, time: item.dataset.time, text: item.dataset.text }); return; }
+    var slot = e.target.closest(".dw-hour-slot");
+    if (slot) openModal({ time: pad2(Number(slot.dataset.hour)) + ":00" });
+    if (e.target.closest("#dw-add")) addEntry(document.getElementById("dw-type").value, null);
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.target.id === "dw-text" && e.key === "Enter") addEntry(document.getElementById("dw-type").value, null);
+  });
+  document.body.addEventListener("htmx:afterSwap", function (e) {
+    if (e.detail.target.id === "dw-day-content") {
+      setMode(currentMode);
+      var cal = document.getElementById("dw-calendar");
+      var target = cal && (cal.querySelector(".dw-editable") || cal.querySelector('[data-hour="8"]'));
+      if (target) cal.scrollTop = Math.max(0, target.offsetTop - cal.offsetTop - 40);
+    }
+    if (e.detail.target.id === "dw-controls") {
+      var input = document.getElementById("dw-time");
+      if (input) input.value = nowHM();
+    }
+  });
+  document.getElementById("dw-prev").addEventListener("click", function () { gotoDate(shiftDate(selectedDate, -1)); });
+  document.getElementById("dw-next").addEventListener("click", function () { gotoDate(shiftDate(selectedDate, 1)); });
+  document.getElementById("dw-today").addEventListener("click", function () { gotoDate(todayYMD()); });
+  document.getElementById("dw-refresh").addEventListener("click", function () { loadDay(); if (!document.getElementById("dw-view-team").classList.contains("dw-hidden")) loadTeam(); });
+  document.getElementById("dw-date").addEventListener("change", function (e) { if (e.target.value) gotoDate(e.target.value); });
+  document.getElementById("dw-edit-save").addEventListener("click", saveModal);
+  document.getElementById("dw-edit-cancel").addEventListener("click", closeModal);
+  document.getElementById("dw-edit-delete").addEventListener("click", deleteModal);
+  document.getElementById("dw-modal").addEventListener("click", function (e) { if (e.target === this) closeModal(); });
 })();
 </script>
 {% endblock %}

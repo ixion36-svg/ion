@@ -1,0 +1,36 @@
+{% if can_write %}
+<button class="btn" data-click-action="shOpenRaiseModal">Raise Handover</button>
+<dialog id="sh-raise-modal" class="rounded-box bg-base-200 text-base-content p-6 w-full max-w-2xl border border-base-300">
+  <div>
+    <div class="flex items-center justify-between gap-4">
+      <h3 class="font-semibold text-lg">Raise a handover</h3>
+      <button class="btn btn-ghost btn-sm btn-circle" data-click-action="shCloseRaiseModal" aria-label="Close">&times;</button>
+    </div>
+    <p class="text-sm opacity-60 mt-2">This freezes the shift report as it stands now. The numbers will not move afterwards, which is what makes them accountable.</p>
+    <div class="flex flex-col gap-3 mt-4">
+      <div class="flex flex-col gap-1">
+        <span class="label-tiny opacity-60">Incoming lead</span>
+        <button id="sh-leads-refresh" class="btn btn-sm" hx-get="/ui/shift-handover/leads" hx-target="#sh-leads">Retry incoming leads</button><div id="sh-leads" hx-get="/ui/shift-handover/leads" hx-trigger="load"></div>
+      </div>
+      <label class="flex flex-col gap-1">
+        <span class="label-tiny opacity-60">Shift length</span>
+        <select id="sh-raise-hours" class="select select-bordered">
+          <option value="4">4 hours</option>
+          <option value="8" selected>8 hours</option>
+          <option value="12">12 hours</option>
+          <option value="24">24 hours</option>
+        </select>
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="label-tiny opacity-60">Summary</span>
+        <textarea id="sh-raise-summary" class="textarea textarea-bordered" rows="3" placeholder="What the incoming shift most needs to know"></textarea>
+      </label>
+    </div>
+    <div class="modal-action">
+      <button class="btn" data-click-action="shCloseRaiseModal">Cancel</button>
+      <button class="btn btn-primary" data-click-action="shRaiseHandover">Raise draft</button>
+    </div>
+  </div>
+</dialog>
+
+{% endif %}

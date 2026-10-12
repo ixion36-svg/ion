@@ -719,14 +719,15 @@ class TestWiring:
         assert metrics in src and detail in src
         assert src.index(metrics) < src.index(detail)
 
-    def test_the_page_calls_the_handover_endpoints(self):
-        """The page builds URLs from its own API prefix constant, so the
-        assertion is on the paths it appends, not the whole URL."""
-        tpl = (_SRC / "ion" / "web" / "templates" / "shift_handover.html"
-               ).read_text(encoding="utf-8")
-        assert "/shift-handover" in tpl           # the API prefix constant
-        assert "SH_TRANSFERS" in tpl
-        assert "/metrics" in tpl
+    def test_the_page_calls_the_handover_endpoints(self, db):
+        from starlette.requests import Request
+        from ion.web.ui.shift_handover import transfers
+        h = _draft(db)
+        handovers.submit_handover(db, handover_id=h.id, actor_id=1)
+        request = Request({"type": "http", "path": "/ui/shift-handover/transfers", "headers": []})
+        html = transfers(request, db).body.decode()
+        assert f'data-sh-open="{h.id}"' in html
+        assert 'Offered and not taken' in html and '>1</div>' in html
 
     def test_the_page_exposes_the_whole_decision_flow(self):
         tpl = (_SRC / "ion" / "web" / "templates" / "shift_handover.html"
@@ -735,13 +736,18 @@ class TestWiring:
                         "shAddAction", "shCompleteAction", "shCancelAction"):
             assert control in tpl, control
 
-    def test_the_page_renders_carry_count_and_overdue(self):
-        """The two signals the review asked to be measurable."""
-        tpl = (_SRC / "ion" / "web" / "templates" / "shift_handover.html"
-               ).read_text(encoding="utf-8")
-        assert "carry_count" in tpl
-        assert "overdue_action_count" in tpl
-        assert "unowned_action_count" in tpl
+    def test_the_page_renders_carry_count_and_overdue(self, db):
+        from ion.web.templating import make_templates
+        h = _draft(db)
+        action = handovers.add_action(db, handover_id=h.id, actor_id=1,
+                                     description="Review", due_at=datetime.now(timezone.utc) - timedelta(hours=1))
+        action.carry_count = 2
+        db.commit()
+        payload = handovers.get_handover(db, h.id)
+        html = make_templates().env.get_template("_fragments/shift_handover_detail.html").render(
+            h=payload, capabilities={}, users=None)
+        assert 'carried ×2' in html and '>Overdue<' in html
+        assert '1 open · 1 overdue · 1 unowned' in html
 
 
 # ── Timestamps carry their zone ──────────────────────────────────────────

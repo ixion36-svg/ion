@@ -52,6 +52,31 @@ class HandoverError(Exception):
     """A handover operation was refused."""
 
 
+SUBMITTABLE_STATUSES = (HandoverStatus.DRAFT.value, HandoverStatus.REJECTED.value)
+RECEIVABLE_STATUSES = (HandoverStatus.SUBMITTED.value,)
+EDITABLE_STATUSES = (HandoverStatus.DRAFT.value, HandoverStatus.SUBMITTED.value,
+                     HandoverStatus.REJECTED.value)
+RESOLVABLE_ACTION_STATUSES = (HandoverActionStatus.OPEN.value,)
+
+
+def handover_capabilities(status, outgoing_lead_id, incoming_lead_id, actor_id):
+    """State and actor rules shared by service validation and read controls."""
+    outgoing = actor_id == outgoing_lead_id
+    receive = status in RECEIVABLE_STATUSES and not outgoing
+    return {
+        "set_incoming": status == HandoverStatus.DRAFT.value and outgoing,
+        "submit": status in SUBMITTABLE_STATUSES and outgoing and incoming_lead_id is not None,
+        "accept": receive,
+        "reject": receive,
+        "add_action": status in EDITABLE_STATUSES,
+    }
+
+
+def _capabilities(handover, actor_id):
+    return handover_capabilities(handover.status, handover.outgoing_lead_id,
+                                 handover.incoming_lead_id, actor_id)
+
+
 #: Snapshot counters compared against the previous accepted handover. Each is
 #: a (name, path) pair into the snapshot dict. Deliberately a short list of
 #: counts an incoming lead actually acts on, not everything in the report.
@@ -253,7 +278,7 @@ def set_incoming_lead(
             f"handover {handover_id} is '{handover.status}'; the incoming lead "
             "can only be changed on a draft"
         )
-    if actor_id != handover.outgoing_lead_id:
+    if not _capabilities(handover, actor_id)["set_incoming"]:
         raise HandoverError("only the outgoing lead may edit their own draft")
     if incoming_lead_id == handover.outgoing_lead_id:
         raise HandoverError(
@@ -293,9 +318,12 @@ def submit_handover(
             "someone on the other end"
         )
 
+    if not _capabilities(handover, actor_id)["submit"]:
+        raise HandoverError(f"handover {handover_id} cannot be submitted")
+
     if not _claim_status(
         session, handover_id,
-        expected=(HandoverStatus.DRAFT.value, HandoverStatus.REJECTED.value),
+        expected=SUBMITTABLE_STATUSES,
         new=HandoverStatus.SUBMITTED.value,
         submitted_at=_now().replace(tzinfo=None),
         rejection_reason=None,
@@ -319,12 +347,12 @@ def accept_handover(
     the acceptor was not the designated lead.
     """
     handover = _require(session, handover_id)
-    if handover.status != HandoverStatus.SUBMITTED.value:
+    if handover.status not in RECEIVABLE_STATUSES:
         raise HandoverError(
             f"handover {handover_id} is '{handover.status}'; only a submitted "
             "handover can be accepted"
         )
-    if actor_id == handover.outgoing_lead_id:
+    if not _capabilities(handover, actor_id)["accept"]:
         raise HandoverError(
             "the outgoing lead cannot accept their own handover; the record "
             "exists to show that someone else took it"
@@ -334,7 +362,7 @@ def accept_handover(
 
     if not _claim_status(
         session, handover_id,
-        expected=(HandoverStatus.SUBMITTED.value,),
+        expected=RECEIVABLE_STATUSES,
         new=HandoverStatus.ACCEPTED.value,
         accepted_at=_now().replace(tzinfo=None),
         accepted_by_id=actor_id,
@@ -362,17 +390,17 @@ def reject_handover(
         raise HandoverError("a rejection needs a reason the outgoing lead can act on")
 
     handover = _require(session, handover_id)
-    if handover.status != HandoverStatus.SUBMITTED.value:
+    if handover.status not in RECEIVABLE_STATUSES:
         raise HandoverError(
             f"handover {handover_id} is '{handover.status}'; only a submitted "
             "handover can be rejected"
         )
-    if actor_id == handover.outgoing_lead_id:
+    if not _capabilities(handover, actor_id)["reject"]:
         raise HandoverError("the outgoing lead cannot reject their own handover")
 
     if not _claim_status(
         session, handover_id,
-        expected=(HandoverStatus.SUBMITTED.value,),
+        expected=RECEIVABLE_STATUSES,
         new=HandoverStatus.REJECTED.value,
         rejection_reason=reason.strip(),
     ):
@@ -388,10 +416,6 @@ def reject_handover(
 # ---------------------------------------------------------------------------
 # Actions
 # ---------------------------------------------------------------------------
-
-_EDITABLE = (HandoverStatus.DRAFT.value, HandoverStatus.SUBMITTED.value,
-             HandoverStatus.REJECTED.value)
-
 
 def add_action(
     session: Session,
@@ -415,7 +439,7 @@ def add_action(
         raise HandoverError("an action needs a description")
 
     handover = _require(session, handover_id)
-    if handover.status not in _EDITABLE:
+    if not _capabilities(handover, actor_id)["add_action"]:
         raise HandoverError(
             f"handover {handover_id} is '{handover.status}' and is closed to "
             "edits; raise the action on the next handover"
@@ -450,7 +474,7 @@ def _resolve_action(
     action = session.get(ShiftHandoverAction, action_id)
     if action is None:
         raise HandoverError(f"handover action {action_id} not found")
-    if action.status != HandoverActionStatus.OPEN.value:
+    if action.status not in RESOLVABLE_ACTION_STATUSES:
         raise HandoverError(
             f"action {action_id} is already '{action.status}'"
         )
@@ -459,7 +483,7 @@ def _resolve_action(
         update(ShiftHandoverAction)
         .where(
             ShiftHandoverAction.id == action_id,
-            ShiftHandoverAction.status == HandoverActionStatus.OPEN.value,
+            ShiftHandoverAction.status.in_(RESOLVABLE_ACTION_STATUSES),
         )
         .values(
             status=new_status,

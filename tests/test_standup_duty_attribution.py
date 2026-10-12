@@ -305,9 +305,20 @@ class TestTheWiring:
         assert "_standup_attribution(" in block
         assert "attribution=attribution" in block
 
-    def test_checks_reports_who_is_on_duty(self):
-        block = self._source().split("def get_daily_checks(")[1][:2500]
-        assert '"duty":' in block
+    def test_checks_reports_who_is_on_duty(self, monkeypatch):
+        import asyncio
+        import json
+        from unittest.mock import AsyncMock
+        from ion.web import daily_standup_api as api
+
+        expected = {"assigned": True, "user": {"id": 7, "name": "Duty analyst"}}
+        monkeypatch.setattr(api, "_duty_today", lambda: expected)
+        for name in ("_check_cluster_health", "_check_critical_alerts", "_check_stale_cases",
+                     "_check_log_source_health", "_check_rule_failures", "_check_open_alerts_30d",
+                     "_check_alerts_24h", "_check_case_status_counts", "_check_triage_throughput_24h"):
+            monkeypatch.setattr(api, name, AsyncMock(return_value={}))
+        response = asyncio.run(api.get_daily_checks(current_user=object()))
+        assert json.loads(response.body)["duty"] == expected
 
     def test_the_duty_lookup_cannot_break_the_page(self):
         """Every other check in this endpoint is wrapped so one failure

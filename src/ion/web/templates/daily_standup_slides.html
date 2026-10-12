@@ -30,16 +30,15 @@
     <div>v{{ ion_version }} · /daily-standup</div>
   </div>
 
-  <div class="flex flex-1 flex-col items-center justify-center gap-3 text-lg text-base-content/50" id="deck-loading">
-    <span class="loading loading-spinner loading-lg text-primary"></span>
-    <div>Running checks…</div>
+  <div class="flex min-h-0 flex-1 flex-col" id="deck-content" hx-get="/ui/daily-standup/slides" hx-trigger="load" hx-swap="innerHTML">
+    <div class="flex flex-1 items-center justify-center" id="deck-loading"><span class="loading loading-spinner loading-lg text-primary"></span>Running checks...</div>
   </div>
-  <div class="flex min-h-0 flex-1 flex-col" id="deck-content"></div>
 
   <div class="absolute bottom-[3vh] left-[4vw] right-[4vw] z-[2] flex flex-wrap items-center justify-between gap-3 text-xs text-base-content/40">
     <div class="flex gap-1.5" id="deck-progress"></div>
     <div class="font-mono text-[11px] tracking-widest text-base-content/50" id="deck-counter">—</div>
     <div class="flex flex-wrap items-center gap-3">
+      <button type="button" class="btn btn-ghost btn-xs" id="deck-refresh" hx-get="/ui/daily-standup/slides" hx-target="#deck-content" hx-swap="innerHTML">Refresh</button>
       <a href="#" class="btn btn-ghost btn-xs" data-click-action="dsDownloadPptx" data-args='["$event"]' title="Download as PowerPoint">.pptx</a>
       <span class="text-base-content/30">·</span>
       <span><kbd class="kbd kbd-xs">F</kbd> fullscreen</span>
@@ -52,429 +51,24 @@
 <script nonce="{{ csp_nonce }}">
 (function () {
   const host = document.getElementById('deck-host');
-  const loading = document.getElementById('deck-loading');
   const content = document.getElementById('deck-content');
-  const progress = document.getElementById('deck-progress');
   const counter = document.getElementById('deck-counter');
   const sectionName = document.getElementById('deck-section-name');
   const metaDate = document.getElementById('deck-meta-date');
   document.body.classList.add('presenting');
 
-  let slides = [];          // [{html, name}]
+  let slides = [];
   let idx = 0;
 
-  // --- helpers ---------------------------------------------------
-  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
-  const fmtTime = (ts) => {
-    if (!ts) return '—';
-    try { return new Date(ts).toLocaleString(); } catch { return ts; }
-  };
-  const sevPill = (s) => {
-    const sev = String(s || '').toLowerCase();
-    const cls = sev === 'critical' ? 'badge-error'
-              : sev === 'high' ? 'badge-warning'
-              : sev === 'medium' ? 'badge-info'
-              : sev === 'low' ? 'badge-success'
-              : 'badge-ghost';
-    return `<span class="badge badge-sm ${cls}">${esc(s || '—')}</span>`;
-  };
-  const kpiTone = (kind) =>
-    kind === 'crit' ? 'text-error'
-    : kind === 'warn' ? 'text-warning'
-    : kind === 'ok' ? 'text-success'
-    : kind === 'brand' ? 'text-primary'
-    : 'text-base-content';
-
-  // The slide is a flex column with a real height budget: the head
-  // block sizes to its content, the body takes what is left, and
-  // nothing is allowed to grow past the footer chrome.
-  //
-  // It used to be one overflow-hidden box with padding. Padding does not
-  // stop overflow, so a table longer than the slide ran underneath the
-  // .pptx / fullscreen / Exit controls and was then clipped mid-row --
-  // on the one screen a room full of people is reading.
-  const slideShell = (attrs, body) =>
-    `<div class="deck-slide relative flex flex-1 flex-col overflow-hidden" ${attrs}>${body}</div>`;
-  // Wraps whatever a slide puts below its heading. min-h-0 is what lets
-  // a flex child actually shrink instead of forcing its parent taller.
-  const slideBody = (inner) => `<div class="deck-body">${inner}</div>`;
-  const titleShell = (attrs, body) =>
-    `<div class="deck-slide title-slide relative flex flex-1 flex-col items-center justify-center overflow-hidden p-0 text-center" ${attrs}>${body}</div>`;
-  const eyebrow = (text) =>
-    `<div class="mb-[1.6vh] flex items-center gap-2.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary"><span class="inline-block h-px w-[22px] bg-primary"></span>${text}</div>`;
-  const titleEyebrow = (text) =>
-    `<div class="mb-[1.6vh] flex items-center justify-center gap-2.5 text-xs font-semibold uppercase tracking-[0.22em] text-primary">${text}</div>`;
-  const hTitle = (text) =>
-    `<div class="deck-h-title text-[clamp(32px,5vw,64px)] font-semibold leading-[1.05] tracking-tight">${text}</div>`;
-  // Heading with the headline figure beside it rather than stacked in a
-  // stat card above the content.
-  //
-  // The card was ~120px of a 720px screen, which on the alerts slide
-  // left room for three rows of seven and a scrollbar. Nobody scrolls a
-  // projector, so those four alerts were simply not in the briefing. The
-  // number is still the biggest thing on the slide; it just shares the
-  // line with the title instead of pushing the table off the bottom.
-  const hTitleWithKpi = (text, value, label, tone) =>
-    `<div class="deck-h-row">
-       <div class="deck-h-title text-[clamp(32px,5vw,64px)] font-semibold leading-[1.05] tracking-tight">${text}</div>
-       <div class="deck-kpi">
-         <div class="deck-kpi-value tabular-nums ${kpiTone(tone)}">${value}</div>
-         <div class="deck-kpi-label">${label}</div>
-       </div>
-     </div>`;
-  const statVal = (tone, extra, inner) =>
-    `<div class="stat-value tabular-nums text-[clamp(40px,6vw,80px)] leading-none ${kpiTone(tone)} ${extra}">${inner}</div>`;
-
-  // How many rows a slide shows, and what it says about the rest.
-  //
-  // The cap used to be a bare .slice(10): alert eleven simply was not in
-  // the briefing and nothing on the slide said so. A deck that quietly
-  // drops rows is worse than one that admits it ran out of room, because
-  // the room believes it has seen everything.
-  function capRows(list, cap) {
-    const shown = list.slice(0, cap);
-    return { shown: shown, hidden: Math.max(0, list.length - shown.length) };
-  }
-  const moreNote = (hidden, noun) => hidden
-    ? `<div class="deck-more text-xs text-base-content/50">
-         + ${hidden} more ${noun} not shown &mdash; see the full list on
-         the standup page or in the .pptx.
-       </div>`
-    : '';
-  // Tables scroll inside their own box rather than pushing the slide
-  // taller. On a projector nobody scrolls, which is exactly why the
-  // count above has to be truthful.
-  const tableBox = (inner) =>
-    `<div class="card deck-tablebox bg-base-200 shadow">${inner}</div>`;
-
-  // --- slide builders --------------------------------------------
-  function slideTitle(d) {
-    const ts = d.timestamp || new Date().toISOString();
-    const dateLong = new Date(ts).toLocaleDateString(undefined, {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-    });
-    return {
-      name: 'Daily Standup',
-      html: titleShell('data-slide="title"', `
-        <div class="deck-brand-big mb-[5vh] grid h-24 w-24 place-items-center rounded-[22px] font-mono text-5xl font-bold text-primary-content">I</div>
-        ${titleEyebrow('Daily SOC Standup')}
-        <div class="deck-title mb-[2vh] text-[clamp(48px,8vw,110px)] font-semibold leading-[1.05] tracking-tight">${esc(dateLong)}</div>
-        <div class="text-[clamp(18px,2vw,28px)] text-base-content/60">Operations briefing · automated checks · sign-off</div>
-      `)
-    };
-  }
-
-  function slideCluster(d) {
-    const c = d.cluster_health || {};
-    const status = (c.status || 'unknown').toLowerCase();
-    const cls = status === 'green' ? 'ok' : status === 'yellow' ? 'warn' : 'crit';
-    return {
-      name: 'Cluster Health',
-      html: slideShell('data-slide="cluster"', `
-        ${eyebrow('Section 1 · Elasticsearch Health')}
-        ${hTitle('Cluster ' + esc(c.cluster_name || '—'))}
-        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
-          <div class="stat"><div class="stat-title">Status</div>
-            ${statVal(cls, '', esc(c.status || '—'))}</div>
-          <div class="stat"><div class="stat-title">Indices</div>
-            ${statVal('muted', '', esc(c.indices_count ?? '—'))}</div>
-          <div class="stat"><div class="stat-title">Storage</div>
-            ${statVal('muted', 'text-[clamp(28px,4vw,56px)]', esc(c.store_size || '—'))}</div>
-          <div class="stat"><div class="stat-title">Unassigned shards</div>
-            ${statVal((c.unassigned_shards || 0) > 0 ? 'crit' : 'ok', '', esc(c.unassigned_shards ?? '—'))}</div>
-        </div>
-      `)
-    };
-  }
-
-  function slideCriticals(d) {
-    const a = d.critical_alerts || {};
-    const list = a.alerts || [];
-    // surface the ION-local fallback so analysts know
-    // the source has degraded — different from a clean empty state.
-    const isFallback = a.source === 'ion_fallback';
-    const fallback = isFallback
-      ? `<div class="alert alert-warning mb-[2vh] py-2.5 px-4 bg-[rgba(251,191,36,0.08)] border-l-[3px] border-l-[var(--ion-amber)] rounded-[4px] text-xs text-[var(--ion-amber)]">
-           <span><strong>ION-local fallback active</strong> ·
-           ${esc(a.fallback_reason || 'ES returned no critical-severity matches')}</span>
-         </div>`
-      : '';
-    let body;
-    if (a.error) {
-      body = `<div class="alert alert-error mt-[4vh]">Critical-alert check failed: ${esc(a.error)}</div>`;
-    } else if (!list.length) {
-      body = `<div class="alert alert-success mt-[4vh]">✓ No critical alerts in the last 24 hours.</div>`;
-    } else {
-      // final fallback to alert id so the Rule cell is
-      // never blank on the slide — matches the standup page change.
-      const cut = capRows(list, 8);
-      const rows = cut.shown.map(r => {
-        const ruleLabel = r.rule_name || r.title || r.id || '(unnamed)';
-        return `<tr>
-        <td class="font-mono whitespace-nowrap">${esc(fmtTime(r.timestamp).slice(0,16))}</td>
-        <td>${sevPill(r.severity)}</td>
-        <td class="max-w-[30vw] truncate" title="${esc(ruleLabel)}">${esc(ruleLabel)}</td>
-        <td class="font-mono whitespace-nowrap">${esc(r.host || '\u2014')}</td>
-      </tr>`;
-      }).join('');
-      body = tableBox(`<table class="table table-sm"><thead class="sticky top-0 bg-base-200"><tr>
-        <th>Time</th><th>Severity</th><th>Rule</th><th>Host</th>
-      </tr></thead><tbody>${rows}</tbody></table>`) + moreNote(cut.hidden, 'alerts');
-    }
-    return {
-      name: 'Critical Alerts',
-      html: slideShell('data-slide="criticals"', `
-        ${eyebrow('Section 2 · ' + (isFallback ? 'ION-Tracked Alerts' : 'Critical Alerts') + ' (Last 24h)')}
-        ${hTitleWithKpi(
-          isFallback ? 'Recent Alerts' : 'Critical Alerts',
-          esc(a.critical_count ?? 0),
-          (isFallback ? 'open in ION' : 'critical') + ' · last 24h',
-          'crit')}
-        <div class="deck-h-gap"></div>
-        ${fallback}
-        ${slideBody(body)}
-      `)
-    };
-  }
-
-  function slideStaleCases(d) {
-    const c = d.stale_cases || {};
-    const list = c.cases || [];
-    let body;
-    if (!list.length) {
-      body = `<div class="alert alert-success mt-[4vh]">✓ No stale cases.</div>`;
-    } else {
-      // render every stale case (no .slice cap) and wrap
-      // the table in a scrollable container so 50+ rows don't blow
-      // out the slide. Added a Triggered Rules column so analysts
-      // can see which detection rules backed each case.
-      const rows = list.map(r => {
-        const rules = (r.triggered_rules && r.triggered_rules.length)
-          ? r.triggered_rules.slice(0, 3).map(esc).join(', ')
-            + (r.triggered_rules.length > 3 ? ` +${r.triggered_rules.length - 3}` : '')
-          : '<span class="text-[var(--deck-faint)]">—</span>';
-        return `<tr>
-          <td class="font-mono">${esc(r.case_number || '')}</td>
-          <td class="max-w-[30vw] truncate">${esc(r.title || '')}</td>
-          <td class="max-w-[30vw] truncate max-w-[22vw]">${rules}</td>
-          <td>${sevPill(r.severity)}</td>
-          <td class="font-mono">${esc(r.hours_open ?? 0)}h</td>
-        </tr>`;
-      }).join('');
-      body = tableBox(`<table class="table table-sm">
-        <thead class="sticky top-0 bg-base-200"><tr>
-          <th>Case</th><th>Title</th><th>Triggered Rules</th><th>Severity</th><th>Open</th>
-        </tr></thead><tbody>${rows}</tbody></table>`);
-    }
-    return {
-      name: 'Stale Cases',
-      html: slideShell('data-slide="stale-cases"', `
-        ${eyebrow('Section 3 · Stale Cases (Open &gt; 24h, all)')}
-        ${hTitleWithKpi('Stale Cases', esc(c.count ?? list.length),
-                        'open beyond threshold',
-                        list.length ? 'warn' : 'ok')}
-        <div class="deck-h-gap"></div>
-        ${slideBody(body)}
-      `)
-    };
-  }
-
-  function slideBacklog(d) {
-    const a = d.open_alerts_30d || {};
-    if (a.total == null) {
-      return {
-        name: 'Alert Backlog',
-        html: slideShell('data-slide="backlog"', `
-          ${eyebrow('Section 4 · Alert Backlog (30 days)')}
-          ${hTitle('Alert Backlog')}
-          <div class="alert alert-info mt-[4vh]">No data.</div>
-        `)
-      };
-    }
-    const stillOpen = a.still_open_pct ?? 0;
-    const cls = stillOpen >= 30 ? 'crit' : stillOpen >= 15 ? 'warn' : 'ok';
-    return {
-      name: 'Alert Backlog',
-      html: slideShell('data-slide="backlog"', `
-        ${eyebrow('Section 4 · Alert Backlog (Last 30 Days)')}
-        ${hTitle('Alert Backlog')}
-        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
-          <div class="stat"><div class="stat-title">Total alerts</div>
-            ${statVal('muted', '', (a.total ?? 0).toLocaleString())}</div>
-          <div class="stat"><div class="stat-title">Still open</div>
-            ${statVal(cls, '', (a.open ?? 0).toLocaleString())}
-            <div class="stat-desc">${esc(stillOpen)}% of 30-day total</div></div>
-          <div class="stat"><div class="stat-title">Acknowledged</div>
-            ${statVal('warn', '', (a.acknowledged ?? 0).toLocaleString())}</div>
-          <div class="stat"><div class="stat-title">Closed</div>
-            ${statVal('ok', '', (a.closed ?? 0).toLocaleString())}</div>
-        </div>
-      `)
-    };
-  }
-
-  function slideCaseStatus(d) {
-    const cs = d.case_status_counts || {};
-    // API field names changed in v0.19.14 — open/in_progress
-    // are now "created in last 24h, currently in this state",
-    // closed_24h is "closed in last 24h regardless of created date".
-    return {
-      name: 'Case Status',
-      html: slideShell('data-slide="case-status"', `
-        ${eyebrow('Section 5 · Cases (Last 24h)')}
-        ${hTitle('Case Status — Today')}
-        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
-          <div class="stat"><div class="stat-title">Opened (24h, still open)</div>
-            ${statVal('warn', '', esc(cs.open ?? 0))}</div>
-          <div class="stat"><div class="stat-title">In progress</div>
-            ${statVal('muted', '', esc(cs.in_progress ?? 0))}</div>
-          <div class="stat"><div class="stat-title">Closed in 24h</div>
-            ${statVal('ok', '', esc(cs.closed_24h ?? 0))}</div>
-          <div class="stat"><div class="stat-title">Intake (24h)</div>
-            ${statVal('brand', '', esc(cs.intake_24h ?? 0))}</div>
-        </div>
-      `)
-    };
-  }
-
-  function slideLogHealth(d) {
-    // was reading silent_count/total but the API actually
-    // returns hosts_with_gaps/host_count. The slide quietly showed
-    // 0 / 0 to everyone since v0.19.10 — caught in the v0.19.4..HEAD
-    // review. Aligned to the API.
-    const dc = d.dc_log_health || {};
-    const wef = d.wef_log_health || {};
-    const block = (label, x) => {
-      const silent = x.hosts_with_gaps ?? 0;
-      const total = x.host_count ?? 0;
-      const cls = silent > 0 ? 'crit' : 'ok';
-      return `<div class="stat">
-        <div class="stat-title">${esc(label)}</div>
-        ${statVal(cls, '', esc(silent) + ' <span class="text-[var(--deck-faint)] text-[0.5em] font-normal">/ ' + esc(total) + '</span>')}
-        <div class="stat-desc">silent / total hosts</div>
-      </div>`;
-    };
-    return {
-      name: 'Log Sources',
-      html: slideShell('data-slide="log-health"', `
-        ${eyebrow('Section 6 · Log-Source Health')}
-        ${hTitle('Log Sources')}
-        <div class="stats stats-vertical lg:stats-horizontal mb-[4vh] w-full bg-base-200 shadow">
-          ${block('Domain Controllers', dc)}
-          ${block('Windows Event Forwarding', wef)}
-        </div>
-      `)
-    };
-  }
-
-  function slideRuleFailures(d) {
-    const r = d.rule_failures || {};
-    const list = r.rules || [];
-    let body;
-    if (!list.length) {
-      body = `<div class="alert alert-success mt-[4vh]">✓ No detection-rule execution failures.</div>`;
-    } else {
-      // was reading x.name + x.last_status but API was
-      // emitting rule_name + failure_count, so every row rendered
-      // blank. Aligned now — name + failures + last_failure shown.
-      const rows = list.map(x => `<tr>
-        <td class="max-w-[30vw] truncate">${esc(x.name || x.rule_name || '(unnamed)')}</td>
-        <td class="font-mono">${esc(x.failures ?? x.failure_count ?? 0)}</td>
-        <td class="font-mono">${esc((x.last_failure || '').slice(0, 16).replace('T', ' '))}</td>
-        <td>${sevPill(x.last_status || 'failure')}</td>
-      </tr>`).join('');
-      body = `<div class="card bg-base-200 shadow max-h-[56vh] overflow-y-auto rounded-[12px]">
-        <table class="table table-sm"><thead><tr>
-          <th>Rule</th><th>Failures (24h)</th><th>Last failure</th><th>Status</th>
-        </tr></thead><tbody>${rows}</tbody></table>
-      </div>`;
-    }
-    return {
-      name: 'Rule Failures',
-      html: slideShell('data-slide="rule-failures"', `
-        ${eyebrow('Section 7 · Detection Rule Failures (Last 24h)')}
-        ${hTitle('Rule Failures')}
-        <div class="mb-[4vh] grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-[2vw] grid-cols-[minmax(220px,_320px)]">
-          <div class="stats w-full bg-base-200 shadow">
-            <div class="stat"><div class="stat-title">Failing rules</div>
-            ${statVal(list.length ? 'crit' : 'ok', '', esc(r.count ?? list.length))}</div>
-          </div>
-        </div>
-        ${body}
-      `)
-    };
-  }
-
-  // load AI threat summary + AOB notes from localStorage,
-  // populated by the live /daily-standup page. Both stale after 12 h.
   function _readLS(key) {
     try {
       const raw = localStorage.getItem(key);
       if (!raw) return null;
       const {text, ts} = JSON.parse(raw);
-      if (!text || !text.trim()) return null;
-      if (Date.now() - (ts || 0) > 12 * 60 * 60 * 1000) return null;
+      if (typeof text !== 'string' || !text.trim() || typeof ts !== 'number') return null;
+      if (Date.now() - ts > 12 * 60 * 60 * 1000) return null;
       return text;
     } catch (_) { return null; }
-  }
-
-  function slideThreatSummary() {
-    const text = _readLS('ion.standup.ai_summary');
-    const body = text
-      ? `<div class="card bg-base-200 shadow text-[clamp(15px,_1.4vw,_20px)] text-[var(--deck-text)] leading-[1.6] whitespace-pre-wrap bg-[var(--deck-card)] border border-[var(--deck-line)] rounded-[12px] py-7 px-8 max-h-[56vh] overflow-y-auto [backdrop-filter:blur(6px)]">${esc(text)}</div>`
-      : `<div class="alert alert-info mt-[4vh]">
-           No AI threat summary available.<br>
-           <span class="text-[0.6em] text-[var(--deck-faint)]">
-             Click <strong>Generate Summary</strong> on /daily-standup, then refresh this deck.
-           </span>
-         </div>`;
-    return {
-      name: 'AI Threat Summary',
-      html: slideShell('data-slide="threat-summary"', `
-        ${eyebrow('Section 8 · Threat Landscape')}
-        ${hTitle('AI Threat Summary')}
-        ${body}
-      `)
-    };
-  }
-
-  function slideAOB() {
-    const text = _readLS('ion.standup.aob');
-    const body = text
-      ? `<div class="card bg-base-200 shadow text-[clamp(16px,_1.6vw,_24px)] text-[var(--deck-text)] leading-[1.6] whitespace-pre-wrap bg-[var(--deck-card)] border border-[var(--deck-line)] rounded-[12px] py-8 px-9 max-h-[56vh] overflow-y-auto [backdrop-filter:blur(6px)]">${esc(text)}</div>`
-      : `<div class="alert alert-info mt-[4vh]">
-           No AOB items recorded.<br>
-           <span class="text-[0.6em] text-[var(--deck-faint)]">
-             Add notes via the <strong>Additional Notes</strong> field on /daily-standup, then refresh this deck.
-           </span>
-         </div>`;
-    return {
-      name: 'Any Other Business',
-      html: slideShell('data-slide="aob"', `
-        ${eyebrow('Section 9 · Any Other Business')}
-        ${hTitle('AOB')}
-        ${body}
-      `)
-    };
-  }
-
-  function slideClose() {
-    return {
-      name: 'Close',
-      html: titleShell('data-slide="close"', `
-        <div class="deck-brand-big mb-[5vh] grid h-24 w-24 place-items-center rounded-[22px] font-mono text-5xl font-bold text-primary-content">I</div>
-        ${titleEyebrow('End of Standup')}
-        <div class="deck-title mb-[2vh] text-[clamp(48px,8vw,110px)] font-semibold leading-[1.05] tracking-tight">Questions? Action items?</div>
-        <div class="text-[clamp(18px,2vw,28px)] text-base-content/60">
-          <kbd class="kbd kbd-sm font-mono text-sm py-[3px] px-2 rounded-[5px] bg-[rgba(148,163,184,0.12)] border border-[var(--deck-line)]">←</kbd>
-          to revisit any section ·
-          <kbd class="kbd kbd-sm font-mono text-sm py-[3px] px-2 rounded-[5px] bg-[rgba(148,163,184,0.12)] border border-[var(--deck-line)]">Esc</kbd>
-          to exit
-        </div>
-      `)
-    };
   }
 
   // .pptx button now POSTs localStorage values so the
@@ -513,36 +107,27 @@
     [...content.querySelectorAll('.deck-slide')].forEach((el, k) => {
       el.classList.toggle('hidden', k !== idx);
     });
-    [...progress.children].forEach((dot, k) => {
+    [...document.getElementById('deck-progress').children].forEach((dot, k) => {
       dot.classList.toggle('active', k === idx);
       dot.classList.toggle('passed', k < idx);
     });
     counter.textContent = `${String(idx + 1).padStart(2, '0')} / ${String(slides.length).padStart(2, '0')}`;
-    sectionName.textContent = slides[idx].name || 'Daily Standup';
+    sectionName.textContent = slides[idx] ? slides[idx].dataset.name : 'Daily Standup';
   }
 
-  function render(data) {
-    const ts = data.timestamp || new Date().toISOString();
-    metaDate.textContent = new Date(ts).toLocaleString();
-
-    slides = [
-      slideTitle(data),
-      slideCluster(data),
-      slideCriticals(data),
-      slideStaleCases(data),
-      slideBacklog(data),
-      slideCaseStatus(data),
-      slideLogHealth(data),
-      slideRuleFailures(data),
-      slideThreatSummary(),
-      slideAOB(),
-      slideClose(),
-    ];
-    content.innerHTML = slides.map(s => s.html).join('');
-    progress.innerHTML = slides.map(() => '<span class="deck-progress-dot"></span>').join('');
-    loading.style.display = 'none';
-    show(0);
+  function initialiseSlides() {
+    slides = [...content.querySelectorAll('.deck-slide')];
+    content.querySelectorAll('[data-storage-key]').forEach(el => {
+      const text = _readLS(el.dataset.storageKey);
+      if (text) el.textContent = text;
+    });
+    metaDate.textContent = '';
+    if (slides.length) show(0);
+    else { counter.textContent = 'Unavailable'; sectionName.textContent = 'Daily Standup'; }
   }
+  document.body.addEventListener('htmx:afterSwap', ev => {
+    if (ev.detail.target.id === 'deck-content') initialiseSlides();
+  });
 
   // --- input -----------------------------------------------------
   document.addEventListener('keydown', (ev) => {
@@ -571,14 +156,6 @@
     show(idx + 1);
   });
 
-  // --- fetch -----------------------------------------------------
-  fetch('/api/daily-standup/checks', { credentials: 'same-origin' })
-    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-    .then(render)
-    .catch(err => {
-      loading.innerHTML =
-        '<div class="alert alert-error text-[var(--ion-coral)]">Failed to load: ' + esc(err.message) + '</div>';
-    });
 })();
 </script>
 {% endblock %}
