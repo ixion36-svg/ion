@@ -78,3 +78,52 @@ def test_the_instant_is_attribute_escaped():
     html = render('"><script>alert(1)</script>')
     assert "<script>alert(1)</script>" not in html
     assert "&lt;script&gt;" in html or "&#34;&gt;" in html
+
+
+# ---------------------------------------------------------------------------
+# Aware versus naive, which is the difference between a localised time and a
+# confidently wrong one
+# ---------------------------------------------------------------------------
+
+
+def test_an_aware_value_is_marked_localisable():
+    html = render(datetime(2026, 10, 12, 9, 41, 7, tzinfo=timezone.utc))
+    assert 'data-ts-local="yes"' in html
+    assert "title=" not in html, "an aware value needs no caveat"
+
+
+def test_a_naive_value_is_not_localised_and_says_whose_clock_it_is():
+    """ION stores audit timestamps in a naive column defaulting to the
+    database's func.now(), which is UTC on SQLite and the session timezone
+    on Postgres, with nothing in the row to say which.
+
+    Localising it anyway is worse than leaving it: JavaScript parses a
+    zoneless ISO date-time as local, so the browser would read the digits as
+    the viewer's clock, convert out of a zone the value was never in, and
+    show a time wrong by the viewer's offset while looking authoritative.
+    An unknown zone is not UTC, the same way unmeasured is not zero.
+    """
+    html = render(datetime(2026, 10, 12, 9, 41, 7))
+    assert 'data-ts-local="no"' in html
+    assert "stores no timezone" in html
+    assert "UTC" not in html, "claiming UTC for an unknown zone invents a fact"
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("2026-10-12T09:41:07+00:00", "yes"),
+    ("2026-10-12T09:41:07Z", "yes"),
+    ("2026-10-12T09:41:07+0200", "yes"),
+    ("2026-10-12T09:41:07", "no"),
+    ("2026-10-12 09:41:07", "no"),
+])
+def test_a_string_is_classified_by_whether_it_carries_an_offset(text, expected):
+    assert f'data-ts-local="{expected}"' in render(text)
+
+
+def test_an_aware_fallback_is_stated_in_utc():
+    """Two different zones in one column reads as two different times."""
+    from datetime import timedelta
+
+    html = render(datetime(2026, 10, 12, 11, 41, 7,
+                           tzinfo=timezone(timedelta(hours=2))))
+    assert "2026-10-12 09:41 UTC" in html

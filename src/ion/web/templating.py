@@ -42,6 +42,68 @@ def _nav_visible(item: nav.Item) -> bool:
     return True
 
 
+def _ts_parts(value: object) -> dict | None:
+    """Split a timestamp into the instant, a fallback string, and whether it
+    can honestly be localised.
+
+    The `ts` macro in templates/_fragments/_time.html is the only caller.
+
+    A timezone-aware value carries its offset, so a browser can put it on
+    the viewer's clock and the fallback can name UTC. A naive value cannot:
+    ION stores audit and event timestamps in a naive `DateTime` column
+    defaulting to the database's `func.now()`, which is UTC on SQLite and
+    the session timezone on Postgres, and nothing in the row records which.
+
+    So a naive value is not localised. Emitting it without an offset and
+    localising anyway would be worse than leaving it alone, because
+    JavaScript parses a zoneless ISO date-time as LOCAL time, so the
+    browser would read the digits as the viewer's clock, convert from a
+    zone the value was never in, and display a time that is wrong by the
+    viewer's offset while looking authoritative.
+
+    The JavaScript this replaces had exactly that shape: it passed the
+    naive string to `new Date()` and called `toLocaleString()`, which
+    parsed as local and formatted as local, so it showed the stored digits
+    unchanged and unlabelled. Showing the same digits with a note saying
+    whose clock they are on is strictly more information, and is why this
+    returns `localise` rather than guessing a zone.
+
+    An unknown zone is not UTC, the same way unmeasured is not zero.
+    """
+    import re
+    from datetime import datetime, timezone
+
+    if value is None or value == "":
+        return None
+
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            as_utc = value.astimezone(timezone.utc)
+            return {
+                "iso": value.isoformat(),
+                "shown": as_utc.strftime("%Y-%m-%d %H:%M UTC"),
+                "localise": True,
+                "note": "",
+            }
+        return {
+            "iso": value.isoformat(),
+            "shown": value.strftime("%Y-%m-%d %H:%M"),
+            "localise": False,
+            "note": "Server time. This record stores no timezone.",
+        }
+
+    text = str(value)
+    # Z, +00:00, +0000. A date-only string has no time to place in a zone.
+    if re.search(r"(Z|[+-]\d{2}:?\d{2})$", text):
+        return {"iso": text, "shown": text, "localise": True, "note": ""}
+    return {
+        "iso": text,
+        "shown": text,
+        "localise": False,
+        "note": "Server time. This record stores no timezone.",
+    }
+
+
 def make_templates(directory: Path | None = None) -> Jinja2Templates:
     """Return a Jinja2Templates env configured identically across the app.
 
@@ -64,6 +126,7 @@ def make_templates(directory: Path | None = None) -> Jinja2Templates:
     # or any page extending base.html raises UndefinedError. The helpers are
     # callables, not values, so a licence change is read per render without a
     # template reload.
+    templates.env.globals["ts_parts"] = _ts_parts
     templates.env.globals["nav_items"] = nav.NAV
     templates.env.globals["nav_mobile_items"] = nav.mobile_items
     templates.env.globals["nav_shortcuts"] = nav.shortcuts

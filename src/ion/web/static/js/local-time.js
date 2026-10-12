@@ -43,6 +43,17 @@
     var raw = el.getAttribute('datetime');
     if (!raw) return;
 
+    // A timestamp has to carry a zone before it can be moved to another
+    // one. The server marks the ones that do. Rewriting a zoneless value
+    // is how you get a confidently wrong time: `new Date("2026-10-12T09:41:07")`
+    // parses as LOCAL, so this would read the digits as the viewer's clock,
+    // convert out of a zone the value was never in, and leave the row off
+    // by the viewer's offset. The server's text is already honest.
+    if (el.dataset.tsLocal === 'no') {
+      el.dataset.tsLocalised = '1';
+      return;
+    }
+
     var parsed = new Date(raw);
     if (isNaN(parsed.getTime())) {
       // Leave the server's fallback text in place. A timestamp we cannot
