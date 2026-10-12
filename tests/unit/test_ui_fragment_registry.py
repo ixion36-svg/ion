@@ -329,15 +329,31 @@ def test_every_template_a_fragment_names_exists():
 MODULE_GATED_PREFIXES = {"de_": "require_de_module"}
 
 
+def _ordered_dependency_names(route) -> list[str]:
+    """Dependency qualnames in declaration order.
+
+    `_dependency_calls` pops from a stack, so its output order is not the
+    order the route declares. That is fine for every caller asking whether
+    something is present and useless for one asking whether it is first.
+    """
+    out: list[str] = []
+
+    def walk(deps):
+        for dep in deps:
+            if dep.call is not None:
+                out.append(getattr(dep.call, "__qualname__", ""))
+            walk(dep.dependencies)
+
+    walk(getattr(route.dependant, "dependencies", []))
+    return out
+
+
 def test_a_licence_gated_fragment_carries_its_module_gate():
     """A fragment is reachable on an unlicensed deployment without this.
 
-    The gate also has to come before the permission, because router
-    dependencies resolve first on the JSON side and the order decides what
-    an unauthenticated request to a disabled module is told: 404, meaning
-    this does not exist here, rather than 401, meaning log in and try
-    again. The second answer tells an unlicensed caller that the feature is
-    there and they are merely not signed in.
+    Whether the gate comes BEFORE the permission is a separate question and
+    the test below is the one that asks it. This one only asks whether the
+    gate is there at all.
     """
     for name in ui._page_modules():
         gate = next((g for p, g in MODULE_GATED_PREFIXES.items()
@@ -355,3 +371,53 @@ def test_a_licence_gated_fragment_carries_its_module_gate():
             f"{gate}, so its fragment is reachable on a deployment that is "
             "not licensed for the module"
         )
+
+
+def test_the_module_gate_is_declared_before_the_permission():
+    """The order decides what an unlicensed caller is told.
+
+    Router dependencies resolve in declaration order, so a `de_*` fragment
+    listing `require_permission` first answers 401 to an unauthenticated
+    request against a disabled module, meaning log in and try again, rather
+    than 404, meaning this does not exist here. The 401 tells a caller the
+    feature is there and they are merely not signed in.
+
+    This assertion is the whole point, and it did not exist. The guard
+    above spent four sentences of its own docstring explaining this
+    ordering and then asserted only that the gate appeared somewhere in a
+    stack-popped list, so a module declaring the two the wrong way round
+    passed it while leaking the module's existence. A guard whose docstring
+    describes a check it does not perform is worse than no guard, because
+    it reports success.
+
+    Found by a conversion that wrote the ordering assertion for its own
+    page and noticed nothing covered the DE pages already shipped.
+    """
+    checked = 0
+    for name in ui._page_modules():
+        gate = next((g for p, g in MODULE_GATED_PREFIXES.items()
+                     if name.startswith(p)), None)
+        if gate is None:
+            continue
+        mod = importlib.import_module(f"ion.web.ui.{name}")
+        for route in mod.router.routes:
+            bases = [n.split(".")[0]
+                     for n in _ordered_dependency_names(route)]
+            if gate not in bases:
+                continue
+            perms = [i for i, b in enumerate(bases)
+                     if b in ("require_permission", "require_any_permission")]
+            if not perms:
+                continue
+            checked += 1
+            assert bases.index(gate) < min(perms), (
+                f"ion.web.ui.{name} declares {gate} after its permission on "
+                f"{route.path}, so an unauthenticated request to an "
+                f"unlicensed deployment gets 401 rather than 404 and learns "
+                f"the module exists. Declared order: {bases}"
+            )
+
+    assert checked, (
+        "no licence-gated route carried both a module gate and a named "
+        "permission, so this proves nothing"
+    )
