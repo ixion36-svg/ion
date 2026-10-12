@@ -20,12 +20,44 @@
     </p>
   </div>
   <div class="flex items-center gap-2 flex-wrap">
-    <button class="btn btn-ghost" data-click-action="cgRefresh">Refresh</button>
+    {# Refresh re-requests the same fragment, so "what refresh does" has one
+       definition. It and Run now sit outside #cg-content, which is what
+       guarantees that no render of the fragment, success or failure, can
+       remove the page's own way out. #}
+    <button class="btn btn-ghost"
+            hx-get="/ui/case-grouper/status"
+            hx-target="#cg-content"
+            hx-swap="innerHTML">Refresh</button>
     <button class="btn btn-primary" id="cg-run-btn" data-click-action="cgRunNow">Run now</button>
   </div>
 </section>
 
-<div id="cg-content">
+{# Run now's own figures. The grouper records a summary only from the
+   background loop's tick, so a manual pass is reported here and nowhere
+   else, which is why this line is a permanent part of the shell rather than
+   something the panel's markup carries: a swap of the panel must not take
+   the result of the run that triggered it away.
+
+   It is filled with textContent, never innerHTML, so the redesign's `server`
+   column still passes and the styling comes from the stylesheet. #}
+<div id="cg-flash" class="alert mb-4" role="status" hidden></div>
+
+{# The whole panel body is one fragment, rendered by
+   ion.web.ui.case_grouper.case_grouper_status_fragment. It used to be four
+   innerHTML writes fed by 137 lines of inline JavaScript with a hand-rolled
+   esc() and a hand-rolled relative-time formatter: the stat tiles, the Last
+   run table, the side-effect badges and the flash line. The markup now has
+   one definition, in Jinja, which escapes it, and a restyle of a stat tile
+   reaches it from the stylesheet.
+
+   hx-trigger="load" keeps the shell's first paint immediate with the data
+   arriving in its own request, which is what the fetch it replaces already
+   did. `cg:changed` is what Run now fires when its pass has finished, so a
+   state change re-requests this fragment instead of rebuilding it. #}
+<div id="cg-content"
+     hx-get="/ui/case-grouper/status"
+     hx-trigger="load, cg:changed from:body"
+     hx-swap="innerHTML">
   <div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading status...</div>
 </div>
 
@@ -35,141 +67,53 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-const CG_API = '/api/case-grouper';
+// cgEsc() and cgFmtTime() are gone with the markup they served: Jinja
+// autoescapes the panel and the `ts` macro emits the timestamp for
+// static/js/local-time.js to put on the viewer's clock. What is left here
+// triggers a grouping pass, which is a state change, not markup.
 
-function cgEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
-function cgFmtTime(iso){if(!iso)return'never';try{const d=new Date(iso);const diff=(Date.now()-d.getTime())/1000;if(diff<60)return Math.round(diff)+'s ago';if(diff<3600)return Math.round(diff/60)+'m ago';if(diff<86400)return Math.round(diff/3600)+'h ago';return Math.round(diff/86400)+'d ago';}catch(e){return iso}}
+// A figure the run did not report is not zero. The old flash read
+// `sum.scanned||0` and printed a confident 0 for an absent key, in a line
+// whose whole job is to report what one pass actually did.
+function cgNum(v){ return v == null ? 'not reported' : v; }
 
-async function cgLoad() {
-  const c = document.getElementById('cg-content');
-  c.innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading status...</div>';
-  try {
-    const r = await fetch(CG_API + '/status');
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    const data = await r.json();
-    cgRender(data);
-  } catch (e) {
-    c.innerHTML = `<div class="alert alert-error text-[var(--sev-critical,#f85149)]">${cgEsc(e.message || 'Failed to load')}</div>`;
-  }
+// The old flash cleared itself after six seconds. It is left on screen now
+// because it is the only record of what a manual pass did: run_grouper_once
+// does not write the telemetry slot the Last run table reads, so a timer
+// here deleted the figures rather than tidying them away.
+function cgFlash(kind, msg){
+  const host = document.getElementById('cg-flash');
+  if(!host) return;
+  host.className = 'alert mb-4 alert-' + kind;
+  host.textContent = msg;
+  host.hidden = false;
 }
 
-function cgRender(s) {
-  const c = document.getElementById('cg-content');
-  const enabledLabel = s.enabled ? 'Enabled' : 'Disabled';
-  const result = s.last_result || {};
-  const cards = `
-    <div class="stats stats-vertical lg:stats-horizontal w-full bg-base-200 shadow mb-6">
-      <div class="stat ${s.enabled ? '' : 'opacity-75'}">
-        <div class="stat-title">Status</div>
-        <div class="stat-value font-mono ${s.enabled ? 'text-success' : ''}">${cgEsc(enabledLabel)}</div>
-        <div class="stat-desc">Advisory lock 1017 · one worker per container</div>
-      </div>
-      <div class="stat">
-        <div class="stat-title">Poll interval</div>
-        <div class="stat-value font-mono">${cgEsc(s.interval_s)}s</div>
-        <div class="stat-desc">ION_CASE_GROUPER_INTERVAL_S</div>
-      </div>
-      <div class="stat">
-        <div class="stat-title">Extend window</div>
-        <div class="stat-value font-mono">${cgEsc(s.window_minutes)}m</div>
-        <div class="stat-desc">append alerts to open [Auto] case within this window</div>
-      </div>
-      <div class="stat ${s.auto_cases_total > 0 ? '' : 'opacity-75'}">
-        <div class="stat-title">Total auto-cases</div>
-        <div class="stat-value font-mono">${cgEsc(s.auto_cases_total)}</div>
-        <div class="stat-desc">all AlertCases with title "[Auto]…"</div>
-      </div>
-    </div>
-  `;
-
-  const lastRun = `
-    <div class="card bg-base-200 shadow mb-4">
-      <div class="card-body p-0">
-        <div class="px-5 py-3 border-b border-base-300">
-          <h2 class="card-title text-base">Last run</h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <tbody>
-              <tr><td class="text-base-content/60">Ran at</td><td class="font-mono">${cgFmtTime(s.last_run_at)}${s.last_run_at ? ' · '+cgEsc(s.last_run_at) : ''}</td></tr>
-              <tr><td class="text-base-content/60">Scanned</td><td class="font-mono">${cgEsc(result.scanned ?? '—')}</td></tr>
-              <tr><td class="text-base-content/60">New cases</td><td class="font-mono">${cgEsc(result.grouped_new_cases ?? '—')}</td></tr>
-              <tr><td class="text-base-content/60">Extended cases</td><td class="font-mono">${cgEsc(result.grouped_extended_cases ?? '—')}</td></tr>
-              <tr><td class="text-base-content/60">Alerts attached</td><td class="font-mono">${cgEsc(result.alerts_attached ?? '—')}</td></tr>
-              <tr><td class="text-base-content/60">Investigations queued</td><td class="font-mono">${cgEsc(result.investigations_queued ?? '—')}</td></tr>
-              <tr><td class="text-base-content/60">Errors</td><td class="font-mono">${cgEsc(result.errors ?? '—')}</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const toggles = `
-    <div class="card bg-base-200 shadow mb-4">
-      <div class="card-body p-0">
-        <div class="px-5 py-3 border-b border-base-300">
-          <h2 class="card-title text-base">Side-effects</h2>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="table table-sm">
-            <tbody>
-              <tr>
-                <td class="text-base-content/60">Push new cases to Kibana</td>
-                <td class="text-end"><span class="badge badge-sm uppercase ${s.push_to_kibana ? 'badge-success' : 'badge-ghost'}">${s.push_to_kibana ? 'on' : 'off'}</span></td>
-              </tr>
-              <tr>
-                <td class="text-base-content/60">Auto-run investigation pipeline</td>
-                <td class="text-end"><span class="badge badge-sm uppercase ${s.auto_investigate ? 'badge-success' : 'badge-ghost'}">${s.auto_investigate ? 'on' : 'off'}</span></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="px-5 pb-4 mt-1 text-[var(--text-secondary)] text-xs">
-          <span>Toggle via ION_CASE_GROUPER_PUSH_TO_KIBANA / ION_CASE_GROUPER_AUTO_INVESTIGATE.</span>
-          <span></span>
-        </div>
-      </div>
-    </div>
-  `;
-
-  c.innerHTML = (document.getElementById('cg-flash-host')?.outerHTML || '<div id="cg-flash-host"></div>') + cards + lastRun + toggles;
-}
-
-function cgFlash(cls, msg) {
-  let host = document.getElementById('cg-flash-host');
-  if (!host) return;
-  const kind = cls === 'err' ? 'alert-error' : 'alert-success';
-  host.innerHTML = `<div class="alert ${kind} mb-4">${cgEsc(msg)}</div>`;
-  setTimeout(() => { if (host.firstChild) host.replaceChildren(); }, 6000);
-}
-
-async function cgRefresh() { await cgLoad(); }
-
-async function cgRunNow() {
+async function cgRunNow(){
   const btn = document.getElementById('cg-run-btn');
-  if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+  if(btn){ btn.disabled = true; btn.textContent = 'Running…'; }
   try {
-    const r = await fetch(CG_API + '/run-now', { method: 'POST' });
-    if (!r.ok) {
+    const r = await fetch('/api/case-grouper/run-now', { method:'POST', credentials:'same-origin' });
+    if(!r.ok){
       const body = await r.json().catch(() => ({}));
       throw new Error(body.detail || ('HTTP ' + r.status));
     }
     const data = await r.json();
     const sum = data.summary || {};
-    cgFlash('ok',
-      `Scanned ${sum.scanned||0} · new ${sum.grouped_new_cases||0} · `+
-      `extended ${sum.grouped_extended_cases||0} · attached ${sum.alerts_attached||0} · `+
-      `investigations ${sum.investigations_queued||0}`
-    );
-    await cgLoad();
+    cgFlash('success',
+      'Scanned ' + cgNum(sum.scanned) + ' · new ' + cgNum(sum.grouped_new_cases) +
+      ' · extended ' + cgNum(sum.grouped_extended_cases) +
+      ' · attached ' + cgNum(sum.alerts_attached) +
+      ' · investigations ' + cgNum(sum.investigations_queued) +
+      ' · errors ' + cgNum(sum.errors));
+    // Re-request the fragment rather than rebuilding the panel, so a row has
+    // one definition and it is the server's.
+    document.body.dispatchEvent(new CustomEvent('cg:changed'));
   } catch (e) {
-    cgFlash('err', 'Run failed: ' + (e.message || e));
+    cgFlash('error', 'Run failed: ' + (e.message || e));
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Run now'; }
+    if(btn){ btn.disabled = false; btn.textContent = 'Run now'; }
   }
 }
-
-document.addEventListener('DOMContentLoaded', cgLoad);
 </script>
 {% endblock %}

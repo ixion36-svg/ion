@@ -1,0 +1,147 @@
+{# The cross-source timeline for one entity: header, source filters, events.
+
+   Replaces four innerHTML writes in entity_timeline.html, a hand-rolled
+   `esc()`, and a `display:none` sweep that filtered rows the browser had
+   already been sent. The `et-*` classes are kept deliberately: they are
+   real rules in frontend/ion-pages.css scoped to
+   body[data-page="entity_timeline"], so moving this markup into a template
+   is exactly what brings them within a restyle's reach.
+
+   Four states, each its own claim:
+
+     prompt   nothing searched yet
+     failed   the read did not complete, which is not an empty timeline
+     ok, no events at all for this entity in this window
+     ok, events, possibly narrowed by the source filter
+
+   The search box, the type select and the window select live in the page
+   shell, outside this swap target, so a failed read cannot take away the
+   controls that would retry it. The source pills have to live here, since
+   only the result knows which sources it contains, so they are re-rendered
+   with their own active state on every swap.
+
+   A failed request is handled by static/js/htmx-errors.js, not here. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if state == 'prompt' %}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body items-center text-center py-16">
+      <i class="icon-search text-[2rem] mb-2 text-[var(--primary)]"></i>
+      <div>Search for any entity to see its complete history across all ION data sources.</div>
+      <div class="text-[.78rem] mt-2 text-[var(--text-muted)]">Cases, alert triage, observables, enrichments, and audit log entries, all in one timeline.</div>
+    </div>
+  </div>
+
+{% elif state == 'failed' %}
+  {# Never "No events found". That sentence tells an analyst nothing
+     happened to this host, and an unreadable timeline and an empty one are
+     opposite claims about whether anything happened. The search controls
+     are in the page shell, so this branch does not strand the user. #}
+  <div role="alert" class="alert alert-error">
+    <div>
+      <div class="font-semibold">The timeline for {{ q }} could not be read.</div>
+      <div class="text-sm mt-1">
+        This is not an empty timeline. No conclusion can be drawn from this
+        view about whether anything happened to this entity. Try the search
+        again, and check the server log if it keeps failing.
+      </div>
+    </div>
+  </div>
+
+{% else %}
+  <div class="et-header">
+    <span class="et-entity-type">{{ entity_type }}</span>
+    <span class="et-entity-value">{{ q }}</span>
+    <span class="text-[var(--text-secondary)] text-[.82rem]">
+      {# `is not none`, because zero events found is a measurement and a
+         missing count is not. A truthiness test renders both as blank. #}
+      {% if total_events is not none %}
+        {{ total_events }} event{{ '' if total_events == 1 else 's' }} found
+      {% else %}
+        Event count unavailable
+      {% endif %}
+      {% if sources_count is not none %}
+        across {{ sources_count }} source{{ '' if sources_count == 1 else 's' }}
+      {% endif %}
+    </span>
+  </div>
+
+  {% if not pills %}
+    <div class="et-empty">No events found for this entity in the selected time window.</div>
+  {% else %}
+    {# The All pill renders whenever there are any events, including when
+       the active filter matches none of them, because a filter that can
+       hide every row has to keep the control that clears it. Its count is
+       the number of events this response holds, so it agrees with the sum
+       of the pills beside it. #}
+    <div class="et-filters">
+      <button type="button" class="et-filter {% if not active_sources %}active{% endif %}"
+              hx-get="/ui/entity-timeline"
+              hx-include="#et-query, #et-type, #et-hours"
+              hx-target="#et-content"
+              hx-swap="innerHTML">All ({{ shown_count }})</button>
+      {% for pill in pills %}
+        <button type="button" class="et-filter {% if pill.active %}active{% endif %}"
+                hx-get="{{ pill.url }}"
+                hx-include="#et-query, #et-type, #et-hours"
+                hx-target="#et-content"
+                hx-swap="innerHTML">
+          <span class="et-source-badge et-source-{{ pill.source }} mr-0.5">{{ pill.source }}</span> {{ pill.count }}
+        </button>
+      {% endfor %}
+    </div>
+
+    {% if total_events is not none and total_events > shown_count %}
+      {# The service caps the event list at 200 while counting every match,
+         so the header's number can exceed the rows below it. The page used
+         to show 200 rows under a header claiming 340 events and explain
+         nothing. #}
+      <div class="et-empty text-[.78rem] py-2">
+        Showing the {{ shown_count }} most recent of {{ total_events }} matching events.
+      </div>
+    {% endif %}
+
+    {% if not events %}
+      <div class="et-empty">
+        No events from the selected source{{ '' if active_sources|length == 1 else 's' }}.
+        Clear the filter with All to see the rest.
+      </div>
+    {% else %}
+      <div class="et-timeline">
+        {% for event in events %}
+          <div class="et-event source-{{ event.source }}" data-source="{{ event.source }}">
+            <div class="et-event-header">
+              <span class="et-source-badge et-source-{{ event.source }}">{{ event.source }}</span>
+              {# Only critical, high and medium carried a badge on this page.
+                 See SEVERITY_CLASS in ion/web/ui/entity_timeline.py. #}
+              {% if event.severity_class %}
+                <span class="sev-badge {{ event.severity_class }}">{{ event.severity }}</span>
+              {% endif %}
+              <span class="et-event-title">{{ event.title }}</span>
+              {# Every source on this page stores a naive timestamp, so the
+                 macro leaves all of them as stored and labels the whole
+                 column server time. Formatting here instead would show an
+                 analyst in another timezone a time that looks authoritative
+                 and is off by their offset. #}
+              <span class="et-event-time">{{ ts(event.timestamp, fallback='No timestamp recorded') }}</span>
+            </div>
+            {# A string, so truthiness is the right test: the service emits
+               "" for an event with no description, and an empty detail is
+               genuinely nothing rather than an unmeasured value. #}
+            {% if event.detail %}
+              <div class="et-event-detail">{{ event.detail }}</div>
+            {% endif %}
+            {% if event.meta %}
+              <div class="et-event-meta">
+                {% for label, value in event.meta %}
+                  <span class="et-meta-tag">{{ label }}: {{ value }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endif %}
+{% endif %}
