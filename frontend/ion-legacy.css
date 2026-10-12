@@ -2514,3 +2514,24 @@ h1, h2, h3, h4, h5, h6 {
    fixed palette value naming a swatch rather than a role, so it cannot
    follow the mode. Dark already clears, so only light is overridden. */
 [data-mode="light"] .text-slate-600 { color: var(--text-muted); }
+
+/* htmx's loading affordance, defined here rather than injected.
+ *
+ * base.html sets includeIndicatorStyles:false, which stops htmx inserting
+ * its own stylesheet. That was correct when nothing used the class, but it
+ * also meant `hx-indicator` did nothing at all: the attribute is honoured,
+ * htmx adds .htmx-request, and no rule anywhere reacted to it. Every
+ * fragment conversion that wanted a spinner during a slow request found the
+ * affordance dead and fell back to hx-disabled-elt.
+ *
+ * Defining the pair in this sheet rather than re-enabling the injected one
+ * keeps it where a stylesheet sweep can see it, which is the whole premise
+ * of the redesign.
+ *
+ * Both forms: the indicator inside the requesting element, and the
+ * requesting element being the indicator. htmx supports both and a page
+ * using the second with only the first defined shows nothing.
+ */
+.htmx-indicator { display: none; }
+.htmx-request .htmx-indicator { display: inline-flex; }
+.htmx-request.htmx-indicator { display: inline-flex; }

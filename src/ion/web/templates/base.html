@@ -55,7 +55,11 @@
     <!-- tell HTMX not to inject its indicator <style> block at runtime.
          Inline-injected styles can't carry our per-request CSP nonce, so they'd
          be blocked by `style-src 'self' 'nonce-XXX'`. ION does not use the
-         .htmx-indicator class anywhere, so disabling it has no UI impact. -->
+         .htmx-indicator class is instead defined in frontend/ion-legacy.css,
+         so hx-indicator works and the rule sits where a stylesheet sweep can
+         see it. It used to say nothing referenced the class, which was true
+         and meant hx-indicator did nothing at all: htmx still added
+         .htmx-request and no rule anywhere reacted to it. -->
     <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
     <script nonce="{{ csp_nonce }}" src="/static/js/theme-init.js?v={{ ion_version }}"></script>
     <script nonce="{{ csp_nonce }}" src="/static/js/htmx.min.js"></script>
