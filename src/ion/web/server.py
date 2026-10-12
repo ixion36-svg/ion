@@ -1622,15 +1622,25 @@ async def case_page(
 async def threat_intel_actor_profile_page(
     entity_id: str,
     request: Request,
+    entity_class: str = "intrusion_set",
     user: User = Depends(require_page_permission("observable:read")),
 ):
-    """v0.27.0: actor deep-dive page. Data loaded client-side from
-    /api/threat-intel/actors/{id}/profile so the page renders fast
-    while OpenCTI roundtrips."""
+    """v0.27.0: actor deep-dive page.
+
+    The shell renders immediately and the profile arrives as a fragment
+    from /ui/threat-intel/actors/{id}, so OpenCTI's roundtrip still does
+    not block the first paint. It used to be fetched and assembled by the
+    page's own JavaScript.
+
+    `entity_class` is read here rather than in the browser. The page pulled
+    it off window.location.search, so the server could not build the
+    fragment URL and the only thing that knew which class was being viewed
+    was the script. Same default as the API this mirrors.
+    """
     return templates.TemplateResponse(
         request=request,
         name="threat_intel_actor.html",
-        context={"entity_id": entity_id},
+        context={"entity_id": entity_id, "entity_class": entity_class},
     )
 
 
