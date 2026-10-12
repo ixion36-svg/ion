@@ -150,6 +150,22 @@ information to announce that newer information is coming. A page wanting a
 stronger cue can still declare `hx-indicator`, which now works, because
 the `.htmx-indicator` pair is defined in `frontend/ion-legacy.css`.
 
+**No htmx feature that compiles a string.** ION serves
+`script-src 'self' 'nonce-...'` with no `unsafe-eval`, so anything htmx
+hands to `Function()` throws and the feature silently does nothing. That
+rules out an `hx-trigger` event filter such as
+`hx-trigger="keyup[key=='Enter']"`, the `js:` form of `hx-vals` and
+`hx-headers`, and `hx-on`. For an Enter key, wrap the controls in a real
+`<form>` carrying the `hx-get`: it submits natively, needs no expression,
+and still works with htmx disabled.
+
+This is invisible outside a browser console. The markup looks right and
+the fragment the server returns is right, so a conversion that reads
+correctly and passes every HTTP check still ships a dead control. A
+browser smoke crawl across the converted pages is what found the one
+instance. `tests/test_review_20261008_page_wiring_guards.py` now guards
+all three.
+
 **Delete the hand-rolled `esc()`.** Jinja autoescapes. Assert it with a
 test that feeds `<script>`.
 
