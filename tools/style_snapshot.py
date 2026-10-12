@@ -108,7 +108,20 @@ def capture(base: str, cookies: str, paths: list[str], modes: list[str]) -> dict
                 if r is None or r.status >= 400:
                     print(f"  {path} {mode}: HTTP {r.status if r else '?'}")
                     continue
-                pg.evaluate(f"document.documentElement.setAttribute('data-mode','{mode}')")
+                # `print` is a media type, not a colour mode. It is here
+                # because a page's @media print block becomes global the
+                # moment its CSS moves into a shared sheet, and a screen-only
+                # snapshot cannot see that: guide.html's print rules
+                # (`.navbar { display:none !important }`, `body { background:
+                # #fff !important }`) went global in the tier-A move and this
+                # tool reported zero changes, correctly, for screen.
+                if mode == "print":
+                    pg.emulate_media(media="print")
+                else:
+                    pg.emulate_media(media="screen")
+                    pg.evaluate(
+                        f"document.documentElement.setAttribute('data-mode','{mode}')"
+                    )
                 pg.wait_for_timeout(1000)
                 snap[f"{path}|{mode}"] = pg.evaluate(PROBE, PROPS)
                 print(f"  {path:24} {mode:6} {len(snap[f'{path}|{mode}'])} elements")
@@ -166,7 +179,8 @@ def main() -> int:
     ap.add_argument("--cookies")
     ap.add_argument("--out", type=Path)
     ap.add_argument("--pages", nargs="*")
-    ap.add_argument("--modes", nargs="*", default=["light", "dark"])
+    ap.add_argument("--modes", nargs="*", default=["light", "dark"],
+                    help='"light", "dark" and/or "print"')
     ap.add_argument("--diff", nargs=2, type=Path)
     args = ap.parse_args()
 
