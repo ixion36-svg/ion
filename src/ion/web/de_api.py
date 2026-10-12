@@ -444,12 +444,19 @@ async def create_tuning_request(
     return {"request": req.to_dict()}
 
 
-@router.get("/tuning-requests", dependencies=[Depends(require_permission("de:read"))])
-def list_tuning_requests(
-    status: Optional[str] = Query(None, description="Filter by status"),
-    limit: int = Query(100, ge=1, le=500),
-    session: Session = Depends(get_db_session),
-):
+def tuning_requests_payload(
+    session: Session,
+    status: Optional[str] = None,
+    limit: int = 100,
+) -> dict:
+    """What GET /api/de/tuning-requests answers.
+
+    Extracted because the DE Workbench fragment needs the same rows in the
+    same order, and the query was inline in the route below. A second copy of
+    ``order_by(id.desc())`` is how the page and the API start disagreeing
+    about which request is oldest, and a second copy of the status filter is
+    how one of them starts counting closed requests as open.
+    """
     from ion.models.tuning_request import TuningRequest
 
     q = session.query(TuningRequest).order_by(TuningRequest.id.desc())
@@ -457,6 +464,15 @@ def list_tuning_requests(
         q = q.filter(TuningRequest.status == status)
     rows = q.limit(limit).all()
     return {"requests": [r.to_dict() for r in rows]}
+
+
+@router.get("/tuning-requests", dependencies=[Depends(require_permission("de:read"))])
+def list_tuning_requests(
+    status: Optional[str] = Query(None, description="Filter by status"),
+    limit: int = Query(100, ge=1, le=500),
+    session: Session = Depends(get_db_session),
+):
+    return tuning_requests_payload(session, status=status, limit=limit)
 
 
 def _get_request_or_404(session: Session, request_id: int):

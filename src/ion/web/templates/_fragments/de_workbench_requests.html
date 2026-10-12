@@ -1,0 +1,112 @@
+{# The tuning-request queue for /de, plus the open-request tile.
+
+   Replaces the innerHTML write in renderRequests() and the hidden/reveal
+   dance on #req-empty: the table and the empty state are branches of one
+   render now, so there is never a table on screen with an alert hidden
+   behind it claiming the opposite.
+
+   Three outcomes. The module being licence-gated off never reaches this
+   template: the route answers 404 and static/js/htmx-errors.js words it.
+
+     read failed  the tile says nothing and the panel says why. The
+                  JavaScript's `r.ok ? r.json() : { requests: [] }` painted
+                  "the queue is clear" and a confident 0 for a 500 or a 403,
+                  and a clear queue is what ends a shift.
+     queue clear  the empty state, which is a real finding.
+     rows         the table.
+
+   The Refresh button and the delegated click listener are both in the page
+   shell, outside this swap target, so a failed render cannot take away the
+   control that retries it or the handler the action buttons need. #}
+
+{% from "_fragments/_time.html" import ts %}
+{% from "_fragments/de_workbench_kpi.html" import kpi %}
+
+{% if failed %}
+{{ kpi('kpi-requests', 'Open requests', 'text-error', '—', 'read failed, count unknown') }}
+<div role="alert" class="alert alert-error">
+  The tuning-request queue could not be read. This is not a clear queue: the
+  query failed, so how many analyst requests are waiting is unknown rather
+  than zero. Refresh to try again.
+</div>
+{% else %}
+{{ kpi('kpi-requests', 'Open requests', 'text-error', view.count, view.oldest_text) }}
+{% if not view.rows %}
+<div role="alert" class="alert justify-center">No open tuning requests. The queue is clear.</div>
+{% else %}
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Rule</th>
+        <th>Reason</th>
+        <th>Details</th>
+        <th>Waiting</th>
+        <th>FP/7d</th>
+        <th>Ticket</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in view.rows %}
+        <tr class="border-b border-white/5 align-top">
+          <td class="py-2.5 pr-4 font-mono text-[11.5px]">{{ r.rule_name if r.rule_name else '—' }}</td>
+          <td class="py-2.5 pr-4">{{ r.reason_label if r.reason_label else '—' }}</td>
+          <td class="py-2.5 pr-4 opacity-60 max-w-[320px]">{{ r.details if r.details else '—' }}</td>
+          {# The age and the instant together. The age is a duration, so the
+             server's clock gives the viewer the same answer; the instant goes
+             through the macro because a server-formatted clock would be the
+             server's. An unrecorded created_at says so rather than measuring
+             the wait from the epoch, which is what the JavaScript's
+             `new Date(null)` did. #}
+          <td class="py-2.5 pr-4">
+            {% if r.age_text is not none %}{{ r.age_text }}{% else %}<span class="opacity-60">unknown</span>{% endif %}
+            <div class="text-[10px] opacity-50">{{ ts(r.created_at, 'datetime', fallback='no timestamp') }}</div>
+          </td>
+          {# Gated on the number, printing the text. Zero false positives in
+             the last seven days is a measurement, and the interesting one:
+             the noise the analyst complained about has already stopped. The
+             gate is on `fp_7d` rather than on `fp_7d_text` because the text
+             for zero is the string "0", which is truthy, so a gate on the
+             text would survive being weakened and prove nothing. #}
+          <td class="py-2.5 pr-4">{% if r.fp_7d is not none %}{{ r.fp_7d_text }}{% else %}<span class="opacity-60">—</span>{% endif %}</td>
+          {# |safe_url once, and both the gate and the href read that one
+             value. The JavaScript escaped the characters in this column and
+             not its scheme, so a `javascript:` value stored on the row
+             rendered a link that executed on click. The filter allows http,
+             https, mailto and a site-relative path, drops the rest, and
+             returns "" for a refusal, which is what the gate tests. #}
+          <td class="py-2.5 pr-4">
+            {% set ticket = r.gitlab_issue_url|safe_url %}
+            {% if ticket %}
+              <a class="link link-primary" href="{{ ticket }}" target="_blank" rel="noopener">{% if r.gitlab_issue_iid is not none %}#{{ r.gitlab_issue_iid }}{% else %}ticket{% endif %} ↗</a>
+            {% else %}
+              <span class="opacity-60">—</span>
+            {% endif %}
+          </td>
+          <td class="py-2.5 pr-4">
+            {% if r.status is not none %}
+              <span class="badge badge-sm {{ r.status_css }}">{{ r.status }}</span>
+            {% else %}
+              <span class="opacity-60">—</span>
+            {% endif %}
+          </td>
+          {# No buttons at all for a viewer without de:propose, and none for a
+             status the service would refuse. The JavaScript offered Triage,
+             Draft and Close to every reader, so the only way to learn the
+             server would say no was to click and read the error. #}
+          <td class="py-2.5 whitespace-nowrap">
+            {% if r.actions and r.id is not none %}
+              {% for a in r.actions %}<button class="btn btn-xs {{ a.css }} mr-1" data-click-action="{{ a.action }}" data-args='[{{ r.id }}, {{ r.rule_name|tojson }}]'>{{ a.label }}</button>{% endfor %}
+            {% else %}
+              <span class="opacity-60">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endif %}

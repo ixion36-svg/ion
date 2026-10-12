@@ -1,0 +1,69 @@
+{# The three-column proposal board for /de, plus the in-flight tile.
+
+   Replaces the innerHTML write in loadProposals() that looped over
+   [['prop-draft', ...], ['prop-applied', ...], ['prop-rejected', ...]] and
+   the propCard() concatenation it called, plus the three column-count spans
+   it set separately.
+
+   Two outcomes. The module being licence-gated off never reaches this
+   template: the route answers 404 and static/js/htmx-errors.js words it.
+
+     read failed  the tile says nothing and the board says why. The
+                  JavaScript's `r.ok ? r.json() : { proposals: [] }` painted
+                  a KPI of 0, a sub-line of "0 draft · 0 applied/measuring"
+                  and three columns reading "none" for a read that never
+                  completed. Five confident zeros for a store nobody could
+                  reach.
+     board        the three columns, each with its own count and its own
+                  empty wording.
+
+   A card says "measured" only for a figure somebody measured and "exp." only
+   for a forecast, and never confuses the two. The JavaScript read
+   `p.outcome_json.fp_reduction_pct`; the row carries the column as `outcome`
+   and the comparable figure at `comparable.drop_pct`, so the measured branch
+   could not run and every applied proposal showed its forecast instead. #}
+
+{% from "_fragments/de_workbench_kpi.html" import kpi %}
+
+{% macro card(p) -%}
+<div class="rounded-[10px] bg-white/3 border border-white/5 px-3 py-2.5">
+  <div class="text-[10px] font-semibold uppercase tracking-[0.1em] text-ion-cyan">{{ p.change_type if p.change_type is not none else 'proposal' }}</div>
+  <div class="font-mono text-[11.5px] mt-1">{{ p.label if p.label else '—' }}</div>
+  {% if p.note %}<div class="text-[11px] opacity-70 mt-0.5">{{ p.note }}</div>{% endif %}
+  {% if p.expected %}<div class="text-[11px] opacity-50 mt-0.5">{{ p.expected }}</div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% macro column(heading, count, cards, empty) -%}
+<div>
+  <div class="text-xs font-semibold uppercase tracking-wide opacity-60 mb-2">{{ heading }} ({{ count }})</div>
+  <div class="space-y-2">
+    {% if cards %}
+      {% for p in cards %}{{ card(p) }}{% endfor %}
+      {% if count > cards|length %}<div class="text-[11px] opacity-50">and {{ count - cards|length }} more on the full board</div>{% endif %}
+    {% else %}
+      <div class="text-[12px] opacity-60">{{ empty }}</div>
+    {% endif %}
+  </div>
+</div>
+{%- endmacro %}
+
+{% if failed %}
+{{ kpi('kpi-proposals', 'Proposals in flight', 'text-primary', '—', 'read failed, count unknown') }}
+<div role="alert" class="alert alert-error">
+  The proposal board could not be read. This is not an empty board: the query
+  failed, so how many tuning drafts are waiting is unknown rather than zero.
+  Refresh to try again.
+</div>
+{% else %}
+{{ kpi(
+  'kpi-proposals', 'Proposals in flight', 'text-primary',
+  view.in_flight,
+  view.draft_count ~ ' draft · ' ~ view.applied_count ~ ' applied/measuring'
+) }}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  {{ column('Draft', view.draft_count, view.draft, 'Nothing drafted.') }}
+  {{ column('Applied · measuring', view.applied_count, view.applied, 'Nothing applied.') }}
+  {{ column('Rejected', view.rejected_count, view.rejected, 'Nothing rejected.') }}
+</div>
+{% endif %}

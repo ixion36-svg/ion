@@ -1,0 +1,24 @@
+{# The one definition of a DE Workbench KPI tile.
+
+   The four tiles at the top of /de are each derived from one region's read
+   and nothing else, so each region's fragment sends its own tile back beside
+   its panel as an out-of-band swap. That keeps the figure and the table it
+   summarises from the same read, where a separate tiles request would re-read
+   all four stores and let the two disagree.
+
+   The caller decides what `value` and `sub` say, because deciding that is
+   where the `is not none` tests belong and they should be visible in the
+   region's own template. This macro owns only the chrome, so a tile cannot
+   be the shape of a stat in one region and something else in another.
+
+   `hx-swap-oob="true"` replaces the whole tile, which is why the title lives
+   in here: a tile rendered without one would lose its label on the first
+   swap. #}
+
+{% macro kpi(slot, title, tone, value, sub) -%}
+<div class="stat" id="{{ slot }}" hx-swap-oob="true">
+  <div class="stat-title {{ tone }}">{{ title }}</div>
+  <div class="stat-value {{ tone }}">{{ value }}</div>
+  <div class="stat-desc">{{ sub }}</div>
+</div>
+{%- endmacro %}

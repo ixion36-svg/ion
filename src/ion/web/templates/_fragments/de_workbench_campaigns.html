@@ -1,0 +1,81 @@
+{# The costliest noise campaigns for /de, plus the addressable-hours tile.
+
+   Replaces the innerHTML write in loadMetrics() and the hidden/reveal dance
+   on #camp-empty. The rows are de_metrics' own campaign rows, so this summary
+   and the full table on /de-metrics cannot disagree about what a rule costs.
+
+   Three outcomes. The module being licence-gated off never reaches this
+   template: the route answers 404 and static/js/htmx-errors.js words it.
+
+     read failed  the tile says nothing and the panel says why. The
+                  JavaScript's `if (!d) return;` left the tile reading "—"
+                  and the table empty with no sentence anywhere saying the
+                  measurement had not happened.
+     no campaigns the empty state, which is a real finding: no rule in the
+                  window clustered past the minimum.
+     rows         the table.
+
+   Every figure is gated on `is not none`. A campaign without a cost is not a
+   campaign that cost nothing, and the JavaScript concatenated the number raw,
+   so a missing `cost_hours` rendered the literal text "nullh". #}
+
+{% from "_fragments/de_workbench_kpi.html" import kpi %}
+
+{% if failed %}
+{{ kpi('kpi-hours', 'Addressable hours', 'text-warning', '—', 'read failed, hours unknown') }}
+<div role="alert" class="alert alert-error">
+  The noise campaigns could not be measured. This is not an estate with no
+  noise: the query failed, so how much analyst time is reclaimable is unknown
+  rather than zero. Refresh to try again.
+</div>
+{% else %}
+{# "unknown" in words rather than a 0. The JavaScript got the value right with
+   `!= null` and this keeps it: a measured 0 means the false-positive closures
+   in this window cost nothing worth reclaiming, which is the opposite finding
+   from nobody having measured them.
+
+   Gated on `view.hours` and `view.count`, the raw numbers, not on the texts
+   beside them. `_num_text(0)` is the string "0" and a non-empty string is
+   truthy, so a gate written on the text would survive being weakened to
+   truthiness and the `is not none` would be decorative. #}
+{{ kpi(
+  'kpi-hours', 'Addressable hours', 'text-warning',
+  (view.hours_text ~ 'h') if view.hours is not none else '—',
+  ('across ' ~ view.count_text ~ ' campaigns · ' ~ days ~ 'd') if view.count is not none else ('campaign count unknown · ' ~ days ~ 'd')
+) }}
+{% if not view.rows %}
+<div role="alert" class="alert justify-center">No active noise campaigns in the last {{ days }} days.</div>
+{% else %}
+<div class="overflow-x-auto">
+  <table class="table table-sm">
+    <thead>
+      <tr>
+        <th>Rule</th>
+        <th class="text-right">FP alerts</th>
+        <th class="text-right">Hours</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in view.rows %}
+        <tr class="border-b border-white/5">
+          <td class="py-2.5 pr-4 font-mono text-[11.5px]">{{ c.rule_name if c.rule_name else '—' }}</td>
+          <td class="py-2.5 pr-4 text-right">{% if c.fp_alerts is not none %}{{ c.fp_alerts }}{% else %}<span class="opacity-60">—</span>{% endif %}</td>
+          <td class="py-2.5 pr-4 text-right text-ion-amber">{% if c.cost_hours is not none %}{{ c.cost_hours }}h{% else %}<span class="opacity-60">—</span>{% endif %}</td>
+          {# Withheld without de:propose. The draft chain this button starts is
+             POST /api/de/proposals/draft then POST /api/de/proposals, both
+             gated on that permission, and the JavaScript offered the button to
+             every reader. A rule name is required to draft against, so a row
+             without one offers nothing either. #}
+          <td class="py-2.5 text-right">
+            {% if can_propose and c.rule_name %}
+              <button class="btn btn-xs btn-ghost" data-click-action="dwDraftForRule" data-args='[{{ c.rule_name|tojson }}]'>Draft proposal</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endif %}
