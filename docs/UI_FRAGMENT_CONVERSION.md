@@ -14,6 +14,22 @@ Worked examples, in increasing order of how much they cover:
 * `src/ion/web/ui/bob_eval.py` with `_fragments/bob_eval_samples.html`.
   A paginated table whose pager is htmx rather than JavaScript.
 
+## Start here
+
+    python tools/fragment_plan.py <page>
+
+It prints the page's own route and permission, every URL its JavaScript
+fetches with the method and gates each one actually carries, the innerHTML
+sites with line numbers, and which of the traps below the page is likely to
+hit. The gates are read off the live application, out of the closure cell
+`require_permission` closes over, so they are what a request really meets
+rather than what the decorator looks like.
+
+Five conversions worked this out by hand before the tool existed. The one
+thing among it that is easy to get wrong is the permission, because a
+fragment softer than the API it mirrors is not visible in a diff. Where the
+tool prints `a guess, confirm it`, confirm it.
+
 ## The shape
 
 The page template keeps its shell and holds an empty slot:
