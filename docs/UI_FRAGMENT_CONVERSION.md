@@ -166,6 +166,35 @@ browser smoke crawl across the converted pages is what found the one
 instance. `tests/test_review_20261008_page_wiring_guards.py` now guards
 all three.
 
+**A swap target that carries `hx-include` must disinherit it.** `hx-include`
+is inherited, so every element your fragment renders inside that container
+inherits it and sends the control's value on its own requests too. Where the
+inner request already carries that parameter, baked in server-side, the
+request goes out with it twice and FastAPI reads the last one, which is the
+appended inherited copy. The control then decides the parameter and the baked
+value is ignored, which is the reverse of what the markup says.
+
+    <div id="x-content"
+         hx-get="/ui/x/panel"
+         hx-trigger="load"
+         hx-include="#x-days"
+         hx-disinherit="hx-include"
+         hx-swap="innerHTML">
+
+`hx-disinherit` governs only what children inherit, so the container's own
+request still sends the control. Both halves need a guard, because deleting
+the `hx-include` to stop the duplicate breaks the restored-select case it
+was added for.
+
+Two pages were found doing this independently, `detection_health` through
+its drill-down and `stories` through its nested run table, and in both the
+two copies agreed, so nothing looked wrong. `stories` was one disagreement
+away from a 422. This is not visible in the markup and not visible in an
+HTTP check: only the request the browser actually sends shows it, so
+measure it with a request listener rather than reasoning about the
+attributes. Fourteen containers of this shape exist across the converted
+pages and only those two are known to be safe.
+
 **Delete the hand-rolled `esc()`.** Jinja autoescapes. Assert it with a
 test that feeds `<script>`.
 

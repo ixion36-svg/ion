@@ -67,11 +67,21 @@
    arriving in their own request, which is what the fetch it replaces did.
    hx-include is on this request too, not only on Refresh: Firefox restores a
    select's value across a reload, so without it the first paint would report
-   90 days while the select read 7. #}
+   90 days while the select read 7.
+
+   hx-disinherit stops the drill-down buttons this panel renders from
+   inheriting that hx-include. They carry the window baked into their own
+   URL, and an inherited hx-include appends the select's live value after it,
+   so the request went out as days=90&days=90 and FastAPI reads the last of a
+   duplicate. Both copies agree today, because every path that changes the
+   select also re-renders the panel. It is the drill-down answering for
+   whichever window the select happens to hold, rather than the window the
+   row above it was measured in, that this prevents. #}
 <div id="dh-content"
      hx-get="/ui/detection-health/metrics"
      hx-trigger="load"
      hx-include="#dh-days"
+     hx-disinherit="hx-include"
      hx-swap="innerHTML"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading detection metrics...</div></div>
 
 </div><!-- /ion-tw inner -->

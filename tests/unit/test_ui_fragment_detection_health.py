@@ -50,7 +50,17 @@ from ion.web.ui.detection_health import (
 
 PAGE = Path(ion.web.__file__).parent / "templates" / "detection_health.html"
 
-CREATED = datetime(2026, 10, 1, 14, 5, tzinfo=timezone.utc)
+# The shape get_rule_disagreements really returns: AIFeedback.created_at is
+# a naive DateTime column on both backends and the service hands back
+# `c.isoformat()` of it, so what reaches this page is a zoneless string.
+# This was a timezone-aware datetime, which the service cannot produce, and
+# the assertions underneath it certified a localised render this page never
+# performs. A fixture richer than production is a test that passes while the
+# real path is broken.
+CREATED = "2026-10-01T14:05:00"
+
+# Kept only to assert that this page does not reach the localising branch.
+CREATED_AWARE = datetime(2026, 10, 1, 14, 5, tzinfo=timezone.utc)
 
 
 def _rule(**over: Any) -> dict[str, Any]:
@@ -605,17 +615,47 @@ def test_a_verdict_the_row_does_not_carry_is_not_printed_as_none():
 
 
 # ---------------------------------------------------------------------------
-# The timestamp, which is the viewer's clock and not the server's
+# The timestamp, which on this page is the server's clock and says so
 # ---------------------------------------------------------------------------
 
 
-def test_a_disagreement_timestamp_is_emitted_for_the_viewers_clock():
+def test_a_disagreement_timestamp_is_marked_as_server_time():
+    """What this page can actually render.
+
+    The feedback row's `created_at` is a naive column, so nothing records
+    which zone its digits are in. Localising it would read those digits as
+    the viewer's clock and convert out of a zone the value was never in,
+    which is wrong by the viewer's offset while looking authoritative, so
+    the macro declines and labels it instead.
+    """
     html = render_drill([
         {"alert_id": "a", "bob_suggested_verdict": "b", "human_verdict": "c",
          "created_at": CREATED},
     ])
-    assert '<time datetime="2026-10-01T14:05:00+00:00"' in html
-    assert 'data-ts-local="yes"' in html
+    assert '<time datetime="2026-10-01T14:05:00"' in html
+    assert 'data-ts-local="no"' in html
+    assert "stores no timezone" in _flat(html)
+
+
+def test_this_page_never_reaches_the_localising_branch():
+    """The guard on the fixture above.
+
+    If the service ever starts returning an aware value, this goes red and
+    whoever changed it has to decide what the page should say, rather than
+    the page quietly switching clocks. The aware shape is asserted here to
+    show the branch exists and that this page is not taking it.
+    """
+    aware = render_drill([
+        {"alert_id": "a", "bob_suggested_verdict": "b", "human_verdict": "c",
+         "created_at": CREATED_AWARE},
+    ])
+    assert 'data-ts-local="yes"' in aware, "the macro can localise"
+
+    from ion.services import detection_health_service as svc
+    source = Path(svc.__file__).read_text(encoding="utf-8")
+    assert '"created_at": c.isoformat() if c else None' in source, (
+        "get_rule_disagreements no longer returns the naive column's "
+        "isoformat; re-check what data-ts-local the page now emits")
 
 
 def test_a_disagreement_with_no_timestamp_does_not_render_the_epoch():
@@ -673,6 +713,37 @@ def test_the_drill_url_is_percent_encoded_and_carries_the_window():
         "/ui/detection-health/disagreements?rule=Rule+%26+Co&days=30"
     assert drill_url("(unmapped)", None) == \
         "/ui/detection-health/disagreements?rule=%28unmapped%29"
+
+
+def test_the_panel_disinherits_its_hx_include():
+    """So the window in that URL is the one the request carries.
+
+    htmx inherits hx-include, and every drill-down button is rendered
+    inside #dh-content, which carries hx-include="#dh-days" for its own
+    load. The button therefore sent the select's live value appended after
+    its own baked one, measured in a browser as
+
+        ?rule=probe&days=90&days=90
+
+    and FastAPI reads the last of a duplicate, so the select was deciding
+    the window rather than the row. The two agree today because every path
+    that changes the select also re-renders the panel, which is why nothing
+    looked wrong. hx-disinherit governs only what children inherit, so the
+    panel's own request still sends the select, which the test below holds.
+    """
+    page = PAGE.read_text(encoding="utf-8")
+    container = re.search(r"<div id=\"dh-content\"[^>]*>", page)
+    assert container, "the panel container moved or was renamed"
+    assert 'hx-disinherit="hx-include"' in container.group(0)
+
+
+def test_the_panel_still_sends_the_window_on_its_own_request():
+    """The other half. Dropping hx-include to stop the duplicate would mean
+    a select the browser restored across a reload reporting one window
+    while the panel was rendered for another."""
+    page = PAGE.read_text(encoding="utf-8")
+    container = re.search(r"<div id=\"dh-content\"[^>]*>", page)
+    assert 'hx-include="#dh-days"' in container.group(0)
 
 
 def test_the_rendered_drill_url_escapes_its_separator_once():
@@ -798,16 +869,56 @@ def _dependency_calls(route) -> list:
 
 
 def _permissions(route) -> set[str]:
+    """Every permission name a route's dependencies require.
+
+    Both factories, not just one. This read only `require_permission`,
+    which made the guard below blind to exactly the gate it exists to
+    police: the tuning POST is declared
+    `require_any_permission(["de:propose"])`, so a fragment gated the same
+    way returned an empty set here and the assertion that no fragment is
+    locked behind the write permission passed without looking at anything.
+    A guard that cannot see the thing it forbids is worse than no guard,
+    because it reports success.
+    """
     found = set()
     for fn in _dependency_calls(route):
-        if not getattr(fn, "__qualname__", "").startswith("require_permission."):
+        base = getattr(fn, "__qualname__", "").split(".")[0]
+        if base not in ("require_permission", "require_any_permission"):
             continue
         cells = dict(zip(fn.__code__.co_freevars,
                          (c.cell_contents for c in (fn.__closure__ or ()))))
-        name = cells.get("permission_name")
-        if name:
-            found.add(name)
+        one = cells.get("permission_name")
+        many = cells.get("permission_names")
+        if isinstance(one, str):
+            found.add(one)
+        if isinstance(many, (list, tuple, set)):
+            found.update(str(p) for p in many)
     return found
+
+
+def test_the_permission_reader_sees_both_dependency_factories():
+    """The guard on the helper above.
+
+    Without this, the blindness that made
+    test_no_fragment_is_gated_on_the_proposal_permission vacuous is
+    reintroduced by a one-word edit and nothing goes red. Read off the real
+    API router, which uses one factory for the reads and the other for the
+    write, so this cannot drift from the thing it describes.
+    """
+    from ion.web.detection_health_api import router as api_router
+
+    by_factory = {}
+    for route in api_router.routes:
+        for fn in _dependency_calls(route):
+            base = getattr(fn, "__qualname__", "").split(".")[0]
+            if base in ("require_permission", "require_any_permission"):
+                by_factory.setdefault(base, set()).update(_permissions(route))
+
+    assert set(by_factory) == {"require_permission", "require_any_permission"}, (
+        "this page's API no longer uses both factories, so this test is no "
+        "longer proving the helper handles both")
+    assert PROPOSE_PERMISSION in by_factory["require_any_permission"]
+    assert READ_PERMISSION in by_factory["require_permission"]
 
 
 # The API router declares its own `/detection-health` prefix and is mounted
