@@ -1,0 +1,230 @@
+{# The response-action approval inbox: the mode banner, the queue of pending
+   cards and the decision history.
+
+   Replaces four innerHTML writes in response_approvals.html (the banner, the
+   two sections, the disabled-surface notice and the failure alert) plus
+   rapEsc(), which Jinja's autoescaping makes unnecessary.
+
+   The banner lives in here rather than in the page because it is part of the
+   same read: a stale "dry-run mode" banner above a freshly rendered queue
+   would be the one lie this page cannot afford. The Refresh button stays in
+   the page shell, outside this swap target, so no render of this fragment
+   can remove the control that re-requests it.
+
+   Three states, never collapsed into two: the surface is switched off, the
+   read failed, or there is data. An empty queue is a fourth thing again and
+   says so in its own words. #}
+{% from "_fragments/_time.html" import ts %}
+
+{% if surface_off %}
+  {# ION_RESPONSE_ACTIONS_ENABLED is off, so nothing can be requested,
+     approved or dispatched. Not an empty queue and not a failure. #}
+  <div class="card bg-base-200 shadow">
+    <div class="card-body items-center text-center py-10">
+      <h3 class="card-title">Response actions are disabled</h3>
+      <p class="opacity-70 max-w-xl">Set ION_RESPONSE_ACTIONS_ENABLED to expose
+        the response-action surface. While it is off nothing can be requested,
+        approved or dispatched.</p>
+    </div>
+  </div>
+
+{% elif failed %}
+  {# "Nothing is waiting for you" and "we could not look" lead to opposite
+     actions here: the first ends the shift, the second means containment
+     decisions may be sitting unanswered. The count badge is omitted rather
+     than zeroed, because 0 would be the lie. #}
+  <section class="mb-10">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="font-semibold text-[20px]">Awaiting decision</h2>
+    </div>
+    <div role="alert" class="alert alert-error">
+      <div>
+        <div class="font-semibold">The approval inbox could not be read</div>
+        <div class="text-sm opacity-80 mt-1">This is not an empty queue. The
+          read failed, so how many response actions are waiting for a decision
+          is unknown. Nothing has been approved or rejected by this.</div>
+      </div>
+    </div>
+  </section>
+
+{% else %}
+  {% if inbox.has_mode %}
+    {# A single wrapper child: .alert is a CSS grid, so sibling children
+       become columns instead of stacking. #}
+    <div class="mb-6">
+      <div class="alert {{ 'alert-warning' if inbox.mode_live else 'alert-info' }}">
+        <div>
+          <div class="font-semibold">
+            {%- if inbox.mode_live %}Live mode, approving changes the target
+            {%- else %}Dry-run mode, approving changes nothing{% endif -%}
+          </div>
+          <div class="text-sm opacity-80 mt-1">{{ inbox.mode_reason }}</div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <section class="mb-10">
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="font-semibold text-[20px]">Awaiting decision</h2>
+      {# `is not none`: a measured 0 is the answer "nothing is waiting", and
+         the count is a separate query from the rows, capped at a different
+         limit, so it is not the same number as `pending|length`. #}
+      <span class="badge {{ 'badge-warning' if inbox.pending else 'badge-ghost' }}">
+        {{- inbox.pending_count if inbox.pending_count is not none else inbox.pending|length -}}
+      </span>
+    </div>
+
+    {% if not inbox.pending %}
+      <div class="card bg-base-200 shadow">
+        <div class="card-body items-center text-center py-10">
+          <h3 class="card-title">Nothing waiting</h3>
+          <p class="opacity-70">No response action is awaiting a decision.</p>
+        </div>
+      </div>
+    {% else %}
+      {% for e in inbox.pending %}
+        <div class="card bg-base-200 shadow mb-4">
+          <div class="card-body p-4 gap-3">
+
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold text-[15px]">{{ e.action_label }}</span>
+                  <span class="badge {{ e.risk_css }}">{{ e.risk_text }} risk</span>
+                  <span class="badge {{ e.readiness_css }}">{{ e.readiness_label }}</span>
+                  <span class="badge {{ 'badge-warning' if e.would_live else 'badge-ghost' }}">
+                    {{- 'would run live' if e.would_live else 'would simulate' -}}
+                  </span>
+                </div>
+                {% if e.action_description %}
+                  <div class="text-sm opacity-60 mt-1">{{ e.action_description }}</div>
+                {% endif %}
+              </div>
+              <div class="flex items-center gap-2">
+                {# Derived from the service's own rules, not from a map in the
+                   page: approve_action and reject_action refuse any row that
+                   is no longer awaiting a decision, and approve_action
+                   refuses a high-risk row to its own requester. A second copy
+                   of either rule offers a button the server answers with an
+                   error. The POST itself is still a fetch, because it
+                   confirms first and then re-requests this fragment. #}
+                {% for d in e.decisions %}
+                  <button class="btn btn-sm {{ d.css }}"
+                          data-click-action="rapDecide"
+                          data-args='[{{ e.id }}, "{{ d.verb }}"]'>{{ d.label }}</button>
+                {% endfor %}
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div>
+                <div class="label-tiny opacity-50">Target</div>
+                <div class="font-mono text-xs break-words">{{ e.target if e.target else '—' }}</div>
+              </div>
+              <div>
+                <div class="label-tiny opacity-50">Case</div>
+                {# `is not none`, not truthiness: the JavaScript tested
+                   `case_id == null`, and an id of 0 is a case, not an
+                   absence of one. #}
+                {% if e.case_id is not none %}
+                  <div class="text-sm break-words">
+                    <a class="link link-hover" href="{{ ('/cases/' ~ e.case_id)|safe_url }}">{{ e.case_label }}</a>
+                    {%- if e.case_severity %} <span class="opacity-50">· {{ e.case_severity }}</span>{% endif -%}
+                  </div>
+                {% else %}
+                  <div class="text-sm text-warning">Not linked to a case</div>
+                {% endif %}
+              </div>
+              <div>
+                <div class="label-tiny opacity-50">Requested by</div>
+                <div class="text-sm break-words">{{ e.requester_label }}</div>
+              </div>
+              <div>
+                <div class="label-tiny opacity-50">Requested at</div>
+                {# The macro, never a server-formatted string: the JavaScript
+                   called toLocaleString(), which is the viewer's clock, and
+                   the server knows only its own. #}
+                <div class="text-sm break-words">{{ ts(e.requested_at, fallback='—') }}</div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div class="label-tiny opacity-50">Adapter</div>
+                <div class="text-sm break-words">{{ e.adapter_line }}</div>
+              </div>
+              <div>
+                <div class="label-tiny opacity-50">Dispatch key</div>
+                <div class="font-mono text-xs break-words">{{ e.idempotency_key if e.idempotency_key else '—' }}</div>
+              </div>
+            </div>
+
+            {% if e.approve_blocked %}
+              {# Said because the Approve button is absent, not instead of
+                 absent. The page used to print this warning and render the
+                 button anyway, so the only way to learn the server refuses
+                 was to click it. #}
+              <div class="text-xs text-warning">Separation of duty: this action is
+                high-risk and you requested it, so you cannot approve it. Another
+                approver has to. You can still reject it.</div>
+            {% elif e.requires_second_person %}
+              <div class="text-xs text-warning">Separation of duty: this action is
+                high-risk, so it cannot be approved by {{ e.requester_label }} who
+                requested it.</div>
+            {% endif %}
+            {% if e.blocked %}
+              <div class="text-xs text-error">{{ e.adapter_detail }}</div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </section>
+
+  <section>
+    <div class="flex items-center gap-3 mb-4">
+      <h2 class="font-semibold text-[20px]">Decision history</h2>
+    </div>
+
+    {% if not inbox.decided %}
+      <div class="card bg-base-200 shadow">
+        <div class="card-body items-center text-center py-10">
+          <h3 class="card-title">No decisions yet</h3>
+          <p class="opacity-70">Approved and rejected actions appear here with
+            what actually happened.</p>
+        </div>
+      </div>
+    {% else %}
+      {% for e in inbox.decided %}
+        <div class="card bg-base-200 shadow mb-2">
+          <div class="card-body p-3 gap-2 text-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                {% if e.has_outcome %}
+                  <span class="badge {{ e.outcome_css }}">{{ e.outcome_label }}</span>
+                {% endif %}
+                <span class="font-semibold">{{ e.action_label }}</span>
+                <span class="font-mono text-xs opacity-60">{{ e.target }}</span>
+              </div>
+              <span class="font-mono text-xs opacity-60">{{ ts(e.decided_at, fallback='—') }}</span>
+            </div>
+            <div class="opacity-70">{{ e.outcome_detail }}</div>
+            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-60">
+              <span>requested by {{ e.requester_label }}</span>
+              <span>decided by {{ e.decider_label }}</span>
+              {% if e.case_id is not none %}
+                <span>case <a class="link link-hover" href="{{ ('/cases/' ~ e.case_id)|safe_url }}">{{ e.case_label }}</a></span>
+              {% else %}
+                <span class="text-warning">no case</span>
+              {% endif %}
+              {% if e.show_confirmation %}
+                <span class="{{ e.confirmation_css }}">{{ e.confirmation_label }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </section>
+{% endif %}

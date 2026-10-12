@@ -398,9 +398,40 @@ class TestInboxEndpoint:
         assert '@router.get("/actions/inbox"' in src
 
     def test_the_route_requires_the_approve_permission(self):
-        src = (_SRC / "ion" / "web" / "response_api.py").read_text(encoding="utf-8")
-        block = src.split('@router.get("/actions/inbox"')[1][:500]
-        assert 'require_permission("response:approve")' in block
+        """Read off the live route rather than grepped out of the source.
+
+        This used to look for the literal
+        `require_permission("response:approve")` in the 500 characters
+        after the decorator. The permission has moved to a module constant
+        that the four action routes and the /ui fragment all import,
+        precisely so they cannot drift apart, and the literal check then
+        failed on a change that made the gate harder to get wrong. A test
+        pinning the spelling of a dependency rather than its effect blocks
+        the refactor that removes the duplication.
+        """
+        from ion.web.server import app
+
+        routes = [r for r in app.routes
+                  if r.path == "/api/response/actions/inbox"
+                  and getattr(r, "dependant", None)]
+        assert routes, "the inbox route is not mounted"
+
+        found = set()
+        for route in routes:
+            stack = list(route.dependant.dependencies)
+            while stack:
+                dep = stack.pop()
+                call = dep.call
+                if call is not None and getattr(
+                    call, "__qualname__", ""
+                ).startswith("require_permission."):
+                    cells = dict(zip(
+                        call.__code__.co_freevars,
+                        (c.cell_contents for c in (call.__closure__ or ())),
+                    ))
+                    found.add(cells.get("permission_name"))
+                stack.extend(dep.dependencies)
+        assert "response:approve" in found, found
 
     def test_the_route_is_behind_the_feature_flag(self):
         src = (_SRC / "ion" / "web" / "response_api.py").read_text(encoding="utf-8")
@@ -420,10 +451,24 @@ class TestInboxEndpoint:
         assert tpl.exists()
 
     def test_the_template_never_prints_a_bare_completed(self):
-        """The whole point of classify_outcome is that the UI uses it."""
-        tpl = (_SRC / "ion" / "web" / "templates" / "response_approvals.html"
-               ).read_text(encoding="utf-8")
-        assert "outcome" in tpl
+        """The whole point of classify_outcome is that the UI uses it.
+
+        The decision history moved out of the page and into
+        _fragments/response_approvals.html when the page's `server` column
+        was converted, so the page shell no longer mentions an outcome and
+        this used to fail on the move. The claim is unchanged and still
+        worth holding: whichever template renders a decided row has to use
+        the classification rather than print the raw status.
+        """
+        shell = _SRC / "ion" / "web" / "templates" / "response_approvals.html"
+        fragment = (_SRC / "ion" / "web" / "templates" / "_fragments"
+                    / "response_approvals.html")
+        rendered_by = [p for p in (fragment, shell)
+                       if p.exists() and "outcome" in p.read_text(encoding="utf-8")]
+        assert rendered_by, (
+            "no response-approvals template mentions an outcome, so a "
+            "decided row is printing its raw status"
+        )
 
     def test_the_page_is_reachable_from_the_navigation(self):
         from tests.nav_render import render

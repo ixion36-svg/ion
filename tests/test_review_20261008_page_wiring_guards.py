@@ -54,10 +54,19 @@ class TestCspNonce:
         assert len(_template_files()) > 30
 
     def test_no_template_has_a_script_tag_without_the_nonce(self):
-        """A bare <script> is silently dead under ION's CSP."""
+        """A bare <script> is silently dead under ION's CSP.
+
+        Comments are stripped first. A Jinja comment in the architecture
+        fragment explains why the workflow edges are rendered as elements
+        rather than as a `<script>` data block, and the guard flagged the
+        explanation. Rewording the comment to satisfy the regex would be
+        the wrong way round: that file contains no script tag at all.
+        """
         offenders = []
         for path in _template_files():
             text = path.read_text(encoding="utf-8")
+            text = re.sub(r"\{#.*?#\}", "", text, flags=re.S)
+            text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
             for match in re.finditer(r"<script(?![^>]*\bsrc\s*=)([^>]*)>", text):
                 attrs = match.group(1)
                 if "csp_nonce" not in attrs:

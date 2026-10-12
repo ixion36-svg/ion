@@ -29,10 +29,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/response", tags=["response"])
 
 
+#: The permission every decision on this surface is gated on. Approving and
+#: rejecting take the same one as reading the inbox, so a user who can see
+#: the queue can act on it. The /ui fragment imports this rather than
+#: spelling the string again, which is what stops it becoming a softer way
+#: in than the API it mirrors.
+_APPROVE_PERM = "response:approve"
+
+
+def response_actions_enabled() -> bool:
+    """Whether the response-action surface is exposed at all.
+
+    One definition, because the /ui fragment has to answer the same question
+    and cannot do it by catching the 404: htmx does not swap a non-2xx body,
+    so a fragment that 404s shows the generic "no longer available" alert
+    instead of naming the flag that turns the surface on.
+    """
+    return bool(get_config().response_actions_enabled)
+
+
+def response_inbox_payload(session: Session, decided_limit: int = 50) -> dict:
+    """The approval inbox, with the history cap the API applies.
+
+    Shared with the /ui fragment so the clamp has one definition. A second
+    copy of it drifts the moment either side changes its default.
+    """
+    return actions.get_approval_inbox(
+        session, decided_limit=max(1, min(decided_limit, 200))
+    )
+
+
 def _require_enabled() -> None:
     # Evaluated before any auth/DB work, so a disabled deployment exposes
     # nothing — the MCP-endpoint pattern.
-    if not get_config().response_actions_enabled:
+    if not response_actions_enabled():
         raise HTTPException(status_code=404, detail="Not found")
 
 
@@ -124,7 +154,7 @@ def request_response_action(
 
 @router.get("/actions/pending", dependencies=[Depends(_require_enabled)])
 def pending_response_actions(
-    _user: User = Depends(require_permission("response:approve")),
+    _user: User = Depends(require_permission(_APPROVE_PERM)),
     session: Session = Depends(get_db_session),
 ):
     """The approver queue — actions awaiting a decision.
@@ -137,7 +167,7 @@ def pending_response_actions(
 @router.get("/actions/inbox", dependencies=[Depends(_require_enabled)])
 def response_approval_inbox(
     decided_limit: int = 50,
-    _user: User = Depends(require_permission("response:approve")),
+    _user: User = Depends(require_permission(_APPROVE_PERM)),
     session: Session = Depends(get_db_session),
 ):
     """The approval inbox: pending decisions plus recent decision history.
@@ -149,16 +179,14 @@ def response_approval_inbox(
     actually execute in, and the dispatch idempotency key) and classifies
     each outcome, so a dry run is never presented as containment.
     """
-    return actions.get_approval_inbox(
-        session, decided_limit=max(1, min(decided_limit, 200))
-    )
+    return response_inbox_payload(session, decided_limit)
 
 
 @router.post("/actions/{log_id}/approve", dependencies=[Depends(_require_enabled)])
 def approve_response_action(
     log_id: int,
     request: Request,
-    user: User = Depends(require_permission("response:approve")),
+    user: User = Depends(require_permission(_APPROVE_PERM)),
     session: Session = Depends(get_db_session),
 ):
     """Approve + execute. Rejects self-approval of a high-risk action (SoD)."""
@@ -176,7 +204,7 @@ def approve_response_action(
 def reject_response_action(
     log_id: int,
     request: Request,
-    user: User = Depends(require_permission("response:approve")),
+    user: User = Depends(require_permission(_APPROVE_PERM)),
     session: Session = Depends(get_db_session),
 ):
     """Reject a pending action."""
