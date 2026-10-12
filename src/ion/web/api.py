@@ -344,11 +344,19 @@ async def logout(
     return {"message": "Logout successful"}
 
 
-@router.get("/auth/me")
-async def get_current_user_info(
-    current_user: User = Depends(get_current_user),
-):
-    """Get current user information."""
+def current_user_payload(current_user: User) -> dict:
+    """Everything GET /api/auth/me answers with, for one caller or two.
+
+    Extracted so /ui/profile renders the account card from this rather than
+    from a second copy. The permission set is the part that must not be
+    duplicated: it unions over ``effective_roles``, which is focus-mode
+    filtered, so a second copy reading ``roles`` would show an analyst in
+    focus mode permissions their session does not currently carry.
+
+    Takes the already-authenticated user and nothing else. There is no
+    account selector here or in either caller, which is how a profile read
+    cannot be pointed at somebody else's row.
+    """
     focus_role = getattr(current_user, '_focus_role', None)
     return {
         "id": current_user.id,
@@ -369,6 +377,14 @@ async def get_current_user_info(
         "elastic_uid": getattr(current_user, "elastic_uid", None),
         "keycloak_sub": getattr(current_user, "keycloak_sub", None),
     }
+
+
+@router.get("/auth/me")
+async def get_current_user_info(
+    current_user: User = Depends(get_current_user),
+):
+    """Get current user information."""
+    return current_user_payload(current_user)
 
 
 class FocusModeRequest(BaseModel):
@@ -472,15 +488,20 @@ def update_own_profile(
     }
 
 
-@router.post("/auth/profile/resolve-elastic")
-def resolve_elastic_uid(
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_db_session),
-):
+def resolve_elastic_payload(current_user: User, session: Session) -> dict:
     """Resolve the current user's Elastic/Kibana user profile UID.
 
     Tries: elastic_username → ION username → email prefix.
     Queries Kibana's user profile suggest API.
+
+    Extracted so POST /ui/profile/resolve-elastic runs this and not a second
+    copy of the candidate order. It raises HTTPException(400) when Kibana is
+    not configured, which is deliberately not the same answer as "no match":
+    the fragment words those two differently because they lead to different
+    actions, and keeping the gate here means both callers see it the same way.
+
+    The write is scoped by ``id=current_user.id``, so the only row this can
+    touch is the caller's own.
     """
 
     kb_svc = get_kibana_cases_service()
@@ -544,6 +565,15 @@ def resolve_elastic_uid(
         "candidates_tried": candidates,
         "profiles_found": all_profiles,
     }
+
+
+@router.post("/auth/profile/resolve-elastic")
+def resolve_elastic_uid(
+    current_user: User = Depends(get_current_user),
+    session: Session = Depends(get_db_session),
+):
+    """Resolve the current user's Elastic/Kibana user profile UID."""
+    return resolve_elastic_payload(current_user, session)
 
 
 @router.post("/auth/change-password")

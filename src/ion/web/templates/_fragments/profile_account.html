@@ -1,0 +1,79 @@
+{# The Account Information card body for /profile.
+
+   Replaces two innerHTML sites in profile.html: the six-field grid and the
+   `<div class="error">Error loading profile</div>` it fell back to. The
+   `.profile-field` / `.role-badge` / `.permissions-list` markup is kept
+   exactly as the JavaScript emitted it, so the page looks the same and the
+   move is checkable with tools/style_snapshot.py rather than by eye.
+   frontend/ion-pages.css carries a block of `#profile-info .profile-field`
+   overrides whose comment says it "cannot add daisyUI classes without
+   changing JS". It can now; that is what this conversion is for.
+
+   Chrome: the card and its Refresh button stay on the page, outside this
+   target, because a failed render must not remove the control that retries.
+   This fragment is the card's contents and nothing else.
+
+   The distinction this template is careful about is "not set" against
+   "could not be read". An account with no display name is an account with
+   no display name, and an account with no roles is a real and visible
+   state. An account whose read failed has unknown roles. Those lead to
+   opposite actions, so the failure branch never borrows the empty wording
+   and the empty states never borrow the failure wording. The JavaScript
+   printed nothing for an empty roles list, which looked like the load had
+   not finished. #}
+
+{% from "_fragments/_time.html" import ts %}
+
+{% if failed %}
+  <div role="alert" class="alert alert-error text-[0.8125rem]">
+    Your account details could not be read. This is not an empty account:
+    the read failed, so your roles and permissions are unknown rather than
+    none. Refresh to try again.
+  </div>
+{% else %}
+  <div class="profile-field">
+    <label>Username</label>
+    <span>{{ user.username }}</span>
+  </div>
+  <div class="profile-field">
+    <label>Email</label>
+    <span>{{ user.email }}</span>
+  </div>
+  <div class="profile-field">
+    <label>Display Name</label>
+    {# Truthiness is right for this one field and nowhere else here: the
+       column is nullable and PUT /api/auth/profile stores a blank as NULL,
+       so None and "" are the same claim, "not set". A read that failed is a
+       different branch entirely, which is what keeps this from being the
+       truthiness mistake. #}
+    <span>{% if user.display_name %}{{ user.display_name }}{% else %}<span class="opacity-60">Not set</span>{% endif %}</span>
+  </div>
+  <div class="profile-field">
+    <label>Roles</label>
+    <span>
+      {%- if user.roles -%}
+        {%- for r in user.roles %}<span class="role-badge role-{{ r }}">{{ r }}</span> {% endfor -%}
+      {%- else -%}
+        <span class="opacity-60">No roles assigned</span>
+      {%- endif -%}
+    </span>
+  </div>
+  <div class="profile-field">
+    <label>Last Login</label>
+    {# The macro, not a server-formatted string: a server knows only its own
+       clock. 'Never' is the fallback the JavaScript used for a null, and it
+       is the right word, because a null here means the account has not
+       signed in rather than that the timestamp went missing. #}
+    <span>{{ ts(last_login, fallback='Never') }}</span>
+  </div>
+  <div class="profile-field">
+    <label>Permissions</label>
+    <span class="permissions-list">
+      {%- if permissions -%}
+        {{ permissions | join(', ') }}
+      {%- else -%}
+        <span class="opacity-60">No permissions granted</span>
+      {%- endif -%}
+    </span>
+  </div>
+{% endif %}

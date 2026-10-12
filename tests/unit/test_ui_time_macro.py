@@ -45,7 +45,13 @@ def test_an_iso_string_is_accepted_too():
     stored text, and a fragment author cannot tell which from the row."""
     html = render("2026-10-12T09:41:07+00:00")
     assert 'datetime="2026-10-12T09:41:07+00:00"' in html
-    assert "2026-10-12T09:41:07+00:00</time>" in html
+    # This used to assert the string was echoed into the text verbatim,
+    # which is why two conversions reported raw microseconds as the ugliest
+    # thing on their page. A parseable string is now formatted exactly as
+    # the datetime it encodes, so a column does not change appearance based
+    # on whether a repository happened to call .isoformat(). The attribute
+    # still carries the full instant for the script to read.
+    assert "2026-10-12 09:41 UTC</time>" in html
 
 
 def test_a_missing_timestamp_is_not_the_epoch_and_not_an_empty_cell():
@@ -127,3 +133,43 @@ def test_an_aware_fallback_is_stated_in_utc():
     html = render(datetime(2026, 10, 12, 11, 41, 7,
                            tzinfo=timezone(timedelta(hours=2))))
     assert "2026-10-12 09:41 UTC" in html
+
+
+# ---------------------------------------------------------------------------
+# A string and a datetime of the same instant must render the same
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("aware", [True, False])
+def test_an_iso_string_renders_exactly_like_the_datetime_it_encodes(aware):
+    """A fragment author cannot tell which type they will be handed.
+
+    Some repositories return parsed objects and some call .isoformat() for
+    their JSON consumer, and the fragment sees whichever. Before this, a
+    datetime showed "2026-10-12 14:51" while the ISO string of the same
+    moment showed "2026-10-12T14:51:48.123456", so the prettiness of a
+    column depended on an implementation detail upstream. Two conversions
+    reported the raw microseconds as the ugliest thing on their page.
+    """
+    from ion.web.templating import _ts_parts
+
+    tz = timezone.utc if aware else None
+    value = datetime(2026, 10, 12, 14, 51, 48, 123456, tzinfo=tz)
+    assert _ts_parts(value)["shown"] == _ts_parts(value.isoformat())["shown"]
+    assert _ts_parts(value)["localise"] == _ts_parts(value.isoformat())["localise"]
+
+
+def test_a_date_with_no_time_is_not_given_a_midnight():
+    """Parsing it would render "2026-10-12 00:00", asserting a time of day
+    the data never carried. Inventing a midnight on a date is the same
+    defect as printing 0 for a figure nobody measured."""
+    from ion.web.templating import _ts_parts
+
+    assert _ts_parts("2026-10-12")["shown"] == "2026-10-12"
+
+
+def test_an_unparseable_value_is_still_shown():
+    """An unreadable timestamp is evidence, not something to blank."""
+    from ion.web.templating import _ts_parts
+
+    assert _ts_parts("whenever")["shown"] == "whenever"

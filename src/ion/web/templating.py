@@ -93,6 +93,34 @@ def _ts_parts(value: object) -> dict | None:
         }
 
     text = str(value)
+
+    # A string that parses is handed to the branch above, so the same
+    # instant renders the same way whichever type the repository returned.
+    # Without this a `datetime` showed "2026-10-12 14:51" while the ISO
+    # string of the same moment showed "2026-10-12T14:51:48.123456", and a
+    # fragment author cannot tell which they will get: some repositories
+    # hand back parsed objects and some call .isoformat() for their JSON
+    # consumer. Two conversions reported the raw microseconds as the
+    # ugliest thing on their page.
+    # A date with no time is left alone. Parsing it would render
+    # "2026-10-12 00:00", asserting a midnight the data never carried, and
+    # inventing a time of day on a date is the same defect as printing 0
+    # for a figure nobody measured.
+    date_only = re.fullmatch(r"\d{4}-\d{2}-\d{2}", text) is not None
+
+    parsed = None
+    if not date_only:
+        try:
+            # fromisoformat accepts "Z" only from 3.11 and ION targets 3.12,
+            # but normalising costs nothing and keeps this true on 3.10.
+            parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            parsed = None
+    if parsed is not None:
+        return _ts_parts(parsed)
+
+    # Not parseable. Keep it exactly as given rather than blanking it: an
+    # unreadable timestamp is still evidence, and the zone is unknown.
     # Z, +00:00, +0000. A date-only string has no time to place in a zone.
     if re.search(r"(Z|[+-]\d{2}:?\d{2})$", text):
         return {"iso": text, "shown": text, "localise": True, "note": ""}

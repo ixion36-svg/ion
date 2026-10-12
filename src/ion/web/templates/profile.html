@@ -20,8 +20,20 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <div class="card bg-base-200 shadow">
         <div class="card-body">
-            <h2 class="card-title">Account Information</h2>
-            <div class="profile-info" id="profile-info">
+            <!-- The heading and Refresh sit outside #profile-info on purpose:
+                 a render that fails must not be able to remove the control
+                 that retries it. -->
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="card-title">Account Information</h2>
+                <button type="button" class="btn btn-ghost btn-sm" id="profile-refresh"
+                        hx-get="/ui/profile"
+                        hx-target="#profile-info"
+                        hx-swap="innerHTML">Refresh</button>
+            </div>
+            <div class="profile-info" id="profile-info"
+                 hx-get="/ui/profile"
+                 hx-trigger="load"
+                 hx-swap="innerHTML">
                 <div class="flex justify-center items-center gap-2 py-8 text-center opacity-50">
                     <span class="loading loading-spinner loading-sm text-primary"></span> Loading profile...
                 </div>
@@ -48,14 +60,27 @@
                     <legend class="fieldset-legend">Elastic UID <span class="text-[var(--text-muted)] font-normal">(auto-resolved)</span></legend>
                     <div class="flex gap-2 items-center">
                         <input class="input min-w-0 opacity-70 flex-1" type="text" id="id-elastic-uid" readonly>
-                        <button type="button" class="btn btn-sm whitespace-nowrap" data-click-action="resolveElasticUid" id="resolve-btn">Resolve</button>
+                        <!-- hx-params="none": this button sits inside a form, and
+                             htmx would otherwise post the form's fields with it.
+                             The endpoint takes no input beyond who is asking.
+                             hx-disabled-elt replaces the hand-rolled disable and
+                             "Resolving..." relabel the JavaScript did. -->
+                        <button type="button" class="btn btn-sm whitespace-nowrap" id="resolve-btn"
+                                hx-post="/ui/profile/resolve-elastic"
+                                hx-target="#resolve-result"
+                                hx-swap="innerHTML"
+                                hx-params="none"
+                                hx-disabled-elt="this">Resolve</button>
                     </div>
                 </fieldset>
                 <fieldset class="fieldset p-0">
                     <legend class="fieldset-legend">Keycloak Subject ID <span class="text-[var(--text-muted)] font-normal">(auto-set on OIDC login)</span></legend>
                     <input class="input w-full opacity-70" type="text" id="id-keycloak-sub" readonly>
                 </fieldset>
-                <div class="hidden mb-4" id="resolve-result"></div>
+                <!-- Empty, not hidden. Nothing requested means nothing shown, so
+                     there is no reveal to forget; the lookup's own answer is the
+                     only thing that ever appears here. -->
+                <div class="mb-4" id="resolve-result"></div>
                 <button type="submit" class="btn btn-primary">Save Mappings</button>
             </form>
         </div>
@@ -157,66 +182,57 @@
 
 {% block scripts %}
 <script nonce="{{ csp_nonce }}">
-let currentUser = null;
-
-async function loadProfile() {
+/* What this file still does, and what it stopped doing.
+ *
+ * The account card is a server-rendered fragment now, requested by
+ * #profile-info on load. Everything that built markup out of strings is
+ * gone: templates/_fragments/profile_account.html renders those six fields
+ * and _fragments/profile_resolve.html renders the Elastic lookup result.
+ *
+ * This fetch remains, narrowed to the form fields it fills. It is deliberate
+ * rather than left over. Serving the identity inputs from a fragment would
+ * mean the server echoing entry-field values back into markup, and would put
+ * the Save control inside a swap target where a failed render takes it away.
+ * It also keeps the page working for the one user who most needs it: a
+ * must_change_password account is refused every path outside
+ * _PWD_CHANGE_ALLOWED_PREFIXES in ion/auth/dependencies.py, and
+ * /api/auth/me is on that list while /ui/profile is not, so the notice and
+ * the form below survive even when the account card cannot load.
+ */
+async function loadIdentity() {
     try {
         const response = await fetch('/api/auth/me');
         if (response.status === 401) {
             window.location.href = '/login?redirect=/profile';
             return;
         }
-        currentUser = await response.json();
-        renderProfile();
+        if (!response.ok) {
+            throw new Error('HTTP ' + response.status);
+        }
+        const user = await response.json();
 
-        // Check if password change is required
+        document.getElementById('current-browser').textContent = navigator.userAgent.split(' ').slice(-2).join(' ');
+
+        document.getElementById('id-elastic-username').value = user.elastic_username || '';
+        document.getElementById('id-gitlab-username').value = user.gitlab_username || '';
+        document.getElementById('id-elastic-uid').value = user.elastic_uid || '';
+        document.getElementById('id-keycloak-sub').value = user.keycloak_sub || '';
+
         const urlParams = new URLSearchParams(window.location.search);
-        if (currentUser.must_change_password || urlParams.get('change_password') === '1') {
+        if (user.must_change_password || urlParams.get('change_password') === '1') {
             document.getElementById('password-change-required').style.display = 'block';
             document.getElementById('change-password-card').scrollIntoView({ behavior: 'smooth' });
         }
     } catch (error) {
-        document.getElementById('profile-info').innerHTML = '<div class="error">Error loading profile</div>';
+        /* The account card reports its own failure through its fragment. This
+         * one owns the identity inputs, so it has to say that those are
+         * unread rather than empty: saving a blank form would clear mappings
+         * that are still set. */
+        document.getElementById('identity-mapping-form').querySelectorAll('input, button').forEach(el => {
+            el.disabled = true;
+        });
+        showToast('Your identity mappings could not be read, so they are not shown. Reload before saving.', 'error');
     }
-}
-
-function renderProfile() {
-    const info = document.getElementById('profile-info');
-    info.innerHTML = `
-        <div class="profile-field">
-            <label>Username</label>
-            <span>${escapeHtml(currentUser.username)}</span>
-        </div>
-        <div class="profile-field">
-            <label>Email</label>
-            <span>${escapeHtml(currentUser.email)}</span>
-        </div>
-        <div class="profile-field">
-            <label>Display Name</label>
-            <span>${escapeHtml(currentUser.display_name || '-')}</span>
-        </div>
-        <div class="profile-field">
-            <label>Roles</label>
-            <span>${currentUser.roles.map(r => `<span class="role-badge role-${r}">${r}</span>`).join(' ')}</span>
-        </div>
-        <div class="profile-field">
-            <label>Last Login</label>
-            <span>${currentUser.last_login ? new Date(currentUser.last_login).toLocaleString() : 'Never'}</span>
-        </div>
-        <div class="profile-field">
-            <label>Permissions</label>
-            <span class="permissions-list">${currentUser.permissions.sort().join(', ')}</span>
-        </div>
-    `;
-
-    // Update session info
-    document.getElementById('current-browser').textContent = navigator.userAgent.split(' ').slice(-2).join(' ');
-
-    // Populate identity mapping fields
-    document.getElementById('id-elastic-username').value = currentUser.elastic_username || '';
-    document.getElementById('id-gitlab-username').value = currentUser.gitlab_username || '';
-    document.getElementById('id-elastic-uid').value = currentUser.elastic_uid || '';
-    document.getElementById('id-keycloak-sub').value = currentUser.keycloak_sub || '';
 }
 
 async function changePassword(event) {
@@ -253,8 +269,8 @@ async function changePassword(event) {
             document.getElementById('change-password-form').reset();
             document.getElementById('password-change-required').style.display = 'none';
 
-            // Reload profile to update must_change_password status
-            loadProfile();
+            // Re-read so must_change_password reflects the change
+            loadIdentity();
         } else {
             showToast(result.detail || 'Error changing password', 'error');
         }
@@ -331,7 +347,7 @@ async function saveIdentityMapping(event) {
             showToast('Identity mappings saved', 'success');
             // Update UID field (cleared when username changes)
             document.getElementById('id-elastic-uid').value = result.elastic_uid || '';
-            loadProfile();
+            loadIdentity();
         } else {
             showToast(result.detail || 'Error saving mappings', 'error');
         }
@@ -340,59 +356,15 @@ async function saveIdentityMapping(event) {
     }
 }
 
-async function resolveElasticUid() {
-    const btn = document.getElementById('resolve-btn');
-    const resultDiv = document.getElementById('resolve-result');
-    btn.disabled = true;
-    btn.textContent = 'Resolving...';
-    resultDiv.style.display = 'none';
-
-    try {
-        const response = await fetch('/api/auth/profile/resolve-elastic', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        });
-        const result = await response.json();
-
-        if (response.ok) {
-            if (result.resolved) {
-                document.getElementById('id-elastic-uid').value = result.elastic_uid;
-                if (result.matched_username) {
-                    document.getElementById('id-elastic-username').value = result.matched_username;
-                }
-                showToast(`Resolved Elastic UID via "${result.matched_username}"`, 'success');
-                resultDiv.innerHTML = `<div class="alert alert-success text-[0.8125rem]">
-                    Matched as <strong>${escapeHtml(result.matched_username)}</strong>
-                    &mdash; UID: <code>${escapeHtml(result.elastic_uid)}</code>
-                </div>`;
-            } else {
-                showToast('Could not resolve Elastic UID', 'error');
-                let profilesHtml = '';
-                if (result.profiles_found && result.profiles_found.length) {
-                    profilesHtml = '<p class="mt-2">Available profiles found:</p><ul class="mt-1 mr-0 mb-0 ml-4">' +
-                        result.profiles_found.map(p =>
-                            `<li><strong>${escapeHtml(p.username)}</strong> (${escapeHtml(p.full_name || p.email || '')})</li>`
-                        ).join('') + '</ul><p class="mt-2">Set your <em>Elastic Username</em> to one of these and try again.</p>';
-                }
-                resultDiv.innerHTML = `<div class="alert alert-warning text-[0.8125rem]">
-                    No exact match found. Tried: ${result.candidates_tried.map(c => `"${escapeHtml(c)}"`).join(', ')}
-                    ${profilesHtml}
-                </div>`;
-            }
-            resultDiv.style.display = 'block';
-        } else {
-            showToast(result.detail || 'Error resolving', 'error');
-        }
-    } catch (error) {
-        showToast('Error resolving Elastic UID', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Resolve';
-    }
-}
+/* The Elastic lookup is #resolve-btn's own hx-post now, and its result is a
+ * rendered fragment rather than two template strings. What JavaScript is
+ * still needed is the part the fragment cannot reach: the UID the lookup
+ * persisted lives in an input this page owns, so the route answers a match
+ * with `HX-Trigger: profile:changed` and this re-reads the fields. */
+document.body.addEventListener('profile:changed', loadIdentity);
 
 // Initialize
-loadProfile();
+loadIdentity();
 loadTheme();
 </script>
 {% endblock %}
