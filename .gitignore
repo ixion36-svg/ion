@@ -162,3 +162,4 @@ test_pcaps/real/smbtorture.cap
 # autonomous-run working files
 todo.md
 decisions.tsv
+.grok-rejected/

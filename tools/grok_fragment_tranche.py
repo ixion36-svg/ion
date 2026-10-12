@@ -66,6 +66,10 @@ FRAGMENTS = TEMPLATES / "_fragments"
 UI = REPO / "src/ion/web/ui"
 TESTS = REPO / "tests/unit"
 RESULTS = REPO / "tools/grok_fragment_results.json"
+# Rejected conversions land here rather than in the tree: they are evidence,
+# not candidates, and discovery must not find a module in them. Gitignored,
+# unlike RESULTS, because this holds whole source files that failed.
+REJECTED = REPO / ".grok-rejected"
 VENV_PY = Path("C:/Users/lyndo/projects/ION/.venv/Scripts/python.exe")
 
 # The same expression tools/ui_redesign_status.py measures with. Imported
@@ -94,16 +98,54 @@ def owned_paths(page: str) -> list[Path]:
 
 
 def snapshot(page: str, tmp: Path) -> dict:
-    """Copy what exists and record what does not, so both can be undone."""
+    """Copy what exists and record what does not, so both can be undone.
+
+    Backups mirror the path they came from rather than being flattened to a
+    basename. A page and its own fragment share one: `templates/x.html` and
+    `templates/_fragments/x.html`. Flattened, the second copy overwrote the
+    first and both keys pointed at the same backup, so a rollback on an
+    already-converted page would have restored the fragment's contents into
+    the page template and reported success. Every page converted so far has
+    a fragment named exactly after it, so this would have fired on the first
+    re-run of any of them. Found by testing the rollback path rather than by
+    reading it.
+    """
     stem = page.removesuffix(".html")
     existed, backups = [], {}
     for path in owned_paths(page):
         if path.exists():
             existed.append(str(path))
-            dest = tmp / path.name
+            dest = tmp / path.relative_to(REPO)
+            dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy(path, dest)
             backups[str(path)] = str(dest)
     return {"stem": stem, "existed": existed, "backups": backups}
+
+
+def preserve(snap: dict) -> list[str]:
+    """Copy a rejected conversion aside before it is undone.
+
+    A rollback used to discard the work and keep only the summary line, so
+    `de_workbench` spent 2853 seconds, failed two of its own tests, and left
+    nothing to diagnose or build on: not the failing test names, not the
+    module, not the fragment. The next attempt had to start from the
+    original template.
+
+    Rejected work is still evidence. Most of a conversion that fails two
+    tests is usually right, and the two that failed are the interesting
+    part.
+    """
+    stem = snap["stem"]
+    out = REJECTED / f"{stem}-{time.strftime('%Y%m%d-%H%M%S')}"
+    out.mkdir(parents=True, exist_ok=True)
+    kept = []
+    for path in owned_paths(f"{stem}.html"):
+        if path.exists():
+            dest = out / path.relative_to(REPO)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(path, dest)
+            kept.append(str(path.relative_to(REPO)))
+    return [f"rejected work kept in {out.relative_to(REPO)}"] if kept else []
 
 
 def roll_back(snap: dict) -> list[str]:
@@ -231,6 +273,16 @@ def verify(page: str) -> tuple[bool, list[str]]:
     if pytest.returncode != 0:
         ok = False
         notes.append("FAIL tests do not pass")
+        # Which ones, not just how many. The summary line alone is what made
+        # a rolled-back page undiagnosable: "2 failed, 98 passed" says
+        # nothing about whether the conversion was nearly right or wholly
+        # wrong, and the files are gone by the time anyone reads it.
+        named = [line.strip() for line in tail
+                 if line.startswith(("FAILED", "ERROR"))]
+        notes.extend(named[:12] or ["no FAILED lines in the output, so the "
+                                    "suite did not run: check for a "
+                                    "collection error, which reds every "
+                                    "test and proves none"])
 
     return ok, notes
 
@@ -351,7 +403,7 @@ def convert(page: str, timeout: int, dry_run: bool) -> dict:
             result["stderr"] = (proc.stderr or "")[-600:]
         except subprocess.TimeoutExpired:
             result["exit"] = "timeout"
-            result["notes"] = ["timed out"] + roll_back(snap)
+            result["notes"] = ["timed out"] + preserve(snap) + roll_back(snap)
             result["seconds"] = round(time.time() - started)
             return result
 
@@ -361,7 +413,7 @@ def convert(page: str, timeout: int, dry_run: bool) -> dict:
         if ok:
             result["kept"] = True
         else:
-            result["notes"] += roll_back(snap)
+            result["notes"] += preserve(snap) + roll_back(snap)
 
     result["seconds"] = round(time.time() - started)
     return result
