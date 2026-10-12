@@ -22,10 +22,10 @@ page cannot be forgotten. Status is measured, never set by hand.
 | measure | remaining |
 |---|---|
 | templates | 82 |
-| total lines | 81,118 |
-| inline `<style>` lines | 18,096 |
+| total lines | 81,136 |
+| inline `<style>` lines | 18,114 |
 | runtime DOM writes | 1,119 |
-| literal light-on-dark colours | 13 |
+| literal light-on-dark colours | 11 |
 
 ## Shell and partials
 
@@ -136,14 +136,14 @@ Needs the server-rendered fragment work first; a markup-only restyle cannot reac
 | `security_dashboard.html` | 795 | 89 | 461 | 13 | yes | no | no |  |
 | `gitlab.html` | 761 | 147 | 428 | 23 | no | no | no |  |
 | `dashboard_v2.html` | 714 | 0 | 412 | 15 | yes | yes | no |  |
-| `templates.html` | 687 | 157 | 406 | 12 | no | no | no |  |
-| `template_view.html` | 637 | 155 | 350 | 13 | no | no | no |  |
+| `templates.html` | 696 | 166 | 406 | 12 | yes | no | no |  |
+| `template_view.html` | 646 | 164 | 350 | 13 | yes | no | no |  |
 | `network_topology.html` | 579 | 178 | 320 | 12 | yes | no | no |  |
 | `analyst.html` | 545 | 0 | 360 | 18 | yes | yes | no |  |
 | `alert_arkime.html` | 516 | 7 | 275 | 13 | yes | no | no |  |
 | `scheduler.html` | 510 | 45 | 349 | 15 | yes | no | no |  |
 
-Subtotal: 30 templates, 62,347 lines, 15,192 inline css lines, 927 runtime writes, 11 light-mode literals.
+Subtotal: 30 templates, 62,365 lines, 15,210 inline css lines, 927 runtime writes, 9 light-mode literals.
 
 ## Cleanup, so nothing is left behind
 

@@ -68,6 +68,14 @@
     --neon-green: #86f0a0;
     --neon-yellow: #f8b33a;
     --neon-orange: #f8b33a;
+    /* Hues that only existed as per-page literals until now. Added as
+       two-mode tokens so the pages that use them stop hardcoding a value
+       that cannot flip. Dark values are the literals those pages already
+       used, so the dark page is unchanged by construction. */
+    --neon-lime: #a3e635;
+    --neon-teal: #2dd4bf;
+    --neon-pink: #f472b6;
+    --neon-sky:  #93c5fd;
     --neon-red: #ff6c6c;
 
     /* Primary color */
@@ -311,7 +319,13 @@
 
     --text-primary: #1e293b;
     --text-secondary: #475569;
-    --text-muted: #64748b;
+    /* Was #64748b, the dark block's old value. On pure white that is
+       4.76:1, but ION's cards sit on a #f6f7f9 tint where it measures
+       **4.44:1**, just under the floor, which the crawl caught on
+       /analytics. #5b6b84 is 5.05:1 on the card and 5.41:1 on white:
+       the mirror of the dark-mode fix, which went #64748b -> #7c8ba1
+       for the same reason in the other direction. */
+    --text-muted: #5b6b84;
     --text-bright: #0f172a;
 
     --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
@@ -352,6 +366,14 @@
     --mitre-covered: #15803d;
     --mitre-gap: var(--sev-critical);
     --mitre-partial: var(--sev-medium);
+
+    /* The light partners, each the smallest darkening that clears AA as
+       text on white (measured): lime 1.51 -> 4.99, teal 1.86 -> 5.47,
+       pink 2.65 -> 6.04, sky 1.80 -> 6.70. */
+    --neon-lime: #4d7c0f;
+    --neon-teal: #0f766e;
+    --neon-pink: #be185d;
+    --neon-sky:  #1d4ed8;
 
     /* ── 5-Severity System, light mode ──────────────────── */
     /* The dark ramp on a white page measured 2.12:1 to 2.63:1 for badge
