@@ -61,6 +61,33 @@ def load_map() -> dict:
     return json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {}
 
 
+def _never_valid_css(entry: dict | None) -> bool:
+    """Was this class's rule something a browser ever applied?
+
+    The v0.31.21 inline-style migration hashed `style="top:' + (cy - r1) +
+    'px"` into a static class whose body is the literal JavaScript, so 25
+    of the 905 mapped classes hold text like
+
+        top:' + (cy - r2 - 55) + 'px;
+
+    which is not CSS. Every browser dropped the whole declaration, so the
+    style was never in effect and its disappearance cannot be a style loss.
+    Reporting it as one reports the repair as the damage, which is the same
+    mistake the gained-hooks offset below already exists to avoid.
+
+    This is a claim about effect, not about need: the page may still want
+    that value computed at runtime, and if it does the replacement is a
+    data-ion-style hook or a direct style.setProperty. Whether it got one
+    is a separate and stronger question, and tools/verify_conversion.py is
+    where it is answered. The marker comes from the map's own analysis
+    rather than from a list kept here, so a new one is covered the day it
+    is recorded.
+    """
+    if not entry:
+        return False
+    return any("JS-concatenated" in str(u) for u in (entry.get("unmapped") or []))
+
+
 def check(baseline: dict, current: dict) -> list[str]:
     """Report only LOSSES and REGRESSIONS, never mere change.
 
@@ -89,7 +116,8 @@ def check(baseline: dict, current: dict) -> list[str]:
         lost = set(base["hashed_classes"]) - set(cur["hashed_classes"])
         unreplaceable = sorted(
             c for c in lost
-            if c not in cmap or cmap[c].get("kind") == "manual"
+            if (c not in cmap or cmap[c].get("kind") == "manual")
+            and not _never_valid_css(cmap.get(c))
         )
         # A utility is not the only legitimate replacement. Where the original
         # style was computed at runtime -- `flex:' + slaCounts.green + '` -- no

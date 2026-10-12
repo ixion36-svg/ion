@@ -38,6 +38,7 @@ from ion.web.ui.de_quirks import (
     _as_dt,
     _row,
     _scope_chips,
+    de_quirks_fragment,
     router,
 )
 
@@ -259,12 +260,23 @@ def test_a_scopeless_quirk_shows_a_dash():
 # ---------------------------------------------------------------------------
 
 
-def test_the_review_date_is_emitted_for_the_viewers_clock():
-    """Never formatted into a locale string on the server. The macro emits
-    the machine-readable instant and static/js/local-time.js decides."""
+def test_the_review_date_is_emitted_as_a_machine_readable_instant():
+    """Never formatted into a locale string on the server.
+
+    local-time.js does not rewrite this one, and that is correct rather
+    than a gap: `review_date` is a naive DateTime column, so the macro
+    marks it `data-ts-local="no"` and leaves the text as stored. A value
+    carrying no offset cannot be moved to the viewer's clock without
+    inventing one, and the title says whose clock it is.
+
+    The format token is `datetime`, not `date`, because it is what a
+    timezone-aware column would be rendered with and `date` would strip
+    the time of day this table deliberately shows.
+    """
     html = one()
     assert '<time datetime="2026-11-01T00:00:00"' in html
-    assert 'data-ts-format="date"' in html
+    assert 'data-ts-format="datetime"' in html
+    assert 'data-ts-local="no"' in html
 
 
 def test_the_review_date_keeps_its_time_of_day():
@@ -362,7 +374,7 @@ def test_the_action_buttons_carry_parseable_args():
     args = re.findall(r"data-args='([^']*)'", html)
     assert args, "no action buttons rendered"
     for raw in args:
-        assert json.loads(raw.replace("&#34;", '"'))[0] == 7
+        assert json.loads(raw)[0] == 7
 
 
 # ---------------------------------------------------------------------------
@@ -533,9 +545,42 @@ def test_the_route_filters_by_status(app, session, monkeypatch):
     assert "No active quirks" in resp.text
 
 
-def test_the_route_404s_when_the_module_is_licence_disabled(app, monkeypatch):
+def test_the_status_filter_accepts_exactly_the_services_states():
+    """The annotation is spelled out, so this is what keeps it from drifting
+    from the enum. A state added to SystemQuirkStatus and not here would be
+    unreachable from the page, with nothing anywhere saying so."""
+    from typing import get_args, get_type_hints
+
+    # get_type_hints, not __annotations__. The module has
+    # `from __future__ import annotations`, so the raw annotation is the
+    # *string* 'Literal["all", ...]' and get_args on a string returns (),
+    # which made the first version of this assertion compare an empty set
+    # and fail against correct code.
+    hints = get_type_hints(de_quirks_fragment)
+    allowed = set(get_args(hints["status"]))
+    assert allowed == {"all"} | {s.value for s in SystemQuirkStatus}
+
+
+def test_an_unparseable_filter_is_a_bad_request_not_a_failed_read(app, monkeypatch):
+    """"We could not look" is reserved for a read that failed. A filter
+    value the service cannot parse is the caller's mistake, and answering it
+    with the failure fragment spends that message on the wrong thing and
+    logs a stack trace for it."""
+    monkeypatch.setattr(gating, "de_module_available", lambda: True)
+    with TestClient(app) as client:
+        resp = client.get("/ui/de-quirks", params={"status": "bogus"})
+    assert resp.status_code == 422
+    assert "could not be read" not in resp.text
+
+
+def test_the_route_404s_when_the_module_is_licence_disabled(app, session, monkeypatch):
     """The state that is neither empty nor failed. Nothing about the quirk
-    store leaks, and htmx-errors.js words the 404 for the user."""
+    store leaks, and htmx-errors.js words the 404 for the user.
+
+    The row is inserted first on purpose: without it, "the title is absent"
+    is true of any 404 body and asserts nothing.
+    """
+    _probe(session, SystemQuirkStatus.PENDING)
     monkeypatch.setattr(gating, "de_module_available", lambda: False)
     with TestClient(app) as client:
         resp = client.get("/ui/de-quirks")

@@ -79,7 +79,13 @@
                 {% if q.verified_by_username %}<br>verified: {{ q.verified_by_username }}{% endif %}
                 {% if q.reverted_by_username %}<br>reverted: {{ q.reverted_by_username }}{% endif %}
               </td>
-              <td class="font-mono text-sm opacity-60">{{ ts(q.review_date, 'date', fallback='No review date') }}</td>
+              {# `datetime`, not `date`. The token is inert while review_date
+                 is a naive column, because a zoneless value cannot be moved
+                 to another clock and local-time.js leaves the text alone. It
+                 would bite the day the column gains a timezone: `date` would
+                 strip the time of day, and the time of day is the point,
+                 since quirk_match compares against the instant. #}
+              <td class="font-mono text-sm opacity-60">{{ ts(q.review_date, 'datetime', fallback='No review date') }}</td>
               <td>
                 {% if q.actions %}
                   {% for a in q.actions %}<button class="btn {{ a.css }} btn-sm" data-click-action="{{ a.action }}" data-args='[{{ q.id }}]'>{{ a.label }}</button>{% endfor %}

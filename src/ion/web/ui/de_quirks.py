@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import HTMLResponse
@@ -112,15 +112,17 @@ def _as_dt(raw: object) -> Optional[datetime]:
     `(q.review_date||'').slice(0,10)` did, because `quirk_match` compares
     against the instant: a quirk goes inert at that time of day, not at the
     end of that date.
+
+    The parsing itself is the service's, not a second copy of it. `_parse_dt`
+    is private, which is the cost of there being no public accessor, and the
+    alternative was this module deciding independently what counts as a
+    readable timestamp for rows that same service produced.
     """
-    if not raw:
-        return None
     if isinstance(raw, datetime):
         return raw
-    try:
-        return datetime.fromisoformat(str(raw).replace("Z", ""))
-    except (TypeError, ValueError):
-        return None
+    from ion.services.de_quirk_service import _parse_dt
+
+    return _parse_dt(raw)
 
 
 def _row(q: dict[str, Any]) -> dict[str, Any]:
@@ -154,7 +156,15 @@ def _row(q: dict[str, Any]) -> dict[str, Any]:
 )
 def de_quirks_fragment(
     request: Request,
-    status: str = Query("all", description="pending | active | reverted | all"),
+    # Constrained rather than a bare str, so a filter value the service
+    # cannot parse is a 422 instead of being caught below and worded as
+    # "the read failed". A bad request and an unreadable store lead to
+    # different actions, and the failure message is reserved for the second.
+    # The members are the service's own states plus its "all" sentinel, and
+    # a test holds them to that.
+    status: Literal["all", "pending", "active", "reverted"] = Query(
+        "all", description="pending | active | reverted | all"
+    ),
     session: Session = Depends(get_db_session),
 ) -> HTMLResponse:
     """The filtered quirk table as one fragment.
