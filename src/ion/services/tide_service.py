@@ -23,6 +23,42 @@ logger = logging.getLogger(__name__)
 # anything outside this set is what keeps `WHERE space = '{self.space}'` safe.
 _SPACE_RE = re.compile(r"^[A-Za-z0-9_.\- ]{1,64}$")
 
+#: TIDE refuses any statement longer than this. Documented in the upstream
+#: README (github.com/sigeauk/tide) alongside the SELECT/WITH-only rule and
+#: the keyword blocklist. Queries here are hand-built strings, so this is a
+#: real ceiling: anything that interpolates a list of unknown length can
+#: cross it, and the rejection comes back as a 4xx that _query turns into
+#: None, which every caller reads as "no rows".
+_MAX_SQL_CHARS = 4000
+
+
+def _quoted_id_batches(ids, budget: int):
+    """Split ids into quoted SQL list fragments, each at most `budget` chars.
+
+    Measured 2026-10-12 against the technique-coverage query, whose body is
+    439 characters: that leaves room for roughly 296 subtechnique ids or 445
+    parent ids in one statement. A baseline playbook can list more, and the
+    rejection used to surface as an empty coverage map, which the caller then
+    rendered as every technique having no rules. A query too long to send was
+    being drawn as a total absence of detection.
+
+    Also escapes each id. The previous inline f-string did not, so a quote
+    inside a technique id broke the statement.
+    """
+    batch: list[str] = []
+    size = 0
+    for raw in ids:
+        token = "'" + str(raw).replace("'", "''") + "'"
+        extra = len(token) + (1 if batch else 0)
+        if batch and size + extra > budget:
+            yield ",".join(batch)
+            batch, size = [token], len(token)
+        else:
+            batch.append(token)
+            size += extra
+    if batch:
+        yield ",".join(batch)
+
 
 # Per-process micro-cache for identical SQL within a short window. Detection
 # Engineering pages fan out 6+ parallel queries on load; without this, every
@@ -135,6 +171,20 @@ class TideService:
 
     def _query(self, sql: str, retries: int = 1) -> Optional[dict]:
         if not self.enabled:
+            return None
+
+        # 0. Length ceiling. TIDE refuses any statement over _MAX_SQL_CHARS,
+        #    and refuses it as a 4xx that this method turns into None. Every
+        #    caller reads None as "no rows", so an over-long query arrives as
+        #    an absence of data rather than as an error. Catching it here
+        #    names the offender in the log instead of leaving a page quietly
+        #    reporting zero coverage. See _quoted_id_batches.
+        if len(sql) > _MAX_SQL_CHARS:
+            logger.error(
+                "TIDE query is %d chars, over the %d limit, so it was not sent. "
+                "Build it with _quoted_id_batches. sql=%s",
+                len(sql), _MAX_SQL_CHARS, sql[:200],
+            )
             return None
 
         # 1. Cache hit short-circuits everything (including 504 storms).
@@ -757,25 +807,41 @@ class TideService:
 
             # For each technique in steps, get rule coverage
             if all_tids:
-                tid_list = ",".join(f"'{t}'" for t in all_tids)
-                cov = self._query(f"""
-                    SELECT t.technique_id,
-                           count(DISTINCT dr.rule_id) as rule_count,
-                           count(DISTINCT dr.rule_id) FILTER (WHERE dr.enabled = 1) as enabled_rules
-                    FROM detection_rules dr, LATERAL unnest(dr.mitre_ids) AS t(technique_id)
-                    WHERE dr.space = '{self.space}' AND t.technique_id IN ({tid_list})
-                    GROUP BY t.technique_id
-                """)
+                # Built as prefix + ids + suffix so the budget is exact by
+                # construction rather than a guessed headroom figure.
+                prefix = (
+                    "SELECT t.technique_id, "
+                    "count(DISTINCT dr.rule_id) as rule_count, "
+                    "count(DISTINCT dr.rule_id) FILTER (WHERE dr.enabled = 1) "
+                    "as enabled_rules "
+                    "FROM detection_rules dr, "
+                    "LATERAL unnest(dr.mitre_ids) AS t(technique_id) "
+                    f"WHERE dr.space = '{self.space}' AND t.technique_id IN ("
+                )
+                suffix = ") GROUP BY t.technique_id"
+                budget = _MAX_SQL_CHARS - len(prefix) - len(suffix)
+
                 cov_map = {}
-                if cov:
+                measured = True
+                for id_list in _quoted_id_batches(sorted(all_tids), budget):
+                    cov = self._query(prefix + id_list + suffix)
+                    if cov is None:
+                        # One failed batch means the map is incomplete, and an
+                        # incomplete map is indistinguishable from "these
+                        # techniques have no rules". Say it is unmeasured
+                        # rather than let a reader draw the wrong conclusion.
+                        measured = False
+                        continue
                     for r in cov["rows"]:
                         cov_map[r["technique_id"]] = {
                             "rule_count": r["rule_count"],
                             "enabled_rules": r["enabled_rules"],
                         }
                 p["technique_coverage"] = cov_map
+                p["technique_coverage_measured"] = measured
             else:
                 p["technique_coverage"] = {}
+                p["technique_coverage_measured"] = True
 
         return playbooks
 
