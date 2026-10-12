@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 
 from ion.web.templating import make_templates
-from ion.web.ui import _systems_display
+from ion.web.ui.service_accounts import _systems_display
 
 FRAGMENT = "_fragments/service_accounts.html"
 
