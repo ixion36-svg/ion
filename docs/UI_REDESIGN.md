@@ -17,12 +17,12 @@ page cannot be forgotten. Status is measured, never set by hand.
 | styled | no inline `<style>` block at all | appearance comes from the compiled sheet, so it is themed, cached and swept once |
 | server | no `innerHTML` / `insertAdjacentHTML` | one partial renders a thing, so a restyle reaches every instance of it |
 
-**13 of 82 templates complete.**
+**11 of 80 templates complete.**
 
 | measure | remaining |
 |---|---|
-| templates | 82 |
-| total lines | 80,615 |
+| templates | 80 |
+| total lines | 80,312 |
 | inline `<style>` lines | 17,600 |
 | runtime DOM writes | 1,119 |
 | literal light-on-dark colours | 11 |
@@ -34,13 +34,11 @@ Rendered by or into every page, so these move first or last, never mid-tranche.
 | template | lines | css | js | writes | light | styled | server | done |
 |---|--:|--:|--:|--:|:--:|:--:|:--:|:--:|
 | `base.html` | 559 | 303 | 116 | 0 | no | no | yes |  |
-| `_components.html` | 260 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `login.html` | 206 | 20 | 112 | 2 | yes | no | no |  |
 | `_icons.html` | 69 | 0 | 0 | 0 | yes | yes | yes | **done** |
-| `_queue_rows.html` | 43 | 0 | 0 | 0 | yes | yes | yes | **done** |
 | `_nav_tabs.html` | 33 | 0 | 0 | 0 | yes | yes | yes | **done** |
 
-Subtotal: 6 templates, 1,170 lines, 323 inline css lines, 2 runtime writes, 2 light-mode literals.
+Subtotal: 4 templates, 867 lines, 323 inline css lines, 2 runtime writes, 2 light-mode literals.
 
 ## Tier A, no runtime DOM building
 
@@ -147,23 +145,39 @@ Subtotal: 30 templates, 62,369 lines, 15,215 inline css lines, 927 runtime write
 
 ## Cleanup, so nothing is left behind
 
-Measured by `tools/dead_inventory` style scans over the whole tree.
-The redesign is not complete while any of these remain.
+Measured, like the tables above. This section used to be hand-written
+prose, and after the first cleanup tranche landed it still described
+files that had been deleted: a generated document asserting the
+opposite of the tree it describes. Each row now checks the artifact.
 
-| artifact | size | state |
-|---|---|---|
-| `archive/` | 37 html, 67 py | **0 referenced from live code.** Delete the tree or move it out of the repo. It currently inflates every `find` and every grep, and it is why an early count of this work said 118 templates when the live number is 82. |
-| `_components.html` | 18 macros | **0 importers, ever.** The one grep hit is its own docstring. Delete it in the tranche that introduces the real vocabulary, not before, so the replacement exists first. |
-| `_queue_rows.html` | 44 lines | Spike artifact from the HTMX measurement. Wire it to a `/ui` fragment route or delete it. Not rendered by anything today. |
-| `static/js/plotly.min.js` | 4,195 KB | Vendored at `0e81f29` and never wired to a page. Keep only if a chart lands this cycle; otherwise it ships 4 MB to every visitor's cache for nothing. |
-| `static/js/html2pdf.bundle.min.js` | 885 KB | Unreferenced. Same decision. |
-| `static/js/turndown.min.js` + gfm plugin | 31 KB | Unreferenced. Same decision. |
-| 302 CSS class rules | across inline `<style>` | Defined, and the name appears nowhere in any template, JS or Python. Candidates for deletion, one proof each. |
-| 57 CSS class rules | across inline `<style>` | **Keep.** The name is assembled at runtime (`'alert-status-' + status`), so it never appears whole. Deleting these silently unstyles live elements. |
+| artifact | state |
+|---|---|
+| `archive/` | **gone.** Deleted; recoverable from git history. |
+| `_components.html` | **gone.** Deleted; recoverable from git history. |
+| `plotly.min.js` | **gone.** Deleted; recoverable from git history. |
+| `html2pdf.bundle.min.js` | **gone.** Deleted; recoverable from git history. |
+| `turndown.min.js` | **gone.** Deleted; recoverable from git history. |
+| `turndown-plugin-gfm.js` | **gone.** Deleted; recoverable from git history. |
+| `_queue_rows.html` | **resolved.** Moved to `tools/fixtures/`, where `bench_htmx_rows.py` reads it. It is a benchmark input, not a page, so it no longer counts as a live template. |
 
-The last two rows are the trap. A bulk delete of everything
-unreferenced removes 57 rules that are genuinely in use, and the
-failure is invisible: the element renders, unstyled, with no error.
-That is the mechanism that left a severity stripe colourless for
-three releases.
+### Dead CSS
+
+Not counted here, deliberately. `tools/dead_css.py` owns this question:
+it has a vetted reference scanner and a regression suite
+(`tests/test_dead_css.py`) whose every case is a class the scanner once
+failed to see. A count in this document would be a second, worse answer.
+
+Run `python tools/dead_css.py` for the verdict. Two things to know
+before passing `--write`:
+
+- It reports the sheets it can parse. A rule inside a template's inline
+  `<style>` is not one of them, which is a further reason to pass the
+  `styled` column: moving a page's CSS into a sheet is what brings it
+  under the scanner.
+- Classes assembled at runtime are the trap. The scanner knows
+  `'sev-' + x`, `` `sc-${n}` `` and `sr-c-{{ color }}`, each added after
+  it reported live rules as dead. A construction it does not know yet
+  will do the same, and the failure is silent: the element renders
+  unstyled, with no error. That is what left a severity stripe
+  colourless for three releases.
 

@@ -120,14 +120,24 @@ def diff(a_path: Path, b_path: Path) -> int:
     a = json.loads(a_path.read_text(encoding="utf-8"))
     b = json.loads(b_path.read_text(encoding="utf-8"))
     changed = 0
+    prop_set_changed: set[str] = set()
     for scope in sorted(set(a) | set(b)):
         ea, eb = a.get(scope, {}), b.get(scope, {})
         only_a = set(ea) - set(eb)
         only_b = set(eb) - set(ea)
         rows = []
+        # Only properties BOTH snapshots recorded. PROPS changes between
+        # captures (box-shadow and background-image were dropped once ION's
+        # pulsing glow proved to differ by an animation frame), and a property
+        # missing on one side is a change to this tool, not to the page.
+        # Comparing them crashed on `None[:52]`, which is how this was found.
         for key in sorted(set(ea) & set(eb)):
-            for prop, va in ea[key].items():
-                vb = eb[key].get(prop)
+            shared = set(ea[key]) & set(eb[key])
+            dropped = (set(ea[key]) | set(eb[key])) - shared
+            if dropped:
+                prop_set_changed.update(dropped)
+            for prop in sorted(shared):
+                va, vb = ea[key][prop], eb[key][prop]
                 if va != vb:
                     rows.append((key, prop, va, vb))
         if not rows and not only_a and not only_b:

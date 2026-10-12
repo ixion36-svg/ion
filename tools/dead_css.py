@@ -47,7 +47,13 @@ SEARCH_DIRS = [REPO / "src/ion/web/templates", REPO / "src/ion/web/static/js"]
 # less.
 SHEETS = ["ion-migrated-styles.css", "alert-detail.css",
           "ai-chat.css", "ion-workspace.css",
-          "alerts-queue.css", "ion-legacy.css"]
+          "alerts-queue.css", "ion-legacy.css",
+          # Page sheets lifted out of template <style> blocks by the
+          # redesign's `styled` column. Adding them here is the point of
+          # that column: once a page's CSS is in a linked sheet, this
+          # tool's vetted scanner covers it, where an inline block was
+          # only ever a candidate list needing per-rule proof.
+          "ion-pages.css"]
 
 CLASS_IN_SELECTOR = re.compile(r"\.(_?[A-Za-z][A-Za-z0-9_-]*)")
 RULE = re.compile(r"(?P<sel>[^{}]+)\{(?P<body>[^{}]*)\}", re.S)
@@ -66,8 +72,15 @@ def sheet_path(sheet: str) -> Path:
     what survived style.css, compiled into ion.css from frontend/. It is still
     worth scanning: it is the largest remaining pile of legacy rules, and being
     a build input makes dead code in it easier to overlook, not harder.
+
+    ion-pages.css is the same kind of file: it holds the CSS lifted out of
+    template <style> blocks by the redesign's `styled` column, and covering
+    it here is the point of that column. An inline <style> block was only
+    ever a candidate list needing a per-rule proof; once its rules live in a
+    sheet, this tool's vetted scanner covers them.
     """
-    return (REPO / "frontend" / sheet) if sheet == "ion-legacy.css" \
+    BUILD_INPUTS = {"ion-legacy.css", "ion-pages.css"}
+    return (REPO / "frontend" / sheet) if sheet in BUILD_INPUTS \
         else (CSS_DIR / sheet)
 
 
@@ -218,6 +231,18 @@ def constructed_prefixes(text: str) -> set[str]:
         out.add(m.group(1))
     # `...prefix-${expr}`
     for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*[-_])\$\{", text):
+        out.add(m.group(1))
+    # `...prefix-{{ expr }}` -- Jinja, not JavaScript.
+    #
+    # This blind spot was found by covering ion-pages.css, the sheet the
+    # redesign's `styled` column fills. soc_roles.html builds its deck as
+    #     <div class="card ... sr-role sr-c-{{ r.color }}">
+    # so all eleven .sr-c-* rules read as dead at once and --write would have
+    # removed them. tests/test_v052_soc_roles_page.py asserts every one of
+    # those eleven class names reaches the page, which is how the
+    # contradiction surfaced. The same shape covers {%- -%} trim markers and
+    # Jinja filters, since only the text before `{{` matters here.
+    for m in re.finditer(r"([A-Za-z][A-Za-z0-9_-]*[-_])\{\{", text):
         out.add(m.group(1))
     # Also `className = base + '-' + x` style: a lone '-' joiner means we cannot
     # know the prefix, so treat every class in that file as live is too blunt --

@@ -475,24 +475,10 @@
   font-size: .6rem;
   letter-spacing: 1.5px;
 }
-.sr-course {
-  justify-content: space-between;
-  background: var(--sr-tint);
-  border-color: var(--color-base-300);
-  font-weight: 700;
-  margin-bottom: 5px;
-  height: auto;
-  min-height: var(--size);
-  white-space: normal;
-}
-.sr-course:hover { border-color: var(--sr-ac); }
-.sr-lvl {
-  font-family: 'JetBrains Mono', 'Consolas', monospace;
-  color: var(--sr-ac);
-  background: transparent;
-  border-color: transparent;
-}
-.sr-link { color: var(--sr-ac); }
+
+
+
+
 .sr-chips { margin-top: 10px; }
 .sr-chiplabel {
   font-family: 'JetBrains Mono', 'Consolas', monospace;

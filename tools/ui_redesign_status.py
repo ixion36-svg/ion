@@ -202,25 +202,92 @@ def main() -> int:
 
     w("## Cleanup, so nothing is left behind")
     w("")
-    w("Measured by `tools/dead_inventory` style scans over the whole tree.")
-    w("The redesign is not complete while any of these remain.")
+    w("Measured, like the tables above. This section used to be hand-written")
+    w("prose, and after the first cleanup tranche landed it still described")
+    w("files that had been deleted: a generated document asserting the")
+    w("opposite of the tree it describes. Each row now checks the artifact.")
     w("")
-    w("| artifact | size | state |")
-    w("|---|---|---|")
-    w("| `archive/` | 37 html, 67 py | **0 referenced from live code.** Delete the tree or move it out of the repo. It currently inflates every `find` and every grep, and it is why an early count of this work said 118 templates when the live number is 82. |")
-    w("| `_components.html` | 18 macros | **0 importers, ever.** The one grep hit is its own docstring. Delete it in the tranche that introduces the real vocabulary, not before, so the replacement exists first. |")
-    w("| `_queue_rows.html` | 44 lines | Spike artifact from the HTMX measurement. Wire it to a `/ui` fragment route or delete it. Not rendered by anything today. |")
-    w("| `static/js/plotly.min.js` | 4,195 KB | Vendored at `0e81f29` and never wired to a page. Keep only if a chart lands this cycle; otherwise it ships 4 MB to every visitor's cache for nothing. |")
-    w("| `static/js/html2pdf.bundle.min.js` | 885 KB | Unreferenced. Same decision. |")
-    w("| `static/js/turndown.min.js` + gfm plugin | 31 KB | Unreferenced. Same decision. |")
-    w("| 302 CSS class rules | across inline `<style>` | Defined, and the name appears nowhere in any template, JS or Python. Candidates for deletion, one proof each. |")
-    w("| 57 CSS class rules | across inline `<style>` | **Keep.** The name is assembled at runtime (`'alert-status-' + status`), so it never appears whole. Deleting these silently unstyles live elements. |")
+    w("| artifact | state |")
+    w("|---|---|")
+
+    def _refs(needle: str, *, skip: str = "") -> int:
+        """How many live files mention `needle`, excluding the artifact itself."""
+        n = 0
+        for d in (ROOT / "src", ROOT / "tools", ROOT / "tests"):
+            if not d.exists():
+                continue
+            for f in d.rglob("*"):
+                if not f.is_file() or f.suffix not in {".py", ".html", ".js", ".css"}:
+                    continue
+                if skip and skip in f.as_posix():
+                    continue
+                try:
+                    if needle in f.read_text(encoding="utf-8", errors="replace"):
+                        n += 1
+                except OSError:
+                    pass
+        return n
+
+    arch = ROOT / "archive"
+    if arch.exists():
+        html = len(list(arch.rglob("*.html")))
+        py = len(list(arch.rglob("*.py")))
+        w(f"| `archive/` | **present**, {html} html and {py} py. Delete the tree or "
+          f"move it out of the repo: it inflates every `find` and every grep. |")
+    else:
+        w("| `archive/` | **gone.** Deleted; recoverable from git history. |")
+
+    for rel, label in (
+        ("src/ion/web/templates/_components.html", "`_components.html`"),
+        ("src/ion/web/static/js/plotly.min.js", "`plotly.min.js`"),
+        ("src/ion/web/static/js/html2pdf.bundle.min.js", "`html2pdf.bundle.min.js`"),
+        ("src/ion/web/static/js/turndown.min.js", "`turndown.min.js`"),
+        ("src/ion/web/static/js/turndown-plugin-gfm.js", "`turndown-plugin-gfm.js`"),
+    ):
+        f = ROOT / rel
+        if not f.exists():
+            w(f"| {label} | **gone.** Deleted; recoverable from git history. |")
+            continue
+        kb = f.stat().st_size // 1024
+        n = _refs(f.name, skip=rel)
+        state = (f"**{n} referencing file(s)**" if n else
+                 "**0 references.** Unreferenced; delete or wire it up")
+        w(f"| {label} | present, {kb:,} KB. {state}. |")
+
+    qr_tpl = ROOT / "src/ion/web/templates/_queue_rows.html"
+    qr_fix = ROOT / "tools/fixtures/_queue_rows.html"
+    if qr_tpl.exists():
+        w("| `_queue_rows.html` | in the template tree, rendered by no route. "
+          "Wire it to a `/ui` fragment route, or move it beside the tool that "
+          "uses it. |")
+    elif qr_fix.exists():
+        w("| `_queue_rows.html` | **resolved.** Moved to `tools/fixtures/`, where "
+          "`bench_htmx_rows.py` reads it. It is a benchmark input, not a page, so "
+          "it no longer counts as a live template. |")
+    else:
+        w("| `_queue_rows.html` | **gone.** |")
+
     w("")
-    w("The last two rows are the trap. A bulk delete of everything")
-    w("unreferenced removes 57 rules that are genuinely in use, and the")
-    w("failure is invisible: the element renders, unstyled, with no error.")
-    w("That is the mechanism that left a severity stripe colourless for")
-    w("three releases.")
+    w("### Dead CSS")
+    w("")
+    w("Not counted here, deliberately. `tools/dead_css.py` owns this question:")
+    w("it has a vetted reference scanner and a regression suite")
+    w("(`tests/test_dead_css.py`) whose every case is a class the scanner once")
+    w("failed to see. A count in this document would be a second, worse answer.")
+    w("")
+    w("Run `python tools/dead_css.py` for the verdict. Two things to know")
+    w("before passing `--write`:")
+    w("")
+    w("- It reports the sheets it can parse. A rule inside a template's inline")
+    w("  `<style>` is not one of them, which is a further reason to pass the")
+    w("  `styled` column: moving a page's CSS into a sheet is what brings it")
+    w("  under the scanner.")
+    w("- Classes assembled at runtime are the trap. The scanner knows")
+    w("  `'sev-' + x`, `` `sc-${n}` `` and `sr-c-{{ color }}`, each added after")
+    w("  it reported live rules as dead. A construction it does not know yet")
+    w("  will do the same, and the failure is silent: the element renders")
+    w("  unstyled, with no error. That is what left a severity stripe")
+    w("  colourless for three releases.")
     w("")
 
     text = "\n".join(L) + "\n"

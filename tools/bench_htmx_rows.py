@@ -35,7 +35,11 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemBytecodeCache, FileSystemLoader, select_autoescape
 
 ROOT = Path(__file__).resolve().parent.parent
-TEMPLATES = ROOT / "src" / "ion" / "web" / "templates"
+# The fixture lives beside this tool, not in the app's template tree.
+# It is a benchmark input, never rendered by a route, and leaving it
+# under templates/ made it an orphan in the redesign inventory and
+# inflated the "82 live templates" count by one.
+TEMPLATES = ROOT / "tools" / "fixtures"
 CACHE = Path("/tmp/ion-jinja2-bench-cache")
 
 SIZES = [25, 50, 100, 250, 500, 1000, 2000]
