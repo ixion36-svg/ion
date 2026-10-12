@@ -16,7 +16,25 @@
   <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Reviewable drafts of tuning changes, born from noise campaigns. You edit, then mark <em>applied</em> (after applying it in your own detection backend) or <em>rejected</em>. ION records the decision and measures the drop — it never writes to a detection backend.</p>
 </div>
 <div class="flex items-center gap-2 flex-wrap">
-        <select id="dp-status" class="select select-sm w-auto" data-change-action="dpLoad">
+        {# The filters and Refresh are the request. Both live out here, not
+           in the swapped region: an error render must not be able to remove
+           the control that retries it. htmx sends each select's own value
+           plus the other one, so there is no handler that reads them and no
+           second definition of what a filtered table looks like.
+
+           The retired /tuning-proposals page redirects here as ?source=bob.
+           The script below the fold writes that into #dp-source while the
+           document is still parsing, which is before htmx (loaded from the
+           head) handles DOMContentLoaded and fires hx-trigger="load". A
+           listener on DOMContentLoaded would run second, and the first
+           request would ignore the queue the reviewer was sent here to see.
+           hx-include is on the load request for the same reason it is on
+           Refresh: Firefox restores a select across a reload. #}
+        <select id="dp-status" name="status" class="select select-sm w-auto"
+                hx-get="/ui/de-proposals"
+                hx-include="#dp-source"
+                hx-target="#dp-content"
+                hx-swap="innerHTML">
             <option value="all" selected>All</option>
             <option value="draft">Draft</option>
             <option value="applied">Applied</option>
@@ -26,16 +44,35 @@
         {# Bob files proposals unattended off a false-positive verdict
            (previously into the unreachable /tuning-proposals queue). Provenance
            matters on review, so it is filterable rather than flattened. #}
-        <select id="dp-source" class="select select-sm w-auto" data-change-action="dpLoad">
+        <select id="dp-source" name="source" class="select select-sm w-auto"
+                hx-get="/ui/de-proposals"
+                hx-include="#dp-status"
+                hx-target="#dp-content"
+                hx-swap="innerHTML">
             <option value="all" selected>Any source</option>
             <option value="bob">From Bob</option>
             <option value="human">From an analyst</option>
         </select>
-        <button class="btn btn-primary" data-click-action="dpLoad">Refresh</button>
+        <button class="btn btn-primary" id="dp-refresh"
+                hx-get="/ui/de-proposals"
+                hx-include="#dp-status,#dp-source"
+                hx-target="#dp-content"
+                hx-swap="innerHTML">Refresh</button>
     </div>
 </section>
 
-<div id="dp-content"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading proposals...</div></div>
+{# The table is rendered whole by ion.web.ui.de_proposals: rows, the Bob
+   badge, the outcome block, the status pill and the action buttons. It
+   used to be a string concatenated in dpRender() and written in with
+   innerHTML, which no stylesheet sweep could reach.
+
+   hx-trigger="load" keeps the shell's first paint immediate and the rows
+   arriving in their own request, which is what the fetch it replaces did. #}
+<div id="dp-content"
+     hx-get="/ui/de-proposals"
+     hx-trigger="load"
+     hx-include="#dp-status,#dp-source"
+     hx-swap="innerHTML"><div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading proposals...</div></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -106,133 +143,43 @@
 <script nonce="{{ csp_nonce }}">
 const DP_API = '/api/de/proposals';
 function dp$(id){return document.getElementById(id)}
-function dpEsc(s){if(s===null||s===undefined)return'';const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function dpToast(m,k){ if(typeof showToast==='function') showToast(m,k); else if(k==='error') alert(m); }
-let _dpItems = [];
 let _dpDecide = {id:null, decision:null};
 
-async function dpLoad(){
+// dpEsc(), dpPill(), dpSource(), dpOutcome() and dpRender() are gone with
+// the markup they served. The table is /ui/de-proposals and Jinja
+// autoescapes it.
+//
+// Re-request that table. Edit, decide and measure call this instead of
+// rebuilding rows, so a row has one definition and it is the fragment.
+// The filters and Refresh do the same thing declaratively, and this reads
+// them back so a refresh after a write keeps the filter the user set.
+function dpLoad(){
     const status = dp$('dp-status').value;
     const source = (dp$('dp-source') || {}).value || 'all';
-    dp$('dp-content').innerHTML = '<div class="flex justify-center items-center gap-2 py-14 text-center opacity-50"><span class="loading loading-spinner loading-sm text-primary"></span> Loading proposals...</div>';
+    return htmx.ajax('GET', '/ui/de-proposals?status=' + encodeURIComponent(status)
+                     + '&source=' + encodeURIComponent(source),
+                     { target: '#dp-content', swap: 'innerHTML' });
+}
+
+// The list used to be cached in _dpItems so Edit could fill the modal from
+// a copy taken when the table was built. That copy goes stale the moment
+// someone else decides the row, and it was why the table had to be JSON in
+// the browser at all. Edit reads the proposal from the endpoint that owns it.
+async function dpEdit(id){
     try {
-        const r = await fetch(DP_API + '?status=' + encodeURIComponent(status)
-                             + '&source=' + encodeURIComponent(source));
-        if(!r.ok) throw new Error('HTTP ' + r.status);
-        const data = await r.json();
-        _dpItems = data.proposals || [];
-        dpRender(_dpItems);
-    } catch(e){
-        dp$('dp-content').innerHTML = '<div role="alert" class="alert alert-error"><span>Failed to load: ' + dpEsc(e.message) + '</span></div>';
-    }
-}
-
-// Bob files proposals unattended off a false-positive verdict (they
-// used to go to the unreachable /tuning-proposals queue). Flag that on review —
-// an inference from ONE alert is weaker evidence than a noise campaign, and the
-// reviewer should weigh it accordingly.
-function dpSource(p){
-    if(p.source !== 'bob') return '';
-    const via = p.alert_id ? ' from alert ' + dpEsc(p.alert_id) : '';
-    return '<span class="badge badge-ghost badge-sm" title="Drafted automatically by Bob' + via
-         + '. Review the evidence before applying.">Bob</span>';
-}
-
-function dpPill(status){
-    const cls = status === 'applied' ? 'badge-success' : status === 'rejected' ? 'badge-error' : 'badge-info';
-    return '<span class="badge badge-sm ' + cls + '">' + dpEsc(status) + '</span>';
-}
-
-function dpOutcome(p){
-    const o = p.outcome;
-    if(!o) return p.status === 'applied' ? '<div class="bg-base-300 rounded p-2 mt-2 text-sm opacity-60">Not yet measured.</div>' : '';
-
-    // Quote the equal-window comparison, never the top-level drop_pct:
-    // that one divides a full 30-day baseline by however little time has
-    // passed since the change, so it flatters anything applied recently.
-    const c = o.comparable;
-    if(!c){
-        // Outcome measured before this fix — say so rather than quote it
-        // as though the windows matched.
-        const legacy = (o.drop_pct === null || o.drop_pct === undefined) ? 'n/a' : (o.drop_pct + '%');
-        return '<div class="bg-base-300 rounded p-2 mt-2 text-sm opacity-70">Legacy measurement: '
-            + legacy + ' (uneven windows — re-measure for a comparable figure)</div>';
-    }
-
-    if(!c.sufficient_observation || c.drop_pct === null || c.drop_pct === undefined){
-        return '<div class="bg-base-300 rounded p-2 mt-2 text-sm">'
-            + '<strong>Not enough observation yet</strong> — '
-            + c.before_count + ' FP before vs ' + c.after_count + ' after over '
-            + c.window_days_exact + 'd each way'
-            + (c.reason ? '<div class="opacity-70 mt-1">' + dpEsc(c.reason) + '</div>' : '')
-            + '</div>';
-    }
-
-    const threats = o.confirmed_threats || {};
-    const lost = threats.lost_confirmed_threats
-        ? '<div class="text-warning mt-1">No confirmed threats from this rule since the change ('
-          + threats.before_count + ' in the matched window before) — check it has not silenced a real detection.</div>'
-        : '';
-
-    return '<div class="bg-base-300 rounded p-2 mt-2 text-sm">Noise drop <strong>' + c.drop_pct + '%</strong> — '
-        + c.before_count + ' FP before vs ' + c.after_count + ' after, matched '
-        + c.window_days_exact + 'd windows ('
-        + c.before_per_day + '/d → ' + c.after_per_day + '/d)'
-        + lost
-        + '</div>';
-}
-
-function dpRender(items){
-    if(!items.length){
-        dp$('dp-content').innerHTML = '<div class="card bg-base-200 shadow"><div class="card-body items-center text-center py-14"><p class="opacity-60">No proposals yet. Draft one from a campaign on the <a href="/de-metrics" class="link link-primary">DE Metrics</a> page.</p></div></div>';
-        return;
-    }
-    let html = '<div class="card bg-base-200 shadow"><div class="card-body p-0"><div class="overflow-x-auto"><table class="table table-sm"><thead><tr>'
-        + '<th>Rule</th><th>Type</th><th>Proposal</th><th>Expected</th><th>Status</th><th>Actions</th></tr></thead><tbody>';
-    for(const p of items){
-        const expected = (p.expected_fp_reduction != null)
-            ? (p.expected_fp_reduction + ' FP · ' + (p.expected_hours_reclaimed != null ? p.expected_hours_reclaimed + 'h' : '')) : '—';
-        let actions = '';
-        if(p.status === 'draft'){
-            actions = '<button class="btn btn-ghost btn-sm" data-click-action="dpEdit" data-args=\'[' + p.id + ']\'>Edit</button>'
-                + '<button class="btn btn-ghost btn-sm" data-click-action="dpDecide" data-args=\'[' + p.id + ',"applied"]\'>Apply</button>'
-                + '<button class="btn btn-ghost btn-sm btn-error" data-click-action="dpDecide" data-args=\'[' + p.id + ',"rejected"]\'>Reject</button>';
-        } else if(p.status === 'applied'){
-            actions = '<button class="btn btn-ghost btn-sm" data-click-action="dpMeasure" data-args=\'[' + p.id + ']\'>Measure outcome</button>';
-        } else {
-            actions = '<span class="opacity-50">—</span>';
-        }
-        const mitre = (p.mitre_techniques || []).slice(0,6).map(function(m){return '<span class="badge badge-sm badge-info font-mono">' + dpEsc(m) + '</span>'}).join(' ');
-        html += '<tr>'
-            + '<td class="font-mono text-sm">' + dpEsc(p.rule_name || '—') + '</td>'
-            + '<td><span class="badge badge-ghost badge-sm">' + dpEsc(p.change_type) + '</span></td>'
-            + '<td><strong>' + dpEsc(p.title) + '</strong> ' + dpSource(p)
-                + '<div class="whitespace-pre-wrap text-sm mt-1">' + dpEsc(p.suggested_change) + '</div>'
-                + (mitre ? '<div class="flex flex-wrap gap-1 mt-1">' + mitre + '</div>' : '')
-                + dpOutcome(p) + '</td>'
-            + '<td class="font-mono text-sm">' + dpEsc(expected) + '</td>'
-            + '<td>' + dpPill(p.status)
-                + (p.decided_by_username ? '<div class="text-xs opacity-60 mt-1">by ' + dpEsc(p.decided_by_username) + '</div>' : '') + '</td>'
-            + '<td>' + actions + '</td>'
-            + '</tr>';
-    }
-    html += '</tbody></table></div></div></div>';
-    dp$('dp-content').innerHTML = html;
-}
-
-function _dpFind(id){ return _dpItems.find(function(x){return x.id === id}); }
-
-// ── edit ──
-function dpEdit(id){
-    const p = _dpFind(id); if(!p) return;
-    dp$('dp-edit-overlay').setAttribute('data-id', id);
-    dp$('dp-edit-id').textContent = '#' + id;
-    dp$('dp-edit-title').value = p.title || '';
-    dp$('dp-edit-type').value = p.change_type || 'exclusion';
-    dp$('dp-edit-change').value = p.suggested_change || '';
-    dp$('dp-edit-rationale').value = p.rationale || '';
-    dp$('dp-edit-scope').value = p.scope || '';
-    dp$('dp-edit-overlay').classList.add('show');
+        const r = await fetch(DP_API + '/' + id);
+        if(!r.ok){ const e = await r.json().catch(()=>({})); throw new Error(e.detail || ('HTTP '+r.status)); }
+        const p = await r.json();
+        dp$('dp-edit-overlay').setAttribute('data-id', id);
+        dp$('dp-edit-id').textContent = '#' + id;
+        dp$('dp-edit-title').value = p.title || '';
+        dp$('dp-edit-type').value = p.change_type || 'exclusion';
+        dp$('dp-edit-change').value = p.suggested_change || '';
+        dp$('dp-edit-rationale').value = p.rationale || '';
+        dp$('dp-edit-scope').value = p.scope || '';
+        dp$('dp-edit-overlay').classList.add('show');
+    } catch(e){ dpToast('Could not open the draft: ' + (e.message||e),'error'); }
 }
 function dpCloseEdit(){ dp$('dp-edit-overlay').classList.remove('show'); }
 async function dpSaveEdit(){
@@ -290,10 +237,15 @@ async function dpMeasure(id){
     } catch(e){ dpToast('Measure failed: ' + (e.message||e),'error'); }
 }
 
-document.addEventListener('DOMContentLoaded', dpLoad);
-
+// The table's first paint is hx-trigger="load" on #dp-content, not a call
+// from here.
+//
 // The retired /tuning-proposals page redirects here as ?source=bob, so the
-// reviewer lands on exactly the queue that used to be unreachable.
+// reviewer lands on exactly the queue that used to be unreachable. This
+// runs now, while the document is still parsing, because htmx's own load
+// handler was registered from the head and therefore runs first on
+// DOMContentLoaded. Setting the select from a listener here would lose
+// that race and the first request would show every source.
 (function () {
     var q = new URLSearchParams(window.location.search).get('source');
     if (q) {

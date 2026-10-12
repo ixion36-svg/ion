@@ -1,0 +1,18 @@
+[
+  {
+    "page": "de_proposals.html",
+    "writes_before": 4,
+    "exit": 0,
+    "kept": true,
+    "notes": [
+      "writes=0",
+      "mounted ['/de-proposals']",
+      "node --check exit=0",
+      "91 passed, 1 warning in 20.38s"
+    ],
+    "tail": "placing `is not none` with a truthiness check made the zero-reduction tests fail. They pass again with the guard restored.\n\n**What I could not do.** The old table never rendered a timestamp or a stored URL, so there was nothing to put through the time macro or `safe_url`. The only link is the fixed `/de-metrics` path in the empty state. I did not drive the page in a browser. It needs a signed-in session on a licensed deployment, and the checks above are what this conversion is verified against.\n",
+    "stderr": "",
+    "writes_after": 0,
+    "seconds": 1553
+  }
+]
