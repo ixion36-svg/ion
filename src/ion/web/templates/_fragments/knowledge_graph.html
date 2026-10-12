@@ -1,0 +1,121 @@
+{# The knowledge graph's meta bar, legend, graph state and node detail cards.
+
+   Replaces all six `innerHTML` writes in knowledge_graph.html: the canvas
+   loading and error overlays, the `#kg-meta` counts and legend, the "no data
+   to graph" overlay, the selected node's detail card, and the detail panel's
+   placeholder line. frontend/ion-pages.css has rules for `.kg-loading`,
+   `.kg-spinner`, `#kg-meta strong`, `.kg-legend`, `.kg-legend-item`,
+   `.kg-legend-dot`, `.kg-detail h3`, `.kg-detail-meta` and `.kg-detail-link`,
+   and two of those blocks carry a comment saying the markup they style is
+   built by JavaScript. None of it was reachable from a stylesheet sweep.
+
+   The graph itself stays in the browser. `#kg-canvas` is vis-network's
+   container and this fragment leaves it empty: nodes and edges are JavaScript
+   objects with nested colour and shape that the library consumes, and
+   /api/knowledge-graph already serves them. Physics and hit-testing are the
+   library's, and which node is selected is only known in the browser.
+
+   So every detail card is rendered here, hidden, and the page reveals one by
+   `data-kg-node`. A fragment per click would put a multi-table read behind the
+   commonest action on the page; these fields are the same ones the JSON the
+   page already downloads carries. #}
+
+{% if payload is none %}
+  {# A failed read is not an empty graph. The empty state tells an analyst to
+     go and link some observables; this one tells them to look at the logs.
+     Rendering the first for the second sends them to do the wrong thing.
+
+     The retry lives in here because the panel is what failed. The page's own
+     Refresh button is outside the swap and still works, so this is a second
+     way back rather than the only one, which is the point: a render that
+     cannot show the graph must not also take away the control that retries. #}
+  <div class="card bg-base-200 shadow mb-2.5 px-3.5 py-2.5 text-sm"
+       data-kg-read-failed="true">
+    <div role="alert" class="alert alert-error">
+      <span>The knowledge graph could not be read, so no graph is shown. This
+        is not an empty graph: nothing about it was measured.</span>
+      <button class="btn btn-sm"
+              hx-get="/ui/knowledge-graph"
+              hx-target="#kg-panel"
+              hx-swap="innerHTML"
+              hx-include="#kg-seed, #kg-closed, #kg-limit">Retry</button>
+    </div>
+  </div>
+{% else %}
+  <div class="card bg-base-200 shadow mb-2.5 flex flex-row flex-wrap items-center gap-[18px] max-md:gap-2.5 px-3.5 py-2.5 text-sm"
+       id="kg-meta">
+    {# `is not none`, never truthiness, on both counts. A graph with 0 nodes
+       is a measured zero and has to read "0 nodes"; a stats block with no
+       count in it has not been measured and has to say so. Under a
+       truthiness test those two render the same, and they are opposite
+       claims. The JavaScript's `stats.total_nodes||0` printed 0 for both. #}
+    <span><strong>{% if payload.total_nodes is not none %}{{ payload.total_nodes }}{% else %}Unknown{% endif %}</strong> nodes</span>
+    <span><strong>{% if payload.total_edges is not none %}{{ payload.total_edges }}{% else %}Unknown{% endif %}</strong> edges</span>
+    <span class="kg-legend">
+      {%- for entry in payload.legend %}
+      {# A type with no nodes has no entry at all, which is what the
+         JavaScript's `if (!counts[t]) continue` did. A type present with a
+         count of 0 keeps its dot and renders "(0)": the same truthiness test
+         that drops it would drop a type the graph just lost its last node
+         of, and silently shrinking the legend hides that. #}
+      <span class="kg-legend-item"><span class="kg-legend-dot" data-ion-style="background:{{ entry.color }}"></span>{{ entry.type }} ({% if entry.count is not none %}{{ entry.count }}{% else %}unknown{% endif %})</span>
+      {%- endfor %}
+    </span>
+  </div>
+
+  <div class="card bg-base-200 shadow overflow-hidden">
+    <div class="card-body p-0">
+      <div class="relative overflow-hidden h-[620px] max-md:h-[460px] max-[480px]:h-[380px]">
+        {# `has_nodes`, not `total_nodes`. The empty state is a claim about the
+           node list, so it is read off the node list: a graph whose stats
+           block lost its count still has nodes to draw. #}
+        {% if payload.has_nodes %}
+          {# vis-network's container, and nothing else. The error overlay is a
+             sibling so the library can own every child of this element. #}
+          <div id="kg-canvas" class="absolute inset-0"></div>
+          <div id="kg-graph-error"
+               class="kg-loading absolute inset-0 hidden text-[var(--sev-critical,#f85149)]">
+            The graph data could not be read, so no graph is drawn. This is not
+            an empty graph: nothing about it was measured.
+          </div>
+        {% else %}
+          <div class="kg-loading" data-kg-empty="true">No data to graph. Open some cases and link observables, then come back.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Every node's detail card, hidden, plus the two states that are not a
+     node. The page toggles `hidden` and `.empty`; it assembles nothing. #}
+  <div id="kg-detail" class="card bg-base-200 shadow mt-3.5 p-4 min-h-[60px] text-sm kg-detail empty">
+    <p id="kg-detail-hint">Select a node to see details. Drag to pan, scroll to zoom.</p>
+    {# The graph comes from a second read of the same data, so a node can be in
+       the graph and absent from here. Saying so beats leaving the placeholder
+       up, which reads as "the click did nothing". #}
+    <p id="kg-detail-missing" class="hidden">This node is not in the detail set. Refresh to read the graph again.</p>
+    {%- for detail in payload.details %}
+    <div class="kg-detail-node hidden" data-kg-node="{{ detail.id }}">
+      <h3>{{ detail.label }}</h3>
+      <div class="kg-detail-meta">
+        {%- for label, value in detail.meta %}
+        {%- if not loop.first %} &middot; {% endif %}
+        {%- if label %}{{ label }}: {% endif %}{{ value }}
+        {%- endfor %}
+      </div>
+      {# |safe_url even though the service composes these from a row id today.
+         Jinja escapes characters, not schemes, so the day one of these comes
+         from a column `href="{{ detail.url }}"` renders a link that executes
+         on click. The filter costs nothing and the hole is invisible.
+
+         The link is tested after filtering, not before. A rejected scheme
+         leaves `href=""`, and an anchor to nowhere styled as a working link
+         is worse than no link: it looks like the detail view is broken
+         rather than like this node has none. #}
+      {%- set href = detail.url|safe_url %}
+      {%- if href %}
+      <a class="kg-detail-link" href="{{ href }}">Open in detail view &rarr;</a>
+      {%- endif %}
+    </div>
+    {%- endfor %}
+  </div>
+{% endif %}

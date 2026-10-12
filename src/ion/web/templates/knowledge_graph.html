@@ -15,31 +15,62 @@
   <h1 class="font-sans font-semibold text-[36px] md:text-[44px] xl:text-[52px] leading-[1.05] tracking-[-0.02em]">Knowledge Graph</h1>
   <p class="mt-3 max-w-2xl text-[15px] text-base-content/60">Interactive visualisation of related observables and entities.</p>
 </div>
-<div class="flex items-center gap-2 flex-wrap">
-        <input id="kg-seed" type="text" placeholder="Pivot from observable value..." class="input input-sm w-[240px] max-md:w-full max-md:max-w-[280px]">
+{# A real form, so Enter in the seed box submits with no key handler.
+   An `hx-trigger` event filter is not an option here: htmx compiles the
+   `[...]` expression with `Function()`, ION serves script-src without
+   'unsafe-eval', so the compile throws in the console and the trigger never
+   fires at all. Nothing else on the page breaks, which is what makes it
+   invisible until somebody presses the key.
+
+   The three filters and Refresh stay outside #kg-panel. A render that cannot
+   show the graph must not also remove the control that retries, and the
+   form sends its own fields while the panel's load trigger uses hx-include.
+
+   `action` is the no-htmx path: a native submit reloads this page rather
+   than navigating to a bare fragment. The filters reset on that path,
+   because /knowledge-graph is a static entry in server.py's _PAGES table
+   and passes the template no context to read them back from. #}
+<form class="flex items-center gap-2 flex-wrap"
+      action="/knowledge-graph" method="get"
+      hx-get="/ui/knowledge-graph"
+      hx-target="#kg-panel"
+      hx-swap="innerHTML">
+        <input id="kg-seed" name="seed" type="text" placeholder="Pivot from observable value..."
+               class="input input-sm w-[240px] max-md:w-full max-md:max-w-[280px]">
         <label class="label cursor-pointer gap-2 py-0">
-            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="kg-closed">
+            <input type="checkbox" class="checkbox checkbox-sm checkbox-primary" id="kg-closed" name="include_closed" value="true">
             <span class="label-text text-sm">Include closed cases</span>
         </label>
-        <select id="kg-limit" class="select select-sm">
+        <select id="kg-limit" name="case_limit" class="select select-sm">
             <option value="20">Last 20 cases</option>
             <option value="50" selected>Last 50</option>
             <option value="100">Last 100</option>
             <option value="200">Last 200</option>
         </select>
-        <button class="btn btn-primary btn-sm" data-click-action="kgLoad">Refresh</button>
-    </div>
+        <button type="submit" class="btn btn-primary btn-sm">Refresh</button>
+    </form>
 </section>
 
-<div class="card bg-base-200 shadow mb-2.5 flex flex-row flex-wrap items-center gap-[18px] max-md:gap-2.5 px-3.5 py-2.5 text-sm" id="kg-meta">Loading...</div>
-<div class="card bg-base-200 shadow overflow-hidden">
-  <div class="card-body p-0">
-    <div id="kg-canvas" class="relative overflow-hidden h-[620px] max-md:h-[460px] max-[480px]:h-[380px]">
-        <div class="kg-loading"><span class="kg-spinner"></span> Loading vis-network...</div>
+{# The meta bar, the legend, the canvas slot, the empty and failed-read states
+   and every node's detail card are one fragment, rendered by
+   ion.web.ui.knowledge_graph. They were six innerHTML writes, so every
+   frontend/ion-pages.css rule for .kg-legend*, .kg-loading, #kg-meta strong
+   and .kg-detail* was unreachable from the stylesheet.
+
+   hx-trigger="load" keeps the shell's first paint immediate and the read in
+   its own request, which is what the fetch it replaces already did. #}
+<div id="kg-panel"
+     hx-get="/ui/knowledge-graph"
+     hx-trigger="load"
+     hx-swap="innerHTML"
+     hx-include="#kg-seed, #kg-closed, #kg-limit">
+  <div class="card bg-base-200 shadow mb-2.5 px-3.5 py-2.5 text-sm">
+    <div class="text-center p-10 text-base-content/60">
+      <span class="loading loading-spinner loading-sm text-primary"></span>
+      Loading graph...
     </div>
   </div>
 </div>
-<div id="kg-detail" class="card bg-base-200 shadow mt-3.5 p-4 min-h-[60px] text-sm kg-detail"></div>
 
 </div><!-- /ion-tw inner -->
 </div><!-- /ion-tw -->
@@ -48,122 +79,135 @@
 {% block scripts %}
 <script nonce="{{ csp_nonce }}" src="/static/js/vis-network.min.js"></script>
 <script nonce="{{ csp_nonce }}">
-const KG_API = '/api/knowledge-graph';
-let kgNetwork = null;
-let kgData = null;
+(function() {
+    'use strict';
 
-function kgEsc(s){if(s==null)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+    var KG_API = '/api/knowledge-graph';
+    var PANEL_ID = 'kg-panel';
+    var network = null;
 
-async function kgLoad() {
-    const limit = document.getElementById('kg-limit').value;
-    const closed = document.getElementById('kg-closed').checked ? '&include_closed=true' : '';
-    const seed = document.getElementById('kg-seed').value.trim();
-    const seedQs = seed ? '&seed=' + encodeURIComponent(seed) : '';
-    document.getElementById('kg-meta').textContent = 'Loading graph...';
-    document.getElementById('kg-canvas').innerHTML = '<div class="kg-loading"><span class="kg-spinner"></span> Building graph...</div>';
-    try {
-        const r = await fetch(`${KG_API}?case_limit=${limit}${closed}${seedQs}`);
-        if (!r.ok) throw new Error('Graph request failed');
-        kgData = await r.json();
-        kgRender(kgData);
-    } catch (e) {
-        document.getElementById('kg-canvas').innerHTML = `<div class="kg-loading text-[var(--sev-critical,#f85149)]">${kgEsc(e.message)}</div>`;
-    }
-}
-
-function kgRenderMeta(stats) {
-    const counts = stats.by_type || {};
-    const types = ['case', 'alert', 'observable', 'host', 'user', 'technique'];
-    const colors = {
-        case: '#58a6ff', alert: '#d29922', observable: '#3fb950',
-        host: '#79c0ff', user: '#ffa657', technique: '#bc8cff', actor: '#f85149',
-    };
-    let legend = '';
-    for (const t of types) {
-        if (!counts[t]) continue;
-        legend += `<span class="kg-legend-item"><span class="kg-legend-dot" data-ion-style="background:${colors[t]}"></span>${kgEsc(t)} (${counts[t]})</span>`;
-    }
-    document.getElementById('kg-meta').innerHTML = `
-        <span><strong>${stats.total_nodes||0}</strong> nodes</span>
-        <span><strong>${stats.total_edges||0}</strong> edges</span>
-        <span class="kg-legend">${legend}</span>
-    `;
-}
-
-function kgRender(data) {
-    kgRenderMeta(data.stats || {});
-    if (!data.nodes || !data.nodes.length) {
-        document.getElementById('kg-canvas').innerHTML = `<div class="kg-loading">No data to graph. Open some cases and link observables, then come back.</div>`;
-        return;
+    function query() {
+        var limit = document.getElementById('kg-limit').value;
+        var closed = document.getElementById('kg-closed').checked ? '&include_closed=true' : '';
+        var seed = document.getElementById('kg-seed').value.trim();
+        return '?case_limit=' + encodeURIComponent(limit) + closed +
+               (seed ? '&seed=' + encodeURIComponent(seed) : '');
     }
 
-    const container = document.getElementById('kg-canvas');
-    container.replaceChildren();
+    // Reveals one of the cards the fragment rendered. Nothing is assembled
+    // here: the h3, the meta line and the link are server-rendered markup and
+    // this only decides which of them is visible.
+    function showDetail(id) {
+        var panel = document.getElementById('kg-detail');
+        if (!panel) return;
+        panel.querySelectorAll('.kg-detail-node').forEach(function(el) {
+            el.classList.add('hidden');
+        });
+        // CSS.escape because a node id carries a host name or a user name
+        // straight from the database, and a quote in one would otherwise
+        // break the selector rather than fail to match.
+        var card = panel.querySelector(
+            '.kg-detail-node[data-kg-node="' + CSS.escape(id) + '"]'
+        );
+        var hint = document.getElementById('kg-detail-hint');
+        var missing = document.getElementById('kg-detail-missing');
+        if (hint) hint.classList.add('hidden');
+        // The graph and the detail cards come from two reads of the same data,
+        // so a node can be in one and not the other. Say so rather than leave
+        // the placeholder up, which reads as the click having done nothing.
+        if (missing) missing.classList.toggle('hidden', !!card);
+        if (card) card.classList.remove('hidden');
+        panel.classList.remove('empty');
+    }
 
-    const nodes = new vis.DataSet(data.nodes.map(n => ({
-        id: n.id,
-        label: n.label,
-        title: n.label,
-        color: n.color,
-        shape: n.shape,
-        font: { color: '#c9d1d9', size: 12, face: 'Inter, sans-serif' },
-        borderWidth: 2,
-    })));
-    const edges = new vis.DataSet(data.edges.map((e, i) => ({
-        id: 'e' + i,
-        from: e.from,
-        to: e.to,
-        label: e.label || '',
-        color: { color: '#484f58', highlight: '#58a6ff' },
-        font: { color: '#8b949e', size: 10, align: 'middle' },
-        arrows: { to: { enabled: false } },
-        smooth: { type: 'continuous' },
-    })));
+    function clearDetail() {
+        var panel = document.getElementById('kg-detail');
+        if (!panel) return;
+        panel.querySelectorAll('.kg-detail-node').forEach(function(el) {
+            el.classList.add('hidden');
+        });
+        var missing = document.getElementById('kg-detail-missing');
+        var hint = document.getElementById('kg-detail-hint');
+        if (missing) missing.classList.add('hidden');
+        if (hint) hint.classList.remove('hidden');
+        panel.classList.add('empty');
+    }
 
-    const options = {
-        physics: {
-            forceAtlas2Based: { gravitationalConstant: -55, springLength: 90 },
-            solver: 'forceAtlas2Based',
-            stabilization: { iterations: 200 },
-        },
-        interaction: { hover: true, tooltipDelay: 150 },
-        nodes: { borderWidthSelected: 3 },
-    };
+    function render(container, data) {
+        container.replaceChildren();
 
-    kgNetwork = new vis.Network(container, { nodes, edges }, options);
+        var nodes = new vis.DataSet((data.nodes || []).map(function(n) {
+            return {
+                id: n.id,
+                label: n.label,
+                title: n.label,
+                color: n.color,
+                shape: n.shape,
+                font: { color: '#c9d1d9', size: 12, face: 'Inter, sans-serif' },
+                borderWidth: 2
+            };
+        }));
+        var edges = new vis.DataSet((data.edges || []).map(function(e, i) {
+            return {
+                id: 'e' + i,
+                from: e.from,
+                to: e.to,
+                label: e.label || '',
+                color: { color: '#484f58', highlight: '#58a6ff' },
+                font: { color: '#8b949e', size: 10, align: 'middle' },
+                arrows: { to: { enabled: false } },
+                smooth: { type: 'continuous' }
+            };
+        }));
 
-    kgNetwork.on('selectNode', (params) => {
-        const id = params.nodes[0];
-        const node = (kgData.nodes || []).find(n => n.id === id);
-        if (node) kgRenderDetail(node);
+        var options = {
+            physics: {
+                forceAtlas2Based: { gravitationalConstant: -55, springLength: 90 },
+                solver: 'forceAtlas2Based',
+                stabilization: { iterations: 200 }
+            },
+            interaction: { hover: true, tooltipDelay: 150 },
+            nodes: { borderWidthSelected: 3 }
+        };
+
+        network = new vis.Network(container, { nodes: nodes, edges: edges }, options);
+        network.on('selectNode', function(params) { showDetail(params.nodes[0]); });
+        network.on('deselectNode', clearDetail);
+        clearDetail();
+    }
+
+    // The fragment decides whether there is anything to draw. No canvas means
+    // it rendered the empty state or said the read failed, and fetching the
+    // same data a second time to reach the same conclusion would only produce
+    // a second, differently worded message.
+    function load() {
+        var container = document.getElementById('kg-canvas');
+        if (!container) return;
+        fetch(KG_API + query()).then(function(r) {
+            if (!r.ok) throw new Error('Graph request failed: ' + r.status);
+            return r.json();
+        }).then(function(data) {
+            render(container, data);
+        }).catch(function(e) {
+            console.error(e);
+            // The wording is the fragment's, not this message's. The old code
+            // printed e.message into the page, which put request internals in
+            // front of an analyst and said nothing useful about what to do.
+            var err = document.getElementById('kg-graph-error');
+            if (err) err.classList.remove('hidden');
+            container.classList.add('hidden');
+        });
+    }
+
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        var target = (e.detail && e.detail.target) || e.target;
+        if (target && target.id === PANEL_ID) load();
     });
-    kgNetwork.on('deselectNode', () => kgClearDetail());
 
-    kgClearDetail();
-}
-
-function kgRenderDetail(node) {
-    const det = document.getElementById('kg-detail');
-    det.classList.remove('empty');
-    let meta = `Type: ${kgEsc(node.type)}`;
-    if (node.severity) meta += ` &middot; Severity: ${kgEsc(node.severity)}`;
-    if (node.status) meta += ` &middot; Status: ${kgEsc(node.status)}`;
-    if (node.threat_level) meta += ` &middot; Threat: ${kgEsc(node.threat_level)}`;
-    if (node.obs_type) meta += ` &middot; ${kgEsc(node.obs_type)}`;
-    let link = '';
-    if (node.url) {
-        link = `<a class="kg-detail-link" href="${kgEsc(node.url)}">Open in detail view &rarr;</a>`;
-    }
-    det.innerHTML = `<h3>${kgEsc(node.label)}</h3><div class="kg-detail-meta">${meta}</div>${link}`;
-}
-
-function kgClearDetail() {
-    const det = document.getElementById('kg-detail');
-    det.classList.add('empty');
-    det.innerHTML = 'Select a node to see details. Drag to pan, scroll to zoom.';
-}
-
-document.addEventListener('DOMContentLoaded', kgLoad);
-document.getElementById('kg-seed').addEventListener('keydown', (e) => { if (e.key === 'Enter') kgLoad(); });
+    // A rescue for the ordering where htmx has already swapped by the time
+    // this script runs. It is a no-op on the normal path, because the slot
+    // holds the loading placeholder and has no canvas in it yet.
+    load();
+})();
 </script>
 {% endblock %}
