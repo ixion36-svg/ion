@@ -228,7 +228,7 @@
    */
   --color-ion-cyan:  #155e75;  /* was #0b7c99: measured 4.46:1 on a tinted card, 0.04 under the floor. #0e7490 is 5.36:1 and matches --primary. */
   --color-ion-iris:  #5a49d6;
-  --color-ion-amber: #a56c00;
+  --color-ion-amber: #854d0e;  /* #a56c00 measured 3.64:1 on a card */
   --color-ion-lime:  #1c7a3a;
   --color-ion-coral: #c02828;
 }

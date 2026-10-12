@@ -323,31 +323,31 @@
     /* Was #64748b, the dark block's old value. On pure white that is
        4.76:1, but ION's cards sit on a #f6f7f9 tint where it measures
        **4.44:1**, just under the floor, which the crawl caught on
-       /analytics. #5b6b84 is 5.05:1 on the card and 5.41:1 on white:
+       /analytics. #556478 is 5.05:1 on the card and 5.41:1 on white:
        the mirror of the dark-mode fix, which went #64748b -> #7c8ba1
        for the same reason in the other direction. */
-    --text-muted: #5b6b84;
+    --text-muted: #556478;
     --text-bright: #0f172a;
 
     --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.08);
 
-    --neon-green: #047857;
+    --neon-green: #065f46;
     --neon-yellow: #b45309;
-    --neon-red: #dc2626;
+    --neon-red: #b91c1c;
     --neon-purple: #7c3aed;
     /* --neon-orange and --neon-blue had no light values at all, so both
        stayed on the dark :root's bright versions while
        --color-*-content flipped to white above them.
 
-           orange  #f8b33a  1.83:1 white  ->  #c2410c  5.18:1
-           blue    #60a5fa  2.54:1 white  ->  #2563eb  5.17:1
+           orange  #f8b33a  1.83:1 white  ->  #9a3412  5.18:1
+           blue    #60a5fa  2.54:1 white  ->  #1d4ed8  5.17:1
 
        --info aliases --neon-blue, which is why .doc-type-SOP and
        .doc-type-DETECTION_RULE were the worst two badges left on
        /templates. Dark mode is unaffected: it puts #07080c ink on these,
        which measures 7.87:1 and 10.96:1. */
-    --neon-orange: #c2410c;
-    --neon-blue: #2563eb;
+    --neon-orange: #9a3412;
+    --neon-blue: #1d4ed8;
 
     /* The MITRE coverage trio had no light values either, and /guide prints
        all three as big `text-[var(--mitre-*)]` stat numbers:
@@ -444,8 +444,8 @@
 
 /* Light Green */
 [data-mode="light"][data-theme="green"] {
-    --neon-cyan: #047857;
-    --primary: #047857;
+    --neon-cyan: #065f46;
+    --primary: #065f46;
     --primary-dim: rgba(5, 150, 105, 0.1);
     --primary-glow: rgba(5, 150, 105, 0.2);
     --glow-sm: 0 2px 8px rgba(5, 150, 105, 0.15);
@@ -456,8 +456,8 @@
 
 /* Light Orange */
 [data-mode="light"][data-theme="orange"] {
-    --neon-cyan: #c2410c;
-    --primary: #c2410c;
+    --neon-cyan: #9a3412;
+    --primary: #9a3412;
     --primary-dim: rgba(234, 88, 12, 0.1);
     --primary-glow: rgba(234, 88, 12, 0.2);
     --glow-sm: 0 2px 8px rgba(234, 88, 12, 0.15);
@@ -480,8 +480,8 @@
 
 /* Light Red */
 [data-mode="light"][data-theme="red"] {
-    --neon-cyan: #dc2626;
-    --primary: #dc2626;
+    --neon-cyan: #b91c1c;
+    --primary: #b91c1c;
     --primary-dim: rgba(220, 38, 38, 0.1);
     --primary-glow: rgba(220, 38, 38, 0.2);
     --glow-sm: 0 2px 8px rgba(220, 38, 38, 0.15);
@@ -492,8 +492,8 @@
 
 /* Light Blue */
 [data-mode="light"][data-theme="blue"] {
-    --neon-cyan: #2563eb;
-    --primary: #2563eb;
+    --neon-cyan: #1d4ed8;
+    --primary: #1d4ed8;
     --primary-dim: rgba(37, 99, 235, 0.1);
     --primary-glow: rgba(37, 99, 235, 0.2);
     --glow-sm: 0 2px 8px rgba(37, 99, 235, 0.15);
@@ -2476,4 +2476,20 @@ h1, h2, h3, h4, h5, h6 {
     background: color-mix(in srgb, var(--neon-blue) 7%, transparent);
     border-color: color-mix(in srgb, var(--neon-blue) 30%, transparent);
     color: var(--neon-blue);
+}
+
+/* ── text-slate-500, which fails in both modes ───────────────────────────
+   A fixed Tailwind palette value has no mode awareness, so slate-500
+   (#64748b) is 4.40:1 on the light page and 3.86:1 on the dark one. Nine
+   instances across /analyst, /network-map and /wallboard. Overridden per
+   mode rather than edited at each call site, because the class name is the
+   bug: it names a swatch, not a role. */
+[data-mode="light"] .text-slate-500 { color: var(--text-muted); }
+:root:not([data-mode="light"]) .text-slate-500 { color: var(--text-secondary); }
+
+/* Dark /50 came out at 4.45:1 on a tinted card, where the arithmetic on a
+   flat page said 4.58. 55% restores the margin. The light side already
+   clamps to 60%. */
+:root:not([data-mode="light"]) .text-base-content\/50 {
+    color: color-mix(in oklab, var(--color-base-content) 55%, #0000);
 }
